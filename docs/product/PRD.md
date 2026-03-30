@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Product / feature name | **SeaRise Europe** *(working title; to be confirmed)* |
-| Owner | **Artem** *(assumed portfolio owner)* |
+| Owner | **Artem Sem** |
 | Status | Draft |
 | Version | 0.1 |
 | Last updated | 2026-03-30 |
