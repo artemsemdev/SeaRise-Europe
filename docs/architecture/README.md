@@ -19,7 +19,8 @@ These documents exist to:
 | `docs/product/PRD.md` | **Primary source of truth.** All functional requirements (FR-xxx), business rules (BR-xxx), non-functional requirements (NFR-xxx), and acceptance criteria (AC-xxx) come from here. Architecture decisions reference PRD IDs explicitly. |
 | `docs/product/VISION.md` | Establishes strategic pillars (scientific honesty, data transparency, engineering quality) that constrain architectural choices. |
 | `docs/product/PERSONAS.md` | Informs frontend architecture priorities (P-01: clear result states; P-02: transparent methodology; P-03: graceful error handling and real data). |
-| `docs/product/ROADMAP.md` | Defines Phase 0 (data pipeline + infrastructure) as a prerequisite for Phase 1 (MVP). Architecture is structured to respect this dependency. |
+| `docs/product/ROADMAP.md` | Pointer to [`docs/delivery/ROADMAP.md`](../delivery/ROADMAP.md). The delivery roadmap defines Phase 0 (data pipeline + infrastructure) as a prerequisite for Phase 1 (MVP). Architecture is structured to respect this dependency. |
+| `docs/delivery/ROADMAP.md` | **Delivery roadmap.** Epic breakdown (01–08), dependency map, critical path, MVP definition of done, and story-level implementation plans. Translates architecture into sequenced, implementation-ready work. |
 | `docs/product/METRICS_PLAN.md` | Defines the observability and analytics requirements that shape the logging, metrics, and instrumentation design. |
 | `docs/product/CONTENT_GUIDELINES.md` | Establishes result-state copy rules and prohibited language that constrain frontend component behavior and test coverage. |
 
