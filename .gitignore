@@ -1,0 +1,44 @@
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Editor and IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+
+# Coverage and reports
+coverage/
+
+# Claude local tooling files
+# Keep Claude machine-local state out of git by default.
+.claude/
+
+# If you later want to commit shared Claude instructions, replace the
+# rule above with a more selective setup such as:
+# .claude/*
+# !.claude/commands/
+# !.claude/agents/
+# !CLAUDE.md
