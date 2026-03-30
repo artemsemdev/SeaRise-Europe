@@ -12,6 +12,8 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+.env.local
+.env.*.local
 
 # Node.js / Next.js
 node_modules/
@@ -29,16 +31,39 @@ TestResults/
 *.user
 *.suo
 
+# Python / geospatial pipeline
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.python-version
+
 # Coverage and reports
 coverage/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+blob-report/
+*.log
+
+# Infrastructure and local container overrides
+.terraform/
+*.tfstate
+*.tfstate.*
+docker-compose.override.yml
+
+# Local pipeline data and working directories
+data/raw/
+data/work/
+data/output/
+artifacts/
+tmp/
+.cache/
 
 # Claude local tooling files
 # Keep Claude machine-local state out of git by default.
 .claude/
-
-# If you later want to commit shared Claude instructions, replace the
-# rule above with a more selective setup such as:
-# .claude/*
-# !.claude/commands/
-# !.claude/agents/
-# !CLAUDE.md
