@@ -1,0 +1,69 @@
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Editor and IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# .NET
+bin/
+obj/
+TestResults/
+*.user
+*.suo
+
+# Python / geospatial pipeline
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.python-version
+
+# Coverage and reports
+coverage/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+blob-report/
+*.log
+
+# Infrastructure and local container overrides
+.terraform/
+*.tfstate
+*.tfstate.*
+docker-compose.override.yml
+
+# Local pipeline data and working directories
+data/raw/
+data/work/
+data/output/
+artifacts/
+tmp/
+.cache/
+
+# Claude local tooling files
+# Keep Claude machine-local state out of git by default.
+.claude/
