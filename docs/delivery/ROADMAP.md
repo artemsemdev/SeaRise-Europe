@@ -144,6 +144,8 @@ Any delay on any epic delays the release. The highest-risk items on the critical
 
 ### 6.1 Blocking Open Questions (Must Resolve in Epic 01)
 
+Current proposed resolutions for these questions are collected in [17-open-question-closure-proposal.md](../architecture/17-open-question-closure-proposal.md). Epic 01 is where those proposals become approved delivery decisions.
+
 | OQ | Question | Blocks |
 |---|---|---|
 | OQ-02 | MVP scenario set (IDs, names, descriptions) | Schema seed, pipeline COG paths, API contract, frontend controls |

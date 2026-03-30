@@ -40,13 +40,15 @@ Architecture documents do not restate product decisions — they translate them 
 7. [03a-frontend-architecture.md](03a-frontend-architecture.md) — understand the frontend before writing UI code
 8. [16-geospatial-data-pipeline.md](16-geospatial-data-pipeline.md) — understand the offline pipeline before beginning Phase 0 data work
 9. [12-risks-assumptions-and-open-questions.md](12-risks-assumptions-and-open-questions.md) — understand what is blocked and what to resolve first
+10. [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md) — review the proposed closure set before converting decisions into ADRs and seed data
 
 ### For a technical reviewer or architect:
 1. [01-system-context.md](01-system-context.md)
 2. [11-architecture-decisions.md](11-architecture-decisions.md)
 3. [12-risks-assumptions-and-open-questions.md](12-risks-assumptions-and-open-questions.md)
-4. [03a-frontend-architecture.md](03a-frontend-architecture.md)
-5. [13-domain-model.md](13-domain-model.md)
+4. [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
+5. [03a-frontend-architecture.md](03a-frontend-architecture.md)
+6. [13-domain-model.md](13-domain-model.md)
 
 ### For operations and deployment:
 1. [08-deployment-topology.md](08-deployment-topology.md)
@@ -77,6 +79,7 @@ Architecture documents do not restate product decisions — they translate them 
 | 14 | [14-integration-patterns.md](14-integration-patterns.md) | Third-party integrations, retry/timeout, fallback, failure isolation | Proposed Architecture |
 | 15 | [15-performance-and-scalability.md](15-performance-and-scalability.md) | Latency budgets, bottleneck analysis, caching, concurrency | Proposed Architecture |
 | 16 | [16-geospatial-data-pipeline.md](16-geospatial-data-pipeline.md) | Offline data pipeline: acquisition, processing, COG generation, publication | Proposed Architecture |
+| 17 | [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md) | Proposed resolutions for the architecture open questions before ADR conversion | Proposal for review |
 
 ---
 
@@ -130,6 +133,8 @@ All four optional documents (13–16) were created because:
 - Technical risks
 - Architecture assumptions
 - Contradictions between repository state and product intent
+
+Use [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md) as the companion document when you want the **recommended closure set** rather than the unresolved-question inventory.
 
 The five blocking questions **must be resolved before Phase 1 implementation begins**. They are documented in detail in document 12 and referenced throughout the architecture where relevant.
 

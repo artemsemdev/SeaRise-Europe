@@ -2,6 +2,7 @@
 
 > **Status:** Proposed Architecture
 > **Source of truth:** PRD v0.1 — all FR, BR, NFR, and OQ references below are from `docs/product/PRD.md`
+> **Companion decision baseline:** For the current proposed resolutions of the referenced open questions, see [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
 
 ---
 

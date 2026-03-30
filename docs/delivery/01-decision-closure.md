@@ -15,6 +15,8 @@
 
 Resolve all blocking open questions and produce a documented decision baseline that unblocks all downstream implementation epics.
 
+The current recommended starting point for that baseline is [17-open-question-closure-proposal.md](../architecture/17-open-question-closure-proposal.md). This epic still owns converting that proposal into approved ADRs, seed data, and final committed decisions.
+
 ---
 
 ## 2  Why This Epic Exists
@@ -82,6 +84,7 @@ This epic exists specifically to close the following questions. Each is mapped t
 | ---------------------------------------------------------- | ---------------------------------- |
 | `docs/architecture/11-architecture-decisions.md`           | ADR records for each decision      |
 | `docs/architecture/12-risks-assumptions-and-open-questions.md` | Blocking question definitions  |
+| `docs/architecture/17-open-question-closure-proposal.md`   | Proposed closure set and rationale |
 | `docs/architecture/05-data-architecture.md`                | Schema seed values                 |
 | `docs/architecture/16-geospatial-data-pipeline.md`         | Methodology definition             |
 | `docs/architecture/13-domain-model.md`                     | Entity definitions                 |
