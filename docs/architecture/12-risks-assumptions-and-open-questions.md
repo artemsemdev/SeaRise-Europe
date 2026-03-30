@@ -2,6 +2,7 @@
 
 > **Status:** Confirmed (known state) | Proposed Architecture (mitigations)
 > **Note:** This document consolidates all blocking open questions from the PRD with their architectural impact, tracks working assumptions that must be validated before Phase 1 launch, and documents risks with mitigations.
+> **Companion document:** For a reviewable recommended closure set, see [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
 
 ---
 

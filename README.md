@@ -15,13 +15,15 @@ The repository is currently in the planning and architecture phase. There is no 
 1. [Product vision](docs/product/VISION.md)
 2. [Product requirements](docs/product/PRD.md)
 3. [Architecture index](docs/architecture/README.md)
+4. [Delivery roadmap](docs/delivery/ROADMAP.md)
 
 ## Repository Structure
 
 ```text
 docs/
-  product/         Product vision, PRD, roadmap, personas, metrics, content rules
+  product/         Product vision, PRD, personas, metrics, content rules
   architecture/    System context, containers, components, API, data, security, ops
+  delivery/        Delivery roadmap, epic breakdowns (01-08), story-level implementation plans
 ```
 
 ## What This Project Is
