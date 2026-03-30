@@ -6,11 +6,19 @@
 |---|---|
 | Product / feature name | **SeaRise Europe** *(working title; to be confirmed)* |
 | Owner | **Artem Sem** |
+| Stakeholders / Reviewers | Design, Engineering, QA, Solution Architecture *(named reviewers to be confirmed)* |
 | Status | Draft |
 | Version | 0.1 |
 | Last updated | 2026-03-30 |
+| Target release | TBD |
 | Platforms | Responsive web application |
 | Short description | Europe-only, portfolio-first web application that lets a user enter a location and view scenario-based coastal sea-level exposure on an interactive map across selected future time horizons |
+
+**Version History**
+
+| Version | Date | Author | Summary of Changes |
+|---|---|---|---|
+| 0.1 | 2026-03-30 | Artem Sem | Initial draft |
 
 **Related links / references**
 
@@ -417,7 +425,7 @@ This PRD does **not** cover the following for MVP:
 
 **BR-004** Coastal analysis is performed only for locations within a configured coastal analysis zone. The exact definition of that zone is an open question and must be documented before implementation.
 
-**BR-005** The default scenario and default time horizon are configuration-driven. Final defaults are not yet specified.
+**BR-005** The default scenario and default time horizon are configuration-driven. Final defaults are an open question (OQ-03) and must be confirmed before the scenario and time-horizon controls are implemented.
 
 **BR-006** Candidate locations returned from geocoding are displayed in provider-ranked order.
 
@@ -533,81 +541,107 @@ The planned implementation assumes ASP.NET Core for the backend API, Azure Conta
 ## 13. Non-Functional Requirements
 
 ### Performance
-**NFR-001** Initial app shell load on a modern desktop browser over broadband should reach interactive state within **4 seconds p75**.  
-**NFR-002** Geocoding response time should be **2.5 seconds p95** or better, excluding upstream provider outages.  
-**NFR-003** Exposure assessment response time should be **3.5 seconds p95** or better for normal in-scope requests.  
-**NFR-004** Scenario or time-horizon switches after the initial result should update the visible result within **1.5 seconds p95** when required assets are already available.  
+**NFR-001** Initial app shell load on a modern desktop browser over broadband shall reach interactive state within **4 seconds p95**.  
+**NFR-002** Geocoding response time shall be **2.5 seconds p95** or better, excluding upstream provider outages.
+**NFR-003** Exposure assessment response time shall be **3.5 seconds p95** or better for normal in-scope requests.
+**NFR-004** Scenario or time-horizon switches after the initial result shall update the visible result within **1.5 seconds p95** when required assets are already available.
 
 ### Security
-**NFR-005** All client-server communication must use HTTPS.  
-**NFR-006** No secrets may be embedded in client-side source.  
-**NFR-007** Raw user-entered addresses must not be stored by default.  
+**NFR-005** All client-server communication must use HTTPS.
+**NFR-006** No secrets may be embedded in client-side source.
+**NFR-007** Raw user-entered addresses must not be stored by default.
+
+### Browser Support
+**NFR-008** The application must be fully functional in the two most recent stable releases of Chrome, Firefox, Safari, and Edge at the time of MVP launch.
 
 ### Reliability / Availability
-**NFR-008** Target availability for the public MVP is **99.5% monthly**, excluding planned maintenance.  
-**NFR-009** The system must fail gracefully by returning clear user-visible error or unavailable states rather than blank or broken UI.  
-**NFR-010** The deployed backend services must expose health/readiness endpoints for operations monitoring.  
+**NFR-009** Target availability for the public MVP is **99.5% monthly**, excluding planned maintenance.
+**NFR-010** The system must fail gracefully by returning clear user-visible error or unavailable states rather than blank or broken UI.
+**NFR-011** The deployed backend services must expose health/readiness endpoints for operations monitoring.
 
 ### Observability / Logging
-**NFR-011** The backend must emit structured logs for geocoding, assessment, errors, and result-state generation.  
-**NFR-012** Assessment requests must include correlation identifiers in logs.  
-**NFR-013** Logs must be sufficient to distinguish geocoding failures, validation failures, data-unavailable states, and internal service errors.  
+**NFR-012** The backend must emit structured logs for geocoding, assessment, errors, and result-state generation.
+**NFR-013** Assessment requests must include correlation identifiers in logs.
+**NFR-014** Logs must be sufficient to distinguish geocoding failures, validation failures, data-unavailable states, and internal service errors.
 
 ### Accessibility
-**NFR-014** Core MVP flows should meet **WCAG 2.2 AA** intent for keyboard access, contrast, labeling, and non-color-dependent communication.  
-**NFR-015** Every result shown visually on the map must also have a text equivalent in the summary panel.  
+**NFR-015** Core MVP flows shall meet **WCAG 2.2 AA** criteria for keyboard access, color contrast, labeling, and non-color-dependent communication.
+**NFR-016** Every result shown visually on the map must also have a text equivalent in the summary panel.
 
 ### Localization
-**NFR-016** MVP UI is English only.  
-**NFR-017** UI copy should be stored in a way that supports later localization without major UI rewrites.  
+**NFR-017** MVP UI is English only.
+**NFR-018** UI copy shall be stored in a way that supports later localization without major UI rewrites.
 
 ### Scalability
-**NFR-018** Application services should be stateless where practical so they can scale horizontally if traffic increases.  
-**NFR-019** Large geospatial assets should be stored and served in a way that does not require full-file transfer for each map interaction.  
+**NFR-019** Application services shall be stateless where practical so they can scale horizontally if traffic increases.
+**NFR-020** Large geospatial assets shall be stored and served in a cloud-optimized format that does not require full-file transfer for each map interaction (e.g., COG or PMTiles).
 
 ### Maintainability
-**NFR-020** Methodology versioning must be explicit and visible in both the UI and service outputs.  
-**NFR-021** The data-processing workflow must be reproducible and documented outside the UI so that layer generation can be re-run without manual guesswork.  
-**NFR-022** MVP deployment should favor managed services and low operational complexity over infrastructure that is unnecessary for portfolio goals.
+**NFR-021** Methodology versioning must be explicit and visible in both the UI and service outputs.
+**NFR-022** The data-processing workflow must be reproducible and documented outside the UI so that layer generation can be re-run without manual guesswork.
+**NFR-023** MVP deployment shall use managed services and low operational complexity; Kubernetes or equivalent orchestration is not required for MVP.
 
 ---
 
 ## 14. Success Metrics
 
 ### Product and User Metrics
-1. **Search-to-result completion rate:** At least **85%** of valid in-scope QA test addresses return a completed result without manual retry.
-2. **First-use task completion:** At least **90%** of pilot users can search a location and interpret the returned state within **2 minutes** without external explanation.
-3. **Result comprehension quality:** In moderated testing, at least **80%** of users correctly distinguish between:
+
+1. **Search-to-result completion rate** — At least **85%** of valid in-scope QA test addresses return a completed result without manual retry.
+   *How measured:* QA regression run using a defined set of ≥20 representative in-scope European addresses. Pass/fail recorded per address. Measured before MVP launch.
+
+2. **First-use task completion** — At least **90%** of pilot users can search a location and interpret the returned state within **2 minutes** without external explanation.
+   *How measured:* Moderated or unmoderated usability sessions (minimum 5 participants). Facilitator records task success and time-on-task. Measured before or at launch.
+
+3. **Result comprehension quality** — In moderated testing, at least **80%** of participants correctly identify all four result states:
    - Unsupported Geography,
    - Out of Scope,
    - No Modeled Coastal Exposure Detected,
    - Modeled Coastal Exposure Detected.
+   *How measured:* Comprehension check during usability sessions using labeled screenshots or live application. Minimum 5 participants. Measured before launch.
 
 ### Performance and Reliability Metrics
-4. **Search-to-first-result latency:** p95 time from candidate selection to visible result is **5 seconds or less**.
-5. **Control-switch latency:** p95 time from scenario/horizon change to visible updated result is **1.5 seconds or less** after initial result.
-6. **Unhandled error rate:** Less than **2%** of sessions end in an unhandled client-visible failure.
+
+4. **Search-to-first-result latency** — p95 time from candidate selection to visible result is **5 seconds or less**.
+   *How measured:* Backend structured logs (NFR-012) and browser performance timing. Evaluated against a staging environment representative of production asset sizes. Measured before launch and monitored post-launch.
+
+5. **Control-switch latency** — p95 time from scenario/horizon change to visible updated result is **1.5 seconds or less** after initial result (see NFR-004).
+   *How measured:* Same instrumentation as Metric 4. Measured with pre-cached initial result.
+
+6. **Unhandled error rate** — Less than **2%** of sessions end in an unhandled client-visible failure.
+   *How measured:* Frontend error tracking (tool TBD, see OQ-10). Percentage of sessions with an unhandled exception reaching the user. Monitored continuously post-launch.
 
 ### Trust / Transparency Metrics
-7. **Source visibility:** **100%** of displayed results include visible source attribution and methodology version.
-8. **Copy integrity:** **0** approved QA findings where the UI copy overstates certainty beyond the underlying methodology.
+
+7. **Source visibility** — **100%** of displayed results include visible source attribution and methodology version.
+   *How measured:* QA checklist review (see AC-014, AC-013). Verified for all result states across all tested scenario/horizon combinations. Measured before launch.
+
+8. **Copy integrity** — **0** approved QA findings where the UI copy overstates certainty beyond the underlying methodology.
+   *How measured:* Copy review against approved disclaimer and methodology text. Conducted by product owner and at least one independent reviewer before launch.
 
 ### Portfolio / Demo Readiness Metrics
-9. **Demo pass rate:** The application can complete scripted demo flows for at least **3 coastal European locations** and **3 inland European locations** without manual data manipulation.
-10. **Reviewer clarity:** In portfolio review sessions, technical reviewers can identify the app’s core value, limitations, and architecture scope within a **3-minute** walkthrough.
+
+9. **Demo pass rate** — The application can complete scripted demo flows for at least **3 coastal European locations** and **3 inland European locations** without manual data manipulation.
+   *How measured:* Scripted walkthrough against a defined demo script. Executed on the production-like demo deployment by the product owner. Measured before declaring demo readiness.
+
+10. **Reviewer clarity** — In portfolio review sessions, technical reviewers can identify the app’s core value, limitations, and architecture scope within a **3-minute** walkthrough.
+    *How measured:* Informal assessment during portfolio or interview sessions. Qualitative pass/fail recorded by the presenter based on reviewer questions and stated understanding.
 
 ---
 
 ## 15. Risks, Assumptions, and Dependencies
 
 ### Risks
-1. **False precision risk:** Users may interpret model outputs as parcel-level certainty if copy or visuals are too strong.
-2. **Data-resolution risk:** Public elevation and projection datasets may be too coarse for certain coastlines or urban contexts.
-3. **Methodology risk:** Simplified exposure logic may not fully capture hydrological connectivity, defenses, or local conditions.
-4. **Provider risk:** Public geocoding or map services may impose rate limits or usage constraints.
-5. **Performance risk:** Large geospatial assets may degrade result latency or map responsiveness.
-6. **Attribution/licensing risk:** Incorrect or incomplete attribution could create compliance problems.
-7. **Scope creep risk:** Requests for global coverage, annual projections, 3D simulation, or inland hazards could dilute MVP quality.
+
+| # | Risk | Likelihood | Impact | Mitigation |
+|---|------|-----------|--------|-----------|
+| R-01 | **False precision risk:** Users may interpret model outputs as parcel-level certainty if copy or visuals are too strong. | High | High | Enforce disclaimer (FR-024), prohibit definitive copy (FR-025), include limitations in methodology panel (FR-033), and conduct copy review before launch (see Success Metric #8). |
+| R-02 | **Data-resolution risk:** Public elevation and projection datasets may be too coarse for certain coastlines or urban contexts. | Medium | Medium | Call out resolution limitations explicitly in the methodology panel. Return **Data Unavailable** rather than producing a result where data is known to be inadequate. Validate against a representative set of coastline types during QA. |
+| R-03 | **Methodology risk:** Simplified exposure logic may not fully capture hydrodynamic connectivity, flood defenses, or local conditions. | Medium | High | Document all methodology assumptions and version them (NFR-021). The methodology panel (FR-033) must state what the model does and does not account for. Avoid any result copy that implies full physical simulation. |
+| R-04 | **Provider risk:** Public geocoding or map services may impose rate limits or usage constraints that affect demo reliability. | Medium | Medium | Finalize production-grade geocoding strategy before launch (Open Question #6, Dependency #2). Keep Nominatim as a development-only fallback. Select a tile provider with portfolio-appropriate SLAs. |
+| R-05 | **Performance risk:** Large geospatial assets may degrade result latency or map responsiveness beyond NFR targets. | Medium | Medium | Store and serve assets in cloud-optimized format (NFR-020). Validate against NFR-001 through NFR-004 in a production-like environment before demo readiness. |
+| R-06 | **Attribution/licensing risk:** Incorrect or incomplete attribution could create compliance problems with data providers. | Low | High | Maintain a tracked list of required attribution strings per provider. AC-014 verifies attribution is visible. Complete licensing review for all data sources before launch (Dependency #1). |
+| R-07 | **Scope creep risk:** Requests for global coverage, annual projections, 3D simulation, or inland hazards could dilute MVP quality. | Medium | High | Non-goals (Section 5) are explicit and versioned. Route enhancement requests to Future Considerations (Section 7). Reinforce scope boundaries with all stakeholders before implementation begins. |
 
 ### Assumptions
 1. The product is portfolio-first and not initially a commercial SaaS offering.
@@ -635,18 +669,22 @@ The planned implementation assumes ASP.NET Core for the backend API, Azure Conta
 
 ## 16. Open Questions
 
-1. What is the final product name?
-2. What exact scenario set should MVP expose to users?
-3. What should the default scenario and default time horizon be?
-4. How is the coastal analysis zone defined for MVP?
-5. What exact methodology determines “Modeled Coastal Exposure Detected” for a point near a boundary?
-6. Will the MVP use a self-hosted geocoder, a managed provider, or a development-only public geocoder during early stages?
-7. What base map and tile provider will be used in production-like demo environments?
-8. Will the app expose shareable URLs or deep links in MVP?
-9. What dataset refresh cadence is expected after initial launch?
-10. Should analytics be enabled in MVP, and if yes, what consent/privacy model applies?
-11. Will the app expose raw coordinates to the user in addition to the display label?
-12. Is tablet/mobile visual parity required, or is desktop-first sufficient provided all core flows work?
+Questions marked **Blocking** must be resolved before implementation of the affected area begins. Questions marked **Pre-launch** must be resolved before public availability.
+
+| # | Question | Priority | Owner | Target Resolution |
+|---|----------|----------|-------|-------------------|
+| OQ-01 | What is the final product name? | SeaRise Europe | Artem Sem | Done |
+| OQ-02 | What exact scenario set should MVP expose to users? | **Blocking** — required for FR-014 and scenario selector implementation | TBD | TBD |
+| OQ-03 | What should the default scenario and default time horizon be? | **Blocking** — required for FR-016 and BR-005 | TBD | TBD |
+| OQ-04 | How is the coastal analysis zone defined for MVP? | **Blocking** — required for FR-011, FR-012, and BR-004 | TBD | TBD |
+| OQ-05 | What exact methodology determines “Modeled Coastal Exposure Detected” for a point near a boundary? | **Blocking** — required for BR-011 and assessment implementation | TBD | TBD |
+| OQ-06 | Will the MVP use a self-hosted geocoder, a managed provider, or a development-only public geocoder? | **Blocking** — required for FR-004 and production readiness | TBD | TBD |
+| OQ-07 | What base map and tile provider will be used in production-like demo environments? | Pre-launch | TBD | TBD |
+| OQ-08 | Will the app expose shareable URLs or deep links in MVP? | Pre-launch | TBD | TBD |
+| OQ-09 | What dataset refresh cadence is expected after initial launch? | Pre-launch | TBD | TBD |
+| OQ-10 | Should analytics be enabled in MVP, and if yes, what consent and privacy model applies? | Pre-launch | TBD | TBD |
+| OQ-11 | Will the app expose raw coordinates to the user in addition to the display label? | Pre-launch | TBD | TBD |
+| OQ-12 | Is tablet/mobile visual parity required, or is desktop-first sufficient provided all core flows work? | Pre-launch | TBD | TBD |
 
 ---
 
@@ -761,15 +799,48 @@ The planned implementation assumes ASP.NET Core for the backend API, Azure Conta
 **When** the user activates reset  
 **Then** the marker, overlay, and result state are cleared and the UI returns to the initial empty state.
 
-**AC-021** *(FR-042, BR-016)*  
-**Condition:** Inspect application behavior and configured storage/logging behavior for default MVP operation.  
-**Expected Result:** Raw entered address strings are not persisted beyond request processing by default.
+**AC-021** *(FR-042, BR-016)*
+**Given** a user has submitted a location query and an assessment has completed
+**When** the backend storage and logs are inspected under default MVP configuration
+**Then** no raw address string entered by the user is found persisted in the database or log store beyond the duration of the originating request.
 
 #### H. Accessibility
-**AC-022** *(UX / Accessibility, NFR-014, NFR-015)*  
-**Given** a keyboard-only user navigates the core flow  
-**When** the user searches, selects a candidate, changes scenario/horizon, and opens methodology  
+**AC-022** *(UX / Accessibility, NFR-015, NFR-016)*
+**Given** a keyboard-only user navigates the core flow
+**When** the user searches, selects a candidate, changes scenario/horizon, and opens methodology
 **Then** all of those actions are possible without requiring a mouse, and the result meaning is available as text outside the map.
+
+#### I. Map Visualization
+**AC-023** *(FR-026)*
+**Given** a user opens the application for the first time
+**When** the page finishes loading
+**Then** the map is visible and centered on a Europe-focused view before any search is performed.
+
+**AC-024** *(FR-027)*
+**Given** the map is displayed
+**When** the user drags or pinches the map, or uses scroll/zoom controls
+**Then** the map pans and zooms accordingly and no map errors are shown.
+
+**AC-025** *(FR-028)*
+**Given** a location is selected and an exposure overlay is visible
+**When** the user inspects the map
+**Then** the selected location marker is visually distinguishable from the exposure overlay and the base map (e.g., by shape, color, or z-order).
+
+**AC-026** *(FR-029)*
+**Given** a result is displayed
+**When** the user changes the active scenario or time horizon
+**Then** the legend updates to reflect the new active layer and remains visible alongside the map.
+
+**AC-027** *(FR-030)*
+**Given** a result is displayed
+**When** the user inspects the controls
+**Then** the scenario selector and time-horizon control are both visible and interactive without requiring a reset or new search.
+
+#### J. Assessment Trigger for In-Scope Locations
+**AC-028** *(FR-013)*
+**Given** the selected location is within supported Europe geography and within the configured coastal analysis zone
+**When** validation completes
+**Then** the system automatically runs an exposure assessment for the active scenario and time horizon without requiring additional user action.
 
 ### 17.2 PRD Quality Acceptance Checklist
 
@@ -779,11 +850,15 @@ This PRD is acceptable only if all items below are true:
 - [x] Scope is bounded and consistent with MVP intent.
 - [x] Non-goals are explicit.
 - [x] Key requirements are specific, numbered, and testable.
+- [x] All FRs have corresponding acceptance criteria.
 - [x] Main user flows are covered.
 - [x] Edge cases and error states are covered.
 - [x] Business rules are defined and visible.
+- [x] All risks include likelihood, impact, and mitigation strategies.
 - [x] Dependencies, assumptions, and risks are explicit.
-- [x] Success metrics are defined.
+- [x] Success metrics are defined with measurement approach and timing.
 - [x] Every major feature has testable acceptance criteria.
-- [x] Ambiguities are exposed as assumptions or open questions rather than hidden.
+- [x] Ambiguities are exposed as open questions with owner and priority.
+- [x] Blocking open questions are clearly labeled.
+- [ ] All blocking open questions (OQ-02 through OQ-06) are resolved. *(Required before implementation of affected areas begins.)*
 - [x] The document is implementation-ready for engineering and QA at the product-requirements level.
