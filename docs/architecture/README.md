@@ -80,6 +80,8 @@ Architecture documents do not restate product decisions — they translate them 
 | 15 | [15-performance-and-scalability.md](15-performance-and-scalability.md) | Latency budgets, bottleneck analysis, caching, concurrency | Proposed Architecture |
 | 16 | [16-geospatial-data-pipeline.md](16-geospatial-data-pipeline.md) | Offline data pipeline: acquisition, processing, COG generation, publication | Proposed Architecture |
 | 17 | [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md) | Proposed resolutions for the architecture open questions before ADR conversion | Proposal for review |
+| 18 | [18-uml-system-architecture.md](18-uml-system-architecture.md) | UML diagrams: system context, containers, components, classes, sequences, state machines, deployment, activity | Proposed Architecture |
+| 19 | [19-entity-relationship-model.md](19-entity-relationship-model.md) | Entity-Relationship diagrams, entity definitions, constraints, indexes, physical schema (DDL) | Proposed Architecture |
 
 ---
 
