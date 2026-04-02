@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Out of Scope (Inland)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+    .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
+    /* Tooltip for map label */
+    .map-selection-tooltip {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+    .map-selection-tooltip::before { display: none !important; }
+  </style>
+  <style>
+    /* Inland info overlay on map */
+    .inland-overlay {
+      position: absolute;
+      left: 35%;
+      top: 15%;
+      z-index: 15;
+      max-width: 320px;
+    }
+
+    .inland-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-2);
+      padding: var(--spacing-2) var(--spacing-4);
+      background: var(--surface-container-high);
+      border-radius: var(--radius-md);
+      font-size: var(--label-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--on-surface-variant);
+      font-weight: 600;
+      margin-bottom: var(--spacing-3);
+    }
+
+    .inland-title {
+      font-family: var(--font-display);
+      font-size: var(--display-lg);
+      font-weight: 800;
+      color: var(--on-surface);
+      line-height: 1;
+      margin-bottom: var(--spacing-5);
+    }
+
+    .inland-description {
+      font-size: var(--body-md);
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+    }
+
+    .inland-description strong {
+      color: var(--on-surface);
+    }
+
+    /* Sidebar link buttons */
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-3);
+      padding: var(--spacing-4) var(--spacing-5);
+      background: var(--primary-container);
+      border-radius: var(--radius-md);
+      color: var(--primary);
+      font-size: var(--body-md);
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .sidebar-link:hover {
+      background: rgba(0, 43, 75, 0.8);
+    }
+
+    .sidebar-link.secondary {
+      background: var(--surface-container-high);
+      color: var(--on-surface-variant);
+    }
+
+    .sidebar-link.secondary:hover {
+      background: var(--surface-bright);
+    }
+
+    .info-note {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-3);
+      padding: var(--spacing-4);
+      background: var(--surface-container-highest);
+      border-radius: var(--radius-md);
+      font-size: var(--body-sm);
+      color: var(--on-surface-variant);
+      line-height: 1.5;
+    }
+
+    .info-note .note-icon {
+      color: var(--primary);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-brand">SEARISE EUROPE</div>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Assessments</a></li>
+          <li><a href="#">Insights</a></li>
+          <li><a href="06-methodology.html">Methodology</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-actions">
+        <div class="topbar-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--on-surface-variant); opacity: 0.5; flex-shrink: 0;">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="Search coastal sectors…" value="Berlin, Germany">
+        </div>
+        <button class="icon-btn" title="Settings">⚙</button>
+        <button class="icon-btn" title="Help">?</button>
+        <div class="avatar">A</div>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main-content">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <span class="sidebar-label">Climate Scenarios</span>
+          <div class="toggle-group">
+            <div class="toggle-item selected">
+              <span class="toggle-icon">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              SSP1-1.9
+            </div>
+            <div class="toggle-item">
+              <span class="toggle-icon"></span>
+              SSP2-4.5
+            </div>
+            <div class="toggle-item">
+              <span class="toggle-icon"></span>
+              SSP5-8.5
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <span class="sidebar-label">Time Horizons</span>
+          <div class="toggle-group">
+            <div class="toggle-item selected">
+              <span class="toggle-icon">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              2050 HORIZON
+            </div>
+            <div class="toggle-item">
+              <span class="toggle-icon"></span>
+              2100 HORIZON
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: var(--spacing-3);">
+          <a class="sidebar-link" href="01-landing.html">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Search a coastal location
+          </a>
+          <a class="sidebar-link secondary" href="06-methodology.html">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            View Methodology
+          </a>
+        </div>
+
+        <div class="info-note">
+          <span class="note-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </span>
+          <span>Inland and fluvial risk modeling for the European Economic Area is expected to be available in Q2 2026.</span>
+        </div>
+
+        <div style="margin-top: auto;">
+          <button class="btn-run" style="opacity: 0.4; cursor: not-allowed;">RUN SIMULATION</button>
+        </div>
+
+        <div class="collapsible-header">
+          <span class="sidebar-label">Sources</span>
+          <span class="chevron">▾</span>
+        </div>
+      </aside>
+
+      <!-- Map -->
+      <div class="map-area">
+        <div id="map"></div>
+
+        <!-- Inland Info Overlay -->
+        <div class="inland-overlay">
+          <div class="inland-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
+            Out of Scope Region
+          </div>
+          <div class="inland-title">Inland</div>
+          <div class="inland-description">
+            This location is <strong>outside the configured coastal analysis zone</strong>. The SeaRise modeling engine currently covers <strong>sea-level rise dynamics</strong> across the European coastline only.
+            <br><br>
+            Future versions will incorporate <strong>fluvial and elevation-based risk assessment</strong> for inland locations.
+          </div>
+        </div>
+
+        <!-- Map Controls -->
+        <div class="map-controls">
+          <button class="map-control-btn">+</button>
+          <button class="map-control-btn">−</button>
+          <div class="map-control-divider"></div>
+          <button class="map-control-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>
+          </button>
+          <button class="map-control-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>© 2026 SeaRise Europe Observatory. Data provided by Copernicus &amp; IPCC.</span>
+      <div>
+        <a href="06-methodology.html">Methodology</a>
+        <a href="#">API Access</a>
+        <a href="#">Privacy Policy</a>
+      </div>
+    </footer>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', {
+      center: [52.52, 13.405],
+      zoom: 12,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // Precision target marker for Berlin
+    var markerIcon = L.divIcon({
+      className: '',
+      html: '<div class="marker-outer"><div class="marker-inner"></div></div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+    var marker = L.marker([52.52, 13.405], { icon: markerIcon }).addTo(map);
+
+    // "Current Selection" label as a tooltip
+    marker.bindTooltip(
+      '<div class="selection-tag">CURRENT SELECTION</div><div class="selection-name" style="font-size:1.3rem;">Berlin, DE</div>',
+      { permanent: true, direction: 'bottom', offset: [0, 16], className: 'map-selection-tooltip' }
+    );
+  </script>
+</body>
+</html>

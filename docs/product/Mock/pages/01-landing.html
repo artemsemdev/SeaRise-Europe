@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Landing</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+    /* Hide default Leaflet controls — we have our own */
+    .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
+  </style>
+  <style>
+    /* Landing-specific: centered hero search */
+    .landing-hero {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      padding: var(--spacing-10);
+    }
+
+    .hero-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--spacing-8);
+      max-width: 560px;
+      text-align: center;
+    }
+
+    .hero-tagline {
+      font-family: var(--font-display);
+      font-size: var(--display-lg);
+      font-weight: 800;
+      color: var(--on-surface);
+      line-height: 1.1;
+    }
+
+    .hero-tagline .accent {
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: var(--body-lg);
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+      max-width: 460px;
+    }
+
+    .hero-search {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      max-width: 480px;
+      background: var(--surface-container-low);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-3);
+      gap: var(--spacing-3);
+      position: relative;
+    }
+
+    .hero-search input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--on-surface);
+      font-family: var(--font-technical);
+      font-size: var(--body-lg);
+      padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .hero-search input::placeholder {
+      color: var(--on-surface-variant);
+      opacity: 0.5;
+    }
+
+    .hero-search .search-submit {
+      padding: var(--spacing-3) var(--spacing-8);
+      background: var(--gradient-primary);
+      border: none;
+      border-radius: var(--radius-md);
+      color: var(--surface);
+      font-family: var(--font-technical);
+      font-size: var(--body-md);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .hero-features {
+      display: flex;
+      gap: var(--spacing-10);
+      margin-top: var(--spacing-5);
+    }
+
+    .hero-feature {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--spacing-2);
+    }
+
+    .hero-feature-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-md);
+      background: var(--surface-container-high);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      font-size: 18px;
+    }
+
+    .hero-feature-text {
+      font-size: var(--label-md);
+      color: var(--on-surface-variant);
+      text-align: center;
+      max-width: 100px;
+    }
+
+    /* Europe outline hint */
+    .europe-outline {
+      position: absolute;
+      width: 700px;
+      height: 500px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 0.04;
+      z-index: 1;
+    }
+
+    .europe-outline svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .disclaimer-bar {
+      position: absolute;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface-container-high);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-2) var(--spacing-5);
+      font-size: var(--label-sm);
+      color: var(--on-surface-variant);
+      opacity: 0.6;
+      white-space: nowrap;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-brand">SEARISE EUROPE</div>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Assessments</a></li>
+          <li><a href="#">Insights</a></li>
+          <li><a href="06-methodology.html">Methodology</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-actions">
+        <button class="icon-btn" title="Settings">⚙</button>
+        <button class="icon-btn" title="Help">?</button>
+        <div class="avatar">A</div>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main-content">
+      <div class="map-area">
+
+        <div id="map"></div>
+
+        <!-- Hero Search -->
+        <div class="landing-hero">
+          <div class="hero-content">
+            <h1 class="hero-tagline">
+              Explore coastal<br><span class="accent">sea-level exposure</span><br>across Europe
+            </h1>
+            <p class="hero-subtitle">
+              Enter a European location to view scenario-based coastal exposure projections across selected future time horizons.
+            </p>
+            <div class="hero-search">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--on-surface-variant); opacity: 0.5; flex-shrink: 0; margin-left: 8px;">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input type="text" placeholder="Search a European location…">
+              <button class="search-submit">Search</button>
+            </div>
+            <div class="hero-features">
+              <div class="hero-feature">
+                <div class="hero-feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <span class="hero-feature-text">Europe-wide coverage</span>
+              </div>
+              <div class="hero-feature">
+                <div class="hero-feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+                </div>
+                <span class="hero-feature-text">Multiple climate scenarios</span>
+              </div>
+              <div class="hero-feature">
+                <div class="hero-feature-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </div>
+                <span class="hero-feature-text">2030 – 2100 time horizons</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="disclaimer-bar">
+          Scenario-based projections only — not an engineering, legal, or financial determination
+        </div>
+
+        <!-- Map Controls -->
+        <div class="map-controls">
+          <button class="map-control-btn">+</button>
+          <button class="map-control-btn">−</button>
+          <div class="map-control-divider"></div>
+          <button class="map-control-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>
+          </button>
+          <button class="map-control-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>© 2026 SeaRise Europe Observatory. Data provided by Copernicus &amp; IPCC.</span>
+      <div>
+        <a href="06-methodology.html">Methodology</a>
+        <a href="#">API Access</a>
+        <a href="#">Privacy Policy</a>
+      </div>
+    </footer>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', {
+      center: [50, 15],
+      zoom: 5,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+  </script>
+</body>
+</html>

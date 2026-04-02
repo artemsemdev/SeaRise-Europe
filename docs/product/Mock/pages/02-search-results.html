@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Search Results</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+    .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
+  </style>
+  <style>
+    .search-wrapper {
+      position: absolute;
+      top: var(--spacing-8);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 480px;
+      z-index: 30;
+    }
+
+    .search-active {
+      display: flex;
+      align-items: center;
+      background: var(--surface-container-low);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: var(--spacing-3);
+      gap: var(--spacing-3);
+    }
+
+    .search-active input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--on-surface);
+      font-family: var(--font-technical);
+      font-size: var(--body-lg);
+      padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .search-active .clear-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface-container-high);
+      border: none;
+      color: var(--on-surface-variant);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .candidates-dropdown {
+      background: var(--surface-container-low);
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .candidates-header {
+      padding: var(--spacing-3) var(--spacing-5);
+      font-size: var(--label-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--on-surface-variant);
+      opacity: 0.6;
+    }
+
+    .candidate-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-4);
+      padding: var(--spacing-4) var(--spacing-5);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .candidate-item:hover {
+      background: var(--surface-container-high);
+    }
+
+    .candidate-item .cand-pin {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-container-high);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .candidate-item:hover .cand-pin {
+      background: var(--primary-container);
+    }
+
+    .cand-details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .cand-name {
+      font-size: var(--body-md);
+      font-weight: 500;
+      color: var(--on-surface);
+    }
+
+    .cand-name strong {
+      color: var(--primary);
+    }
+
+    .cand-region {
+      font-size: var(--label-sm);
+      color: var(--on-surface-variant);
+      opacity: 0.7;
+    }
+
+    .cand-type {
+      font-size: var(--label-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--on-surface-variant);
+      opacity: 0.5;
+      padding: var(--spacing-1) var(--spacing-3);
+      background: var(--surface-container-high);
+      border-radius: var(--radius-sm);
+    }
+
+    /* Faded map hint */
+    .search-map-hint {
+      position: absolute;
+      bottom: var(--spacing-8);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: var(--body-sm);
+      color: var(--on-surface-variant);
+      opacity: 0.4;
+      text-align: center;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-brand">SEARISE EUROPE</div>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Assessments</a></li>
+          <li><a href="#">Insights</a></li>
+          <li><a href="06-methodology.html">Methodology</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-actions">
+        <button class="icon-btn" title="Settings">⚙</button>
+        <button class="icon-btn" title="Help">?</button>
+        <div class="avatar">A</div>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main-content">
+      <div class="map-area">
+        <div id="map"></div>
+
+        <!-- Search with Candidates Dropdown -->
+        <div class="search-wrapper">
+          <div class="search-active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--primary); flex-shrink: 0; margin-left: 8px;">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input type="text" value="Bordeaux">
+            <button class="clear-btn">✕</button>
+          </div>
+
+          <div class="candidates-dropdown">
+            <div class="candidates-header">5 locations found</div>
+
+            <div class="candidate-item">
+              <div class="cand-pin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div class="cand-details">
+                <div class="cand-name"><strong>Bordeaux</strong>, Gironde</div>
+                <div class="cand-region">Nouvelle-Aquitaine, France</div>
+              </div>
+              <span class="cand-type">City</span>
+            </div>
+
+            <div class="candidate-item">
+              <div class="cand-pin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div class="cand-details">
+                <div class="cand-name"><strong>Bordeaux</strong> Port Area</div>
+                <div class="cand-region">Garonne Estuary, France</div>
+              </div>
+              <span class="cand-type">Port</span>
+            </div>
+
+            <div class="candidate-item">
+              <div class="cand-pin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div class="cand-details">
+                <div class="cand-name"><strong>Bordeaux</strong>-Mérignac Airport</div>
+                <div class="cand-region">Gironde, France</div>
+              </div>
+              <span class="cand-type">Airport</span>
+            </div>
+
+            <div class="candidate-item">
+              <div class="cand-pin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div class="cand-details">
+                <div class="cand-name"><strong>Bordeaux</strong> Lac</div>
+                <div class="cand-region">Northern Bordeaux, France</div>
+              </div>
+              <span class="cand-type">Area</span>
+            </div>
+
+            <div class="candidate-item">
+              <div class="cand-pin">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              </div>
+              <div class="cand-details">
+                <div class="cand-name"><strong>Bordeaux</strong> Saint-Jean Station</div>
+                <div class="cand-region">Centre-ville, France</div>
+              </div>
+              <span class="cand-type">Station</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hint -->
+        <div class="search-map-hint">
+          Select a location to view coastal sea-level exposure assessment
+        </div>
+
+        <!-- Map Controls -->
+        <div class="map-controls">
+          <button class="map-control-btn">+</button>
+          <button class="map-control-btn">−</button>
+          <div class="map-control-divider"></div>
+          <button class="map-control-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>
+          </button>
+          <button class="map-control-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>© 2026 SeaRise Europe Observatory. Data provided by Copernicus &amp; IPCC.</span>
+      <div>
+        <a href="06-methodology.html">Methodology</a>
+        <a href="#">API Access</a>
+        <a href="#">Privacy Policy</a>
+      </div>
+    </footer>
+  </div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', {
+      center: [45.5, -0.5],
+      zoom: 7,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+  </script>
+</body>
+</html>
