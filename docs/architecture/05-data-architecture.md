@@ -1,7 +1,7 @@
 # 05 — Data Architecture
 
-> **Status:** Proposed Architecture
-> **Note:** Several schema values depend on blocking open questions (OQ-02, OQ-03, OQ-04, OQ-05). Schema structure is confirmed; seed data values are TBD.
+> **Status:** Confirmed
+> **Note:** All blocking open questions (OQ-02 through OQ-05) have been resolved. Schema structure and seed data values are confirmed. See [`docs/delivery/artifacts/seed-data-spec.sql`](../delivery/artifacts/seed-data-spec.sql) for the complete seed specification.
 
 ---
 
@@ -33,9 +33,9 @@ CREATE TABLE scenarios (
     is_default   BOOLEAN      NOT NULL DEFAULT false,
     created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
--- Constraint: at most one row has is_default = true (enforced by partial unique index or application)
--- Values: OQ-02 (BLOCKING) — example: 'ssp1-26', 'ssp2-45', 'ssp5-85'
--- Default: OQ-03 (BLOCKING)
+-- Constraint: at most one row has is_default = true (enforced by partial unique index)
+-- Values: ADR-016 — 'ssp1-26', 'ssp2-45', 'ssp5-85'
+-- Default: ADR-017 — 'ssp2-45'
 ```
 
 ### horizons
@@ -47,9 +47,9 @@ CREATE TABLE horizons (
     is_default    BOOLEAN     NOT NULL DEFAULT false,
     sort_order    INTEGER     NOT NULL
 );
--- is_default: OQ-03 (BLOCKING) — example: 2050
+-- is_default: ADR-017 — 2050
 INSERT INTO horizons VALUES (2030, '2030', false, 1);
-INSERT INTO horizons VALUES (2050, '2050', false, 2);  -- is_default TBD
+INSERT INTO horizons VALUES (2050, '2050', true,  2);  -- ADR-017: default horizon
 INSERT INTO horizons VALUES (2100, '2100', false, 3);
 ```
 
@@ -64,7 +64,7 @@ CREATE TABLE methodology_versions (
     what_it_does             TEXT         NOT NULL,
     limitations              TEXT         NOT NULL,   -- JSON array string or newline-delimited
     resolution_note          TEXT         NOT NULL,
-    exposure_threshold       NUMERIC,                 -- OQ-05 (BLOCKING): the value threshold
+    exposure_threshold       NUMERIC,                 -- ADR-015: NULL for v1.0 (binary, no runtime threshold)
     exposure_threshold_desc  TEXT         NOT NULL,
     updated_at               TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -106,8 +106,8 @@ CREATE TABLE geography_boundaries (
 );
 CREATE INDEX geography_boundaries_geom_idx ON geography_boundaries USING GIST(geom);
 -- Required rows:
---   'europe'               — WGS84 Europe boundary geometry (source: Natural Earth or EEA)
---   'coastal_analysis_zone' — OQ-04 (BLOCKING): zone polygon TBD
+--   'europe'               — WGS84 Europe boundary geometry (source: Natural Earth 10m cultural vectors)
+--   'coastal_analysis_zone' — ADR-018: Copernicus Coastal Zones 2018, dissolved, ~10 km inland
 ```
 
 ---
@@ -195,7 +195,7 @@ erDiagram
 
 | Data | Owner | Written By | When |
 |---|---|---|---|
-| Scenario config | Engineering / Product | Manual DB seed | Phase 0 (OQ-02) |
+| Scenario config | Engineering / Product | Manual DB seed | Phase 0 (ADR-016) |
 | Horizon config | Engineering | Manual DB seed | Phase 0 (confirmed as 2030/2050/2100) |
 | Methodology versions | Engineering | Manual DB seed | Phase 0 + version bumps |
 | Geography boundaries | Engineering | Offline pipeline | Phase 0 |
@@ -279,7 +279,7 @@ Every `AssessmentResult` returned by the API carries:
 ```json
 {
   "methodologyVersion": "v1.0",
-  "scenario": { "id": "ssp2-45", "displayName": "Intermediate (SSP2-4.5)" },
+  "scenario": { "id": "ssp2-45", "displayName": "Intermediate emissions (SSP2-4.5)" },
   "horizon": { "year": 2050, "displayLabel": "2050" },
   "layerId": "uuid-of-layers-row",
   "generatedAt": "2026-03-30T12:00:00Z"

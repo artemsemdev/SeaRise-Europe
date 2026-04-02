@@ -2,7 +2,7 @@
 
 > **Status:** Proposed Architecture
 > **Scope:** The offline pipeline that transforms raw climate and elevation data into Cloud-Optimized GeoTIFF (COG) exposure layers. This is **not a runtime service** — it runs on demand before Phase 0 and on methodology version updates.
-> **Dependencies:** OQ-05 (BLOCKING — exposure threshold/methodology), OQ-02 (BLOCKING — scenario set), OQ-04 (BLOCKING — coastal analysis zone)
+> **Dependencies:** ADR-015 (exposure methodology — binary v1.0), ADR-016 (scenario set — ssp1-26, ssp2-45, ssp5-85), ADR-018 (coastal analysis zone — Copernicus Coastal Zones 2018)
 
 ---
 
@@ -35,7 +35,7 @@ The runtime API serves precomputed binary raster layers. These layers are the ou
 | URL | https://sealevel.nasa.gov/ipcc-ar6-sea-level-projection-tool |
 | Format | NetCDF (.nc) |
 | Coverage | Global; Europe subset extracted |
-| Scenarios | SSP1-2.6, SSP2-4.5, SSP5-8.5 (OQ-02: exact set TBD) |
+| Scenarios | SSP1-2.6, SSP2-4.5, SSP5-8.5 (ADR-016: confirmed) |
 | Time horizons | Median projections for 2030, 2050, 2100 (FR-015) |
 | Units | Meters (sea-level rise above 2020 baseline) |
 | License | CC BY 4.0 (cite in `methodology_versions.sea_level_source_name`) |
@@ -59,9 +59,9 @@ The runtime API serves precomputed binary raster layers. These layers are the ou
 
 ---
 
-## 3. Processing Logic (OQ-05 Dependent)
+## 3. Processing Logic (ADR-015 Confirmed)
 
-> **BLOCKING:** The exact processing logic depends on OQ-05 (exposure methodology). The approach below assumes binary exposure: a location is "exposed" if the projected sea-level rise meets or exceeds the terrain elevation.
+> **Confirmed (ADR-015):** Binary exposure methodology approved. A location is "exposed" if the projected mean sea-level rise meets or exceeds the terrain elevation within the coastal analysis zone.
 
 ### 3.1 Conceptual Algorithm
 
@@ -77,7 +77,7 @@ The runtime API serves precomputed binary raster layers. These layers are the ou
 # 3. Compute exposure: location is exposed if SLR ≥ DEM elevation
 #    exposure[lat, lon] = 1 if slr_grid[lat, lon] >= dem[lat, lon] else 0
 #
-# 4. Mask: apply coastal analysis zone mask (OQ-04)
+# 4. Mask: apply coastal analysis zone mask (ADR-018: Copernicus Coastal Zones 2018)
 #    NoData outside coastal_analysis_zone
 #
 # Result: binary raster (0 = not exposed, 1 = exposed, NoData = out of zone)
@@ -104,7 +104,7 @@ The runtime API serves precomputed binary raster layers. These layers are the ou
 | Raster analysis | `numpy` | Array operations (SLR ≥ DEM comparison) |
 | COG conversion | `rio-cogeo` | Validate and convert output to COG format |
 | Geospatial | `GDAL` (via rasterio) | Reproject, resample, warp |
-| Spatial analysis | `geopandas` / `shapely` | Coastal zone masking (OQ-04 geometry) |
+| Spatial analysis | `geopandas` / `shapely` | Coastal zone masking (ADR-018: Copernicus Coastal Zones 2018) |
 | Upload | `azure-storage-blob` (Python SDK) | Upload COGs to Azure Blob Storage |
 | DB registration | `psycopg2` or `asyncpg` | INSERT into `layers` table |
 
@@ -201,7 +201,7 @@ def align_to_dem_grid(slr_nc: Path, dem_tif: Path, output_tif: Path):
 def compute_binary_exposure(
     dem_tif: Path,
     slr_tif: Path,        # SLR values aligned to DEM grid
-    coastal_zone_geom,    # shapely geometry for coastal_analysis_zone (OQ-04)
+    coastal_zone_geom,    # shapely geometry for coastal_analysis_zone (ADR-018)
     output_tif: Path
 ):
     """
@@ -219,7 +219,7 @@ def compute_binary_exposure(
         slr = slr_src.read(1, masked=True)   # sea-level rise projection
 
         # Binary comparison: exposed where SLR >= terrain elevation
-        # OQ-05: if continuous threshold, replace with: slr >= (dem + threshold)
+        # ADR-015: binary exposure — SLR >= DEM (no separate threshold)
         exposure = np.where(
             dem.mask | slr.mask,            # NoData regions
             np.nan,
@@ -568,7 +568,7 @@ To roll back: run the same transaction swapping the version strings.
 
 ## 12. Pipeline Checklist (Pre-Activation)
 
-- [ ] All 9 COG files generated (3 scenarios × 3 horizons) — or the confirmed set from OQ-02
+- [ ] All 9 COG files generated (3 scenarios × 3 horizons: ssp1-26, ssp2-45, ssp5-85 — ADR-016)
 - [ ] All COGs pass `rio-cogeo validate` (no errors)
 - [ ] All COGs are EPSG:4326
 - [ ] All COGs contain only binary pixel values (0, 1, NoData)

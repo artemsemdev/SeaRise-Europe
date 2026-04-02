@@ -39,8 +39,8 @@ All human users interact through the same anonymous public interface — no role
 
 | System | Type | Direction | Runtime? | Key Requirement |
 |---|---|---|---|---|
-| Geocoding provider | External HTTP API | Outbound from API container | Yes | FR-004; OQ-06 (BLOCKING — provider TBD) |
-| Basemap tile provider | External CDN | Outbound from browser | Yes | FR-026; OQ-07 (basemap provider TBD) |
+| Geocoding provider | External HTTP API | Outbound from API container | Yes | FR-004; ADR-019 (Azure Maps Search) |
+| Basemap tile provider | External CDN | Outbound from browser | Yes | FR-026; ADR-020 (MapTiler Dataviz Light) |
 | Azure Blob Storage | Managed cloud service | Read by TiTiler + API | Yes | NFR-020 (COG format); stores precomputed raster assets |
 | Azure Database for PostgreSQL | Managed cloud service | Read by API container | Yes | Stores scenario config, layer metadata, geography boundaries |
 
@@ -73,7 +73,7 @@ All human users interact through the same anonymous public interface — no role
          │                              │                     ▲
          ▼                              ▼                     │
   Geocoding provider           Basemap tile provider    Offline pipeline
-  (external — OQ-06)           (external — OQ-07)       (NASA AR6 + Copernicus DEM)
+  (Azure Maps — ADR-019)       (MapTiler — ADR-020)     (NASA AR6 + Copernicus DEM)
 ```
 
 **Inside the boundary**: Next.js frontend, ASP.NET Core API, TiTiler, PostgreSQL, Azure Blob Storage, Azure Container Registry, Azure Key Vault.
@@ -89,8 +89,8 @@ graph TD
     User["👤 Anonymous End User\n(Browser)"]
 
     subgraph External["External Services"]
-        Geocoder["Geocoding Provider\n(OQ-06 — TBD)\nHTTPS / REST"]
-        Basemap["Basemap Tile Provider\n(OQ-07 — TBD)\nXYZ Tiles / CDN"]
+        Geocoder["Azure Maps Search\n(ADR-019)\nHTTPS / REST"]
+        Basemap["MapTiler\n(ADR-020)\nVector Tiles / CDN"]
     end
 
     subgraph Upstream["Upstream Data Sources (Offline)"]
@@ -132,7 +132,7 @@ graph TD
 |---|---|---|---|
 | IPCC AR6 sea-level projections | Offline pipeline input | Phase 0 (initial setup) + periodic refresh (OQ-09) | Consumed via NASA AR6 web tool; license confirmation required (Dependency #1) |
 | Copernicus DEM GLO-30 | Offline pipeline input | Phase 0 + as needed | Free with attribution; 30m resolution |
-| Geocoding provider | Synchronous runtime dependency | Every user search | OQ-06 is blocking for production; Nominatim for dev only |
+| Geocoding provider | Synchronous runtime dependency | Every user search | ADR-019: Azure Maps Search for production; Nominatim for dev only |
 
 ### Downstream (the system feeds)
 
@@ -153,7 +153,7 @@ These constraints from the PRD most directly shape architectural decisions:
 | Constraint | Source | Architectural Impact |
 |---|---|---|
 | Europe-only coverage | BR-003 | Geography validation must be server-side (PostGIS) — client-side is bypassable |
-| Coastal-only scope | BR-004, OQ-04 | Coastal analysis zone must be a server-side configured geometry — zone definition is BLOCKING |
+| Coastal-only scope | BR-004, ADR-018 | Coastal analysis zone is Copernicus Coastal Zones 2018, ~10 km inland, seeded in PostGIS |
 | No user data persistence | BR-016, NFR-007 | No user tables, no session storage, no address logging |
 | Anonymous access | BR-001 | No auth infrastructure, no JWT, no session tokens |
 | COG/PMTiles format required | NFR-020 | TiTiler required; full-file raster transfer is not acceptable |
@@ -187,7 +187,7 @@ These constraints from the PRD most directly shape architectural decisions:
 |---|---|---|---|
 | A-01 | Azure is the cloud provider | All infrastructure choices are Azure-specific | Confirmed by product docs |
 | A-02 | Hosting region is EU (West Europe or North Europe) | GDPR data residency concern | Assumption — confirm before deployment |
-| A-03 | Geocoding provider is a single configured external HTTP service | Architecture assumes one provider; multi-provider fallback not designed | Assumption — depends on OQ-06 |
+| A-03 | Geocoding provider is a single configured external HTTP service | Architecture assumes one provider; multi-provider fallback not designed | Confirmed: Azure Maps Search (ADR-019) |
 | A-04 | Data refresh is a manual operational workflow in MVP | Dataset update process is undocumented if assumed to be automated | Confirmed — BR-018 |
 | A-05 | The offline pipeline runs outside the container runtime | Pipeline is not a Container App; it is a separate script set | Assumption — aligns with ROADMAP Phase 0 scope |
 | A-06 | Europe boundary geometry from a standard public source is sufficient | Islands, overseas territories, or ambiguous borders may produce unexpected results | Assumption — validate edge cases during Phase 0 |

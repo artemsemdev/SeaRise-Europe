@@ -1,6 +1,6 @@
 # 17 — Open Question Closure Proposal
 
-> **Status:** Proposal for review
+> **Status:** Approved — all blocking proposals (OQ-02 through OQ-07) converted to ADRs (ADR-015 through ADR-020) on 2026-04-03
 > **Purpose:** Recommend implementation-ready resolutions for the open questions referenced in the architecture set without rewriting the existing open-questions document until decisions are approved.
 > **Decision lens:** Optimize for scientific caution, delivery realism, and low operational complexity for a solo-engineer MVP.
 

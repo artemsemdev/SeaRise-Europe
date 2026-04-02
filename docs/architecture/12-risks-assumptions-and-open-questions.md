@@ -2,7 +2,8 @@
 
 > **Status:** Confirmed (known state) | Proposed Architecture (mitigations)
 > **Note:** This document consolidates all blocking open questions from the PRD with their architectural impact, tracks working assumptions that must be validated before Phase 1 launch, and documents risks with mitigations.
-> **Companion document:** For a reviewable recommended closure set, see [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
+> **Companion document:** For the closure proposal and rationale, see [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
+> **Update 2026-04-03:** OQ-02 through OQ-07 resolved and converted to ADRs (ADR-015 through ADR-020). See [11-architecture-decisions.md](11-architecture-decisions.md).
 
 ---
 
@@ -10,100 +11,51 @@
 
 These must be resolved before Phase 1 (MVP) launch. Architecture structure is ready; specific values and decisions are pending.
 
-### OQ-02 — Scenario Set Definition (BLOCKING)
+### OQ-02 — Scenario Set Definition (RESOLVED)
 
-**Question:** What are the exact scenario IDs, display names, descriptions, and sort order for the climate scenarios?
+**Resolution:** ADR-016 (S01-01, approved 2026-04-03)
 
-**Current illustrative values (NOT confirmed):**
-- `ssp1-26` / "Low (SSP1-2.6)"
-- `ssp2-45` / "Intermediate (SSP2-4.5)"
-- `ssp5-85` / "High (SSP5-8.5)"
-
-**Architectural impact:**
-- Scenario IDs are used as `scenarioId` in `POST /v1/assess` — client and server must agree
-- Scenario IDs are part of the COG blob path (`layers/v1.0/{scenarioId}/{year}.tif`)
-- Scenario IDs are stored as primary keys in the `scenarios` table — changing them later requires data migration
-- **CORS and API contract:** once API is deployed, scenario ID changes are breaking
-
-**Action needed:** Confirm exact scenario IDs, display names, and CONTENT_GUIDELINES-compliant descriptions. Seed into `scenarios` table before Phase 1.
+Three scenarios confirmed: `ssp1-26` / "Lower emissions (SSP1-2.6)", `ssp2-45` / "Intermediate emissions (SSP2-4.5)", `ssp5-85` / "Higher emissions (SSP5-8.5)". IDs are stable keys across database, API, and blob paths. See seed data specification: [`docs/delivery/artifacts/seed-data-spec.sql`](../delivery/artifacts/seed-data-spec.sql).
 
 ---
 
-### OQ-03 — Default Scenario and Horizon (BLOCKING)
+### OQ-03 — Default Scenario and Horizon (RESOLVED)
 
-**Question:** Which scenario and horizon are pre-selected on application load?
+**Resolution:** ADR-017 (S01-02, approved 2026-04-03)
 
-**Architectural impact:**
-- `defaults.scenarioId` and `defaults.horizonYear` returned by `GET /v1/config/scenarios`
-- `is_default` field in `scenarios` and `horizons` tables
-- Affects the first result a user sees (P-01 Marina's first impression)
-
-**Action needed:** Product decision (PRD §3 or §10 may have guidance). Set `is_default = true` on the chosen rows after OQ-02 is resolved.
+Default scenario: `ssp2-45` (middle-of-the-road). Default horizon: `2050` (mid-century). `is_default = true` set on the corresponding rows in `scenarios` and `horizons` tables.
 
 ---
 
-### OQ-04 — Coastal Analysis Zone Definition (BLOCKING)
+### OQ-04 — Coastal Analysis Zone Definition (RESOLVED)
 
-**Question:** What is the exact geometry of the `coastal_analysis_zone` used to determine `OutOfScope` vs. `InEuropeAndCoastalZone`?
+**Resolution:** ADR-018 (S01-03, approved 2026-04-03)
 
-**Architectural impact:**
-- Stored as a `GEOMETRY(MULTIPOLYGON, 4326)` row in `geography_boundaries` table
-- `PostGisGeographyRepository.IsWithinCoastalZoneAsync` queries this geometry
-- Definition directly determines which locations get an assessment vs. "Outside MVP Coverage Area"
-- Amsterdam (coastal) should return `InCoastalZone`; Prague (inland) should return `OutOfScope`
-- The boundary is inherently ambiguous near transition zones (50 km from coast? EEA coastal zone definition?)
-
-**Action needed:** Select a source geometry (Natural Earth 10m coastline buffer? EEA coastal zone shapefile?) and seed into database. Document source in `geography_boundaries.source` column.
+Source: Copernicus Land Monitoring Service — Coastal Zones 2018 dataset, dissolved into a single multipolygon, ~10 km inland extent. Validated against 10 reference coordinates (5 coastal, 5 inland). Geometry file: `data/geometry/coastal_analysis_zone.geojson` (produced during pipeline bootstrap). Source documented in `geography_boundaries.source` column.
 
 ---
 
-### OQ-05 — Exposure Threshold Methodology (BLOCKING)
+### OQ-05 — Exposure Threshold Methodology (RESOLVED)
 
-**Question:** What is the exact methodology for determining whether a point is "exposed"? Specifically: is the pixel value threshold binary (0/1), and what does value 1 mean precisely?
+**Resolution:** ADR-015 (S01-04, approved 2026-04-03)
 
-**Architectural impact:**
-- Determines `ExposureEvaluator` implementation
-- Determines whether COG pixel values are binary (0/1) or continuous (sea-level rise in meters)
-- If binary: `pixelValue == 1` → `ModeledExposureDetected` (simple, current assumption)
-- If continuous: needs threshold comparison against `exposure_threshold` in `methodology_versions`
-- `CONTENT_GUIDELINES.md §3` interpretation text depends on this definition
-
-**Current assumption:** Binary COG (0 = no exposure, 1 = exposure, NoData = outside zone). This drives the entire pipeline design. If the answer is continuous, significant pipeline rework is needed.
-
-**Action needed:** Confirm binary vs continuous approach with whoever is defining the methodology. Document in `methodology_versions.exposure_threshold_desc`.
+Binary exposure methodology confirmed for v1.0. Pixel value `1` = modeled exposure (SLR >= DEM within coastal analysis zone), `0` = no exposure, `NoData` = outside zone. No runtime threshold — exposure is precomputed offline. Full specification: [`docs/delivery/artifacts/methodology-spec.md`](../delivery/artifacts/methodology-spec.md).
 
 ---
 
-### OQ-06 — Production Geocoding Provider (BLOCKING)
+### OQ-06 — Production Geocoding Provider (RESOLVED)
 
-**Question:** Which geocoding provider is used in production? Nominatim is dev-only (acceptable use policy prohibits high-volume use).
+**Resolution:** ADR-019 (S01-05, approved 2026-04-03)
 
-**Candidate providers:** Pelias, Mapbox Geocoding API, HERE Geocoding, Azure Maps Search, Photon
-
-**Architectural impact:**
-- Provider is encapsulated behind `IGeocodingService` — code change required only in the Infrastructure layer
-- Provider response format must be normalized to `GeocodingCandidate` (Rank, Label, Country, DisplayContext)
-- `displayContext` availability varies by provider — some return admin hierarchy, some do not
-- API key must be stored in Key Vault and injected as `GEOCODING_API_KEY`
-- Provider selection affects candidate quality for European place names (P-01 Marina's primary use case)
-
-**Action needed:** Select provider. Implement `[Provider]GeocodingClient` replacing `NominatimGeocodingClient` placeholder.
+Azure Maps Search selected as production geocoder. Nominatim retained for development only. Field mapping to `GeocodingCandidate` model documented in ADR-019. API key stored server-side in Key Vault as `geocoding-provider-api-key`. Fallback: HERE Geocoding if European coverage proves insufficient.
 
 ---
 
-### OQ-07 — Basemap Tile Provider (BLOCKING for visual output)
+### OQ-07 — Basemap Tile Provider (RESOLVED)
 
-**Question:** Which provider serves the background map tiles?
+**Resolution:** ADR-020 (S01-06, approved 2026-04-03)
 
-**Candidate providers:** Mapbox, MapTiler, Stadia Maps, OpenFreeMap (OSM-based, free)
-
-**Architectural impact:**
-- Basemap URL template is `NEXT_PUBLIC_BASEMAP_TILE_URL` in frontend environment
-- Provider key may need domain restriction (see [07-security-architecture.md](07-security-architecture.md) §3.3)
-- Map style (light/dark/satellite) is configured via this URL — affects visual design
-- Some providers (MapTiler, Mapbox) require attribution in the map UI (legal requirement)
-
-**Action needed:** Select provider. Configure URL template. Add attribution element to MapSurface component.
+MapTiler selected with Dataviz Light vector style, origin-restricted browser API key, and MapLibre GL JS rendering. Attribution: "© MapTiler © OpenStreetMap contributors". Style URL via `NEXT_PUBLIC_BASEMAP_STYLE_URL` environment variable. Key management: origin-restricted (production + staging domains).
 
 ---
 
@@ -184,13 +136,9 @@ These are architectural decisions made based on incomplete information. Each mus
 
 ---
 
-### A-06: COG Files Are Binary (0/1) — Not Continuous
+### A-06: COG Files Are Binary (0/1) — Not Continuous (CONFIRMED)
 
-**Assumption:** The exposure layers are pre-computed binary rasters: 1 = exposure zone, 0 = no exposure zone, NoData = outside analysis area.
-
-**Risk if wrong (see OQ-05):** If the layers are continuous (sea-level rise in meters), the `ExposureEvaluator` must compare pixel values against a threshold rather than checking `pixelValue == 1`.
-
-**Validation:** Resolve OQ-05 with the methodology team.
+**Confirmed by ADR-015 (2026-04-03).** The exposure layers are pre-computed binary rasters: 1 = exposure zone, 0 = no exposure zone, NoData = outside analysis area. No longer an assumption — this is the approved methodology for v1.0.
 
 ---
 
@@ -199,11 +147,11 @@ These are architectural decisions made based on incomplete information. Each mus
 | ID | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | R-01 | TiTiler `/point` latency too high for assessment p95 target | Medium | High | Phase 0 latency spike (A-01); fallback Option C |
-| R-02 | Geocoding provider (OQ-06) doesn't return `displayContext`-equivalent field | Medium | Medium | Map provider's admin hierarchy fields to `displayContext`; accept degraded disambiguation |
+| R-02 | Azure Maps (ADR-019) doesn't return `displayContext`-equivalent field | Medium | Medium | Map `locality` + admin fields to `displayContext`; accept degraded disambiguation |
 | R-03 | Azure Container Apps cold start breaks demo | Medium | High | Warm up containers before demo; set `minReplicas: 1` as fallback |
-| R-04 | Coastal zone geometry (OQ-04) is too large / too small | Medium | High | Define zone conservatively; plan to iterate after Phase 0 data review |
+| R-04 | Coastal zone geometry (ADR-018: Copernicus Coastal Zones) is too large / too small | Medium | High | ~10 km inland extent is conservative; iterate after Phase 0 data review |
 | R-05 | COG files too large for acceptable tile serving speed | Low | Medium | Ensure correct COG tiling and overview levels during pipeline (see doc 16) |
-| R-06 | Basemap provider attribution requirements missed | Low | Medium | Review OQ-07 provider license; add attribution before Phase 1 launch |
+| R-06 | Basemap provider attribution requirements missed | Low | Medium | ADR-020: MapTiler + OSM attribution required; add before Phase 1 launch |
 | R-07 | GDAL VSIAZ driver not configured correctly for Azure Blob | Medium | High | Phase 0 spike: verify TiTiler can read COG from Azure Blob with managed identity |
 | R-08 | `results` cache (60s TanStack Query) serves stale data after methodology version change | Low | Medium | Methodology version changes are rare + manual; acceptable to restart containers to clear in-process cache |
 | R-09 | DB connection pool exhaustion at concurrent demo traffic | Low | Medium | Monitor `active_connections`; set Npgsql `Maximum Pool Size = 20` per API instance |
@@ -220,7 +168,7 @@ These don't block MVP but must be addressed before or during Phase 2.
 | OQ-01 | What is the supported browser matrix? (NFR-022) | Phase 1 |
 | OQ-08 | Should a CDN be used for frontend assets? | Phase 3 |
 | OQ-09 | Is server-side rendering required for SEO? (Note: `noindex` is default for portfolio demos) | Phase 2 |
-| OQ-10 | Analytics provider and consent model | Phase 2 |
+| OQ-10 | Analytics provider and consent model (see also §1 OQ-10 above) | Phase 2 |
 | OQ-11 | Multi-language support (i18n)? | Not in scope for MVP (BR-003 — English only) |
 | OQ-12 | Mobile-first vs desktop-first priority for responsive layout? | Phase 1 (UX decision) |
 
@@ -231,26 +179,12 @@ These don't block MVP but must be addressed before or during Phase 2.
 The following diagram shows which Phase 0 / Phase 1 tasks are blocked by each open question:
 
 ```
-OQ-02 (Scenarios) ──► Seed scenarios table
-                  ──► Generate COG paths (scenario IDs in blob paths)
-                  ──► Test data for E2E tests
+OQ-02 (Scenarios) ──► RESOLVED (ADR-016): ssp1-26, ssp2-45, ssp5-85
+OQ-03 (Defaults)  ──► RESOLVED (ADR-017): ssp2-45, 2050
+OQ-04 (Coastal)   ──► RESOLVED (ADR-018): Copernicus Coastal Zones 2018
+OQ-05 (Threshold) ──► RESOLVED (ADR-015): Binary, SLR >= DEM
+OQ-06 (Geocoding) ──► RESOLVED (ADR-019): Azure Maps Search
+OQ-07 (Basemap)   ──► RESOLVED (ADR-020): MapTiler Dataviz Light
 
-OQ-03 (Defaults) ──► GET /v1/config/scenarios response
-                 ──► Initial UI state on load
-
-OQ-04 (Coastal zone) ──► Seed coastal_analysis_zone geometry
-                     ──► IsWithinCoastalZone integration tests
-                     ──► OutOfScope vs. coastal test cases
-
-OQ-05 (Threshold) ──► ExposureEvaluator implementation
-                  ──► COG pipeline design (binary vs continuous)
-                  ──► CONTENT_GUIDELINES interpretation text
-
-OQ-06 (Geocoding) ──► Production GeocodingClient implementation
-                  ──► API key procurement
-                  ──► displayContext field availability
-
-OQ-07 (Basemap) ──► MapSurface tile URL configuration
-               ──► Attribution requirements
-               ──► Map visual style
+All blocking questions resolved 2026-04-03. Downstream implementation unblocked.
 ```

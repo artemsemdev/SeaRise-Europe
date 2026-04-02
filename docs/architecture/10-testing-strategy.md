@@ -167,7 +167,7 @@ public async Task IsWithinEurope_NewYork_ReturnsFalse()
 [Fact]
 public async Task IsWithinCoastalZone_InlandEuropeanCity_ReturnsFalse()
 {
-    // OQ-04 dependent: requires coastal_analysis_zone seeded
+    // ADR-018: requires coastal_analysis_zone seeded (Copernicus Coastal Zones 2018)
     // Prague: lat 50.07, lng 14.43
 }
 ```
@@ -489,7 +489,7 @@ The PRD defines 28 acceptance criteria (AC-001 to AC-028). High-risk ACs and the
 | New York | 40.7128 | -74.0060 | UnsupportedGeography |
 | Ostend, Belgium | 51.2298 | 2.9186 | ModeledExposureDetected (coastal) |
 
-**Note:** Exact results for `ModeledExposureDetected` vs `NoModeledExposureDetected` depend on OQ-04 (coastal zone definition) and OQ-05 (exposure threshold). Test coordinates above are illustrative; actual values require real COG data to be present.
+**Note:** Exact results for `ModeledExposureDetected` vs `NoModeledExposureDetected` depend on the Copernicus Coastal Zones 2018 geometry (ADR-018) and binary exposure methodology (ADR-015). Test coordinates above are illustrative; actual values require real COG data to be present.
 
 ### Database Seeding for Tests
 
@@ -499,7 +499,7 @@ Integration tests use a `TestDbFixture` that:
 3. Seeds test scenarios, horizons, methodology version, and geometry for Europe boundary
 4. Tears down after test run
 
-Coastal zone geometry is stubbed as a bounding box for Europe's coastline (simplified) until OQ-04 is resolved.
+Coastal zone geometry is stubbed as a simplified bounding box for Europe's coastline in tests. Production uses Copernicus Coastal Zones 2018 (ADR-018).
 
 ---
 

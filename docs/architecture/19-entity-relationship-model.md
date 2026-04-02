@@ -54,7 +54,7 @@ erDiagram
         string what_it_does "Plain-language methodology"
         jsonb limitations "Array of limitation strings"
         string resolution_note "~30m resolution caveat"
-        decimal exposure_threshold "OQ-05: TBD"
+        decimal exposure_threshold "ADR-015: NULL for v1.0 (binary)"
         timestamp updated_at "Last modification time"
     }
 
@@ -139,9 +139,9 @@ The set of climate emissions pathways (Shared Socioeconomic Pathways) available 
 | `display_name` | `VARCHAR(200)` | NO | Human-readable name, e.g., `Intermediate (SSP2-4.5)` |
 | `description` | `TEXT` | NO | CONTENT_GUIDELINES-compliant explanation of the pathway |
 | `sort_order` | `INTEGER` | NO | Controls display ordering in UI |
-| `is_default` | `BOOLEAN` | NO | At most one row may be `true` (OQ-03 BLOCKING) |
+| `is_default` | `BOOLEAN` | NO | At most one row may be `true` (ADR-017: ssp2-45) |
 
-**Cardinality:** Expected 2-4 rows (likely SSP1-2.6, SSP2-4.5, SSP5-8.5). Exact values depend on OQ-02 resolution.
+**Cardinality:** Exactly 3 rows: ssp1-26, ssp2-45, ssp5-85 (ADR-016).
 
 ---
 
@@ -153,7 +153,7 @@ Fixed set of future time horizons for sea-level projections.
 |---|---|---|---|
 | `year` | `INTEGER` | NO (PK) | Projection year: 2030, 2050, or 2100 |
 | `display_label` | `VARCHAR(10)` | NO | Display string, e.g., `"2050"` |
-| `is_default` | `BOOLEAN` | NO | At most one row may be `true` (OQ-03 BLOCKING) |
+| `is_default` | `BOOLEAN` | NO | At most one row may be `true` (ADR-017: 2050) |
 | `sort_order` | `INTEGER` | NO | Controls display ordering |
 
 **Cardinality:** Exactly 3 rows. Not extensible without API version bump (FR-015 confirmed).
@@ -175,7 +175,7 @@ Tracks the scientific methodology and data sources used to compute exposure laye
 | `what_it_does` | `TEXT` | NO | Plain-language methodology description (2-4 sentences) |
 | `limitations` | `JSONB` | NO | Array of known limitation strings |
 | `resolution_note` | `TEXT` | NO | Resolution caveat text |
-| `exposure_threshold` | `DECIMAL(10,4)` | YES | OQ-05 BLOCKING: threshold value if continuous model |
+| `exposure_threshold` | `DECIMAL(10,4)` | YES | ADR-015: NULL for v1.0 (binary methodology, no runtime threshold) |
 | `updated_at` | `TIMESTAMPTZ` | NO | Last modification timestamp |
 
 **Invariant:** Old versions are never deleted (NFR-021 audit trail). Activation is an atomic swap: deactivate current, activate new.
@@ -221,8 +221,8 @@ Stores PostGIS geometries used for server-side geography validation.
 
 | `name` | Purpose | Source |
 |---|---|---|
-| `europe` | Europe boundary for `UnsupportedGeography` check | Natural Earth or EEA (TBD) |
-| `coastal_analysis_zone` | Coastal zone for `OutOfScope` check | OQ-04 BLOCKING: definition TBD |
+| `europe` | Europe boundary for `UnsupportedGeography` check | Natural Earth 10m cultural vectors |
+| `coastal_analysis_zone` | Coastal zone for `OutOfScope` check | ADR-018: Copernicus Coastal Zones 2018, ~10 km inland |
 
 ---
 

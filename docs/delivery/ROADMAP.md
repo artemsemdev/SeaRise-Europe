@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03  
+**Last updated:** 2026-04-03 (Wave 1 complete)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -9,22 +9,22 @@
 ## Progress Snapshot
 
 ```text
-  ░░░░░░░░░░░░░░░░░░░░  0% COMPLETE  ·  0 of 58 stories delivered
+  ██░░░░░░░░░░░░░░░░░░  12% COMPLETE  ·  7 of 58 stories delivered
 ```
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **0** / 58 |
-| Epics completed | **0** / 8 |
-| Waves fully completed | **0** / 8 |
-| Current wave | Wave 1 — Decision Closure (0 / 7) READY |
+| Stories completed | **7** / 58 |
+| Epics completed | **1** / 8 |
+| Waves fully completed | **1** / 8 |
+| Current wave | Wave 2 — Local Dev Environment (0 / 3) READY |
 | Unit tests passing | N/A — implementation not started |
-| Next up | `S01-01` Confirm MVP Scenario Set |
+| Next up | `S02-01` Set Up Docker Compose Local Development Environment |
 
 ```mermaid
 pie title Story Completion
-    "Completed (0)" : 0
-    "Remaining (58)" : 58
+    "Completed (7)" : 7
+    "Remaining (51)" : 51
 ```
 
 ---
@@ -32,8 +32,8 @@ pie title Story Completion
 ## Wave Progress
 
 ```text
-Wave 1 · Decision Closure      ░░░░░░░░░░░░░░░░░░░░  0/7     0%  READY
-Wave 2 · Local Dev Environment ░░░░░░░░░░░░░░░░░░░░  0/3     0%  PLANNED
+Wave 1 · Decision Closure      ████████████████████  7/7   100%  DONE
+Wave 2 · Local Dev Environment ░░░░░░░░░░░░░░░░░░░░  0/3     0%  READY
 Wave 3 · Geospatial Pipeline   ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
 Wave 4 · Backend API Core      ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
 Wave 5 · Frontend Search       ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
@@ -48,7 +48,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 
 | # | Epic | Progress | Status |
 |--:|------|:--------:|:------:|
-| 1 | Decision Closure and Delivery Baseline | 0 / 7 (0%) | Ready |
+| 1 | Decision Closure and Delivery Baseline | 7 / 7 (100%) | **Done** |
 | 2 | Local Development Environment | 0 / 3 (0%) | Planned |
 | 3 | Geospatial Data Pipeline | 0 / 8 (0%) | Planned |
 | 4 | Backend API Core | 0 / 7 (0%) | Planned |
@@ -60,18 +60,6 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Remaining Work
-
-### Decision Closure — 7 stories · Wave 1
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S01-01 | Confirm MVP Scenario Set | Final scenario IDs, names, and descriptions |
-| S01-02 | Confirm Default Scenario and Time Horizon | Initial UI defaults and config response |
-| S01-03 | Define Coastal Analysis Zone Geometry | Boundary definition and validation geometry |
-| S01-04 | Confirm Exposure Methodology | Binary methodology and explanatory copy |
-| S01-05 | Select Production Geocoding Provider | Provider choice, constraints, and mapping |
-| S01-06 | Select Basemap Tile Provider | Basemap provider, attribution, and keys |
-| S01-07 | Produce Seed Data Specification | Canonical seed values for downstream epics |
 
 ### Local Development Environment — 3 stories · Wave 2
 
@@ -163,6 +151,18 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 
 ## Recently Completed
 
+### Decision Closure — 7 stories · Wave 1 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S01-04 | Confirm Exposure Methodology | ADR-015: binary v1.0, methodology-spec.md, panel text |
+| S01-01 | Confirm MVP Scenario Set | ADR-016: ssp1-26, ssp2-45, ssp5-85 with display names and descriptions |
+| S01-02 | Confirm Default Scenario and Time Horizon | ADR-017: ssp2-45 + 2050 defaults |
+| S01-03 | Define Coastal Analysis Zone Geometry | ADR-018: Copernicus Coastal Zones 2018, validation spec |
+| S01-05 | Select Production Geocoding Provider | ADR-019: Azure Maps Search, field mapping |
+| S01-06 | Select Basemap Tile Provider | ADR-020: MapTiler Dataviz Light, attribution, key model |
+| S01-07 | Produce Seed Data Specification | seed-data-spec.sql with cross-references |
+
 ### Planning Baseline — non-counted groundwork · DONE 2026-04-02
 
 | ID | Work Item | What was delivered |
@@ -178,7 +178,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | Version | Milestone | Status |
 |:-------:|-----------|:------:|
 | v0.1 | Documentation Baseline — product, architecture, and delivery planning docs | **Done** |
-| v0.2 | Decision Closure — OQ-02 through OQ-07 approved and recorded | Planned |
+| v0.2 | Decision Closure — OQ-02 through OQ-07 approved and recorded (ADR-015 through ADR-020) | **Done** |
 | v0.3 | Local Foundation — Docker Compose, schema, and CI operational | Planned |
 | v0.4 | Data Pipeline — validated COG generation and seeded metadata | Planned |
 | v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | Planned |
@@ -194,10 +194,10 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 flowchart LR
     subgraph Completed
         B[Docs Baseline]
+        W1[S01-01..07 Decision Closure]
     end
 
     subgraph Planned
-        W1[S01-01..07 Decision Closure]
         W2[S02-01..03 Local Dev]
         W3[S03-01..08 Pipeline]
         W4[S04-01..07 Backend API]
@@ -212,8 +212,8 @@ flowchart LR
     classDef done fill:#d9f99d,stroke:#3f6212,color:#111827;
     classDef later fill:#e5e7eb,stroke:#6b7280,color:#111827;
 
-    class B done;
-    class W1,W2,W3,W4,W5,W6,W7,W8 later;
+    class B,W1 done;
+    class W2,W3,W4,W5,W6,W7,W8 later;
 ```
 
 ---

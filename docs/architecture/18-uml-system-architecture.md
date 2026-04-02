@@ -41,8 +41,8 @@ C4Context
 
     System(searise, "SeaRise Europe", "Web application that assesses coastal sea-level exposure for European locations under IPCC AR6 scenarios")
 
-    System_Ext(geocoding, "Geocoding Provider", "Resolves free-text addresses to coordinates (OQ-06: provider TBD)")
-    System_Ext(basemap, "Basemap Tile Provider", "Serves vector/raster map tiles for interactive map (OQ-07: provider TBD)")
+    System_Ext(geocoding, "Azure Maps Search", "Resolves free-text addresses to coordinates (ADR-019)")
+    System_Ext(basemap, "MapTiler", "Serves Dataviz Light vector tiles for interactive map (ADR-020)")
     System_Ext(ipcc, "IPCC AR6 Projections", "Sea-level rise projection data (NetCDF, offline pipeline input)")
     System_Ext(copernicus, "Copernicus DEM GLO-30", "Digital elevation model at ~30m resolution (offline pipeline input)")
 
@@ -711,8 +711,8 @@ graph TB
     end
 
     subgraph External
-        GEO["Geocoding Provider<br/>(OQ-06 TBD)"]
-        BASE["Basemap Tile Provider<br/>(OQ-07 TBD)"]
+        GEO["Azure Maps Search<br/>(ADR-019)"]
+        BASE["MapTiler<br/>(ADR-020)"]
     end
 
     User -->|HTTPS| FE

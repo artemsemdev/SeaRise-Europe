@@ -66,7 +66,7 @@ public record GeocodingCandidate(
 
 **Implementations:**
 - `NominatimGeocodingClient` — dev only; uses Nominatim public API (acceptable-use constrained)
-- `[Provider]GeocodingClient` — production (OQ-06 BLOCKING — class exists as a placeholder)
+- `AzureMapsGeocodingClient` — production (ADR-019: Azure Maps Search selected)
 
 **Rules enforced here:**
 - Returns at most 5 candidates (BR-007)
@@ -116,14 +116,14 @@ SELECT ST_Within(
     geom
 ) FROM geography_boundaries WHERE name = 'europe';
 
--- Coastal zone check (requires OQ-04 to be seeded)
+-- Coastal zone check (ADR-018: Copernicus Coastal Zones 2018)
 SELECT ST_Within(
     ST_SetSRID(ST_Point(@longitude, @latitude), 4326),
     geom
 ) FROM geography_boundaries WHERE name = 'coastal_analysis_zone';
 ```
 
-**Critical note:** The `coastal_analysis_zone` geometry is **BLOCKING** (OQ-04). The table row must be seeded before this check can return meaningful results. The check is architecturally complete; the geometry is the missing input.
+**Note:** The `coastal_analysis_zone` geometry source is confirmed (ADR-018: Copernicus Coastal Zones 2018). The geometry will be seeded during pipeline bootstrap (Epic 03). The check is architecturally complete.
 
 **GIST index required:**
 ```sql
@@ -176,12 +176,12 @@ public interface IExposureEvaluator
     Task<bool> IsExposedAsync(double latitude, double longitude, ExposureLayer layer, CancellationToken ct);
 }
 ```
-**Proposed implementation options (OQ-05 determines the correct approach):**
-- Option A: Call TiTiler's `/point/{lng},{lat}` endpoint with the COG URL → get pixel value → apply methodology threshold
-- Option B: Direct GDAL/rasterio raster query from within the API (adds rasterio Python dependency or GDAL.NET)
-- Option C: Pre-materialized point lookup in PostgreSQL raster table (using PostGIS raster extension)
+**Implementation (ADR-015 confirmed binary methodology):**
+- Option A (selected): Call TiTiler's `/point/{lng},{lat}` endpoint with the COG URL → pixel value `1` means exposed, `0` means not exposed (no runtime threshold needed)
+- Option B: Direct GDAL/rasterio raster query from within the API (deferred — unnecessary complexity for MVP)
+- Option C: Pre-materialized point lookup in PostgreSQL raster table (deferred)
 
-**Recommendation:** Option A (TiTiler `/point` endpoint) for MVP — avoids adding a raster processing dependency to the API container. Mark as Proposed; validate TiTiler `/point` performance in staging.
+**Decision:** Option A (TiTiler `/point` endpoint) for MVP — avoids adding a raster processing dependency to the API container. Binary methodology (ADR-015) means pixel value check is `pixelValue == 1`. Validate TiTiler `/point` performance in staging.
 
 `ResultStateDeterminator`:
 ```csharp
@@ -219,8 +219,8 @@ public interface IMethodologyRepository { Task<MethodologyVersion> GetActiveAsyn
 ```
 
 **Notes:**
-- Scenario IDs and display names: seeded from database (OQ-02 — BLOCKING)
-- Default scenario and horizon: `is_default` field in database (OQ-03 — BLOCKING)
+- Scenario IDs and display names: seeded from database (ADR-016: ssp1-26, ssp2-45, ssp5-85)
+- Default scenario and horizon: `is_default` field in database (ADR-017: ssp2-45, 2050)
 - Horizons are confirmed: {2030, 2050, 2100} (FR-015) — can be hardcoded or seeded
 - Methodology metadata is read from `methodology_versions` WHERE `is_active = true`
 
@@ -365,4 +365,4 @@ TiTiler is an off-the-shelf FastAPI application. Within SeaRise Europe its role 
 - Serve `/point/{lng},{lat}` — pixel value at a coordinate (used by ExposureEvaluator, Option A)
 - No application-layer customization — only environment configuration (Blob connection, CORS, allowed origins)
 
-**Open Question:** Whether assessment point evaluation uses TiTiler `/point` (Option A) or a direct GDAL query in the API. Resolve during Phase 0 spike based on latency and reliability testing.
+**Decision:** Assessment point evaluation uses TiTiler `/point` (Option A) for MVP. Binary methodology (ADR-015) simplifies the evaluation to `pixelValue == 1`. Validate TiTiler `/point` latency during Phase 0 spike.

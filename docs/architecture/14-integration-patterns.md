@@ -23,7 +23,7 @@
 
 ### 2.1 Interface Contract
 
-The geocoding provider is abstracted behind `IGeocodingService`. The production implementation (`[Provider]GeocodingClient`) adapts whatever provider API is chosen (OQ-06) to the internal `GeocodingCandidate` model.
+The geocoding provider is abstracted behind `IGeocodingService`. The production implementation (`AzureMapsGeocodingClient`, ADR-019) adapts the Azure Maps Search API to the internal `GeocodingCandidate` model.
 
 ```csharp
 public interface IGeocodingService
@@ -120,7 +120,7 @@ Response:
 - `0` → `NoModeledExposureDetected`
 - `null` / NoData → treat as `NoModeledExposureDetected` (location is within coastal zone but outside COG extent)
 
-**Note:** OQ-05 may change this interpretation if COG pixel values are continuous rather than binary.
+**Confirmed (ADR-015):** Binary methodology — pixel values are 0 or 1. No continuous interpretation needed.
 
 ### 3.2 ExposureEvaluator Implementation
 
@@ -148,7 +148,7 @@ public class TilerExposureEvaluator : IExposureEvaluator
 
         _logger.LogDebug("TilerQueryCompleted {PixelValue}", pixelValue);
 
-        return pixelValue == 1;  // OQ-05: adjust if continuous threshold
+        return pixelValue == 1;  // ADR-015: binary methodology, pixel 1 = exposed
     }
 }
 ```
