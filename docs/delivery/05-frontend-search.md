@@ -38,7 +38,7 @@ The frontend is the only delivery vehicle for the product's value. Every prior e
 - EmptyState, LoadingState, ErrorBanner components for all conditional UI phases.
 - Localization-ready string file (`lib/i18n/en.ts`) with all UI copy externalized.
 - Config fetch on app load (`GET /v1/config/scenarios`, staleTime: Infinity).
-- Vitest + React Testing Library unit tests, Playwright smoke test, bundle size baseline.
+- Vitest + React Testing Library unit tests, authored `@playwright/test` smoke test, `playwright-cli` exploratory validation, bundle size baseline.
 
 ### 3.2 Out of Scope
 
@@ -354,7 +354,7 @@ The map is the largest visual element in the application and the primary spatial
 
 - Vitest + RTL: verify the dynamic import renders the loading placeholder, then the map container element.
 - Manual verification: open in browser, pan/zoom, confirm attribution, confirm marker placement on simulated selection.
-- Playwright smoke test (deferred to S05-08): page loads without errors, map canvas is present.
+- `@playwright/test` smoke test (deferred to S05-08): page loads without errors, map canvas is present. Use `playwright-cli` for ad-hoc visual verification during development.
 
 **Evidence Required**
 
@@ -679,7 +679,7 @@ NFR-010 prohibits blank or broken UI states. Every phase of the AppPhase state m
 
 **Statement**
 
-As the engineer, I want a Vitest + RTL test suite covering store transitions and component renders, a Playwright smoke test for the critical search flow, and a bundle size measurement, so that quality and performance baselines are established before Epic 06 builds on top.
+As the engineer, I want a Vitest + RTL test suite covering store transitions and component renders, an authored `@playwright/test` smoke test for the critical search flow, and a bundle size measurement, so that quality and performance baselines are established before Epic 06 builds on top. Additionally, `playwright-cli` should be available for ad-hoc visual verification during development.
 
 **Why**
 
@@ -698,12 +698,17 @@ This epic produces the foundation that all subsequent frontend work builds on. W
   - EmptyState: renders correct text when phase is `idle`.
   - LoadingState: renders correct text for `geocoding` and `assessing` phases.
   - ErrorBanner: renders correct text and retry button for error phases.
-- Configure Playwright.
-- Write Playwright smoke test:
+- Configure `@playwright/test` (the authored test runner).
+- Write an authored `@playwright/test` smoke test:
   - Load page.
   - Verify map canvas is present.
   - Type a query into SearchBar, submit.
   - Verify CandidateList appears (with MSW or API stub).
+- Verify `playwright-cli` works against the local Docker Compose environment for ad-hoc exploration:
+  ```bash
+  npx playwright-cli goto http://localhost:3000
+  npx playwright-cli screenshot homepage.png
+  ```
 - Measure and record bundle size:
   - Run `next build` and extract the route-level JS sizes from build output.
   - Assert initial JS (critical path, before lazy chunks) is under 300KB gzipped.
@@ -716,9 +721,10 @@ This epic produces the foundation that all subsequent frontend work builds on. W
 
 **Implementation Notes**
 
-- Use MSW (Mock Service Worker) to stub API responses in both Vitest (for integration-level component tests) and Playwright (for smoke tests).
+- Use MSW (Mock Service Worker) to stub API responses in both Vitest (for integration-level component tests) and `@playwright/test` (for authored smoke tests).
 - The bundle size assertion should be a script or CI step that parses `next build` output — not a manual check. This becomes a regression gate in CI.
-- Playwright needs a running `next dev` or `next start` server. Use `webServer` config in `playwright.config.ts` to start the dev server automatically.
+- `@playwright/test` needs a running `next dev` or `next start` server. Use `webServer` config in `playwright.config.ts` to start the dev server automatically. The `baseURL` should default to `http://localhost:3000` (local Docker Compose).
+- `playwright-cli` (`npx playwright-cli`) is available for ad-hoc visual verification but does not replace the authored test. Use it to quickly check UI states, capture screenshots, or debug rendering issues during development.
 
 **Acceptance Criteria**
 
@@ -726,7 +732,7 @@ This epic produces the foundation that all subsequent frontend work builds on. W
 2. appStore tests cover every valid phase transition and the `reset()` from every phase.
 3. Each conditional component (EmptyState, LoadingState, ErrorBanner, CandidateList) has at least one render test verifying correct text and ARIA attributes.
 4. SearchBar test verifies empty submit is blocked.
-5. Playwright smoke test loads the page, confirms map canvas element exists, types a query, submits, and verifies candidate list renders.
+5. Authored `@playwright/test` smoke test loads the page, confirms map canvas element exists, types a query, submits, and verifies candidate list renders.
 6. `next build` output shows initial route JS under 300KB gzipped.
 7. Total JS (including lazy chunks) is under 800KB gzipped.
 8. Bundle size measurement is recorded and committed (as a CI step or documented baseline).
@@ -734,9 +740,9 @@ This epic produces the foundation that all subsequent frontend work builds on. W
 **Definition of Done**
 
 - All Vitest tests pass.
-- Playwright smoke test passes.
+- Authored `@playwright/test` smoke test passes against local Docker Compose.
 - Bundle size baseline recorded and committed.
-- CI configuration updated to run Vitest and bundle size check on PR.
+- CI configuration updated to run Vitest, `@playwright/test` smoke test, and bundle size check on PR.
 
 **Testing Approach**
 
@@ -745,7 +751,7 @@ This epic produces the foundation that all subsequent frontend work builds on. W
 **Evidence Required**
 
 - Vitest test run output (all pass).
-- Playwright smoke test run output (pass).
+- `@playwright/test` smoke test run output (pass).
 - `next build` output showing bundle sizes.
 - Documented bundle size baseline.
 
@@ -768,7 +774,7 @@ This epic produces the foundation that all subsequent frontend work builds on. W
 | TanStack Query config hook            | TypeScript module                     | S05-06      |
 | EmptyState, LoadingState, ErrorBanner | React components                      | S05-07      |
 | Vitest test suite                     | TypeScript test files                 | S05-08      |
-| Playwright smoke test                 | TypeScript test file                  | S05-08      |
+| `@playwright/test` smoke test         | TypeScript test file                  | S05-08      |
 | Bundle size baseline                  | Documented measurement                | S05-08      |
 
 ---
@@ -782,7 +788,7 @@ This epic consumes two API endpoints built in Epic 04:
 | `/v1/geocode`                | POST   | SearchBar (S05-04)  | Geocoding query; returns candidates    |
 | `/v1/config/scenarios`       | GET    | Config hook (S05-06)| Scenario list; cached for session      |
 
-No database writes. No Blob Storage access. No infrastructure provisioning. The frontend container will be added to the existing Docker Compose configuration (Epic 02, S02-04) and the CI/CD pipeline (Epic 02, S02-05).
+No database writes. No Blob Storage access. No infrastructure provisioning. The frontend container will be added to the existing Docker Compose configuration (Epic 02, S02-01) and the basic CI pipeline (Epic 02, S02-03). CI/CD deployment to Azure is deferred to Epic 08.
 
 ---
 
@@ -813,7 +819,7 @@ No database writes. No Blob Storage access. No infrastructure provisioning. The 
 | S05-05  | Vitest + RTL — rendering, keyboard navigation, selection; axe-core accessibility   |
 | S05-06  | Vitest — config hook with MSW mock; code review for hardcoded strings              |
 | S05-07  | Vitest + RTL — each component renders in correct phase with correct ARIA           |
-| S05-08  | Vitest full suite, Playwright smoke test, bundle size measurement                  |
+| S05-08  | Vitest full suite, `@playwright/test` smoke test, `playwright-cli` verification, bundle size measurement |
 
 ---
 
@@ -832,7 +838,7 @@ No database writes. No Blob Storage access. No infrastructure provisioning. The 
 
 | Assumption | Impact if Wrong |
 | ---------- | --------------- |
-| Epic 04 delivers `POST /v1/geocode` and `GET /v1/config/scenarios` before this epic completes. | Frontend can be developed and tested entirely against mocks, but integration testing and the Playwright smoke test against a real API are blocked. |
+| Epic 04 delivers `POST /v1/geocode` and `GET /v1/config/scenarios` before this epic completes. | Frontend can be developed and tested entirely against mocks, but integration testing and the `@playwright/test` smoke test against a real local API are blocked. |
 | MapLibre GL JS works with the selected basemap provider's style URL without additional configuration. | May require adapter configuration or a different tile source format. Low risk — MapLibre supports all common vector and raster tile formats. |
 | The 300KB initial JS budget is achievable with Next.js 14 + TailwindCSS + Zustand + TanStack Query (before MapLibre lazy load). | If exceeded, investigate tree-shaking, dependency analysis, and further code splitting. |
 
@@ -850,7 +856,7 @@ No database writes. No Blob Storage access. No infrastructure provisioning. The 
 8. All UI strings are sourced from `lib/i18n/en.ts` — no hardcoded copy in components.
 9. Config scenarios are fetched on app load and cached for the session.
 10. Vitest test suite passes with coverage of all store transitions and component renders.
-11. Playwright smoke test passes (load, search, candidate list appears).
+11. `@playwright/test` smoke test passes against local Docker Compose (load, search, candidate list appears).
 12. Initial JS bundle (critical path) is under 300KB gzipped.
 
 ---
@@ -859,7 +865,7 @@ No database writes. No Blob Storage access. No infrastructure provisioning. The 
 
 - All 8 user stories completed with evidence.
 - `next build` and Docker build succeed in CI.
-- Vitest and Playwright test suites pass.
+- Vitest and `@playwright/test` suites pass against local Docker Compose.
 - Bundle size baseline recorded and within budget.
 - No blank or broken UI states across any appPhase.
 - All UI copy sourced from the localization file.
@@ -874,9 +880,9 @@ No database writes. No Blob Storage access. No infrastructure provisioning. The 
 | ----------------------------------------------------- | ------------------------------------------------ |
 | Running application at localhost:3000                  | Docker Compose or `next start`                   |
 | Map rendering at Europe view                          | Screenshot or screen recording                   |
-| Search flow: query -> candidates -> selection -> marker | Screen recording or Playwright trace            |
+| Search flow: query -> candidates -> selection -> marker | Screen recording, `@playwright/test` trace, or `playwright-cli` screenshots |
 | EmptyState, LoadingState, ErrorBanner renders         | Screenshots per phase                            |
 | Responsive layout at 3 breakpoints                    | Screenshots at 1280px, 900px, 375px widths       |
 | Vitest test results                                   | CI output or terminal screenshot                 |
-| Playwright smoke test results                         | CI output or Playwright HTML report              |
+| `@playwright/test` smoke test results                 | CI output or Playwright HTML report              |
 | Bundle size baseline                                  | `next build` output showing route-level JS sizes |

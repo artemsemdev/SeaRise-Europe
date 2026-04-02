@@ -6,7 +6,7 @@
 | Phase          | 0/1 — bridges foundation and MVP                                                                   |
 | Status         | Not Started                                                                                        |
 | Effort         | ~7 days                                                                                            |
-| Dependencies   | Epic 02 (Azure infrastructure, PostgreSQL schema), Epic 03 (seed data + COG layers in Blob Storage)|
+| Dependencies   | Epic 02 (local Docker Compose environment, PostgreSQL schema), Epic 03 (seed data + COG layers in local storage) |
 | Stories        | 7 (S04-01 through S04-07)                                                                          |
 | Produces       | Fully functional API that the frontend consumes                                                    |
 
@@ -670,7 +670,7 @@ The assessment pipeline produces results that users interpret as exposure inform
 - **Database:** Read-only at runtime. Queries `scenarios`, `horizons`, `methodology_versions`, `layers`, and `geography_boundaries` tables. No schema changes — schema is created in Epic 02, seed data inserted in Epic 03.
 - **API:** This epic creates the API. All five endpoints defined in `docs/architecture/06-api-and-contracts.md` are implemented.
 - **Blob Storage:** Read-only. The `TiTilerExposureEvaluator` constructs blob URLs for TiTiler to read. The health check verifies blob container reachability.
-- **Infrastructure:** Consumes the Container Apps, PostgreSQL, Blob Storage, and Key Vault resources provisioned in Epic 02. The Dockerfile produced here is built and deployed by the CI/CD pipeline from Epic 02.
+- **Infrastructure:** Consumes the local PostgreSQL and local blob storage provisioned in Epic 02 via Docker Compose. The Dockerfile produced here is built locally and tested via Docker Compose. Azure Container Apps deployment happens in Epic 08.
 
 ---
 

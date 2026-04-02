@@ -34,7 +34,7 @@ This epic addresses two foundational product pillars: Scientific Honesty and Acc
 - Full keyboard navigation flow with correct Tab order and arrow key support.
 - ARIA attributes on all interactive and live regions.
 - Responsive layout validation at desktop, tablet, and mobile breakpoints.
-- Automated and manual accessibility audit (axe-core, keyboard walkthrough, VoiceOver, color contrast).
+- Automated and manual accessibility audit (`@axe-core/playwright` via `@playwright/test`, `playwright-cli` for interactive checks, keyboard walkthrough, VoiceOver, color contrast).
 
 ### 3.2 Out of Scope
 
@@ -396,13 +396,14 @@ WCAG 2.2 AA (NFR-015) requires all functionality to be operable via keyboard. Th
 **Testing Approach**
 
 - Manual keyboard walkthrough: complete the full search-to-result flow using only keyboard.
-- Playwright test: Tab sequence verification (focus moves through expected elements in order).
-- Playwright test: Escape key closes open panels.
-- Playwright test: Enter key selects a candidate and triggers assessment.
+- Authored `@playwright/test` test: Tab sequence verification (focus moves through expected elements in order).
+- Authored `@playwright/test` test: Escape key closes open panels.
+- Authored `@playwright/test` test: Enter key selects a candidate and triggers assessment.
+- `playwright-cli` for interactive keyboard walkthrough verification during development (ad-hoc, not CI-gated).
 
 **Evidence Required**
 
-- Playwright test output (all keyboard navigation tests pass).
+- `@playwright/test` output (all keyboard navigation tests pass).
 - Manual keyboard walkthrough recording or checklist confirming all flows are completable.
 
 ---
@@ -472,7 +473,7 @@ WCAG 2.2 AA requires assistive technology compatibility. The architecture docume
 
 - Unit test: ARIA attributes are present on rendered components (query by role).
 - Manual test: VoiceOver walkthrough of the full search-to-result flow on macOS.
-- Playwright test: verify `aria-live` region content updates when result state changes.
+- Authored `@playwright/test` test: verify `aria-live` region content updates when result state changes.
 
 **Evidence Required**
 
@@ -540,13 +541,14 @@ The architecture defines three layout modes: split-pane at desktop (1024px and a
 **Testing Approach**
 
 - Manual test: full flow at 1024px, 768px, and 375px viewports.
-- Playwright test: viewport-parameterized test runs the search-to-result flow at each breakpoint.
+- Authored `@playwright/test` viewport-parameterized test runs the search-to-result flow at each breakpoint.
+- `playwright-cli` for quick visual spot-checks at each viewport size during development.
 - Visual inspection: no overflow, clipping, or overlap at any breakpoint.
 
 **Evidence Required**
 
-- Screenshots at each breakpoint showing the result state.
-- Playwright test output for viewport-parameterized tests.
+- Screenshots at each breakpoint showing the result state (from `@playwright/test` or `playwright-cli`).
+- `@playwright/test` output for viewport-parameterized tests.
 - OQ-12 gap documentation (if applicable).
 
 ---
@@ -577,7 +579,8 @@ Individual stories in this epic implement specific accessibility features, but c
 - Color contrast verification: all text meets 4.5:1 ratio (normal text) and 3:1 ratio (large text).
 - Non-color-dependent communication check: result states are distinguishable without color (text labels, patterns, or opacity differences).
 - Verify the map overlay and legend are comprehensible without color perception.
-- Create a Playwright accessibility test suite that runs axe-core on key pages/states and is integrated into CI.
+- Create an authored `@playwright/test` accessibility test suite that runs `@axe-core/playwright` on key pages/states and is integrated into CI.
+- Use `playwright-cli` for interactive keyboard walkthrough and focus verification during development.
 
 **Traceability**
 
@@ -586,8 +589,9 @@ Individual stories in this epic implement specific accessibility features, but c
 
 **Implementation Notes**
 
-- Use `@axe-core/playwright` for automated scanning within Playwright tests.
-- Structure the Playwright a11y test suite to navigate to each UI state before running the axe scan.
+- Use `@axe-core/playwright` for automated scanning within authored `@playwright/test` tests. These run against the local Docker Compose environment during this epic; they are re-run against staging during Epic 08.
+- Structure the `@playwright/test` a11y test suite to navigate to each UI state before running the axe scan.
+- Use `playwright-cli` (`npx playwright-cli`) for interactive keyboard walkthrough during development — navigate to each state, tab through elements, and verify focus order in real time.
 - For color contrast, use axe-core's built-in contrast checks plus manual verification with a contrast ratio tool for any custom colors.
 - For non-color-dependent communication, verify each result state has a unique text label in addition to its color. Verify the map overlay uses pattern or opacity variation, not color alone. Verify the legend includes text labels.
 - Document all findings in a structured audit report.
@@ -600,7 +604,7 @@ Individual stories in this epic implement specific accessibility features, but c
 4. All text meets WCAG 2.2 AA color contrast ratios (4.5:1 normal, 3:1 large).
 5. All result states are distinguishable without color (text + color, not color alone).
 6. Map overlay and legend are comprehensible without color perception.
-7. Playwright a11y test suite is committed and runs in CI.
+7. `@playwright/test` a11y test suite is committed and runs in CI against local Docker Compose.
 8. Audit report is committed documenting findings, remediations, and residual items (if any).
 
 **Definition of Done**
@@ -610,12 +614,13 @@ Individual stories in this epic implement specific accessibility features, but c
 - VoiceOver walkthrough documented and passing.
 - Color contrast verified.
 - Non-color-dependent communication verified.
-- Playwright a11y test suite committed and integrated into CI.
+- `@playwright/test` a11y test suite committed and integrated into CI.
 - Audit report committed.
 
 **Testing Approach**
 
-- Automated: Playwright + axe-core scan of all UI states.
+- Automated: `@axe-core/playwright` via authored `@playwright/test` tests scanning all UI states against local Docker Compose.
+- Interactive: `playwright-cli` for keyboard and focus verification during development.
 - Manual: keyboard walkthrough checklist.
 - Manual: VoiceOver walkthrough checklist.
 - Manual: color contrast spot-check with browser DevTools or dedicated tool.
@@ -628,7 +633,7 @@ Individual stories in this epic implement specific accessibility features, but c
 - VoiceOver walkthrough checklist (every element's announcement documented).
 - Color contrast verification results.
 - Grayscale screenshot confirming result states are distinguishable without color.
-- Playwright a11y test suite output (all tests pass).
+- `@playwright/test` a11y test suite output (all tests pass).
 - Audit report committed to repository.
 
 ---
@@ -644,7 +649,7 @@ Individual stories in this epic implement specific accessibility features, but c
 | Keyboard navigation implementation         | Component updates (committed)    | S07-04      |
 | ARIA attribute implementation              | Component updates (committed)    | S07-05      |
 | Responsive layout fixes                    | Component/CSS updates (committed)| S07-06      |
-| Playwright a11y test suite                 | Test files (committed, in CI)    | S07-07      |
+| `@playwright/test` a11y test suite (`@axe-core/playwright`) | Test files (committed, in CI) | S07-07 |
 | Accessibility audit report                 | Markdown (committed)             | S07-07      |
 
 ---
@@ -668,7 +673,7 @@ Individual stories in this epic implement specific accessibility features, but c
 ## 11  Observability
 
 - No new observability instrumentation is required. The MethodologyPanel API call is covered by existing frontend request logging (if instrumented in Epic 05/06).
-- The Playwright a11y test suite produces structured output that can be archived as a CI artifact for trend tracking.
+- The `@playwright/test` a11y test suite produces structured output that can be archived as a CI artifact for trend tracking.
 
 ---
 
@@ -679,10 +684,10 @@ Individual stories in this epic implement specific accessibility features, but c
 | S07-01  | Unit tests, integration test (TanStack Query caching), manual focus trap test, bundle analysis |
 | S07-02  | Automated prohibited-language scan, manual copy review against CONTENT_GUIDELINES |
 | S07-03  | Automated i18n lint rule, manual locale-file duplication test                     |
-| S07-04  | Playwright keyboard navigation tests, manual keyboard walkthrough                |
-| S07-05  | Unit tests (ARIA attributes), manual VoiceOver walkthrough, Playwright live region test |
-| S07-06  | Playwright viewport-parameterized tests, manual visual inspection at 3 breakpoints |
-| S07-07  | Playwright + axe-core automated scan, manual keyboard/VoiceOver/contrast audit   |
+| S07-04  | Authored `@playwright/test` keyboard navigation tests, `playwright-cli` interactive walkthrough, manual keyboard walkthrough |
+| S07-05  | Unit tests (ARIA attributes), manual VoiceOver walkthrough, authored `@playwright/test` live region test |
+| S07-06  | Authored `@playwright/test` viewport-parameterized tests, `playwright-cli` visual spot-checks, manual visual inspection at 3 breakpoints |
+| S07-07  | `@axe-core/playwright` via `@playwright/test` automated scan, `playwright-cli` for interactive a11y checks, manual keyboard/VoiceOver/contrast audit |
 
 ---
 
@@ -721,7 +726,7 @@ Individual stories in this epic implement specific accessibility features, but c
 9. VoiceOver walkthrough confirms correct announcements for all elements and state transitions.
 10. Color contrast meets WCAG 2.2 AA ratios; all result states are distinguishable without color.
 11. Prohibited-language lint script and i18n externalization lint rule are committed and running in CI.
-12. Playwright a11y test suite is committed and running in CI.
+12. `@playwright/test` a11y test suite is committed and running in CI against local Docker Compose.
 
 ---
 
@@ -731,12 +736,12 @@ Individual stories in this epic implement specific accessibility features, but c
 - MethodologyPanel fully functional with API integration, dynamic import, and correct accessibility behavior.
 - Content audit complete with zero prohibited-language violations and all copy matching CONTENT_GUIDELINES templates.
 - i18n externalization verified with zero hardcoded strings.
-- Keyboard navigation verified through manual walkthrough and Playwright tests.
+- Keyboard navigation verified through manual walkthrough, `playwright-cli` interactive checks, and authored `@playwright/test` tests.
 - ARIA attributes verified through unit tests and VoiceOver walkthrough.
 - Responsive layout verified at all three breakpoints.
-- axe-core scan passes with zero critical and zero serious violations.
+- axe-core scan (via `@axe-core/playwright`) passes with zero critical and zero serious violations.
 - Accessibility audit report committed.
-- Two new CI gates (prohibited-language scan, i18n lint rule) and Playwright a11y test suite committed and passing.
+- Two new CI gates (prohibited-language scan, i18n lint rule) and `@playwright/test` a11y test suite committed and passing.
 - No unresolved blocker remains within this epic's scope.
 
 ---
@@ -750,8 +755,8 @@ Individual stories in this epic implement specific accessibility features, but c
 | Prohibited-language lint script                             | `scripts/lint-prohibited-language.ts` (or equivalent)        |
 | Content audit log                                           | `docs/delivery/artifacts/content-audit-log.md`               |
 | i18n externalization lint rule                              | Integrated into ESLint config or standalone script            |
-| Playwright keyboard navigation tests                        | `tests/a11y/keyboard-navigation.spec.ts`                     |
-| Playwright a11y test suite (axe-core)                       | `tests/a11y/axe-scan.spec.ts`                                |
+| `@playwright/test` keyboard navigation tests                | `tests/a11y/keyboard-navigation.spec.ts`                     |
+| `@playwright/test` a11y test suite (`@axe-core/playwright`) | `tests/a11y/axe-scan.spec.ts`                                |
 | VoiceOver walkthrough checklist                             | Included in accessibility audit report                        |
 | Color contrast verification results                         | Included in accessibility audit report                        |
 | Grayscale screenshot (non-color-dependent verification)     | Included in accessibility audit report                        |

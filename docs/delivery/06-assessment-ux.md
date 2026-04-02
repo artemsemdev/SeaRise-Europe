@@ -619,11 +619,12 @@ The assessment flow involves multiple components (controls, API hook, result pan
   - Stale request handling: rapid scenario changes produce only the final result.
   - Cache behavior: switch to scenario A, switch to scenario B, switch back to scenario A — verify no network request on the third switch (NFR-004).
   - Error and retry: mock API error → ErrorBanner displayed → click Retry → success response → result displayed.
-- Playwright E2E tests:
-  - Full assessment flow against Docker Compose environment.
+- Authored `@playwright/test` E2E tests:
+  - Full assessment flow against local Docker Compose environment.
   - Keyboard-only flow: Tab through controls, Arrow keys to change scenario/horizon, Enter to open methodology entry point, Enter to reset.
   - URL state: navigate to app with URL params, verify result loads.
-- Accessibility: axe-core scan on result panel in each of the 5 result states.
+- Use `playwright-cli` for ad-hoc visual verification of result states and control interactions during development.
+- Accessibility: `@axe-core/playwright` scan on result panel in each of the 5 result states.
 
 **Traceability**
 
@@ -634,7 +635,7 @@ The assessment flow involves multiple components (controls, API hook, result pan
 
 - MSW handlers should return different `resultState` values based on request params (e.g., a specific lat/lng returns `OutOfScope`, another returns `DataUnavailable`). This avoids brittle mocks.
 - For cache testing: MSW can count the number of requests received. Assert that the third scenario switch (back to A) does not increment the request count.
-- Playwright tests should use the Docker Compose environment with seeded data (Epic 02 seed data + Epic 03 COGs).
+- `@playwright/test` tests should use the local Docker Compose environment with seeded data (Epic 02 seed data + Epic 03 COGs).
 - axe-core scan: run after each result state renders, assert zero violations at AA level.
 
 **Acceptance Criteria**
@@ -644,15 +645,15 @@ The assessment flow involves multiple components (controls, API hook, result pan
 3. RTL integration test verifies stale request handling — only the latest result is rendered after rapid changes.
 4. RTL integration test verifies TanStack Query cache — no redundant network request on revisiting a cached scenario/horizon.
 5. RTL integration test verifies error → retry → success flow.
-6. Playwright E2E test passes for the full assessment flow in Docker Compose.
-7. Playwright E2E test passes for keyboard-only assessment flow.
-8. Playwright E2E test passes for URL-initialized assessment.
+6. `@playwright/test` E2E test passes for the full assessment flow in local Docker Compose.
+7. `@playwright/test` E2E test passes for keyboard-only assessment flow.
+8. `@playwright/test` E2E test passes for URL-initialized assessment.
 9. axe-core scan passes with zero AA violations for all 5 result states.
 
 **Definition of Done**
 
 - All integration tests pass in CI.
-- All Playwright E2E tests pass against Docker Compose.
+- All `@playwright/test` E2E tests pass against local Docker Compose.
 - axe-core scan shows zero AA violations.
 - Test coverage report shows assessment flow hooks and components covered.
 
@@ -663,7 +664,7 @@ The assessment flow involves multiple components (controls, API hook, result pan
 **Evidence Required**
 
 - CI output showing all RTL integration tests passing.
-- Playwright test run output with screenshots for each result state.
+- `@playwright/test` run output with screenshots for each result state.
 - axe-core violation report (zero violations).
 
 ---
@@ -727,7 +728,7 @@ No new API endpoints, database tables, or Azure resources are required.
 | S06-04  | RTL Legend test; manual visual verification of ExposureLayer; accessibility text-label check            |
 | S06-05  | RTL tests for LoadingState, ErrorBanner, result_updating visual state; manual blank-frame check         |
 | S06-06  | Unit tests for URL parsing; RTL integration test for URL-initialized state                             |
-| S06-07  | Full RTL integration suite; Playwright E2E; axe-core AA scan on all 5 result states                    |
+| S06-07  | Full RTL integration suite; `@playwright/test` E2E; `@axe-core/playwright` AA scan on all 5 result states |
 
 ---
 
@@ -778,7 +779,7 @@ No new API endpoints, database tables, or Azure resources are required.
 - All 5 result states render with correct copy verified against CONTENT_GUIDELINES.
 - Stale request handling verified by integration test.
 - TanStack Query cache verified — no redundant requests on revisited scenario/horizon.
-- Playwright E2E test passes the full assessment flow in Docker Compose.
+- `@playwright/test` E2E test passes the full assessment flow in local Docker Compose.
 - axe-core scan shows zero WCAG 2.2 AA violations.
 - No prohibited language from CONTENT_GUIDELINES section 9 appears in any committed string.
 - No unresolved blocker remains within this epic's scope.
@@ -793,8 +794,8 @@ No new API endpoints, database tables, or Azure resources are required.
 | Assessment hook MSW test output (cache, stale, transitions)    | CI test run artifacts                                    |
 | RTL test output for all 5 result states                        | CI test run artifacts                                    |
 | ExposureLayer + Legend visual verification screenshot           | Linked from S06-04 evidence                              |
-| Playwright E2E full assessment flow recording                  | CI test run artifacts or linked video                    |
-| Playwright keyboard-only flow recording                        | CI test run artifacts or linked video                    |
+| `@playwright/test` E2E full assessment flow recording          | CI test run artifacts or linked video                    |
+| `@playwright/test` keyboard-only flow recording                | CI test run artifacts or linked video                    |
 | axe-core AA violation report (zero violations)                 | CI test run artifacts                                    |
 | Prohibited language grep result (zero matches)                 | CI test run artifacts                                    |
-| URL state round-trip verification (paste URL → result loads)   | Playwright test or manual screenshot                     |
+| URL state round-trip verification (paste URL → result loads)   | `@playwright/test` or manual screenshot                  |

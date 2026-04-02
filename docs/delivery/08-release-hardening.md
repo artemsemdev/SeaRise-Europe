@@ -1,25 +1,27 @@
-# Epic 08 — Testing, Security Hardening, and Release Readiness
+# Epic 08 — Azure Deployment, Release Hardening, and Go-Live
 
 | Field          | Value                                                                        |
 | -------------- | ---------------------------------------------------------------------------- |
 | Epic ID        | E-08                                                                         |
-| Phase          | 1                                                                            |
+| Phase          | Release                                                                      |
 | Status         | Not Started                                                                  |
-| Effort         | ~7 days                                                                      |
+| Effort         | ~10 days                                                                     |
 | Dependencies   | ALL prior epics (E-01 through E-07)                                          |
-| Stories        | 8 (S08-01 through S08-08)                                                    |
+| Stories        | 11 (S08-01 through S08-11)                                                   |
+
+> **Change history (v0.2, 2026-04-02):** This epic was formerly titled "Testing, Security Hardening, and Release Readiness" (~7 days). It now also includes all Azure resource provisioning, CI/CD deployment pipeline setup, and staging deployment — work previously scoped to Epic 02. This implements the local-first delivery strategy: the application is fully built and tested locally before any cloud resources are provisioned. Effort increased from ~7 to ~10 days to account for the Azure provisioning work. Testing references updated to distinguish `playwright-cli` (exploratory/agent-driven) from `@playwright/test` (authored E2E suite).
 
 ---
 
 ## 1  Objective
 
-Achieve release readiness by completing all test suites, hardening security controls, verifying every non-functional requirement, and confirming the MVP Definition of Done checklist item by item. This epic is the release gate — the MVP is not complete until every story in this epic passes.
+Provision all Azure infrastructure, deploy the application to the cloud for the first time, achieve release readiness by completing all test suites against both local and staging environments, harden security controls, verify every non-functional requirement, and confirm the MVP Definition of Done checklist item by item. This epic is the release gate — the MVP is not complete until every story in this epic passes.
 
 ---
 
 ## 2  Why This Epic Exists
 
-Epics 01 through 07 produce the application's decisions, infrastructure, data, backend, and frontend. But none of those epics prove the system works end-to-end, prove it is secure, or prove it meets its non-functional targets. Without a dedicated hardening and verification pass, the project ships with untested assumptions about correctness, performance, accessibility, and privacy. This epic converts those assumptions into evidence. It is intentionally the last epic because it requires all prior work to be complete — there is nothing to test, audit, or harden until the application exists.
+Epics 01 through 07 produce the application's decisions, local development environment, data, backend, and frontend — all running and tested locally via Docker Compose. But none of those epics deploy the application to the cloud, prove the system works end-to-end against production-like infrastructure, prove it is secure in a cloud context, or prove it meets its non-functional targets on real Azure services. This epic provisions Azure resources, deploys the application for the first time, and converts local-only assumptions into cloud-verified evidence. It is intentionally the last epic because it requires all prior work to be complete — there is nothing to deploy, test, audit, or harden until the application exists and passes locally.
 
 ---
 
@@ -27,24 +29,34 @@ Epics 01 through 07 produce the application's decisions, infrastructure, data, b
 
 ### 3.1 In Scope
 
-- Backend unit and integration test suites (pytest, xUnit, Testcontainers).
-- Frontend unit and integration test suites (Vitest, React Testing Library, MSW).
-- End-to-end test suite (Playwright) covering all 28 acceptance criteria and all 10 demo scenarios.
+**Azure provisioning and deployment (new in v0.2):**
+- Provision all Azure resources: Resource Group, Container Apps Environment, PostgreSQL Flexible Server, Blob Storage, Key Vault, Container Registry, Log Analytics Workspace.
+- Configure Key Vault secrets.
+- Upload COG layers to Azure Blob Storage.
+- Migrate local PostgreSQL schema and seed data to Azure PostgreSQL.
+- Establish CI/CD deployment pipeline (GitHub Actions: push images to ACR, deploy to staging, smoke test gate).
+- Deploy all three containers to staging Container Apps.
+
+**Testing and hardening:**
+- Backend unit and integration test suites (pytest, xUnit, Testcontainers) — confirm all pass in CI.
+- Frontend unit and integration test suites (Vitest, React Testing Library, MSW) — confirm all pass in CI.
+- End-to-end test suite (`@playwright/test`) covering all 28 acceptance criteria and all 10 demo scenarios — run against both local Docker Compose and staging.
+- Exploratory staging validation using `playwright-cli` to spot-check UI behavior on the cloud deployment.
 - Security hardening: CORS, CSP headers, rate limiting, input validation, SSRF prevention, Key Vault verification, HTTPS enforcement.
 - Log audit: scan all log statements for PII leakage (raw addresses, precise coordinates).
-- NFR verification: measured evidence for NFR-001 through NFR-023.
-- Accessibility audit: axe-core automated scan plus manual keyboard and screen reader walkthrough.
+- NFR verification: measured evidence for NFR-001 through NFR-023 against the staging deployment.
+- Accessibility audit: axe-core automated scan (via `@axe-core/playwright`) plus manual keyboard and screen reader walkthrough.
 - Release readiness checklist: every item from the MVP Definition of Done verified and evidenced.
-- Staging deployment confirmation via CI/CD.
+- Local-cloud parity confirmation: all tests that pass locally also pass against staging.
 
 ### 3.2 Out of Scope
 
 - Load testing or stress testing beyond NFR target verification.
 - Penetration testing by external parties.
-- Production deployment (separate operational step).
-- Custom domain and DNS configuration.
+- Custom domain and production DNS (documented as a post-MVP step).
+- CDN configuration.
 - Analytics integration (OQ-10).
-- Post-launch monitoring dashboards.
+- Post-launch monitoring dashboards beyond basic health checks.
 
 ---
 
@@ -96,27 +108,33 @@ None. All blocking open questions were resolved in Epic 01. This epic consumes t
 
 ## 6  Implementation Plan
 
-Work through stories in the following recommended order. The execution order map shows dependencies and parallelization opportunities:
+Work through stories in the following recommended order. Azure provisioning comes first so the staging deployment is available for all subsequent validation work. The execution order map shows dependencies and parallelization opportunities:
 
 ```
-S08-01 (Backend Test Suite)
+S08-01 (Provision Azure Resources + Key Vault)
   |
-  +----> S08-02 (Frontend Test Suite)     <-- parallel with S08-03
-  |
-  +----> S08-03 (Security Hardening)      <-- parallel with S08-02
+  +----> S08-02 (CI/CD Deployment Pipeline + Staging Deploy)
   |        |
-  |        +----> S08-04 (Log Audit)
+  |        +----> S08-03 (Upload COGs + Migrate Data to Azure)
   |
-  +----> S08-05 (E2E + Demo Script)       <-- after S08-01 + S08-02
+  +----> S08-04 (Backend Test Suite — confirm CI pass)     <-- parallel with S08-03
+  |
+  +----> S08-05 (Frontend Test Suite)     <-- parallel with S08-06
+  |
+  +----> S08-06 (Security Hardening)      <-- parallel with S08-05
   |        |
-  |        +----> S08-06 (NFR Verification)
+  |        +----> S08-07 (Log Audit)
+  |
+  +----> S08-08 (E2E + Demo Script — local + staging)     <-- after S08-04 + S08-05
+  |        |
+  |        +----> S08-09 (NFR Verification — staging)
   |                 |
-  |                 +----> S08-07 (Accessibility Audit)
+  |                 +----> S08-10 (Accessibility Audit)
   |
-  +----> S08-08 (Release Checklist)       <-- after ALL prior stories
+  +----> S08-11 (Release Checklist)       <-- after ALL prior stories
 ```
 
-**Ordering rationale.** S08-01 is first because backend test infrastructure (Testcontainers, test data seeding) establishes patterns reused by integration and E2E tests. S08-02 and S08-03 run in parallel because they are independent workstreams (frontend tests vs. security configuration). S08-04 follows S08-03 because the log audit validates that security-related logging changes from hardening are correct. S08-05 depends on both S08-01 and S08-02 because E2E tests exercise the full stack and assume unit/integration coverage is already in place. S08-06 follows S08-05 because NFR measurement requires a stable, tested system. S08-07 follows S08-06 because accessibility is a subset of NFR verification that benefits from a stable deployment. S08-08 is strictly last — it is the final gate that walks through every item on the MVP Definition of Done checklist and cannot be completed until all other stories have passed.
+**Ordering rationale.** S08-01 provisions Azure resources first because staging deployment is needed for cloud-specific testing. S08-02 establishes the CI/CD deployment pipeline and deploys to staging. S08-03 uploads COG data and migrates seed data to Azure. S08-04 and S08-05 confirm that all unit/integration tests pass in CI (they should already pass locally from Epics 03-07). S08-06 hardens security controls against the cloud deployment. S08-07 audits logs. S08-08 runs the full E2E suite against both local and staging. S08-09 measures NFRs against the staging deployment. S08-10 runs the accessibility audit against staging. S08-11 is strictly last — the final gate that walks through every item on the MVP Definition of Done checklist.
 
 ---
 
@@ -124,14 +142,164 @@ S08-01 (Backend Test Suite)
 
 ---
 
-### S08-01 — Complete Backend Test Suite
+### S08-01 — Provision Azure Resources and Key Vault
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
 | ID             | S08-01                                                                     |
+| Type           | Infrastructure                                                             |
+| Effort         | ~1.5 days                                                                  |
+| Dependencies   | Epic 01 (provider decisions), all local development complete               |
+
+**Statement**
+
+As the engineer maintaining delivery quality, I want all Azure resources provisioned and Key Vault configured, so that the application has a cloud deployment target.
+
+**Why**
+
+Until this story, the application has only ever run locally via Docker Compose. Azure resources must exist before the CI/CD pipeline can deploy containers or the E2E suite can validate cloud behavior. This is the first cloud-touching story in the entire project.
+
+**Scope Notes**
+
+- Provision Azure Resource Group (`rg-searise-europe-prod`) in West Europe.
+- Provision Azure Database for PostgreSQL Flexible Server (Burstable B1ms, PostGIS enabled).
+- Provision Azure Blob Storage Account (LRS, Hot tier, private `geospatial` container).
+- Provision Azure Key Vault (`kv-searise-europe`).
+- Provision Azure Container Registry (`acr-seariseeurope`, Basic tier).
+- Provision Log Analytics Workspace (`law-searise-europe`).
+- Provision Container Apps Environment (`cae-searise-europe`).
+- Configure Key Vault secrets: `postgres-connection-string`, `blob-storage-connection-string`, `geocoding-provider-api-key`, `cors-allowed-origins`.
+
+**Traceability**
+
+- Requirements: NFR-005, NFR-006, NFR-009, NFR-023
+- Architecture: `docs/architecture/08-deployment-topology.md` sections 2-3
+
+**Acceptance Criteria**
+
+1. All Azure resources listed above exist and are operational in West Europe.
+2. PostgreSQL Flexible Server is running with PostGIS extension enabled.
+3. Blob Storage account exists with private `geospatial` container.
+4. Key Vault contains all required secrets (no secrets in source code).
+5. Container Registry exists and is accessible.
+6. Log Analytics Workspace is connected to the Container Apps Environment.
+
+**Definition of Done**
+
+- Azure resources verified via `az` CLI.
+- Key Vault secrets confirmed present (names only).
+- PostgreSQL connection test succeeds.
+
+**Evidence Required**
+
+- `az resource list` output.
+- PostgreSQL connection test.
+- Key Vault secret list (names only).
+
+---
+
+### S08-02 — CI/CD Deployment Pipeline and Staging Deployment
+
+| Field          | Value                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| ID             | S08-02                                                                     |
+| Type           | Platform                                                                   |
+| Effort         | ~1.5 days                                                                  |
+| Dependencies   | S08-01 (Azure resources must exist)                                        |
+
+**Statement**
+
+As the engineer maintaining delivery quality, I want a CI/CD deployment pipeline that pushes container images to ACR and deploys to staging Container Apps, so that the application runs in the cloud for the first time.
+
+**Why**
+
+The existing CI pipeline (from Epic 02) only runs lint, type check, and unit tests. This story extends it with deployment: build and push Docker images to ACR, deploy to Container Apps staging, and run a basic smoke test (`curl /health`) before promoting.
+
+**Scope Notes**
+
+- Extend GitHub Actions with a CD workflow: push images to ACR (tagged with git SHA), deploy to staging Container Apps, run smoke test.
+- Deploy all three container apps (frontend, API, TiTiler) with correct environment variables and Key Vault secret references.
+- Configure health probes on all container apps.
+- Verify scale-to-zero behavior.
+- Smoke test failure blocks any further deployment.
+
+**Traceability**
+
+- Requirements: NFR-009, NFR-011, NFR-019
+- Architecture: `docs/architecture/08-deployment-topology.md` section 6
+
+**Acceptance Criteria**
+
+1. CD workflow triggers on merge to main: pushes images to ACR, deploys to staging, runs smoke test (`curl /health`).
+2. All three container apps are deployed and healthy on staging.
+3. Health endpoints respond correctly on staging URLs.
+4. Azure credentials are stored as GitHub repository secrets.
+5. Smoke test failure blocks production deployment.
+
+**Definition of Done**
+
+- CI/CD pipeline tested end-to-end (green deployment to staging).
+- Staging health endpoints verified.
+
+**Evidence Required**
+
+- GitHub Actions CD run output (green).
+- Staging `curl /health` responses from all three containers.
+
+---
+
+### S08-03 — Upload COGs and Migrate Data to Azure
+
+| Field          | Value                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| ID             | S08-03                                                                     |
+| Type           | Infrastructure / Data                                                      |
+| Effort         | ~0.5 days                                                                  |
+| Dependencies   | S08-01 (Blob Storage + Azure PostgreSQL exist), S08-02 (staging deployed)  |
+
+**Statement**
+
+As the system, I need all COG layers uploaded to Azure Blob Storage and all seed data migrated to Azure PostgreSQL, so that the staging deployment serves real data.
+
+**Why**
+
+During Epics 03-07, all data lived locally. The staging deployment needs the same COG layers in Azure Blob Storage and the same seed data (scenarios, horizons, methodology versions, geography boundaries, layer registrations) in Azure PostgreSQL.
+
+**Scope Notes**
+
+- Upload all COG files generated by the pipeline (Epic 03) to the Azure Blob Storage `geospatial` container.
+- Deploy the database schema to Azure PostgreSQL (same `init.sql` used locally).
+- Seed Azure PostgreSQL with all pipeline-registered data.
+- Verify TiTiler on staging can read COGs from Azure Blob Storage.
+- Verify API on staging can query Azure PostgreSQL.
+
+**Acceptance Criteria**
+
+1. All COG files are in Azure Blob Storage.
+2. Azure PostgreSQL has the full schema and all seed data.
+3. TiTiler on staging serves tiles from Azure Blob Storage COGs.
+4. API on staging returns valid assessment results.
+
+**Definition of Done**
+
+- COG upload verified via `az storage blob list`.
+- Staging API returns a valid assessment for a known test coordinate.
+
+**Evidence Required**
+
+- Blob storage listing showing all COG files.
+- Staging `/assess` response for Amsterdam (known coastal location).
+
+---
+
+### S08-04 — Complete Backend Test Suite
+
+| Field          | Value                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| ID             | S08-04                                                                     |
 | Type           | Quality Assurance                                                          |
 | Effort         | ~1.5 days                                                                  |
-| Dependencies   | Epics 03, 04 (backend code must exist)                                     |
+| Dependencies   | Epics 03, 04 (backend code must exist); S08-02 (CI/CD pipeline available)  |
 
 **Statement**
 
@@ -198,14 +366,14 @@ The backend contains the core business logic: geography validation, result state
 
 ---
 
-### S08-02 — Complete Frontend Test Suite
+### S08-05 — Complete Frontend Test Suite
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-02                                                                     |
+| ID             | S08-05                                                                     |
 | Type           | Quality Assurance                                                          |
 | Effort         | ~1 day                                                                     |
-| Dependencies   | Epics 05, 06 (frontend code must exist); S08-01 (test patterns established) |
+| Dependencies   | Epics 05, 06 (frontend code must exist); S08-04 (test patterns established) |
 
 **Statement**
 
@@ -267,14 +435,14 @@ The frontend implements a multi-phase application flow (Initial, Searching, Asse
 
 ---
 
-### S08-03 — Security Hardening
+### S08-06 — Security Hardening
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-03                                                                     |
+| ID             | S08-06                                                                     |
 | Type           | Security                                                                   |
 | Effort         | ~1 day                                                                     |
-| Dependencies   | Epics 02, 04, 05 (infrastructure, API, and frontend must exist)            |
+| Dependencies   | S08-02 (staging deployed), Epics 04, 05 (API and frontend must exist)      |
 
 **Statement**
 
@@ -345,14 +513,14 @@ The security architecture defines specific controls — CORS, CSP, rate limiting
 
 ---
 
-### S08-04 — Log Audit and Privacy Verification
+### S08-07 — Log Audit and Privacy Verification
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-04                                                                     |
+| ID             | S08-07                                                                     |
 | Type           | Security / Privacy                                                         |
 | Effort         | ~0.5 days                                                                  |
-| Dependencies   | S08-03 (security hardening must be complete)                               |
+| Dependencies   | S08-06 (security hardening must be complete)                               |
 
 **Statement**
 
@@ -360,7 +528,7 @@ As the engineer maintaining delivery quality, I want every log statement in the 
 
 **Why**
 
-The application processes user-submitted addresses. If any log statement writes the raw address string, the system violates NFR-007 and creates a privacy liability. Structured logging with correlation IDs allows debugging without exposing user input. This audit must be performed after security hardening (S08-03) to verify that any logging changes introduced during hardening are also compliant.
+The application processes user-submitted addresses. If any log statement writes the raw address string, the system violates NFR-007 and creates a privacy liability. Structured logging with correlation IDs allows debugging without exposing user input. This audit must be performed after security hardening (S08-06) to verify that any logging changes introduced during hardening are also compliant.
 
 **Scope Notes**
 
@@ -414,27 +582,29 @@ The application processes user-submitted addresses. If any log statement writes 
 
 ---
 
-### S08-05 — E2E Test Suite and Demo Script Validation
+### S08-08 — E2E Test Suite and Demo Script Validation
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-05                                                                     |
+| ID             | S08-08                                                                     |
 | Type           | Quality Assurance                                                          |
 | Effort         | ~1.5 days                                                                  |
-| Dependencies   | S08-01 (backend tests), S08-02 (frontend tests) — E2E requires a stable, tested stack |
+| Dependencies   | S08-03 (data migrated), S08-04 (backend tests), S08-05 (frontend tests) — E2E requires a stable, tested stack on both local and staging |
 
 **Statement**
 
-As the engineer maintaining delivery quality, I want a Playwright E2E test suite that validates all 28 acceptance criteria and all 10 demo scenarios against the running application, so that the system is proven correct end-to-end with screenshot evidence.
+As the engineer maintaining delivery quality, I want a `@playwright/test` E2E test suite that validates all 28 acceptance criteria and all 10 demo scenarios against both the local Docker Compose environment and the Azure staging deployment, so that the system is proven correct end-to-end with screenshot evidence and local-cloud parity is confirmed.
 
 **Why**
 
-Unit and integration tests verify components in isolation. They do not prove that the full system — frontend, API, database, TiTiler, geocoding provider — works together to deliver the user experience defined in the acceptance criteria. E2E tests are the only way to verify that a user can search for a location, see candidates, select one, view the exposure assessment, switch scenario and horizon controls, and see the methodology panel — all without error. The demo script scenarios additionally prove the system handles the representative inputs that will be used in stakeholder demonstrations.
+Unit and integration tests verify components in isolation. They do not prove that the full system — frontend, API, database, TiTiler, geocoding provider — works together to deliver the user experience defined in the acceptance criteria. E2E tests are the only way to verify that a user can search for a location, see candidates, select one, view the exposure assessment, switch scenario and horizon controls, and see the methodology panel — all without error. Running the same suite against both local and staging proves that the cloud deployment behaves identically to the local environment. The demo script scenarios additionally prove the system handles the representative inputs that will be used in stakeholder demonstrations.
+
+> **Tooling note:** This story uses authored `@playwright/test` tests for repeatable, CI-gated coverage. Additionally, use `playwright-cli` (`npx playwright-cli`) for ad-hoc spot-checking of the staging deployment — for example, navigating to a specific page state, taking screenshots, or verifying focus behavior interactively. `playwright-cli` output (screenshots, snapshots) may be attached as supplementary evidence but is not a substitute for the authored test suite.
 
 **Scope Notes**
 
-- Playwright tests for all 28 acceptance criteria (AC-001 through AC-028).
-- Playwright tests for all 10 demo scenarios:
+- `@playwright/test` tests for all 28 acceptance criteria (AC-001 through AC-028).
+- `@playwright/test` tests for all 10 demo scenarios:
 
 | #    | Input                        | Expected State              |
 | ---- | ---------------------------- | --------------------------- |
@@ -451,7 +621,7 @@ Unit and integration tests verify components in isolation. They do not prove tha
 
 - Full search-to-result flow coverage.
 - Screenshot capture at each significant step for evidence.
-- Accessibility assertions embedded in E2E tests (axe-core via Playwright where applicable).
+- Accessibility assertions embedded in E2E tests (`@axe-core/playwright` where applicable).
 
 **Traceability**
 
@@ -460,50 +630,55 @@ Unit and integration tests verify components in isolation. They do not prove tha
 
 **Implementation Notes**
 
-- Run Playwright against the staging deployment or Docker Compose local environment.
-- Each AC should map to one or more Playwright test cases. Use descriptive test names that reference the AC ID (e.g., `test('AC-003: candidate list displays up to 5 results')`).
+- Run `@playwright/test` against both the local Docker Compose environment (`BASE_URL=http://localhost:3000`) and the staging deployment (`BASE_URL=https://staging.searise-europe.example.com`). Both runs must pass.
+- Each AC should map to one or more `@playwright/test` test cases. Use descriptive test names that reference the AC ID (e.g., `test('AC-003: candidate list displays up to 5 results')`).
 - Demo scenarios should be a separate test suite file for clear traceability.
 - Capture screenshots at: initial state, search results, candidate selection, result display (for each result state), scenario switch, horizon switch, methodology panel, disclaimer.
-- Configure Playwright to generate an HTML report with embedded screenshots.
+- Configure `@playwright/test` to generate an HTML report with embedded screenshots.
+- Use `playwright-cli` to interactively explore the staging deployment for any visual or behavioral discrepancies not caught by the authored suite.
 
 **Acceptance Criteria**
 
-1. Playwright test exists for each of the 28 acceptance criteria (AC-001 through AC-028), with test name referencing the AC ID.
-2. Playwright test exists for each of the 10 demo scenarios (D-01 through D-10), with test name referencing the demo ID.
+1. `@playwright/test` test exists for each of the 28 acceptance criteria (AC-001 through AC-028), with test name referencing the AC ID.
+2. `@playwright/test` test exists for each of the 10 demo scenarios (D-01 through D-10), with test name referencing the demo ID.
 3. All 28 AC tests pass.
 4. All 10 demo scenario tests pass.
-5. Screenshots are captured at each significant step and included in the Playwright HTML report.
+5. Screenshots are captured at each significant step and included in the `@playwright/test` HTML report.
 6. Full search-to-result flow (search, select candidate, view result, switch scenario, switch horizon, view methodology, view disclaimer, reset) is covered.
-7. E2E tests run in CI.
+7. E2E tests run in CI against both local Docker Compose and staging.
+8. All tests that pass locally also pass against staging (local-cloud parity).
 
 **Definition of Done**
 
-- All 28 AC tests pass.
-- All 10 demo scenario tests pass.
-- Playwright HTML report with screenshots committed or archived as CI artifact.
+- All 28 AC tests pass against local Docker Compose.
+- All 28 AC tests pass against staging.
+- All 10 demo scenario tests pass against both environments.
+- `@playwright/test` HTML report with screenshots committed or archived as CI artifact.
 - Tests run in CI pipeline.
 
 **Testing Approach**
 
-- Playwright against staging or Docker Compose.
+- `@playwright/test` against local Docker Compose and staging (same suite, different `BASE_URL`).
+- `playwright-cli` for ad-hoc staging spot-checks.
 - HTML report generation with screenshots.
 
 **Evidence Required**
 
-- Playwright HTML report with all tests passing and embedded screenshots.
-- CI run output showing E2E suite passing.
+- `@playwright/test` HTML report (local run) with all tests passing and embedded screenshots.
+- `@playwright/test` HTML report (staging run) with all tests passing and embedded screenshots.
+- CI run output showing E2E suite passing against both environments.
 - Screenshot evidence for each demo scenario showing the correct result state.
 
 ---
 
-### S08-06 — NFR Verification
+### S08-09 — NFR Verification
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-06                                                                     |
+| ID             | S08-09                                                                     |
 | Type           | Quality Assurance                                                          |
 | Effort         | ~0.5 days                                                                  |
-| Dependencies   | S08-05 (E2E tests confirm functional correctness before measuring NFRs)    |
+| Dependencies   | S08-08 (E2E tests confirm functional correctness before measuring NFRs)    |
 
 **Statement**
 
@@ -515,15 +690,15 @@ Non-functional requirements define the quality attributes that distinguish a wor
 
 **Scope Notes**
 
-- NFR-001: Measure shell cold load LCP using Playwright. Target: ≤4s.
+- NFR-001: Measure shell cold load LCP using `@playwright/test` against staging. Target: ≤4s.
 - NFR-002: Measure geocoding p95 latency over 20+ requests. Target: ≤2.5s.
 - NFR-003: Measure assessment p95 latency over 20+ requests. Target: ≤3.5s.
 - NFR-004: Measure control switch latency (scenario or horizon change with cached data). Target: ≤1.5s.
 - NFR-005: Verify HTTPS on all endpoints (API, frontend, TiTiler). Pass/fail.
 - NFR-006: Verify no secrets in client-side source (view-source, network tab inspection). Pass/fail.
-- NFR-007: Verify no raw addresses in logs (cross-reference S08-04 log audit). Pass/fail.
+- NFR-007: Verify no raw addresses in logs (cross-reference S08-07 log audit). Pass/fail.
 - NFR-011: Verify health endpoint returns accurate status reflecting downstream dependencies. Pass/fail.
-- NFR-015: Verify WCAG 2.2 AA (cross-reference S08-07 accessibility audit). Pass/fail.
+- NFR-015: Verify WCAG 2.2 AA (cross-reference S08-10 accessibility audit). Pass/fail.
 - NFR-019: Verify stateless containers — restart a container, confirm no data loss. Pass/fail.
 - NFR-021: Verify methodology version is present in every assessment response.
 - NFR-022: Verify same input produces same result (reproducibility).
@@ -537,16 +712,16 @@ Non-functional requirements define the quality attributes that distinguish a wor
 
 **Implementation Notes**
 
-- Use Playwright's `page.evaluate(() => performance.getEntriesByType('navigation'))` or LCP observer for NFR-001.
-- For NFR-002 and NFR-003, use a script that sends 20+ requests and computes p95 from response times.
-- For NFR-004, measure time from control click to map tile update completion using Playwright network idle detection.
+- Use `@playwright/test`'s `page.evaluate(() => performance.getEntriesByType('navigation'))` or LCP observer for NFR-001 against the staging deployment.
+- For NFR-002 and NFR-003, use a script that sends 20+ requests to the staging API and computes p95 from response times.
+- For NFR-004, measure time from control click to map tile update completion using `@playwright/test` network idle detection against staging.
 - For NFR-019, use `docker restart` on a container and verify the next request succeeds with correct data.
 - For NFR-022, send the same assessment request 3 times and assert identical response payloads.
 - Record each measurement in a structured table: NFR ID, target, measured value, pass/fail.
 
 **Acceptance Criteria**
 
-1. NFR-001: LCP measurement ≤4s on cold load (Playwright measurement recorded).
+1. NFR-001: LCP measurement ≤4s on cold load (`@playwright/test` measurement recorded).
 2. NFR-002: Geocoding p95 latency ≤2.5s over 20+ requests (measurements recorded).
 3. NFR-003: Assessment p95 latency ≤3.5s over 20+ requests (measurements recorded).
 4. NFR-004: Control switch latency ≤1.5s from cache (measurement recorded).
@@ -567,28 +742,28 @@ Non-functional requirements define the quality attributes that distinguish a wor
 
 **Testing Approach**
 
-- Playwright for frontend performance measurements (NFR-001, NFR-004).
+- `@playwright/test` for frontend performance measurements (NFR-001, NFR-004).
 - Scripted HTTP requests for backend latency measurements (NFR-002, NFR-003).
 - Manual and scripted verification for pass/fail NFRs.
 
 **Evidence Required**
 
 - NFR verification report table: NFR ID, target, measured value, pass/fail.
-- Playwright LCP measurement output.
+- `@playwright/test` LCP measurement output.
 - p95 latency calculation output for geocoding and assessment.
 - Container restart test output.
 - Reproducibility test output (3 identical responses).
 
 ---
 
-### S08-07 — Accessibility Audit
+### S08-10 — Accessibility Audit
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-07                                                                     |
+| ID             | S08-10                                                                     |
 | Type           | Quality Assurance                                                          |
 | Effort         | ~0.5 days                                                                  |
-| Dependencies   | S08-06 (NFR verification confirms system stability before accessibility audit) |
+| Dependencies   | S08-09 (NFR verification confirms system stability before accessibility audit) |
 
 **Statement**
 
@@ -600,7 +775,7 @@ Accessibility is a non-negotiable quality attribute, not a stretch goal. The app
 
 **Scope Notes**
 
-- axe-core automated scan via Playwright: run on every major view (initial state, search results, each of the 5 result states, methodology panel, error state).
+- `@axe-core/playwright` automated scan: run on every major view (initial state, search results, each of the 5 result states, methodology panel, error state).
 - Zero critical or serious violations allowed (minor and moderate must be documented with remediation plan).
 - Keyboard walkthrough: verify all interactive elements are reachable via Tab, activatable via Enter/Space, and have visible focus indicators.
 - Screen reader test: verify search input, candidate list, result panel, and controls are announced correctly (test with VoiceOver on macOS or NVDA on Windows).
@@ -614,15 +789,15 @@ Accessibility is a non-negotiable quality attribute, not a stretch goal. The app
 
 **Implementation Notes**
 
-- Use `@axe-core/playwright` to integrate axe scans into Playwright tests.
+- Use `@axe-core/playwright` to integrate axe scans into authored `@playwright/test` tests. Run against staging.
 - Run axe on at least 8 distinct page states: initial, searching, candidate list, each of the 5 result states, methodology panel open.
-- For keyboard walkthrough, document the tab order and verify it follows a logical reading sequence.
+- For keyboard walkthrough, use `playwright-cli` interactively against staging to verify tab order and focus behavior in real time, then document findings.
 - For screen reader testing, document what each landmark and interactive element announces.
 - If the map component (MapLibre GL) has known accessibility limitations, document them as known issues with mitigation plan.
 
 **Acceptance Criteria**
 
-1. axe-core scan runs on every major view (minimum 8 page states).
+1. axe-core scan (via `@axe-core/playwright`) runs on every major view (minimum 8 page states) against staging.
 2. Zero critical accessibility violations.
 3. Zero serious accessibility violations.
 4. All minor and moderate violations are documented with remediation plan.
@@ -640,8 +815,8 @@ Accessibility is a non-negotiable quality attribute, not a stretch goal. The app
 
 **Testing Approach**
 
-- axe-core via Playwright (automated).
-- Manual keyboard walkthrough.
+- `@axe-core/playwright` via authored `@playwright/test` tests (automated, CI-gated).
+- `playwright-cli` for interactive keyboard and focus verification against staging.
 - Manual screen reader test (VoiceOver or NVDA).
 - Manual color contrast verification (browser DevTools or contrast checker tool).
 
@@ -655,14 +830,14 @@ Accessibility is a non-negotiable quality attribute, not a stretch goal. The app
 
 ---
 
-### S08-08 — Release Readiness Checklist and Staging Deployment
+### S08-11 — Release Readiness Checklist
 
 | Field          | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
-| ID             | S08-08                                                                     |
+| ID             | S08-11                                                                     |
 | Type           | Release Gate                                                               |
 | Effort         | ~0.5 days                                                                  |
-| Dependencies   | S08-01 through S08-07 (ALL prior stories must pass)                        |
+| Dependencies   | S08-01 through S08-10 (ALL prior stories must pass)                        |
 
 **Statement**
 
@@ -676,29 +851,31 @@ The MVP Definition of Done is a 17-item checklist. Individual stories in this ep
 
 Walk through every item from the MVP Definition of Done and record status with evidence reference:
 
-| # | Checklist Item                                             | Evidence Source       |
-|---|------------------------------------------------------------|-----------------------|
-| 1 | All 28 AC pass                                             | S08-05 (E2E report)  |
-| 2 | All 5 result states render correctly                       | S08-05 (screenshots) |
-| 3 | All 10 demo scenarios pass                                 | S08-05 (E2E report)  |
-| 4 | Full search-to-assess flow works E2E                       | S08-05 (E2E report)  |
-| 5 | Scenario/horizon controls update without new search        | S08-05 (D-09, D-10)  |
-| 6 | Methodology panel displays all required elements           | S08-05 (AC tests)    |
-| 7 | Disclaimer visible on every result                         | S08-05 (screenshots) |
-| 8 | Reset returns to initial state                             | S08-05 (AC tests)    |
-| 9 | All NFR targets met                                        | S08-06 (NFR report)  |
-| 10| 0 copy integrity findings                                 | S08-02 (language scan)|
-| 11| 100% results include methodology version                   | S08-06 (SM-7 check)  |
-| 12| No prohibited language in any UI string                    | S08-02 (language scan)|
-| 13| All containers deploy to staging via CI/CD                 | S08-08 (this story)  |
-| 14| E2E test suite passes                                      | S08-05 (CI output)   |
-| 15| Accessibility audit passes                                 | S08-07 (audit report) |
-| 16| Log audit confirms no PII                                  | S08-04 (log audit)   |
-| 17| Security checklist complete                                | S08-03 (sec report)  |
+| # | Checklist Item                                             | Evidence Source          |
+|---|------------------------------------------------------------|-----------------------   |
+| 1 | All 28 AC pass                                             | S08-08 (E2E report)     |
+| 2 | All 5 result states render correctly                       | S08-08 (screenshots)    |
+| 3 | All 10 demo scenarios pass                                 | S08-08 (E2E report)     |
+| 4 | Full search-to-assess flow works E2E                       | S08-08 (E2E report)     |
+| 5 | Scenario/horizon controls update without new search        | S08-08 (D-09, D-10)     |
+| 6 | Methodology panel displays all required elements           | S08-08 (AC tests)       |
+| 7 | Disclaimer visible on every result                         | S08-08 (screenshots)    |
+| 8 | Reset returns to initial state                             | S08-08 (AC tests)       |
+| 9 | All NFR targets met                                        | S08-09 (NFR report)     |
+| 10| 0 copy integrity findings                                 | S08-05 (language scan)  |
+| 11| 100% results include methodology version                   | S08-09 (SM-7 check)     |
+| 12| No prohibited language in any UI string                    | S08-05 (language scan)  |
+| 13| All Azure resources provisioned                            | S08-01 (az CLI output)  |
+| 14| All containers deploy to staging via CI/CD                 | S08-02 (CI/CD output)   |
+| 15| COGs uploaded and data migrated to Azure                   | S08-03 (blob list)      |
+| 16| E2E test suite passes (local + staging)                    | S08-08 (CI output)      |
+| 17| Accessibility audit passes                                 | S08-10 (audit report)   |
+| 18| Log audit confirms no PII                                  | S08-07 (log audit)      |
+| 19| Security checklist complete                                | S08-06 (sec report)     |
+| 20| Local-cloud parity confirmed                               | S08-08 (both reports)   |
 
-- Deploy all containers to staging via CI/CD pipeline.
+- Verify all containers are running and healthy in Container Apps (confirmed by S08-02).
 - Run smoke tests against staging: `/health` returns 200, frontend loads, search returns results.
-- Verify all containers are running and healthy in Container Apps.
 - Draft release notes summarizing what the MVP includes.
 
 **Traceability**
@@ -709,16 +886,16 @@ Walk through every item from the MVP Definition of Done and record status with e
 **Implementation Notes**
 
 - Create a markdown file (`release-readiness-checklist.md`) with each checklist item, its status (pass/fail), and a link or reference to the evidence artifact.
-- Trigger the full CI/CD pipeline to deploy all three containers (frontend, API, TiTiler) to staging.
-- After deployment, run the full E2E suite against staging (not just local).
+- Staging deployment was completed in S08-02; this story verifies the final state.
+- E2E suite has already run against both local and staging in S08-08; this story cross-references those results.
 - If any item fails, it must be remediated before this story can be marked complete. There are no exceptions — this is the release gate.
 - Draft release notes should list: key capabilities, known limitations, technology stack, and methodology version.
 
 **Acceptance Criteria**
 
-1. All 3 containers (frontend, API, TiTiler) are deployed to staging via CI/CD.
+1. All 3 containers confirmed running and healthy on staging (cross-reference S08-02).
 2. Staging smoke tests pass: `/health` returns 200, frontend loads, one search-to-result flow succeeds.
-3. Release readiness checklist is complete with all 17 items marked as pass.
+3. Release readiness checklist is complete with all 20 items marked as pass.
 4. Every checklist item has a reference to its evidence artifact.
 5. No checklist item is marked as pass without corresponding evidence.
 6. Release notes are drafted.
@@ -726,8 +903,8 @@ Walk through every item from the MVP Definition of Done and record status with e
 
 **Definition of Done**
 
-- All 3 containers deployed to staging.
-- All 17 MVP Definition of Done items verified as pass with evidence references.
+- All 3 containers deployed to staging and healthy.
+- All 20 release checklist items verified as pass with evidence references.
 - Release readiness checklist committed.
 - Release notes drafted and committed.
 - Zero open items.
@@ -735,7 +912,7 @@ Walk through every item from the MVP Definition of Done and record status with e
 **Testing Approach**
 
 - Staging deployment verification via CI/CD.
-- Smoke tests via `curl` and Playwright.
+- Smoke tests via `curl` and `playwright-cli` (ad-hoc staging verification).
 - Checklist walkthrough with evidence cross-referencing.
 
 **Evidence Required**
@@ -751,19 +928,22 @@ Walk through every item from the MVP Definition of Done and record status with e
 
 | Deliverable                                    | Format                              | Produced By |
 | ---------------------------------------------- | ----------------------------------- | ----------- |
-| Backend test suite                             | xUnit/pytest tests (committed)      | S08-01      |
-| Backend coverage report                        | HTML/XML (CI artifact)              | S08-01      |
-| Frontend test suite                            | Vitest/RTL tests (committed)        | S08-02      |
-| Prohibited language scan test                  | Vitest test (committed)             | S08-02      |
-| Security verification report                   | Markdown (committed)                | S08-03      |
-| Completed security checklist                   | Markdown (committed)                | S08-03      |
-| Log audit report                               | Markdown (committed)                | S08-04      |
-| Playwright E2E test suite                      | Playwright tests (committed)        | S08-05      |
-| Playwright HTML report with screenshots        | HTML (CI artifact)                  | S08-05      |
-| NFR verification report                        | Markdown (committed)                | S08-06      |
-| Accessibility audit report                     | Markdown + axe-core output (committed) | S08-07   |
-| Release readiness checklist                    | Markdown (committed)                | S08-08      |
-| Release notes                                  | Markdown (committed)                | S08-08      |
+| Azure resource provisioning evidence           | `az` CLI output                     | S08-01      |
+| CI/CD deployment pipeline                      | GitHub Actions workflows            | S08-02      |
+| COG upload and data migration evidence         | Blob listing, staging API response  | S08-03      |
+| Backend test suite                             | xUnit/pytest tests (committed)      | S08-04      |
+| Backend coverage report                        | HTML/XML (CI artifact)              | S08-04      |
+| Frontend test suite                            | Vitest/RTL tests (committed)        | S08-05      |
+| Prohibited language scan test                  | Vitest test (committed)             | S08-05      |
+| Security verification report                   | Markdown (committed)                | S08-06      |
+| Completed security checklist                   | Markdown (committed)                | S08-06      |
+| Log audit report                               | Markdown (committed)                | S08-07      |
+| `@playwright/test` E2E test suite              | Playwright tests (committed)        | S08-08      |
+| Playwright HTML report (local + staging)       | HTML (CI artifact)                  | S08-08      |
+| NFR verification report                        | Markdown (committed)                | S08-09      |
+| Accessibility audit report                     | Markdown + axe-core output (committed) | S08-10   |
+| Release readiness checklist                    | Markdown (committed)                | S08-11      |
+| Release notes                                  | Markdown (committed)                | S08-11      |
 
 ---
 
@@ -780,21 +960,21 @@ This epic does not introduce new data, API endpoints, or infrastructure resource
 
 ## 10  Security and Privacy
 
-- **CORS enforcement (S08-03):** API and TiTiler restrict origins to the frontend domain only.
-- **CSP headers (S08-03):** Frontend responses include restrictive Content-Security-Policy.
-- **Rate limiting (S08-03):** Geocode and assess endpoints are rate-limited per IP.
-- **Input validation (S08-03):** All user input is validated server-side with length and format constraints.
-- **SSRF prevention (S08-03):** Geocoding client validates all response URLs.
-- **Key Vault (S08-03):** All secrets accessed via `secretref`; zero secrets in source.
-- **PII in logs (S08-04):** Zero raw addresses in any log statement. Correlation IDs enable request tracing without PII.
-- **HTTPS (S08-03):** All public endpoints serve HTTPS only.
+- **CORS enforcement (S08-06):** API and TiTiler restrict origins to the frontend domain only.
+- **CSP headers (S08-06):** Frontend responses include restrictive Content-Security-Policy.
+- **Rate limiting (S08-06):** Geocode and assess endpoints are rate-limited per IP.
+- **Input validation (S08-06):** All user input is validated server-side with length and format constraints.
+- **SSRF prevention (S08-06):** Geocoding client validates all response URLs.
+- **Key Vault (S08-06):** All secrets accessed via `secretref`; zero secrets in source.
+- **PII in logs (S08-07):** Zero raw addresses in any log statement. Correlation IDs enable request tracing without PII.
+- **HTTPS (S08-06):** All public endpoints serve HTTPS only.
 
 ---
 
 ## 11  Observability
 
-- Backend tests (S08-01) verify that the health endpoint accurately reflects downstream dependency status.
-- Log audit (S08-04) verifies structured logging format, correlation ID presence, and PII absence.
+- Backend tests (S08-04) verify that the health endpoint accurately reflects downstream dependency status.
+- Log audit (S08-07) verifies structured logging format, correlation ID presence, and PII absence.
 - NFR verification (S08-06) confirms health endpoint behavior under normal and degraded conditions.
 - No new observability infrastructure is introduced; existing Log Analytics and health endpoint configuration is verified.
 
@@ -804,14 +984,17 @@ This epic does not introduce new data, API endpoints, or infrastructure resource
 
 | Story   | Testing Approach                                                                              |
 | ------- | --------------------------------------------------------------------------------------------- |
-| S08-01  | xUnit unit tests, Testcontainers integration tests, pytest pipeline tests, CI execution       |
-| S08-02  | Vitest unit tests, RTL component tests, MSW integration tests, CI execution                   |
-| S08-03  | Manual and scripted verification: `curl` headers, rate limit scripts, source code scan         |
-| S08-04  | Source code scan, manual log statement review, runtime Log Analytics query                     |
-| S08-05  | Playwright E2E tests against staging or Docker Compose, HTML report with screenshots           |
-| S08-06  | Playwright performance measurement, scripted latency tests, manual pass/fail verification      |
-| S08-07  | axe-core via Playwright, manual keyboard walkthrough, manual screen reader test                 |
-| S08-08  | CI/CD deployment, staging smoke tests, checklist walkthrough with evidence cross-referencing    |
+| S08-01  | Infrastructure verification via `az` CLI                                                      |
+| S08-02  | CI/CD pipeline execution, staging health endpoint verification                                |
+| S08-03  | Blob listing, staging API validation for known test coordinate                                |
+| S08-04  | xUnit unit tests, Testcontainers integration tests, pytest pipeline tests, CI execution       |
+| S08-05  | Vitest unit tests, RTL component tests, MSW integration tests, CI execution                   |
+| S08-06  | Manual and scripted verification: `curl` headers, rate limit scripts, source code scan         |
+| S08-07  | Source code scan, manual log statement review, runtime Log Analytics query                     |
+| S08-08  | `@playwright/test` E2E against local Docker Compose + staging, HTML reports; `playwright-cli` for ad-hoc staging spot-checks |
+| S08-09  | `@playwright/test` performance measurement against staging, scripted latency tests, manual pass/fail verification |
+| S08-10  | `@axe-core/playwright` automated scan, `playwright-cli` interactive keyboard verification, manual screen reader test |
+| S08-11  | Staging smoke tests via `curl` and `playwright-cli`, checklist walkthrough with evidence cross-referencing |
 
 ---
 
@@ -832,38 +1015,46 @@ This epic does not introduce new data, API endpoints, or infrastructure resource
 | Assumption | Impact if Wrong |
 | ---------- | --------------- |
 | All prior epics (01-07) are complete and their code is merged to main. | This epic cannot start until all prior work is done. Any incomplete epic blocks the entire release gate. |
-| Staging environment is accessible and representative of production configuration. | NFR measurements on a non-representative environment produce misleading results. Verify staging configuration matches production before measuring. |
+| Azure subscription is available with sufficient credits (~$30-40/month). | Azure provisioning (S08-01) cannot proceed. Does not block Epics 01-07. |
+| Azure PostgreSQL Flexible Server supports the same PostGIS version as the local Docker image. | Schema or query behavior may differ. Mitigation: pin PostGIS version, test early in S08-03. |
+| Staging environment is representative of production configuration (production = staging for MVP). | NFR measurements on a non-representative environment produce misleading results. |
 | The geocoding provider is available and responsive during E2E test execution. | E2E tests that depend on live geocoding will fail. Mitigation: have a fallback plan to use cached responses if the provider is down during testing. |
 | axe-core catches the majority of accessibility violations. | Some violations (screen reader behavior, cognitive accessibility) require manual testing. Manual walkthrough is included in scope for this reason. |
+| Local Docker Compose environment faithfully replicates the Azure topology. | Gaps discovered during staging validation. Mitigation: the local-cloud parity check in S08-08 explicitly catches these. |
 
 ---
 
 ## 14  Epic Acceptance Criteria
 
-1. Backend test suite passes with 100% branch coverage on `ResultStateDeterminator` and integration tests covering all 5 result states.
-2. Frontend test suite passes with component coverage for all views, AppPhase transitions, and zero prohibited language findings.
-3. All security controls from `docs/architecture/07-security-architecture.md` are verified with evidence.
-4. Log audit confirms zero PII in log statements with evidence.
-5. All 28 acceptance criteria (AC-001 through AC-028) pass in Playwright E2E tests.
-6. All 10 demo scenarios (D-01 through D-10) pass in Playwright E2E tests.
-7. All NFR targets are met with measured evidence.
-8. Accessibility audit shows zero critical/serious violations.
-9. All 3 containers are deployed to staging via CI/CD.
-10. MVP Definition of Done checklist (17 items) is complete with all items passing and all evidence referenced.
+1. All Azure resources are provisioned and operational.
+2. CI/CD deployment pipeline deploys all 3 containers to staging.
+3. COG layers uploaded to Azure Blob Storage; seed data migrated to Azure PostgreSQL.
+4. Backend test suite passes with 100% branch coverage on `ResultStateDeterminator` and integration tests covering all 5 result states.
+5. Frontend test suite passes with component coverage for all views, AppPhase transitions, and zero prohibited language findings.
+6. All security controls from `docs/architecture/07-security-architecture.md` are verified with evidence.
+7. Log audit confirms zero PII in log statements with evidence.
+8. All 28 acceptance criteria (AC-001 through AC-028) pass in `@playwright/test` E2E tests against both local and staging.
+9. All 10 demo scenarios (D-01 through D-10) pass in `@playwright/test` E2E tests against both local and staging.
+10. All NFR targets are met with measured evidence against staging.
+11. Accessibility audit shows zero critical/serious violations.
+12. Release checklist (20 items) is complete with all items passing and all evidence referenced.
+13. Local-cloud parity confirmed: all tests pass in both environments.
 
 ---
 
 ## 15  Definition of Done
 
-- All 8 user stories completed with evidence committed to the repository.
-- All 28 acceptance criteria verified by E2E tests.
-- All 10 demo scenarios verified by E2E tests.
-- All NFR targets met with measured evidence.
+- All 11 user stories completed with evidence committed to the repository.
+- All Azure resources provisioned and verified.
+- CI/CD deployment pipeline operational with all 3 containers deployed to staging.
+- All 28 acceptance criteria verified by `@playwright/test` E2E tests (local + staging).
+- All 10 demo scenarios verified by `@playwright/test` E2E tests (local + staging).
+- All NFR targets met with measured evidence against staging.
 - Security verification report complete with all controls passing.
 - Log audit report complete with zero PII findings.
 - Accessibility audit report complete with zero critical/serious violations.
 - All 3 containers deployed to staging and healthy.
-- Release readiness checklist complete with all 17 items passing.
+- Release readiness checklist complete with all 20 items passing.
 - Release notes drafted.
 - No unresolved blocker remains within this epic's scope.
 
@@ -873,6 +1064,10 @@ This epic does not introduce new data, API endpoints, or infrastructure resource
 
 | Evidence                                                    | Location (expected)                                         |
 | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| Azure resource provisioning (`az resource list`)            | Terminal output or CI artifact                              |
+| Key Vault secret list (names only)                          | Terminal output                                             |
+| CI/CD deployment pipeline output (green)                    | GitHub Actions run artifact                                 |
+| COG upload verification (`az storage blob list`)            | Terminal output                                             |
 | Backend test suite CI output (green)                        | GitHub Actions run artifact                                 |
 | ResultStateDeterminator coverage report                     | CI artifact or `docs/delivery/artifacts/coverage-report`    |
 | Frontend test suite CI output (green)                       | GitHub Actions run artifact                                 |
@@ -880,10 +1075,10 @@ This epic does not introduce new data, API endpoints, or infrastructure resource
 | Security verification report                                | `docs/delivery/artifacts/security-verification.md`          |
 | Completed security checklist                                | `docs/delivery/artifacts/security-checklist.md`             |
 | Log audit report                                            | `docs/delivery/artifacts/log-audit.md`                      |
-| Playwright E2E HTML report with screenshots                 | CI artifact or `docs/delivery/artifacts/e2e-report/`        |
+| `@playwright/test` E2E HTML report — local run              | CI artifact or `docs/delivery/artifacts/e2e-report-local/`  |
+| `@playwright/test` E2E HTML report — staging run            | CI artifact or `docs/delivery/artifacts/e2e-report-staging/`|
 | NFR verification report                                     | `docs/delivery/artifacts/nfr-verification.md`               |
 | Accessibility audit report (axe-core + manual)              | `docs/delivery/artifacts/accessibility-audit.md`            |
-| Release readiness checklist (17 items, all pass)            | `docs/delivery/artifacts/release-readiness-checklist.md`    |
+| Release readiness checklist (20 items, all pass)            | `docs/delivery/artifacts/release-readiness-checklist.md`    |
 | Release notes                                               | `docs/delivery/artifacts/release-notes.md`                  |
-| Staging deployment CI/CD output (green)                     | GitHub Actions run artifact                                 |
 | Staging smoke test output                                   | GitHub Actions run artifact or terminal output              |

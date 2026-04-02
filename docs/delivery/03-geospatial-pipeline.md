@@ -6,7 +6,7 @@
 | Phase          | 0 — Pre-Implementation                                                                             |
 | Status         | Not Started                                                                                        |
 | Effort         | ~7 days                                                                                            |
-| Dependencies   | Epic 01 (methodology decisions from OQ-02, OQ-04, OQ-05), Epic 02 (Blob Storage + PostgreSQL)     |
+| Dependencies   | Epic 01 (methodology decisions from OQ-02, OQ-04, OQ-05), Epic 02 (local PostgreSQL + local blob storage via Docker Compose) |
 | Stories        | 8 (S03-01 through S03-08)                                                                          |
 | Risk           | HIGHEST — produces the COG exposure layers that the entire application serves                      |
 
@@ -14,7 +14,9 @@
 
 ## 1  Objective
 
-Build and execute the offline geospatial pipeline that transforms raw IPCC AR6 sea-level projections and Copernicus DEM elevation data into Cloud-Optimized GeoTIFF (COG) exposure layers, upload them to Azure Blob Storage, and register them in PostgreSQL with a valid methodology version.
+Build and execute the offline geospatial pipeline that transforms raw IPCC AR6 sea-level projections and Copernicus DEM elevation data into Cloud-Optimized GeoTIFF (COG) exposure layers, upload them to local blob storage (Azurite or filesystem), and register them in local PostgreSQL with a valid methodology version.
+
+> **Local-first note (v0.2):** During this epic, all outputs go to the local Docker Compose environment (Azurite for blob storage, local PostgreSQL). The actual upload to Azure Blob Storage happens in Epic 08 (S08-03). References to "Azure Blob Storage" in this document describe the target path structure and contract — during development, the same structure is replicated locally.
 
 ---
 
@@ -141,7 +143,7 @@ S03-01 (Project Setup)
 | ID             | S03-01                 |
 | Type           | Platform               |
 | Effort         | ~0.5 days              |
-| Dependencies   | Epic 02 S02-01 (Azure resources exist) |
+| Dependencies   | Epic 02 S02-01 (local Docker Compose environment exists) |
 
 **Statement**
 
@@ -815,7 +817,7 @@ Future enhancement (post-MVP): if the pipeline is moved to GitHub Actions or Azu
 | IPCC AR6 sea-level projection data is freely downloadable from NASA without institutional access. | Pipeline is blocked. Escalate immediately. Alternative: use locally archived copies if available. |
 | Copernicus DEM GLO-30 is accessible without paid subscription for the Europe extent. | Pipeline is blocked at DEM download. Alternative: use SRTM 30m (less accurate at high latitudes). |
 | Binary exposure methodology is confirmed by Epic 01 S01-04. | If continuous methodology is selected, S03-04 comparison logic changes and COG pixel values are no longer binary. Rework estimate: ~1 day. |
-| Epic 02 has provisioned Azure Blob Storage and PostgreSQL before this epic begins. | Pipeline cannot upload or register layers. Complete Epic 02 first. |
+| Epic 02 has provisioned the local Docker Compose environment (PostgreSQL + local blob storage) before this epic begins. | Pipeline cannot store COGs or register layers locally. Complete Epic 02 first. Azure Blob Storage is not needed until Epic 08. |
 | The coastal zone geometry from Epic 01 S01-03 is available as a GeoJSON file in the repository. | S03-04 cannot apply the coastal mask. Block until S01-03 is complete. |
 | 30m DEM resolution is sufficient for MVP-quality exposure results. | If higher resolution is needed, file sizes and processing time increase significantly. 30m is the architecture baseline. |
 

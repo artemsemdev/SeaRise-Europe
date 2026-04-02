@@ -1,7 +1,9 @@
 # 10 — Testing Strategy
 
-> **Status:** Proposed Architecture
-> **Philosophy:** Test the things that are genuinely risky. The domain layer (result state determination, geography validation logic) is high-risk and fully unit-testable. Infrastructure adapters are tested through integration tests. The UI is tested through component tests and a small end-to-end smoke suite.
+> **Status:** Proposed Architecture | **Last updated:** 2026-04-02
+> **Philosophy:** Test the things that are genuinely risky. The domain layer (result state determination, geography validation logic) is high-risk and fully unit-testable. Infrastructure adapters are tested through integration tests. The UI is tested through component tests, a small authored end-to-end suite, and agent-driven exploratory validation with `playwright-cli`.
+>
+> **Local-first principle:** All tests run against the local Docker Compose environment during development. Staging and Azure are used only for the final release validation pass (Epic 08).
 
 ---
 
@@ -292,12 +294,77 @@ describe('API client (useGeocode, useAssess)', () => {
 
 ---
 
-## 5. End-to-End Tests (Playwright)
+## 5. Browser-Based UI Testing
 
-A small smoke suite covering the demo script (ROADMAP.md D-01 to D-10). These run in CI against the staging environment.
+This project uses two complementary Playwright-based tools for browser testing. They serve different purposes and are not interchangeable.
+
+### 5.1 Playwright CLI — Exploratory and Agent-Driven Testing
+
+**Package:** `@playwright/cli` ([github.com/microsoft/playwright-cli](https://github.com/microsoft/playwright-cli))
+
+**What it is:** A token-efficient command-line tool for agent-driven browser automation. It does not require authored test files. A developer or coding agent issues CLI commands to navigate, interact, inspect, and screenshot the running application.
+
+**Install:**
+```bash
+# Preferred: local execution via npx (no global install)
+npx playwright-cli --help
+
+# Fallback: global install
+npm install -g @playwright/cli@latest
+playwright-cli --help
+```
+
+**When to use:**
+- Ad-hoc local smoke checks during development (e.g., "does the search flow work after my last change?")
+- Agent-driven exploratory validation — a coding agent can use `playwright-cli` to verify UI behavior without writing test files
+- Capturing screenshots for visual inspection or documentation evidence
+- Interactive debugging of UI states (loading, error, result rendering)
+- Quick validation of accessibility behavior (focus order, visible focus indicators)
+
+**Example workflow (local development):**
+```bash
+# Start the local stack
+docker compose up -d
+
+# Open the app and take a screenshot
+npx playwright-cli goto http://localhost:3000
+npx playwright-cli screenshot --full-page homepage.png
+
+# Exercise the search flow
+npx playwright-cli fill '[role="searchbox"]' 'Amsterdam'
+npx playwright-cli press '[role="searchbox"]' Enter
+npx playwright-cli snapshot   # inspect the DOM state
+npx playwright-cli screenshot search-result.png
+
+# Visual dashboard for monitoring
+npx playwright-cli show
+```
+
+**What it does not replace:** `playwright-cli` does not produce repeatable, CI-integrated test suites. It is not a substitute for authored `@playwright/test` tests.
+
+### 5.2 Playwright Test Runner — Authored E2E Test Suite
+
+**Package:** `@playwright/test`
+
+**What it is:** The standard Playwright testing framework. Tests are authored TypeScript files that run deterministically and produce structured reports. This is the tool used for CI gating and release verification.
+
+**When to use:**
+- Repeatable E2E coverage for all 28 acceptance criteria (AC-001 through AC-028) and 10 demo scenarios (D-01 through D-10)
+- CI pipeline test gating (every PR must pass)
+- Accessibility scanning with `@axe-core/playwright`
+- NFR performance measurement (LCP, latency)
+- Screenshot evidence for release readiness checklist
+
+**Test target:**
+- During development (Epics 05-07): tests run against the local Docker Compose environment (`baseURL = http://localhost:3000`)
+- During release hardening (Epic 08): tests run against the Azure staging deployment
+
+### 5.3 Authored E2E Tests (Demo Script Coverage)
+
+A small smoke suite covering the demo script (ROADMAP.md D-01 to D-10). During development these run locally against Docker Compose; during release hardening they run against the staging deployment.
 
 ```typescript
-// playwright.config.ts: baseURL = staging URL
+// playwright.config.ts: baseURL = process.env.BASE_URL ?? 'http://localhost:3000'
 
 test('D-01: App loads and shows EmptyState', async ({ page }) => {
   await page.goto('/')
@@ -453,8 +520,15 @@ jobs:
       - npx vitest run                                 # unit + component
       - npx tsc --noEmit                               # type check
 
-  e2e:
-    needs: [deploy-staging]
+  e2e-local:
     steps:
-      - npx playwright test                            # staging only
+      - docker compose up -d                           # spin up local stack
+      - npx playwright test                            # run against localhost
+      - docker compose down
 ```
+
+> **Note:** During Epics 05-07, all Playwright tests run against the local Docker Compose environment. The staging deployment is not required until Epic 08. During Epic 08 (release hardening), an additional `e2e-staging` job runs the same test suite against the Azure staging URL to confirm parity between local and cloud environments.
+
+### 9.1 Local Exploratory Validation (Not CI-Gated)
+
+`playwright-cli` is used during development for ad-hoc validation but is not part of the CI pipeline. It is an interactive tool, not an automated gate. Developers and coding agents use it to verify UI behavior before committing changes. Its output (screenshots, snapshots) may be attached as evidence artifacts but is not required to pass any CI check.

@@ -313,9 +313,11 @@ This is well within a portfolio project budget. At higher traffic, Container App
 
 ## 9. Phase-by-Phase Infrastructure Rollout
 
+> **Delivery strategy: local-first, Azure-last.** All development, testing, and validation happen against the local Docker Compose environment first. Azure resources are provisioned and deployed only as the final release step (Epic 08). This minimizes cloud spend during development and eliminates Azure availability as a blocker for feature work.
+
 | Phase | Infrastructure Work |
 |---|---|
-| **Phase 0** | Provision Resource Group, ACR, Key Vault, PostgreSQL, Blob Storage; run data pipeline; seed database |
-| **Phase 1 (MVP)** | Provision Container Apps Environment; deploy all 3 containers; configure custom domains + TLS; set up CI/CD |
-| **Phase 2** | Add staging environment; add smoke test gate in CD; configure Azure Monitor alerts |
-| **Phase 3** | Evaluate CDN for frontend assets; evaluate autoscaling rules tuning; review costs |
+| **Phase 0 — Local Foundation** | Set up Docker Compose (PostgreSQL + PostGIS, TiTiler, API, frontend); run data pipeline locally; seed local database; establish CI for lint, type check, and unit tests |
+| **Phase 1 — Local MVP** | Develop and test all features against Docker Compose; run authored Playwright E2E tests locally; use `playwright-cli` for exploratory UI validation; all acceptance criteria pass locally |
+| **Release — Azure Deployment** | Provision Resource Group, ACR, Key Vault, Azure PostgreSQL, Blob Storage, Container Apps; configure CI/CD with deployment pipeline; deploy all 3 containers to staging; run E2E suite against staging; configure custom domains + TLS; security hardening against cloud environment; release readiness checklist |
+| **Post-MVP** | Evaluate CDN for frontend assets; evaluate autoscaling rules tuning; configure Azure Monitor alerts; review costs |
