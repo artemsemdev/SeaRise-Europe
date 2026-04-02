@@ -95,6 +95,20 @@ The frontend is the only delivery vehicle for the product's value. Every prior e
 | `docs/architecture/07-security-architecture.md`    | Basemap key management, no secrets in client       |
 | `docs/architecture/10-testing-strategy.md`         | Frontend testing patterns                          |
 
+### 4.3 Mock Visual Specification
+
+The clickable prototype is the authoritative visual specification. Each story must match the corresponding mock screen. See `docs/product/Mock/MOCK_REQUIREMENTS_MAP.md` for the full traceability map.
+
+| Story   | Mock Screen(s) to Match                                    |
+| ------- | ---------------------------------------------------------- |
+| S05-01  | `01-landing.html` (shell layout, responsive skeleton)      |
+| S05-03  | `01-landing.html`, `06-exposure.html` (map surface, dark tiles, markers, overlays) |
+| S05-04  | `01-landing.html` (search input), `02-search-loading.html` (loading state) |
+| S05-05  | `03-candidates.html` (candidate dropdown)                  |
+| S05-06  | All screens (localized strings, config-driven labels)      |
+| S05-07  | `01-landing.html` (empty), `02-search-loading.html` (loading), `04-no-results.html` (no results), `12-error-geocoding.html` (error) |
+| S05-08  | All above screens (smoke tests across all states)          |
+
 ---
 
 ## 5  Implementation Plan

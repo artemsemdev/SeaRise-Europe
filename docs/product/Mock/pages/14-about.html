@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — About Data</title>
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    .about-layout {
+      display: flex;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Main content */
+    .about-content {
+      flex: 1;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: var(--sp10) var(--sp8);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp10);
+    }
+    .about-content h1 {
+      font-family: var(--f-d);
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+    .about-content .intro {
+      font-size: 1rem;
+      color: var(--text2);
+      line-height: 1.7;
+      margin-top: var(--sp3);
+    }
+    .about-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp6);
+    }
+    .about-section h2 {
+      font-family: var(--f-d);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      padding-bottom: var(--sp3);
+      border-bottom: 1px solid var(--s-high);
+    }
+    .about-section p {
+      font-size: .9rem;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    /* Source cards */
+    .source-cards {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp4);
+    }
+    .source-card {
+      background: var(--s-low);
+      border-radius: var(--r-lg);
+      padding: var(--sp6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp3);
+    }
+    .source-card .tag {
+      display: inline-flex;
+      padding: var(--sp1) var(--sp3);
+      border-radius: var(--r-sm);
+      font-size: .7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      width: fit-content;
+    }
+    .tag.ipcc { background: var(--p-bg); color: var(--primary); }
+    .tag.copernicus { background: var(--ok-bg); color: var(--ok); }
+    .tag.eea { background: rgba(255,186,56,.1); color: var(--warn); }
+    .source-card h3 {
+      font-family: var(--f-d);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .source-card p {
+      font-size: .85rem;
+      color: var(--text2);
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    /* Forecast model cards */
+    .forecast-cards {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp4);
+    }
+    .forecast-card {
+      background: var(--s-low);
+      border-radius: var(--r-lg);
+      padding: var(--sp6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp3);
+    }
+    .forecast-card .fc-label {
+      font-family: var(--f-d);
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .forecast-card .fc-tag {
+      font-size: .7rem;
+      font-weight: 600;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .forecast-card p {
+      font-size: .85rem;
+      color: var(--text2);
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    /* Warning card */
+    .warning-card {
+      background: var(--w-bg);
+      border-radius: var(--r-lg);
+      padding: var(--sp6);
+      font-size: .9rem;
+      color: var(--warn);
+      line-height: 1.7;
+    }
+    .limitation-list {
+      list-style: disc;
+      padding-left: var(--sp6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp3);
+      margin-top: var(--sp4);
+    }
+    .limitation-list li {
+      font-size: .85rem;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    /* TOC Sidebar */
+    .toc-sidebar {
+      width: 220px;
+      min-width: 220px;
+      padding: var(--sp10) var(--sp6);
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp4);
+    }
+    .toc-label {
+      font-size: .7rem;
+      font-weight: 600;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .toc-links {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp3);
+      list-style: none;
+    }
+    .toc-links a {
+      font-size: .8rem;
+      color: var(--text2);
+      text-decoration: none;
+      transition: color .2s;
+      line-height: 1.4;
+    }
+    .toc-links a:hover {
+      color: var(--text);
+    }
+    .toc-back {
+      margin-top: auto;
+      padding-top: var(--sp6);
+      border-top: 1px solid var(--s-high);
+    }
+    .toc-back a {
+      font-size: .8rem;
+      color: var(--primary);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp2);
+    }
+    .toc-back a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html">Explorer</a></li>
+          <li><a href="14-about.html" class="active">About Data</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Help">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="about-layout">
+        <!-- Content -->
+        <article class="about-content">
+          <div>
+            <h1 id="top">How does this work?</h1>
+            <p class="intro">SeaRise Europe combines real climate data from trusted scientific organizations to show you how sea levels might change at any European coastal location. We take the best available research and make it easy to explore.</p>
+          </div>
+
+          <!-- Section 1 -->
+          <section class="about-section" id="what-we-show">
+            <h2>What we show you</h2>
+            <p>You enter a location anywhere in Europe. We first check if it's near the coast. If it is, we look up scientific sea-level projections for that area and show you how much the water might rise over 10, 20, 30, 50, or 100 years. You can switch between optimistic, moderate, and worst-case forecast models to see a range of possible futures.</p>
+          </section>
+
+          <!-- Section 2 -->
+          <section class="about-section" id="data-sources">
+            <h2>Where does the data come from?</h2>
+            <div class="source-cards">
+              <div class="source-card">
+                <span class="tag ipcc">Sea-level projections</span>
+                <h3>IPCC AR6</h3>
+                <p>The Intergovernmental Panel on Climate Change Sixth Assessment Report provides global and regional sea-level rise projections under multiple emissions scenarios. This is the gold standard for climate science.</p>
+              </div>
+              <div class="source-card">
+                <span class="tag copernicus">Elevation data</span>
+                <h3>Copernicus DEM</h3>
+                <p>The Copernicus Digital Elevation Model gives us high-resolution terrain data across Europe at 30-meter resolution. We use this to understand which areas sit below projected future sea levels.</p>
+              </div>
+              <div class="source-card">
+                <span class="tag eea">Coastline reference</span>
+                <h3>European Environment Agency (EEA)</h3>
+                <p>EEA coastline data helps us determine whether a location is coastal and within the scope of sea-level analysis.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 3 -->
+          <section class="about-section" id="forecast-models">
+            <h2>Forecast models explained</h2>
+            <div class="forecast-cards">
+              <div class="forecast-card">
+                <span class="fc-tag">Optimistic</span>
+                <div class="fc-label">NASA (optimistic)</div>
+                <p>Best case &mdash; the world takes strong climate action. Emissions drop fast and temperatures stabilize. Sea levels still rise, but more slowly.</p>
+              </div>
+              <div class="forecast-card">
+                <span class="fc-tag">Moderate</span>
+                <div class="fc-label">Copernicus (moderate)</div>
+                <p>Middle of the road &mdash; some progress on emissions, but not enough to hit the best targets. Sea-level rise is noticeable and ongoing.</p>
+              </div>
+              <div class="forecast-card">
+                <span class="fc-tag">Worst case</span>
+                <div class="fc-label">IPCC (worst case)</div>
+                <p>If nothing changes &mdash; emissions keep rising, ice sheets melt faster, and sea levels rise significantly. The most challenging scenario for coastal communities.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 4 -->
+          <section class="about-section" id="what-this-is-not">
+            <h2>What this is NOT</h2>
+            <div class="warning-card">This is an educational tool based on scientific models. It is not a legal, engineering, insurance, or financial assessment. Do not use it for property decisions, planning permissions, or insurance claims.</div>
+            <ul class="limitation-list">
+              <li>Does not account for storm surges or extreme wave events</li>
+              <li>Does not include local flood defenses, barriers, or drainage systems</li>
+              <li>Does not model land sinking (subsidence) or uplift</li>
+              <li>Does not include river flooding or rainfall runoff</li>
+              <li>Uses 30-meter satellite elevation data &mdash; not building-level precision</li>
+              <li>Projections are based on global models, not hyper-local measurements</li>
+            </ul>
+          </section>
+        </article>
+
+        <!-- TOC Sidebar -->
+        <aside class="toc-sidebar">
+          <div class="toc-label">On this page</div>
+          <ul class="toc-links">
+            <li><a href="#what-we-show">What we show you</a></li>
+            <li><a href="#data-sources">Data sources</a></li>
+            <li><a href="#forecast-models">Forecast models</a></li>
+            <li><a href="#what-this-is-not">What this is NOT</a></li>
+          </ul>
+          <div class="toc-back">
+            <a href="01-landing.html">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              Back to Explorer
+            </a>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Select Location</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    .search-float {
+      position: absolute;
+      top: var(--sp6);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 520px;
+    }
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: var(--s-low);
+      border-radius: var(--r-lg) var(--r-lg) 0 0;
+      padding: var(--sp2) var(--sp4);
+      width: 100%;
+      gap: var(--sp3);
+    }
+    .search-bar input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-family: var(--f-b);
+      font-size: .95rem;
+      color: var(--text);
+      padding: var(--sp3) 0;
+    }
+    .clear-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--s-high);
+      border: none;
+      color: var(--text2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: background .2s;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .clear-btn:hover { background: var(--s-bright); }
+    .dropdown {
+      width: 100%;
+      background: var(--s-low);
+      border-radius: 0 0 var(--r-lg) var(--r-lg);
+      border-top: 1px solid var(--s-high);
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    .dropdown-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: var(--sp3) var(--sp5);
+      text-decoration: none;
+      color: var(--text);
+      transition: background .15s;
+      border-bottom: 1px solid var(--s-high);
+    }
+    .dropdown-item:last-child { border-bottom: none; }
+    .dropdown-item:hover {
+      background: var(--s-high);
+    }
+    .dropdown-item .name {
+      font-size: .9rem;
+      font-weight: 600;
+    }
+    .dropdown-item .name strong {
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .dropdown-item .detail {
+      font-size: .75rem;
+      color: var(--text3);
+    }
+    .bottom-hint {
+      position: absolute;
+      bottom: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--s-low);
+      border-radius: var(--r-md);
+      padding: var(--sp2) var(--sp5);
+      font-size: .8rem;
+      color: var(--text3);
+      z-index: 10;
+      white-space: nowrap;
+      box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Explorer</a></li>
+          <li><a href="14-about.html">About Data</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Help">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="map-area">
+        <div id="map"></div>
+
+        <!-- Floating search + dropdown -->
+        <div class="search-float">
+          <div class="search-bar">
+            <svg style="color:var(--text3);flex-shrink:0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" value="Bordeaux" readonly>
+            <a href="01-landing.html" class="clear-btn" title="Clear search">&times;</a>
+          </div>
+          <div class="dropdown">
+            <a href="05-assessing.html" class="dropdown-item">
+              <span class="name"><strong>Bordeaux</strong></span>
+              <span class="detail">Gironde &mdash; Nouvelle-Aquitaine, France</span>
+            </a>
+            <a href="05-assessing.html" class="dropdown-item">
+              <span class="name"><strong>Bordeaux</strong> Port</span>
+              <span class="detail">Garonne Estuary, France</span>
+            </a>
+            <a href="05-assessing.html" class="dropdown-item">
+              <span class="name"><strong>Bordeaux</strong>-M&eacute;rignac Airport</span>
+              <span class="detail">Gironde, France</span>
+            </a>
+            <a href="05-assessing.html" class="dropdown-item">
+              <span class="name"><strong>Bordeaux</strong> Lac</span>
+              <span class="detail">Northern Bordeaux, France</span>
+            </a>
+            <a href="05-assessing.html" class="dropdown-item">
+              <span class="name"><strong>Bordeaux</strong> Saint-Jean</span>
+              <span class="detail">Centre-ville, France</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Map controls -->
+        <div class="map-controls">
+          <button class="map-ctrl" title="Zoom in">+</button>
+          <button class="map-ctrl" title="Zoom out">&minus;</button>
+        </div>
+
+        <!-- Bottom hint -->
+        <div class="bottom-hint">Pick a location to see what may happen</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', {
+      center: [45.5, -0.5],
+      zoom: 7,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    document.querySelector('.map-ctrl[title="Zoom in"]').addEventListener('click', () => map.zoomIn());
+    document.querySelector('.map-ctrl[title="Zoom out"]').addEventListener('click', () => map.zoomOut());
+  </script>
+</body>
+</html>

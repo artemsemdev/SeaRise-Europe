@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Methodology</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    .drawer-section { display: flex; flex-direction: column; gap: var(--sp3); }
+    .drawer-section h3 { margin-bottom: var(--sp1); }
+    .model-card {
+      background: var(--s-high);
+      border-radius: var(--r-md);
+      padding: var(--sp4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp2);
+    }
+    .model-card .model-name {
+      font-family: var(--f-d);
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .model-card p { margin: 0; }
+    .warning-box {
+      background: var(--w-bg);
+      border-radius: var(--r-md);
+      padding: var(--sp4);
+      font-size: .85rem;
+      color: var(--warn);
+      line-height: 1.7;
+    }
+    .drawer-meta {
+      font-size: .7rem;
+      color: var(--text3);
+      padding-top: var(--sp4);
+      border-top: 1px solid var(--s-high);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Explorer</a></li>
+          <li><a href="14-about.html">About Data</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Help">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main: duplicated 06-exposure layout -->
+    <div class="main">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div>
+          <div class="sidebar-title">Bordeaux, France</div>
+          <div style="font-size:.8rem;color:var(--text2);margin-top:4px;">Garonne estuary, Atlantic coast</div>
+        </div>
+
+        <div>
+          <div class="sidebar-label">How far into the future?</div>
+          <div class="timeline">
+            <div class="timeline-stops">
+              <div class="timeline-fill" style="width:100%"></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+10 yr</span><span class="year-abs">2036</span></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+20 yr</span><span class="year-abs">2046</span></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+30 yr</span><span class="year-abs">2056</span></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+50 yr</span><span class="year-abs">2076</span></div>
+              <div class="timeline-stop active"><div class="dot"></div><span class="label">+100 yr</span><span class="year-abs">2126</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sidebar-label">Forecast model</div>
+          <div class="model-list" style="margin-top:var(--sp2);">
+            <div class="model-item">
+              <span class="model-dot"></span>
+              <div>
+                <div>NASA (optimistic)</div>
+                <div class="model-desc">Low emissions, strong climate action</div>
+              </div>
+            </div>
+            <div class="model-item">
+              <span class="model-dot"></span>
+              <div>
+                <div>Copernicus (moderate)</div>
+                <div class="model-desc">Middle-of-the-road path</div>
+              </div>
+            </div>
+            <div class="model-item active">
+              <span class="model-dot"></span>
+              <div>
+                <div>IPCC (worst case)</div>
+                <div class="model-desc">High emissions, minimal action</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-note">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Change the year or model to see different outcomes for this location.</span>
+        </div>
+
+        <div style="margin-top:auto;">
+          <a href="11-methodology.html" style="display:inline-flex;align-items:center;gap:var(--sp2);font-size:.75rem;color:var(--primary);text-decoration:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            How is this calculated?
+          </a>
+        </div>
+      </aside>
+
+      <!-- Map -->
+      <div class="map-area">
+        <div id="map"></div>
+
+        <!-- Result card -->
+        <div class="result-card">
+          <div class="badge warn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+            Risk detected
+          </div>
+
+          <div>
+            <div class="loc">Bordeaux, France</div>
+            <div class="loc-sub">In 100 years (year 2126) &middot; IPCC worst case</div>
+          </div>
+
+          <div>
+            <div class="big-label">Sea level may rise by</div>
+            <div class="big-num">+0.85 m</div>
+            <div class="bar" style="margin-top:6px;"></div>
+          </div>
+
+          <div class="card-section">
+            At this level, low-lying areas near the Garonne estuary could experience regular flooding. Roughly <strong style="color:var(--text);">2,400 homes</strong> are in the projected exposure zone.
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="row"><span class="l">Forecast model</span><span class="v">IPCC (worst case)</span></div>
+          <div class="row"><span class="l">Timeframe</span><span class="v">+100 years</span></div>
+          <div class="row"><span class="l">Confidence range</span><span class="v">0.73 &ndash; 0.97 m</span></div>
+
+          <div class="src">Source: IPCC AR6 sea-level projections &middot; Copernicus DEM elevation data</div>
+        </div>
+
+        <!-- Map controls -->
+        <div class="map-controls">
+          <button class="map-ctrl" title="Zoom in">+</button>
+          <button class="map-ctrl" title="Zoom out">&minus;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Methodology Drawer Overlay -->
+  <div class="drawer-overlay">
+    <div class="drawer" style="position:relative;">
+      <a href="06-exposure.html" class="drawer-close" title="Close">&times;</a>
+
+      <h2>How is this calculated?</h2>
+
+      <div class="drawer-section">
+        <h3>Data sources</h3>
+        <p>We combine sea-level projections from the IPCC Sixth Assessment Report with high-resolution elevation data from the Copernicus satellite program.</p>
+      </div>
+
+      <div class="drawer-section">
+        <h3>Forecast models explained</h3>
+        <div class="model-card">
+          <div class="model-name">NASA (optimistic)</div>
+          <p>Best case &mdash; the world takes strong action. Emissions drop fast.</p>
+        </div>
+        <div class="model-card">
+          <div class="model-name">Copernicus (moderate)</div>
+          <p>Middle of the road &mdash; some progress, emissions don't drop as fast.</p>
+        </div>
+        <div class="model-card">
+          <div class="model-name">IPCC (worst case)</div>
+          <p>If nothing changes &mdash; emissions keep rising.</p>
+        </div>
+      </div>
+
+      <div class="drawer-section">
+        <h3>What this does NOT include</h3>
+        <ul>
+          <li>Storm surges and extreme waves</li>
+          <li>Local flood barriers and drainage</li>
+          <li>Land sinking (subsidence)</li>
+          <li>River flooding</li>
+          <li>Building-level precision (we use 30m satellite data)</li>
+        </ul>
+      </div>
+
+      <div class="drawer-section">
+        <h3>Important</h3>
+        <div class="warning-box">This is an educational tool based on scientific models. It is not a legal, engineering, insurance, or financial assessment.</div>
+      </div>
+
+      <div class="drawer-meta">Methodology version: v1.0.0 &middot; Data updated Q1 2026</div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', {
+      center: [44.865, -0.58],
+      zoom: 12,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    var icon = L.divIcon({
+      className: '', iconSize: [28,28], iconAnchor: [14,14],
+      html: '<div class="marker-outer warn"><div class="marker-inner"></div></div>'
+    });
+    L.marker([44.84, -0.57], { icon: icon }).addTo(map);
+
+    L.polygon([
+      [44.91,-0.65],[44.90,-0.58],[44.88,-0.54],[44.86,-0.52],
+      [44.84,-0.53],[44.82,-0.55],[44.80,-0.56],[44.79,-0.60],
+      [44.80,-0.64],[44.82,-0.67],[44.85,-0.68],[44.88,-0.67],[44.91,-0.65]
+    ], {
+      color: 'rgba(82,148,214,0.4)', fillColor: 'rgba(157,202,255,0.15)',
+      fillOpacity: 1, weight: 1
+    }).addTo(map);
+
+    document.querySelector('.map-ctrl[title="Zoom in"]').addEventListener('click', () => map.zoomIn());
+    document.querySelector('.map-ctrl[title="Zoom out"]').addEventListener('click', () => map.zoomOut());
+  </script>
+</body>
+</html>

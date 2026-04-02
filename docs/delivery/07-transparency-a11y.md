@@ -92,6 +92,20 @@ No blocking open questions. All prerequisites are resolved by upstream epics. OQ
 | `docs/architecture/03-component-view.md`           | Component responsibilities                          |
 | `docs/product/CONTENT_GUIDELINES.md`               | All copy requirements, prohibited language           |
 
+### 5.4 Mock Visual Specification
+
+The clickable prototype is the authoritative visual specification. Each story must match the corresponding mock screen. See `docs/product/Mock/MOCK_REQUIREMENTS_MAP.md` for the full traceability map.
+
+| Story   | Mock Screen(s) to Match                                    |
+| ------- | ---------------------------------------------------------- |
+| S07-01  | `11-methodology.html` (drawer layout, model cards, limitations list, warning box, methodology version) |
+| S07-02  | All screens — audit simplified copy (§2.7 of CONTENT_GUIDELINES) against mock text |
+| S07-03  | All screens — verify all user-facing strings are externalized |
+| S07-04  | All interactive screens — keyboard flow through sidebar, timeline, model selector, result card |
+| S07-05  | All screens — ARIA roles on all components |
+| S07-06  | All screens — responsive layout at 3 breakpoints matching mock proportions |
+| S07-07  | All screens — comprehensive a11y audit |
+
 ---
 
 ## 6  Implementation Plan

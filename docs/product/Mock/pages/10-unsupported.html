@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Tokyo (Outside Europe)</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    .map-dim {
+      position: absolute; inset: 0; z-index: 2;
+      background: rgba(10, 15, 19, 0.6);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
+      <nav><ul class="topbar-nav">
+        <li><a href="01-landing.html" class="active">Explorer</a></li>
+        <li><a href="14-about.html">About Data</a></li>
+      </ul></nav>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Help">?</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="map-area">
+        <div id="map"></div>
+        <div class="map-dim"></div>
+
+        <!-- Center card -->
+        <div class="center-card">
+          <div class="center-card-inner">
+            <div class="center-icon" style="background:var(--w-bg);">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M2 12h20"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            </div>
+            <h2>Tokyo is outside Europe</h2>
+            <p>SeaRise Europe only covers <strong style="color:var(--text);">European coastlines</strong> right now. We hope to expand to other regions in the future.</p>
+            <p style="font-size:.8rem;">Try a European coastal city like Lisbon, Naples, or Copenhagen.</p>
+            <div style="display:flex;gap:var(--sp3);">
+              <a href="01-landing.html" class="btn btn-primary">New search</a>
+              <a href="01-landing.html" class="btn btn-ghost">Reset</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-controls">
+          <button class="map-ctrl">+</button>
+          <button class="map-ctrl">&minus;</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = L.map('map', { center: [35.68, 139.69], zoom: 5, zoomControl: false, attributionControl: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+  </script>
+</body>
+</html>

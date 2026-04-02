@@ -6,6 +6,14 @@
 
 ---
 
+## 0. Visual Specification Authority
+
+> The clickable prototype in `docs/product/Mock/pages/` is the **authoritative visual specification** for the production frontend. All component implementations must match the mocks in layout, spacing, color, typography, and copy. See `docs/product/Mock/MOCK_REQUIREMENTS_MAP.md` for the full traceability map linking each mock screen to its requirements and delivery stories.
+>
+> Where this architecture document describes component behavior or copy in generic terms, the mock provides the concrete visual reference. Where the mocks use simplified user-facing language (e.g., "Risk detected" instead of "Modeled Coastal Exposure Detected"), the simplified version is authoritative for the UI. Internal/API vocabulary remains unchanged.
+
+---
+
 ## 1. Frontend Goals and Constraints
 
 ### Goals (derived from PRD, VISION, PERSONAS, METRICS_PLAN, CONTENT_GUIDELINES)
@@ -152,8 +160,8 @@ Rendered when `appPhase` is in `['assessing', 'result', 'result_updating', 'asse
 Contains:
 - `ResultStateHeader`: headline from `strings.resultStates[result.resultState]` — one of 5 values (BR-010)
 - `ResultSummary`: fills CONTENT_GUIDELINES §3 template with location label, scenario displayName, horizonYear
-- `ScenarioControl`: radio group or tab set; shows active scenario (FR-018); onChange → new assessment
-- `HorizonControl`: segmented control `[2030 | 2050 | 2100]`; shows active horizon (FR-018); onChange → new assessment
+- `ScenarioControl`: vertical list of model cards (NASA optimistic / Copernicus moderate / IPCC worst case); shows active selection with highlight (FR-018); onChange → new assessment. See mock `06-exposure.html` sidebar for reference layout.
+- `HorizonControl`: visual timeline selector with 5 stops `[+10 yr | +20 yr | +30 yr | +50 yr | +100 yr]`; gradient fill track showing progression; shows active horizon with absolute year annotation (FR-018); onChange → new assessment. See mock `06-exposure.html` for reference layout.
 - `Disclaimer`: exact text from CONTENT_GUIDELINES §4 (FR-024)
 - `MethodologyEntryPoint`: "How to interpret this result" button (FR-032)
 - `ResetButton`: clears all state → returns to `idle` phase (FR-041)
@@ -328,21 +336,22 @@ Panel visibility, tooltip visibility — no business logic.
 
 ## 5. UI State Model
 
-| UI State | AppPhase | What the User Sees |
-|---|---|---|
-| Initial Empty | `idle` | EmptyState + Map (Europe view) + SearchBar |
-| Geocoding Loading | `geocoding` | SearchBar (loading), map unchanged, "Searching for locations…" |
-| No Results | `no_geocoding_results` | "No locations found" message in panel area |
-| Candidate Selection | `candidate_selection` | CandidateList (1–5 options) |
-| Assessment Loading | `assessing` | Map with marker, "Calculating exposure…" loading state |
-| Modeled Exposure Detected | `result` (resultState = ModeledExposureDetected) | ResultPanel + ExposureLayer + Legend |
-| No Modeled Exposure | `result` (NoModeledExposureDetected) | ResultPanel (no exposure text) + marker + legend |
-| Data Unavailable | `result` (DataUnavailable) | ResultPanel with Data Unavailable copy |
-| Out of Scope | `result` (OutOfScope) | ResultPanel with Outside Coverage Area copy |
-| Unsupported Geography | `result` (UnsupportedGeography) | ResultPanel with Location Outside Supported Area copy |
-| Control Changing | `result_updating` | Previous result still visible + inline loading indicator |
-| Recoverable Error | `geocoding_error` or `assessment_error` | ErrorBanner + Retry button |
-| Methodology Panel | (any result state) | MethodologyPanel overlays ResultPanel |
+| UI State | AppPhase | What the User Sees | Mock Reference |
+|---|---|---|---|
+| Initial Empty | `idle` | EmptyState + Map (Europe view) + SearchBar | `01-landing.html` |
+| Geocoding Loading | `geocoding` | SearchBar (loading), map unchanged, "Searching for locations…" | `02-search-loading.html` |
+| No Results | `no_geocoding_results` | "No locations found" message in panel area | `04-no-results.html` |
+| Candidate Selection | `candidate_selection` | CandidateList (1–5 options) | `03-candidates.html` |
+| Assessment Loading | `assessing` | Map with marker, "Calculating exposure…" loading state | `05-assessing.html` |
+| Modeled Exposure Detected | `result` (ModeledExposureDetected) | Sidebar + ResultCard: "Risk detected" badge, sea-level value, exposure overlay | `06-exposure.html` |
+| No Modeled Exposure | `result` (NoModeledExposureDetected) | Sidebar + ResultCard: "No risk detected" badge, marker, no overlay | `07-no-exposure.html` |
+| Data Unavailable | `result` (DataUnavailable) | Sidebar + ResultCard: "Data not available" badge, action suggestions | `08-data-unavailable.html` |
+| Out of Scope | `result` (OutOfScope) | Center card: "This location is too far from the coast" | `09-inland.html` |
+| Unsupported Geography | `result` (UnsupportedGeography) | Center card: "This location is outside Europe" | `10-unsupported.html` |
+| Control Changing | `result_updating` | Previous result still visible + inline loading indicator | (behavioral — see `06-exposure.html` layout) |
+| Recoverable Error (geocoding) | `geocoding_error` | Center card with retry + clear actions | `12-error-geocoding.html` |
+| Recoverable Error (assessment) | `assessment_error` | Sidebar visible + error card with retry | `13-error-assessment.html` |
+| Methodology Panel | (any result state) | Right-side drawer overlay on result view | `11-methodology.html` |
 
 ```mermaid
 stateDiagram-v2
@@ -420,10 +429,10 @@ MapLibre attribution control shows basemap provider attribution automatically fr
 ## 7. Responsive Behavior
 
 ### Desktop (≥1024px) — Primary target
-- Split-pane layout: left panel (SearchBar + ResultPanel, ~360px width) + map fills remaining width
-- MethodologyPanel: right-side drawer or modal overlay on left panel
-- Legend: overlaid on map (bottom-left)
-- ScenarioControl + HorizonControl: visible in left panel at all times (FR-030)
+- Layout per mocks: left sidebar (280px) with location info + timeline selector + forecast model list, map area fills remaining width, floating result card (320px) overlaid on map right side. See `06-exposure.html`.
+- MethodologyPanel: right-side drawer overlay with dimmed background. See `11-methodology.html`.
+- Map controls: zoom buttons on map right edge, glass-morphism style.
+- ScenarioControl + HorizonControl: visible in sidebar at all times (FR-030).
 
 ### Tablet (768–1023px)
 - Map fills full width; ResultPanel as collapsible bottom panel
@@ -552,12 +561,14 @@ export const strings = {
     body: 'Enter a European address, city, or location...',
     subtext: 'Results are model-based estimates, not engineering assessments.',
   },
+  // User-facing labels use simplified language per mock visual spec.
+  // Internal API states remain unchanged (ModeledExposureDetected, etc.)
   resultStates: {
-    ModeledExposureDetected: 'Modeled Coastal Exposure Detected',
-    NoModeledExposureDetected: 'No Modeled Coastal Exposure Detected',
-    DataUnavailable: 'Data Unavailable',
-    OutOfScope: 'Outside MVP Coverage Area',
-    UnsupportedGeography: 'Location Outside Supported Area',
+    ModeledExposureDetected: 'Risk detected',
+    NoModeledExposureDetected: 'No risk detected',
+    DataUnavailable: 'Data not available',
+    OutOfScope: 'This location is too far from the coast',
+    UnsupportedGeography: 'This location is outside Europe',
   },
   loading: {
     geocoding: 'Searching for locations…',

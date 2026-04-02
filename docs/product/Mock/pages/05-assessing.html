@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Assessing Bordeaux</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    .assess-card {
+      position: absolute;
+      right: 72px;
+      top: var(--sp6);
+      width: 340px;
+      background: var(--s-low);
+      border-radius: var(--r-lg);
+      padding: var(--sp6);
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp5);
+      z-index: 20;
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    .assess-header {
+      display: flex;
+      align-items: center;
+      gap: var(--sp4);
+    }
+    .assess-header .spinner {
+      flex-shrink: 0;
+    }
+    .assess-title {
+      font-family: var(--f-d);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .assess-sub {
+      font-size: .85rem;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+    .assess-steps {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp3);
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: var(--sp3);
+      font-size: .8rem;
+      color: var(--text3);
+    }
+    .step.done { color: var(--ok); }
+    .step.active { color: var(--primary); }
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--s-high);
+      flex-shrink: 0;
+    }
+    .step.done .step-dot { background: var(--ok); }
+    .step.active .step-dot { background: var(--primary); }
+    .progress-track {
+      height: 3px;
+      background: var(--s-high);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--grad);
+      border-radius: 2px;
+      width: 0%;
+      animation: fill-progress 2s ease-in-out forwards;
+    }
+    @keyframes fill-progress {
+      0% { width: 0%; }
+      30% { width: 35%; }
+      60% { width: 65%; }
+      90% { width: 90%; }
+      100% { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Explorer</a></li>
+          <li><a href="14-about.html">About Data</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Help">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="map-area">
+        <div id="map"></div>
+
+        <!-- Assessment card -->
+        <div class="assess-card">
+          <div class="assess-header">
+            <div class="spinner"></div>
+            <div>
+              <div class="assess-title">Calculating...</div>
+            </div>
+          </div>
+
+          <div class="assess-sub">Checking sea-level data for <strong style="color:var(--text)">Bordeaux, France</strong>...</div>
+
+          <div class="progress-track">
+            <div class="progress-fill"></div>
+          </div>
+
+          <div class="assess-steps">
+            <div class="step done">
+              <span class="step-dot"></span>
+              <span>Location confirmed</span>
+            </div>
+            <div class="step done">
+              <span class="step-dot"></span>
+              <span>Elevation data loaded</span>
+            </div>
+            <div class="step active">
+              <span class="step-dot"></span>
+              <span>Running sea-level models...</span>
+            </div>
+            <div class="step">
+              <span class="step-dot"></span>
+              <span>Generating exposure report</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Map controls -->
+        <div class="map-controls">
+          <button class="map-ctrl" title="Zoom in">+</button>
+          <button class="map-ctrl" title="Zoom out">&minus;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', {
+      center: [44.865, -0.58],
+      zoom: 11,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    // Pulsing marker
+    const markerIcon = L.divIcon({
+      className: '',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      html: '<div class="marker-outer"><div class="marker-inner"></div></div>'
+    });
+    L.marker([44.84, -0.57], { icon: markerIcon }).addTo(map);
+
+    document.querySelector('.map-ctrl[title="Zoom in"]').addEventListener('click', () => map.zoomIn());
+    document.querySelector('.map-ctrl[title="Zoom out"]').addEventListener('click', () => map.zoomOut());
+
+    // Auto-redirect after 2 seconds
+    setTimeout(() => {
+      window.location.href = '06-exposure.html';
+    }, 2000);
+  </script>
+</body>
+</html>

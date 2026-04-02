@@ -3,56 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SeaRise Europe — Explore Sea-Level Futures</title>
+  <title>SeaRise Europe — Searching...</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="design-system.css">
   <style>
-    .hero {
+    .search-float {
       position: absolute;
-      inset: 0;
+      top: var(--sp6);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      z-index: 10;
-      text-align: center;
-      padding: var(--sp6);
-      pointer-events: none;
+      gap: var(--sp4);
     }
-    .hero > * { pointer-events: auto; }
-    .hero h1 {
-      font-family: var(--f-d);
-      font-size: 2.4rem;
-      font-weight: 800;
-      color: var(--text);
-      line-height: 1.2;
-      max-width: 560px;
-      margin-bottom: var(--sp3);
-    }
-    .hero h1 .accent {
-      background: var(--grad);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .hero .subtitle {
-      font-size: .95rem;
-      color: var(--text2);
-      max-width: 480px;
-      line-height: 1.6;
-      margin-bottom: var(--sp8);
-    }
-    .search-box {
+    .search-bar {
       display: flex;
       align-items: center;
       background: var(--s-low);
       border-radius: var(--r-lg);
-      padding: var(--sp2);
-      width: 100%;
-      max-width: 520px;
+      padding: var(--sp2) var(--sp4);
+      width: 480px;
       box-shadow: 0 8px 32px rgba(0,0,0,.4);
+      gap: var(--sp3);
     }
-    .search-box input {
+    .search-bar input {
       flex: 1;
       background: none;
       border: none;
@@ -60,15 +36,27 @@
       font-family: var(--f-b);
       font-size: .95rem;
       color: var(--text);
-      padding: var(--sp3) var(--sp4);
+      padding: var(--sp3) 0;
     }
-    .search-box input::placeholder {
-      color: var(--text3);
-    }
-    .search-box .btn-primary {
-      padding: var(--sp3) var(--sp6);
+    .search-status {
+      display: flex;
+      align-items: center;
+      gap: var(--sp3);
+      background: var(--s-low);
       border-radius: var(--r-md);
-      white-space: nowrap;
+      padding: var(--sp3) var(--sp5);
+      font-size: .85rem;
+      color: var(--text2);
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+    }
+    .cancel-link {
+      font-size: .8rem;
+      color: var(--primary);
+      text-decoration: none;
+      margin-top: var(--sp1);
+    }
+    .cancel-link:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
@@ -95,26 +83,24 @@
       <div class="map-area">
         <div id="map"></div>
 
-        <!-- Hero overlay -->
-        <div class="hero">
-          <h1>What will happen to <span class="accent">your coast</span> in the future?</h1>
-          <p class="subtitle">Enter any European location to see how sea levels may change over the next 10 to 100 years.</p>
-          <div class="search-box">
-            <svg style="margin-left:12px;color:var(--text3);flex-shrink:0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder='Try "Bordeaux", "Amsterdam", "Venice"...'>
-            <a href="02-search-loading.html" class="btn btn-primary">Search</a>
+        <!-- Floating search + status -->
+        <div class="search-float">
+          <div class="search-bar">
+            <svg style="color:var(--text3);flex-shrink:0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" value="Bordeaux" readonly>
+            <div class="spinner" style="width:20px;height:20px;border-width:2px;flex-shrink:0"></div>
           </div>
+          <div class="search-status">
+            <div class="spinner" style="width:18px;height:18px;border-width:2px"></div>
+            Searching for locations...
+          </div>
+          <a href="01-landing.html" class="cancel-link">Cancel</a>
         </div>
 
         <!-- Map controls -->
         <div class="map-controls">
           <button class="map-ctrl" title="Zoom in">+</button>
           <button class="map-ctrl" title="Zoom out">&minus;</button>
-        </div>
-
-        <!-- Disclaimer -->
-        <div class="disclaimer">
-          This is a forecast, not a guarantee &mdash; <a href="14-about.html">learn how it works</a>
         </div>
       </div>
     </div>
@@ -132,8 +118,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const map = L.map('map', {
-      center: [50, 15],
-      zoom: 5,
+      center: [46, 2],
+      zoom: 6,
       zoomControl: false,
       attributionControl: false
     });
@@ -144,6 +130,11 @@
 
     document.querySelector('.map-ctrl[title="Zoom in"]').addEventListener('click', () => map.zoomIn());
     document.querySelector('.map-ctrl[title="Zoom out"]').addEventListener('click', () => map.zoomOut());
+
+    // Auto-redirect after 2 seconds
+    setTimeout(() => {
+      window.location.href = '03-candidates.html';
+    }, 2000);
   </script>
 </body>
 </html>

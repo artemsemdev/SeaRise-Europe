@@ -3,35 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SeaRise Europe — Bordeaux</title>
+  <title>SeaRise Europe — Bordeaux Exposure</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="design-system.css">
-  <style>
-    #map { position: absolute; inset: 0; z-index: 1; }
-    .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
-
-    .result-card .what-means {
-      font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6;
-      background: var(--surface-high); border-radius: var(--r-md);
-      padding: var(--sp-3);
-    }
-    .result-card .divider {
-      height: 1px; background: var(--surface-high);
-    }
-    .data-link {
-      display: inline-flex; align-items: center; gap: var(--sp-2);
-      font-size: 0.75rem; color: var(--primary); text-decoration: none;
-    }
-    .data-link:hover { text-decoration: underline; }
-  </style>
 </head>
 <body>
   <div class="shell">
     <header class="topbar">
-      <div class="topbar-brand">SEARISE EUROPE</div>
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
       <nav><ul class="topbar-nav">
         <li><a href="01-landing.html" class="active">Explorer</a></li>
-        <li><a href="06-methodology.html">About Data</a></li>
+        <li><a href="14-about.html">About Data</a></li>
       </ul></nav>
       <div class="topbar-right">
         <button class="icon-btn" title="Help">?</button>
@@ -43,23 +25,26 @@
       <aside class="sidebar">
         <div>
           <div class="sidebar-title">Bordeaux, France</div>
-          <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">Garonne estuary, Atlantic coast</div>
+          <div style="font-size:.8rem;color:var(--text2);margin-top:4px;">Garonne estuary, Atlantic coast</div>
         </div>
 
         <div>
           <div class="sidebar-label">How far into the future?</div>
-          <div class="year-pills" style="margin-top:var(--sp-2);">
-            <button class="year-pill">+10 yr</button>
-            <button class="year-pill">+20 yr</button>
-            <button class="year-pill">+30 yr</button>
-            <button class="year-pill">+50 yr</button>
-            <button class="year-pill active">+100 yr</button>
+          <div class="timeline">
+            <div class="timeline-stops">
+              <div class="timeline-fill" style="width:100%"></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+10 yr</span><span class="year-abs">2036</span></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+20 yr</span><span class="year-abs">2046</span></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+30 yr</span><span class="year-abs">2056</span></div>
+              <div class="timeline-stop passed"><div class="dot"></div><span class="label">+50 yr</span><span class="year-abs">2076</span></div>
+              <div class="timeline-stop active"><div class="dot"></div><span class="label">+100 yr</span><span class="year-abs">2126</span></div>
+            </div>
           </div>
         </div>
 
         <div>
           <div class="sidebar-label">Forecast model</div>
-          <div class="model-list" style="margin-top:var(--sp-2);">
+          <div class="model-list" style="margin-top:var(--sp2);">
             <div class="model-item">
               <span class="model-dot"></span>
               <div>
@@ -89,10 +74,14 @@
           <span>Change the year or model to see different outcomes for this location.</span>
         </div>
 
-        <div style="margin-top:auto;">
-          <a href="06-methodology.html" class="data-link">
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:var(--sp3);">
+          <a href="11-methodology.html" class="btn-link" style="display:inline-flex;align-items:center;gap:var(--sp2);">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             How is this calculated?
+          </a>
+          <a href="01-landing.html" class="btn-link" style="display:inline-flex;align-items:center;gap:var(--sp2);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            New search
           </a>
         </div>
       </aside>
@@ -103,56 +92,61 @@
 
         <!-- Result card -->
         <div class="result-card">
-          <div class="result-badge warn">
+          <div class="badge warn">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
             Risk detected
           </div>
 
           <div>
-            <div class="location-name">Bordeaux, France</div>
-            <div class="location-sub">In 100 years (year 2126) &middot; IPCC worst case</div>
+            <div class="loc">Bordeaux, France</div>
+            <div class="loc-sub">In 100 years (year 2126) &middot; IPCC worst case</div>
           </div>
 
           <div>
-            <div class="result-big-label">Sea level may rise by</div>
-            <div class="result-big-number">+0.85 m</div>
-            <div class="result-bar" style="margin-top:6px;"></div>
+            <div class="big-label">Sea level may rise by</div>
+            <div class="big-num">+0.85 m</div>
+            <div class="bar" style="margin-top:6px;"></div>
           </div>
 
-          <div class="what-means">
+          <div class="card-section">
             At this level, low-lying areas near the Garonne estuary could experience regular flooding. Roughly <strong style="color:var(--text);">2,400 homes</strong> are in the projected exposure zone.
           </div>
 
           <div class="divider"></div>
 
-          <div class="result-row">
-            <span class="label">Forecast model</span>
-            <span class="value">IPCC (worst case)</span>
+          <div class="row">
+            <span class="l">Forecast model</span>
+            <span class="v">IPCC (worst case)</span>
           </div>
-          <div class="result-row">
-            <span class="label">Timeframe</span>
-            <span class="value">+100 years</span>
+          <div class="row">
+            <span class="l">Timeframe</span>
+            <span class="v">+100 years</span>
           </div>
-          <div class="result-row">
-            <span class="label">Confidence range</span>
-            <span class="value">0.73 – 0.97 m</span>
+          <div class="row">
+            <span class="l">Confidence range</span>
+            <span class="v">0.73 &ndash; 0.97 m</span>
           </div>
 
-          <div class="result-source">
-            Source: IPCC AR6 sea-level projections &middot; Copernicus DEM elevation data
+          <div class="src">Source: IPCC AR6 sea-level projections &middot; Copernicus DEM elevation data</div>
+
+          <div style="font-size:.7rem;color:var(--text3);font-style:italic;">
+            This is a model estimate, not an engineering or legal assessment.
           </div>
         </div>
 
         <div class="map-controls">
           <button class="map-ctrl">+</button>
-          <button class="map-ctrl">−</button>
+          <button class="map-ctrl">&minus;</button>
         </div>
       </div>
     </main>
 
     <footer class="footer">
       <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
-      <div><a href="06-methodology.html">About Data</a><a href="#">Privacy</a></div>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
     </footer>
   </div>
 

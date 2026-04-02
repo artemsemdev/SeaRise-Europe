@@ -95,6 +95,20 @@ None. All blocking questions for this epic were resolved in Epic 01 (scenario se
 | `docs/architecture/13-domain-model.md`                     | ResultState, AssessmentResult types              |
 | `docs/architecture/03-component-view.md`                   | ExposureEvaluator, ResultStateDeterminator        |
 
+### 5.3 Mock Visual Specification
+
+The clickable prototype is the authoritative visual specification. Each story must match the corresponding mock screen. See `docs/product/Mock/MOCK_REQUIREMENTS_MAP.md` for the full traceability map.
+
+| Story   | Mock Screen(s) to Match                                    |
+| ------- | ---------------------------------------------------------- |
+| S06-01  | `06-exposure.html` sidebar (timeline selector with 5 horizons, forecast model list with 3 models) |
+| S06-02  | `05-assessing.html` (assessment trigger), `06-exposure.html` (result delivery) |
+| S06-03  | `06-exposure.html` (exposure), `07-no-exposure.html` (no exposure), `08-data-unavailable.html` (data unavailable), `09-inland.html` (out of scope), `10-unsupported.html` (unsupported) |
+| S06-04  | `06-exposure.html` (exposure polygon overlay, warn marker, gradient bar) |
+| S06-05  | `05-assessing.html` (loading), `13-error-assessment.html` (error with retry) |
+| S06-06  | All result screens (URL state reflects active scenario/horizon/location) |
+| S06-07  | All above screens (integration tests across full assessment cycle) |
+
 ---
 
 ## 6  Implementation Plan
@@ -157,7 +171,7 @@ The scenario and horizon controls are the primary interaction mechanism for the 
 **Scope Notes**
 
 - ScenarioControl: radio group or tab set rendering all scenarios from the `['config', 'scenarios']` query.
-- HorizonControl: segmented control with three options: 2030, 2050, 2100.
+- HorizonControl: visual timeline selector with 5 stops: +10 yr (2036), +20 yr (2046), +30 yr (2056), +50 yr (2076), +100 yr (2126). Implements a horizontal track with gradient fill, dot indicators, and relative/absolute year labels. See mock `06-exposure.html` sidebar for the reference implementation.
 - Both controls populated from `GET /v1/config/scenarios` response (fetched and cached in Epic 05).
 - Default selections applied from the config `defaults` object on initial load (FR-016).
 - Active selection visually indicated at all times (FR-018).
@@ -182,7 +196,7 @@ The scenario and horizon controls are the primary interaction mechanism for the 
 **Acceptance Criteria**
 
 1. ScenarioControl renders all scenarios from the config query in sort order with display names.
-2. HorizonControl renders 2030, 2050, 2100 in sort order.
+2. HorizonControl renders 5 timeline stops (+10 yr, +20 yr, +30 yr, +50 yr, +100 yr) with gradient fill track matching mock `06-exposure.html`.
 3. Default scenario and horizon are pre-selected on initial load per the config `defaults` object.
 4. Changing a scenario visually updates the active indicator immediately.
 5. Changing a horizon visually updates the active indicator immediately.

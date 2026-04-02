@@ -178,7 +178,7 @@ This PRD does **not** cover the following for MVP:
 
 **FR-014** The system shall provide a scenario selector driven by a configured MVP scenario set.
 
-**FR-015** The system shall provide a time-horizon control that supports exactly these MVP horizons: **2030**, **2050**, and **2100**.
+**FR-015** The system shall provide a time-horizon control that supports exactly these MVP horizons: **+10 yr (2036)**, **+20 yr (2046)**, **+30 yr (2056)**, **+50 yr (2076)**, and **+100 yr (2126)**. The control uses a visual timeline selector with relative labels ("+10 yr") and absolute year annotations. See mock `06-exposure.html` for the reference implementation.
 
 **FR-016** The system shall apply a configured default scenario and default time horizon after the first valid in-scope location is selected.
 
@@ -348,19 +348,39 @@ This PRD does **not** cover the following for MVP:
 
 ### 10.1 Screens / Views
 
-**A. Landing / Search View**
-- Search input visible on first load.
-- Europe-focused map visible on first load.
-- Short supporting copy explains that the app shows scenario-based coastal exposure for Europe.
+> **Visual specification:** The clickable prototype in `docs/product/Mock/pages/` is the authoritative visual specification for all screens below. The production application must match these mocks in layout, styling, copy, and interaction patterns. See `docs/product/Mock/MOCK_REQUIREMENTS_MAP.md` for full traceability from each mock screen to its requirements, acceptance criteria, and delivery stories.
 
-**B. Results View**
-- Map remains the primary visual surface.
-- Result summary panel is visible alongside the map on larger screens.
+**A. Landing / Search View** — Mock: `01-landing.html`
+- Search input visible on first load, centered on a dark Europe-focused map.
+- Hero overlay with gradient accent text and supporting copy.
+- Footer with data source attribution.
+
+**B. Results View** — Mocks: `06-exposure.html`, `07-no-exposure.html`, `08-data-unavailable.html`, `09-inland.html`, `10-unsupported.html`
+- Map remains the primary visual surface with a left sidebar (280px) containing:
+  - Location name and context.
+  - Timeline selector ("How far into the future?") with visual track and dot indicators.
+  - Forecast model selector (NASA optimistic / Copernicus moderate / IPCC worst case).
+  - "How is this calculated?" methodology link.
+  - "New search" link.
+- Floating result card on the map area (right side) showing result badge, sea-level projection, confidence range, and disclaimer.
 - On smaller screens, the summary panel may collapse into a bottom sheet or drawer.
 
-**C. Methodology / Details View**
-- Accessible from the result view.
-- Contains source names, methodology version, interpretation guidance, and limitations.
+**C. Methodology / Details View** — Mock: `11-methodology.html`
+- Right-side drawer overlay triggered from the result view.
+- Contains data sources, three forecast model explanations, limitations list, educational disclaimer, and methodology version.
+
+**D. Search Flow States** — Mocks: `02-search-loading.html`, `03-candidates.html`, `04-no-results.html`, `05-assessing.html`
+- Search loading: spinner centered on map.
+- Candidate selection: dropdown list of up to 5 matching locations.
+- No results: centered card with guidance.
+- Assessment loading: map zoomed to location with spinner card.
+
+**E. Error States** — Mocks: `12-error-geocoding.html`, `13-error-assessment.html`
+- Geocoding error: centered card with retry action.
+- Assessment error: error card with retry, sidebar controls still visible.
+
+**F. Information Page** — Mock: `14-about.html`
+- Full-page content layout with methodology, sources, limitations, and disclaimer.
 
 ### 10.2 Input Validation
 - Empty search submission must show inline validation.
@@ -647,7 +667,7 @@ The planned implementation assumes ASP.NET Core for the backend API, Azure Conta
 1. The product is portfolio-first and not initially a commercial SaaS offering.
 2. MVP is Europe-only.
 3. MVP is coastal-only.
-4. MVP supports exactly three time horizons: 2030, 2050, and 2100.
+4. MVP supports five time horizons: +10 yr (2036), +20 yr (2046), +30 yr (2056), +50 yr (2076), +100 yr (2126).
 5. MVP uses a configured scenario set, but final scenario labels are still to be confirmed.
 6. Anonymous public access is sufficient for MVP.
 7. Managed cloud hosting is preferred over Kubernetes for MVP.
@@ -661,7 +681,7 @@ The planned implementation assumes ASP.NET Core for the backend API, Azure Conta
 3. Definition of the coastal analysis zone.
 4. Definition of the exact exposure methodology and boundary behavior.
 5. Availability of geospatial preprocessing pipeline and layer-generation workflow.
-6. Final design system and map visual design decisions.
+6. Final design system and map visual design decisions. *(Resolved: see `docs/product/Mock/pages/design-system.css` and clickable prototype.)*
 7. Cloud infrastructure, CI/CD, and deployment configuration.
 8. Final disclaimer and methodology copy review.
 

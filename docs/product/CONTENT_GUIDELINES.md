@@ -105,11 +105,36 @@ These are different states. "Data Unavailable" means the model could not be eval
 
 ---
 
+## 2.7 Simplified User-Facing Language (Mock Visual Spec)
+
+The clickable prototype (`docs/product/Mock/pages/`) establishes simplified user-facing language that replaces the formal scientific terminology in the UI. This is an intentional design decision to maximize comprehensibility for non-specialist users (§1 Voice: "Clear", "Direct").
+
+**The production application must use the simplified labels below for all user-facing surfaces.** The formal terminology in sections 3–5 below remains the canonical internal/API vocabulary and the basis for copy review. The `lib/i18n/en.ts` string file maps API result states to simplified display strings.
+
+| Formal (API / Internal) | Simplified (User-Facing) | Mock Reference |
+|---|---|---|
+| Modeled Coastal Exposure Detected | **Risk detected** | `06-exposure.html` |
+| No Modeled Coastal Exposure Detected | **No risk detected** | `07-no-exposure.html` |
+| Data Unavailable | **Data not available** | `08-data-unavailable.html` |
+| Outside MVP Coverage Area | **This location is too far from the coast** | `09-inland.html` |
+| Location Outside Supported Area | **This location is outside Europe** | `10-unsupported.html` |
+| Scenario | **Forecast model** | Sidebar in `06-exposure.html` |
+| Time horizon | **How far into the future?** | Sidebar in `06-exposure.html` |
+| SSP1-1.9 / optimistic scenario | **NASA (optimistic)** | Sidebar in `06-exposure.html` |
+| SSP2-4.5 / moderate scenario | **Copernicus (moderate)** | Sidebar in `06-exposure.html` |
+| SSP5-8.5 / worst-case scenario | **IPCC (worst case)** | Sidebar in `06-exposure.html` |
+
+> **Copy review rule:** When auditing UI strings (S07-02), verify that user-facing surfaces use the simplified labels above, and that internal/API strings use the formal vocabulary. Both forms are correct in their respective contexts.
+
+---
+
 ## 3. Result State Copy
 
 ### 3.1 Modeled Coastal Exposure Detected
 
-**Headline:** `Modeled Coastal Exposure Detected`
+> **Mock reference:** `06-exposure.html` — User-facing headline: "Risk detected"
+
+**Headline (internal):** `Modeled Coastal Exposure Detected`
 
 **Summary template:**
 > Based on the **[Scenario]** scenario and the **[Year]** time horizon, the selected location falls within a modeled coastal exposure zone. This result is based on **[Dataset Name]** sea-level projections and **[Elevation Dataset]** elevation data.
@@ -130,7 +155,9 @@ These are different states. "Data Unavailable" means the model could not be eval
 
 ### 3.2 No Modeled Coastal Exposure Detected
 
-**Headline:** `No Modeled Coastal Exposure Detected`
+> **Mock reference:** `07-no-exposure.html` — User-facing headline: "No risk detected"
+
+**Headline (internal):** `No Modeled Coastal Exposure Detected`
 
 **Summary template:**
 > Based on the **[Scenario]** scenario and the **[Year]** time horizon, the selected location does not fall within the active modeled exposure zone. This result reflects the resolution and assumptions of the current methodology and does not constitute a safety determination.
@@ -147,7 +174,9 @@ These are different states. "Data Unavailable" means the model could not be eval
 
 ### 3.3 Data Unavailable
 
-**Headline:** `Data Unavailable`
+> **Mock reference:** `08-data-unavailable.html` — User-facing headline: "Data not available"
+
+**Headline (internal):** `Data Unavailable`
 
 **Summary template:**
 > Data is not available for this location under the **[Scenario]** scenario and **[Year]** time horizon. The system has not substituted another scenario, horizon, or dataset. Try a different scenario or time horizon, or check the methodology for coverage notes.
@@ -164,7 +193,9 @@ These are different states. "Data Unavailable" means the model could not be eval
 
 ### 3.4 Out of Scope
 
-**Headline:** `Outside MVP Coverage Area`
+> **Mock reference:** `09-inland.html` — User-facing headline: "This location is too far from the coast"
+
+**Headline (internal):** `Outside MVP Coverage Area`
 
 **Summary template:**
 > The selected location is within Europe but outside the coastal analysis area covered by this tool. SeaRise Europe currently covers coastal sea-level exposure only. Inland locations are not in scope for MVP. Try a location closer to the coast.
@@ -181,7 +212,9 @@ These are different states. "Data Unavailable" means the model could not be eval
 
 ### 3.5 Unsupported Geography
 
-**Headline:** `Location Outside Supported Area`
+> **Mock reference:** `10-unsupported.html` — User-facing headline: "This location is outside Europe"
+
+**Headline (internal):** `Location Outside Supported Area`
 
 **Summary template:**
 > The selected location is outside the area supported by SeaRise Europe. This tool covers European coastal locations only. Please search a European address or location.

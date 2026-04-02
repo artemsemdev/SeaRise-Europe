@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeaRise Europe — Assessment Error</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="design-system.css">
+  <style>
+    .result-card .card-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp3);
+    }
+    .result-card .card-actions .btn {
+      width: 100%;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <a href="01-landing.html" class="topbar-brand">SEARISE EUROPE</a>
+      <nav>
+        <ul class="topbar-nav">
+          <li><a href="01-landing.html" class="active">Explorer</a></li>
+          <li><a href="14-about.html">About Data</a></li>
+        </ul>
+      </nav>
+      <div class="topbar-right">
+        <button class="icon-btn" title="Help">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main">
+      <div class="map-area">
+        <div id="map"></div>
+
+        <!-- Floating result card with error -->
+        <div class="result-card">
+          <div>
+            <div class="loc">Bordeaux, France</div>
+            <div class="loc-sub">Garonne estuary, Atlantic coast</div>
+          </div>
+
+          <div class="error-banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            Something went wrong while calculating. Please try again.
+          </div>
+
+          <div class="card-actions">
+            <a href="05-assessing.html" class="btn btn-primary">Retry</a>
+            <a href="01-landing.html" class="btn btn-ghost">New search</a>
+          </div>
+        </div>
+
+        <!-- Map controls -->
+        <div class="map-controls">
+          <button class="map-ctrl" title="Zoom in">+</button>
+          <button class="map-ctrl" title="Zoom out">&minus;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div>
+        <a href="14-about.html">About Data</a>
+        <a href="#">Privacy</a>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', {
+      center: [44.865, -0.58],
+      zoom: 11,
+      zoomControl: false,
+      attributionControl: false
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    // Blue marker
+    var icon = L.divIcon({
+      className: '', iconSize: [28,28], iconAnchor: [14,14],
+      html: '<div class="marker-outer"><div class="marker-inner"></div></div>'
+    });
+    L.marker([44.865, -0.58], { icon: icon }).addTo(map);
+
+    document.querySelector('.map-ctrl[title="Zoom in"]').addEventListener('click', () => map.zoomIn());
+    document.querySelector('.map-ctrl[title="Zoom out"]').addEventListener('click', () => map.zoomOut());
+  </script>
+</body>
+</html>
