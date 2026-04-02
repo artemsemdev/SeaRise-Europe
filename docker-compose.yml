@@ -1,0 +1,128 @@
+# =============================================================================
+# SeaRise Europe — Local Development Environment
+# =============================================================================
+# Epic:   E-02 (Local Development Environment)
+# Story:  S02-01
+# Source: docs/architecture/08-deployment-topology.md section 5.1
+#
+# Usage:
+#   cp .env.local.example .env.local   # first time only
+#   docker compose up --build
+#
+# Services:
+#   frontend  — Next.js 14+         → http://localhost:3000
+#   api       — ASP.NET Core .NET 8 → http://localhost:8080
+#   tiler     — TiTiler / FastAPI   → http://localhost:8000
+#   postgres  — PostgreSQL + PostGIS → localhost:5432
+#   azurite   — Azure Blob emulator → localhost:10000
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Frontend (Next.js 14+)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build: ./src/frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      NEXT_PUBLIC_BASEMAP_STYLE_URL: ${BASEMAP_STYLE_URL:-}
+    depends_on:
+      api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # API (ASP.NET Core .NET 8 Minimal API)
+  # ---------------------------------------------------------------------------
+  api:
+    build: ./src/api
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: "Host=postgres;Port=5432;Database=searise;Username=searise;Password=dev"
+      GEOCODING_API_KEY: ${GEOCODING_API_KEY:-}
+      TILER_BASE_URL: http://tiler:8000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      ASPNETCORE_ENVIRONMENT: Development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # TiTiler (Tile Server)
+  # ---------------------------------------------------------------------------
+  tiler:
+    image: ghcr.io/developmentseed/titiler:0.18.8
+    ports:
+      - "8000:8000"
+    environment:
+      # Local Azurite connection string for GDAL VSIAZ driver
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1"
+      TITILER_API_CORS_ORIGINS: http://localhost:3000
+      GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
+      CPL_VSIL_USE_TEMP_FILE_FOR_RANDOM_WRITE: "NO"
+      VSI_CACHE: "TRUE"
+      VSI_CACHE_SIZE: "52428800"
+    depends_on:
+      azurite:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL + PostGIS
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgis/postgis:16-3.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: searise
+      POSTGRES_USER: searise
+      POSTGRES_PASSWORD: dev
+    volumes:
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U searise -d searise"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Azurite (Azure Blob Storage emulator)
+  # ---------------------------------------------------------------------------
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+      - "10002:10002"
+    command: "azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --loose"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "10000"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  pgdata:

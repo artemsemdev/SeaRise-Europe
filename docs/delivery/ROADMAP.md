@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 1 complete)  
+**Last updated:** 2026-04-03 (Wave 2 complete)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -9,22 +9,22 @@
 ## Progress Snapshot
 
 ```text
-  ██░░░░░░░░░░░░░░░░░░  12% COMPLETE  ·  7 of 58 stories delivered
+  ████░░░░░░░░░░░░░░░░  17% COMPLETE  ·  10 of 58 stories delivered
 ```
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **7** / 58 |
-| Epics completed | **1** / 8 |
-| Waves fully completed | **1** / 8 |
-| Current wave | Wave 2 — Local Dev Environment (0 / 3) READY |
-| Unit tests passing | N/A — implementation not started |
-| Next up | `S02-01` Set Up Docker Compose Local Development Environment |
+| Stories completed | **10** / 58 |
+| Epics completed | **2** / 8 |
+| Waves fully completed | **2** / 8 |
+| Current wave | Wave 3 — Geospatial Pipeline (0 / 8) READY |
+| Unit tests passing | N/A — stub services only |
+| Next up | `S03-01` Set Up Pipeline Project and Dependencies |
 
 ```mermaid
 pie title Story Completion
-    "Completed (7)" : 7
-    "Remaining (51)" : 51
+    "Completed (10)" : 10
+    "Remaining (48)" : 48
 ```
 
 ---
@@ -33,8 +33,8 @@ pie title Story Completion
 
 ```text
 Wave 1 · Decision Closure      ████████████████████  7/7   100%  DONE
-Wave 2 · Local Dev Environment ░░░░░░░░░░░░░░░░░░░░  0/3     0%  READY
-Wave 3 · Geospatial Pipeline   ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
+Wave 2 · Local Dev Environment ████████████████████  3/3   100%  DONE
+Wave 3 · Geospatial Pipeline   ░░░░░░░░░░░░░░░░░░░░  0/8     0%  READY
 Wave 4 · Backend API Core      ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
 Wave 5 · Frontend Search       ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
 Wave 6 · Assessment UX         ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
@@ -49,7 +49,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | # | Epic | Progress | Status |
 |--:|------|:--------:|:------:|
 | 1 | Decision Closure and Delivery Baseline | 7 / 7 (100%) | **Done** |
-| 2 | Local Development Environment | 0 / 3 (0%) | Planned |
+| 2 | Local Development Environment | 3 / 3 (100%) | **Done** |
 | 3 | Geospatial Data Pipeline | 0 / 8 (0%) | Planned |
 | 4 | Backend API Core | 0 / 7 (0%) | Planned |
 | 5 | Frontend Shell and Search Flow | 0 / 8 (0%) | Planned |
@@ -60,14 +60,6 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Remaining Work
-
-### Local Development Environment — 3 stories · Wave 2
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S02-01 | Set Up Docker Compose Local Development Environment | Frontend, API, TiTiler, Postgres, local blob storage |
-| S02-02 | Deploy Local PostgreSQL Schema and Enable PostGIS | Schema bootstrap, PostGIS, indexes, init scripts |
-| S02-03 | Establish Basic CI Pipeline | PR lint, type check, unit tests, Docker builds |
 
 ### Geospatial Pipeline — 8 stories · Wave 3
 
@@ -151,6 +143,14 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 
 ## Recently Completed
 
+### Local Dev Environment — 3 stories · Wave 2 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S02-01 | Set Up Docker Compose Local Development Environment | `docker-compose.yml` with frontend, api, tiler, postgres, azurite; `.env.local.example` |
+| S02-02 | Deploy Local PostgreSQL Schema and Enable PostGIS | `infra/db/init.sql` with PostGIS, 5 tables, indexes, seed data |
+| S02-03 | Establish Basic CI Pipeline | `.github/workflows/ci.yml` — lint, type check, unit tests, Docker build on PR |
+
 ### Decision Closure — 7 stories · Wave 1 · DONE 2026-04-03
 
 | ID | Story | What was delivered |
@@ -179,7 +179,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 |:-------:|-----------|:------:|
 | v0.1 | Documentation Baseline — product, architecture, and delivery planning docs | **Done** |
 | v0.2 | Decision Closure — OQ-02 through OQ-07 approved and recorded (ADR-015 through ADR-020) | **Done** |
-| v0.3 | Local Foundation — Docker Compose, schema, and CI operational | Planned |
+| v0.3 | Local Foundation — Docker Compose, schema, and CI operational | **Done** |
 | v0.4 | Data Pipeline — validated COG generation and seeded metadata | Planned |
 | v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | Planned |
 | v0.6 | Frontend MVP — search flow and assessment UX working locally | Planned |
@@ -195,10 +195,10 @@ flowchart LR
     subgraph Completed
         B[Docs Baseline]
         W1[S01-01..07 Decision Closure]
+        W2[S02-01..03 Local Dev]
     end
 
     subgraph Planned
-        W2[S02-01..03 Local Dev]
         W3[S03-01..08 Pipeline]
         W4[S04-01..07 Backend API]
         W5[S05-01..08 Frontend Search]
@@ -212,8 +212,8 @@ flowchart LR
     classDef done fill:#d9f99d,stroke:#3f6212,color:#111827;
     classDef later fill:#e5e7eb,stroke:#6b7280,color:#111827;
 
-    class B,W1 done;
-    class W2,W3,W4,W5,W6,W7,W8 later;
+    class B,W1,W2 done;
+    class W3,W4,W5,W6,W7,W8 later;
 ```
 
 ---
