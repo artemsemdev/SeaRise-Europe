@@ -23,8 +23,8 @@ SeaRise Europe is composed of three runtime containers (frontend, api, tiler) an
 | **blob** | Azure Blob Storage | COG raster files (one per scenario × horizon × methodology version) | Azure Managed Service | Proposed Architecture |
 | **registry** | Azure Container Registry | Docker images for frontend, api, tiler | Azure Managed Service | Proposed Architecture |
 | **cdn** *(optional)* | Azure CDN / Front Door | Caches Next.js static assets | Azure Managed Service | Assumption |
-| Geocoding provider | External (OQ-06) | Geocodes free-text queries to coordinates | External service | Open Question |
-| Basemap tile provider | External (OQ-07) | Serves vector/raster basemap tiles | External CDN | Open Question |
+| Geocoding provider | Azure Maps Search (ADR-019) | Geocodes free-text queries to coordinates | External service | Confirmed |
+| Basemap tile provider | MapTiler (ADR-020) | Serves vector basemap tiles (Dataviz Light) | External CDN | Confirmed |
 
 ---
 
@@ -46,8 +46,8 @@ graph TD
     end
 
     subgraph External["External Services"]
-        Geocoder["Geocoding Provider\n(OQ-06)"]
-        Basemap["Basemap Tile Provider\n(OQ-07)"]
+        Geocoder["Azure Maps Search\n(ADR-019)"]
+        Basemap["MapTiler\n(ADR-020)"]
     end
 
     CDN["Azure CDN\n(optional)"]
@@ -112,7 +112,7 @@ graph TD
 **Core operations:**
 1. Proxy geocoding requests to the configured provider (hiding provider details and API key from the browser)
 2. Perform Europe geography validation via PostGIS (FR-009)
-3. Perform coastal zone validation via PostGIS (FR-011, OQ-04)
+3. Perform coastal zone validation via PostGIS (FR-011, ADR-018)
 4. Resolve scenario + horizon + active methodology version to an exposure layer
 5. Evaluate point-in-exposure-zone using TiTiler or direct COG query
 6. Return an AssessmentResult with the result state and methodology version
@@ -127,7 +127,7 @@ graph TD
 **Key technical characteristics:**
 - Minimal API style in ASP.NET Core — no MVC controller scaffolding
 - Clean layered architecture: HTTP endpoints → Application services → Domain logic → Infrastructure adapters
-- IGeocodingService abstraction — dev implementation against Nominatim, production against OQ-06 provider
+- IGeocodingService abstraction — dev implementation against Nominatim, production against Azure Maps Search (ADR-019)
 - Parameterized PostGIS queries via Npgsql (no SQL injection risk)
 - All requests include a correlation ID in logs and responses (NFR-013)
 - Raw addresses never written to logs (NFR-007)
@@ -165,11 +165,11 @@ graph TD
 **Primary responsibility:** Persistent relational store for all structured application data.
 
 **Stored data:**
-- `scenarios`: configured scenario set (OQ-02 — values to be seeded)
+- `scenarios`: configured scenario set (ADR-016: ssp1-26, ssp2-45, ssp5-85)
 - `horizons`: 2030, 2050, 2100 (FR-015 — confirmed)
 - `methodology_versions`: active and historical methodology records
 - `layers`: layer metadata mapping scenario × horizon × version → blob path
-- `geography_boundaries`: Europe boundary and coastal analysis zone geometries (PostGIS, OQ-04)
+- `geography_boundaries`: Europe boundary and coastal analysis zone geometries (PostGIS, ADR-018)
 
 **What it does NOT store:** User data, raw addresses, search logs, or any session state.
 

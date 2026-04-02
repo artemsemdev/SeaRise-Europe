@@ -90,7 +90,7 @@ graph TD
 **Environment variables:**
 ```
 NEXT_PUBLIC_API_BASE_URL=https://api.searise-europe.example.com
-NEXT_PUBLIC_BASEMAP_TILE_URL=...              # OQ-07 — provider URL template
+NEXT_PUBLIC_BASEMAP_STYLE_URL=...              # ADR-020: MapTiler Dataviz Light style.json URL
 # Note: no secret keys in frontend env vars (NFR-006)
 ```
 

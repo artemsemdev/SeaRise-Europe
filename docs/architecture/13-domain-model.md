@@ -31,7 +31,7 @@ Scenario {
   displayName: string            -- human-readable label
   description: string            -- CONTENT_GUIDELINES-compliant explanation
   sortOrder:   int               -- display ordering
-  isDefault:   bool              -- at most one scenario is default (OQ-02, OQ-03)
+  isDefault:   bool              -- at most one scenario is default (ADR-016, ADR-017)
 }
 
 Invariant: At most one Scenario has isDefault = true at any time.
@@ -50,7 +50,7 @@ A future year for which projections are available.
 TimeHorizon {
   year:         HorizonYear      -- 2030 | 2050 | 2100 (FR-015, confirmed)
   displayLabel: string           -- "2030", "2050", "2100"
-  isDefault:    bool             -- OQ-03
+  isDefault:    bool             -- ADR-017: default is 2050
 }
 
 HorizonYear = 2030 | 2050 | 2100   -- exhaustive enumeration (NOT extensible without API version bump)
@@ -74,7 +74,7 @@ MethodologyVersion {
   whatItDoes:           string    -- plain-language methodology description
   limitations:          string[]  -- "whatItDoesNotAccountFor" list
   resolutionNote:       string    -- ~30m resolution caveat
-  exposureThreshold:    decimal?  -- OQ-05 (if continuous: the threshold value)
+  exposureThreshold:    decimal?  -- ADR-015: NULL for v1.0 (binary, no runtime threshold)
   updatedAt:            datetime
 }
 

@@ -103,7 +103,7 @@
   },
   "scenario": {
     "id": "ssp2-45",
-    "displayName": "Intermediate (SSP2-4.5)"
+    "displayName": "Intermediate emissions (SSP2-4.5)"
   },
   "horizon": {
     "year": 2050,
@@ -126,7 +126,7 @@
   "requestId": "req_ghi789",
   "resultState": "OutOfScope",
   "location": { "latitude": 50.07, "longitude": 14.43 },
-  "scenario": { "id": "ssp2-45", "displayName": "Intermediate (SSP2-4.5)" },
+  "scenario": { "id": "ssp2-45", "displayName": "Intermediate emissions (SSP2-4.5)" },
   "horizon": { "year": 2050, "displayLabel": "2050" },
   "methodologyVersion": "v1.0",
   "layerTileUrlTemplate": null,
@@ -141,7 +141,7 @@
   "requestId": "req_jkl012",
   "resultState": "DataUnavailable",
   "location": { "latitude": 51.20, "longitude": 2.90 },
-  "scenario": { "id": "ssp1-26", "displayName": "Low (SSP1-2.6)" },
+  "scenario": { "id": "ssp1-26", "displayName": "Lower emissions (SSP1-2.6)" },
   "horizon": { "year": 2030, "displayLabel": "2030" },
   "methodologyVersion": "v1.0",
   "layerTileUrlTemplate": null,
@@ -176,20 +176,20 @@
   "scenarios": [
     {
       "id": "ssp1-26",
-      "displayName": "Low (SSP1-2.6)",
-      "description": "A lower-emissions pathway representing ambitious mitigation.",
+      "displayName": "Lower emissions (SSP1-2.6)",
+      "description": "Lower-emissions AR6 pathway used as the lower-bound scenario in MVP.",
       "sortOrder": 1
     },
     {
       "id": "ssp2-45",
-      "displayName": "Intermediate (SSP2-4.5)",
-      "description": "A middle-of-the-road pathway. Reflects current policy trajectory.",
+      "displayName": "Intermediate emissions (SSP2-4.5)",
+      "description": "Mid-range AR6 pathway used as the default reference scenario in MVP.",
       "sortOrder": 2
     },
     {
       "id": "ssp5-85",
-      "displayName": "High (SSP5-8.5)",
-      "description": "A high-emissions pathway. Upper-bound projection.",
+      "displayName": "Higher emissions (SSP5-8.5)",
+      "description": "Higher-emissions AR6 pathway used as the upper-bound scenario in MVP.",
       "sortOrder": 3
     }
   ],
@@ -205,7 +205,7 @@
 }
 ```
 
-**IMPORTANT:** Scenario IDs, display names, and descriptions above are **illustrative examples only**. Actual values are determined by OQ-02 (BLOCKING). Horizon values (2030, 2050, 2100) are confirmed (FR-015). Default scenario and horizon are OQ-03 (BLOCKING).
+**Values confirmed:** Scenario IDs, display names, and descriptions are approved (ADR-016). Horizon values (2030, 2050, 2100) are confirmed (FR-015). Default scenario (`ssp2-45`) and horizon (`2050`) are approved (ADR-017).
 
 ---
 

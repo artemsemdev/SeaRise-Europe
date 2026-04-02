@@ -196,7 +196,7 @@ AppTraces
 | take 20
 ```
 
-**Action:** Check provider status page. No automated fallback at MVP. If sustained, consider temporarily surfacing a static message. Provider is configured in `GEOCODING_API_KEY` env var — swapping provider requires new key + code change (OQ-06 unresolved at MVP).
+**Action:** Check Azure Maps status page. No automated fallback at MVP. If sustained, consider temporarily surfacing a static message. Provider is configured in `GEOCODING_API_KEY` env var (ADR-019: Azure Maps Search).
 
 ### 6.2 TiTiler Returning No Pixel Values
 

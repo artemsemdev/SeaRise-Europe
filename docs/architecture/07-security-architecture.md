@@ -26,7 +26,7 @@ Key security properties:
 | Asset | Sensitivity | Rationale |
 |---|---|---|
 | Geocoding provider API key | High | Billing exposure if leaked; rate-limit abuse |
-| Basemap tile provider key (OQ-07) | Medium–High | Billing and usage policy violation if scraped |
+| Basemap tile provider key (ADR-020: MapTiler) | Medium–High | Billing and usage policy violation if scraped; mitigated by origin-restricted key |
 | PostgreSQL connection string | High | Read access to all scenario/layer config |
 | Azure Blob Storage credentials | Medium | Read access to COG layer files |
 | Azure Key Vault access | High | Master access to all above credentials |
@@ -37,7 +37,7 @@ Key security properties:
 |---|---|---|
 | **API key exfiltration** | Client-side bundle inspection | Keys held in API container env vars only; never bundled into frontend (NFR-006) |
 | **Geocoding provider key abuse** | Scraped from source / network traffic | Key only used server-side in the API container; browser only communicates with `/v1/geocode` |
-| **Basemap key scraping** | Browser Network tab | OQ-07 — mitigated by domain-restricted keys (see §3.3); key visible in tile URL is accepted risk if domain-locked |
+| **Basemap key scraping** | Browser Network tab | ADR-020 — mitigated by MapTiler origin-restricted keys (see §3.3); key visible in tile URL is accepted risk if domain-locked |
 | **SQL injection** | Malformed coordinates in POST body | Parameterized queries via Npgsql; never string-interpolated (see §4) |
 | **SSRF via geocoding endpoint** | Attacker-controlled `query` input | Query string is passed only to the trusted managed geocoding provider; no URL construction from query value |
 | **SSRF via assess endpoint** | Attacker-controlled lat/lng | Coordinates are floats, validated at HTTP layer; no URL constructed from coordinate values |
@@ -69,7 +69,7 @@ Azure Key Vault
 ├── blob-storage-connection-string   → API container: BLOB_CONNECTION_STRING
 │                                    → TiTiler container: AZURE_STORAGE_CONNECTION_STRING
 ├── cors-allowed-origins             → API container: CORS_ALLOWED_ORIGINS
-└── basemap-tile-key (OQ-07)         → Frontend build env OR API proxy (see §3.3)
+└── basemap-tile-key (ADR-020: MapTiler) → Frontend build env: NEXT_PUBLIC_BASEMAP_STYLE_URL (origin-restricted, see §3.3)
 ```
 
 **Key Vault reference syntax in Container Apps:**
@@ -91,7 +91,7 @@ TiTiler accesses Azure Blob Storage via the GDAL VSIAZ driver. Two access option
 
 **Recommendation:** Managed Identity for TiTiler → Blob access (Proposed Architecture). Managed Identity also for the API container's Blob integrity check access.
 
-### 3.3 Basemap Tile Key (OQ-07)
+### 3.3 Basemap Tile Key (ADR-020: MapTiler)
 
 The basemap provider key is the only credential that must be accessible from the browser (as part of tile URLs). Three mitigation approaches:
 
@@ -101,7 +101,7 @@ The basemap provider key is the only credential that must be accessible from the
 | **HTTP referrer restriction** | Provider rejects requests not originating from registered referrer | Low — configure in provider dashboard |
 | **Server-side tile proxy** | API proxies all tile requests; key never leaves server | High — adds latency and hosting cost |
 
-**Recommendation:** Domain-restricted key + HTTP referrer restriction for MVP (Proposed Architecture). If OQ-07 resolves to a provider that supports domain restriction, this is sufficient. Server-side proxy is a fallback if provider doesn't support restriction.
+**Decision (ADR-020):** Domain-restricted key via MapTiler origin restriction. MapTiler supports origin-restricted keys. Production and staging domains registered. Server-side proxy not needed.
 
 ### 3.4 Key Rotation
 
@@ -230,7 +230,7 @@ Precise coordinates must not appear in production logs or analytics (see [METRIC
 The application is Europe-focused and may attract EU residents. Key considerations:
 
 - **No personal data processed** → minimal GDPR exposure
-- **Analytics (OQ-10 BLOCKING):** If analytics are enabled, events must use `country_code` only, not coordinates or any user identifier. This is documented in METRICS_PLAN.md §6.
+- **Analytics (OQ-10):** No client-side analytics in MVP (server-side observability only). If analytics are added in Phase 2, events must use `country_code` only, not coordinates or any user identifier. This is documented in METRICS_PLAN.md §6.
 - **Consent banner:** Required only if analytics cookies are set. If analytics are server-side only (no cookies), no consent banner required under ePrivacy Directive.
 - **Privacy policy:** Required for production deployment. Content is outside this document's scope.
 
@@ -293,7 +293,7 @@ For MVP, single TiTiler instance with public ingress is accepted. Internal traff
 - [ ] All secrets in Key Vault — none in source code, Dockerfiles, or environment variable literals
 - [ ] HTTPS enforced on all ingress (Container Apps managed certificate)
 - [ ] CORS configured to production frontend domain only
-- [ ] Basemap provider key domain-restricted (OQ-07)
+- [ ] MapTiler basemap key origin-restricted (ADR-020)
 - [ ] Raw query string absent from all log statements (code review + log audit)
 - [ ] Precise coordinates absent from all log statements
 - [ ] CSP headers configured for frontend
