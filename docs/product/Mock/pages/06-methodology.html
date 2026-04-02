@@ -3,421 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SeaRise Europe — Methodology</title>
+  <title>SeaRise Europe — About the Data</title>
   <link rel="stylesheet" href="design-system.css">
   <style>
-    .methodology-layout {
-      flex: 1;
-      display: flex;
-      overflow: hidden;
+    .about-layout { flex: 1; display: flex; overflow: hidden; }
+    .about-content {
+      flex: 1; max-width: 640px; padding: var(--sp-12) var(--sp-12);
+      overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-10);
     }
-
-    /* Left: methodology content */
-    .methodology-content {
-      flex: 1;
-      max-width: 680px;
-      padding: var(--spacing-12) var(--spacing-16);
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-10);
+    .about-content h1 {
+      font-family: var(--font-display); font-size: 2.2rem; font-weight: 800;
+      line-height: 1.15;
     }
-
-    .meth-hero {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-5);
+    .about-content .intro {
+      font-size: 0.95rem; color: var(--text-secondary); line-height: 1.7;
+      max-width: 520px;
     }
-
-    .meth-hero h1 {
-      font-family: var(--font-display);
-      font-size: var(--display-lg);
-      font-weight: 800;
-      color: var(--on-surface);
-      line-height: 1.1;
+    .about-section { display: flex; flex-direction: column; gap: var(--sp-4); }
+    .about-section h2 {
+      font-family: var(--font-display); font-size: 1.2rem; font-weight: 700;
+      display: flex; align-items: center; gap: var(--sp-3);
     }
-
-    .meth-hero .version-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      font-size: var(--label-sm);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--primary);
-      background: var(--primary-container);
-      padding: var(--spacing-1) var(--spacing-3);
-      border-radius: var(--radius-sm);
-      width: fit-content;
-    }
-
-    .meth-hero .subtitle {
-      font-size: var(--body-lg);
-      color: var(--on-surface-variant);
-      line-height: 1.7;
-      max-width: 560px;
-    }
-
-    .meth-section {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-5);
-    }
-
-    .meth-section h2 {
-      font-family: var(--font-display);
-      font-size: var(--headline-md);
-      font-weight: 700;
-      color: var(--on-surface);
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-3);
-    }
-
-    .meth-section h2 .section-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      border-radius: var(--radius-sm);
-      background: var(--primary-container);
-      color: var(--primary);
-      font-family: var(--font-technical);
-      font-size: var(--label-md);
-      font-weight: 700;
+    .about-section h2 .num {
+      width: 26px; height: 26px; border-radius: var(--r-sm);
+      background: var(--primary-bg); color: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-body); font-size: 0.75rem; font-weight: 700;
       flex-shrink: 0;
     }
-
-    .meth-section h3 {
-      font-family: var(--font-display);
-      font-size: var(--title-md);
-      font-weight: 600;
-      color: var(--on-surface);
-      margin-top: var(--spacing-3);
+    .about-section p {
+      font-size: 0.85rem; color: var(--text-secondary); line-height: 1.7;
     }
-
-    .meth-section p {
-      font-size: var(--body-md);
-      color: var(--on-surface-variant);
-      line-height: 1.7;
-    }
-
-    .meth-section ul {
-      list-style: none;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-3);
-    }
-
-    .meth-section li {
-      font-size: var(--body-md);
-      color: var(--on-surface-variant);
-      line-height: 1.6;
-      padding-left: var(--spacing-5);
-      position: relative;
-    }
-
-    .meth-section li::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 10px;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--primary);
-      opacity: 0.6;
-    }
-
-    /* Source cards */
+    .about-section strong { color: var(--text); }
     .source-card {
-      background: var(--surface-container-high);
-      border-radius: var(--radius-md);
-      padding: var(--spacing-5);
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-3);
+      background: var(--surface-high); border-radius: var(--r-md);
+      padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2);
     }
-
-    .source-card .source-name {
-      font-size: var(--body-md);
-      font-weight: 600;
-      color: var(--on-surface);
+    .source-card .tag {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--primary); font-weight: 600;
     }
-
-    .source-card .source-desc {
-      font-size: var(--body-sm);
-      color: var(--on-surface-variant);
-      line-height: 1.5;
+    .source-card .title { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+    .source-card .desc { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
+    .warning-card {
+      background: var(--warn-bg); border-radius: var(--r-md);
+      padding: var(--sp-4); display: flex; gap: var(--sp-3);
     }
-
-    .source-card .source-tag {
-      font-size: var(--label-sm);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--primary);
-      font-weight: 600;
+    .warning-card svg { flex-shrink: 0; margin-top: 2px; }
+    .warning-card .text {
+      font-size: 0.85rem; color: var(--warn-text); line-height: 1.6;
     }
+    .warning-card .text strong { color: var(--warn); }
 
-    /* Limitation callout */
-    .limitation-card {
-      background: var(--tertiary-container);
-      border-radius: var(--radius-md);
-      padding: var(--spacing-5);
-      display: flex;
-      gap: var(--spacing-4);
+    /* Side TOC */
+    .about-toc {
+      width: 220px; min-width: 220px; background: var(--surface-low);
+      padding: var(--sp-8) var(--sp-6); display: flex; flex-direction: column;
+      gap: var(--sp-4); overflow-y: auto;
     }
-
-    .limitation-card .lim-icon {
-      color: var(--on-tertiary-container);
-      flex-shrink: 0;
-      margin-top: 2px;
+    .toc-label {
+      font-size: 0.65rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
     }
-
-    .limitation-card .lim-text {
-      font-size: var(--body-md);
-      color: var(--on-tertiary-container);
-      line-height: 1.6;
-    }
-
-    .limitation-card .lim-text strong {
-      color: var(--tertiary);
-    }
-
-    /* Right: sticky sidebar TOC */
-    .meth-toc {
-      width: 260px;
-      min-width: 260px;
-      background: var(--surface-container-low);
-      padding: var(--spacing-10) var(--spacing-8);
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-5);
-      overflow-y: auto;
-    }
-
-    .toc-title {
-      font-size: var(--label-sm);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--on-surface-variant);
-      font-weight: 600;
-    }
-
-    .toc-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-2);
-      list-style: none;
-    }
-
+    .toc-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-1); }
     .toc-list a {
-      display: block;
-      padding: var(--spacing-2) var(--spacing-4);
-      font-size: var(--body-sm);
-      color: var(--on-surface-variant);
-      text-decoration: none;
-      border-radius: var(--radius-sm);
+      display: block; padding: var(--sp-2) var(--sp-3);
+      font-size: 0.8rem; color: var(--text-secondary); text-decoration: none;
+      border-radius: var(--r-sm); border-left: 2px solid transparent;
       transition: all 0.2s;
-      border-left: 2px solid transparent;
     }
-
-    .toc-list a:hover {
-      color: var(--on-surface);
-      background: var(--surface-container-high);
-    }
-
-    .toc-list a.active {
-      color: var(--primary);
-      border-left-color: var(--primary);
-      background: var(--primary-container);
-    }
-
+    .toc-list a:hover { color: var(--text); background: var(--surface-high); }
+    .toc-list a.active { color: var(--primary); border-left-color: var(--primary); background: var(--primary-bg); }
     .toc-back {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      font-size: var(--body-sm);
-      color: var(--primary);
-      text-decoration: none;
-      margin-top: auto;
-      padding: var(--spacing-3) var(--spacing-4);
-      border-radius: var(--radius-md);
-      transition: background 0.2s;
+      display: flex; align-items: center; gap: var(--sp-2);
+      font-size: 0.8rem; color: var(--primary); text-decoration: none;
+      margin-top: auto; padding: var(--sp-3) var(--sp-3);
+      border-radius: var(--r-md); transition: background 0.2s;
     }
-
-    .toc-back:hover {
-      background: var(--primary-container);
-    }
+    .toc-back:hover { background: var(--primary-bg); }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-
-    <!-- Top Bar -->
+  <div class="shell">
     <header class="topbar">
       <div class="topbar-brand">SEARISE EUROPE</div>
-      <nav>
-        <ul class="topbar-nav">
-          <li><a href="01-landing.html">Assessments</a></li>
-          <li><a href="#">Insights</a></li>
-          <li><a href="06-methodology.html" class="active">Methodology</a></li>
-        </ul>
-      </nav>
-      <div class="topbar-actions">
-        <button class="icon-btn" title="Settings">⚙</button>
+      <nav><ul class="topbar-nav">
+        <li><a href="01-landing.html">Explorer</a></li>
+        <li><a href="06-methodology.html" class="active">About Data</a></li>
+      </ul></nav>
+      <div class="topbar-right">
         <button class="icon-btn" title="Help">?</button>
-        <div class="avatar">A</div>
       </div>
     </header>
 
-    <!-- Main -->
-    <main class="main-content">
+    <main class="main">
+      <div class="about-content">
 
-      <!-- Methodology Content -->
-      <div class="methodology-content">
-
-        <div class="meth-hero">
-          <span class="version-tag">Methodology v1.0.0</span>
-          <h1>How to Interpret<br>Your Results</h1>
-          <p class="subtitle">
-            SeaRise Europe combines authoritative climate projections, high-resolution elevation data, and transparent methodology to produce scenario-based coastal exposure assessments. This page explains what the results mean, how they are generated, and what they do not cover.
+        <div>
+          <h1>How does this work?</h1>
+          <p class="intro" style="margin-top:var(--sp-4);">
+            We take real climate data from the world's most trusted scientific organizations and show you what it means for a specific place, in plain language.
           </p>
         </div>
 
-        <!-- Section 1 -->
-        <div class="meth-section" id="what-we-show">
-          <h2><span class="section-num">1</span> What We Show</h2>
+        <div class="about-section" id="what">
+          <h2><span class="num">1</span> What we show you</h2>
           <p>
-            SeaRise Europe displays <strong style="color: var(--on-surface);">scenario-based coastal sea-level exposure</strong> for European locations. When you search for a location, the system determines whether it falls within a coastal analysis zone and, if so, calculates projected exposure under the selected climate scenario and time horizon.
+            When you search for a location, we check if it's near the European coast. If it is, we show you <strong>how much the sea level is expected to rise</strong> at that location, based on the time frame and forecast model you pick.
           </p>
           <p>
-            Results include a projected sea-level rise value, an uncertainty range, and a visual overlay on the map showing areas that may be exposed under the selected conditions.
+            The result is a simple number — like "+0.85 m in 100 years" — with a plain explanation of what it could mean for the area.
           </p>
         </div>
 
-        <!-- Section 2 -->
-        <div class="meth-section" id="data-sources">
-          <h2><span class="section-num">2</span> Data Sources</h2>
-          <p>All projections are derived from peer-reviewed, publicly available datasets:</p>
+        <div class="about-section" id="sources">
+          <h2><span class="num">2</span> Where does the data come from?</h2>
+          <p>All data comes from publicly available, peer-reviewed scientific sources:</p>
 
           <div class="source-card">
-            <span class="source-tag">Projections</span>
-            <span class="source-name">IPCC AR6 Sea Level Projections</span>
-            <span class="source-desc">Regional sea-level rise projections under Shared Socioeconomic Pathways (SSPs). Provides median values and confidence ranges for multiple time horizons through 2150.</span>
+            <span class="tag">Sea level forecasts</span>
+            <span class="title">IPCC AR6 Sea Level Projections</span>
+            <span class="desc">The world's most comprehensive climate report, published by the United Nations. Provides regional sea-level forecasts under different future scenarios.</span>
           </div>
-
           <div class="source-card">
-            <span class="source-tag">Elevation</span>
-            <span class="source-name">Copernicus DEM (GLO-30)</span>
-            <span class="source-desc">Global 30-meter resolution digital elevation model derived from radar satellite imagery. Used to determine terrain elevation relative to current sea level.</span>
+            <span class="tag">Elevation data</span>
+            <span class="title">Copernicus DEM (European Space Agency)</span>
+            <span class="desc">Satellite-measured terrain heights at 30-meter resolution. We use this to check how high the ground is relative to sea level.</span>
           </div>
-
           <div class="source-card">
-            <span class="source-tag">Indicator</span>
-            <span class="source-name">EEA Extreme Sea Levels Indicator</span>
-            <span class="source-desc">European Environment Agency indicator on extreme sea levels and coastal flooding, providing context for the frequency and impact of sea-level events along European coastlines.</span>
-          </div>
-
-          <div class="source-card">
-            <span class="source-tag">Geocoding</span>
-            <span class="source-name">Nominatim (OpenStreetMap)</span>
-            <span class="source-desc">Free-text location search and geocoding service used to resolve user queries into geographic coordinates within the European coverage area.</span>
+            <span class="tag">Coastal risk context</span>
+            <span class="title">European Environment Agency (EEA)</span>
+            <span class="desc">European coastal flood indicators that help put the numbers in context.</span>
           </div>
         </div>
 
-        <!-- Section 3 -->
-        <div class="meth-section" id="scenarios">
-          <h2><span class="section-num">3</span> Climate Scenarios</h2>
+        <div class="about-section" id="models">
+          <h2><span class="num">3</span> What are the forecast models?</h2>
           <p>
-            SeaRise Europe supports projections under three Shared Socioeconomic Pathways (SSPs) from the IPCC Sixth Assessment Report:
+            Nobody knows the future exactly, so climate scientists create different scenarios. We label them in simple terms:
           </p>
-          <ul>
-            <li><strong style="color: var(--on-surface);">SSP1-1.9</strong> — Very low greenhouse gas emissions scenario. Assumes rapid and deep emissions reductions, reaching net-zero CO₂ around 2050. Represents the most optimistic pathway.</li>
-            <li><strong style="color: var(--on-surface);">SSP2-4.5</strong> — Intermediate scenario. Assumes moderate mitigation efforts with emissions peaking around mid-century. Often used as a "middle of the road" reference.</li>
-            <li><strong style="color: var(--on-surface);">SSP5-8.5</strong> — Very high emissions scenario. Assumes continued fossil fuel reliance with minimal climate policy. Represents the upper boundary of projected change.</li>
-          </ul>
+          <div class="source-card">
+            <span class="tag" style="color:var(--success);">NASA (optimistic)</span>
+            <span class="desc"><strong>Best case</strong> — the world takes strong action on climate change. Emissions drop fast. Sea levels still rise, but less.</span>
+          </div>
+          <div class="source-card">
+            <span class="tag">Copernicus (moderate)</span>
+            <span class="desc"><strong>Middle of the road</strong> — some progress is made, but emissions don't drop as fast as needed. The most commonly referenced scenario.</span>
+          </div>
+          <div class="source-card">
+            <span class="tag" style="color:var(--warn);">IPCC (worst case)</span>
+            <span class="desc"><strong>If nothing changes</strong> — emissions keep rising with minimal action. This shows the upper end of what could happen.</span>
+          </div>
         </div>
 
-        <!-- Section 4 -->
-        <div class="meth-section" id="time-horizons">
-          <h2><span class="section-num">4</span> Time Horizons</h2>
-          <p>
-            Results are available for three future time horizons:
-          </p>
-          <ul>
-            <li><strong style="color: var(--on-surface);">2030</strong> — Near-term horizon. Differences between scenarios are relatively small at this range, as committed warming dominates.</li>
-            <li><strong style="color: var(--on-surface);">2050</strong> — Mid-century horizon. Scenario divergence becomes more visible, especially between SSP1-1.9 and SSP5-8.5.</li>
-            <li><strong style="color: var(--on-surface);">2100</strong> — End-of-century horizon. Maximum divergence between pathways. Uncertainty ranges are widest at this horizon.</li>
-          </ul>
-        </div>
-
-        <!-- Section 5 -->
-        <div class="meth-section" id="interpretation">
-          <h2><span class="section-num">5</span> Interpretation Guidance</h2>
-          <p>
-            All results should be understood as <strong style="color: var(--on-surface);">modeled projections under specified conditions</strong>, not predictions or forecasts. Key points:
-          </p>
-          <ul>
-            <li>Projected values represent the median estimate from the AR6 ensemble for the selected scenario and horizon, with a stated uncertainty range.</li>
-            <li>The exposure overlay shows areas where terrain elevation is at or below the projected sea-level rise value. It does not account for local flood defenses, drainage systems, or land-use changes.</li>
-            <li>Infrastructure impact counts are modeled estimates based on geospatial datasets and should not be interpreted as confirmed counts.</li>
-            <li>Results update when you change the scenario, time horizon, or location — they always reflect the currently active selection.</li>
-          </ul>
-        </div>
-
-        <!-- Section 6 -->
-        <div class="meth-section" id="limitations">
-          <h2><span class="section-num">6</span> Key Limitations</h2>
-
-          <div class="limitation-card">
-            <span class="lim-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 21h22L12 2 1 21z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            </span>
-            <span class="lim-text">
-              <strong>Not a legal, engineering, insurance, or financial determination.</strong> Results are for informational and educational purposes only. Do not use this tool to make property, investment, or safety decisions without consulting qualified professionals.
+        <div class="about-section" id="limits">
+          <h2><span class="num">4</span> What this is NOT</h2>
+          <div class="warning-card">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 21h22L12 2 1 21z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span class="text">
+              This is <strong>not</strong> a legal, engineering, or financial assessment. It is an educational tool based on scientific models. Don't make property or safety decisions based on this alone.
             </span>
           </div>
-
-          <ul>
-            <li>Elevation data (30m resolution) is not detailed enough for parcel-level or building-level assessments.</li>
-            <li>The model does not include storm surge, tidal extremes, wave action, subsidence, or glacial isostatic adjustment at the local level.</li>
-            <li>Inland flood risk (rivers, rainfall, groundwater) is not assessed in this version.</li>
-            <li>Results are based on the current coastline and do not model future adaptation measures or land reclamation.</li>
-            <li>Data availability may vary by region. Some coastal areas may return "Data Unavailable" if the required datasets do not cover the location.</li>
-          </ul>
+          <p>Other limitations to keep in mind:</p>
+          <p>
+            &bull; The elevation data is accurate to ~30 meters, not individual buildings.<br>
+            &bull; We don't include storm surges, tides, or river flooding (yet).<br>
+            &bull; Local flood defenses are not factored in.<br>
+            &bull; Some coastal areas may not have full data coverage.
+          </p>
         </div>
       </div>
 
-      <!-- TOC Sidebar -->
-      <aside class="meth-toc">
-        <span class="toc-title">On This Page</span>
+      <!-- TOC sidebar -->
+      <aside class="about-toc">
+        <span class="toc-label">On this page</span>
         <ul class="toc-list">
-          <li><a href="#what-we-show" class="active">What We Show</a></li>
-          <li><a href="#data-sources">Data Sources</a></li>
-          <li><a href="#scenarios">Climate Scenarios</a></li>
-          <li><a href="#time-horizons">Time Horizons</a></li>
-          <li><a href="#interpretation">Interpretation Guidance</a></li>
-          <li><a href="#limitations">Key Limitations</a></li>
+          <li><a href="#what" class="active">What we show you</a></li>
+          <li><a href="#sources">Where does the data come from?</a></li>
+          <li><a href="#models">Forecast models explained</a></li>
+          <li><a href="#limits">What this is NOT</a></li>
         </ul>
-
         <a href="01-landing.html" class="toc-back">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          Back to Assessments
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to Explorer
         </a>
       </aside>
     </main>
 
-    <!-- Footer -->
     <footer class="footer">
-      <span>© 2026 SeaRise Europe Observatory. Data provided by Copernicus &amp; IPCC.</span>
-      <div>
-        <a href="06-methodology.html">Methodology</a>
-        <a href="#">API Access</a>
-        <a href="#">Privacy Policy</a>
-      </div>
+      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <div><a href="06-methodology.html">About Data</a><a href="#">Privacy</a></div>
     </footer>
   </div>
 </body>
