@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 2 complete)  
+**Last updated:** 2026-04-03 (Wave 3 complete)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -9,22 +9,22 @@
 ## Progress Snapshot
 
 ```text
-  ████░░░░░░░░░░░░░░░░  17% COMPLETE  ·  10 of 58 stories delivered
+  ██████░░░░░░░░░░░░░░  31% COMPLETE  ·  18 of 58 stories delivered
 ```
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **10** / 58 |
-| Epics completed | **2** / 8 |
-| Waves fully completed | **2** / 8 |
-| Current wave | Wave 3 — Geospatial Pipeline (0 / 8) READY |
+| Stories completed | **18** / 58 |
+| Epics completed | **3** / 8 |
+| Waves fully completed | **3** / 8 |
+| Current wave | Wave 4 — Backend API Core (0 / 7) PLANNED |
 | Unit tests passing | N/A — stub services only |
-| Next up | `S03-01` Set Up Pipeline Project and Dependencies |
+| Next up | `S04-01` Initialize ASP.NET Core Minimal API Project |
 
 ```mermaid
 pie title Story Completion
-    "Completed (10)" : 10
-    "Remaining (48)" : 48
+    "Completed (18)" : 18
+    "Remaining (40)" : 40
 ```
 
 ---
@@ -34,7 +34,7 @@ pie title Story Completion
 ```text
 Wave 1 · Decision Closure      ████████████████████  7/7   100%  DONE
 Wave 2 · Local Dev Environment ████████████████████  3/3   100%  DONE
-Wave 3 · Geospatial Pipeline   ░░░░░░░░░░░░░░░░░░░░  0/8     0%  READY
+Wave 3 · Geospatial Pipeline   ████████████████████  8/8   100%  DONE
 Wave 4 · Backend API Core      ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
 Wave 5 · Frontend Search       ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
 Wave 6 · Assessment UX         ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
@@ -50,7 +50,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 |--:|------|:--------:|:------:|
 | 1 | Decision Closure and Delivery Baseline | 7 / 7 (100%) | **Done** |
 | 2 | Local Development Environment | 3 / 3 (100%) | **Done** |
-| 3 | Geospatial Data Pipeline | 0 / 8 (0%) | Planned |
+| 3 | Geospatial Data Pipeline | 8 / 8 (100%) | **Done** |
 | 4 | Backend API Core | 0 / 7 (0%) | Planned |
 | 5 | Frontend Shell and Search Flow | 0 / 8 (0%) | Planned |
 | 6 | Scenario Controls and Assessment UX | 0 / 7 (0%) | Planned |
@@ -60,19 +60,6 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Remaining Work
-
-### Geospatial Pipeline — 8 stories · Wave 3
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S03-01 | Set Up Pipeline Project and Dependencies | Python project, env, and geospatial tooling |
-| S03-02 | Download and Cache Source Data | AR6 inputs, DEM assets, local caching |
-| S03-03 | Reproject and Align SLR to DEM Grid | Common CRS, alignment, raster prep |
-| S03-04 | Compute Binary Exposure Rasters | Exposure mask generation inside coastal zone |
-| S03-05 | COGify and QA Validate | Cloud-Optimized GeoTIFF output and validation |
-| S03-06 | Upload COGs to Azure Blob Storage | Local blob contract matching Azure layout |
-| S03-07 | Register Layers and Seed Metadata in PostgreSQL | Layer rows, scenarios, horizons, methodology metadata |
-| S03-08 | Pipeline Orchestration CLI and End-to-End Validation | One-command pipeline run and checklist validation |
 
 ### Backend API Core — 7 stories · Wave 4
 
@@ -143,6 +130,19 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 
 ## Recently Completed
 
+### Geospatial Pipeline — 8 stories · Wave 3 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S03-01 | Set Up Pipeline Project and Dependencies | `src/pipeline/` project structure, `requirements-pipeline.txt`, `.env.pipeline.example` |
+| S03-02 | Download and Cache Source Data | `download.py`: IPCC AR6 NetCDF + Copernicus DEM download with local caching |
+| S03-03 | Reproject and Align SLR to DEM Grid | `preprocess.py`: bilinear resampling of SLR to DEM grid at 30m resolution |
+| S03-04 | Compute Binary Exposure Rasters | `compute_exposure.py`: binary SLR >= DEM comparison with coastal zone masking |
+| S03-05 | COGify and QA Validate | `cogify.py` + `validate.py`: COG conversion and 5-check QA validation |
+| S03-06 | Upload COGs to Azure Blob Storage | `upload.py`: Azurite/Azure upload with correct paths, content-type, cache-control |
+| S03-07 | Register Layers and Seed Metadata in PostgreSQL | `register.py`: seed all reference tables, register 9 layers, methodology activation |
+| S03-08 | Pipeline Orchestration CLI and End-to-End Validation | `run_pipeline.py`: Click CLI orchestrating all 7 steps with summary report |
+
 ### Local Dev Environment — 3 stories · Wave 2 · DONE 2026-04-03
 
 | ID | Story | What was delivered |
@@ -180,7 +180,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | v0.1 | Documentation Baseline — product, architecture, and delivery planning docs | **Done** |
 | v0.2 | Decision Closure — OQ-02 through OQ-07 approved and recorded (ADR-015 through ADR-020) | **Done** |
 | v0.3 | Local Foundation — Docker Compose, schema, and CI operational | **Done** |
-| v0.4 | Data Pipeline — validated COG generation and seeded metadata | Planned |
+| v0.4 | Data Pipeline — validated COG generation and seeded metadata | **Done** |
 | v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | Planned |
 | v0.6 | Frontend MVP — search flow and assessment UX working locally | Planned |
 | v0.7 | Transparency & A11y — methodology, copy, responsive behavior, and accessibility verified | Planned |
@@ -196,10 +196,10 @@ flowchart LR
         B[Docs Baseline]
         W1[S01-01..07 Decision Closure]
         W2[S02-01..03 Local Dev]
+        W3[S03-01..08 Pipeline]
     end
 
     subgraph Planned
-        W3[S03-01..08 Pipeline]
         W4[S04-01..07 Backend API]
         W5[S05-01..08 Frontend Search]
         W6[S06-01..07 Assessment UX]
@@ -212,8 +212,8 @@ flowchart LR
     classDef done fill:#d9f99d,stroke:#3f6212,color:#111827;
     classDef later fill:#e5e7eb,stroke:#6b7280,color:#111827;
 
-    class B,W1,W2 done;
-    class W3,W4,W5,W6,W7,W8 later;
+    class B,W1,W2,W3 done;
+    class W4,W5,W6,W7,W8 later;
 ```
 
 ---

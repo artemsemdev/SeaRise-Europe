@@ -1,6 +1,6 @@
 # 16 — Geospatial Data Pipeline
 
-> **Status:** Proposed Architecture
+> **Status:** Implemented
 > **Scope:** The offline pipeline that transforms raw climate and elevation data into Cloud-Optimized GeoTIFF (COG) exposure layers. This is **not a runtime service** — it runs on demand before Phase 0 and on methodology version updates.
 > **Dependencies:** ADR-015 (exposure methodology — binary v1.0), ADR-016 (scenario set — ssp1-26, ssp2-45, ssp5-85), ADR-018 (coastal analysis zone — Copernicus Coastal Zones 2018)
 
