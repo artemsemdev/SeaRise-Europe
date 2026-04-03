@@ -24,7 +24,7 @@ SeaRise Europe is composed of three runtime containers (frontend, api, tiler) an
 | **registry** | Azure Container Registry | Docker images for frontend, api, tiler | Azure Managed Service | Proposed Architecture |
 | **cdn** *(optional)* | Azure CDN / Front Door | Caches Next.js static assets | Azure Managed Service | Assumption |
 | Geocoding provider | Azure Maps Search (ADR-019) | Geocodes free-text queries to coordinates | External service | Confirmed |
-| Basemap tile provider | MapTiler (ADR-020) | Serves vector basemap tiles (Dataviz Light) | External CDN | Confirmed |
+| Basemap tile provider | Azure Maps (ADR-020) | Serves vector basemap tiles (Light style) | Azure service | Confirmed |
 
 ---
 
@@ -47,7 +47,7 @@ graph TD
 
     subgraph External["External Services"]
         Geocoder["Azure Maps Search\n(ADR-019)"]
-        Basemap["MapTiler\n(ADR-020)"]
+        Basemap["Azure Maps\n(ADR-020)"]
     end
 
     CDN["Azure CDN\n(optional)"]
@@ -198,7 +198,7 @@ graph TD
 | Browser | frontend | HTTPS | TLS terminated at Azure Container Apps ingress |
 | Browser | api | HTTPS | Direct REST calls (Option A — see below) |
 | Browser | tiler | HTTPS | Direct XYZ tile requests |
-| Browser | Basemap provider | HTTPS | Client-side, external CDN |
+| Browser | Basemap provider | HTTPS | Client-side, Azure Maps |
 | frontend | api | HTTPS REST/JSON | Same as browser→api in Option A |
 | api | PostgreSQL | TCP/PostgreSQL | Private network within Container Apps Environment |
 | api | Blob Storage | HTTPS (Azure SDK) | Managed identity preferred |

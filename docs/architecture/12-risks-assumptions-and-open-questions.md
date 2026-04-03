@@ -55,7 +55,7 @@ Azure Maps Search selected as production geocoder. Nominatim retained for develo
 
 **Resolution:** ADR-020 (S01-06, approved 2026-04-03)
 
-MapTiler selected with Dataviz Light vector style, origin-restricted browser API key, and MapLibre GL JS rendering. Attribution: "© MapTiler © OpenStreetMap contributors". Style URL via `NEXT_PUBLIC_BASEMAP_STYLE_URL` environment variable. Key management: origin-restricted (production + staging domains).
+Azure Maps selected with Light vector style, CORS origin-restricted subscription key, and MapLibre GL JS rendering. Attribution: "© Microsoft, © OpenStreetMap contributors". Style URL via `NEXT_PUBLIC_BASEMAP_STYLE_URL` environment variable. Key management: CORS origin-restricted (production + staging domains). Amended 2026-04-03 from MapTiler to Azure Maps to keep all runtime services under Azure credit coverage.
 
 ---
 
@@ -151,7 +151,7 @@ These are architectural decisions made based on incomplete information. Each mus
 | R-03 | Azure Container Apps cold start breaks demo | Medium | High | Warm up containers before demo; set `minReplicas: 1` as fallback |
 | R-04 | Coastal zone geometry (ADR-018: Copernicus Coastal Zones) is too large / too small | Medium | High | ~10 km inland extent is conservative; iterate after Phase 0 data review |
 | R-05 | COG files too large for acceptable tile serving speed | Low | Medium | Ensure correct COG tiling and overview levels during pipeline (see doc 16) |
-| R-06 | Basemap provider attribution requirements missed | Low | Medium | ADR-020: MapTiler + OSM attribution required; add before Phase 1 launch |
+| R-06 | Basemap provider attribution requirements missed | Low | Medium | ADR-020: Azure Maps + OSM attribution required; add before Phase 1 launch |
 | R-07 | GDAL VSIAZ driver not configured correctly for Azure Blob | Medium | High | Phase 0 spike: verify TiTiler can read COG from Azure Blob with managed identity |
 | R-08 | `results` cache (60s TanStack Query) serves stale data after methodology version change | Low | Medium | Methodology version changes are rare + manual; acceptable to restart containers to clear in-process cache |
 | R-09 | DB connection pool exhaustion at concurrent demo traffic | Low | Medium | Monitor `active_connections`; set Npgsql `Maximum Pool Size = 20` per API instance |
@@ -184,7 +184,7 @@ OQ-03 (Defaults)  ──► RESOLVED (ADR-017): ssp2-45, 2050
 OQ-04 (Coastal)   ──► RESOLVED (ADR-018): Copernicus Coastal Zones 2018
 OQ-05 (Threshold) ──► RESOLVED (ADR-015): Binary, SLR >= DEM
 OQ-06 (Geocoding) ──► RESOLVED (ADR-019): Azure Maps Search
-OQ-07 (Basemap)   ──► RESOLVED (ADR-020): MapTiler Dataviz Light
+OQ-07 (Basemap)   ──► RESOLVED (ADR-020): Azure Maps Light
 
 All blocking questions resolved 2026-04-03. Downstream implementation unblocked.
 ```

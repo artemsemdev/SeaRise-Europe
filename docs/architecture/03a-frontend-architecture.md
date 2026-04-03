@@ -382,7 +382,7 @@ stateDiagram-v2
 
 - Instance created once via `useRef` — not React state (no re-renders on map pan/zoom)
 - Destroyed on component unmount (`map.remove()`)
-- Basemap style URL from `NEXT_PUBLIC_BASEMAP_STYLE_URL` (ADR-020: MapTiler Dataviz Light)
+- Basemap style URL from `NEXT_PUBLIC_BASEMAP_STYLE_URL` (ADR-020: Azure Maps Light)
 - Attribution control: enabled, bottom-right corner
 
 ### 6.2 deck.gl Integration

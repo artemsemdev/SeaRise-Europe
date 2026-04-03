@@ -160,7 +160,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | S01-02 | Confirm Default Scenario and Time Horizon | ADR-017: ssp2-45 + 2050 defaults |
 | S01-03 | Define Coastal Analysis Zone Geometry | ADR-018: Copernicus Coastal Zones 2018, validation spec |
 | S01-05 | Select Production Geocoding Provider | ADR-019: Azure Maps Search, field mapping |
-| S01-06 | Select Basemap Tile Provider | ADR-020: MapTiler Dataviz Light, attribution, key model |
+| S01-06 | Select Basemap Tile Provider | ADR-020: Azure Maps Light, attribution, key model (amended from MapTiler 2026-04-03) |
 | S01-07 | Produce Seed Data Specification | seed-data-spec.sql with cross-references |
 
 ### Cross-Epic Audit Fixes — 2026-04-03

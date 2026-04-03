@@ -40,7 +40,7 @@ All human users interact through the same anonymous public interface — no role
 | System | Type | Direction | Runtime? | Key Requirement |
 |---|---|---|---|---|
 | Geocoding provider | External HTTP API | Outbound from API container | Yes | FR-004; ADR-019 (Azure Maps Search) |
-| Basemap tile provider | External CDN | Outbound from browser | Yes | FR-026; ADR-020 (MapTiler Dataviz Light) |
+| Basemap tile provider | Azure Maps | Outbound from browser | Yes | FR-026; ADR-020 (Azure Maps Light) |
 | Azure Blob Storage | Managed cloud service | Read by TiTiler + API | Yes | NFR-020 (COG format); stores precomputed raster assets |
 | Azure Database for PostgreSQL | Managed cloud service | Read by API container | Yes | Stores scenario config, layer metadata, geography boundaries |
 
@@ -73,7 +73,7 @@ All human users interact through the same anonymous public interface — no role
          │                              │                     ▲
          ▼                              ▼                     │
   Geocoding provider           Basemap tile provider    Offline pipeline
-  (Azure Maps — ADR-019)       (MapTiler — ADR-020)     (NASA AR6 + Copernicus DEM)
+  (Azure Maps — ADR-019)       (Azure Maps — ADR-020)   (NASA AR6 + Copernicus DEM)
 ```
 
 **Inside the boundary**: Next.js frontend, ASP.NET Core API, TiTiler, PostgreSQL, Azure Blob Storage, Azure Container Registry, Azure Key Vault.
@@ -90,7 +90,7 @@ graph TD
 
     subgraph External["External Services"]
         Geocoder["Azure Maps Search\n(ADR-019)\nHTTPS / REST"]
-        Basemap["MapTiler\n(ADR-020)\nVector Tiles / CDN"]
+        Basemap["Azure Maps\n(ADR-020)\nVector Tiles"]
     end
 
     subgraph Upstream["Upstream Data Sources (Offline)"]

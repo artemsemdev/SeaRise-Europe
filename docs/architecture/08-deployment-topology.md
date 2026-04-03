@@ -90,7 +90,7 @@ graph TD
 **Environment variables:**
 ```
 NEXT_PUBLIC_API_BASE_URL=https://api.searise-europe.example.com
-NEXT_PUBLIC_BASEMAP_STYLE_URL=...              # ADR-020: MapTiler Dataviz Light style.json URL
+NEXT_PUBLIC_BASEMAP_STYLE_URL=...              # ADR-020: Azure Maps Light style URL with subscription key
 # Note: no secret keys in frontend env vars (NFR-006)
 ```
 

@@ -466,43 +466,46 @@ Use **Azure Maps Search** as the production geocoder. Keep `NominatimGeocodingCl
 
 ---
 
-## ADR-020: Basemap Tile Provider — MapTiler (Dataviz Light)
+## ADR-020: Basemap Tile Provider — Azure Maps (Light style)
 
-**Status:** Approved (S01-06, OQ-07)
+**Status:** Approved (S01-06, OQ-07) — Amended 2026-04-03: replaced MapTiler with Azure Maps to unify all external services under Azure credits.
 
 **Context:**
-The basemap is the visual foundation of the map interface. Provider selection determines the style URL format used by the `MapSurface` component, the attribution text required in the UI, and the key management approach. Candidates evaluated: Mapbox, MapTiler, Stadia Maps, OpenFreeMap.
+The basemap is the visual foundation of the map interface. Provider selection determines the style URL format used by the `MapSurface` component, the attribution text required in the UI, and the key management approach. Candidates evaluated: Mapbox, MapTiler, Stadia Maps, OpenFreeMap. Post-approval amendment: MapTiler replaced with Azure Maps to avoid third-party SaaS costs outside Azure credit coverage.
 
 **Decision:**
-Use **MapTiler** as the basemap provider with:
-- A light, overlay-friendly **Dataviz** vector style
-- A browser-exposed **origin-restricted API key**
+Use **Azure Maps** as the basemap provider with:
+- The built-in **road_light** or **grayscale_light** vector style (overlay-friendly, minimal visual competition with data layers)
+- A **subscription key** managed server-side, passed to the frontend via `NEXT_PUBLIC_BASEMAP_STYLE_URL`
 - MapLibre GL JS as the rendering library (already planned in frontend architecture)
 
 **Rationale:**
-- MapTiler explicitly documents MapLibre usage — straightforward integration path
-- Dataviz Light style is designed for data overlays — better default for exposure visualization than a busy streets map
-- Origin-restricted API keys match the security architecture for browser-visible basemap credentials
-- Keeps basemap choice decoupled from geocoding; avoids Mapbox-specific library coupling
+- Azure Maps is a first-party Azure service — fully covered by Azure startup credits ($1,000 until June 2026)
+- MapTiler is a third-party SaaS not covered by Azure credits — switching eliminates the only non-Azure runtime dependency
+- Azure Maps provides MapLibre-compatible vector tile endpoints with documented integration paths
+- Consolidates both geocoding (ADR-019) and basemap under a single Azure Maps account — one key, one billing, one dashboard
+- Light/grayscale styles are overlay-friendly — suitable for exposure data visualization
 
 **Configuration:**
-- `NEXT_PUBLIC_BASEMAP_STYLE_URL` = MapTiler Dataviz Light `style.json` URL with key parameter
-- Key protection: production domain + staging domain restricted; optional localhost dev key kept separate
+- `NEXT_PUBLIC_BASEMAP_STYLE_URL` = Azure Maps style URL (e.g., `https://atlas.microsoft.com/map/tile?api-version=2024-04-01&tilesetId=microsoft.base.road&zoom={z}&x={x}&y={y}&subscription-key={key}` or the MapLibre-compatible style JSON endpoint)
+- Key protection: subscription key with CORS origin restriction configured in Azure Portal
 
 **Attribution requirements:**
 - Keep the MapLibre attribution control enabled
-- Visible attribution must satisfy both MapTiler and OpenStreetMap requirements
-- Attribution text: "© MapTiler © OpenStreetMap contributors"
+- Visible attribution must satisfy Azure Maps and OpenStreetMap requirements
+- Attribution text: "© Microsoft, © OpenStreetMap contributors"
 
 **Key management:**
-- Origin-restricted browser key (not secret — visible in tile URLs, protected by domain restriction)
-- Production and staging domains registered in MapTiler dashboard
-- Separate localhost key for development
+- Azure Maps subscription key stored in Key Vault as `basemap-subscription-key`
+- Injected into frontend build env as `NEXT_PUBLIC_BASEMAP_STYLE_URL` (URL includes key parameter)
+- CORS origin restriction configured in Azure Maps account settings (production + staging domains)
+- For local development: same key used via `.env.local`
 
 **Consequences:**
-- `+` Best MapLibre fit — documented integration, no GL JS license coupling
-- `+` Overlay-friendly cartography — Dataviz Light designed for data visualization
-- `+` Straightforward key protection via origin restriction
-- `+` Free tier covers expected portfolio traffic levels
-- `-` Browser key is visible in network requests — accepted risk with domain restriction
-- `-` Dependency on commercial provider — mitigated by MapLibre + standard vector tile protocol (can switch providers without code changes)
+- `+` All runtime services covered by Azure credits — zero third-party SaaS cost
+- `+` Single Azure Maps account for both geocoding and basemap — simplified operations
+- `+` MapLibre GL JS compatible — no rendering library changes needed
+- `+` CORS origin restriction available — same security model as before
+- `-` Azure Maps light styles may differ visually from MapTiler Dataviz Light — acceptable for MVP
+- `-` Azure Maps tile rendering may have slightly different cartographic detail in some zoom levels
+- `-` Browser key is visible in network requests — accepted risk with CORS restriction (same as before)
