@@ -4,7 +4,7 @@
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | Epic ID        | E-04                                                                                               |
 | Phase          | 0/1 — bridges foundation and MVP                                                                   |
-| Status         | Not Started                                                                                        |
+| Status         | Done                                                                                               |
 | Effort         | ~7 days                                                                                            |
 | Dependencies   | Epic 02 (local Docker Compose environment, PostgreSQL schema), Epic 03 (seed data + COG layers in local storage) |
 | Stories        | 7 (S04-01 through S04-07)                                                                          |
