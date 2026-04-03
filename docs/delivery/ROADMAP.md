@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 4 complete)  
+**Last updated:** 2026-04-03 (Wave 5 complete)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -9,22 +9,22 @@
 ## Progress Snapshot
 
 ```text
-  █████████░░░░░░░░░░░  43% COMPLETE  ·  25 of 58 stories delivered
+  ███████████████░░░░░  57% COMPLETE  ·  33 of 58 stories delivered
 ```
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **25** / 58 |
-| Epics completed | **4** / 8 |
-| Waves fully completed | **4** / 8 |
-| Current wave | Wave 5 — Frontend Search (0 / 8) PLANNED |
-| Unit tests passing | 27 unit + 12 integration (39 total) |
-| Next up | `S05-01` Initialize Next.js Project and App Shell |
+| Stories completed | **33** / 58 |
+| Epics completed | **5** / 8 |
+| Waves fully completed | **5** / 8 |
+| Current wave | Wave 6 — Assessment UX (0 / 7) PLANNED |
+| Unit tests passing | 27 unit + 12 integration + 52 frontend (91 total) |
+| Next up | `S06-01` Implement ScenarioControl and HorizonControl |
 
 ```mermaid
 pie title Story Completion
-    "Completed (25)" : 25
-    "Remaining (33)" : 33
+    "Completed (33)" : 33
+    "Remaining (25)" : 25
 ```
 
 ---
@@ -36,7 +36,7 @@ Wave 1 · Decision Closure      ████████████████
 Wave 2 · Local Dev Environment ████████████████████  3/3   100%  DONE
 Wave 3 · Geospatial Pipeline   ████████████████████  8/8   100%  DONE
 Wave 4 · Backend API Core      ████████████████████  7/7   100%  DONE
-Wave 5 · Frontend Search       ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
+Wave 5 · Frontend Search       ████████████████████  8/8   100%  DONE
 Wave 6 · Assessment UX         ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
 Wave 7 · Transparency & A11y   ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
 Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░░░░░  0/11    0%  PLANNED
@@ -52,7 +52,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | 2 | Local Development Environment | 3 / 3 (100%) | **Done** |
 | 3 | Geospatial Data Pipeline | 8 / 8 (100%) | **Done** |
 | 4 | Backend API Core | 7 / 7 (100%) | **Done** |
-| 5 | Frontend Shell and Search Flow | 0 / 8 (0%) | Planned |
+| 5 | Frontend Shell and Search Flow | 8 / 8 (100%) | **Done** |
 | 6 | Scenario Controls and Assessment UX | 0 / 7 (0%) | Planned |
 | 7 | Transparency, Accessibility, and Content Compliance | 0 / 7 (0%) | Planned |
 | 8 | Azure Deployment, Release Hardening, and Go-Live | 0 / 11 (0%) | Planned |
@@ -60,19 +60,6 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Remaining Work
-
-### Frontend Search — 8 stories · Wave 5
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S05-01 | Initialize Next.js Project and App Shell | App shell, layout, responsive skeleton |
-| S05-02 | Implement Zustand State Stores | Client state model and transitions |
-| S05-03 | Implement MapSurface with MapLibre | Base map, markers, and map interactions |
-| S05-04 | Implement SearchBar and Geocoding Integration | Search input, requests, loading handling |
-| S05-05 | Implement CandidateList and Location Selection | Candidate selection and keyboard interaction |
-| S05-06 | Implement Config Fetch and Localization Setup | Config bootstrapping and string externalization |
-| S05-07 | Implement EmptyState, LoadingState, ErrorBanner | Search-state UI and failure handling |
-| S05-08 | Frontend Smoke Tests and Performance Baseline | Smoke coverage, Playwright, bundle baseline |
 
 ### Assessment UX — 7 stories · Wave 6
 
@@ -117,6 +104,19 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Recently Completed
+
+### Frontend Shell and Search Flow — 8 stories · Wave 5 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S05-01 | Initialize Next.js Project and App Shell | Next.js 14+ App Router with TailwindCSS v4, responsive split-pane layout, AppShell client boundary, Dockerfile |
+| S05-02 | Implement Zustand State Stores | `appStore` (9-phase discriminated union), `mapStore` (viewport + selectedLocation), `uiStore` (panel visibility), shared TypeScript types |
+| S05-03 | Implement MapSurface with MapLibre | MapLibre GL JS dynamic import (SSR: false), Europe-centered view, pan/zoom, attribution, click-to-assess, LocationMarker with flyTo |
+| S05-04 | Implement SearchBar and Geocoding Integration | TanStack Query v5, geocoding mutation hook, SearchBar with validation (empty blocked, 200-char max), auto-select on single result |
+| S05-05 | Implement CandidateList and Location Selection | Keyboard-navigable listbox (up to 5 candidates), label + displayContext, ARIA roles, selection triggers assessment |
+| S05-06 | Implement Config Fetch and Localization Setup | `lib/i18n/en.ts` with all UI copy externalized, config query hook with staleTime: Infinity |
+| S05-07 | Implement EmptyState, LoadingState, ErrorBanner | Phase-conditional components with ARIA (aria-live, aria-busy, role=alert), retry on error, NoResults variant |
+| S05-08 | Frontend Smoke Tests and Performance Baseline | Vitest + RTL (47 tests across 9 files), CI updated with frontend unit tests, bundle baseline: 104 kB first load JS |
 
 ### Backend API Core — 7 stories · Wave 4 · DONE 2026-04-03
 
@@ -163,6 +163,28 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | S01-06 | Select Basemap Tile Provider | ADR-020: MapTiler Dataviz Light, attribution, key model |
 | S01-07 | Produce Seed Data Specification | seed-data-spec.sql with cross-references |
 
+### Cross-Epic Audit Fixes — 2026-04-03
+
+A post-Wave-5 audit of Epics 02–04 identified gaps between the architecture specification and the implementation. All issues were fixed in a single pass. The fixes are not new stories — they are corrections to work that should have been complete within the original epic scope.
+
+**Root cause:** During initial implementation of Epics 02–04, the focus was on delivering functional code that satisfied the story's primary acceptance criteria. Secondary concerns — CI strictness, logging fidelity, documentation parity, test coverage for edge cases — were implemented partially or with placeholders (e.g., `continue-on-error: true`, `DurationMs: 0`). The audit caught these gaps before they could affect downstream epics.
+
+| Epic | Fix | What changed | Why it was missed |
+|------|-----|-------------|-------------------|
+| E-02 | CI: remove `continue-on-error` on integration tests | Integration test failures now break the build | Placeholder to unblock CI while Testcontainers stabilized |
+| E-02 | docker-compose: frontend `depends_on` changed to `service_healthy` | Frontend waits for API health check, not just container start | Overlooked when API healthcheck was added later in Epic 04 |
+| E-02 | CI: add pipeline job (ruff, mypy, pytest) | Pipeline code now linted and tested in CI | Pipeline CI job was not specified in Epic 02 stories; added retroactively |
+| E-03 | cogify.py: pass `COG_OVERVIEW_LEVELS` to `cog_translate` | Overview levels now actually applied to COG output | Config constant was imported but not wired into the function call |
+| E-03 | validate.py: add test for check 5 (extent outside Europe) | All 5 QA checks now have dedicated test coverage | Edge-case test was missing from the initial test suite |
+| E-03 | Add tests for download, preprocess, upload, register modules | 4 new test files covering caching, alignment, blob paths, seed data constants | Initial test suite focused on compute_exposure, cogify, validate, config only |
+| E-03 | pyproject.toml created | Pipeline has proper Python project metadata with dev dependencies | Pipeline used requirements.txt only; no project-level config for ruff/mypy/pytest |
+| E-04 | Serilog middleware reordering | `UseSerilogRequestLogging()` now runs after correlation ID middleware | Middleware was placed before correlation ID, so `requestId` was missing from request logs |
+| E-04 | AssessmentService: add ILogger + 3 log events | `GeographyCheckCompleted`, `LayerResolved`, `LayerNotFound` now emitted | Service had no logger injected; architecture doc specified these events but they weren't implemented |
+| E-04 | TiTilerExposureEvaluator: fix `DurationMs` | Uses `Stopwatch` instead of hardcoded `0` | Placeholder value was left in during initial implementation |
+| E-04 | Add WebApplicationFactory endpoint integration tests | 7 HTTP-level tests validating endpoints without external dependencies | Test story (S04-07) focused on unit tests and Testcontainers; WAF tests were not written |
+| E-04 | appsettings.json: add `Cors` config key | CORS configuration documented in appsettings for discoverability | Config was read from env vars only; appsettings had no matching key |
+| Docs | ER diagram: add missing columns | `exposure_threshold_desc`, `blob_container`, `cog_format`, `description`, `created_at` added to diagram | Diagram was authored before schema was finalized; drift accumulated |
+
 ### Planning Baseline — non-counted groundwork · DONE 2026-04-02
 
 | ID | Work Item | What was delivered |
@@ -182,7 +204,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | v0.3 | Local Foundation — Docker Compose, schema, and CI operational | **Done** |
 | v0.4 | Data Pipeline — validated COG generation and seeded metadata | **Done** |
 | v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | **Done** |
-| v0.6 | Frontend MVP — search flow and assessment UX working locally | Planned |
+| v0.6 | Frontend MVP — search flow and assessment UX working locally | In Progress |
 | v0.7 | Transparency & A11y — methodology, copy, responsive behavior, and accessibility verified | Planned |
 | v1.0 | Cloud Release — Azure staging, hardening, NFR checks, and release readiness complete | Planned |
 
@@ -198,10 +220,10 @@ flowchart LR
         W2[S02-01..03 Local Dev]
         W3[S03-01..08 Pipeline]
         W4[S04-01..07 Backend API]
+        W5[S05-01..08 Frontend Search]
     end
 
     subgraph Planned
-        W5[S05-01..08 Frontend Search]
         W6[S06-01..07 Assessment UX]
         W7[S07-01..07 Transparency and A11y]
         W8[S08-01..11 Azure Release]
@@ -212,8 +234,8 @@ flowchart LR
     classDef done fill:#d9f99d,stroke:#3f6212,color:#111827;
     classDef later fill:#e5e7eb,stroke:#6b7280,color:#111827;
 
-    class B,W1,W2,W3,W4 done;
-    class W5,W6,W7,W8 later;
+    class B,W1,W2,W3,W4,W5 done;
+    class W6,W7,W8 later;
 ```
 
 ---

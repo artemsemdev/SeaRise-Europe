@@ -48,6 +48,9 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      - name: Unit tests
+        run: npm test
+
   # ---------------------------------------------------------------------------
   # API: format check, build, unit tests
   # ---------------------------------------------------------------------------
@@ -78,7 +81,36 @@ jobs:
 
       - name: Integration Tests
         run: dotnet test SeaRise.sln --no-build -c Release --verbosity normal --filter "Category=Integration"
-        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Pipeline: lint, type-check, unit tests
+  # ---------------------------------------------------------------------------
+  pipeline:
+    name: Pipeline (ruff, mypy, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install ruff mypy pytest
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Type check (mypy)
+        run: mypy . --ignore-missing-imports
+
+      - name: Unit tests
+        run: pytest tests/ -v
 
   # ---------------------------------------------------------------------------
   # Docker: build all three images (no push)

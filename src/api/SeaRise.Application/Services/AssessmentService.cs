@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SeaRise.Application.Interfaces;
 using SeaRise.Domain.Interfaces;
 using SeaRise.Domain.Logic;
@@ -12,19 +13,22 @@ public class AssessmentService : IAssessmentService
     private readonly IExposureEvaluator _exposureEvaluator;
     private readonly IScenarioRepository _scenarioRepo;
     private readonly IMethodologyRepository _methodologyRepo;
+    private readonly ILogger<AssessmentService> _logger;
 
     public AssessmentService(
         IGeographyRepository geographyRepo,
         ILayerResolver layerResolver,
         IExposureEvaluator exposureEvaluator,
         IScenarioRepository scenarioRepo,
-        IMethodologyRepository methodologyRepo)
+        IMethodologyRepository methodologyRepo,
+        ILogger<AssessmentService> logger)
     {
         _geographyRepo = geographyRepo;
         _layerResolver = layerResolver;
         _exposureEvaluator = exposureEvaluator;
         _scenarioRepo = scenarioRepo;
         _methodologyRepo = methodologyRepo;
+        _logger = logger;
     }
 
     public async Task<AssessmentResult> AssessAsync(AssessmentQuery query, string requestId, CancellationToken ct)
@@ -54,6 +58,9 @@ public class AssessmentService : IAssessmentService
             (true, true) => GeographyClassification.InEuropeAndCoastalZone
         };
 
+        _logger.LogDebug("GeographyCheckCompleted {Geography} {IsInEurope} {IsInCoastalZone}",
+            geography.ToString(), isInEurope, isInCoastalZone);
+
         // Short-circuit: outside Europe or outside coastal zone
         if (geography != GeographyClassification.InEuropeAndCoastalZone)
         {
@@ -65,8 +72,11 @@ public class AssessmentService : IAssessmentService
         var layer = await _layerResolver.ResolveAsync(query.ScenarioId, query.HorizonYear, ct);
         if (layer is null)
         {
+            _logger.LogWarning("LayerNotFound {ScenarioId} {HorizonYear}", query.ScenarioId, query.HorizonYear);
             return BuildResult(requestId, ResultState.DataUnavailable, query, scenarioInfo, horizonInfo, methodology.Version, null);
         }
+
+        _logger.LogDebug("LayerResolved {LayerId} {BlobPath}", layer.Id, layer.BlobPath);
 
         // Evaluate exposure
         var isExposed = await _exposureEvaluator.IsExposedAsync(query.Latitude, query.Longitude, layer, ct);

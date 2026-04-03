@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+:root {
+  /* Surface hierarchy — "Precision Observatory" palette */
+  --surface: #0f1418;
+  --s-darkest: #0a0f13;
+  --s-low: #171c20;
+  --s-mid: #1b2025;
+  --s-high: #262b2f;
+  --s-highest: #303538;
+  --s-bright: #353a3e;
+
+  /* Primary */
+  --primary: #9dcaff;
+  --p-dim: #5294d6;
+  --p-bg: #002b4b;
+
+  /* Semantic */
+  --warn: #ffba38;
+  --w-bg: #392500;
+  --ok: #7dd99b;
+  --ok-bg: rgba(125, 217, 155, 0.1);
+  --err: #ffb4ab;
+  --err-bg: rgba(255, 180, 171, 0.1);
+
+  /* Text */
+  --text: #dfe3e9;
+  --text2: #c0c7cd;
+  --text3: #8a9199;
+
+  /* Glass */
+  --glass: rgba(48, 53, 56, 0.6);
+  --glass-blur: 20px;
+
+  /* Gradient */
+  --grad: linear-gradient(135deg, #9dcaff, #5294d6);
+
+  /* Radius — "no-line" rule: prefer tonal shifts over borders */
+  --r-sm: 0.25rem;
+  --r-md: 0.5rem;
+  --r-lg: 0.75rem;
+  --r-xl: 1rem;
+}
+
+/* Marker pulse animation */
+@keyframes marker-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+/* Hide default MapLibre attribution to match mock (custom attribution in footer) */
+.maplibregl-ctrl-attrib { display: none !important; }
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--font-inter, "Inter", sans-serif);
+  background: var(--surface);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}

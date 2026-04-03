@@ -150,6 +150,7 @@ erDiagram
         text description
         int sort_order
         boolean is_default
+        timestamptz created_at
     }
     horizons {
         int year PK
@@ -166,6 +167,7 @@ erDiagram
         text limitations
         text resolution_note
         numeric exposure_threshold
+        text exposure_threshold_desc
         timestamptz updated_at
     }
     layers {
@@ -174,6 +176,8 @@ erDiagram
         int horizon_year FK
         varchar methodology_version FK
         text blob_path
+        text blob_container
+        boolean cog_format
         boolean layer_valid
         jsonb legend_colormap
         timestamptz generated_at
@@ -181,7 +185,9 @@ erDiagram
     geography_boundaries {
         varchar name PK
         geometry geom
+        text description
         text source
+        timestamptz created_at
     }
 
     scenarios ||--o{ layers : "has layers"

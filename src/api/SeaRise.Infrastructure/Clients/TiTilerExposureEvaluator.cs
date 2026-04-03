@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SeaRise.Domain.Interfaces;
@@ -18,6 +19,8 @@ public class TiTilerExposureEvaluator : IExposureEvaluator
 
     public async Task<bool> IsExposedAsync(double latitude, double longitude, ExposureLayer layer, CancellationToken ct)
     {
+        var sw = Stopwatch.StartNew();
+
         var cogUrl = $"az://geospatial/{layer.BlobPath}";
         var url = $"/cog/point/{longitude},{latitude}?url={Uri.EscapeDataString(cogUrl)}";
 
@@ -29,7 +32,8 @@ public class TiTilerExposureEvaluator : IExposureEvaluator
 
         var pixelValue = result?.Values?.FirstOrDefault()?.FirstOrDefault();
 
-        _logger.LogDebug("TilerQueryCompleted {PixelValue} {DurationMs}", pixelValue, 0);
+        sw.Stop();
+        _logger.LogDebug("TilerQueryCompleted {PixelValue} {DurationMs}", pixelValue, sw.ElapsedMilliseconds);
 
         return pixelValue == 1;
     }
