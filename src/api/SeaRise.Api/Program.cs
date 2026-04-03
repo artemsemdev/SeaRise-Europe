@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using SeaRise.Api;
 using SeaRise.Api.Dtos;
 using SeaRise.Api.Validators;
 using SeaRise.Application.Interfaces;
@@ -206,7 +207,7 @@ try
         if (!validation.IsValid)
         {
             var firstError = validation.Errors.First();
-            return Results.Json(
+            return StreamJsonResults.Json(
                 new ErrorResponse(requestId, new ErrorDetail("VALIDATION_ERROR", firstError.ErrorMessage, firstError.PropertyName.ToLowerInvariant())),
                 statusCode: 400);
         }
@@ -224,7 +225,7 @@ try
             var candidateDtos = candidates.Select(c => new CandidateDto(
                 c.Rank, c.Label, c.Country, c.Latitude, c.Longitude, c.DisplayContext)).ToList();
 
-            return Results.Ok(new GeocodeResponse(requestId, candidateDtos));
+            return StreamJsonResults.Ok(new GeocodeResponse(requestId, candidateDtos));
         }
         catch (GeocodingProviderException ex)
         {
@@ -232,7 +233,7 @@ try
             Log.ForContext("requestId", requestId)
                .Error("GeocodeProviderError {DurationMs}", sw.ElapsedMilliseconds);
 
-            return Results.Json(
+            return StreamJsonResults.Json(
                 new ErrorResponse(requestId, new ErrorDetail("GEOCODING_PROVIDER_ERROR", ex.Message)),
                 statusCode: 500);
         }
@@ -259,7 +260,7 @@ try
                 "UNKNOWN_HORIZON" => "UNKNOWN_HORIZON",
                 _ => "VALIDATION_ERROR"
             };
-            return Results.Json(
+            return StreamJsonResults.Json(
                 new ErrorResponse(requestId, new ErrorDetail(errorCode, firstError.ErrorMessage, firstError.PropertyName.ToLowerInvariant())),
                 statusCode: 400);
         }
@@ -296,7 +297,7 @@ try
                     : null,
                 GeneratedAt: result.GeneratedAt);
 
-            return Results.Ok(response);
+            return StreamJsonResults.Ok(response);
         }
         catch (Exception ex)
         {
@@ -304,7 +305,7 @@ try
             Log.ForContext("requestId", requestId)
                .Error(ex, "AssessmentError {ErrorCode} {DurationMs}", "INTERNAL_ERROR", sw.ElapsedMilliseconds);
 
-            return Results.Json(
+            return StreamJsonResults.Json(
                 new ErrorResponse(requestId, new ErrorDetail("INTERNAL_ERROR", "An unexpected error occurred.")),
                 statusCode: 500);
         }
@@ -325,7 +326,7 @@ try
 
         httpContext.Response.Headers["Cache-Control"] = "public, max-age=3600";
 
-        return Results.Ok(new ConfigScenariosResponse(
+        return StreamJsonResults.Ok(new ConfigScenariosResponse(
             RequestId: requestId,
             Scenarios: scenarios.Select(s =>
                 new ScenarioConfigDto(s.Id, s.DisplayName, s.Description, s.SortOrder)).ToList(),
@@ -358,7 +359,7 @@ try
 
         httpContext.Response.Headers["Cache-Control"] = "public, max-age=3600";
 
-        return Results.Ok(new ConfigMethodologyResponse(
+        return StreamJsonResults.Ok(new ConfigMethodologyResponse(
             RequestId: requestId,
             MethodologyVersion: methodology.Version,
             SeaLevelProjectionSource: new SourceDto(
@@ -396,7 +397,7 @@ try
 
         Log.Debug("HealthCheckCompleted {Postgres} {BlobStorage}", postgresStatus, blobStatus);
 
-        return Results.Json(
+        return StreamJsonResults.Json(
             new HealthResponse(overallStatus, new HealthComponentsDto(postgresStatus, blobStatus), DateTime.UtcNow),
             statusCode: statusCode);
     });
