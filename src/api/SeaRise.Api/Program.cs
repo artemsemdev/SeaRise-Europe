@@ -116,10 +116,10 @@ try
     // ---------------------------------------------------------------------------
     // Middleware
     // ---------------------------------------------------------------------------
-    app.UseSerilogRequestLogging();
     app.UseCors("frontend");
 
-    // Correlation ID middleware
+    // Correlation ID middleware (must run before Serilog request logging
+    // so that requestId is included in the structured log properties)
     app.Use(async (context, next) =>
     {
         var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
@@ -132,6 +132,8 @@ try
             await next();
         }
     });
+
+    app.UseSerilogRequestLogging();
 
     // ---------------------------------------------------------------------------
     // Endpoints

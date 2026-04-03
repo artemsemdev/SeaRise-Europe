@@ -41,6 +41,7 @@ def cogify(input_tif: Path, output_cog: Path) -> Path:
         str(output_cog),
         profile,
         in_memory=False,
+        overview_level=COG_OVERVIEW_LEVELS,
         overview_resampling="nearest",
         config=config,
     )

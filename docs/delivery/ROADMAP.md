@@ -18,7 +18,7 @@
 | Epics completed | **5** / 8 |
 | Waves fully completed | **5** / 8 |
 | Current wave | Wave 6 — Assessment UX (0 / 7) PLANNED |
-| Unit tests passing | 27 unit + 12 integration + 47 frontend (86 total) |
+| Unit tests passing | 27 unit + 12 integration + 52 frontend (91 total) |
 | Next up | `S06-01` Implement ScenarioControl and HorizonControl |
 
 ```mermaid
@@ -162,6 +162,28 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | S01-05 | Select Production Geocoding Provider | ADR-019: Azure Maps Search, field mapping |
 | S01-06 | Select Basemap Tile Provider | ADR-020: MapTiler Dataviz Light, attribution, key model |
 | S01-07 | Produce Seed Data Specification | seed-data-spec.sql with cross-references |
+
+### Cross-Epic Audit Fixes — 2026-04-03
+
+A post-Wave-5 audit of Epics 02–04 identified gaps between the architecture specification and the implementation. All issues were fixed in a single pass. The fixes are not new stories — they are corrections to work that should have been complete within the original epic scope.
+
+**Root cause:** During initial implementation of Epics 02–04, the focus was on delivering functional code that satisfied the story's primary acceptance criteria. Secondary concerns — CI strictness, logging fidelity, documentation parity, test coverage for edge cases — were implemented partially or with placeholders (e.g., `continue-on-error: true`, `DurationMs: 0`). The audit caught these gaps before they could affect downstream epics.
+
+| Epic | Fix | What changed | Why it was missed |
+|------|-----|-------------|-------------------|
+| E-02 | CI: remove `continue-on-error` on integration tests | Integration test failures now break the build | Placeholder to unblock CI while Testcontainers stabilized |
+| E-02 | docker-compose: frontend `depends_on` changed to `service_healthy` | Frontend waits for API health check, not just container start | Overlooked when API healthcheck was added later in Epic 04 |
+| E-02 | CI: add pipeline job (ruff, mypy, pytest) | Pipeline code now linted and tested in CI | Pipeline CI job was not specified in Epic 02 stories; added retroactively |
+| E-03 | cogify.py: pass `COG_OVERVIEW_LEVELS` to `cog_translate` | Overview levels now actually applied to COG output | Config constant was imported but not wired into the function call |
+| E-03 | validate.py: add test for check 5 (extent outside Europe) | All 5 QA checks now have dedicated test coverage | Edge-case test was missing from the initial test suite |
+| E-03 | Add tests for download, preprocess, upload, register modules | 4 new test files covering caching, alignment, blob paths, seed data constants | Initial test suite focused on compute_exposure, cogify, validate, config only |
+| E-03 | pyproject.toml created | Pipeline has proper Python project metadata with dev dependencies | Pipeline used requirements.txt only; no project-level config for ruff/mypy/pytest |
+| E-04 | Serilog middleware reordering | `UseSerilogRequestLogging()` now runs after correlation ID middleware | Middleware was placed before correlation ID, so `requestId` was missing from request logs |
+| E-04 | AssessmentService: add ILogger + 3 log events | `GeographyCheckCompleted`, `LayerResolved`, `LayerNotFound` now emitted | Service had no logger injected; architecture doc specified these events but they weren't implemented |
+| E-04 | TiTilerExposureEvaluator: fix `DurationMs` | Uses `Stopwatch` instead of hardcoded `0` | Placeholder value was left in during initial implementation |
+| E-04 | Add WebApplicationFactory endpoint integration tests | 7 HTTP-level tests validating endpoints without external dependencies | Test story (S04-07) focused on unit tests and Testcontainers; WAF tests were not written |
+| E-04 | appsettings.json: add `Cors` config key | CORS configuration documented in appsettings for discoverability | Config was read from env vars only; appsettings had no matching key |
+| Docs | ER diagram: add missing columns | `exposure_threshold_desc`, `blob_container`, `cog_format`, `description`, `created_at` added to diagram | Diagram was authored before schema was finalized; drift accumulated |
 
 ### Planning Baseline — non-counted groundwork · DONE 2026-04-02
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Moq;
 using SeaRise.Application.Services;
 using SeaRise.Domain.Interfaces;
@@ -12,6 +13,7 @@ public class AssessmentServiceTests
     private readonly Mock<IExposureEvaluator> _exposureEvaluator = new();
     private readonly Mock<IScenarioRepository> _scenarioRepo = new();
     private readonly Mock<IMethodologyRepository> _methodologyRepo = new();
+    private readonly Mock<ILogger<AssessmentService>> _logger = new();
     private readonly AssessmentService _sut;
 
     private static readonly MethodologyVersion ActiveMethodology = new(
@@ -45,7 +47,8 @@ public class AssessmentServiceTests
             _layerResolver.Object,
             _exposureEvaluator.Object,
             _scenarioRepo.Object,
-            _methodologyRepo.Object);
+            _methodologyRepo.Object,
+            _logger.Object);
     }
 
     private AssessmentQuery MakeQuery(double lat = 52.37, double lng = 4.90) =>

@@ -80,3 +80,23 @@ def test_no_exposure_pixels_fail(tmp_path: Path):
 
     with pytest.raises(ValidationError, match="has_exposure"):
         validate_layer(cog, "ssp2-45", 2050)
+
+
+def test_extent_outside_europe_fails(tmp_path: Path):
+    """A COG with extent outside Europe bounds should fail check 5."""
+    # Place the raster in the Americas (lon -80 to -79, lat 25 to 26)
+    data = np.array([[0.0, 1.0], [1.0, 0.0]], dtype=np.float32)
+    raw = tmp_path / "outside_europe_raw.tif"
+    transform = from_bounds(-80.0, 25.0, -79.0, 26.0, 2, 2)
+    with rasterio.open(
+        raw, "w", driver="GTiff", dtype="float32",
+        width=2, height=2, count=1, crs="EPSG:4326",
+        transform=transform, nodata=np.nan,
+    ) as dst:
+        dst.write(data, 1)
+
+    cog = tmp_path / "outside_europe.tif"
+    cogify(raw, cog)
+
+    with pytest.raises(ValidationError, match="extent"):
+        validate_layer(cog, "ssp2-45", 2050)
