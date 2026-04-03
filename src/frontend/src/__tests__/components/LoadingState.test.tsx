@@ -9,11 +9,19 @@ describe("LoadingState", () => {
     expect(screen.getByText(strings.loading.geocoding)).toBeInTheDocument();
   });
 
-  it("renders assessing loading text with location label", () => {
+  it("renders assessing card with title and subtitle", () => {
     render(<LoadingState variant="assessing" locationLabel="Amsterdam" />);
+    expect(screen.getByText(strings.loading.title)).toBeInTheDocument();
     expect(
-      screen.getByText(strings.loading.assessing("Amsterdam"))
+      screen.getByText(strings.loading.subtitle("Amsterdam"))
     ).toBeInTheDocument();
+  });
+
+  it("renders assessing card with step list", () => {
+    render(<LoadingState variant="assessing" locationLabel="Amsterdam" />);
+    for (const step of strings.loading.steps) {
+      expect(screen.getByText(step)).toBeInTheDocument();
+    }
   });
 
   it("has aria-busy true", () => {

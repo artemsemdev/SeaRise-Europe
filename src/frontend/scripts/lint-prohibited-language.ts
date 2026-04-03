@@ -27,7 +27,8 @@ const PROHIBITED_TERMS = [
 // Approved strings that may contain substrings of prohibited terms
 // These are explicitly sanctioned by CONTENT_GUIDELINES (CG-3)
 const APPROVED_EXCEPTIONS = [
-  "No risk detected",   // CG-3: approved user-facing label for NoModeledExposureDetected
+  "No risk detected",               // CG-3: approved user-facing label for NoModeledExposureDetected
+  "does not mean it is safe",       // CG-3: approved cautionary language for NoModeledExposureDetected summary
 ];
 
 function isApproved(line: string): boolean {

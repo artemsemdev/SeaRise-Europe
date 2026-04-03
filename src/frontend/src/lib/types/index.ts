@@ -9,6 +9,7 @@ export interface GeocodingCandidate {
 
 export interface SelectedLocation {
   label: string;
+  displayContext: string;
   latitude: number;
   longitude: number;
 }

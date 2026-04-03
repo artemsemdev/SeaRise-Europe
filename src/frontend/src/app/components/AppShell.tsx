@@ -110,6 +110,7 @@ function AppContent() {
 
     const location = {
       label: `${urlState.lat.toFixed(4)}, ${urlState.lng.toFixed(4)}`,
+      displayContext: "",
       latitude: urlState.lat,
       longitude: urlState.lng,
     };

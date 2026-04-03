@@ -10,27 +10,43 @@ export const strings = {
     ModeledExposureDetected: "Risk detected",
     NoModeledExposureDetected: "No risk detected",
     DataUnavailable: "Data not available",
-    OutOfScope: "This location is too far from the coast",
-    UnsupportedGeography: "This location is outside Europe",
+    OutOfScope: (cityName: string) => `${cityName} is not on the coast`,
+    UnsupportedGeography: (cityName: string) => `${cityName} is outside Europe`,
   },
 
   resultSummaries: {
     ModeledExposureDetected: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>
       `Under the ${scenarioDisplayName} scenario at ${horizonYear}, ${locationLabel} shows modeled coastal exposure. Areas at or below projected sea levels may experience periodic or permanent inundation under this scenario.`,
     NoModeledExposureDetected: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>
-      `Under the ${scenarioDisplayName} scenario at ${horizonYear}, ${locationLabel} does not show modeled coastal exposure. This does not constitute a safety determination \u2014 conditions may change under different scenarios or time horizons.`,
+      `Based on current models, this location does not show significant coastal exposure under this scenario. This does not mean it is safe \u2014 conditions may change.`,
     DataUnavailable: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>
-      `Data is not available for ${locationLabel} under the ${scenarioDisplayName} scenario at ${horizonYear}. No substitution has been made. Try a different scenario or time horizon \u2014 other combinations may have data.`,
+      `We don\u2019t have enough data for this exact combination of location, forecast model, and timeframe. Try a different model or timeframe \u2014 other combinations may have data.`,
     OutOfScope: (locationLabel: string) =>
-      `${locationLabel} is outside the coastal analysis zone. This tool currently covers coastal locations across Europe. Try searching for a location closer to the coast.`,
+      `We currently only cover coastal locations across Europe. ${locationLabel} is too far inland for sea-level rise to apply here.`,
+    OutOfScopeSuggestion: "Try searching for a city near the coast \u2014 like Hamburg, Amsterdam, or Barcelona.",
     UnsupportedGeography: (locationLabel: string) =>
-      `${locationLabel} is outside the area currently supported by SeaRise Europe. This tool covers European coastlines only.`,
+      `SeaRise Europe only covers European coastlines right now. We hope to expand to other regions in the future.`,
+    UnsupportedGeographySuggestion: "Try a European coastal city like Lisbon, Naples, or Copenhagen.",
+  },
+
+  locSub: (horizonYear: number, currentYear: number, scenarioDisplayName: string) => {
+    const diff = horizonYear - currentYear;
+    return `In ${diff} years (year ${horizonYear}) \u00b7 ${scenarioDisplayName}`;
   },
 
   loading: {
+    title: "Calculating\u2026",
+    subtitle: (locationLabel: string) =>
+      `Checking sea-level data for ${locationLabel}\u2026`,
     geocoding: "Searching for locations\u2026",
     assessing: (locationLabel: string) =>
       `Calculating exposure for ${locationLabel}\u2026`,
+    steps: [
+      "Location confirmed",
+      "Elevation data loaded",
+      "Running sea-level models\u2026",
+      "Generating exposure report",
+    ] as readonly string[],
   },
 
   errors: {
@@ -39,8 +55,8 @@ export const strings = {
       body: "We could not complete your search right now. Please try again.",
     },
     assessmentFailure: {
-      heading: "Result temporarily unavailable",
-      body: "We could not calculate the exposure for this location right now. Please try again.",
+      heading: "Something went wrong while calculating",
+      body: "Please try again.",
     },
     unexpected: {
       heading: "Something went wrong",
@@ -49,7 +65,12 @@ export const strings = {
   },
 
   disclaimer:
-    "This result is a scenario-based model estimate for informational purposes only. It is not an engineering assessment, structural survey, legal determination, insurance evaluation, mortgage guidance, or financial advice. Do not rely on this result for decisions requiring professional expertise.",
+    "This is a model estimate, not an engineering or legal assessment.",
+
+  disclaimerNoExposure:
+    "This is a model estimate. No result should be taken as a safety guarantee.",
+
+  source: "Source: IPCC AR6 sea-level projections \u00b7 Copernicus DEM elevation data",
 
   noResults: {
     heading: "No locations found",
@@ -78,6 +99,8 @@ export const strings = {
     retry: "Retry",
     reset: "Reset",
     searchAnother: "Search another location",
+    tryNextHorizon: "Try +50 yr",
+    tryIpccModel: "Try IPCC model",
   },
 
   methodology: {

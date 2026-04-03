@@ -29,6 +29,7 @@ describe("mapStore", () => {
   it("sets selectedLocation", () => {
     const location = {
       label: "Amsterdam",
+      displayContext: "North Holland",
       latitude: 52.37,
       longitude: 4.9,
     };
@@ -39,6 +40,7 @@ describe("mapStore", () => {
   it("clears selectedLocation", () => {
     useMapStore.getState().setSelectedLocation({
       label: "Test",
+      displayContext: "",
       latitude: 0,
       longitude: 0,
     });

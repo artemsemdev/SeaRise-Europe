@@ -28,7 +28,7 @@ export default function SearchOverlay() {
         if (data.candidates.length === 0) setNoResults(query);
         else if (data.candidates.length === 1) {
           const c = data.candidates[0];
-          startAssessing({ label: c.label, latitude: c.latitude, longitude: c.longitude });
+          startAssessing({ label: c.label, displayContext: c.displayContext, latitude: c.latitude, longitude: c.longitude });
         } else setCandidates(data.candidates);
       },
       onError: (error) => {

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ResultPanel from "@/app/components/assessment/ResultPanel";
 import { useAppStore } from "@/lib/store/appStore";
@@ -31,6 +30,7 @@ function renderResultPanel(resultState: ResultState) {
       <ResultPanel
         result={createMockResult(resultState)}
         locationLabel="Amsterdam, Netherlands"
+        locationContext="North Holland"
       />
     </QueryClientProvider>
   );
@@ -52,45 +52,48 @@ describe("ResultPanel", () => {
   it("renders NoModeledExposureDetected with safety caveat", () => {
     renderResultPanel("NoModeledExposureDetected");
     expect(screen.getByText(strings.resultStates.NoModeledExposureDetected)).toBeInTheDocument();
-    expect(screen.getByText(/does not constitute a safety determination/)).toBeInTheDocument();
-    expect(screen.getByText(strings.disclaimer)).toBeInTheDocument();
+    expect(screen.getByText(/does not mean it is safe/)).toBeInTheDocument();
+    expect(screen.getByText(strings.disclaimerNoExposure)).toBeInTheDocument();
   });
 
-  it("renders DataUnavailable with no-substitution message", () => {
+  it("renders DataUnavailable with suggestion buttons", () => {
     renderResultPanel("DataUnavailable");
     expect(screen.getByText(strings.resultStates.DataUnavailable)).toBeInTheDocument();
-    expect(screen.getByText(/No substitution has been made/)).toBeInTheDocument();
-    expect(screen.getByText(strings.disclaimer)).toBeInTheDocument();
+    expect(screen.getByText(/Try a different model or timeframe/)).toBeInTheDocument();
+    expect(screen.getByText(strings.actions.tryNextHorizon)).toBeInTheDocument();
+    expect(screen.getByText(strings.actions.tryIpccModel)).toBeInTheDocument();
   });
 
-  it("renders OutOfScope with center card layout", () => {
+  it("renders OutOfScope with city-specific heading and center card layout", () => {
     renderResultPanel("OutOfScope");
-    expect(screen.getByText(strings.resultStates.OutOfScope)).toBeInTheDocument();
-    expect(screen.getByText(/outside the coastal analysis zone/)).toBeInTheDocument();
+    expect(screen.getByText("Amsterdam is not on the coast")).toBeInTheDocument();
+    expect(screen.getByText(/too far inland/)).toBeInTheDocument();
+    expect(screen.getByText(strings.resultSummaries.OutOfScopeSuggestion)).toBeInTheDocument();
     expect(screen.getByText(strings.actions.searchAnother)).toBeInTheDocument();
   });
 
-  it("renders UnsupportedGeography with center card layout", () => {
+  it("renders UnsupportedGeography with city-specific heading, two buttons", () => {
     renderResultPanel("UnsupportedGeography");
-    expect(screen.getByText(strings.resultStates.UnsupportedGeography)).toBeInTheDocument();
-    expect(screen.getByText(/outside the area currently supported/)).toBeInTheDocument();
-    expect(screen.getByText(strings.actions.searchAnother)).toBeInTheDocument();
-  });
-
-  it("shows methodology entry point button", () => {
-    renderResultPanel("ModeledExposureDetected");
-    expect(screen.getByText(strings.actions.methodology)).toBeInTheDocument();
-  });
-
-  it("shows new search button", () => {
-    renderResultPanel("ModeledExposureDetected");
+    expect(screen.getByText("Amsterdam is outside Europe")).toBeInTheDocument();
+    expect(screen.getByText(/European coastlines/)).toBeInTheDocument();
     expect(screen.getByText(strings.actions.newSearch)).toBeInTheDocument();
+    expect(screen.getByText(strings.actions.reset)).toBeInTheDocument();
   });
 
-  it("renders metadata rows", () => {
+  it("shows source citation", () => {
+    renderResultPanel("ModeledExposureDetected");
+    expect(screen.getByText(strings.source)).toBeInTheDocument();
+  });
+
+  it("shows loc-sub with temporal format", () => {
+    renderResultPanel("ModeledExposureDetected");
+    // Should contain "years (year 2050)"
+    expect(screen.getByText(/years \(year 2050\)/)).toBeInTheDocument();
+  });
+
+  it("renders metadata rows for exposure result", () => {
     renderResultPanel("ModeledExposureDetected");
     expect(screen.getByText("Forecast model")).toBeInTheDocument();
-    expect(screen.getByText("Time horizon")).toBeInTheDocument();
-    expect(screen.getByText("Methodology")).toBeInTheDocument();
+    expect(screen.getByText("Timeframe")).toBeInTheDocument();
   });
 });

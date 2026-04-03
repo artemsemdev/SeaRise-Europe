@@ -12,6 +12,7 @@ const mockCandidate = {
 
 const mockLocation = {
   label: "Amsterdam, Netherlands",
+  displayContext: "North Holland, Netherlands",
   latitude: 52.3676,
   longitude: 4.9041,
 };

@@ -56,6 +56,7 @@ export default function MapSurface() {
 
       const newLocation = {
         label: `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`,
+        displayContext: "",
         latitude: e.lngLat.lat,
         longitude: e.lngLat.lng,
       };

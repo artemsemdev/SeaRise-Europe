@@ -65,13 +65,13 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
     >
       <div
         ref={panelRef}
-        className="flex w-[420px] max-w-full flex-col gap-6 overflow-y-auto p-8"
+        className="relative flex w-[420px] max-w-full flex-col gap-6 overflow-y-auto p-8"
         style={{
           background: "var(--s-low)",
           boxShadow: "0 0 40px rgba(223,227,233,.08)",
         }}
       >
-        {/* Close button */}
+        {/* Close button — positioned relative to drawer */}
         <button
           ref={closeButtonRef}
           type="button"
@@ -165,13 +165,6 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
                 ))}
               </ul>
             </div>
-
-            {/* Resolution note */}
-            {data.resolutionNote && (
-              <p className="text-[0.85rem] leading-[1.7]" style={{ color: "var(--text2)" }}>
-                {data.resolutionNote}
-              </p>
-            )}
 
             {/* Important warning */}
             <div className="flex flex-col gap-3">

@@ -56,6 +56,12 @@
   to { transform: rotate(360deg); }
 }
 
+/* Loading progress bar animation (mock 05) */
+@keyframes fill-progress {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
 html,
 body {
   height: 100%;

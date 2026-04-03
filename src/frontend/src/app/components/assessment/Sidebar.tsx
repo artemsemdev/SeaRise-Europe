@@ -41,7 +41,7 @@ export default function Sidebar({
       className="flex w-[280px] min-w-[280px] flex-col gap-6 overflow-y-auto p-6 z-10 md:flex"
       style={{ background: "var(--s-low)" }}
     >
-      {/* Location title */}
+      {/* Location title + subtitle */}
       <div>
         <div
           className="text-[0.95rem] font-bold"
@@ -49,6 +49,11 @@ export default function Sidebar({
         >
           {location.label}
         </div>
+        {location.displayContext && (
+          <div className="mt-1 text-[0.8rem]" style={{ color: "var(--text2)" }}>
+            {location.displayContext}
+          </div>
+        )}
       </div>
 
       {/* Horizon selector */}

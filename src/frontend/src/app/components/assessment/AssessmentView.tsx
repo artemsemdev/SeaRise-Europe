@@ -155,15 +155,20 @@ export default function AssessmentView({ config }: AssessmentViewProps) {
       <div className="pointer-events-none absolute inset-0 z-20">
         {/* Loading state (first assessment) */}
         {phase.phase === "assessing" && (
-          <div className="pointer-events-auto absolute left-1/2 top-6 z-30 -translate-x-1/2">
+          <div className="pointer-events-auto absolute right-[72px] top-6 z-30">
             <LoadingState variant="assessing" locationLabel={location.label} />
           </div>
         )}
 
         {/* Assessment error */}
         {phase.phase === "assessment_error" && (
-          <div className="pointer-events-auto absolute left-1/2 top-6 z-30 -translate-x-1/2">
-            <ErrorBanner variant="assessment" onRetry={handleRetry} />
+          <div className="pointer-events-auto absolute right-[72px] top-6 z-30">
+            <ErrorBanner
+              variant="assessment"
+              onRetry={handleRetry}
+              locationLabel={location.label}
+              locationContext={location.displayContext}
+            />
           </div>
         )}
 
@@ -175,7 +180,7 @@ export default function AssessmentView({ config }: AssessmentViewProps) {
             {phase.phase === "result_updating" && (
               <>
                 {/* Loading indicator overlaid */}
-                <div className="pointer-events-auto absolute left-1/2 top-6 z-30 -translate-x-1/2">
+                <div className="pointer-events-auto absolute right-[72px] top-6 z-30">
                   <LoadingState variant="assessing" locationLabel={location.label} />
                 </div>
               </>
@@ -187,7 +192,17 @@ export default function AssessmentView({ config }: AssessmentViewProps) {
                 transition: "opacity 0.2s ease",
               }}
             >
-              <ResultPanel result={result} locationLabel={location.label} />
+              <ResultPanel
+                result={result}
+                locationLabel={location.label}
+                locationContext={location.displayContext}
+                scenarios={config.scenarios}
+                horizons={config.horizons}
+                activeScenarioId={activeScenarioId}
+                activeHorizonYear={activeHorizonYear}
+                onScenarioChange={handleScenarioChange}
+                onHorizonChange={handleHorizonChange}
+              />
             </div>
           </div>
         )}
@@ -198,7 +213,11 @@ export default function AssessmentView({ config }: AssessmentViewProps) {
             aria-busy="true"
             style={{ opacity: 0.5, pointerEvents: "none", transition: "opacity 0.2s ease" }}
           >
-            <ResultPanel result={previousResult} locationLabel={location.label} />
+            <ResultPanel
+              result={previousResult}
+              locationLabel={location.label}
+              locationContext={location.displayContext}
+            />
           </div>
         )}
 
