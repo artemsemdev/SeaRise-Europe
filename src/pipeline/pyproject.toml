@@ -22,6 +22,12 @@ dev = [
     "mypy",
 ]
 
+[tool.setuptools]
+packages = ["pipeline"]
+
+[tool.setuptools.package-dir]
+pipeline = "."
+
 [tool.ruff]
 target-version = "py39"
 line-length = 100
@@ -35,6 +41,7 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+exclude = ["tests/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

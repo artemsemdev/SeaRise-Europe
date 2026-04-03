@@ -38,6 +38,9 @@ TestResults/
 .venv/
 venv/
 __pycache__/
+*.egg-info/
+dist/
+build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -70,3 +73,4 @@ tmp/
 # Claude local tooling files
 # Keep Claude machine-local state out of git by default.
 .claude/
+CLAUDE.md

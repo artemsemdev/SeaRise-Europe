@@ -14,13 +14,12 @@ from __future__ import annotations
 
 import logging
 import shutil
-import tempfile
 import urllib.request
 from pathlib import Path
 
 import rasterio
-from rasterio.merge import merge
 import xarray as xr
+from rasterio.merge import merge
 
 logger = logging.getLogger(__name__)
 

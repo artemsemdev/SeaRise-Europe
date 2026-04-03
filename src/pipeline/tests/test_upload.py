@@ -1,6 +1,5 @@
 """Tests for pipeline.upload — blob path construction logic."""
 
-from pipeline.upload import upload_cog
 
 
 def test_blob_path_convention():

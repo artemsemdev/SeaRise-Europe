@@ -97,9 +97,11 @@ try
     });
 
     // Health checks
-    builder.Services.AddHealthChecks()
-        .AddNpgSql(databaseUrl, name: "postgres")
-        .AddAzureBlobStorage(
+    var healthChecksBuilder = builder.Services.AddHealthChecks();
+    if (!string.IsNullOrEmpty(databaseUrl))
+        healthChecksBuilder.AddNpgSql(databaseUrl, name: "postgres");
+    if (!string.IsNullOrEmpty(blobConnectionString))
+        healthChecksBuilder.AddAzureBlobStorage(
             sp => new Azure.Storage.Blobs.BlobServiceClient(blobConnectionString),
             name: "blobStorage");
 

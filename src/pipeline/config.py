@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-
 # -- Geography (ADR-018) -----------------------------------------------------
 
 EUROPE_BBOX = (-30.0, 30.0, 40.0, 75.0)  # (lon_min, lat_min, lon_max, lat_max)

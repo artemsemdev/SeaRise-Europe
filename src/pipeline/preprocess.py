@@ -10,12 +10,13 @@ the DEM (same CRS, transform, and shape).
 
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import rasterio
+import xarray as xr
 from rasterio.transform import from_bounds
 from rasterio.warp import Resampling, reproject
-import xarray as xr
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ def _extract_slr_grid(
         lats = da.coords[lat_name].values
         lons = da.coords[lon_name].values
 
-        slr_array = da.values.astype(np.float32)
+        slr_array: np.ndarray[Any, np.dtype[np.float32]] = da.values.astype(np.float32)
 
     # Convert mm to metres if values look like millimetres.
     if np.nanmax(np.abs(slr_array)) > 50:

@@ -1,6 +1,5 @@
 """Tests for pipeline.config — constants and env helpers."""
 
-import os
 
 import pytest
 

@@ -13,7 +13,6 @@ import rasterio
 from rasterio.transform import from_bounds
 from shapely.geometry import box, mapping
 
-
 # A small bounding box (roughly "mini-Europe" for testing).
 TEST_BOUNDS = (4.0, 52.0, 5.0, 53.0)  # lon_min, lat_min, lon_max, lat_max
 TEST_SHAPE = (100, 100)  # height, width

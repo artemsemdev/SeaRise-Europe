@@ -10,8 +10,10 @@ COG properties (architecture doc section 8):
 """
 
 import logging
+import math
 from pathlib import Path
 
+import rasterio
 from rio_cogeo.cogeo import cog_translate, cog_validate
 from rio_cogeo.profiles import cog_profiles
 
@@ -36,12 +38,17 @@ def cogify(input_tif: Path, output_cog: Path) -> Path:
 
     config = {"GDAL_TIFF_INTERNAL_MASK": True}
 
+    with rasterio.open(input_tif) as src:
+        min_dim = min(src.width, src.height)
+    max_levels = int(math.log2(min_dim)) if min_dim > 1 else 0
+    overview_levels = min(len(COG_OVERVIEW_LEVELS), max_levels)
+
     cog_translate(
         str(input_tif),
         str(output_cog),
         profile,
         in_memory=False,
-        overview_level=COG_OVERVIEW_LEVELS,
+        overview_level=overview_levels,
         overview_resampling="nearest",
         config=config,
     )

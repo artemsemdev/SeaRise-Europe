@@ -216,8 +216,14 @@ def seed_geography_boundaries(
                     gdf = gpd.read_file(geojson_path)
                     if gdf.crs and gdf.crs.to_epsg() != 4326:
                         gdf = gdf.to_crs(epsg=4326)
-                    geom_geojson = gdf.union_all().geojson if hasattr(gdf, "union_all") else gdf.unary_union.__geo_interface__
-                    geom_json = json.dumps(geom_geojson) if isinstance(geom_geojson, dict) else geom_geojson
+                    if hasattr(gdf, "union_all"):
+                        geom_geojson = gdf.union_all().geojson
+                    else:
+                        geom_geojson = gdf.unary_union.__geo_interface__
+                    geom_json = (
+                        json.dumps(geom_geojson) if isinstance(geom_geojson, dict)
+                        else geom_geojson
+                    )
                     geom_sql = "ST_Multi(ST_GeomFromGeoJSON(%s))"
                     geom_param = (geom_json,)
                 else:

@@ -1,5 +1,7 @@
 """Tests for pipeline.register — seed data constants and layer registration logic."""
 
+import pytest
+
 from pipeline.register import (
     _GEOGRAPHY_BOUNDARIES,
     _HORIZONS,
@@ -55,6 +57,3 @@ def test_geography_boundaries_has_required_entries():
     names = [b["name"] for b in _GEOGRAPHY_BOUNDARIES]
     assert "europe" in names
     assert "coastal_analysis_zone" in names
-
-
-import pytest

@@ -16,10 +16,11 @@ from __future__ import annotations
 import logging
 import sys
 import time
-from pathlib import Path
 
 import click
 
+from .cogify import cogify
+from .compute_exposure import compute_binary_exposure
 from .config import (
     BLOB_CONTAINER,
     EUROPE_BBOX,
@@ -31,8 +32,6 @@ from .config import (
     get_postgres_connection_string,
     get_work_dir,
 )
-from .cogify import cogify
-from .compute_exposure import compute_binary_exposure
 from .download import download_copernicus_dem, download_ipcc_ar6
 from .preprocess import align_to_dem_grid
 from .register import (
@@ -56,8 +55,8 @@ def _titiler_spot_check(
 ) -> int | None:
     """Query TiTiler /point endpoint for a pixel value.  Returns None if
     TiTiler is unavailable."""
-    import urllib.request
     import json as _json
+    import urllib.request
 
     # Build the TiTiler point URL.
     # TiTiler expects the COG URL — in local dev this is the Azurite URL.
@@ -180,7 +179,7 @@ def run(
             # Step 5: Validate
             entry["step"] = "validate"
             validate_layer(cog_path, sc, yr)
-            click.echo(f"  5/7 Validate:  PASS")
+            click.echo("  5/7 Validate:  PASS")
 
             # Step 6: Upload
             entry["step"] = "upload"
@@ -226,20 +225,22 @@ def run(
     amsterdam_val = _titiler_spot_check(
         amsterdam_blob, 52.37, 4.90, tiler_url
     )
-    click.echo(
-        f"  Amsterdam (52.37, 4.90):  "
-        f"{'value=' + str(amsterdam_val) if amsterdam_val is not None else 'TiTiler unavailable (manual check needed)'}"
+    ams_msg = (
+        f"value={amsterdam_val}" if amsterdam_val is not None
+        else "TiTiler unavailable (manual check needed)"
     )
+    click.echo(f"  Amsterdam (52.37, 4.90):  {ams_msg}")
 
     # Inland location: Prague (50.08, 14.43) — expected: 0 or NoData
     inland_blob = f"layers/{methodology_version}/ssp2-45/2050.tif"
     inland_val = _titiler_spot_check(
         inland_blob, 50.08, 14.43, tiler_url
     )
-    click.echo(
-        f"  Prague (50.08, 14.43):    "
-        f"{'value=' + str(inland_val) if inland_val is not None else 'TiTiler unavailable (manual check needed)'}"
+    prg_msg = (
+        f"value={inland_val}" if inland_val is not None
+        else "TiTiler unavailable (manual check needed)"
     )
+    click.echo(f"  Prague (50.08, 14.43):    {prg_msg}")
 
     # -- Summary report ------------------------------------------------------
     elapsed = time.time() - t0
