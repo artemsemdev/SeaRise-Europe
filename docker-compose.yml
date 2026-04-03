@@ -65,7 +65,7 @@ services:
   # TiTiler (Tile Server)
   # ---------------------------------------------------------------------------
   tiler:
-    image: ghcr.io/developmentseed/titiler:0.18.8
+    image: ghcr.io/developmentseed/titiler:2.0.0
     ports:
       - "8000:8000"
     environment:

@@ -101,4 +101,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Pull TiTiler image
-        run: docker pull ghcr.io/developmentseed/titiler:0.18.8
+        run: docker pull ghcr.io/developmentseed/titiler:2.0.0
