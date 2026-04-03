@@ -5,16 +5,19 @@
 # Story:  S02-03
 # Source: docs/architecture/08-deployment-topology.md section 6
 #
-# Triggers on pull requests to master.
-# Runs: lint, type check, unit tests, Docker build for all three images.
+# Triggers on pull requests to master, pushes to master, and manual dispatch.
+# Runs: lint, type check, unit tests, Docker builds, and TiTiler pull verification.
 # No deployment steps — deployment is deferred to Epic 08.
 # =============================================================================
 
 name: CI
 
 on:
+  push:
+    branches: [master]
   pull_request:
     branches: [master]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.head_ref || github.ref_name }}
