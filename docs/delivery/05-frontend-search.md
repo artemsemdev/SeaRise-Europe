@@ -4,7 +4,7 @@
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | Epic ID        | E-05                                                                                               |
 | Phase          | 1 — MVP                                                                                            |
-| Status         | Not Started                                                                                        |
+| Status         | Done                                                                                               |
 | Effort         | ~6 days                                                                                            |
 | Dependencies   | Epic 04 (geocode + config endpoints available)                                                     |
 | Stories        | 8 (S05-01 through S05-08)                                                                          |
