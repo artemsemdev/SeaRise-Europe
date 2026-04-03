@@ -9,7 +9,7 @@ public class ScenarioRepository : IScenarioRepository
 {
     private readonly string _connectionString;
     private readonly IMemoryCache _cache;
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
 
     public ScenarioRepository(string connectionString, IMemoryCache cache)
     {

@@ -28,7 +28,7 @@ export default function SearchOverlay() {
         if (data.candidates.length === 0) setNoResults(query);
         else if (data.candidates.length === 1) {
           const c = data.candidates[0];
-          startAssessing({ label: c.label, latitude: c.latitude, longitude: c.longitude });
+          startAssessing({ label: c.label, displayContext: c.displayContext, latitude: c.latitude, longitude: c.longitude });
         } else setCandidates(data.candidates);
       },
       onError: (error) => {
@@ -37,17 +37,22 @@ export default function SearchOverlay() {
     });
   }, [phase, startGeocoding, geocodeMutation, setCandidates, setNoResults, setGeocodingError, startAssessing]);
 
-  const retryAssessment = useCallback(() => {
-    if (phase.phase !== "assessment_error") return;
-    startAssessing(phase.location);
-  }, [phase, startAssessing]);
-
   // Landing / idle: show full hero overlay
   if (phase.phase === "idle") {
     return <EmptyState />;
   }
 
-  // All other search-related phases: floating search bar at top-center + state below
+  // Assessment phases are handled by AssessmentView — don't render here
+  if (
+    phase.phase === "assessing" ||
+    phase.phase === "result" ||
+    phase.phase === "result_updating" ||
+    phase.phase === "assessment_error"
+  ) {
+    return null;
+  }
+
+  // All search-related phases: floating search bar at top-center + state below
   return (
     <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center pt-6">
       <div className="pointer-events-auto w-full max-w-[520px] px-4">
@@ -73,24 +78,6 @@ export default function SearchOverlay() {
 
         {phase.phase === "candidate_selection" && (
           <CandidateList candidates={phase.candidates} />
-        )}
-
-        {phase.phase === "assessing" && (
-          <div className="mt-4">
-            <LoadingState variant="assessing" locationLabel={phase.location.label} />
-          </div>
-        )}
-
-        {phase.phase === "assessment_error" && (
-          <div className="mt-4">
-            <ErrorBanner variant="assessment" onRetry={retryAssessment} />
-          </div>
-        )}
-
-        {(phase.phase === "result" || phase.phase === "result_updating") && (
-          <div className="mt-4 rounded-[var(--r-lg)] p-4 text-sm" style={{ background: "var(--s-low)", color: "var(--text2)" }}>
-            {phase.phase === "result" ? phase.result.resultState : "Updating..."}
-          </div>
         )}
       </div>
     </div>

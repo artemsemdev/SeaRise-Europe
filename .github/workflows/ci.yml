@@ -45,6 +45,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Content guidelines lint
+        run: npm run lint:content
+
+      - name: i18n externalization lint
+        run: npm run lint:i18n
+
       - name: Type check
         run: npm run type-check
 

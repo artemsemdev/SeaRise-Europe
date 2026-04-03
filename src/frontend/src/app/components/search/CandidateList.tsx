@@ -26,6 +26,7 @@ export default function CandidateList({ candidates }: CandidateListProps) {
     (candidate: GeocodingCandidate) => {
       const location = {
         label: candidate.label,
+        displayContext: candidate.displayContext,
         latitude: candidate.latitude,
         longitude: candidate.longitude,
       };

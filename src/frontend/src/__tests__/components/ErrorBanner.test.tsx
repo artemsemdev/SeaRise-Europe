@@ -32,8 +32,12 @@ describe("ErrorBanner", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it("has a Clear button that resets state", () => {
-    render(<ErrorBanner variant="geocoding" onRetry={() => {}} />);
-    expect(screen.getByText("Clear")).toBeInTheDocument();
+  it("renders assessment error with location header and New search button", () => {
+    render(
+      <ErrorBanner variant="assessment" onRetry={() => {}} locationLabel="Bordeaux, France" locationContext="Atlantic coast" />
+    );
+    expect(screen.getByText("Bordeaux, France")).toBeInTheDocument();
+    expect(screen.getByText("Atlantic coast")).toBeInTheDocument();
+    expect(screen.getByText(strings.actions.newSearch)).toBeInTheDocument();
   });
 });

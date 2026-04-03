@@ -36,7 +36,7 @@ export default function SearchBar() {
             setNoResults(trimmed);
           } else if (candidates.length === 1) {
             const c = candidates[0];
-            const location = { label: c.label, latitude: c.latitude, longitude: c.longitude };
+            const location = { label: c.label, displayContext: c.displayContext, latitude: c.latitude, longitude: c.longitude };
             setSelectedLocation(location);
             startAssessing(location);
           } else {
