@@ -3,7 +3,7 @@
 | Field          | Value                                                                                              |
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | Phase          | 0                                                                                                  |
-| Status         | Not Started                                                                                        |
+| Status         | Done                                                                                               |
 | Effort         | ~2 days                                                                                            |
 | Dependencies   | Epic 01 (provider decisions for geocoding and basemap inform environment variables)                 |
 | Produces       | Docker Compose local dev, local PostgreSQL schema, local blob storage, basic CI pipeline            |

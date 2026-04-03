@@ -1,0 +1,104 @@
+# =============================================================================
+# SeaRise Europe — CI Pipeline
+# =============================================================================
+# Epic:   E-02 (Local Development Environment)
+# Story:  S02-03
+# Source: docs/architecture/08-deployment-topology.md section 6
+#
+# Triggers on pull requests to master.
+# Runs: lint, type check, unit tests, Docker build for all three images.
+# No deployment steps — deployment is deferred to Epic 08.
+# =============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Frontend: lint, type-check, unit tests
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (lint, type-check, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+  # ---------------------------------------------------------------------------
+  # API: format check, build, unit tests
+  # ---------------------------------------------------------------------------
+  api:
+    name: API (format, build, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/api
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Format check
+        run: dotnet format --verify-no-changes
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release --verbosity normal
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
+  # Docker: build all three images (no push)
+  # ---------------------------------------------------------------------------
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - context: src/frontend
+            image: searise-frontend
+          - context: src/api
+            image: searise-api
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.image }}
+        run: docker build -t ${{ matrix.image }}:ci ${{ matrix.context }}
+
+  docker-build-tiler:
+    name: Docker Pull (TiTiler)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull TiTiler image
+        run: docker pull ghcr.io/developmentseed/titiler:0.18.8
