@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 7 complete)  
+**Last updated:** 2026-04-03 (Wave 7 complete, S08-06 security hardening partially implemented)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -70,7 +70,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | S08-03 | Upload COGs and Migrate Data to Azure | Production-like data and storage handoff |
 | S08-04 | Complete Backend Test Suite | Backend verification in CI and staging context |
 | S08-05 | Complete Frontend Test Suite | Frontend verification in CI and staging context |
-| S08-06 | Security Hardening | Headers, rate limits, secret handling, scan fixes |
+| S08-06 | Security Hardening | Headers, rate limits, secret handling, scan fixes — **partially done** (rate limiting, security headers, CSP, request size limit implemented; HTTPS, Key Vault, HSTS pending Azure) |
 | S08-07 | Log Audit and Privacy Verification | Logging review and privacy-safe telemetry |
 | S08-08 | E2E Test Suite and Demo Script Validation | Full demo path on local and staging |
 | S08-09 | NFR Verification | Performance, reliability, and operational checks |
@@ -80,6 +80,18 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Recently Completed
+
+### Security Hardening (S08-06 partial) — pre-deployment controls · 2026-04-03
+
+| Control | What was delivered |
+|---------|-------------------|
+| Rate limiting | ASP.NET Core `AddRateLimiter`: global 60/min per IP, `/v1/geocode` 20/min, `/v1/assess` 10/min; HTTP 429 on exceeded limits |
+| Security headers (API) | Middleware: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` |
+| Security headers (Frontend) | `next.config.js` `headers()`: same headers + `Content-Security-Policy` (script/style/img/connect/worker directives) |
+| Request size limit | Kestrel `MaxRequestBodySize = 1024` (1 KB) |
+| Architecture docs | `07-security-architecture.md` sections 3.5, 4.5, 4.6, and checklist updated |
+
+**Remaining for S08-06 (requires Azure):** CORS staging verification, HTTPS enforcement, Key Vault `secretref`, HSTS header, TiTiler CORS.
 
 ### Transparency, Accessibility, and Content Compliance — 7 stories · Wave 7 · DONE 2026-04-03
 

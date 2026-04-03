@@ -109,12 +109,19 @@ The basemap provider key is the only credential that must be accessible from the
 - Container Apps environment variable update triggers rolling restart
 - No in-process key caching beyond the process lifetime
 
-### 3.5 Rate Limiting (MVP Scope)
+### 3.5 Rate Limiting
 
-The product is a portfolio demo expected to serve low traffic. For MVP:
-- **Accepted risk:** No rate limiting on `/v1/geocode` or `/v1/assess` at launch
-- **Mitigation available:** Azure Container Apps supports built-in ingress rules; Dapr sidecar or APIM can add rate limiting without code changes
-- **Cost protection:** Geocoding provider API key has a monthly quota; provider-level abuse will hit quota limit before significant billing occurs
+ASP.NET Core built-in rate limiter (`System.Threading.RateLimiting`) is configured in `Program.cs`:
+
+| Scope | Limit | Window | Purpose |
+|-------|------:|--------|---------|
+| Global (per IP) | 60 | 1 min | General abuse prevention |
+| `POST /v1/geocode` | 20 | 1 min | Protect Azure Maps API quota |
+| `POST /v1/assess` | 10 | 1 min | Protect TiTiler + PostGIS from expensive queries |
+
+- Exceeded limits return HTTP 429 (Too Many Requests)
+- Request body size limit: 1 KB (Kestrel `MaxRequestBodySize`)
+- **Additional layer (Azure):** Container Apps ingress rules can add infrastructure-level rate limiting if needed
 
 ---
 
@@ -173,22 +180,35 @@ Neither call involves user-controlled URL construction.
 
 ### 4.5 Content Security Policy
 
-**Proposed CSP headers for the frontend** (Next.js middleware or hosting configuration):
+CSP headers are configured in `next.config.js` via the `headers()` function:
 
 ```
 Content-Security-Policy:
   default-src 'self';
-  script-src 'self' 'unsafe-eval';     ← MapLibre WebGL requires unsafe-eval
-  style-src 'self' 'unsafe-inline';    ← MapLibre inlines styles
-  img-src 'self' data: blob: https:;   ← tiles from external tile provider
-  connect-src 'self'
-    https://api.searise-europe.example.com
-    https://tiler.searise-europe.example.com
-    https://<basemap-provider>.example.com;
-  worker-src blob:;                    ← MapLibre web workers
+  script-src 'self' 'unsafe-eval' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' blob: data: https://*.atlas.microsoft.com;
+  connect-src 'self' https://*.atlas.microsoft.com;
+  worker-src 'self' blob:;
+  child-src 'self' blob:;
+  font-src 'self';
 ```
 
-**Note:** `unsafe-eval` is required by MapLibre GL JS (WebGL shader compilation). This is an accepted limitation of the mapping library.
+**Notes:**
+- `unsafe-eval` is required by MapLibre GL JS (WebGL shader compilation). This is an accepted limitation of the mapping library.
+- `unsafe-inline` for scripts is required by Next.js inline script injection. This is an accepted framework limitation.
+- `*.atlas.microsoft.com` covers Azure Maps basemap tiles and search API.
+
+### 4.6 HTTP Security Headers
+
+Both the API (`Program.cs` middleware) and frontend (`next.config.js`) set the following headers on all responses:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-Content-Type-Options` | `nosniff` | Prevent MIME sniffing |
+| `X-Frame-Options` | `DENY` | Prevent clickjacking |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limit referrer leakage |
+| `Permissions-Policy` | `geolocation=(), camera=(), microphone=()` | Disable unnecessary browser APIs |
 
 ---
 
@@ -296,7 +316,10 @@ For MVP, single TiTiler instance with public ingress is accepted. Internal traff
 - [ ] Azure Maps basemap subscription key CORS origin-restricted (ADR-020)
 - [ ] Raw query string absent from all log statements (code review + log audit)
 - [ ] Precise coordinates absent from all log statements
-- [ ] CSP headers configured for frontend
+- [x] CSP headers configured for frontend (`next.config.js`)
+- [x] HTTP security headers configured for API and frontend (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy)
+- [x] Rate limiting configured: global 60/min per IP, geocode 20/min, assess 10/min
+- [x] Request body size limited to 1 KB (Kestrel)
 - [ ] `npm audit` and `dotnet list package --vulnerable` passing in CI
 - [ ] TiTiler CORS configured to frontend domain only (`TITILER_API_CORS_ORIGINS`)
 - [ ] PostgreSQL connection uses `sslmode=require`

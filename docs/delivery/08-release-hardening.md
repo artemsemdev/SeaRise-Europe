@@ -480,15 +480,25 @@ The security architecture defines specific controls — CORS, CSP, rate limiting
 
 1. CORS: API returns `Access-Control-Allow-Origin` matching only the frontend domain; cross-origin requests from other origins are rejected.
 2. CORS: TiTiler returns correct CORS headers.
-3. CSP: Frontend responses include `Content-Security-Policy` header with `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' blob: data: {tiler-domain}`.
-4. Rate limiting: `/geocode` returns 429 after 60 requests within 1 minute from the same IP.
-5. Rate limiting: `/assess` returns 429 after 120 requests within 1 minute from the same IP.
+3. ~~CSP: Frontend responses include `Content-Security-Policy` header.~~ **DONE** — configured in `next.config.js` via `headers()`.
+4. ~~Rate limiting: `/geocode` returns 429 after exceeding limit from the same IP.~~ **DONE** — 20 req/min per IP (stricter than original 60 to protect Azure Maps quota).
+5. ~~Rate limiting: `/assess` returns 429 after exceeding limit from the same IP.~~ **DONE** — 10 req/min per IP (stricter than original 120 to protect TiTiler + PostGIS).
 6. Input validation: requests exceeding 200 chars return 400 with structured error response.
 7. Input validation: requests with out-of-bounds coordinates return 400.
 8. SSRF: geocoding client rejects response URLs not on the provider allowlist.
 9. Key Vault: all secrets are referenced via `secretref`; zero secrets found in source code or Docker images.
 10. HTTPS: all public endpoints respond over HTTPS; HTTP requests are redirected or refused.
 11. Security checklist from `docs/architecture/07-security-architecture.md` section 8 is complete with all items passing.
+
+**Pre-deployment progress (implemented before Azure provisioning):**
+- [x] Rate limiting: global 60/min per IP, `/v1/geocode` 20/min, `/v1/assess` 10/min (ASP.NET Core `AddRateLimiter`)
+- [x] Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` on both API and frontend
+- [x] CSP headers on frontend via `next.config.js`
+- [x] Request body size limit: 1 KB (Kestrel `MaxRequestBodySize`)
+- [ ] CORS verification against staging (requires S08-02)
+- [ ] HTTPS enforcement (requires Azure deployment)
+- [ ] Key Vault verification (requires S08-01)
+- [ ] HSTS header (add after Azure deployment, not locally)
 
 **Definition of Done**
 

@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using FluentValidation;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using SeaRise.Api.Dtos;
 using SeaRise.Api.Validators;
@@ -113,12 +115,60 @@ try
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
     });
 
+    // Rate limiting
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = 429;
+
+        // Global: 60 requests per minute per IP
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 60,
+                    Window = TimeSpan.FromMinutes(1)
+                }));
+
+        // Stricter limit for POST /v1/assess (expensive: TiTiler + PostGIS)
+        options.AddFixedWindowLimiter("assess", opt =>
+        {
+            opt.PermitLimit = 10;
+            opt.Window = TimeSpan.FromMinutes(1);
+        });
+
+        // Stricter limit for POST /v1/geocode (external API call to Azure Maps)
+        options.AddFixedWindowLimiter("geocode", opt =>
+        {
+            opt.PermitLimit = 20;
+            opt.Window = TimeSpan.FromMinutes(1);
+        });
+    });
+
+    // Request size limit (POST bodies are small JSON ~100-200 bytes)
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 1024; // 1 KB
+    });
+
     var app = builder.Build();
 
     // ---------------------------------------------------------------------------
     // Middleware
     // ---------------------------------------------------------------------------
     app.UseCors("frontend");
+
+    // Security headers
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["X-Frame-Options"] = "DENY";
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        context.Response.Headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
+        await next();
+    });
+
+    app.UseRateLimiter();
 
     // Correlation ID middleware (must run before Serilog request logging
     // so that requestId is included in the structured log properties)
@@ -186,7 +236,7 @@ try
                 new ErrorResponse(requestId, new ErrorDetail("GEOCODING_PROVIDER_ERROR", ex.Message)),
                 statusCode: 500);
         }
-    });
+    }).RequireRateLimiting("geocode");
 
     // POST /v1/assess
     app.MapPost("/v1/assess", async (
@@ -258,7 +308,7 @@ try
                 new ErrorResponse(requestId, new ErrorDetail("INTERNAL_ERROR", "An unexpected error occurred.")),
                 statusCode: 500);
         }
-    });
+    }).RequireRateLimiting("assess");
 
     // GET /v1/config/scenarios
     app.MapGet("/v1/config/scenarios", async (
@@ -272,6 +322,8 @@ try
 
         var defaultScenario = scenarios.FirstOrDefault(s => s.IsDefault);
         var defaultHorizon = horizons.FirstOrDefault(h => h.IsDefault);
+
+        httpContext.Response.Headers["Cache-Control"] = "public, max-age=3600";
 
         return Results.Ok(new ConfigScenariosResponse(
             RequestId: requestId,
@@ -303,6 +355,8 @@ try
         {
             limitations.Add(methodology.Limitations);
         }
+
+        httpContext.Response.Headers["Cache-Control"] = "public, max-age=3600";
 
         return Results.Ok(new ConfigMethodologyResponse(
             RequestId: requestId,
