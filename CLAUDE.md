@@ -134,8 +134,8 @@ Progress is tracked in `docs/delivery/ROADMAP.md`. Epics are sequential — each
 |------|------|--------|
 | 1 | Decision Closure | Done |
 | 2 | Local Dev Environment | Done |
-| 3 | Geospatial Pipeline | Ready |
-| 4 | Backend API Core | Planned |
+| 3 | Geospatial Pipeline | Done |
+| 4 | Backend API Core | Done |
 | 5 | Frontend Search | Planned |
 | 6 | Assessment UX | Planned |
 | 7 | Transparency & A11y | Planned |

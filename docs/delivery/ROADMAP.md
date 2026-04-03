@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 3 complete)  
+**Last updated:** 2026-04-03 (Wave 4 complete)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -9,22 +9,22 @@
 ## Progress Snapshot
 
 ```text
-  ██████░░░░░░░░░░░░░░  31% COMPLETE  ·  18 of 58 stories delivered
+  █████████░░░░░░░░░░░  43% COMPLETE  ·  25 of 58 stories delivered
 ```
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **18** / 58 |
-| Epics completed | **3** / 8 |
-| Waves fully completed | **3** / 8 |
-| Current wave | Wave 4 — Backend API Core (0 / 7) PLANNED |
-| Unit tests passing | N/A — stub services only |
-| Next up | `S04-01` Initialize ASP.NET Core Minimal API Project |
+| Stories completed | **25** / 58 |
+| Epics completed | **4** / 8 |
+| Waves fully completed | **4** / 8 |
+| Current wave | Wave 5 — Frontend Search (0 / 8) PLANNED |
+| Unit tests passing | 27 unit + 12 integration (39 total) |
+| Next up | `S05-01` Initialize Next.js Project and App Shell |
 
 ```mermaid
 pie title Story Completion
-    "Completed (18)" : 18
-    "Remaining (40)" : 40
+    "Completed (25)" : 25
+    "Remaining (33)" : 33
 ```
 
 ---
@@ -35,7 +35,7 @@ pie title Story Completion
 Wave 1 · Decision Closure      ████████████████████  7/7   100%  DONE
 Wave 2 · Local Dev Environment ████████████████████  3/3   100%  DONE
 Wave 3 · Geospatial Pipeline   ████████████████████  8/8   100%  DONE
-Wave 4 · Backend API Core      ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
+Wave 4 · Backend API Core      ████████████████████  7/7   100%  DONE
 Wave 5 · Frontend Search       ░░░░░░░░░░░░░░░░░░░░  0/8     0%  PLANNED
 Wave 6 · Assessment UX         ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
 Wave 7 · Transparency & A11y   ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
@@ -51,7 +51,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | 1 | Decision Closure and Delivery Baseline | 7 / 7 (100%) | **Done** |
 | 2 | Local Development Environment | 3 / 3 (100%) | **Done** |
 | 3 | Geospatial Data Pipeline | 8 / 8 (100%) | **Done** |
-| 4 | Backend API Core | 0 / 7 (0%) | Planned |
+| 4 | Backend API Core | 7 / 7 (100%) | **Done** |
 | 5 | Frontend Shell and Search Flow | 0 / 8 (0%) | Planned |
 | 6 | Scenario Controls and Assessment UX | 0 / 7 (0%) | Planned |
 | 7 | Transparency, Accessibility, and Content Compliance | 0 / 7 (0%) | Planned |
@@ -60,18 +60,6 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Remaining Work
-
-### Backend API Core — 7 stories · Wave 4
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S04-01 | Initialize ASP.NET Core Minimal API Project | Service skeleton, configuration, startup baseline |
-| S04-02 | Implement Domain Layer | Core models, result states, domain rules |
-| S04-03 | Implement Infrastructure Adapters | Postgres, TiTiler, geocoder, provider integrations |
-| S04-04 | Implement Assessment Service | Assessment orchestration and business logic |
-| S04-05 | Implement API Endpoints and Validation | Geocode, config, assess endpoints and input validation |
-| S04-06 | Implement Structured Logging and Correlation ID Middleware | JSON logging, request correlation, audit-safe output |
-| S04-07 | Backend Unit and Integration Tests | xUnit, Testcontainers, API integration coverage |
 
 ### Frontend Search — 8 stories · Wave 5
 
@@ -130,6 +118,18 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 
 ## Recently Completed
 
+### Backend API Core — 7 stories · Wave 4 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S04-01 | Initialize ASP.NET Core Minimal API Project | Multi-project solution with 4-layer architecture (Domain, Application, Infrastructure, Api), NuGet packages, Dockerfile |
+| S04-02 | Implement Domain Layer | `ResultStateDeterminator`, `ResultState`, `GeographyClassification`, `AssessmentQuery`, `AssessmentResult`, `GeocodingCandidate`, `ExposureLayer`, 6 domain interfaces |
+| S04-03 | Implement Infrastructure Adapters | `PostGisGeographyRepository`, `LayerRepository`, `ScenarioRepository`, `MethodologyRepository`, `NominatimGeocodingClient`, `TiTilerExposureEvaluator` |
+| S04-04 | Implement Assessment Service | `AssessmentService` with parallel geography checks, short-circuit logic, full pipeline orchestration |
+| S04-05 | Implement API Endpoints and Validation | 5 endpoints (`POST /v1/geocode`, `POST /v1/assess`, `GET /v1/config/scenarios`, `GET /v1/config/methodology`, `GET /health`), FluentValidation, CORS, error envelope |
+| S04-06 | Implement Structured Logging and Correlation ID Middleware | Serilog structured JSON logging, correlation ID middleware, privacy-safe log events |
+| S04-07 | Backend Unit and Integration Tests | 27 unit tests (ResultStateDeterminator 100% branch coverage, validators, AssessmentService), 12 integration tests (Testcontainers PostgreSQL+PostGIS) |
+
 ### Geospatial Pipeline — 8 stories · Wave 3 · DONE 2026-04-03
 
 | ID | Story | What was delivered |
@@ -181,7 +181,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | v0.2 | Decision Closure — OQ-02 through OQ-07 approved and recorded (ADR-015 through ADR-020) | **Done** |
 | v0.3 | Local Foundation — Docker Compose, schema, and CI operational | **Done** |
 | v0.4 | Data Pipeline — validated COG generation and seeded metadata | **Done** |
-| v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | Planned |
+| v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | **Done** |
 | v0.6 | Frontend MVP — search flow and assessment UX working locally | Planned |
 | v0.7 | Transparency & A11y — methodology, copy, responsive behavior, and accessibility verified | Planned |
 | v1.0 | Cloud Release — Azure staging, hardening, NFR checks, and release readiness complete | Planned |
@@ -197,10 +197,10 @@ flowchart LR
         W1[S01-01..07 Decision Closure]
         W2[S02-01..03 Local Dev]
         W3[S03-01..08 Pipeline]
+        W4[S04-01..07 Backend API]
     end
 
     subgraph Planned
-        W4[S04-01..07 Backend API]
         W5[S05-01..08 Frontend Search]
         W6[S06-01..07 Assessment UX]
         W7[S07-01..07 Transparency and A11y]
@@ -212,8 +212,8 @@ flowchart LR
     classDef done fill:#d9f99d,stroke:#3f6212,color:#111827;
     classDef later fill:#e5e7eb,stroke:#6b7280,color:#111827;
 
-    class B,W1,W2,W3 done;
-    class W4,W5,W6,W7,W8 later;
+    class B,W1,W2,W3,W4 done;
+    class W5,W6,W7,W8 later;
 ```
 
 ---
