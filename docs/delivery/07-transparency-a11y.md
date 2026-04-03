@@ -4,7 +4,7 @@
 | ---------------- | ------------------------------------------------------------------------------------ |
 | Epic ID          | E-07                                                                                 |
 | Phase            | 1                                                                                    |
-| Status           | Not Started                                                                          |
+| Status           | Done                                                                                 |
 | Effort           | ~5 days                                                                              |
 | Dependencies     | Epic 06 (result panel, all 5 states, controls exist)                                 |
 | Stories          | 7 (S07-01 through S07-07)                                                            |

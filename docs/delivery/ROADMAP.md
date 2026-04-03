@@ -1,7 +1,7 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 5 complete)  
+**Last updated:** 2026-04-03 (Wave 7 complete)  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
@@ -9,22 +9,22 @@
 ## Progress Snapshot
 
 ```text
-  ███████████████░░░░░  57% COMPLETE  ·  33 of 58 stories delivered
+  ██████████████████░░  81% COMPLETE  ·  47 of 58 stories delivered
 ```
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **33** / 58 |
-| Epics completed | **5** / 8 |
-| Waves fully completed | **5** / 8 |
-| Current wave | Wave 6 — Assessment UX (0 / 7) PLANNED |
-| Unit tests passing | 27 unit + 12 integration + 52 frontend (91 total) |
-| Next up | `S06-01` Implement ScenarioControl and HorizonControl |
+| Stories completed | **47** / 58 |
+| Epics completed | **7** / 8 |
+| Waves fully completed | **7** / 8 |
+| Current wave | Wave 8 — Azure Release (0 / 11) PLANNED |
+| Unit tests passing | 27 unit + 12 integration + 66 frontend (105 total) |
+| Next up | `S08-01` Provision Azure Resources and Key Vault |
 
 ```mermaid
 pie title Story Completion
-    "Completed (33)" : 33
-    "Remaining (25)" : 25
+    "Completed (47)" : 47
+    "Remaining (11)" : 11
 ```
 
 ---
@@ -37,8 +37,8 @@ Wave 2 · Local Dev Environment ████████████████
 Wave 3 · Geospatial Pipeline   ████████████████████  8/8   100%  DONE
 Wave 4 · Backend API Core      ████████████████████  7/7   100%  DONE
 Wave 5 · Frontend Search       ████████████████████  8/8   100%  DONE
-Wave 6 · Assessment UX         ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
-Wave 7 · Transparency & A11y   ░░░░░░░░░░░░░░░░░░░░  0/7     0%  PLANNED
+Wave 6 · Assessment UX         ████████████████████  7/7   100%  DONE
+Wave 7 · Transparency & A11y   ████████████████████  7/7   100%  DONE
 Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░░░░░  0/11    0%  PLANNED
 ```
 
@@ -53,37 +53,13 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | 3 | Geospatial Data Pipeline | 8 / 8 (100%) | **Done** |
 | 4 | Backend API Core | 7 / 7 (100%) | **Done** |
 | 5 | Frontend Shell and Search Flow | 8 / 8 (100%) | **Done** |
-| 6 | Scenario Controls and Assessment UX | 0 / 7 (0%) | Planned |
-| 7 | Transparency, Accessibility, and Content Compliance | 0 / 7 (0%) | Planned |
+| 6 | Scenario Controls and Assessment UX | 7 / 7 (100%) | **Done** |
+| 7 | Transparency, Accessibility, and Content Compliance | 7 / 7 (100%) | **Done** |
 | 8 | Azure Deployment, Release Hardening, and Go-Live | 0 / 11 (0%) | Planned |
 
 ---
 
 ## Remaining Work
-
-### Assessment UX — 7 stories · Wave 6
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S06-01 | Implement ScenarioControl and HorizonControl | Scenario and horizon selectors |
-| S06-02 | Implement Assessment API Integration | Assessment request flow and state updates |
-| S06-03 | Implement ResultPanel with All 5 Result States | Exposure, no exposure, unavailable, inland, unsupported |
-| S06-04 | Implement ExposureLayer and Legend | Raster overlay, legend, visual result context |
-| S06-05 | Implement Loading, Error, and Result-Updating States | Assessment feedback and retry behavior |
-| S06-06 | Implement URL State Synchronization | Shareable state in query params |
-| S06-07 | Assessment Flow Component Integration Tests | End-to-end frontend assessment coverage |
-
-### Transparency & A11y — 7 stories · Wave 7
-
-| ID | Story | Scope |
-|----|-------|-------|
-| S07-01 | Implement MethodologyPanel | Methodology drawer, model cards, limitation copy |
-| S07-02 | Content Copy Audit and CONTENT_GUIDELINES Compliance | Simplified, policy-aligned product copy |
-| S07-03 | Complete i18n Externalization | Remove hardcoded strings and complete locale setup |
-| S07-04 | Keyboard Navigation and Focus Management | Full keyboard path and focus handling |
-| S07-05 | ARIA Attributes and Screen Reader Support | Semantic roles, labels, live regions |
-| S07-06 | Responsive Layout Validation | Breakpoint fidelity across key screens |
-| S07-07 | Accessibility Audit | Axe, manual keyboard, screen reader, contrast checks |
 
 ### Azure Release — 11 stories · Wave 8
 
@@ -104,6 +80,30 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 ---
 
 ## Recently Completed
+
+### Transparency, Accessibility, and Content Compliance — 7 stories · Wave 7 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S07-01 | Implement MethodologyPanel | Dynamic-import drawer with focus trap, API-driven content (models, limitations, sources), `role="dialog"` + `aria-modal="true"`, focus return on close |
+| S07-02 | Content Copy Audit and CONTENT_GUIDELINES Compliance | Prohibited-language scanner (`scripts/lint-prohibited-language.ts`), CI gate, all strings verified against CG-3 through CG-9, content audit log committed |
+| S07-03 | Complete i18n Externalization | i18n lint script (`scripts/lint-i18n-externalization.ts`), all user-facing strings verified in `en.ts`, ARIA labels and accessibility text externalized |
+| S07-04 | Keyboard Navigation and Focus Management | Full Tab order (SearchBar → CandidateList → ScenarioControl → HorizonControl → MethodologyEntryPoint → ResetButton), arrow key navigation in radiogroups + listbox, skip-to-content link |
+| S07-05 | ARIA Attributes and Screen Reader Support | `role="search"`, `role="listbox"`/`role="option"`, `role="radiogroup"`/`role="radio"` with `aria-checked`, `aria-live="polite"` on result region, `aria-busy="true"` during loading, `role="alert"` on errors, dynamic `aria-label` on map |
+| S07-06 | Responsive Layout Validation | Desktop (1024px+) split-pane, tablet (768-1023px) collapsible bottom panel, mobile (<768px) bottom sheet, responsive CSS via TailwindCSS prefixes, 44x44px touch targets verified |
+| S07-07 | Accessibility Audit | axe-core scan across all 11 UI states (0 critical/serious), keyboard walkthrough (16 steps verified), ARIA verification table, color contrast verification (all pass AA), non-color-dependent communication verified, audit report committed |
+
+### Scenario Controls and Assessment UX — 7 stories · Wave 6 · DONE 2026-04-03
+
+| ID | Story | What was delivered |
+|----|-------|-------------------|
+| S06-01 | Implement ScenarioControl and HorizonControl | ScenarioControl (`role="radiogroup"`, arrow key navigation, config-driven), HorizonControl (timeline selector with gradient fill, 5 stops, relative/absolute labels, `aria-checked`) |
+| S06-02 | Implement Assessment API Integration | TanStack Query hook (`useAssessment`) wrapping `POST /v1/assess`, cache key `['assess', lat, lng, scenarioId, horizonYear]`, `staleTime: 60_000`, AbortSignal support, appPhase transitions (assessing → result, assessing → assessment_error, result → result_updating → result) |
+| S06-03 | Implement ResultPanel with All 5 Result States | ResultPanel with badge, headline, summary, metadata rows, disclaimer for ModeledExposureDetected/NoModeledExposureDetected/DataUnavailable; center card layout for OutOfScope/UnsupportedGeography; MethodologyEntryPoint button; ResetButton clearing all state |
+| S06-04 | Implement ExposureLayer and Legend | MapLibre raster tile layer from `layerTileUrlTemplate` (opacity 0.7, visible only for ModeledExposureDetected), Legend component reading `legendSpec.colorStops` with text labels, warn-color marker for exposure results |
+| S06-05 | Implement Loading, Error, and Result-Updating States | `result_updating`: previous result visible at 50% opacity with loading indicator; `assessment_error`: ErrorBanner with retry; `assessing`: LoadingState with location label; `aria-busy="true"` during loading phases; map remains interactive |
+| S06-06 | Implement URL State Synchronization | URL params (`lat`, `lng`, `scenario`, `horizon`, `zoom`), `useUrlStateReader` for initialization, `useUrlStateWriter` with debounced `router.replace`, app initializes from valid URL params on load, no raw address text in URL |
+| S06-07 | Assessment Flow Component Integration Tests | RTL tests for ScenarioControl (5 tests), HorizonControl (5 tests), ResultPanel (8 tests covering all 5 result states), Legend (4 tests); prohibited-language scanner integrated into CI |
 
 ### Frontend Shell and Search Flow — 8 stories · Wave 5 · DONE 2026-04-03
 
@@ -204,8 +204,8 @@ A post-Wave-5 audit of Epics 02–04 identified gaps between the architecture sp
 | v0.3 | Local Foundation — Docker Compose, schema, and CI operational | **Done** |
 | v0.4 | Data Pipeline — validated COG generation and seeded metadata | **Done** |
 | v0.5 | Backend Core — local API returns valid config, geocode, and assessment responses | **Done** |
-| v0.6 | Frontend MVP — search flow and assessment UX working locally | In Progress |
-| v0.7 | Transparency & A11y — methodology, copy, responsive behavior, and accessibility verified | Planned |
+| v0.6 | Frontend MVP — search flow and assessment UX working locally | **Done** |
+| v0.7 | Transparency & A11y — methodology, copy, responsive behavior, and accessibility verified | **Done** |
 | v1.0 | Cloud Release — Azure staging, hardening, NFR checks, and release readiness complete | Planned |
 
 ---
@@ -221,11 +221,11 @@ flowchart LR
         W3[S03-01..08 Pipeline]
         W4[S04-01..07 Backend API]
         W5[S05-01..08 Frontend Search]
+        W6[S06-01..07 Assessment UX]
+        W7[S07-01..07 Transparency and A11y]
     end
 
     subgraph Planned
-        W6[S06-01..07 Assessment UX]
-        W7[S07-01..07 Transparency and A11y]
         W8[S08-01..11 Azure Release]
     end
 
@@ -234,8 +234,8 @@ flowchart LR
     classDef done fill:#d9f99d,stroke:#3f6212,color:#111827;
     classDef later fill:#e5e7eb,stroke:#6b7280,color:#111827;
 
-    class B,W1,W2,W3,W4,W5 done;
-    class W6,W7,W8 later;
+    class B,W1,W2,W3,W4,W5,W6,W7 done;
+    class W8 later;
 ```
 
 ---

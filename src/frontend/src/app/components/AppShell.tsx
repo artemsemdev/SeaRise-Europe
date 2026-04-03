@@ -1,11 +1,16 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import Providers from "./Providers";
 import SearchOverlay from "./search/SearchOverlay";
 import { useScenarioConfig } from "@/lib/api/config";
-import { useAppPhase } from "@/lib/store/appStore";
+import { useAppStore, useAppPhase } from "@/lib/store/appStore";
+import { useMapStore } from "@/lib/store/mapStore";
+import { useUiStore } from "@/lib/store/uiStore";
+import { useUrlStateReader } from "@/lib/hooks/useUrlState";
+import AssessmentView from "./assessment/AssessmentView";
+import { strings } from "@/lib/i18n/en";
 
 const MapSurface = dynamic(() => import("./map/MapSurface"), {
   ssr: false,
@@ -14,6 +19,10 @@ const MapSurface = dynamic(() => import("./map/MapSurface"), {
       <div className="h-8 w-8 animate-pulse rounded-full" style={{ background: "var(--s-high)" }} />
     </div>
   ),
+});
+
+const MethodologyPanel = dynamic(() => import("./assessment/MethodologyPanel"), {
+  ssr: false,
 });
 
 function Topbar() {
@@ -82,20 +91,73 @@ function Footer() {
 }
 
 function AppContent() {
-  useScenarioConfig();
+  const { data: config } = useScenarioConfig();
+  const phase = useAppPhase();
+  const isMethodologyPanelOpen = useUiStore((s) => s.isMethodologyPanelOpen);
+  const closeMethodologyPanel = useUiStore((s) => s.closeMethodologyPanel);
+  const startAssessing = useAppStore((s) => s.startAssessing);
+  const setAssessmentParams = useAppStore((s) => s.setAssessmentParams);
+  const setSelectedLocation = useMapStore((s) => s.setSelectedLocation);
+  const urlState = useUrlStateReader(config);
+  const initializedFromUrl = useRef(false);
+
+  // Initialize from URL params on first load
+  useEffect(() => {
+    if (!config || !urlState || initializedFromUrl.current) return;
+    if (phase.phase !== "idle") return;
+
+    initializedFromUrl.current = true;
+
+    const location = {
+      label: `${urlState.lat.toFixed(4)}, ${urlState.lng.toFixed(4)}`,
+      latitude: urlState.lat,
+      longitude: urlState.lng,
+    };
+
+    setSelectedLocation(location);
+    setAssessmentParams({
+      scenarioId: urlState.scenario,
+      horizonYear: urlState.horizon,
+    });
+    startAssessing(location);
+  }, [config, urlState, phase.phase, startAssessing, setAssessmentParams, setSelectedLocation]);
+
+  const isAssessmentPhase =
+    phase.phase === "assessing" ||
+    phase.phase === "result" ||
+    phase.phase === "result_updating" ||
+    phase.phase === "assessment_error";
 
   return (
     <div className="flex h-full flex-col" style={{ minHeight: "100vh" }}>
+      {/* Skip to content */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[300] focus:rounded-[var(--r-md)] focus:px-4 focus:py-2"
+        style={{ background: "var(--primary)", color: "var(--surface)" }}
+      >
+        {strings.accessibility.skipToContent}
+      </a>
       <Topbar />
-      <div className="relative flex flex-1 overflow-hidden">
-        {/* Full-screen map */}
+      <div id="main-content" className="relative flex flex-1 overflow-hidden">
+        {/* Sidebar for assessment phases */}
+        {isAssessmentPhase && config && (
+          <AssessmentView config={config} />
+        )}
+
+        {/* Map area */}
         <div className="relative flex-1" style={{ background: "var(--surface)" }}>
           <MapSurface />
-          {/* All search UI floats on top of the map */}
-          <SearchOverlay />
+          {/* Search overlay is only shown for non-assessment phases */}
+          {!isAssessmentPhase && <SearchOverlay />}
         </div>
       </div>
       <Footer />
+
+      {/* Methodology panel overlay */}
+      {isMethodologyPanelOpen && (
+        <MethodologyPanel onClose={closeMethodologyPanel} />
+      )}
     </div>
   );
 }
@@ -103,7 +165,9 @@ function AppContent() {
 export default function AppShell() {
   return (
     <Providers>
-      <AppContent />
+      <Suspense fallback={null}>
+        <AppContent />
+      </Suspense>
     </Providers>
   );
 }

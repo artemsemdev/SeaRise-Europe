@@ -70,3 +70,28 @@ export interface ConfigData {
     horizonYear: number;
   };
 }
+
+export interface MethodologySource {
+  name: string;
+  provider: string;
+  url?: string;
+}
+
+export interface MethodologyModel {
+  id: string;
+  displayName: string;
+  description: string;
+}
+
+export interface MethodologyData {
+  requestId: string;
+  methodologyVersion: string;
+  projectionSource: MethodologySource;
+  elevationSource: MethodologySource;
+  description: string;
+  limitations: string[];
+  resolutionNote: string;
+  models: MethodologyModel[];
+  interpretationGuidance: Record<ResultState, string>;
+  dataUpdated: string;
+}

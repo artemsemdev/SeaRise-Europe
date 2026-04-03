@@ -30,8 +30,14 @@ export type AppPhase =
       error: AssessmentError;
     };
 
+interface AssessmentParams {
+  scenarioId: string;
+  horizonYear: number;
+}
+
 interface AppStore {
   appPhase: AppPhase;
+  assessmentParams: AssessmentParams | null;
   startGeocoding: (query: string) => void;
   setGeocodingError: (error: GeocodingError, lastQuery: string) => void;
   setNoResults: (query: string) => void;
@@ -46,6 +52,7 @@ interface AppStore {
     location: SelectedLocation,
     error: AssessmentError
   ) => void;
+  setAssessmentParams: (params: AssessmentParams) => void;
   reset: () => void;
 }
 
@@ -53,6 +60,7 @@ const initialPhase: AppPhase = { phase: "idle" };
 
 export const useAppStore = create<AppStore>((set) => ({
   appPhase: initialPhase,
+  assessmentParams: null,
 
   startGeocoding: (query) => set({ appPhase: { phase: "geocoding", query } }),
 
@@ -79,7 +87,11 @@ export const useAppStore = create<AppStore>((set) => ({
   setAssessmentError: (location, error) =>
     set({ appPhase: { phase: "assessment_error", location, error } }),
 
-  reset: () => set({ appPhase: initialPhase }),
+  setAssessmentParams: (params) => set({ assessmentParams: params }),
+
+  reset: () => set({ appPhase: initialPhase, assessmentParams: null }),
 }));
 
 export const useAppPhase = () => useAppStore((s) => s.appPhase);
+export const useAssessmentParams = () =>
+  useAppStore((s) => s.assessmentParams);

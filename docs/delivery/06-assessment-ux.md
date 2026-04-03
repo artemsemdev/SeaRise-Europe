@@ -4,7 +4,7 @@
 | -------------- | -------------------------------------------------------------------------------------------------- |
 | Epic ID        | E-06                                                                                               |
 | Phase          | 1 — MVP Implementation                                                                             |
-| Status         | Not Started                                                                                        |
+| Status         | Done                                                                                               |
 | Effort         | ~6 days                                                                                            |
 | Dependencies   | Epic 04 (assess endpoint), Epic 05 (map + shell + search flow)                                     |
 | Stories        | 7 (S06-01 through S06-07)                                                                          |
