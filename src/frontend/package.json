@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "lint:content": "npx tsx scripts/lint-prohibited-language.ts",
-    "lint:i18n": "npx tsx scripts/lint-i18n-externalization.ts",
+    "lint:content": "node --import tsx scripts/lint-prohibited-language.ts",
+    "lint:i18n": "node --import tsx scripts/lint-i18n-externalization.ts",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
