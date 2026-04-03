@@ -1,0 +1,21 @@
+# =============================================================================
+# SeaRise Europe — Geospatial Pipeline Dependencies
+# =============================================================================
+# Source: docs/architecture/16-geospatial-data-pipeline.md section 4.1
+# Python: 3.11+
+# Install: pip install -r requirements-pipeline.txt
+# =============================================================================
+
+rasterio>=1.3
+rio-cogeo>=3.0
+xarray>=2024.0
+netCDF4>=1.6
+numpy>=1.26
+geopandas>=0.14
+shapely>=2.0
+azure-storage-blob>=12.0
+psycopg2-binary>=2.9
+click>=8.0
+
+# Testing
+pytest>=8.0

@@ -6,7 +6,7 @@ This directory holds geometry files used by SeaRise Europe for geography validat
 
 | File | Source | Produced By | Status |
 |------|--------|-------------|--------|
-| `coastal_analysis_zone.geojson` | Copernicus Coastal Zones 2018 | Pipeline bootstrap (Epic 03, S03-01) | Pending |
+| `coastal_analysis_zone.geojson` | Copernicus Coastal Zones 2018 | Pipeline bootstrap (Epic 03, `src/pipeline/download.py`) | Pending — produce via pipeline or manual download |
 
 ## Coastal Analysis Zone Specification
 

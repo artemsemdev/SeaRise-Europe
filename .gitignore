@@ -13,6 +13,7 @@ Thumbs.db
 .env.*
 !.env.example
 !.env.local.example
+!.env.pipeline.example
 .env.local
 .env.*.local
 
