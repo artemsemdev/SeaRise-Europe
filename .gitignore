@@ -46,6 +46,7 @@ build/
 .ruff_cache/
 .tox/
 .python-version
+.playwright-mcp
 
 # Coverage and reports
 coverage/
