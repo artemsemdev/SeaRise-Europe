@@ -30,7 +30,7 @@ jobs:
           - language: javascript-typescript
             build-mode: none
           - language: csharp
-            build-mode: autobuild
+            build-mode: manual
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,9 +41,9 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
-      - name: Autobuild
-        if: matrix.build-mode == 'autobuild'
-        uses: github/codeql-action/autobuild@v3
+      - name: Build C#
+        if: matrix.language == 'csharp'
+        run: dotnet build src/api/SeaRise.sln
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
