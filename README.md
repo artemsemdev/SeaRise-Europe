@@ -1,5 +1,8 @@
 # SeaRise Europe
 
+[![CI](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/ci.yml/badge.svg)](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/codeql.yml/badge.svg)](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/codeql.yml)
+
 **Make coastal sea-level exposure understandable for anyone, anywhere in Europe — without overpromising what the science can say.**
 
 SeaRise Europe is a web application that lets users search for a European location and view scenario-based coastal sea-level exposure on an interactive map across selectable future time horizons (+10 to +100 years). It bridges the gap between authoritative but fragmented climate datasets and a clear, scientifically cautious user experience.
