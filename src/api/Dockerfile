@@ -13,7 +13,7 @@ RUN dotnet restore SeaRise.Api/SeaRise.Api.csproj
 COPY . .
 RUN dotnet publish SeaRise.Api/SeaRise.Api.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 appgroup && \
