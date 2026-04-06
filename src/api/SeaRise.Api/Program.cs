@@ -94,7 +94,7 @@ try
         options.AddPolicy("frontend", policy =>
         {
             policy.WithOrigins(corsOrigins)
-                  .AllowAnyMethod()
+                  .WithMethods("GET", "POST", "OPTIONS")
                   .AllowAnyHeader();
         });
     });
@@ -120,6 +120,14 @@ try
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = 429;
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            var clientIp = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var path = context.HttpContext.Request.Path.Value;
+            Log.Warning("RateLimitExceeded {ClientIp} {Path}", clientIp, path);
+            context.HttpContext.Response.StatusCode = 429;
+            await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", cancellationToken);
+        };
 
         // Global: 60 requests per minute per IP
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
@@ -166,6 +174,7 @@ try
         context.Response.Headers["X-Frame-Options"] = "DENY";
         context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
         context.Response.Headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()";
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload";
         await next();
     });
 
@@ -379,7 +388,7 @@ try
             UpdatedAt: methodology.UpdatedAt));
     });
 
-    // GET /health
+    // GET /health — public: minimal status only; internal: component details
     app.MapGet("/health", async (HttpContext httpContext) =>
     {
         var healthCheckService = httpContext.RequestServices.GetRequiredService<HealthCheckService>();
@@ -397,8 +406,16 @@ try
 
         Log.Debug("HealthCheckCompleted {Postgres} {BlobStorage}", postgresStatus, blobStatus);
 
+        var showDetail = httpContext.Request.Headers.ContainsKey("X-Health-Detail");
+        if (showDetail)
+        {
+            return StreamJsonResults.Json(
+                new HealthResponse(overallStatus, new HealthComponentsDto(postgresStatus, blobStatus), DateTime.UtcNow),
+                statusCode: statusCode);
+        }
+
         return StreamJsonResults.Json(
-            new HealthResponse(overallStatus, new HealthComponentsDto(postgresStatus, blobStatus), DateTime.UtcNow),
+            new HealthResponse(overallStatus, Components: null, DateTime.UtcNow),
             statusCode: statusCode);
     });
 

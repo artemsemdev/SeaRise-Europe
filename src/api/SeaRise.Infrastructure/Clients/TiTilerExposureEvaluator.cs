@@ -1,15 +1,19 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using SeaRise.Domain.Interfaces;
 using SeaRise.Domain.Models;
 
 namespace SeaRise.Infrastructure.Clients;
 
-public class TiTilerExposureEvaluator : IExposureEvaluator
+public partial class TiTilerExposureEvaluator : IExposureEvaluator
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<TiTilerExposureEvaluator> _logger;
+
+    [GeneratedRegex(@"^[a-z0-9][a-z0-9/_\-\.]*\.tif$", RegexOptions.Compiled)]
+    private static partial Regex BlobPathPattern();
 
     public TiTilerExposureEvaluator(HttpClient httpClient, ILogger<TiTilerExposureEvaluator> logger)
     {
@@ -20,6 +24,12 @@ public class TiTilerExposureEvaluator : IExposureEvaluator
     public async Task<bool> IsExposedAsync(double latitude, double longitude, ExposureLayer layer, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
+
+        if (!BlobPathPattern().IsMatch(layer.BlobPath) || layer.BlobPath.Contains(".."))
+        {
+            _logger.LogError("InvalidBlobPath {BlobPath}", layer.BlobPath);
+            throw new InvalidOperationException($"Layer blob path failed validation: {layer.BlobPath}");
+        }
 
         var cogUrl = $"az://geospatial/{layer.BlobPath}";
         var url = $"/cog/point/{longitude},{latitude}?url={Uri.EscapeDataString(cogUrl)}";

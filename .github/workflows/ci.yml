@@ -34,9 +34,9 @@ jobs:
       run:
         working-directory: src/frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.3.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 20
           cache: npm
@@ -44,6 +44,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
 
       - name: Lint
         run: npm run lint
@@ -70,14 +73,17 @@ jobs:
       run:
         working-directory: src/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.3.1
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v4.3.1
         with:
           dotnet-version: "8.0.x"
 
       - name: Restore
         run: dotnet restore SeaRise.sln
+
+      - name: Audit dependencies
+        run: dotnet list SeaRise.sln package --vulnerable --include-transitive 2>&1 | tee audit.txt && ! grep -qi 'has the following vulnerable packages' audit.txt
 
       - name: Format check
         run: dotnet format SeaRise.sln --verify-no-changes
@@ -101,9 +107,9 @@ jobs:
       run:
         working-directory: src/pipeline
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.3.1
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.11"
 
@@ -135,7 +141,7 @@ jobs:
           - context: src/api
             image: searise-api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.3.1
 
       - name: Build ${{ matrix.image }}
         run: docker build -t ${{ matrix.image }}:ci ${{ matrix.context }}
