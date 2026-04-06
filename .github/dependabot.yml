@@ -1,0 +1,63 @@
+# =============================================================================
+# SeaRise Europe — Dependabot Configuration
+# =============================================================================
+# Automated dependency update PRs for npm, NuGet, pip, GitHub Actions, and Docker.
+# =============================================================================
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/src/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  - package-ecosystem: "nuget"
+    directory: "/src/api"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "api"
+
+  - package-ecosystem: "pip"
+    directory: "/src/pipeline"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "pipeline"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+
+  - package-ecosystem: "docker"
+    directory: "/src/frontend"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/src/api"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "docker"

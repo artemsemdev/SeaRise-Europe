@@ -44,7 +44,7 @@ Key security properties:
 | **Path traversal in blob access** | Attacker-controlled scenario/horizon IDs | Layer blob path is resolved from DB lookup using validated scenario/horizon IDs — never constructed from raw request values |
 | **Abusive geocoding traffic** | Bot / scripted abuse | Rate limiting at Azure Container Apps ingress or API Gateway (see §3.5); accepted risk at MVP scale |
 | **XSS** | User-supplied query rendered in DOM | React escapes all dynamic content; never use `dangerouslySetInnerHTML` with user input |
-| **CORS bypass** | Cross-origin request to API | CORS policy allows only frontend domain (see §06 §7) |
+| **CORS bypass** | Cross-origin request to API | CORS policy allows only frontend domain with restricted methods (GET, POST, OPTIONS) (see §06 §7) |
 | **Secret drift** | Secrets hardcoded in source / Dockerfile | Key Vault references used; secrets never in source code or image layers (NFR-006) |
 | **Container breakout** | Compromised container affecting others | Azure Container Apps process isolation; least-privilege managed identities per container |
 | **COG tampering** | Malicious blob content affecting tile output | Blobs are write-once from pipeline; Storage account access restricted to pipeline principal + managed identity |
@@ -120,6 +120,7 @@ ASP.NET Core built-in rate limiter (`System.Threading.RateLimiting`) is configur
 | `POST /v1/assess` | 10 | 1 min | Protect TiTiler + PostGIS from expensive queries |
 
 - Exceeded limits return HTTP 429 (Too Many Requests)
+- Rate limit rejections emit a structured `RateLimitExceeded` warning log with client IP and path for monitoring and alerting
 - Request body size limit: 1 KB (Kestrel `MaxRequestBodySize`)
 - **Additional layer (Azure):** Container Apps ingress rules can add infrastructure-level rate limiting if needed
 
@@ -167,7 +168,7 @@ Invalid inputs return HTTP 400 with `VALIDATION_ERROR` before any infrastructure
 
 The API makes two categories of outbound calls:
 1. **Geocoding provider** — URL is a fixed, configured base URL. Only the `query` parameter is appended. The `query` string is treated as a plain search term, not a URL or path.
-2. **TiTiler `/point` endpoint** — URL is constructed from validated float coordinates + a `blob_path` from the database (not from the request). An attacker cannot control the blob_path via the API.
+2. **TiTiler `/point` endpoint** — URL is constructed from validated float coordinates + a `blob_path` from the database (not from the request). An attacker cannot control the blob_path via the API. Additionally, the blob_path is validated against an allowlist pattern (`^[a-z0-9][a-z0-9/_\-\.]*\.tif$`) with an explicit `..` traversal check before being passed to TiTiler, preventing path traversal even in the event of database compromise.
 
 Neither call involves user-controlled URL construction.
 
@@ -187,8 +188,8 @@ Content-Security-Policy:
   default-src 'self';
   script-src 'self' 'unsafe-eval' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://*.atlas.microsoft.com;
-  connect-src 'self' https://*.atlas.microsoft.com;
+  img-src 'self' blob: data: https://*.atlas.microsoft.com {TILER_ORIGIN};
+  connect-src 'self' https://*.atlas.microsoft.com {TILER_ORIGIN};
   worker-src 'self' blob:;
   child-src 'self' blob:;
   font-src 'self';
@@ -198,6 +199,7 @@ Content-Security-Policy:
 - `unsafe-eval` is required by MapLibre GL JS (WebGL shader compilation). This is an accepted limitation of the mapping library.
 - `unsafe-inline` for scripts is required by Next.js inline script injection. This is an accepted framework limitation.
 - `*.atlas.microsoft.com` covers Azure Maps basemap tiles and search API.
+- `{TILER_ORIGIN}` is dynamically resolved from `NEXT_PUBLIC_TILER_BASE_URL` at build time (defaults to `http://localhost:8000` for local dev). This ensures TiTiler raster tile requests are permitted by CSP in all environments.
 
 ### 4.6 HTTP Security Headers
 
@@ -209,6 +211,7 @@ Both the API (`Program.cs` middleware) and frontend (`next.config.js`) set the f
 | `X-Frame-Options` | `DENY` | Prevent clickjacking |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Limit referrer leakage |
 | `Permissions-Policy` | `geolocation=(), camera=(), microphone=()` | Disable unnecessary browser APIs |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Enforce HTTPS in browsers (HSTS) |
 
 ---
 
@@ -300,10 +303,11 @@ For MVP, single TiTiler instance with public ingress is accepted. Internal traff
 
 | Risk | Control |
 |---|---|
-| Compromised npm package | `npm audit` in CI; lock file committed; no `*` version ranges |
-| Compromised NuGet package | Restore from lock file; `dotnet list package --vulnerable` in CI |
-| Compromised Python package (TiTiler) | Pin TiTiler version in Dockerfile; review on upgrade |
-| Malicious Docker base image | Use Microsoft/official base images only; pin digest in production Dockerfile |
+| Compromised npm package | `npm audit --audit-level=high` in CI; lock file committed; no `*` version ranges; Dependabot enabled |
+| Compromised NuGet package | `dotnet list package --vulnerable` in CI; lock file committed; Dependabot enabled |
+| Compromised Python package (TiTiler) | Pin TiTiler version in Dockerfile; review on upgrade; Dependabot enabled for pip |
+| Malicious Docker base image | Use Microsoft/official base images only; pin digest in production Dockerfile; Dependabot enabled for Docker |
+| Compromised GitHub Action | CI actions pinned to specific version tags (not floating major); Dependabot monitors for updates |
 | Azure Container Registry exposure | ACR access restricted to Container Apps environment via Managed Identity |
 
 ---
@@ -316,11 +320,18 @@ For MVP, single TiTiler instance with public ingress is accepted. Internal traff
 - [ ] Azure Maps basemap subscription key CORS origin-restricted (ADR-020)
 - [ ] Raw query string absent from all log statements (code review + log audit)
 - [ ] Precise coordinates absent from all log statements
-- [x] CSP headers configured for frontend (`next.config.js`)
-- [x] HTTP security headers configured for API and frontend (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy)
+- [x] CSP headers configured for frontend (`next.config.js`) — includes TiTiler origin via `NEXT_PUBLIC_TILER_BASE_URL`
+- [x] HTTP security headers configured for API and frontend (X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, Strict-Transport-Security)
 - [x] Rate limiting configured: global 60/min per IP, geocode 20/min, assess 10/min
+- [x] Rate limit rejections (HTTP 429) logged with structured `RateLimitExceeded` event
 - [x] Request body size limited to 1 KB (Kestrel)
-- [ ] `npm audit` and `dotnet list package --vulnerable` passing in CI
+- [x] `npm audit --audit-level=high` and `dotnet list package --vulnerable` in CI pipeline
+- [x] Dependabot configured for npm, NuGet, pip, GitHub Actions, and Docker
+- [x] GitHub Actions pinned to specific version tags (not floating major)
+- [x] CORS restricted to `GET`, `POST`, `OPTIONS` methods only
+- [x] API Dockerfile runs as non-root user (`appuser:1001`)
+- [x] Health endpoint returns minimal response by default; component details require `X-Health-Detail` header
+- [x] Blob path validated against allowlist pattern before TiTiler requests
 - [ ] TiTiler CORS configured to frontend domain only (`TITILER_API_CORS_ORIGINS`)
 - [ ] PostgreSQL connection uses `sslmode=require`
 - [ ] Azure Blob Storage not publicly accessible (private container)

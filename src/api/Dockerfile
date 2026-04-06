@@ -15,7 +15,13 @@ RUN dotnet publish SeaRise.Api/SeaRise.Api.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
+
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 appuser
+
+COPY --from=build --chown=appuser:appgroup /app/publish .
+
+USER appuser
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
