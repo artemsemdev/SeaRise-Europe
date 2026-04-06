@@ -34,15 +34,15 @@ SeaRise Europe is a web application that lets users search for a European locati
 
 ```mermaid
 graph TD
-    Browser["Browser<br/><sub>Next.js · MapLibre GL JS · Zustand</sub>"]
+    Browser["Browser<br/>Next.js · MapLibre GL JS · Zustand"]
 
-    Browser -- "REST API" --> API["ASP.NET Core<br/><sub>Minimal API · .NET 8</sub>"]
-    Browser -- "Raster tiles" --> Tiler["TiTiler<br/><sub>Python · FastAPI · GDAL</sub>"]
+    Browser -- "REST API" --> API["ASP.NET Core<br/>Minimal API · .NET 8"]
+    Browser -- "Raster tiles" --> Tiler["TiTiler<br/>Python · FastAPI · GDAL"]
 
-    API --> DB["PostgreSQL + PostGIS<br/><sub>Scenarios · Layers · Geography</sub>"]
-    Tiler --> Blob["Azure Blob / Azurite<br/><sub>Cloud-Optimized GeoTIFFs</sub>"]
+    API --> DB["PostgreSQL + PostGIS<br/>Scenarios · Layers · Geography"]
+    Tiler --> Blob["Azure Blob / Azurite<br/>Cloud-Optimized GeoTIFFs"]
 
-    Pipeline["Geospatial Pipeline<br/><sub>Python · rasterio · rio-cogeo</sub>"] -.->|"generates COGs"| Blob
+    Pipeline["Geospatial Pipeline<br/>Python · rasterio · rio-cogeo"] -.->|"generates COGs"| Blob
     Pipeline -.->|"seeds metadata"| DB
 
     style Browser fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
