@@ -7,8 +7,6 @@
 
 SeaRise Europe is a web application that lets users search for a European location and view scenario-based coastal sea-level exposure on an interactive map across selectable future time horizons (+10 to +100 years). It bridges the gap between authoritative but fragmented climate datasets and a clear, scientifically cautious user experience.
 
-> This is a portfolio-grade project demonstrating end-to-end product engineering — from product vision and architecture documentation through geospatial data pipelines to a fully tested, accessible frontend.
-
 <p align="center">
   <img src="docs/product/Mock/preview-exposure.png" alt="SeaRise Europe — exposure detected for Bordeaux, France" width="720">
 </p>
