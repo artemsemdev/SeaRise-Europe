@@ -175,21 +175,49 @@ VALUES (
 
 -- ---------------------------------------------------------------------------
 -- geography_boundaries  (ADR-018)
--- Placeholder geometries -- replaced by actual data in Epic 03.
+-- DEV SYNTHETIC: coarse bbox polygons for local development only.
+-- Replace with real Natural Earth / Copernicus Coastal Zones 2018 geometries
+-- in Epic 03 when the full pipeline runs.
 -- ---------------------------------------------------------------------------
 
 INSERT INTO geography_boundaries (name, geom, description, source)
 VALUES (
   'europe',
-  ST_GeomFromText('MULTIPOLYGON EMPTY', 4326),
-  'WGS84 boundary geometry for supported European countries.',
-  'Natural Earth 10m cultural vectors -- Admin 0 countries, filtered to European countries and dissolved.'
+  ST_GeomFromText(
+    'MULTIPOLYGON(((-25 34, 45 34, 45 72, -25 72, -25 34)))',
+    4326
+  ),
+  'DEV SYNTHETIC: coarse bbox covering Europe for local development.',
+  'Synthetic bbox -- replace with Natural Earth 10m Admin 0 dissolved geometry.'
 );
 
 INSERT INTO geography_boundaries (name, geom, description, source)
 VALUES (
   'coastal_analysis_zone',
-  ST_GeomFromText('MULTIPOLYGON EMPTY', 4326),
-  'European coastal analysis zone (~10 km inland extent). Locations inside this zone are eligible for exposure assessment; locations outside return OutOfScope.',
-  'Copernicus Land Monitoring Service -- Coastal Zones 2018 (https://land.copernicus.eu/en/products/coastal-zones). Dissolved, cleaned in EPSG:3035, reprojected to EPSG:4326, clipped to europe boundary.'
+  ST_GeomFromText(
+    'MULTIPOLYGON(((-12 36, 20 36, 20 62, -12 62, -12 36)))',
+    4326
+  ),
+  'DEV SYNTHETIC: coarse bbox used as coastal-zone stand-in for local development.',
+  'Synthetic bbox -- replace with Copernicus Coastal Zones 2018 dissolved ~10 km inland buffer.'
 );
+
+-- ---------------------------------------------------------------------------
+-- layers  (DEV SYNTHETIC)
+-- All rows point at a single synthetic demo COG produced by the blob-seed
+-- service. (ssp5-85, 2100) is deliberately marked invalid to exercise the
+-- DataUnavailable result state. Replace with real pipeline output when
+-- available.
+-- ---------------------------------------------------------------------------
+
+INSERT INTO layers (scenario_id, horizon_year, methodology_version, blob_path, layer_valid, generated_at)
+VALUES
+  ('ssp1-26', 2030, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp1-26', 2050, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp1-26', 2100, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp2-45', 2030, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp2-45', 2050, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp2-45', 2100, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp5-85', 2030, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp5-85', 2050, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp5-85', 2100, 'v1.0', 'layers/v1.0/demo.tif', false, '2026-04-03T00:00:00Z');

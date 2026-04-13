@@ -40,12 +40,12 @@ public partial class TiTilerExposureEvaluator : IExposureEvaluator
         var json = await response.Content.ReadAsStringAsync(ct);
         var result = JsonSerializer.Deserialize<TilerPointResponse>(json, JsonOptions);
 
-        var pixelValue = result?.Values?.FirstOrDefault()?.FirstOrDefault();
+        var pixelValue = result?.Values?.FirstOrDefault();
 
         sw.Stop();
         _logger.LogDebug("TilerQueryCompleted {PixelValue} {DurationMs}", pixelValue, sw.ElapsedMilliseconds);
 
-        return pixelValue == 1;
+        return pixelValue.HasValue && pixelValue.Value == 1.0;
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -53,8 +53,11 @@ public partial class TiTilerExposureEvaluator : IExposureEvaluator
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
+    // TiTiler /cog/point returns {"coordinates":[lon,lat],"values":[v1,v2,...],...}
+    // where values is a flat array with one entry per band. Our exposure COG is
+    // single-band uint8, so values[0] is the pixel value (0, 1, or nodata/null).
     private record TilerPointResponse
     {
-        public List<List<int?>>? Values { get; init; }
+        public List<double?>? Values { get; init; }
     }
 }

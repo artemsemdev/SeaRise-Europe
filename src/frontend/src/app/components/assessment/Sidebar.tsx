@@ -38,7 +38,7 @@ export default function Sidebar({
 
   return (
     <aside
-      className="flex w-[280px] min-w-[280px] flex-col gap-6 overflow-y-auto p-6 z-10 md:flex"
+      className="flex w-full max-h-[50vh] flex-col gap-6 overflow-y-auto p-6 z-10 lg:w-[280px] lg:min-w-[280px] lg:max-h-full"
       style={{ background: "var(--s-low)" }}
     >
       {/* Location title + subtitle */}

@@ -24,6 +24,42 @@
 
 ---
 
+## Progress Update — 2026-04-13 (post-audit execution)
+
+Between the audit ("2026-04-13 morning") and this update ("2026-04-13 evening"), the re-plan was executed in the order recommended in [Order I would execute this in](#order-i-would-execute-this-in). Current state of each phase task:
+
+| # | Task | Status | Notes |
+|---|---|---|---|
+| P0.1 | API Dockerfile `curl` install | ✅ Done | `curl` installed in runtime image; container reaches `healthy`. |
+| P0.2 | TiTiler port mapping | ✅ Done | `docker-compose.yml` now maps `8000:8000` with `PORT=8000` in tiler env and matching `TILER_BASE_URL`. |
+| P0.3 | Compose smoke CI step | ✅ Done | `scripts/compose-smoke.sh` + new CI job fail on unhealthy containers. |
+| P1.1 | `europe.geojson` | ✅ Done | Natural Earth Admin 0 dissolved subset committed. |
+| P1.2 | `coastal_analysis_zone.geojson` | ✅ Done | Derived from Copernicus Coastal Zones 2018, committed. |
+| P1.3 | Pipeline wiring | ⏸ Deferred | Superseded by P1.4 shortcut for local demo; pipeline run itself remains open. |
+| P1.4 | Bake geometries into `init.sql` | ✅ Done | Both polygons loaded via `ST_GeomFromGeoJSON`; live `ST_IsEmpty` now `false`. |
+| P1.5 | Seed `layers` table with real COGs | ✅ Done | Synthetic COG set under `infra/blob-seed/` + SQL seed for 9 scenario×horizon rows. |
+| P1.6 | MethodologyPanel API contract rewrite | ✅ Done | Frontend types + panel aligned to real `/v1/config/methodology` shape (`whatItDoes`, `whatItDoesNotAccountFor[]`, `interpretationGuidance`, `updatedAt`). |
+| P1.7 | Methodology contract test | ✅ Done | `src/frontend/src/__tests__/api/methodology.contract.test.ts` with live fixture + runtime validator (5 cases, all passing). |
+| P2.1 | MapSurface click-to-assess early return | ✅ Done | Removed; fresh map click now starts an assessment when `selectedLocation` is null. |
+| P2.2 | Assessment `staleTime` reconciliation | ✅ Done | Code now uses `60_000` to match ROADMAP S06-02 and `06-assessment-ux.md` lines 249/267/274. |
+| P2.3 | Geocoding `useMutation` → `useQuery` | ✅ Done | `useGeocodeQuery` with cache key `['geocode', normalized]`, `staleTime: 5 * 60 * 1000`. SearchOverlay drives the phase machine via an effect. Verified end-to-end in Playwright: re-submitting "Amsterdam" returned 5 candidates with **0 new `/v1/geocode` calls**. |
+| P2.4 | Hardcoded user-facing strings → `en.ts` | ✅ Done | `SEARISE EUROPE`, Topbar nav, Footer, ResultPanel metadata labels, and EmptyState hero headline all externalized. |
+| P2.5 | Lint gates actually fail | ✅ Done | `lint-i18n-externalization.ts` exits non-zero on findings; `APPROVED_EXCEPTIONS` removed from `lint-prohibited-language.ts` and `NoModeledExposureDetected` summary rewritten to drop the whitelisted "is safe" substring. `content-audit-log.md` updated. |
+| P2.6 | Responsive tablet/mobile layouts | ✅ Done | `AppShell` main-content uses `flex-col-reverse lg:flex-row`; Sidebar is `w-full max-h-[50vh]` below `lg` and `w-[280px]` at `lg+`; ResultPanel clamps to `w-[calc(100vw-3rem)] max-w-[320px]` below `lg`. Verified in Playwright at 375 / 768 / 1280. |
+| P2.7 | Axe-core re-run on running app | ✅ Done | WCAG 2.0/2.1 A+AA: 0 violations on both idle and result phases (27 passes, 2 incomplete). Fixed one real finding: EmptyState disclaimer bar text3→text2 (contrast 4.30 → ~8.08). |
+
+**Phase 3 (P3.1–P3.4) remains deferred.** Known outstanding Phase 3 work: Azure Maps geocoder adapter, Wave 8 cloud items (HTTPS enforcement, Key Vault secretref, CORS verification, provisioning / CI/CD / COG upload / NFR checks), and pinning pipeline Python deps. Also outstanding: dead `NEXT_PUBLIC_API_BASE_URL` references in `assessment.ts` / `config.ts` / `methodology.ts` (removed in `geocoding.ts` during P2.3).
+
+**Verification at time of this update:**
+- `npm run lint` — 0 warnings, 0 errors.
+- `npx tsc --noEmit` — clean.
+- `npx vitest run` — **14 files / 80 tests passed**.
+- Playwright walkthrough at 1280×800 — search "Amsterdam", 5 candidates, re-submit cache hit confirmed, no layout overflow at any breakpoint.
+
+The "Honest Local MVP" exit bar at the bottom of this document should now be re-evaluated against the running stack — items 1–3, 7, 9, 10 are demonstrably true; items 4–6 and 8 depend on the P1.4/P1.5 geometry + layer seeding being correct for the specific cities listed and have not been re-probed in this session.
+
+---
+
 ## Runtime Reality Check (Live Stack Probe)
 
 This section captures findings from a live `docker compose up --build` run performed at audit time. Every claim here is backed by observed output from the running stack, not code inspection.

@@ -52,7 +52,7 @@ describe("ResultPanel", () => {
   it("renders NoModeledExposureDetected with safety caveat", () => {
     renderResultPanel("NoModeledExposureDetected");
     expect(screen.getByText(strings.resultStates.NoModeledExposureDetected)).toBeInTheDocument();
-    expect(screen.getByText(/does not mean it is safe/)).toBeInTheDocument();
+    expect(screen.getByText(/not a safety determination/)).toBeInTheDocument();
     expect(screen.getByText(strings.disclaimerNoExposure)).toBeInTheDocument();
   });
 

@@ -2,22 +2,16 @@
 
 import { useState, useCallback, type FormEvent } from "react";
 import { useAppStore, useAppPhase } from "@/lib/store/appStore";
-import { useMapStore } from "@/lib/store/mapStore";
-import { useGeocodeMutation } from "@/lib/api/geocoding";
 import { strings } from "@/lib/i18n/en";
 
-export default function SearchBar() {
+interface SearchBarProps {
+  onSubmitQuery: (query: string) => void;
+}
+
+export default function SearchBar({ onSubmitQuery }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const phase = useAppPhase();
-  const startGeocoding = useAppStore((s) => s.startGeocoding);
-  const setCandidates = useAppStore((s) => s.setCandidates);
-  const setNoResults = useAppStore((s) => s.setNoResults);
-  const setGeocodingError = useAppStore((s) => s.setGeocodingError);
-  const startAssessing = useAppStore((s) => s.startAssessing);
-  const setSelectedLocation = useMapStore((s) => s.setSelectedLocation);
   const reset = useAppStore((s) => s.reset);
-
-  const geocodeMutation = useGeocodeMutation();
 
   const isSearchActive = phase.phase !== "idle";
 
@@ -26,32 +20,9 @@ export default function SearchBar() {
       e.preventDefault();
       const trimmed = query.trim();
       if (!trimmed) return;
-
-      startGeocoding(trimmed);
-
-      geocodeMutation.mutate(trimmed, {
-        onSuccess: (data) => {
-          const { candidates } = data;
-          if (candidates.length === 0) {
-            setNoResults(trimmed);
-          } else if (candidates.length === 1) {
-            const c = candidates[0];
-            const location = { label: c.label, displayContext: c.displayContext, latitude: c.latitude, longitude: c.longitude };
-            setSelectedLocation(location);
-            startAssessing(location);
-          } else {
-            setCandidates(candidates);
-          }
-        },
-        onError: (error) => {
-          setGeocodingError(
-            { code: error.code ?? "UNKNOWN", message: error.message },
-            trimmed
-          );
-        },
-      });
+      onSubmitQuery(trimmed);
     },
-    [query, startGeocoding, geocodeMutation, setCandidates, setNoResults, setGeocodingError, startAssessing, setSelectedLocation]
+    [query, onSubmitQuery]
   );
 
   const handleClear = useCallback(() => {

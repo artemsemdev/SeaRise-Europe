@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,13 +6,13 @@ import SearchBar from "@/app/components/search/SearchBar";
 import { useAppStore } from "@/lib/store/appStore";
 import { strings } from "@/lib/i18n/en";
 
-function renderSearchBar() {
+function renderSearchBar(onSubmitQuery: (q: string) => void = vi.fn()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <SearchBar />
+      <SearchBar onSubmitQuery={onSubmitQuery} />
     </QueryClientProvider>
   );
 }
@@ -45,11 +45,12 @@ describe("SearchBar", () => {
   });
 
   it("blocks empty submission", async () => {
-    renderSearchBar();
+    const onSubmitQuery = vi.fn();
+    renderSearchBar(onSubmitQuery);
     await userEvent.click(
       screen.getByRole("button", { name: strings.search.submitLabel })
     );
-    expect(useAppStore.getState().appPhase.phase).toBe("idle");
+    expect(onSubmitQuery).not.toHaveBeenCalled();
   });
 
   it("has maxLength 200 on input", () => {

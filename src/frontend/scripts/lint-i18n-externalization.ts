@@ -87,12 +87,11 @@ function main() {
   }
 
   if (issueCount > 0) {
-    console.error(`\n${issueCount} potential hardcoded string(s) found.`);
-    console.error("Review the listed strings. If they are user-facing, externalize them to lib/i18n/en.ts.");
-    // Warning only, not a hard failure — false positives are possible
-    process.exit(0);
+    console.error(`\n${issueCount} hardcoded string(s) found.`);
+    console.error("Externalize them to lib/i18n/en.ts. If a finding is a false positive, tighten IGNORED_PATTERNS rather than whitelisting the line.");
+    process.exit(1);
   } else {
-    console.log("i18n externalization check passed: no obvious hardcoded strings found.");
+    console.log("i18n externalization check passed: no hardcoded strings found.");
     process.exit(0);
   }
 }

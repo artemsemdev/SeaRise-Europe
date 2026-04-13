@@ -5,8 +5,24 @@ const tilerOrigin = tilerBaseUrl
   ? new URL(tilerBaseUrl).origin
   : "http://localhost:8000";
 
+// Server-side proxy target for /v1/* API calls. The browser always hits the
+// frontend origin (same-origin satisfies CSP 'self'); Next rewrites forward
+// those requests to the API. next.config.js is evaluated at build time, so
+// this value is baked into the image. The default matches the docker compose
+// service name. For plain `next dev` outside docker, set API_INTERNAL_URL
+// (e.g. http://localhost:8080) in the build env.
+const apiInternalUrl = process.env.API_INTERNAL_URL || "http://api:8080";
+
 const nextConfig = {
   output: "standalone",
+  async rewrites() {
+    return [
+      {
+        source: "/v1/:path*",
+        destination: `${apiInternalUrl}/v1/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

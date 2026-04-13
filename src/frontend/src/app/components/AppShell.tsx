@@ -36,7 +36,7 @@ function Topbar() {
         className="text-[1.1rem] font-extrabold tracking-wide no-underline"
         style={{ fontFamily: "var(--font-manrope, Manrope, sans-serif)", color: "var(--primary)" }}
       >
-        SEARISE EUROPE
+        {strings.brand.name}
       </a>
       <nav>
         <ul className="flex list-none gap-6">
@@ -45,7 +45,7 @@ function Topbar() {
               className="text-[0.85rem] font-medium"
               style={{ color: "var(--text)", borderBottom: "2px solid var(--primary)", paddingBottom: "2px" }}
             >
-              Explorer
+              {strings.nav.explorer}
             </span>
           </li>
           <li>
@@ -53,7 +53,7 @@ function Topbar() {
               className="cursor-pointer text-[0.85rem] font-medium transition-colors hover:text-[var(--text)]"
               style={{ color: "var(--text2)" }}
             >
-              About Data
+              {strings.nav.aboutData}
             </span>
           </li>
         </ul>
@@ -62,7 +62,7 @@ function Topbar() {
         <button
           className="flex h-[34px] w-[34px] items-center justify-center rounded-full border-none text-[15px] transition-colors"
           style={{ background: "var(--s-high)", color: "var(--text2)" }}
-          title="Help"
+          title={strings.nav.help}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -81,10 +81,10 @@ function Footer() {
       className="relative z-50 flex items-center justify-between px-6 py-2 text-[0.65rem]"
       style={{ background: "var(--s-darkest)", color: "var(--text3)" }}
     >
-      <span>&copy; 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.</span>
+      <span>{strings.footer.copyright}</span>
       <div className="flex gap-6">
-        <span className="cursor-pointer transition-colors hover:text-[var(--text)]">About Data</span>
-        <span className="cursor-pointer transition-colors hover:text-[var(--text)]">Privacy</span>
+        <span className="cursor-pointer transition-colors hover:text-[var(--text)]">{strings.nav.aboutData}</span>
+        <span className="cursor-pointer transition-colors hover:text-[var(--text)]">{strings.nav.privacy}</span>
       </div>
     </footer>
   );
@@ -140,7 +140,7 @@ function AppContent() {
         {strings.accessibility.skipToContent}
       </a>
       <Topbar />
-      <div id="main-content" className="relative flex flex-1 overflow-hidden">
+      <div id="main-content" className="relative flex flex-1 flex-col-reverse overflow-hidden lg:flex-row">
         {/* Sidebar for assessment phases */}
         {isAssessmentPhase && config && (
           <AssessmentView config={config} />

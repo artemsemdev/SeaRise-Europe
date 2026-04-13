@@ -1,6 +1,30 @@
 export const strings = {
+  brand: {
+    name: "SEARISE EUROPE",
+  },
+
+  nav: {
+    explorer: "Explorer",
+    aboutData: "About Data",
+    help: "Help",
+    privacy: "Privacy",
+  },
+
+  footer: {
+    copyright: "\u00a9 2026 SeaRise Europe. Data: NASA, Copernicus, IPCC.",
+  },
+
+  resultMeta: {
+    forecastModel: "Forecast model",
+    timeframe: "Timeframe",
+    yearsSuffix: (years: number) => `+${years} years`,
+  },
+
   emptyState: {
     heading: "Explore coastal sea-level exposure in Europe",
+    headlinePrefix: "What will happen to",
+    headlineAccent: "your coast",
+    headlineSuffix: "in the future?",
     body: "Enter a European address, city, or location to see how it appears in scenario-based sea-level projections. Choose a scenario and time horizon to compare different outlooks.",
     subtext:
       "Results are model-based estimates, not engineering assessments. See methodology for details.",
@@ -18,7 +42,7 @@ export const strings = {
     ModeledExposureDetected: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>
       `Under the ${scenarioDisplayName} scenario at ${horizonYear}, ${locationLabel} shows modeled coastal exposure. Areas at or below projected sea levels may experience periodic or permanent inundation under this scenario.`,
     NoModeledExposureDetected: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>
-      `Based on current models, this location does not show significant coastal exposure under this scenario. This does not mean it is safe \u2014 conditions may change.`,
+      `Based on current models, this location does not show significant coastal exposure under this scenario. This is not a safety determination \u2014 conditions may change.`,
     DataUnavailable: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>
       `We don\u2019t have enough data for this exact combination of location, forecast model, and timeframe. Try a different model or timeframe \u2014 other combinations may have data.`,
     OutOfScope: (locationLabel: string) =>
@@ -106,20 +130,15 @@ export const strings = {
   methodology: {
     title: "How is this calculated?",
     dataSources: "Data sources",
-    forecastModels: "Forecast models explained",
-    limitations: "What this does NOT include",
+    howItWorks: "How it works",
+    whatItDoesNotAccount: "What this does NOT account for",
     important: "Important",
-    limitationItems: [
-      "Storm surges and extreme waves",
-      "Local flood barriers and drainage",
-      "Land sinking (subsidence)",
-      "River flooding",
-      "Building-level precision (we use 30m satellite data)",
-    ] as readonly string[],
     warningText:
       "This is an educational tool based on scientific models. It is not a legal, engineering, insurance, or financial assessment.",
     versionLabel: "Methodology version",
     dataUpdated: "Data updated",
+    sourceProviderSeparator: " \u00b7 ",
+    sourceLinkLabel: "View source",
   },
 
   accessibility: {

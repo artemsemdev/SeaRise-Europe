@@ -75,24 +75,22 @@ export interface ConfigData {
 export interface MethodologySource {
   name: string;
   provider: string;
-  url?: string;
+  url: string;
 }
 
-export interface MethodologyModel {
-  id: string;
-  displayName: string;
-  description: string;
+export interface InterpretationGuidance {
+  modeledExposureDetected: string;
+  noModeledExposureDetected: string;
 }
 
 export interface MethodologyData {
   requestId: string;
   methodologyVersion: string;
-  projectionSource: MethodologySource;
+  seaLevelProjectionSource: MethodologySource;
   elevationSource: MethodologySource;
-  description: string;
-  limitations: string[];
+  whatItDoes: string;
+  whatItDoesNotAccountFor: string[];
   resolutionNote: string;
-  models: MethodologyModel[];
-  interpretationGuidance: Record<ResultState, string>;
-  dataUpdated: string;
+  interpretationGuidance: InterpretationGuidance;
+  updatedAt: string;
 }

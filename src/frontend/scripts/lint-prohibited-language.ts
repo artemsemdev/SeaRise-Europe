@@ -9,6 +9,11 @@
 import * as fs from "fs";
 import * as path from "path";
 
+// Mirrors CONTENT_GUIDELINES §9. Every term here must be detectable on a
+// plain substring match — if a string needs to coexist with one of these, it
+// must be rewritten rather than whitelisted. There is intentionally no
+// APPROVED_EXCEPTIONS list: the 2026-04-13 audit showed the previous
+// whitelist was allowing banned phrases to survive in production copy.
 const PROHIBITED_TERMS = [
   "will flood",
   "will be underwater",
@@ -24,27 +29,12 @@ const PROHIBITED_TERMS = [
   "threat level",
 ];
 
-// Approved strings that may contain substrings of prohibited terms
-// These are explicitly sanctioned by CONTENT_GUIDELINES (CG-3)
-const APPROVED_EXCEPTIONS = [
-  "No risk detected",               // CG-3: approved user-facing label for NoModeledExposureDetected
-  "does not mean it is safe",       // CG-3: approved cautionary language for NoModeledExposureDetected summary
-];
-
-function isApproved(line: string): boolean {
-  return APPROVED_EXCEPTIONS.some((exception) =>
-    line.includes(exception)
-  );
-}
-
 function scanFile(filePath: string): { term: string; line: number; text: string }[] {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const violations: { term: string; line: number; text: string }[] = [];
 
   lines.forEach((line, index) => {
-    if (isApproved(line)) return;
-
     const lower = line.toLowerCase();
     for (const term of PROHIBITED_TERMS) {
       if (lower.includes(term.toLowerCase())) {
