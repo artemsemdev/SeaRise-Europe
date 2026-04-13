@@ -153,3 +153,22 @@ jobs:
     steps:
       - name: Pull TiTiler image
         run: docker pull ghcr.io/developmentseed/titiler:2.0.0
+
+  # ---------------------------------------------------------------------------
+  # Compose smoke: bring the full local stack up and probe the health
+  # endpoints. Guards against the P0.1 / P0.2 class of regressions the
+  # 2026-04-13 audit uncovered (missing curl in the API image, tiler port
+  # mapping drifted from the container's actual listen port). See
+  # scripts/compose-smoke.sh.
+  # ---------------------------------------------------------------------------
+  compose-smoke:
+    name: Compose Smoke (full stack health)
+    runs-on: ubuntu-latest
+    needs: [frontend, api, docker-build, docker-build-tiler]
+    steps:
+      - uses: actions/checkout@v4.3.1
+
+      - name: Run compose smoke test
+        env:
+          WAIT_TIMEOUT: "300"
+        run: bash scripts/compose-smoke.sh

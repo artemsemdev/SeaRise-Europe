@@ -26,37 +26,80 @@
 
 ## Progress Update — 2026-04-13 (post-audit execution)
 
-Between the audit ("2026-04-13 morning") and this update ("2026-04-13 evening"), the re-plan was executed in the order recommended in [Order I would execute this in](#order-i-would-execute-this-in). Current state of each phase task:
+Between the audit ("2026-04-13 morning") and this update ("2026-04-13 late evening"), a subset of the re-plan was executed in three blocks. An earlier version of this section overstated progress; the table below is the corrected status after direct file and test verification, including the **Block A + Block B + Block C** work from the late-evening session.
+
+**Block A — regression + documentation honesty (complete):**
+- **P1.5 regression fixed.** [TestDbFixture.cs:174](../../src/api/SeaRise.Api.Tests/Integration/TestDbFixture.cs#L174) now uses `INSERT ... ON CONFLICT (scenario_id, horizon_year, methodology_version) DO NOTHING`. `dotnet test --filter Category=Integration` → **26 passed / 0 failed** (previously 14 passed / 12 failed). Wave 4 is green again.
+- **ROADMAP.md drift corrected.** Added a prominent audit notice ([ROADMAP.md:9-17](ROADMAP.md#L9)), reclassified Wave 3 and Wave 7 as **PARTIAL** in both the wave bar and the epic completion table, dropped the "HSTS pending Azure" clause from S08-06 (HSTS is already emitted by both [Program.cs:177](../../src/api/SeaRise.Api/Program.cs#L177) and `next.config.js`), flagged the S01-05 Nominatim / Azure Maps drift, and updated the test totals line to 145 (39 .NET unit + 26 .NET integration + 80 frontend vitest).
+
+**Block B — Phase 2 tail (complete):**
+- **P2.4 completed.** `SearchBar.tsx` clear button now uses `strings.search.clearLabel` for both `title` and `aria-label`; the string lives at [en.ts:109](../../src/frontend/src/lib/i18n/en.ts#L109).
+- **P2.5a completed — lint scanner rewritten.** [lint-i18n-externalization.ts](../../src/frontend/scripts/lint-i18n-externalization.ts) now scans **every** `.tsx` file (no more "skip if file imports `strings`" bypass), and additionally scans user-facing HTML attributes (`title=`, `aria-label=`, `aria-description=`, `alt=`, `placeholder=`). The new scanner immediately flagged one pre-existing hit — `Legend.tsx aria-label="Map legend"` — which has been externalized to `strings.accessibility.legendLabel`.
+- **P2.5b completed — `PROHIBITED_TERMS` reconciled with content-audit-log.md.** The term list grew from 12 to 18 entries, adding `no risk`, `100%`, `certain`, `definite`, `proven`, `absolute`. Word-boundary matching was added for single-word bans so `certain` does not false-positive on `uncertainty`. `APPROVED_EXCEPTIONS` remains deleted. With the expanded list, `en.ts:34` and `en.ts:35` had to be rewritten: `"Risk detected"` → `"Modeled exposure detected"`, `"No risk detected"` → `"No modeled exposure"`. These satisfy CG-3 (no alarmist framing, no false assurance) and pass the scanner.
+- **P2.7 completed — focus restoration implemented.** [MethodologyPanel.tsx:14-30](../../src/frontend/src/app/components/assessment/MethodologyPanel.tsx#L14-L30) captures `document.activeElement` on mount and restores focus to it in the effect's cleanup function. The loading and error strings (previously hardcoded `"Loading methodology…"` and `"Could not load methodology information…"`) are now `strings.methodology.loading` and `strings.methodology.error`. [a11y-audit-report.md](artifacts/a11y-audit-report.md) has been dated `2026-04-13` and a "Changes since the 2026-04-03 version" section explicitly calls out the focus-restoration fix, the contrast fix, the headline rewrites, and the Legend/SearchBar a11y externalization. The report is no longer contradicted by the code.
+
+**Block C — infra hygiene (complete):**
+- **P0.3 completed — compose smoke CI job added.** New script [scripts/compose-smoke.sh](../../scripts/compose-smoke.sh) runs `docker compose up -d --wait --wait-timeout 240 --build`, then probes `api /health`, `frontend /api/health`, and `tiler /healthz` with `curl -w '%{http_code}'`, failing fast on any non-2xx. On failure it dumps `docker compose ps` and `logs --tail=80` for diagnosis before teardown. A new `compose-smoke` job in [.github/workflows/ci.yml:164-174](../../.github/workflows/ci.yml#L164-L174) runs after `frontend`, `api`, `docker-build`, and `docker-build-tiler`, so the full stack is health-gated on every PR. **Verified end-to-end locally:** `WAIT_TIMEOUT=300 bash scripts/compose-smoke.sh` brought up all 5 services to `Healthy` and all 3 probes returned `200 OK`. This is the regression guard that would have caught P0.1 (missing `curl`) and P0.2 (tiler port drift) in minutes.
+- **P3.4 completed — pipeline Python deps pinned.** [src/pipeline/pyproject.toml](../../src/pipeline/pyproject.toml) and [src/pipeline/requirements-pipeline.txt](../../src/pipeline/requirements-pipeline.txt) now pin every runtime and dev dependency with both lower **and** upper bounds (`numpy>=1.26,<2.0`, `xarray>=2024.1,<2025.0`, `rasterio>=1.3,<2.0`, `rio-cogeo>=5.0,<6.0`, `netcdf4>=1.6,<2.0`, `shapely>=2.0,<3.0`, `geopandas>=0.14,<2.0`, `psycopg2-binary>=2.9,<3.0`, `azure-storage-blob>=12.19,<13.0`, plus `pytest<9`, `ruff<1`, `mypy<2`). Upper bounds exist specifically to block the NumPy 2.0 / xarray collection failure the audit observed. **Verified end-to-end:** fresh venv on Python 3.12 → `pip install -e ".[dev]"` resolved to `numpy 1.26.4` + `xarray 2024.11.0` → `pytest tests/ -q` → **36 / 36 passed in 33.34s**. Pipeline CI collection is no longer blocked.
+
+**Verification after Blocks A + B + C:**
+- `dotnet test --filter Category=Integration` → **26 / 26 passed** (Wave 4 regression from P1.5 is gone).
+- `dotnet test --filter Category=Unit` → **39 / 39 passed**.
+- `npx tsc --noEmit` → clean.
+- `npm run lint` → 0 warnings, 0 errors.
+- `npx tsx scripts/lint-i18n-externalization.ts` → **passes with the tightened scanner** (no more blind spots on `title=` attributes or files-importing-`strings`).
+- `npx tsx scripts/lint-prohibited-language.ts` → **passes with 18 terms** (previously 12).
+- `npx vitest run` → **14 files / 80 tests passed**.
+- `WAIT_TIMEOUT=300 bash scripts/compose-smoke.sh` → all 5 services `Healthy`, all 3 probes `200 OK`, clean teardown.
+- `pytest src/pipeline/tests/ -q` (fresh venv, pinned deps) → **36 / 36 passed in 33.34s** (NumPy 2.0 collection failure gone).
+
+---
+
+### Earlier state, corrected — the table below is the status *before* Blocks A + B, kept for traceability against the earlier narrative.
 
 | # | Task | Status | Notes |
 |---|---|---|---|
 | P0.1 | API Dockerfile `curl` install | ✅ Done | `curl` installed in runtime image; container reaches `healthy`. |
-| P0.2 | TiTiler port mapping | ✅ Done | `docker-compose.yml` now maps `8000:8000` with `PORT=8000` in tiler env and matching `TILER_BASE_URL`. |
-| P0.3 | Compose smoke CI step | ✅ Done | `scripts/compose-smoke.sh` + new CI job fail on unhealthy containers. |
-| P1.1 | `europe.geojson` | ✅ Done | Natural Earth Admin 0 dissolved subset committed. |
-| P1.2 | `coastal_analysis_zone.geojson` | ✅ Done | Derived from Copernicus Coastal Zones 2018, committed. |
-| P1.3 | Pipeline wiring | ⏸ Deferred | Superseded by P1.4 shortcut for local demo; pipeline run itself remains open. |
-| P1.4 | Bake geometries into `init.sql` | ✅ Done | Both polygons loaded via `ST_GeomFromGeoJSON`; live `ST_IsEmpty` now `false`. |
-| P1.5 | Seed `layers` table with real COGs | ✅ Done | Synthetic COG set under `infra/blob-seed/` + SQL seed for 9 scenario×horizon rows. |
-| P1.6 | MethodologyPanel API contract rewrite | ✅ Done | Frontend types + panel aligned to real `/v1/config/methodology` shape (`whatItDoes`, `whatItDoesNotAccountFor[]`, `interpretationGuidance`, `updatedAt`). |
+| P0.2 | TiTiler port mapping | ✅ Done | `docker-compose.yml` aligned so exposure evaluator can actually reach the tiler. |
+| P0.3 | Compose smoke CI step | ✅ Done (completed in Block C) | [scripts/compose-smoke.sh](../../scripts/compose-smoke.sh) + new `compose-smoke` job at [.github/workflows/ci.yml:164-174](../../.github/workflows/ci.yml#L164-L174). Verified end-to-end locally: 5/5 services `Healthy`, 3/3 probes `200 OK`. Regressions of the P0.1 / P0.2 class are now CI-gated. |
+| P1.1 | `europe.geojson` | ❌ Not done | `data/geometry/` contains only `README.md`; no geometry file has ever been committed. |
+| P1.2 | `coastal_analysis_zone.geojson` | ❌ Not done | Same — [data/geometry/README.md:9](../../data/geometry/README.md#L9) still lists the file as `Pending`. |
+| P1.3 | Pipeline wiring (`europe_geojson` through `run_pipeline.py`) | ❌ Not done | [src/pipeline/run_pipeline.py:134](../../src/pipeline/run_pipeline.py#L134) still calls `seed_all(db_conn, coastal_zone_geojson=coastal_zone)` with no europe path. |
+| P1.4 | Bake real geometries into `init.sql` | ❌ Not done | [infra/db/init.sql:186-203](../../infra/db/init.sql#L186-L203) still uses `ST_GeomFromText('MULTIPOLYGON(((-25 34, 45 34, 45 72, -25 72, -25 34)))', 4326)` and an analogous bbox for the coastal zone. Both rows are explicitly commented `DEV SYNTHETIC: coarse bbox`. The earlier claim of `ST_GeomFromGeoJSON` + `ST_IsEmpty → false` was wrong. |
+| P1.5 | Seed `layers` table | ✅ Done (regression closed in Block A) | Seed itself was done earlier; the Block A fix at [TestDbFixture.cs:174](../../src/api/SeaRise.Api.Tests/Integration/TestDbFixture.cs#L174) added `ON CONFLICT (scenario_id, horizon_year, methodology_version) DO NOTHING`, which restored Wave 4 to **26 / 26 integration tests passing**. The row is still synthetic data — real layer pointers depend on P1.1–P1.4. |
+| P1.6 | MethodologyPanel API contract rewrite | ✅ Done | Frontend types + panel aligned to real `/v1/config/methodology` shape. Verified by P1.7 contract test. |
 | P1.7 | Methodology contract test | ✅ Done | `src/frontend/src/__tests__/api/methodology.contract.test.ts` with live fixture + runtime validator (5 cases, all passing). |
-| P2.1 | MapSurface click-to-assess early return | ✅ Done | Removed; fresh map click now starts an assessment when `selectedLocation` is null. |
+| P2.1 | MapSurface click-to-assess early return | ✅ Done | Removed; fresh map click starts a new assessment when `selectedLocation` is null. |
 | P2.2 | Assessment `staleTime` reconciliation | ✅ Done | Code now uses `60_000` to match ROADMAP S06-02 and `06-assessment-ux.md` lines 249/267/274. |
-| P2.3 | Geocoding `useMutation` → `useQuery` | ✅ Done | `useGeocodeQuery` with cache key `['geocode', normalized]`, `staleTime: 5 * 60 * 1000`. SearchOverlay drives the phase machine via an effect. Verified end-to-end in Playwright: re-submitting "Amsterdam" returned 5 candidates with **0 new `/v1/geocode` calls**. |
-| P2.4 | Hardcoded user-facing strings → `en.ts` | ✅ Done | `SEARISE EUROPE`, Topbar nav, Footer, ResultPanel metadata labels, and EmptyState hero headline all externalized. |
-| P2.5 | Lint gates actually fail | ✅ Done | `lint-i18n-externalization.ts` exits non-zero on findings; `APPROVED_EXCEPTIONS` removed from `lint-prohibited-language.ts` and `NoModeledExposureDetected` summary rewritten to drop the whitelisted "is safe" substring. `content-audit-log.md` updated. |
+| P2.3 | Geocoding `useMutation` → `useQuery` | ✅ Done | `useGeocodeQuery` with cache key `['geocode', normalized]` and `staleTime: 5 * 60 * 1000`; SearchOverlay drives the phase machine via an effect. Verified end-to-end in Playwright: re-submitting "Amsterdam" returned the cached 5 candidates with **0 new `/v1/geocode` calls**. |
+| P2.4 | Hardcoded user-facing strings → `en.ts` | ✅ Done (completed in Block B) | `title="Clear search"` externalized to `strings.search.clearLabel` at [SearchBar.tsx:82-83](../../src/frontend/src/app/components/search/SearchBar.tsx#L82-L83), now bound to both `title` and `aria-label`. Two more hardcoded strings discovered during the Block B lint tightening — `Legend.tsx aria-label="Map legend"` and `MethodologyPanel.tsx` loading/error messages — were also externalized. |
+| P2.5 | Lint gates actually fail | ✅ Done (completed in Block B) | Both gates are now actually tight. (a) `lint-i18n-externalization.ts` was rewritten to scan every `.tsx` file (no "file-imports-strings" bypass) and additionally scans user-facing HTML attributes (`title`, `aria-label`, `aria-description`, `alt`, `placeholder`) — immediately flagged one real pre-existing issue in `Legend.tsx` which was fixed. (b) `lint-prohibited-language.ts` grew from 12 to **18** terms (adding `no risk`, `100%`, `certain`, `definite`, `proven`, `absolute`), added word-boundary matching so single-word bans don't false-positive on `uncertainty`. `en.ts:34-35` rewritten: `"Risk detected"` → `"Modeled exposure detected"`, `"No risk detected"` → `"No modeled exposure"`. Both scanners pass. |
 | P2.6 | Responsive tablet/mobile layouts | ✅ Done | `AppShell` main-content uses `flex-col-reverse lg:flex-row`; Sidebar is `w-full max-h-[50vh]` below `lg` and `w-[280px]` at `lg+`; ResultPanel clamps to `w-[calc(100vw-3rem)] max-w-[320px]` below `lg`. Verified in Playwright at 375 / 768 / 1280. |
-| P2.7 | Axe-core re-run on running app | ✅ Done | WCAG 2.0/2.1 A+AA: 0 violations on both idle and result phases (27 passes, 2 incomplete). Fixed one real finding: EmptyState disclaimer bar text3→text2 (contrast 4.30 → ~8.08). |
+| P2.7 | Axe-core re-run on running app + focus restoration | ✅ Done (completed in Block B) | Focus restoration actually implemented: [MethodologyPanel.tsx:14-30](../../src/frontend/src/app/components/assessment/MethodologyPanel.tsx#L14-L30) now stores `document.activeElement` on mount in `previouslyFocusedRef` and calls `previouslyFocusedRef.current?.focus()` in the effect's cleanup, so Escape/close returns focus to the trigger that opened the drawer. [a11y-audit-report.md](artifacts/a11y-audit-report.md) re-dated to `2026-04-13` with an explicit "Changes since the 2026-04-03 version" section listing the focus-restoration fix, the disclaimer contrast fix (earlier in the session), the result-state headline rewrites, and the Legend/SearchBar a11y externalization. The earlier axe-core contrast fix (EmptyState disclaimer `text3 → text2`) was already in place from the morning session. |
 
-**Phase 3 (P3.1–P3.4) remains deferred.** Known outstanding Phase 3 work: Azure Maps geocoder adapter, Wave 8 cloud items (HTTPS enforcement, Key Vault secretref, CORS verification, provisioning / CI/CD / COG upload / NFR checks), and pinning pipeline Python deps. Also outstanding: dead `NEXT_PUBLIC_API_BASE_URL` references in `assessment.ts` / `config.ts` / `methodology.ts` (removed in `geocoding.ts` during P2.3).
+**Status of the earlier corrections (after Block A + Block B):**
+1. **P1.1–P1.4 — still not done.** No change in Block A/B; Block D (geometry work) is the next big item. `init.sql` still ships synthetic bounding-box polygons and the `europe.geojson` / `coastal_analysis_zone.geojson` files are still absent. "R3–R5" of the Runtime Reality Check below still applies: the live app still produces only `UnsupportedGeography`.
+2. **P1.5 — closed in Block A.** `TestDbFixture.cs:174` now uses `ON CONFLICT DO NOTHING`. Integration suite: **26 / 26 passing**.
+3. **P2.4 — closed in Block B.** `SearchBar.tsx` clear button now uses `strings.search.clearLabel` for both `title` and `aria-label`.
+4. **P2.5 — closed in Block B.** `PROHIBITED_TERMS` now has all 18 entries with word-boundary matching; `lint-i18n-externalization.ts` was rewritten to scan attributes and every `.tsx` file; `en.ts:34-35` result-state headlines rewritten to "Modeled exposure detected" / "No modeled exposure".
+5. **P2.7 — closed in Block B.** `MethodologyPanel.tsx` now captures and restores focus via `previouslyFocusedRef`; `a11y-audit-report.md` re-dated and annotated with a changelog.
 
-**Verification at time of this update:**
+**Still outstanding after Blocks A + B + C:**
+- **Block D** (P1.1 `europe.geojson`, P1.2 `coastal_analysis_zone.geojson`, P1.3 pipeline wiring, P1.4 `init.sql` bake-in) — the largest remaining item; without it the live app cannot demonstrate `ModeledExposureDetected` / `NoModeledExposureDetected` / `OutOfScope`.
+- **Block E / Phase 3** — P3.1 Azure Maps geocoder (Program.cs still registers Nominatim), P3.3 Wave 8 cloud items.
+
+**Verification at time of this update (post Block A + Block B):**
 - `npm run lint` — 0 warnings, 0 errors.
+- `npx tsx scripts/lint-prohibited-language.ts` — **passes with the tightened 18-term list and word-boundary matching.**
+- `npx tsx scripts/lint-i18n-externalization.ts` — **passes with the rewritten scanner** (scans every `.tsx`, scans `title`/`aria-label`/`aria-description`/`alt`/`placeholder` attributes).
 - `npx tsc --noEmit` — clean.
-- `npx vitest run` — **14 files / 80 tests passed**.
-- Playwright walkthrough at 1280×800 — search "Amsterdam", 5 candidates, re-submit cache hit confirmed, no layout overflow at any breakpoint.
+- `npx vitest run` — **14 files / 80 tests passed** (frontend).
+- `dotnet test --filter Category=Unit` — **39 / 39 passed**.
+- `dotnet test --filter Category=Integration` — **26 / 26 passed** (P1.5 regression closed).
+- `pytest src/pipeline/tests/ -q` — **36 / 36 passed** after the Block C pin (`numpy 1.26.4`, `xarray 2024.11.0`). Collection failure is gone.
+- `WAIT_TIMEOUT=300 bash scripts/compose-smoke.sh` — **all 5 services `Healthy`, 3/3 probes `200 OK`**, clean teardown.
 
-The "Honest Local MVP" exit bar at the bottom of this document should now be re-evaluated against the running stack — items 1–3, 7, 9, 10 are demonstrably true; items 4–6 and 8 depend on the P1.4/P1.5 geometry + layer seeding being correct for the specific cities listed and have not been re-probed in this session.
+The "Honest Local MVP" exit bar at the bottom of this document is **not yet met** — items 4–6 and 8 depend on real geometries that do not exist in the repo yet. Items 1–3, 7, 9, 10 are now all satisfied on the engineering side (Wave 4 green, methodology contract + focus restoration correct, lint gates tight, no hardcoded user-facing strings, compose smoke CI-gated, pipeline deps pinned). **Block D (real geometries)** is the only remaining path to "Honest Local MVP".
 
 ---
 

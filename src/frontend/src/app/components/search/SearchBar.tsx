@@ -79,7 +79,8 @@ export default function SearchBar({ onSubmitQuery }: SearchBarProps) {
           onClick={handleClear}
           className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border-none text-sm transition-colors"
           style={{ background: "var(--s-high)", color: "var(--text2)" }}
-          title="Clear search"
+          title={strings.search.clearLabel}
+          aria-label={strings.search.clearLabel}
         >
           &times;
         </button>

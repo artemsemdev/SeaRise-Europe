@@ -31,8 +31,8 @@ export const strings = {
   },
 
   resultStates: {
-    ModeledExposureDetected: "Risk detected",
-    NoModeledExposureDetected: "No risk detected",
+    ModeledExposureDetected: "Modeled exposure detected",
+    NoModeledExposureDetected: "No modeled exposure",
     DataUnavailable: "Data not available",
     OutOfScope: (cityName: string) => `${cityName} is not on the coast`,
     UnsupportedGeography: (cityName: string) => `${cityName} is outside Europe`,
@@ -105,6 +105,7 @@ export const strings = {
   search: {
     placeholder: "Search for a European location",
     submitLabel: "Search",
+    clearLabel: "Clear search",
   },
 
   candidateList: {
@@ -139,11 +140,14 @@ export const strings = {
     dataUpdated: "Data updated",
     sourceProviderSeparator: " \u00b7 ",
     sourceLinkLabel: "View source",
+    loading: "Loading methodology\u2026",
+    error: "Could not load methodology information. Please try again later.",
   },
 
   accessibility: {
     skipToContent: "Skip to main content",
     mapLabel: "Interactive map of Europe",
+    legendLabel: "Map legend",
     mapWithLocation: (locationLabel: string) =>
       `Interactive map showing selected location at ${locationLabel}`,
     mapWithResult: (locationLabel: string, scenarioDisplayName: string, horizonYear: number) =>

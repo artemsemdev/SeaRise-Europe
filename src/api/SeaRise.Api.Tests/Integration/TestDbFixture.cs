@@ -166,10 +166,12 @@ public class TestDbFixture : IAsyncLifetime
         await using var cmd2 = new NpgsqlCommand(updateCoastal, conn);
         await cmd2.ExecuteNonQueryAsync();
 
-        // Seed a valid test layer
+        // Idempotent: init.sql may already seed this row; ON CONFLICT keeps the fixture
+        // compatible with both pre- and post-P1.5 database images.
         const string insertLayer = @"
             INSERT INTO layers (scenario_id, horizon_year, methodology_version, blob_path, layer_valid, generated_at)
-            VALUES ('ssp2-45', 2050, 'v1.0', 'layers/v1.0/ssp2-45/2050.tif', true, now())";
+            VALUES ('ssp2-45', 2050, 'v1.0', 'layers/v1.0/ssp2-45/2050.tif', true, now())
+            ON CONFLICT (scenario_id, horizon_year, methodology_version) DO NOTHING";
 
         await using var cmd3 = new NpgsqlCommand(insertLayer, conn);
         await cmd3.ExecuteNonQueryAsync();

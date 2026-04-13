@@ -12,9 +12,14 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
   const { data, isLoading, isError } = useMethodology();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Focus trap and focus management
+  // Focus trap, focus management, and focus restoration on unmount.
   useEffect(() => {
+    // Capture whoever was focused when the drawer opened so we can return to
+    // it on close. This satisfies WCAG 2.4.3 focus order and matches the
+    // claim in docs/delivery/artifacts/a11y-audit-report.md.
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
@@ -41,7 +46,10 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus();
+    };
   }, [onClose]);
 
   // Prevent scroll on body when panel is open
@@ -96,13 +104,13 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
               className="h-5 w-5 flex-shrink-0 animate-spin rounded-full"
               style={{ border: "2px solid var(--s-high)", borderTopColor: "var(--primary)" }}
             />
-            Loading methodology...
+            {strings.methodology.loading}
           </div>
         )}
 
         {isError && (
           <div className="text-[0.85rem]" style={{ color: "var(--err)" }}>
-            Could not load methodology information. Please try again later.
+            {strings.methodology.error}
           </div>
         )}
 
