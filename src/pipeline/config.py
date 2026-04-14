@@ -70,3 +70,8 @@ def get_postgres_connection_string() -> str:
 def get_coastal_zone_path() -> Path:
     """Path to the coastal analysis zone GeoJSON (ADR-018)."""
     return Path("data/geometry/coastal_analysis_zone.geojson")
+
+
+def get_europe_path() -> Path:
+    """Path to the Europe support geometry GeoJSON (ADR-018)."""
+    return Path("data/geometry/europe.geojson")

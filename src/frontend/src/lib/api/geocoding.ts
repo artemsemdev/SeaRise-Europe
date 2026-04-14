@@ -1,41 +1,45 @@
-import { useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { GeocodingCandidate } from "@/lib/types";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 interface GeocodeResponse {
   requestId: string;
   candidates: GeocodingCandidate[];
 }
 
-interface GeocodeErrorResponse {
-  requestId: string;
-  error: {
-    code: string;
-    message: string;
-  };
+interface GeocodeErrorBody {
+  requestId?: string;
+  error?: { code: string; message: string };
 }
 
-async function geocode(query: string): Promise<GeocodeResponse> {
-  const response = await fetch(`${API_BASE_URL}/v1/geocode`, {
+export interface GeocodeError {
+  code: string;
+  message: string;
+}
+
+async function geocode(query: string, signal?: AbortSignal): Promise<GeocodeResponse> {
+  const response = await fetch(`/v1/geocode`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
+    signal,
   });
 
   if (!response.ok) {
-    const errorBody: GeocodeErrorResponse = await response.json().catch(() => ({
-      requestId: "unknown",
-      error: { code: "UNKNOWN", message: "Geocoding request failed" },
-    }));
-    throw errorBody.error;
+    const errorBody: GeocodeErrorBody = await response.json().catch(() => ({}));
+    throw (errorBody.error ?? { code: "UNKNOWN", message: "Geocoding request failed" }) as GeocodeError;
   }
 
   return response.json();
 }
 
-export function useGeocodeMutation() {
-  return useMutation<GeocodeResponse, { code: string; message: string }, string>({
-    mutationFn: geocode,
+export function useGeocodeQuery(query: string | null) {
+  const normalizedKey = query?.trim().toLowerCase() ?? "";
+  return useQuery<GeocodeResponse, GeocodeError>({
+    queryKey: ["geocode", normalizedKey],
+    queryFn: ({ signal }) => geocode(query!, signal),
+    enabled: normalizedKey.length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 }

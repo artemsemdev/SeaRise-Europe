@@ -1,6 +1,7 @@
 "use client";
 
 import type { LegendColorStop } from "@/lib/types";
+import { strings } from "@/lib/i18n/en";
 
 interface LegendProps {
   colorStops: LegendColorStop[];
@@ -16,7 +17,7 @@ export default function Legend({ colorStops }: LegendProps) {
         background: "var(--glass)",
         backdropFilter: `blur(var(--glass-blur))`,
       }}
-      aria-label="Map legend"
+      aria-label={strings.accessibility.legendLabel}
     >
       {colorStops.map((stop) => (
         <div key={stop.value} className="flex items-center gap-3 text-[0.75rem]">

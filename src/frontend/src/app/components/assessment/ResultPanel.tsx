@@ -220,7 +220,7 @@ export default function ResultPanel({
 
   return (
     <div
-      className="pointer-events-auto absolute right-[72px] top-6 z-20 flex w-[320px] flex-col gap-4 rounded-[var(--r-lg)] p-6"
+      className="pointer-events-auto absolute right-6 top-6 z-20 flex w-[calc(100vw-3rem)] max-w-[320px] flex-col gap-4 rounded-[var(--r-lg)] p-6 lg:right-[72px] lg:w-[320px] lg:max-w-none"
       style={{ background: "var(--s-low)" }}
       aria-live="polite"
       aria-label={strings.accessibility.resultRegion}
@@ -290,15 +290,15 @@ export default function ResultPanel({
           />
           <div>
             <div className="flex items-center justify-between py-1 text-[0.85rem]">
-              <span style={{ color: "var(--text2)" }}>Forecast model</span>
+              <span style={{ color: "var(--text2)" }}>{strings.resultMeta.forecastModel}</span>
               <span className="font-semibold" style={{ color: "var(--text)" }}>
                 {result.scenario.displayName}
               </span>
             </div>
             <div className="flex items-center justify-between py-1 text-[0.85rem]">
-              <span style={{ color: "var(--text2)" }}>Timeframe</span>
+              <span style={{ color: "var(--text2)" }}>{strings.resultMeta.timeframe}</span>
               <span className="font-semibold" style={{ color: "var(--text)" }}>
-                +{result.horizon.year - CURRENT_YEAR} years
+                {strings.resultMeta.yearsSuffix(result.horizon.year - CURRENT_YEAR)}
               </span>
             </div>
           </div>

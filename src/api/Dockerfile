@@ -16,6 +16,12 @@ RUN dotnet publish SeaRise.Api/SeaRise.Api.csproj -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
+# curl is required by the container healthcheck in docker-compose.yml.
+# The aspnet:8.0 base image does not include it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser
 

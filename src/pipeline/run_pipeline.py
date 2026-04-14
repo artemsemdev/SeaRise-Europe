@@ -28,6 +28,7 @@ from .config import (
     get_blob_connection_string,
     get_coastal_zone_path,
     get_download_dir,
+    get_europe_path,
     get_output_dir,
     get_postgres_connection_string,
     get_work_dir,
@@ -117,6 +118,7 @@ def run(
     blob_conn = get_blob_connection_string()
     db_conn = get_postgres_connection_string()
     coastal_zone = get_coastal_zone_path()
+    europe = get_europe_path()
 
     combinations = [(sc, yr) for sc in scenarios for yr in horizons]
     results: list[dict] = []
@@ -131,7 +133,7 @@ def run(
     # -- Seed metadata -------------------------------------------------------
     click.echo("Seeding reference data ...")
     try:
-        seed_all(db_conn, coastal_zone_geojson=coastal_zone)
+        seed_all(db_conn, coastal_zone_geojson=coastal_zone, europe_geojson=europe)
         click.echo("  Seed data: OK")
     except Exception as exc:
         click.echo(f"  Seed data: FAILED ({exc})", err=True)

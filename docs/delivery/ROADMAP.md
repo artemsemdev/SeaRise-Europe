@@ -1,25 +1,35 @@
 # Delivery Dashboard
 
 **Status:** Living document — updated after each completed story  
-**Last updated:** 2026-04-03 (Wave 7 complete, S08-06 security hardening partially implemented)  
+**Last updated:** 2026-04-13 (post-delivery audit — Wave 3 and Wave 7 gaps reopened; see [audit.md](audit.md))  
 **Scope:** SeaRise Europe MVP — 58 stories across 8 epics, delivered in 8 waves
 
 ---
 
+> **Delivery Audit — 2026-04-13.** A post-Wave-7 audit against the live stack ([audit.md](audit.md)) found that this dashboard overstates completeness on two waves:
+>
+> - **Wave 3 (Geospatial Pipeline)** ships synthetic bounding-box geometries — `europe.geojson` and `coastal_analysis_zone.geojson` have never been produced; `init.sql` seeds `ST_GeomFromText('MULTIPOLYGON(((-25 34, 45 34, ...)))')` as a dev placeholder; `run_pipeline.py` never passes `europe_geojson=`. The modules are tested, the end-to-end European baseline is not real.
+> - **Wave 7 (Transparency & A11y)** ships a `PROHIBITED_TERMS` list narrower than `content-audit-log.md` advertises (so "Risk detected" / "No risk detected" pass the gate), an i18n lint with `title="` and import-based blind spots, and an a11y report whose focus-restoration claim is not implemented in `MethodologyPanel`.
+> - **Wave 1 (S01-05)** ADR-019 selects Azure Maps, but `Program.cs` still registers `NominatimGeocodingClient` as `IGeocodingService`. The production geocoder is a paper decision.
+>
+> The historical story counts below are preserved for continuity. The corrected engineering state and re-plan live in `audit.md`. Waves marked **PARTIAL** in the wave bar below have confirmed open gaps.
+
 ## Progress Snapshot
 
 ```text
-  ██████████████████░░  81% COMPLETE  ·  47 of 58 stories delivered
+  ██████████████████░░  81% COMPLETE (historical)  ·  47 of 58 stories accepted
 ```
+
+> Historical acceptance count. The 2026-04-13 audit reclassified Wave 3 and Wave 7 as PARTIAL with confirmed open gaps. See `audit.md` for the honest engineering state and the re-plan (Phases P0–P3).
 
 | Metric | Value |
 |--------|------:|
-| Stories completed | **47** / 58 |
-| Epics completed | **7** / 8 |
-| Waves fully completed | **7** / 8 |
-| Current wave | Wave 8 — Azure Release (0 / 11) PLANNED |
-| Unit tests passing | 27 unit + 12 integration + 66 frontend (105 total) |
-| Next up | `S08-01` Provision Azure Resources and Key Vault |
+| Stories accepted (historical) | **47** / 58 |
+| Epics completed | **5** / 8 (Wave 3 and Wave 7 reopened by audit) |
+| Waves fully completed | **5** / 8 |
+| Current wave | Audit remediation (Blocks A–D, see `audit.md`) → Wave 8 |
+| Unit tests passing | 39 .NET unit + 26 .NET integration + 80 frontend vitest (145 total) |
+| Next up | `audit.md` Phase P1 (real geometries) + Phase P3.1 (Azure Maps geocoder) |
 
 ```mermaid
 pie title Story Completion
@@ -32,13 +42,13 @@ pie title Story Completion
 ## Wave Progress
 
 ```text
-Wave 1 · Decision Closure      ████████████████████  7/7   100%  DONE
+Wave 1 · Decision Closure      ███████████████████░  7/7   100%  DONE*    (* S01-05 paper-only)
 Wave 2 · Local Dev Environment ████████████████████  3/3   100%  DONE
-Wave 3 · Geospatial Pipeline   ████████████████████  8/8   100%  DONE
+Wave 3 · Geospatial Pipeline   ████████████░░░░░░░░  8/8         PARTIAL  (no real European baseline — see audit.md)
 Wave 4 · Backend API Core      ████████████████████  7/7   100%  DONE
 Wave 5 · Frontend Search       ████████████████████  8/8   100%  DONE
 Wave 6 · Assessment UX         ████████████████████  7/7   100%  DONE
-Wave 7 · Transparency & A11y   ████████████████████  7/7   100%  DONE
+Wave 7 · Transparency & A11y   ██████████████░░░░░░  7/7         PARTIAL  (lint blind spots, stale a11y report — see audit.md)
 Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░░░░░  0/11    0%  PLANNED
 ```
 
@@ -48,14 +58,16 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 
 | # | Epic | Progress | Status |
 |--:|------|:--------:|:------:|
-| 1 | Decision Closure and Delivery Baseline | 7 / 7 (100%) | **Done** |
+| 1 | Decision Closure and Delivery Baseline | 7 / 7 (100%) | **Done**\* |
 | 2 | Local Development Environment | 3 / 3 (100%) | **Done** |
-| 3 | Geospatial Data Pipeline | 8 / 8 (100%) | **Done** |
+| 3 | Geospatial Data Pipeline | 8 / 8 accepted | **PARTIAL** — audit.md P1.1–P1.4 |
 | 4 | Backend API Core | 7 / 7 (100%) | **Done** |
 | 5 | Frontend Shell and Search Flow | 8 / 8 (100%) | **Done** |
 | 6 | Scenario Controls and Assessment UX | 7 / 7 (100%) | **Done** |
-| 7 | Transparency, Accessibility, and Content Compliance | 7 / 7 (100%) | **Done** |
+| 7 | Transparency, Accessibility, and Content Compliance | 7 / 7 accepted | **PARTIAL** — audit.md P2.4, P2.5, P2.7 |
 | 8 | Azure Deployment, Release Hardening, and Go-Live | 0 / 11 (0%) | Planned |
+
+\* S01-05 ADR-019 selects Azure Maps; `Program.cs` still registers Nominatim. Addressed in audit.md P3.1.
 
 ---
 
@@ -70,7 +82,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | S08-03 | Upload COGs and Migrate Data to Azure | Production-like data and storage handoff |
 | S08-04 | Complete Backend Test Suite | Backend verification in CI and staging context |
 | S08-05 | Complete Frontend Test Suite | Frontend verification in CI and staging context |
-| S08-06 | Security Hardening | Headers, rate limits, secret handling, scan fixes — **partially done** (rate limiting, security headers, CSP, request size limit implemented; HTTPS, Key Vault, HSTS pending Azure) |
+| S08-06 | Security Hardening | Headers, rate limits, secret handling, scan fixes — **partially done** (rate limiting, security headers, CSP, request size limit, **HSTS** all implemented; HTTPS enforcement, Key Vault `secretref`, TiTiler CORS, staging CORS verification pending Azure) |
 | S08-07 | Log Audit and Privacy Verification | Logging review and privacy-safe telemetry |
 | S08-08 | E2E Test Suite and Demo Script Validation | Full demo path on local and staging |
 | S08-09 | NFR Verification | Performance, reliability, and operational checks |
@@ -91,7 +103,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | Request size limit | Kestrel `MaxRequestBodySize = 1024` (1 KB) |
 | Architecture docs | `07-security-architecture.md` sections 3.5, 4.5, 4.6, and checklist updated |
 
-**Remaining for S08-06 (requires Azure):** CORS staging verification, HTTPS enforcement, Key Vault `secretref`, HSTS header, TiTiler CORS.
+**Remaining for S08-06 (requires Azure):** CORS staging verification, HTTPS enforcement, Key Vault `secretref`, TiTiler CORS. HSTS is already emitted by both the API ([Program.cs:177](../../src/api/SeaRise.Api/Program.cs#L177)) and the Next.js frontend ([next.config.js](../../src/frontend/next.config.js)) with `max-age=63072000; includeSubDomains; preload`.
 
 ### Transparency, Accessibility, and Content Compliance — 7 stories · Wave 7 · DONE 2026-04-03
 
@@ -171,7 +183,7 @@ Wave 8 · Azure Release         ░░░░░░░░░░░░░░░░
 | S01-01 | Confirm MVP Scenario Set | ADR-016: ssp1-26, ssp2-45, ssp5-85 with display names and descriptions |
 | S01-02 | Confirm Default Scenario and Time Horizon | ADR-017: ssp2-45 + 2050 defaults |
 | S01-03 | Define Coastal Analysis Zone Geometry | ADR-018: Copernicus Coastal Zones 2018, validation spec |
-| S01-05 | Select Production Geocoding Provider | ADR-019: Azure Maps Search, field mapping |
+| S01-05 | Select Production Geocoding Provider | ADR-019: Azure Maps Search, field mapping. **Paper-only** — `Program.cs:70` still wires `NominatimGeocodingClient`; `AzureMapsGeocodingClient` is tracked as audit.md P3.1. |
 | S01-06 | Select Basemap Tile Provider | ADR-020: Azure Maps Light, attribution, key model (amended from MapTiler 2026-04-03) |
 | S01-07 | Produce Seed Data Specification | seed-data-spec.sql with cross-references |
 

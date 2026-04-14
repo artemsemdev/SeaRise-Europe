@@ -38,7 +38,7 @@ export function useAssessment(params: AssessParams | null) {
       : ["assess"],
     queryFn: ({ signal }) => assess(params!, signal),
     enabled: params !== null,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
   });

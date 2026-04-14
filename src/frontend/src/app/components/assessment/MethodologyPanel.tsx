@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, type KeyboardEvent } from "react";
+import { useEffect, useRef } from "react";
 import { useMethodology } from "@/lib/api/methodology";
 import { strings } from "@/lib/i18n/en";
 
@@ -12,9 +12,14 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
   const { data, isLoading, isError } = useMethodology();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
-  // Focus trap and focus management
+  // Focus trap, focus management, and focus restoration on unmount.
   useEffect(() => {
+    // Capture whoever was focused when the drawer opened so we can return to
+    // it on close. This satisfies WCAG 2.4.3 focus order and matches the
+    // claim in docs/delivery/artifacts/a11y-audit-report.md.
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     closeButtonRef.current?.focus();
 
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
@@ -41,7 +46,10 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus();
+    };
   }, [onClose]);
 
   // Prevent scroll on body when panel is open
@@ -96,13 +104,13 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
               className="h-5 w-5 flex-shrink-0 animate-spin rounded-full"
               style={{ border: "2px solid var(--s-high)", borderTopColor: "var(--primary)" }}
             />
-            Loading methodology...
+            {strings.methodology.loading}
           </div>
         )}
 
         {isError && (
           <div className="text-[0.85rem]" style={{ color: "var(--err)" }}>
-            Could not load methodology information. Please try again later.
+            {strings.methodology.error}
           </div>
         )}
 
@@ -116,22 +124,9 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
               >
                 {strings.methodology.dataSources}
               </h3>
-              <p className="text-[0.85rem] leading-[1.7]" style={{ color: "var(--text2)" }}>
-                {data.description}
-              </p>
-            </div>
-
-            {/* Forecast models */}
-            <div className="flex flex-col gap-3">
-              <h3
-                className="text-[1rem] font-semibold"
-                style={{ fontFamily: "var(--font-manrope, Manrope, sans-serif)", color: "var(--text)" }}
-              >
-                {strings.methodology.forecastModels}
-              </h3>
-              {data.models.map((model) => (
+              {[data.seaLevelProjectionSource, data.elevationSource].map((source) => (
                 <div
-                  key={model.id}
+                  key={source.name}
                   className="flex flex-col gap-2 rounded-[var(--r-md)] p-4"
                   style={{ background: "var(--s-high)" }}
                 >
@@ -139,31 +134,63 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
                     className="text-[0.9rem] font-semibold"
                     style={{ fontFamily: "var(--font-manrope, Manrope, sans-serif)", color: "var(--text)" }}
                   >
-                    {model.displayName}
+                    {source.name}
                   </div>
-                  <p className="m-0 text-[0.85rem] leading-[1.7]" style={{ color: "var(--text2)" }}>
-                    {model.description}
-                  </p>
+                  <div className="text-[0.8rem]" style={{ color: "var(--text2)" }}>
+                    {source.provider}
+                  </div>
+                  {source.url && (
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[0.8rem] underline"
+                      style={{ color: "var(--primary)" }}
+                    >
+                      {strings.methodology.sourceLinkLabel}
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
 
-            {/* Limitations */}
+            {/* How it works */}
             <div className="flex flex-col gap-3">
               <h3
                 className="text-[1rem] font-semibold"
                 style={{ fontFamily: "var(--font-manrope, Manrope, sans-serif)", color: "var(--text)" }}
               >
-                {strings.methodology.limitations}
+                {strings.methodology.howItWorks}
+              </h3>
+              <p className="text-[0.85rem] leading-[1.7]" style={{ color: "var(--text2)" }}>
+                {data.whatItDoes}
+              </p>
+            </div>
+
+            {/* What this does NOT account for */}
+            <div className="flex flex-col gap-3">
+              <h3
+                className="text-[1rem] font-semibold"
+                style={{ fontFamily: "var(--font-manrope, Manrope, sans-serif)", color: "var(--text)" }}
+              >
+                {strings.methodology.whatItDoesNotAccount}
               </h3>
               <ul
                 className="flex flex-col gap-2 pl-4 text-[0.85rem] leading-[1.7]"
                 style={{ color: "var(--text2)", listStyle: "disc" }}
               >
-                {data.limitations.map((item) => (
+                {data.whatItDoesNotAccountFor.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+              {data.resolutionNote && (
+                <p
+                  className="text-[0.8rem] italic leading-[1.6]"
+                  style={{ color: "var(--text3)" }}
+                >
+                  {data.resolutionNote}
+                </p>
+              )}
             </div>
 
             {/* Important warning */}
@@ -187,7 +214,7 @@ export default function MethodologyPanel({ onClose }: MethodologyPanelProps) {
               className="pt-4 text-[0.7rem]"
               style={{ color: "var(--text3)", borderTop: "1px solid var(--s-high)" }}
             >
-              {strings.methodology.versionLabel}: {data.methodologyVersion} &middot; {strings.methodology.dataUpdated} {data.dataUpdated}
+              {strings.methodology.versionLabel}: {data.methodologyVersion} &middot; {strings.methodology.dataUpdated} {new Date(data.updatedAt).toISOString().slice(0, 10)}
             </div>
           </>
         )}

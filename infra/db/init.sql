@@ -175,21 +175,31 @@ VALUES (
 
 -- ---------------------------------------------------------------------------
 -- geography_boundaries  (ADR-018)
--- Placeholder geometries -- replaced by actual data in Epic 03.
+-- Intentionally NOT seeded here. Real geometries are loaded by
+-- infra/db/init-geography.sql, which uses psql meta-commands (\set) to
+-- inline data/geometry/*.geojson files mounted at /geometry/. That file is
+-- split out because the test-side integration harness (TestDbFixture.cs)
+-- executes init.sql through Npgsql, which is a plain SQL driver and does
+-- not understand psql meta-commands. The integration tests seed their own
+-- synthetic bbox geometries after loading this file.
 -- ---------------------------------------------------------------------------
 
-INSERT INTO geography_boundaries (name, geom, description, source)
-VALUES (
-  'europe',
-  ST_GeomFromText('MULTIPOLYGON EMPTY', 4326),
-  'WGS84 boundary geometry for supported European countries.',
-  'Natural Earth 10m cultural vectors -- Admin 0 countries, filtered to European countries and dissolved.'
-);
+-- ---------------------------------------------------------------------------
+-- layers  (DEV SYNTHETIC)
+-- All rows point at a single synthetic demo COG produced by the blob-seed
+-- service. (ssp5-85, 2100) is deliberately marked invalid to exercise the
+-- DataUnavailable result state. Replace with real pipeline output when
+-- available.
+-- ---------------------------------------------------------------------------
 
-INSERT INTO geography_boundaries (name, geom, description, source)
-VALUES (
-  'coastal_analysis_zone',
-  ST_GeomFromText('MULTIPOLYGON EMPTY', 4326),
-  'European coastal analysis zone (~10 km inland extent). Locations inside this zone are eligible for exposure assessment; locations outside return OutOfScope.',
-  'Copernicus Land Monitoring Service -- Coastal Zones 2018 (https://land.copernicus.eu/en/products/coastal-zones). Dissolved, cleaned in EPSG:3035, reprojected to EPSG:4326, clipped to europe boundary.'
-);
+INSERT INTO layers (scenario_id, horizon_year, methodology_version, blob_path, layer_valid, generated_at)
+VALUES
+  ('ssp1-26', 2030, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp1-26', 2050, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp1-26', 2100, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp2-45', 2030, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp2-45', 2050, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp2-45', 2100, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp5-85', 2030, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp5-85', 2050, 'v1.0', 'layers/v1.0/demo.tif', true,  '2026-04-03T00:00:00Z'),
+  ('ssp5-85', 2100, 'v1.0', 'layers/v1.0/demo.tif', false, '2026-04-03T00:00:00Z');

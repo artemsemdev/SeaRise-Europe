@@ -27,7 +27,7 @@ public class TiTilerBlobPathValidationTests
                 ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
-                Content = new StringContent("{\"values\":[[1]]}")
+                Content = new StringContent("{\"coordinates\":[4.9,52.37],\"values\":[1.0],\"band_names\":[\"b1\"]}")
             });
         return mock.Object;
     }

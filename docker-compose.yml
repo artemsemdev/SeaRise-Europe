@@ -26,13 +26,15 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      # /v1/* is proxied same-origin via next.config.js rewrites to this URL.
+      # Browser calls stay on localhost:3000 so CSP 'self' is enough.
+      API_INTERNAL_URL: http://api:8080
       NEXT_PUBLIC_BASEMAP_STYLE_URL: ${BASEMAP_STYLE_URL:-}
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -48,12 +50,14 @@ services:
     environment:
       DATABASE_URL: "Host=postgres;Port=5432;Database=searise;Username=searise;Password=dev"
       GEOCODING_API_KEY: ${GEOCODING_API_KEY:-}
-      TILER_BASE_URL: http://tiler:8000
+      TILER_BASE_URL: http://tiler:80
       CORS_ALLOWED_ORIGINS: http://localhost:3000
       ASPNETCORE_ENVIRONMENT: Development
     depends_on:
       postgres:
         condition: service_healthy
+      blob-seed:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 15s
@@ -67,7 +71,7 @@ services:
   tiler:
     image: ghcr.io/developmentseed/titiler:2.0.0
     ports:
-      - "8000:8000"
+      - "8000:80"
     environment:
       # Local Azurite connection string for GDAL VSIAZ driver
       AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1"
@@ -80,7 +84,7 @@ services:
       azurite:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:80/healthz"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -98,7 +102,9 @@ services:
       POSTGRES_USER: searise
       POSTGRES_PASSWORD: dev
     volumes:
-      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./infra/db/init-geography.sql:/docker-entrypoint-initdb.d/02-init-geography.sql:ro
+      - ./data/geometry:/geometry:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U searise -d searise"]
@@ -106,6 +112,24 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Blob Seed (one-shot: synthetic demo COG for local dev)
+  # ---------------------------------------------------------------------------
+  # Generates a tiny synthetic exposure COG covering Europe's bbox and uploads
+  # it to Azurite at 'geospatial/layers/v1.0/demo.tif'. All nine layer rows in
+  # infra/db/init.sql point at this file so that /v1/assess returns real
+  # ModeledExposureDetected / NoModeledExposureDetected results without
+  # needing the full pipeline to have run. Replace with real pipeline output
+  # when available.
+  blob-seed:
+    build: ./infra/blob-seed
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1"
+    depends_on:
+      azurite:
+        condition: service_healthy
+    restart: "no"
 
   # ---------------------------------------------------------------------------
   # Azurite (Azure Blob Storage emulator)

@@ -51,9 +51,6 @@ export default function MapSurface() {
 
   const handleMapClick = useCallback(
     (e: maplibregl.MapMouseEvent) => {
-      const currentLocation = useMapStore.getState().selectedLocation;
-      if (!currentLocation) return;
-
       const newLocation = {
         label: `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`,
         displayContext: "",
