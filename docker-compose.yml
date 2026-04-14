@@ -102,7 +102,9 @@ services:
       POSTGRES_USER: searise
       POSTGRES_PASSWORD: dev
     volumes:
-      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./infra/db/init-geography.sql:/docker-entrypoint-initdb.d/02-init-geography.sql:ro
+      - ./data/geometry:/geometry:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U searise -d searise"]

@@ -175,32 +175,14 @@ VALUES (
 
 -- ---------------------------------------------------------------------------
 -- geography_boundaries  (ADR-018)
--- DEV SYNTHETIC: coarse bbox polygons for local development only.
--- Replace with real Natural Earth / Copernicus Coastal Zones 2018 geometries
--- in Epic 03 when the full pipeline runs.
+-- Intentionally NOT seeded here. Real geometries are loaded by
+-- infra/db/init-geography.sql, which uses psql meta-commands (\set) to
+-- inline data/geometry/*.geojson files mounted at /geometry/. That file is
+-- split out because the test-side integration harness (TestDbFixture.cs)
+-- executes init.sql through Npgsql, which is a plain SQL driver and does
+-- not understand psql meta-commands. The integration tests seed their own
+-- synthetic bbox geometries after loading this file.
 -- ---------------------------------------------------------------------------
-
-INSERT INTO geography_boundaries (name, geom, description, source)
-VALUES (
-  'europe',
-  ST_GeomFromText(
-    'MULTIPOLYGON(((-25 34, 45 34, 45 72, -25 72, -25 34)))',
-    4326
-  ),
-  'DEV SYNTHETIC: coarse bbox covering Europe for local development.',
-  'Synthetic bbox -- replace with Natural Earth 10m Admin 0 dissolved geometry.'
-);
-
-INSERT INTO geography_boundaries (name, geom, description, source)
-VALUES (
-  'coastal_analysis_zone',
-  ST_GeomFromText(
-    'MULTIPOLYGON(((-12 36, 20 36, 20 62, -12 62, -12 36)))',
-    4326
-  ),
-  'DEV SYNTHETIC: coarse bbox used as coastal-zone stand-in for local development.',
-  'Synthetic bbox -- replace with Copernicus Coastal Zones 2018 dissolved ~10 km inland buffer.'
-);
 
 -- ---------------------------------------------------------------------------
 -- layers  (DEV SYNTHETIC)

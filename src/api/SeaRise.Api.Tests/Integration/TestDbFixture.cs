@@ -145,25 +145,41 @@ public class TestDbFixture : IAsyncLifetime
 
     private static async Task SeedGeographyBoundariesAsync(NpgsqlConnection conn)
     {
-        // Replace placeholder EMPTY geometries with simplified test bounding boxes
-        // Europe: rough bounding box covering most of Europe
-        const string updateEurope = @"
-            UPDATE geography_boundaries
-            SET geom = ST_GeomFromText(
-                'MULTIPOLYGON(((-25 34, 45 34, 45 72, -25 72, -25 34)))', 4326)
-            WHERE name = 'europe'";
+        // Seed synthetic test bounding boxes for integration tests. Real
+        // production geometries live in infra/db/init-geography.sql, which
+        // uses psql meta-commands and is not loaded by this fixture (see the
+        // header comment in init.sql). ON CONFLICT keeps us compatible with
+        // both code paths (init.sql-found and SeedMinimalSchemaAsync fallback).
+        const string upsertEurope = @"
+            INSERT INTO geography_boundaries (name, geom, description, source)
+            VALUES (
+                'europe',
+                ST_GeomFromText('MULTIPOLYGON(((-25 34, 45 34, 45 72, -25 72, -25 34)))', 4326),
+                'Integration-test synthetic Europe bbox.',
+                'TestDbFixture'
+            )
+            ON CONFLICT (name) DO UPDATE SET
+                geom = EXCLUDED.geom,
+                description = EXCLUDED.description,
+                source = EXCLUDED.source";
 
-        // Coastal zone: narrow strip along western European coast for testing
-        const string updateCoastal = @"
-            UPDATE geography_boundaries
-            SET geom = ST_GeomFromText(
-                'MULTIPOLYGON(((-10 35, 10 35, 10 60, -10 60, -10 35)))', 4326)
-            WHERE name = 'coastal_analysis_zone'";
+        const string upsertCoastal = @"
+            INSERT INTO geography_boundaries (name, geom, description, source)
+            VALUES (
+                'coastal_analysis_zone',
+                ST_GeomFromText('MULTIPOLYGON(((-10 35, 10 35, 10 60, -10 60, -10 35)))', 4326),
+                'Integration-test synthetic coastal-zone strip.',
+                'TestDbFixture'
+            )
+            ON CONFLICT (name) DO UPDATE SET
+                geom = EXCLUDED.geom,
+                description = EXCLUDED.description,
+                source = EXCLUDED.source";
 
-        await using var cmd1 = new NpgsqlCommand(updateEurope, conn);
+        await using var cmd1 = new NpgsqlCommand(upsertEurope, conn);
         await cmd1.ExecuteNonQueryAsync();
 
-        await using var cmd2 = new NpgsqlCommand(updateCoastal, conn);
+        await using var cmd2 = new NpgsqlCommand(upsertCoastal, conn);
         await cmd2.ExecuteNonQueryAsync();
 
         // Idempotent: init.sql may already seed this row; ON CONFLICT keeps the fixture
