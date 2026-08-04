@@ -84,6 +84,10 @@ Exit evidence:
   unsupported cases;
 - a written methodology decision with no unresolved publication blocker.
 
+Source-lock operation, rights status, cache handling, and upstream incident
+response are documented in the
+[source acquisition operator guide](source-acquisition.md).
+
 ## Workstream 1 — artifact contracts and pipeline
 
 - [ ] Add JSON Schemas for release manifest, scenarios, methodology, source

@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/source-lock-v1.json",
+  "title": "SeaRise Europe source lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sources"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:[a-z0-9._-]*[a-z0-9])?$"
+    },
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "licence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "url",
+        "spdx",
+        "attribution",
+        "redistributionStatus",
+        "reviewer",
+        "reviewedAt",
+        "requiredAcknowledgements"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "spdx": { "type": "string", "minLength": 1 },
+        "attribution": { "type": "string", "minLength": 1 },
+        "redistributionStatus": {
+          "enum": ["approved", "review-required", "restricted", "unknown"]
+        },
+        "reviewer": { "type": ["string", "null"] },
+        "reviewedAt": {
+          "oneOf": [
+            { "type": "string", "format": "date" },
+            { "type": "null" }
+          ]
+        },
+        "requiredAcknowledgements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "notes": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "redistributionStatus": { "const": "approved" } },
+            "required": ["redistributionStatus"]
+          },
+          "then": {
+            "properties": {
+              "reviewer": { "type": "string", "minLength": 1 },
+              "reviewedAt": { "type": "string", "format": "date" }
+            }
+          }
+        }
+      ]
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "url",
+        "resolvedUrl",
+        "resolvedVersion",
+        "mediaType",
+        "cachePath",
+        "availability"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "resolvedUrl": { "$ref": "#/$defs/httpsUrl" },
+        "resolvedVersion": { "type": "string", "minLength": 1 },
+        "mediaType": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
+        "cachePath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "availability": { "enum": ["locked", "expected-absent"] },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "upstreamChecksum": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "availability": { "const": "locked" } },
+            "required": ["availability"]
+          },
+          "then": { "required": ["byteSize", "sha256"] },
+          "else": {
+            "not": {
+              "anyOf": [
+                { "required": ["byteSize"] },
+                { "required": ["sha256"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "selectionStatus",
+        "publisher",
+        "canonicalRecord",
+        "version",
+        "snapshotDate",
+        "licence",
+        "assets"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "selectionStatus": { "enum": ["selected", "candidate"] },
+        "publisher": { "type": "string", "minLength": 1 },
+        "canonicalRecord": { "$ref": "#/$defs/httpsUrl" },
+        "version": { "type": "string", "minLength": 1 },
+        "snapshotDate": { "type": "string", "format": "date" },
+        "licence": { "$ref": "#/$defs/licence" },
+        "assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/asset" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "selectionStatus": { "const": "selected" } },
+            "required": ["selectionStatus"]
+          },
+          "then": { "properties": { "assets": { "minItems": 1 } } }
+        }
+      ]
+    }
+  }
+}

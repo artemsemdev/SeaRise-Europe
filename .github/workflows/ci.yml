@@ -99,7 +99,7 @@ jobs:
         run: dotnet test SeaRise.sln --no-build -c Release --verbosity normal --filter "Category=Integration"
 
   # ---------------------------------------------------------------------------
-  # Pipeline: lint and unit tests
+  # Pipeline: source contracts, lint, and unit tests
   # ---------------------------------------------------------------------------
   pipeline:
     name: Pipeline (ruff, pytest)
@@ -121,6 +121,13 @@ jobs:
 
       - name: Lint (ruff)
         run: ruff check .
+
+      - name: Validate audited source registry
+        run: |
+          python -m searise_pipeline.sources validate
+          python -m searise_pipeline.sources publication-check
+          git -C ../.. check-ignore -q data/raw/sources/example.bin
+          git -C ../.. check-ignore -q artifacts/acquisition-receipts/example.json
 
       - name: Unit tests
         run: pytest tests/ -v
