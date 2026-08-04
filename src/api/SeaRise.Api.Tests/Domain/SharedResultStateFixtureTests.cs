@@ -36,7 +36,11 @@ public class SharedResultStateFixtureTests
             true when testCase.Input.InCoastalZone is false => InEuropeOutsideCoastalZone,
             _ => InEuropeAndCoastalZone
         };
-        var layer = testCase.Input.ClassValue is null ? null : SampleLayer;
+        // The legacy enum has no "coastal membership unknown" value. Compare
+        // its fail-closed no-layer path when the target fixture represents it.
+        var layer = testCase.Input.ClassValue is null || testCase.Input.InCoastalZone is null
+            ? null
+            : SampleLayer;
         var exposed = testCase.Input.ClassValue switch
         {
             1 => true,

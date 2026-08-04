@@ -27,6 +27,12 @@
       "expectedState": "DataUnavailable"
     },
     {
+      "id": "unknown-coastal-membership",
+      "rationale": "Unknown coastal membership must fail closed before any exact class is interpreted.",
+      "input": { "inEurope": true, "inCoastalZone": null, "classValue": 1 },
+      "expectedState": "DataUnavailable"
+    },
+    {
       "id": "coastal-exposed",
       "rationale": "The exact class value 1 maps to modeled exposure detected.",
       "input": { "inEurope": true, "inCoastalZone": true, "classValue": 1 },
