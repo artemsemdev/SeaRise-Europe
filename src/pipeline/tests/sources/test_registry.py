@@ -21,6 +21,7 @@ def test_committed_source_lock_is_valid_and_covers_required_publishers():
         "geonames-cities15000",
         "natural-earth-10m",
         "copernicus-dem-glo30",
+        "copernicus-dem-glo90",
         "copernicus-coastal-zones-2018",
     }
     assert len(registry.targets()) == 4

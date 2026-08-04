@@ -153,6 +153,42 @@
       ]
     },
     {
+      "id": "copernicus-dem-glo90",
+      "selectionStatus": "candidate",
+      "publisher": "European Union and ESA; DLR/Airbus source data",
+      "canonicalRecord": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "version": "2021_1",
+      "snapshotDate": "2026-08-05",
+      "licence": {
+        "name": "Licence for Copernicus DEM instance COP-DEM-GLO-90-F",
+        "url": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "spdx": "LicenseRef-Copernicus-DEM-GLO90",
+        "attribution": "Produced using Copernicus WorldDEM-90 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-05",
+        "requiredAcknowledgements": [
+          "Use the mandatory modified-derivative notice for outputs produced from GLO-90.",
+          "Cite https://doi.org/10.5270/ESA-c5d3d65 where applicable."
+        ],
+        "notes": "Candidate only: Phase 0 must compare GLO-90 with GLO-30 and obtain scientific approval before selecting a production grid."
+      },
+      "assets": [
+        {
+          "id": "netherlands-n52-e004-sample",
+          "url": "https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N52_00_E004_00_DEM/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
+          "resolvedUrl": "https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N52_00_E004_00_DEM/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
+          "resolvedVersion": "2021_1",
+          "mediaType": "image/tiff",
+          "byteSize": 1998003,
+          "sha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2",
+          "upstreamChecksum": "etag:8af6b372f880c9fcb0e1e05280f6a171",
+          "cachePath": "samples/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
+          "availability": "locked"
+        }
+      ]
+    },
+    {
       "id": "copernicus-coastal-zones-2018",
       "selectionStatus": "candidate",
       "publisher": "Copernicus Land Monitoring Service",
