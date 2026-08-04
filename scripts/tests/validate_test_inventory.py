@@ -27,7 +27,14 @@ def _schema_validate(inventory: dict[str, Any], schema_path: Path) -> None:
     try:
         import jsonschema
     except ModuleNotFoundError:
-        required = {"schemaVersion", "updatedAt", "evidence", "suites", "knownGaps"}
+        required = {
+            "schemaVersion",
+            "updatedAt",
+            "evidence",
+            "suites",
+            "baselineTests",
+            "knownGaps",
+        }
         missing = required - inventory.keys()
         if missing:
             raise InventoryError(f"inventory is missing required keys: {sorted(missing)}")
@@ -136,9 +143,32 @@ def validate_inventory(
         elif flake["issue"] is not None or flake["expiresAt"] is not None:
             errors.append(f"{suite_id}: non-quarantined suite cannot carry quarantine metadata")
 
-    uncovered = sorted(_discover_test_files() - covered)
+    discovered = _discover_test_files()
+    uncovered = sorted(discovered - covered)
     if uncovered:
         errors.append(f"test files missing from inventory: {uncovered}")
+
+    suite_ids = {suite["id"] for suite in suites}
+    baseline = inventory["baselineTests"]
+    duplicate_paths = _duplicates(item["path"] for item in baseline)
+    if duplicate_paths:
+        errors.append(f"duplicate baseline test paths: {duplicate_paths}")
+    active_paths = {item["path"] for item in baseline if item["status"] == "active"}
+    if active_paths != discovered:
+        missing = sorted(discovered - active_paths)
+        removed = sorted(active_paths - discovered)
+        if missing:
+            errors.append(f"new tests require an inventory baseline entry: {missing}")
+        if removed:
+            errors.append(f"baseline tests removed without retirement evidence: {removed}")
+    for item in baseline:
+        if item["suite"] not in suite_ids:
+            errors.append(f"{item['path']}: unknown suite {item['suite']}")
+        if item["status"] == "retired":
+            if item["removalGate"] is None or item["replacementEvidence"] is None:
+                errors.append(f"{item['path']}: retired test requires gate and evidence")
+        elif item["replacementEvidence"] is not None:
+            errors.append(f"{item['path']}: active test cannot claim replacement evidence")
     return errors
 
 
