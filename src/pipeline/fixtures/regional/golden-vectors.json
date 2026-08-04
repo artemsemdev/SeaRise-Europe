@@ -1,0 +1,148 @@
+{
+  "classificationStatus": "blocked",
+  "fixtureId": "north-sea-n52-e004-real-source-v1",
+  "review": {
+    "requiredRole": "scientific/data reviewer",
+    "status": "pending"
+  },
+  "schemaVersion": 1,
+  "vectors": [
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2030,
+      "id": "blocked-ssp1-26-2030",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp1-26"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2050,
+      "id": "blocked-ssp1-26-2050",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp1-26"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2100,
+      "id": "blocked-ssp1-26-2100",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp1-26"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2030,
+      "id": "blocked-ssp2-45-2030",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp2-45"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2050,
+      "id": "blocked-ssp2-45-2050",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp2-45"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2100,
+      "id": "blocked-ssp2-45-2100",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp2-45"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2030,
+      "id": "blocked-ssp5-85-2030",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp5-85"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2050,
+      "id": "blocked-ssp5-85-2050",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp5-85"
+    },
+    {
+      "expectedCell": {
+        "column": 237,
+        "row": 134
+      },
+      "expectedState": "data-unavailable",
+      "horizon": 2100,
+      "id": "blocked-ssp5-85-2100",
+      "latitude": 52.098333333333336,
+      "longitude": 4.3254166666666665,
+      "purpose": "blocked-layer-parity-only",
+      "scenario": "ssp5-85"
+    },
+    {
+      "expectedCell": null,
+      "expectedState": "unsupported-geography",
+      "horizon": 2050,
+      "id": "west-outside-regional-artifact",
+      "latitude": 52.098333333333336,
+      "longitude": 4.226041666666667,
+      "purpose": "regional-grid-edge-parity-only",
+      "scenario": "ssp2-45"
+    },
+    {
+      "expectedCell": null,
+      "expectedState": "unsupported-geography",
+      "horizon": 2050,
+      "id": "east-exclusive-edge",
+      "latitude": 52.098333333333336,
+      "longitude": 4.333125,
+      "purpose": "regional-grid-edge-parity-only",
+      "scenario": "ssp2-45"
+    }
+  ]
+}
