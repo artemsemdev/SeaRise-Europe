@@ -39,13 +39,16 @@ TiTiler flow: they assume an IPCC grid, create COGs, upload to Blob Storage,
 register database rows, and optionally spot-check TiTiler. That code remains a
 migration input, not the target pipeline described here.
 
-Known gaps that prohibit a production claim:
+Known gaps that prohibit a production claim (see the
+[Phase 0.2 blocking evidence](../science/phase-0-2-source-and-geography-evidence.md)):
 
-- the real IPCC AR6 source has not passed end-to-end schema and methodology
-  validation in this repository;
+- the documented IPCC AR6 mapping is now fail-closed and tested, but the large
+  regional archive still needs a SHA-256 lock and direct member inspection;
+- relative AR6 change has no reviewed baseline water surface or transformation
+  to the DEM's absolute EGM2008 vertical reference;
 - checked-in demo output is synthetic;
-- current acquisition/alignment assumptions may not match the source's actual
-  location-based dimensions;
+- AR6 alignment now validates the actual flattened one-degree location model;
+  the production target grid remains pending the DEM-resolution decision;
 - the checked-in 25 km coastal zone is a Natural Earth approximation;
 - PMTiles, GeoNames catalogs/indexes, GeoParquet, manifest/STAC generation,
   release signing, and R2 publication are not yet the proven end-to-end path.
