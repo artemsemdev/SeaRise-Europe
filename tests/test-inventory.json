@@ -39,7 +39,7 @@
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent migration safety contract." },
       "commands": { "focused": "python scripts/tests/validate_test_inventory.py && python -m unittest discover -s tests/harness -p 'test_*.py'", "full": "python scripts/tests/validate_test_inventory.py && python -m unittest discover -s tests/harness -p 'test_*.py'" },
-      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "test-contracts", "requiresDocker": false, "requiresCredentials": false },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "repository-2026-08-05", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Standard-library validation over checked-in files only." }
     },
@@ -249,7 +249,7 @@
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Retained scheduled diagnostic; scope changes require a new measured pilot report." },
       "commands": { "focused": null, "full": "python scripts/tests/run_mutation_pilot.py --verify-report tests/evidence/mutation-pilot-result-state.json" },
-      "execution": { "tier": "scheduled", "ciWorkflow": "ci.yml", "ciJob": "test-contracts", "requiresDocker": false, "requiresCredentials": false },
+      "execution": { "tier": "scheduled", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Seven fixed source mutations execute from a temporary directory; final measured runtime was 8.09 ms." }
     },
