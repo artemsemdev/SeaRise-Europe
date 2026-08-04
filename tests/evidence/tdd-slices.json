@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "issue": 73,
+  "recordedAt": "2026-08-05T00:25:00+02:00",
+  "fixture": "tests/fixtures/tdd/five-state-characterization-v1.json",
+  "fixtureClassification": "synthetic characterization-only; not scientific validation",
+  "slices": [
+    {
+      "id": "pipeline-five-state",
+      "owner": "science",
+      "firstFailingTest": "src/pipeline/tests/tdd/test_result_state_characterization.py::test_shared_five_state_characterization",
+      "laterDeletionPermit": {
+        "legacyTest": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs",
+        "gateIssue": 71,
+        "status": "not-authorized",
+        "reason": "Target parity exists, but the approved #71 decommission gate has not passed."
+      },
+      "red": {
+        "command": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/tdd/test_result_state_characterization.py -q",
+        "exitCode": 2,
+        "observedResult": "Collection failed: ModuleNotFoundError: No module named 'searise_pipeline.domain'.",
+        "intendedReasonConfirmed": true
+      },
+      "green": {
+        "command": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/tdd/test_result_state_characterization.py -q",
+        "exitCode": 0,
+        "observedResult": "17 passed in 0.03s after the minimum result-state implementation."
+      },
+      "refactor": {
+        "change": "Extract class-value interpretation from support/coastal precedence.",
+        "command": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/tdd/test_result_state_characterization.py -q",
+        "exitCode": 0,
+        "observedResult": "17 passed in 0.03s; later boundary remediation increased the suite to 18 passing cases."
+      },
+      "compare": {
+        "independentControl": "Legacy C# ResultStateDeterminator consuming the same serialized fixture.",
+        "command": "cd src/api && dotnet test SeaRise.sln -c Release --no-restore --filter FullyQualifiedName~SharedResultStateFixtureTests",
+        "exitCode": 0,
+        "observedResult": "6 passed in 16ms after unknown-coastal fail-closed remediation."
+      },
+      "promotion": {
+        "suite": "pipeline-five-state-characterization",
+        "tier": "fast",
+        "ciGate": ".github/workflows/ci.yml pipeline job",
+        "determinismEvidence": "18 fixed table/property cases; no clock, random, network, locale, or external service."
+      }
+    },
+    {
+      "id": "browser-five-state",
+      "owner": "frontend",
+      "firstFailingTest": "src/frontend/src/__tests__/domain/resultState.characterization.test.ts",
+      "laterDeletionPermit": {
+        "legacyTest": "src/frontend/src/__tests__/components/ResultPanel.test.tsx",
+        "gateIssue": 70,
+        "status": "not-authorized",
+        "reason": "The pure browser mapping does not replace component, accessibility, or production-static journey evidence."
+      },
+      "red": {
+        "command": "cd src/frontend && npm test -- src/__tests__/domain/resultState.characterization.test.ts",
+        "exitCode": 1,
+        "observedResult": "Suite failed to resolve @/lib/domain/resultState; no test executed.",
+        "intendedReasonConfirmed": true
+      },
+      "green": {
+        "command": "cd src/frontend && npm test -- src/__tests__/domain/resultState.characterization.test.ts",
+        "exitCode": 0,
+        "observedResult": "11 passed in 987ms after the minimum browser result-state implementation."
+      },
+      "refactor": {
+        "change": "Extract exact class-value mapping into stateForClass while preserving support precedence.",
+        "command": "cd src/frontend && npm test -- src/__tests__/domain/resultState.characterization.test.ts && npm run type-check",
+        "exitCode": 0,
+        "observedResult": "11 passed in 1.04s and TypeScript type-check passed; boundary remediation increased the suite to 12 passing cases."
+      },
+      "compare": {
+        "independentControl": "Python target and legacy C# determiner consume the same expected states; no expected-value generator is shared.",
+        "commands": [
+          "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/tdd -q",
+          "cd src/api && dotnet test SeaRise.sln -c Release --no-restore --filter FullyQualifiedName~SharedResultStateFixtureTests"
+        ],
+        "exitCode": 0,
+        "observedResult": "18 Python cases and 6 independent C# fixture cases passed."
+      },
+      "promotion": {
+        "suite": "frontend-five-state-characterization",
+        "tier": "fast",
+        "ciGate": ".github/workflows/ci.yml frontend job",
+        "determinismEvidence": "12 serialized/table cases under jsdom; no snapshots, clock, random, browser network, or server."
+      }
+    }
+  ],
+  "legacyDeletionSummary": {
+    "testsDeleted": 0,
+    "baselineLock": "tests/test-inventory.json#/baselineTests",
+    "enforcement": "scripts/tests/validate_test_inventory.py"
+  }
+}
