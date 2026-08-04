@@ -85,3 +85,22 @@ def test_checked_in_masks_are_derived_from_nonempty_real_geography() -> None:
         not coastal or support
         for coastal, support in zip(fixture.coastal_mask, fixture.support_mask)
     )
+
+
+def test_delivery_measurement_is_exact_and_scoped_to_reference_profile() -> None:
+    measurement = json.loads(
+        (FIXTURE_DIR / "delivery-measurements.json").read_text(encoding="utf-8")
+    )
+    receipt = json.loads((FIXTURE_DIR / "build-receipt.json").read_text(encoding="utf-8"))
+    cog = receipt["outputs"]["copernicus-dem-window.cog.tif"]
+
+    assert measurement["artifacts"]["cogByteSize"] == cog["byteSize"]
+    assert measurement["artifacts"]["cogSha256"] == cog["sha256"]
+    assert measurement["byteRanges"]["requestCount"] == 3
+    assert all(
+        item["status"] == 206 and item["exactBytes"]
+        for item in measurement["byteRanges"]["measurements"]
+    )
+    assert measurement["interpretation"]["supportsExactCogRangesOnReferenceProfile"]
+    assert not measurement["interpretation"]["supportsProductionNetworkLatencyClaim"]
+    assert measurement["artifacts"]["pmtiles"]["status"] == "not-generated"
