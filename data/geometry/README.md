@@ -13,6 +13,12 @@ These files are not loaded into a production database. Their presence does not
 mean that the Europe support rule or canonical coastal source has passed the
 ADR-021 Phase 0 scientific gate.
 
+Phase 0.2 added a deterministic rebuild implementation, a 19-point control
+corpus, and measured QA. The results are recorded in
+[`geometry-approximation-qa.json`](../../src/pipeline/science/evidence/geometry-approximation-qa.json).
+They confirm the fixtures are useful migration approximations but also expose
+rebuild and topology differences that block promotion.
+
 ## Files
 
 | File | Built | Source | Role and limitation |
@@ -57,8 +63,8 @@ Current control points:
 | Prague, Zurich, Vienna, Munich, Bratislava | Moscow, Istanbul |
 | Reykjavik, Malta | — |
 
-Boundary points require explicit predicate tests; do not assume the behaviour
-of `contains` and `covers` is interchangeable.
+The explicit candidate predicate is `covers`: boundary points are included.
+Tests prove the same point is covered but not contained.
 
 ## `coastal_analysis_zone.geojson` recipe
 

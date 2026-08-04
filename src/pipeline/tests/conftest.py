@@ -99,5 +99,11 @@ def exposure_tif(tmp_path: Path, dem_tif: Path, slr_tif: Path, coastal_zone_geoj
     from pipeline.compute_exposure import compute_binary_exposure
 
     out = tmp_path / "exposure_raw.tif"
-    compute_binary_exposure(dem_tif, slr_tif, coastal_zone_geojson, out)
+    compute_binary_exposure(
+        dem_tif,
+        slr_tif,
+        coastal_zone_geojson,
+        out,
+        allow_blocked_methodology=True,
+    )
     return out

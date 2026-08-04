@@ -3,9 +3,23 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 import rasterio
 
 from pipeline.compute_exposure import compute_binary_exposure
+from searise_pipeline.science import ScienceContractError
+
+
+def test_exposure_fails_while_scientific_gate_is_blocked(
+    dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path, tmp_path: Path
+):
+    with pytest.raises(ScienceContractError, match="publication gate is blocked"):
+        compute_binary_exposure(
+            dem_tif,
+            slr_tif,
+            coastal_zone_geojson,
+            tmp_path / "blocked.tif",
+        )
 
 
 def test_exposure_produces_binary_values(
@@ -13,7 +27,9 @@ def test_exposure_produces_binary_values(
 ):
     """Output should contain only 0.0, 1.0, and NaN."""
     out = tmp_path / "exposure.tif"
-    compute_binary_exposure(dem_tif, slr_tif, coastal_zone_geojson, out)
+    compute_binary_exposure(
+        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
+    )
 
     with rasterio.open(out) as src:
         data = src.read(1)
@@ -28,7 +44,9 @@ def test_low_elevation_is_exposed(
 ):
     """Pixels with elevation < SLR (2 m) inside the coastal zone should be 1."""
     out = tmp_path / "exposure.tif"
-    compute_binary_exposure(dem_tif, slr_tif, coastal_zone_geojson, out)
+    compute_binary_exposure(
+        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
+    )
 
     with rasterio.open(out) as src:
         data = src.read(1)
@@ -42,7 +60,9 @@ def test_high_elevation_not_exposed(
 ):
     """Pixels with elevation >> SLR inside the coastal zone should be 0."""
     out = tmp_path / "exposure.tif"
-    compute_binary_exposure(dem_tif, slr_tif, coastal_zone_geojson, out)
+    compute_binary_exposure(
+        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
+    )
 
     with rasterio.open(out) as src:
         data = src.read(1)
@@ -56,7 +76,9 @@ def test_outside_coastal_zone_is_nodata(
 ):
     """Pixels outside the coastal zone polygon should be NaN."""
     out = tmp_path / "exposure.tif"
-    compute_binary_exposure(dem_tif, slr_tif, coastal_zone_geojson, out)
+    compute_binary_exposure(
+        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
+    )
 
     with rasterio.open(out) as src:
         data = src.read(1)

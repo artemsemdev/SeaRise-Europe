@@ -11,6 +11,12 @@ are active, amended, or superseded.
 |---|---|---|
 | [ADR-021](ADR-021-static-first-offline-geospatial-architecture.md) | Accepted | Adopt the static-first offline geospatial architecture |
 
+## Proposed ADRs
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-022](ADR-022-phase-0-source-and-geography-gate.md) | Proposed; safety gate enforced | Stop publication until source, datum, DEM, and geography decisions receive their named evidence and approvals |
+
 ## Conventions
 
 - One material architecture decision per file.

@@ -31,7 +31,12 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["pipeline", "searise_pipeline", "searise_pipeline.sources"]
+packages = [
+    "pipeline",
+    "searise_pipeline",
+    "searise_pipeline.science",
+    "searise_pipeline.sources",
+]
 
 [tool.setuptools.package-dir]
 pipeline = "."

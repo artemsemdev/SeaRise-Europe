@@ -1,0 +1,118 @@
+{
+  "$schema": "./source-semantics.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.2-source-semantics",
+  "projection": {
+    "sourceKey": "ipcc-ar6-sea-level/20210809",
+    "sourceId": "ipcc-ar6-sea-level",
+    "version": "20210809",
+    "archive": {
+      "record": "https://zenodo.org/records/6382554",
+      "asset": "ar6-regional-confidence.zip",
+      "byteSize": 9243771601,
+      "upstreamChecksum": "md5:fec362a2385079fac32fa736d4a39944",
+      "sha256LockStatus": "blocking",
+      "memberBasenameTemplate": "total_{scenario}_medium_confidence_values.nc"
+    },
+    "mapping": {
+      "scenarios": {
+        "ssp1-26": "ssp126",
+        "ssp2-45": "ssp245",
+        "ssp5-85": "ssp585"
+      },
+      "variable": "sea_level_change",
+      "dimensions": ["quantiles", "years", "locations"],
+      "expectedSizes": {
+        "quantiles": 107,
+        "years": 14,
+        "locations": 66190
+      },
+      "coordinates": {
+        "latitude": "lat",
+        "longitude": "lon",
+        "locations": "locations",
+        "years": "years",
+        "quantiles": "quantiles"
+      },
+      "coordinateUnits": {
+        "latitude": "Degrees North",
+        "longitude": "Degrees East"
+      },
+      "units": "mm",
+      "unitToMetres": 0.001,
+      "fillValue": -32768,
+      "statistic": {
+        "confidence": "medium",
+        "quantile": 0.5
+      },
+      "years": [2030, 2050, 2100],
+      "baseline": "1995-2014 mean"
+    },
+    "nativeCoordinates": {
+      "model": "flattened-complete-1-degree-global-grid",
+      "locationIdMinimum": 1000000000,
+      "locationCount": 65160,
+      "latitudeCount": 181,
+      "longitudeCount": 360,
+      "longitudeRange": [-180, 179],
+      "crsInterpretation": "longitude/latitude degrees on the source-native global grid"
+    },
+    "transformation": {
+      "method": "bilinear",
+      "gridConstruction": "validate explicit lat/lon coordinates, then reshape by coordinate value",
+      "extrapolation": "none",
+      "nodata": "propagate when the requested point or any required interpolation neighbour is missing",
+      "targetGrid": "pending-dem-resolution-review"
+    },
+    "review": {
+      "status": "pending",
+      "requiredRole": "scientific/data reviewer"
+    }
+  },
+  "terrain": {
+    "sourceId": "copernicus-dem",
+    "release": "2021_1",
+    "type": "digital-surface-model",
+    "horizontalCrs": "WGS84-G1150 (EPSG:4326)",
+    "verticalCrs": "EGM2008 (EPSG:3855)",
+    "verticalUnits": "m",
+    "pixelInterpretation": "RasterPixelIsPoint",
+    "instances": {
+      "GLO-30": {
+        "latitudeSpacingArcSeconds": 1,
+        "sampleLongitudeSpacingArcSeconds": 1.5,
+        "sampleShape": [3600, 2400],
+        "sampleAsset": "Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+        "sampleByteSize": 17037271,
+        "sampleSha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1"
+      },
+      "GLO-90": {
+        "latitudeSpacingArcSeconds": 3,
+        "sampleLongitudeSpacingArcSeconds": 4.5,
+        "sampleShape": [1200, 800],
+        "sampleAsset": "Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
+        "sampleByteSize": 1998003,
+        "sampleSha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2"
+      }
+    },
+    "productionChoice": "pending-scientific-review"
+  },
+  "verticalCompatibility": {
+    "status": "blocked",
+    "reason": "AR6 is relative sea-level change from a 1995-2014 baseline, while Copernicus DEM is an absolute EGM2008 orthometric DSM height.",
+    "missingEvidence": [
+      "a pinned local baseline sea-surface or tidal datum",
+      "a reviewed transformation from that datum to EGM2008",
+      "uncertainty controls demonstrating that the combined vertical error is fit for classification"
+    ],
+    "prohibitedOperation": "publish classification from sea_level_change >= DEM elevation"
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "blockingDecisions": [
+      "projection-archive-sha256",
+      "vertical-datum-reconciliation",
+      "dem-resolution-review"
+    ]
+  }
+}

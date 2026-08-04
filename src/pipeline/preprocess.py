@@ -19,8 +19,10 @@ from typing import Any
 import numpy as np
 import rasterio
 import xarray as xr
-from rasterio.transform import from_bounds
+from rasterio.transform import from_origin
 from rasterio.warp import Resampling, reproject
+
+from searise_pipeline.science import extract_projection_grid, load_science_contracts
 
 logger = logging.getLogger(__name__)
 
@@ -36,58 +38,21 @@ def _extract_slr_grid(
         (slr_array, source_crs, source_transform)
         slr_array is shaped (lat, lon) with Float32 values in metres.
     """
-    with xr.open_dataset(nc_path, engine="netcdf4") as ds:
-        # Identify the sea-level variable — AR6 files use varying names.
-        slr_var = None
-        for candidate in ("sea_level_change", "slc", "sla", "total"):
-            if candidate in ds.data_vars:
-                slr_var = candidate
-                break
-        if slr_var is None:
-            # Fall back to the first non-coordinate data variable.
-            data_vars = list(ds.data_vars)
-            if not data_vars:
-                raise RuntimeError(
-                    f"No data variables found in {nc_path}"
-                )
-            slr_var = data_vars[0]
-            logger.warning(
-                "Could not find expected SLR variable; using '%s'", slr_var
-            )
+    contracts = load_science_contracts()
+    projection = contracts.source_semantics["projection"]
+    with xr.open_dataset(nc_path, engine="netcdf4") as dataset:
+        native_grid = extract_projection_grid(dataset, projection, scenario, horizon)
 
-        da = ds[slr_var]
-
-        # Select the target year (nearest available).
-        if "years" in da.dims:
-            da = da.sel(years=horizon, method="nearest")
-        elif "time" in da.dims:
-            da = da.sel(time=horizon, method="nearest")
-
-        # Select median quantile if the dimension exists.
-        if "quantiles" in da.dims:
-            da = da.sel(quantiles=0.5, method="nearest")
-        elif "quantile" in da.dims:
-            da = da.sel(quantile=0.5, method="nearest")
-
-        # Resolve lat / lon coordinate names.
-        lat_name = "lat" if "lat" in da.coords else "latitude"
-        lon_name = "lon" if "lon" in da.coords else "longitude"
-
-        lats = da.coords[lat_name].values
-        lons = da.coords[lon_name].values
-
-        slr_array: np.ndarray[Any, np.dtype[np.float32]] = da.values.astype(np.float32)
-
-    # Convert mm to metres if values look like millimetres.
-    if np.nanmax(np.abs(slr_array)) > 50:
-        logger.info("SLR values appear to be in mm — converting to metres.")
-        slr_array = slr_array / 1000.0
-
-    # Build a source transform from the coordinate arrays.
-    lat_min, lat_max = float(lats.min()), float(lats.max())
-    lon_min, lon_max = float(lons.min()), float(lons.max())
-    height, width = slr_array.shape
-    src_transform = from_bounds(lon_min, lat_min, lon_max, lat_max, width, height)
+    # Raster rows run north-to-south; native coordinates are sorted ascending.
+    slr_array: np.ndarray[Any, np.dtype[np.float32]] = native_grid.values_m[
+        ::-1, :
+    ].astype(np.float32)
+    src_transform = from_origin(
+        float(native_grid.longitudes[0]) - 0.5,
+        float(native_grid.latitudes[-1]) + 0.5,
+        1.0,
+        1.0,
+    )
     src_crs = rasterio.crs.CRS.from_epsg(4326)
 
     logger.info(

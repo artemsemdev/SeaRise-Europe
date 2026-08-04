@@ -1,0 +1,95 @@
+{
+  "$schema": "./geography-rules.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.2-geography-rules",
+  "predicate": "covers",
+  "support": {
+    "id": "europe-support",
+    "version": "natural-earth-5.1.1-approximation-v1",
+    "status": "approximation",
+    "path": "data/geometry/europe.geojson",
+    "sha256": "1d13eea0db9100bc4b8d97ba513ac43def1cba4be4c13c58654f90d0aecefe5e",
+    "source": {
+      "sourceId": "natural-earth-10m",
+      "version": "5.1.1",
+      "assetId": "admin-0-countries"
+    },
+    "recipe": {
+      "filter": "CONTINENT == 'Europe' AND NAME != 'Russia'",
+      "selectedFeatureCount": 50,
+      "clipBoundsWgs84": [-30, 30, 45, 75],
+      "metricCrs": "EPSG:3035",
+      "legacyBufferDegrees": 0.02,
+      "legacySimplifyDegrees": 0.02,
+      "coordinatePrecision": 4
+    },
+    "outcomes": {
+      "included": [
+        "Natural Earth countries classified as Europe except Russia",
+        "Iceland and European islands retained by the clip",
+        "Azores retained by the clip"
+      ],
+      "excluded": [
+        "Russia",
+        "Turkey",
+        "Canary Islands",
+        "French overseas departments and territories outside the clip"
+      ]
+    },
+    "review": {
+      "status": "pending",
+      "requiredRole": "product owner"
+    }
+  },
+  "coastal": {
+    "id": "coastal-analysis-zone",
+    "version": "natural-earth-5.1.1-25km-approximation-v1",
+    "status": "approximation",
+    "path": "data/geometry/coastal_analysis_zone.geojson",
+    "sha256": "a437d66c24e8883c1c759aeecb81812ee32c747807c0ebfafe6053e10c3313d1",
+    "source": {
+      "sourceId": "natural-earth-10m",
+      "version": "5.1.1",
+      "assetId": "ocean"
+    },
+    "recipe": {
+      "oceanClipBoundsWgs84": [-35, 28, 48, 77],
+      "metricCrs": "EPSG:3035",
+      "bufferMetres": 25000,
+      "operation": "intersection(buffer(ocean, 25000), europe-support)",
+      "legacySimplifyDegrees": 0.02,
+      "coordinatePrecision": 4
+    },
+    "canonicalSourceComparison": {
+      "sourceId": "copernicus-coastal-zones-2018",
+      "version": "V1-2018",
+      "status": "blocked",
+      "reason": "No checksum-locked downloadable asset or completed rights/scientific-role review exists in the source registry; the publisher also labels the product not yet validated."
+    },
+    "review": {
+      "status": "pending",
+      "requiredRole": "scientific/data reviewer"
+    }
+  },
+  "connectivity": {
+    "id": "ocean-connected-eight-neighbour-v1",
+    "status": "candidate",
+    "neighbourhood": 8,
+    "seedRule": "eligible cells intersecting the pinned ocean geometry at the analysis boundary",
+    "traversalRule": "flood-fill only through edge- or corner-adjacent eligible cells",
+    "nodataRule": "nodata cells are barriers",
+    "publicationRule": "report differences from unfiltered classification; do not select until scientific review",
+    "review": {
+      "status": "pending",
+      "requiredRole": "scientific/data reviewer"
+    }
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "blockingDecisions": [
+      "supported-geography-approval",
+      "canonical-coastal-source",
+      "connectivity-review"
+    ]
+  }
+}

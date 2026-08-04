@@ -1,9 +1,9 @@
-# Provisional Exposure Methodology — v1.0 Candidate
+# Blocked Provisional Exposure Methodology — v1.0 Candidate
 
-> **Status:** Provisional; not approved for a real-data public release
-> **Last reviewed:** 2026-08-04
-> **Decision sources:** ADR-015, amended by [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
-> **Blocking gate:** Phase 0 scientific validation in ADR-021
+> **Status:** Blocked; not approved for a real-data public release
+> **Last reviewed:** 2026-08-05
+> **Decision sources:** ADR-015, amended by [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and proposed [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md)
+> **Blocking gate:** Phase 0.2 found unresolved vertical compatibility and geography decisions
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
@@ -46,9 +46,9 @@ scientific values; the browser reads the exact classification artifact.
 | Default | `ssp2-45`, `2050` |
 | Required layer matrix | 3 scenarios × 3 horizons = 9 layers |
 
-The source variable and quantile that correspond to each product dimension
-must be confirmed from the actual source metadata, not inferred from filenames
-or an assumed raster layout.
+The source variable and quantile are fixed by the Phase 0.2 machine contract.
+They still require scientific/data review and direct inspection of the
+SHA-256-locked regional archive before publication.
 
 ## Source candidates
 
@@ -62,6 +62,29 @@ or an assumed raster layout.
 Raw inputs are acquired once per release into a local or CI cache. They are not
 served to normal site visitors. The release manifest records all inputs and
 published derivatives.
+
+## Phase 0.2 gate result
+
+[Phase 0.2 evidence](science/phase-0-2-source-and-geography-evidence.md)
+established these binding implementation facts:
+
+- IPCC AR6 version `20210809`, variable `sea_level_change`;
+- total medium-confidence values at exact quantile `0.5`;
+- exact years `2030`, `2050`, and `2100`;
+- flattened explicit one-degree grid locations, not an assumed raster;
+- millimetres converted to metres by `0.001`;
+- bilinear interpolation only inside the native coordinate coverage;
+- no extrapolation or nodata bridging;
+- Copernicus DEM release `2021_1` is an EGM2008-referenced DSM;
+- current support/coastal geometry remains `approximation` and uses `covers`.
+
+The gate also established that the candidate formula cannot currently be
+evaluated scientifically. AR6 supplies relative sea-level change from the
+1995–2014 baseline; Copernicus DEM supplies absolute orthometric height.
+Converting units does not provide the missing baseline water surface or datum
+transformation. The pipeline therefore fails by default before producing a
+binary exposure raster. Synthetic and migration tests must opt into the
+blocked methodology explicitly.
 
 ## Required preprocessing record
 
@@ -79,10 +102,11 @@ Before approval, the pipeline must record and test:
 - optional coastline-connectivity screening;
 - numerical precision and deterministic software/container versions.
 
-The existing claim that AR6 is a regular approximately 0.25-degree grid is an
-unverified assumption. Phase 0 must inspect the real dataset; location-based
-projection dimensions require a documented transformation or interpolation
-method before publication.
+The former claim that AR6 is a regular approximately 0.25-degree raster is
+rejected. The pinned location list proves a complete one-degree grid stored on
+the same flattened location dimension as tide gauges. The exact transformation
+is enforced in code and tests; direct archive inspection and review remain
+publication gates.
 
 ## Coastal analysis scope
 
@@ -169,6 +193,10 @@ Methodology `v1.0` may change from `provisional` to `approved` only when:
 - connected-inundation false positives are reviewed and accepted or mitigated;
 - all nine layer combinations pass array, COG, and PMTiles QA;
 - a domain reviewer approves the interpretation and limitations;
+- an approved baseline sea-surface/tidal datum is transformed to EGM2008 with
+  reviewed uncertainty controls;
+- DEM resolution, Europe/territory scope, canonical coastal evidence, and
+  connectivity have explicit approvals;
 - the signed release manifest links this exact methodology revision.
 
 If any condition changes the classification rule, create methodology `v1.1` or
@@ -180,3 +208,4 @@ a superseding ADR rather than editing a released version in place.
 |---|---|---|---|
 | `v1.0` | 2026-04-03 | Proposed | Initial binary comparison |
 | `v1.0` | 2026-08-04 | Provisional | Added real-data, datum, connectivity, provenance, and browser-parity approval gates |
+| `v1.0` | 2026-08-05 | Blocked | Phase 0.2 replaced source heuristics and stopped direct AR6-change versus EGM2008-height publication |

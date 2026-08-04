@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/source-semantics-v1.json",
+  "title": "SeaRise Europe source semantics contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "projection", "terrain", "verticalCompatibility", "publicationGate"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0.2-source-semantics" },
+    "projection": { "$ref": "#/$defs/projection" },
+    "terrain": { "$ref": "#/$defs/terrain" },
+    "verticalCompatibility": { "$ref": "#/$defs/blockingDecision" },
+    "publicationGate": { "$ref": "#/$defs/gate" }
+  },
+  "$defs": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceKey", "sourceId", "version", "archive", "mapping", "nativeCoordinates", "transformation", "review"],
+      "properties": {
+        "sourceKey": { "const": "ipcc-ar6-sea-level/20210809" },
+        "sourceId": { "const": "ipcc-ar6-sea-level" },
+        "version": { "const": "20210809" },
+        "archive": { "$ref": "#/$defs/archive" },
+        "mapping": { "$ref": "#/$defs/mapping" },
+        "nativeCoordinates": { "$ref": "#/$defs/nativeCoordinates" },
+        "transformation": { "$ref": "#/$defs/transformation" },
+        "review": { "$ref": "#/$defs/review" }
+      }
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record", "asset", "byteSize", "upstreamChecksum", "sha256LockStatus", "memberBasenameTemplate"],
+      "properties": {
+        "record": { "type": "string", "format": "uri" },
+        "asset": { "const": "ar6-regional-confidence.zip" },
+        "byteSize": { "const": 9243771601 },
+        "upstreamChecksum": { "const": "md5:fec362a2385079fac32fa736d4a39944" },
+        "sha256LockStatus": { "const": "blocking" },
+        "memberBasenameTemplate": { "const": "total_{scenario}_medium_confidence_values.nc" }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenarios", "variable", "dimensions", "expectedSizes", "coordinates", "coordinateUnits", "units", "unitToMetres", "fillValue", "statistic", "years", "baseline"],
+      "properties": {
+        "scenarios": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ssp1-26", "ssp2-45", "ssp5-85"],
+          "properties": {
+            "ssp1-26": { "const": "ssp126" },
+            "ssp2-45": { "const": "ssp245" },
+            "ssp5-85": { "const": "ssp585" }
+          }
+        },
+        "variable": { "const": "sea_level_change" },
+        "dimensions": {
+          "type": "array",
+          "prefixItems": [{ "const": "quantiles" }, { "const": "years" }, { "const": "locations" }],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "expectedSizes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["quantiles", "years", "locations"],
+          "properties": {
+            "quantiles": { "const": 107 },
+            "years": { "const": 14 },
+            "locations": { "const": 66190 }
+          }
+        },
+        "coordinates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["latitude", "longitude", "locations", "years", "quantiles"],
+          "properties": {
+            "latitude": { "const": "lat" },
+            "longitude": { "const": "lon" },
+            "locations": { "const": "locations" },
+            "years": { "const": "years" },
+            "quantiles": { "const": "quantiles" }
+          }
+        },
+        "coordinateUnits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["latitude", "longitude"],
+          "properties": {
+            "latitude": { "const": "Degrees North" },
+            "longitude": { "const": "Degrees East" }
+          }
+        },
+        "units": { "const": "mm" },
+        "unitToMetres": { "const": 0.001 },
+        "fillValue": { "const": -32768 },
+        "statistic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["confidence", "quantile"],
+          "properties": {
+            "confidence": { "const": "medium" },
+            "quantile": { "const": 0.5 }
+          }
+        },
+        "years": {
+          "type": "array",
+          "prefixItems": [{ "const": 2030 }, { "const": 2050 }, { "const": 2100 }],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "baseline": { "const": "1995-2014 mean" }
+      }
+    },
+    "nativeCoordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model", "locationIdMinimum", "locationCount", "latitudeCount", "longitudeCount", "longitudeRange", "crsInterpretation"],
+      "properties": {
+        "model": { "const": "flattened-complete-1-degree-global-grid" },
+        "locationIdMinimum": { "const": 1000000000 },
+        "locationCount": { "const": 65160 },
+        "latitudeCount": { "const": 181 },
+        "longitudeCount": { "const": 360 },
+        "longitudeRange": {
+          "type": "array",
+          "prefixItems": [{ "const": -180 }, { "const": 179 }],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "crsInterpretation": { "const": "longitude/latitude degrees on the source-native global grid" }
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "gridConstruction", "extrapolation", "nodata", "targetGrid"],
+      "properties": {
+        "method": { "const": "bilinear" },
+        "gridConstruction": { "const": "validate explicit lat/lon coordinates, then reshape by coordinate value" },
+        "extrapolation": { "const": "none" },
+        "nodata": { "const": "propagate when the requested point or any required interpolation neighbour is missing" },
+        "targetGrid": { "const": "pending-dem-resolution-review" }
+      }
+    },
+    "terrain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "release", "type", "horizontalCrs", "verticalCrs", "verticalUnits", "pixelInterpretation", "instances", "productionChoice"],
+      "properties": {
+        "sourceId": { "const": "copernicus-dem" },
+        "release": { "const": "2021_1" },
+        "type": { "const": "digital-surface-model" },
+        "horizontalCrs": { "const": "WGS84-G1150 (EPSG:4326)" },
+        "verticalCrs": { "const": "EGM2008 (EPSG:3855)" },
+        "verticalUnits": { "const": "m" },
+        "pixelInterpretation": { "const": "RasterPixelIsPoint" },
+        "instances": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["GLO-30", "GLO-90"],
+          "properties": {
+            "GLO-30": { "$ref": "#/$defs/demInstance" },
+            "GLO-90": { "$ref": "#/$defs/demInstance" }
+          }
+        },
+        "productionChoice": { "const": "pending-scientific-review" }
+      }
+    },
+    "demInstance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitudeSpacingArcSeconds", "sampleLongitudeSpacingArcSeconds", "sampleShape", "sampleAsset", "sampleByteSize", "sampleSha256"],
+      "properties": {
+        "latitudeSpacingArcSeconds": { "enum": [1, 3] },
+        "sampleLongitudeSpacingArcSeconds": { "enum": [1.5, 4.5] },
+        "sampleShape": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer" }, { "type": "integer" }],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "sampleAsset": { "$ref": "#/$defs/nonEmpty" },
+        "sampleByteSize": { "type": "integer", "minimum": 1 },
+        "sampleSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "blockingDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reason", "missingEvidence", "prohibitedOperation"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "reason": { "$ref": "#/$defs/nonEmpty" },
+        "missingEvidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmpty" } },
+        "prohibitedOperation": { "const": "publish classification from sea_level_change >= DEM elevation" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRole"],
+      "properties": {
+        "status": { "const": "pending" },
+        "requiredRole": { "const": "scientific/data reviewer" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockingDecisions"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "blockingDecisions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["projection-archive-sha256", "vertical-datum-reconciliation", "dem-resolution-review"] },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}
