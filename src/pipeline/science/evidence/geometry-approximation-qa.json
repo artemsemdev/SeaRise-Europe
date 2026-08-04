@@ -1,0 +1,89 @@
+{
+  "coastal": {
+    "areaSquareKilometres": 1183211.9124813115,
+    "boundsWgs84": [-28.8605, 30.0097, 38.317, 74.5472],
+    "componentCount": 240,
+    "geometryType": "MultiPolygon",
+    "perimeterKilometres": 97783.46379080582,
+    "rebuildComparison": {
+      "byteIdenticalToCurrentFixture": false,
+      "deterministicSha256": "a26954673640abfbc0bd970d7756ff32e0d06169cc95c4ef243863d4f0609e9a",
+      "rebuiltAreaSquareKilometres": 1183676.4922984387,
+      "symmetricDifferenceSquareKilometres": 2019.6613352675226
+    },
+    "sha256": "a437d66c24e8883c1c759aeecb81812ee32c747807c0ebfafe6053e10c3313d1",
+    "status": "approximation",
+    "valid": true,
+    "validityReason": "Valid Geometry",
+    "version": "natural-earth-5.1.1-25km-approximation-v1"
+  },
+  "controls": {
+    "count": 19,
+    "outcomes": [
+      {"kind": "estuary-city", "name": "Amsterdam", "passed": true},
+      {"kind": "port", "name": "Rotterdam", "passed": true},
+      {"kind": "estuary-port", "name": "Hamburg", "passed": true},
+      {"kind": "lagoon-port", "name": "Venice", "passed": true},
+      {"kind": "port", "name": "Barcelona", "passed": true},
+      {"kind": "strait-city", "name": "Copenhagen", "passed": true},
+      {"kind": "estuary-port", "name": "Lisbon", "passed": true},
+      {"kind": "island-city", "name": "Reykjavik", "passed": true},
+      {"kind": "island", "name": "Malta", "passed": true},
+      {"kind": "territory-islands", "name": "Azores", "passed": true},
+      {"kind": "inland-city", "name": "Prague", "passed": true},
+      {"kind": "inland-city", "name": "Vienna", "passed": true},
+      {"kind": "inland-city", "name": "Berlin", "passed": true},
+      {"kind": "inland-low-city", "name": "Utrecht", "passed": true},
+      {"kind": "russia-control", "name": "Moscow", "passed": true},
+      {"kind": "turkey-control", "name": "Istanbul", "passed": true},
+      {"kind": "excluded-territory", "name": "Canary Islands", "passed": true},
+      {"kind": "excluded-territory", "name": "French Guiana", "passed": true},
+      {"kind": "outside-europe", "name": "New York", "passed": true}
+    ],
+    "passed": 19
+  },
+  "decision": {
+    "reasons": [
+      "product owner has not approved the supported geography",
+      "Copernicus Coastal Zones has no checksum-locked reviewed asset",
+      "connectivity candidate has not received scientific review",
+      "current fixture bytes differ from deterministic rebuild and coastal geometry extends slightly outside support after legacy rounding"
+    ],
+    "status": "blocked"
+  },
+  "evidenceDate": "2026-08-05",
+  "predicate": "covers",
+  "schemaVersion": 1,
+  "sourceAssets": {
+    "admin0Sha256": "ce1ac7036499a0edd641fbc093cd209a98f96a49d2eca8480aaacad35138a7f6",
+    "oceanSha256": "db626fcd5d50b096b156c78a2cc95011b39f32a61b4e47d147e3f7a77b8b2719"
+  },
+  "support": {
+    "areaSquareKilometres": 5990331.7885237895,
+    "boundsWgs84": [-28.8605, 30.0097, 40.1784, 74.5472],
+    "componentCount": 237,
+    "geometryType": "MultiPolygon",
+    "perimeterKilometres": 74925.05698168714,
+    "rebuildComparison": {
+      "byteIdenticalToCurrentFixture": false,
+      "deterministicSha256": "c7838c991a9120bcb9f43e658fd1f5f013bbab68b886857280397fc7b3a166fa",
+      "rebuiltAreaSquareKilometres": 5990324.356755151,
+      "symmetricDifferenceSquareKilometres": 655.0102072926915
+    },
+    "sha256": "1d13eea0db9100bc4b8d97ba513ac43def1cba4be4c13c58654f90d0aecefe5e",
+    "status": "approximation",
+    "valid": true,
+    "validityReason": "Valid Geometry",
+    "version": "natural-earth-5.1.1-approximation-v1"
+  },
+  "topology": {
+    "boundaryControl": {
+      "contains": false,
+      "covers": true,
+      "latitude": 54.0137,
+      "longitude": 10.8836
+    },
+    "coastalOutsideSupportSquareKilometres": 290.95968174026024,
+    "supportCoversCoastal": false
+  }
+}
