@@ -179,9 +179,17 @@
     "demInstance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["spacingArcSeconds", "sampleAsset", "sampleByteSize", "sampleSha256"],
+      "required": ["latitudeSpacingArcSeconds", "sampleLongitudeSpacingArcSeconds", "sampleShape", "sampleAsset", "sampleByteSize", "sampleSha256"],
       "properties": {
-        "spacingArcSeconds": { "enum": [1, 3] },
+        "latitudeSpacingArcSeconds": { "enum": [1, 3] },
+        "sampleLongitudeSpacingArcSeconds": { "enum": [1.5, 4.5] },
+        "sampleShape": {
+          "type": "array",
+          "prefixItems": [{ "type": "integer" }, { "type": "integer" }],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
         "sampleAsset": { "$ref": "#/$defs/nonEmpty" },
         "sampleByteSize": { "type": "integer", "minimum": 1 },
         "sampleSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }

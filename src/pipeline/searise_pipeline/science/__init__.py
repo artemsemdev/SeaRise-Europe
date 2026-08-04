@@ -9,6 +9,7 @@ from .contracts import (
     projection_mapping,
     verify_geometry_assets,
 )
+from .dem import compare_dem_samples, inspect_dem_sample
 
 __all__ = [
     "Ar6GridSlice",
@@ -16,8 +17,10 @@ __all__ = [
     "ScienceContracts",
     "assert_publication_ready",
     "bilinear_sample",
+    "compare_dem_samples",
     "extract_projection_grid",
     "load_science_contracts",
+    "inspect_dem_sample",
     "projection_mapping",
     "verify_geometry_assets",
     "validate_ar6_schema",

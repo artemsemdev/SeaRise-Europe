@@ -1,0 +1,71 @@
+{
+  "comparison": "GLO-30 bilinear resampled to the GLO-90 native grid",
+  "decision": {
+    "reason": "One source window and no independent vertical truth cannot establish the production DEM resolution.",
+    "status": "pending-scientific-review"
+  },
+  "evidenceDate": "2026-08-05",
+  "instances": {
+    "GLO-30": {
+      "asset": "Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+      "blockShapes": [[1024, 1024]],
+      "bounds": [3.999791666666667, 52.00013888888889, 4.999791666666667, 53.00013888888889],
+      "byteSize": 17037271,
+      "horizontalCrs": "EPSG:4326",
+      "latitudeSpacingArcSeconds": 1.0,
+      "longitudeSpacingArcSeconds": 1.5,
+      "maskedPixelCount": 0,
+      "maximumMetres": 60.50221252441406,
+      "meanMetres": -0.059642400592565536,
+      "minimumMetres": -20.631919860839844,
+      "nodata": null,
+      "overviewFactors": [2, 4, 8],
+      "pixelCount": 8640000,
+      "pixelInterpretation": "Point",
+      "sha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1",
+      "shape": [3600, 2400],
+      "units": "m",
+      "verticalCrs": "EGM2008 (EPSG:3855)"
+    },
+    "GLO-90": {
+      "asset": "Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
+      "blockShapes": [[2048, 2048]],
+      "bounds": [3.999375, 52.000416666666666, 4.999375000000001, 53.000416666666666],
+      "byteSize": 1998003,
+      "horizontalCrs": "EPSG:4326",
+      "latitudeSpacingArcSeconds": 3.0,
+      "longitudeSpacingArcSeconds": 4.5,
+      "maskedPixelCount": 0,
+      "maximumMetres": 57.13532257080078,
+      "meanMetres": -0.06163647770881653,
+      "minimumMetres": -11.670032501220703,
+      "nodata": null,
+      "overviewFactors": [2, 4],
+      "pixelCount": 960000,
+      "pixelInterpretation": "Point",
+      "sha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2",
+      "shape": [1200, 800],
+      "units": "m",
+      "verticalCrs": "EGM2008 (EPSG:3855)"
+    }
+  },
+  "metrics": {
+    "maximumAbsoluteDifferenceMetres": 7.116770267486572,
+    "meanAbsoluteDifferenceMetres": 0.07935144007205963,
+    "p95AbsoluteDifferenceMetres": 0.4211045071482656,
+    "p99AbsoluteDifferenceMetres": 0.9661990928649904,
+    "pixelCountRatioGlo30ToGlo90": 9.0,
+    "resampleWallSeconds": 0.1206175410000001,
+    "rootMeanSquareDifferenceMetres": 0.22283871471881866,
+    "signedMeanDifferenceMetres": 0.0030643974896520376,
+    "sourceByteRatioGlo30ToGlo90": 8.527149859134346,
+    "validPixelCount": 960000
+  },
+  "references": [
+    "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+    "https://registry.opendata.aws/copernicus-dem/"
+  ],
+  "schemaVersion": 1,
+  "sourceRelease": "2021_1",
+  "window": "N52 E004"
+}

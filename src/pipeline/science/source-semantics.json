@@ -79,13 +79,17 @@
     "pixelInterpretation": "RasterPixelIsPoint",
     "instances": {
       "GLO-30": {
-        "spacingArcSeconds": 1,
+        "latitudeSpacingArcSeconds": 1,
+        "sampleLongitudeSpacingArcSeconds": 1.5,
+        "sampleShape": [3600, 2400],
         "sampleAsset": "Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
         "sampleByteSize": 17037271,
         "sampleSha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1"
       },
       "GLO-90": {
-        "spacingArcSeconds": 3,
+        "latitudeSpacingArcSeconds": 3,
+        "sampleLongitudeSpacingArcSeconds": 4.5,
+        "sampleShape": [1200, 800],
         "sampleAsset": "Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
         "sampleByteSize": 1998003,
         "sampleSha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2"
