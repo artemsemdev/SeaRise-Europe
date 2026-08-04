@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "north-sea-n52-e004-real-source-v1",
+  "description": "Native-resolution Scheveningen coastal window used only for blocked-gate domain and delivery mechanics.",
+  "sourceWindow": {
+    "columnOffset": 544,
+    "rowOffset": 3112,
+    "width": 256,
+    "height": 256
+  },
+  "outputs": {
+    "demCog": "copernicus-dem-window.cog.tif",
+    "lookupFixture": "lookup-fixture.json",
+    "goldenVectors": "golden-vectors.json",
+    "buildReceipt": "build-receipt.json"
+  }
+}
