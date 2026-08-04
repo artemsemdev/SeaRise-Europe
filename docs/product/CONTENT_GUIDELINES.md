@@ -227,11 +227,14 @@ near-zero idle cost within current free allowances,” not “free forever.” U
 
 ## 9. Visual mock status
 
-The HTML mocks in `docs/product/Mock/pages/` are visual direction only. They
-contain legacy geocoder/API states, five relative horizons, provider-named
-scenarios, and unsafe “risk/no risk” result labels. None of those elements is
-approved product copy or behaviour. See
-[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for reconciliation.
+The self-contained [SeaRise Flight mock](Mock/SeaRise-Flight.html) is the active
+visual and interaction direction. It replaces the legacy multi-page mock set.
+The mock uses synthetic illustrative values and remains subordinate to this
+guide, the PRD, methodology, release contracts, accessibility requirements, and
+ADR-021. Fixture counts, release IDs, artifact paths, timings, coordinates, and
+classifications must not be copied into production as constants. See
+[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for the implementation
+scope, required corrections, missing states, and GitHub issue links.
 
 ## 10. Prohibited language
 

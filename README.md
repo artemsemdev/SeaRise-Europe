@@ -11,9 +11,11 @@ coastal exposure across three IPCC scenarios and the 2030, 2050, and 2100
 horizons. It combines a cautious user experience with a reproducible geospatial
 data-product architecture.
 
-<p align="center">
-  <img src="docs/product/Mock/preview-exposure.png" alt="SeaRise Europe modeled-exposure result" width="720">
-</p>
+> **Design preview:** Open the self-contained
+> [SeaRise Flight interactive mock](docs/product/Mock/SeaRise-Flight.html), then
+> review its [implementation scope map](docs/product/Mock/MOCK_REQUIREMENTS_MAP.md).
+> The mock uses synthetic illustrative data and does not override the PRD,
+> methodology, or accepted architecture.
 
 > **Migration status:** ADR-021 was accepted on 2026-08-04. The repository still
 > contains the legacy distributed implementation while the static-first path is
