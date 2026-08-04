@@ -240,6 +240,20 @@
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "17 deterministic table/property cases passed in 0.03 seconds." }
     },
     {
+      "id": "pipeline-result-state-mutation-pilot",
+      "layer": "scientific",
+      "owner": "science",
+      "purpose": "Detect weak five-state boundaries with a bounded set of high-risk operator mutations.",
+      "sourcePaths": ["scripts/tests/run_mutation_pilot.py", "tests/evidence/mutation-pilot-result-state.json"],
+      "changedPaths": ["src/pipeline/searise_pipeline/domain/result_state.py", "tests/fixtures/tdd/five-state-characterization-v1.json", "scripts/tests/run_mutation_pilot.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Retained scheduled diagnostic; scope changes require a new measured pilot report." },
+      "commands": { "focused": null, "full": "python scripts/tests/run_mutation_pilot.py --verify-report tests/evidence/mutation-pilot-result-state.json" },
+      "execution": { "tier": "scheduled", "ciWorkflow": "ci.yml", "ciJob": "test-contracts", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Seven fixed source mutations execute from a temporary directory; final measured runtime was 8.09 ms." }
+    },
+    {
       "id": "pipeline-static-checks",
       "layer": "static-analysis",
       "owner": "data",
