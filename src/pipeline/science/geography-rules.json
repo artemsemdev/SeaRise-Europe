@@ -16,6 +16,7 @@
     },
     "recipe": {
       "filter": "CONTINENT == 'Europe' AND NAME != 'Russia'",
+      "selectedFeatureCount": 50,
       "clipBoundsWgs84": [-30, 30, 45, 75],
       "metricCrs": "EPSG:3035",
       "legacyBufferDegrees": 0.02,

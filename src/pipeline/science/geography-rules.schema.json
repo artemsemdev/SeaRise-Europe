@@ -57,9 +57,10 @@
     "supportRecipe": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["filter", "clipBoundsWgs84", "metricCrs", "legacyBufferDegrees", "legacySimplifyDegrees", "coordinatePrecision"],
+      "required": ["filter", "selectedFeatureCount", "clipBoundsWgs84", "metricCrs", "legacyBufferDegrees", "legacySimplifyDegrees", "coordinatePrecision"],
       "properties": {
         "filter": { "const": "CONTINENT == 'Europe' AND NAME != 'Russia'" },
+        "selectedFeatureCount": { "const": 50 },
         "clipBoundsWgs84": {
           "type": "array",
           "prefixItems": [{ "const": -30 }, { "const": 30 }, { "const": 45 }, { "const": 75 }],

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "predicate": "covers",
+  "controls": [
+    {"name": "Amsterdam", "kind": "estuary-city", "longitude": 4.9041, "latitude": 52.3676, "support": true, "coastal": true},
+    {"name": "Rotterdam", "kind": "port", "longitude": 4.4777, "latitude": 51.9244, "support": true, "coastal": true},
+    {"name": "Hamburg", "kind": "estuary-port", "longitude": 9.9937, "latitude": 53.5511, "support": true, "coastal": true},
+    {"name": "Venice", "kind": "lagoon-port", "longitude": 12.3155, "latitude": 45.4408, "support": true, "coastal": true},
+    {"name": "Barcelona", "kind": "port", "longitude": 2.1734, "latitude": 41.3851, "support": true, "coastal": true},
+    {"name": "Copenhagen", "kind": "strait-city", "longitude": 12.5683, "latitude": 55.6761, "support": true, "coastal": true},
+    {"name": "Lisbon", "kind": "estuary-port", "longitude": -9.1393, "latitude": 38.7223, "support": true, "coastal": true},
+    {"name": "Reykjavik", "kind": "island-city", "longitude": -21.9426, "latitude": 64.1466, "support": true, "coastal": true},
+    {"name": "Malta", "kind": "island", "longitude": 14.3754, "latitude": 35.9375, "support": true, "coastal": true},
+    {"name": "Azores", "kind": "territory-islands", "longitude": -25.6666, "latitude": 37.7412, "support": true, "coastal": true},
+    {"name": "Prague", "kind": "inland-city", "longitude": 14.4378, "latitude": 50.0755, "support": true, "coastal": false},
+    {"name": "Vienna", "kind": "inland-city", "longitude": 16.3738, "latitude": 48.2082, "support": true, "coastal": false},
+    {"name": "Berlin", "kind": "inland-city", "longitude": 13.405, "latitude": 52.52, "support": true, "coastal": false},
+    {"name": "Utrecht", "kind": "inland-low-city", "longitude": 5.1214, "latitude": 52.0907, "support": true, "coastal": false},
+    {"name": "Moscow", "kind": "russia-control", "longitude": 37.6173, "latitude": 55.7558, "support": false, "coastal": false},
+    {"name": "Istanbul", "kind": "turkey-control", "longitude": 28.9784, "latitude": 41.0082, "support": false, "coastal": false},
+    {"name": "Canary Islands", "kind": "excluded-territory", "longitude": -15.43, "latitude": 28.1, "support": false, "coastal": false},
+    {"name": "French Guiana", "kind": "excluded-territory", "longitude": -53.1258, "latitude": 3.9339, "support": false, "coastal": false},
+    {"name": "New York", "kind": "outside-europe", "longitude": -74.006, "latitude": 40.7128, "support": false, "coastal": false}
+  ]
+}
