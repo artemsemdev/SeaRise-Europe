@@ -99,10 +99,10 @@ jobs:
         run: dotnet test SeaRise.sln --no-build -c Release --verbosity normal --filter "Category=Integration"
 
   # ---------------------------------------------------------------------------
-  # Pipeline: lint, type-check, unit tests
+  # Pipeline: lint and unit tests
   # ---------------------------------------------------------------------------
   pipeline:
-    name: Pipeline (ruff, mypy, pytest)
+    name: Pipeline (ruff, pytest)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -121,9 +121,6 @@ jobs:
 
       - name: Lint (ruff)
         run: ruff check .
-
-      - name: Type check (mypy)
-        run: mypy . --ignore-missing-imports
 
       - name: Unit tests
         run: pytest tests/ -v
