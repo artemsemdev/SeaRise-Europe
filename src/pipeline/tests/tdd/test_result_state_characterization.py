@@ -7,6 +7,7 @@ from itertools import product
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from searise_pipeline.domain.result_state import determine_result_state
 from tests.builders.result_state import assessment_sample
@@ -15,6 +16,13 @@ FIXTURE_PATH = (
     Path(__file__).parents[4] / "tests/fixtures/tdd/five-state-characterization-v1.json"
 )
 FIXTURE = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+SCHEMA_PATH = Path(__file__).parents[4] / "tests/contracts/shared-fixture.schema.json"
+
+
+def test_shared_fixture_conforms_to_cross_language_contract() -> None:
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+    Draft202012Validator(schema).validate(FIXTURE)
 
 
 @pytest.mark.parametrize("case", FIXTURE["cases"], ids=lambda case: case["id"])
