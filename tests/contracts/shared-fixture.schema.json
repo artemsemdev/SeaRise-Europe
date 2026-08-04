@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/shared-fixture.schema.json",
+  "title": "SeaRise shared cross-language fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "fixtureId",
+    "kind",
+    "owner",
+    "reviewStatus",
+    "methodologyVersion",
+    "purpose",
+    "cases"
+  ],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "fixtureId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+-v[0-9]+$" },
+    "kind": { "enum": ["synthetic", "source-sample", "golden", "invalid"] },
+    "owner": { "enum": ["data", "frontend", "platform", "science", "security"] },
+    "reviewStatus": {
+      "enum": ["characterization-only", "pending-science-review", "approved-golden"]
+    },
+    "methodologyVersion": { "type": "string", "minLength": 1 },
+    "purpose": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["licence", "attribution"],
+      "properties": {
+        "licence": { "type": "string", "minLength": 1 },
+        "attribution": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rationale", "input", "expectedState"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+          "rationale": { "type": "string", "minLength": 1 },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["inEurope", "inCoastalZone", "classValue"],
+            "properties": {
+              "inEurope": { "type": "boolean" },
+              "inCoastalZone": { "type": ["boolean", "null"] },
+              "classValue": { "type": ["integer", "null"], "enum": [0, 1, null] }
+            }
+          },
+          "expectedState": {
+            "enum": [
+              "ModeledExposureDetected",
+              "NoModeledExposureDetected",
+              "DataUnavailable",
+              "OutOfScope",
+              "UnsupportedGeography"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "source-sample" } } },
+      "then": { "required": ["source"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "golden" } } },
+      "then": {
+        "required": ["source"],
+        "properties": { "reviewStatus": { "const": "approved-golden" } }
+      }
+    }
+  ]
+}
