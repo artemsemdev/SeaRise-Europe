@@ -1,4 +1,7 @@
-"""Pipeline orchestration CLI (S03-08).
+"""Legacy pipeline orchestration CLI.
+
+This command drives the Azure/PostgreSQL migration baseline. It is not the
+ADR-021 immutable release builder and does not authorize a scientific release.
 
 Executes the full geospatial pipeline from download through activation
 for all requested scenario x horizon combinations.

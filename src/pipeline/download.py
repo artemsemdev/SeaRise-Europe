@@ -1,4 +1,7 @@
-"""Step 1: Download and cache source data (S03-02).
+"""Legacy pipeline step: download and cache source data.
+
+ADR-021 requires the real source schema, licence, and checksum to pass Phase 0
+before this module can contribute to a publishable release.
 
 Downloads IPCC AR6 sea-level projection NetCDF files and Copernicus DEM
 GeoTIFF tiles, caching locally to avoid repeated network requests.

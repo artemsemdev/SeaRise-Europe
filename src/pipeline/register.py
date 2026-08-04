@@ -1,6 +1,11 @@
-"""Step 7: Register layers and seed metadata in PostgreSQL (S03-07).
+"""Legacy step: register layers and seed metadata in PostgreSQL.
 
-Seeds the following tables from the Epic 01 specification:
+This module belongs to the migration baseline. ADR-021 replaces database
+registration with an immutable release manifest and removes PostgreSQL from
+the production path. Keep it only for old/new parity until the removal gate
+passes.
+
+It retains the following legacy tables for comparison:
   - scenarios       (ADR-016, ADR-017)
   - horizons        (ADR-017, FR-015)
   - methodology_versions  (ADR-015)
@@ -24,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Seed data (from docs/delivery/artifacts/seed-data-spec.sql)
+# Legacy seed data; active product invariants live in ADR-021 and the PRD.
 # ---------------------------------------------------------------------------
 
 _SCENARIOS = [
@@ -198,7 +203,7 @@ def seed_geography_boundaries(
 
     If GeoJSON paths are provided, real geometries are loaded via PostGIS
     ``ST_GeomFromGeoJSON``.  Otherwise placeholder EMPTY geometries are used
-    (matching the Epic 02 init.sql baseline).
+    (matching the legacy ``init.sql`` migration baseline).
     """
     import geopandas as gpd
 

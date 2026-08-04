@@ -1,375 +1,229 @@
-# 14 — Integration Patterns
+# Integration and Static Contract Patterns
 
-> **Status:** Proposed Architecture
-> **Scope:** How the system integrates with external services (geocoding provider, TiTiler, Azure Blob Storage, PostgreSQL) and the patterns used to manage failures, timeouts, and provider variability.
+> **Status:** Accepted target patterns
+> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
----
+## Boundary principle
 
-## 1. Integration Inventory
+SeaRise Europe has no application API in the production request path. Its
+integrations are deliberately split into:
 
-| Integration | Direction | Protocol | Auth | Criticality |
-|---|---|---|---|---|
-| API → Geocoding provider | Outbound | HTTPS/REST | API key (header) | High (BR-001 use case requires geocoding) |
-| API → TiTiler (`/point`) | Outbound | HTTP/REST (internal) | None | High (assessment depends on pixel value) |
-| Browser → TiTiler (tiles) | Outbound | HTTPS/REST | None | Medium (overlay display; assessment result already known) |
-| API → PostgreSQL | Outbound | TCP (Npgsql) | Connection string | Critical (all domain logic depends on DB) |
-| TiTiler → Azure Blob | Outbound | HTTPS (GDAL VSIAZ) | Managed identity or connection string | Critical (TiTiler is useless without Blob access) |
-| API → Azure Blob (integrity) | Outbound | HTTPS (Azure SDK) | Managed identity | Low (optional integrity check) |
-| Frontend → API | Outbound | HTTPS/REST | None (public) | High |
+- **build-time ingestion**, where upstream scientific and geographic sources
+  are downloaded, verified, normalized, and converted;
+- **release publication**, where one immutable, validated artifact set is
+  uploaded and signed;
+- **browser delivery**, where ordinary HTTPS static files and byte ranges are
+  read from a pinned release;
+- **non-authoritative visual context**, where OpenFreeMap supplies a basemap.
 
----
+The release, not a service endpoint, is the integration unit.
 
-## 2. Geocoding Provider Integration
+```mermaid
+flowchart LR
+    Sources[Versioned upstream sources]
+    Build[Offline pipeline]
+    Release[Immutable release\nmanifest + STAC + artifacts]
+    CDN[Static host + R2 custom domain]
+    Browser[Browser\nsearch + assess + map]
+    Basemap[OpenFreeMap]
 
-### 2.1 Interface Contract
-
-The geocoding provider is abstracted behind `IGeocodingService`. The production implementation (`AzureMapsGeocodingClient`, ADR-019) adapts the Azure Maps Search API to the internal `GeocodingCandidate` model.
-
-```csharp
-public interface IGeocodingService
-{
-    Task<IReadOnlyList<GeocodingCandidate>> GeocodeAsync(
-        string query,
-        CancellationToken cancellationToken);
-}
+    Sources -->|fetch + checksum| Build
+    Build -->|validate + sign + publish| Release
+    Release --> CDN
+    CDN -->|GET / HEAD / Range| Browser
+    Basemap -. visual context only .-> Browser
 ```
 
-### 2.2 Provider Normalization
+## Integration matrix
 
-Each provider returns candidates in a different format. The adapter's job:
+| Boundary | Direction/time | Contract | Failure policy |
+|---|---|---|---|
+| IPCC AR6 | Inbound, build time | Pinned source URL/version, size, SHA-256, documented dimensions/units/licence | Fail build; never fall back to an unrecorded release |
+| Copernicus DEM/coastal data | Inbound, build time | Pinned product/version, CRS/datum/licence, size and SHA-256 | Fail build; no runtime acquisition |
+| GeoNames + alternate names | Inbound, build time | Pinned snapshot, feature-code policy, CC BY attribution, normalized schema | Fail build or explicitly quarantine invalid rows with counts |
+| Natural Earth | Inbound, build time | Pinned version/checksum and derived-geometry parameters | Fail geometry build |
+| Pipeline -> release | Internal, release time | Manifest/JSON Schema, static STAC, GeoParquet schemas, PMTiles/COG validation, provenance | Block publication on any incomplete or inconsistent contract |
+| CI -> R2 | Outbound, release time | New immutable prefix, least-privilege credential, checksum read-back | Leave candidate unreferenced; never overwrite production objects |
+| Browser -> static site | Runtime | Versioned HTML/JS/CSS/config over HTTPS | Use valid cached shell or show availability state |
+| Browser -> R2 custom domain | Runtime | `GET`, `HEAD`, byte-range `GET`, CORS, immutable caching | Use cached ranges or report missing data; never guess |
+| Browser -> OpenFreeMap | Runtime, optional | MapLibre style/tile protocol and attribution | Degrade to no basemap; assessment remains independent |
 
-| Provider Field | Internal Field | Notes |
-|---|---|---|
-| Provider-specific rank/score | `Rank` (1-based) | Preserve provider order (BR-006) |
-| Display name / formatted address | `Label` | Full place label |
-| Country code | `Country` | ISO 3166-1 alpha-2 |
-| lat / lon / location | `Latitude`, `Longitude` | Float coordinates |
-| Admin1 + country or region | `DisplayContext` | Disambiguates duplicate place names (BR-009) |
+No browser integration targets ASP.NET, Next.js server routes, PostgreSQL,
+TiTiler, Azure Maps geocoding, or a runtime configuration service.
 
-`DisplayContext` construction varies:
-- If provider returns admin hierarchy: `"{region}, {country_display_name}"`
-- If provider returns only country: `"{country_display_name}"`
-- Never: raw address string
+## Release manifest contract
 
-### 2.3 Error Handling
+`manifest.json` is the browser entry point and authoritative contract for one
+`dataReleaseId`. It must be schema-versioned and contain, at minimum:
 
-```csharp
-public async Task<IReadOnlyList<GeocodingCandidate>> GeocodeAsync(string query, CancellationToken ct)
-{
-    try
-    {
-        var response = await _httpClient.GetAsync(BuildUrl(query), ct);
-        response.EnsureSuccessStatusCode();
-        return ParseAndNormalize(await response.Content.ReadAsStringAsync(ct));
-    }
-    catch (HttpRequestException ex)
-    {
-        _logger.LogError("GeocodeProviderError {StatusCode}", ex.StatusCode);
-        throw new GeocodingProviderException("Upstream geocoding provider unavailable", ex);
-    }
-    catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-    {
-        // Timeout (not user cancellation)
-        throw new GeocodingProviderException("Geocoding provider request timed out");
-    }
-    // User cancellation (AbortController) — propagate naturally as OperationCanceledException
-}
+- release ID, methodology version, build time, code commit, and previous
+  release ID;
+- each source's authoritative URL, snapshot/version, licence, attribution,
+  byte size, and SHA-256;
+- pinned processing tools and scientific parameters;
+- Europe support and coastal-zone rules;
+- exactly nine scenario/horizon entries for `ssp1-26`, `ssp2-45`, and
+  `ssp5-85` crossed with `2030`, `2050`, and `2100`;
+- for every artifact: canonical URL, media type, role, byte size, bounds, and
+  SHA-256;
+- control-point, coverage, and data-quality summaries;
+- links to STAC, SLSA-compatible provenance, and the Cosign/Sigstore bundle.
+
+The browser rejects an unsupported schema, mismatched release ID, duplicate or
+missing scenario/horizon, unsafe origin, invalid bounds, or artifact role it
+does not understand. Additive optional fields are allowed within the current
+schema rules; a breaking shape or semantic change increments the schema and
+requires coordinated app support.
+
+An application deployment pins one manifest URL/release ID. A short-lived
+`/release.json` may support discovery or the architecture page, but it must not
+silently switch scientific data inside a session.
+
+## Artifact contracts
+
+### Analysis and visualization
+
+- Visual exposure layers are PMTiles archives addressable with HTTP ranges.
+- Exact binary assessment uses the corresponding lossless analysis COG until a
+  separately approved bit-exact PMTiles implementation replaces it.
+- Both representations derive from the same classified array and share bounds,
+  CRS/transform metadata, scenario, horizon, nodata, release, and checksum
+  lineage.
+- Binary lookup uses nearest-neighbour semantics. Rendered colour is never read
+  as a scientific value.
+- Static STAC describes discovery and provenance; there is no STAC API.
+
+### Geography and search
+
+- Europe support and coastal-analysis geometry are versioned release artifacts.
+- `europe-core` contains qualifying populated places with population >= 500
+  plus national/administrative capitals, so inland search can return
+  `OutOfScope`.
+- `europe-coastal` retains all qualifying active populated places inside the
+  coastal analysis zone without a population threshold.
+- Normalized place records use stable numeric IDs and include canonical/ASCII/
+  alternate names, country/admin, coordinates, population, feature code,
+  distance to coast, coastal flag, and source update time.
+- Serialized indexes are Brotli-compressed, loaded lazily, and initialized in a
+  Web Worker. The normalized record schema and ranking fixtures are the public
+  contract; the chosen open-source search library is replaceable.
+
+### Configuration and methodology
+
+Scenarios, horizons, display copy, result-state mapping, source attribution,
+and methodology are versioned files in the release. Product/scientific
+invariants cannot be overridden by an environment variable or mutable remote
+configuration. A content change that affects interpretation requires a new data
+release and, where ADR-021 requires it, a new ADR.
+
+## HTTP delivery contract
+
+Versioned artifacts use:
+
+```http
+Cache-Control: public, max-age=31536000, immutable
+Access-Control-Allow-Origin: https://<production-site>
+Access-Control-Allow-Methods: GET, HEAD
+Access-Control-Allow-Headers: Range, If-Match
+Access-Control-Expose-Headers: Accept-Ranges, Content-Length, Content-Range, ETag
 ```
 
-`GeocodingProviderException` is caught by the HTTP layer and mapped to HTTP 500 `GEOCODING_PROVIDER_ERROR`.
-
-### 2.4 Timeouts
-
-```csharp
-// Registered in DI container
-services.AddHttpClient<IGeocodingService, ProviderGeocodingClient>(client =>
-{
-    client.BaseAddress = new Uri(config["Geocoding:BaseUrl"]);
-    client.Timeout = TimeSpan.FromSeconds(5);  // Hard timeout — within NFR-002 (2.5s) budget
-    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-});
-```
-
-**Timeout strategy:** 5s total timeout on the geocoding HTTP call. If the provider doesn't respond within 5s, the API returns `GEOCODING_PROVIDER_ERROR`. This keeps the API responsive even when the provider is slow.
-
-### 2.5 Retry Policy
-
-For MVP: **no automatic retry** on geocoding failures. The frontend provides a manual "Retry" button (FR-039). Automatic retries risk amplifying provider outage load and add latency to the user experience.
-
----
-
-## 3. TiTiler Integration (Assessment Point Query)
-
-### 3.1 Pattern: HTTP Request to `/point/{lng},{lat}`
-
-The `ExposureEvaluator` (Option A — see ADR-006) queries TiTiler's point endpoint:
-
-```
-GET {TILER_BASE_URL}/cog/point/{longitude},{latitude}?url={blobStorageUrl}
-
-Response:
-{
-  "coordinates": [4.9041, 52.3676, 1],
-  "values": [[1]],
-  "band_names": ["b1"]
-}
-```
-
-**Pixel value interpretation:**
-- `1` → `ModeledExposureDetected`
-- `0` → `NoModeledExposureDetected`
-- `null` / NoData → treat as `NoModeledExposureDetected` (location is within coastal zone but outside COG extent)
-
-**Confirmed (ADR-015):** Binary methodology — pixel values are 0 or 1. No continuous interpretation needed.
-
-### 3.2 ExposureEvaluator Implementation
-
-```csharp
-public class TilerExposureEvaluator : IExposureEvaluator
-{
-    private readonly HttpClient _tilerClient;
-    private readonly ILogger<TilerExposureEvaluator> _logger;
-
-    public async Task<bool> IsExposedAsync(
-        double latitude,
-        double longitude,
-        ExposureLayer layer,
-        CancellationToken ct)
-    {
-        // Blob URL for the COG — from layer.blobPath (not from request input)
-        var cogUrl = BuildBlobUrl(layer.blobPath);
-        var url = $"/cog/point/{longitude},{latitude}?url={Uri.EscapeDataString(cogUrl)}";
-
-        var response = await _tilerClient.GetAsync(url, ct);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<TilerPointResponse>(ct);
-        var pixelValue = result?.Values?.FirstOrDefault()?.FirstOrDefault();
-
-        _logger.LogDebug("TilerQueryCompleted {PixelValue}", pixelValue);
-
-        return pixelValue == 1;  // ADR-015: binary methodology, pixel 1 = exposed
-    }
-}
-```
-
-### 3.3 TiTiler Timeout and Failure Handling
-
-```csharp
-services.AddHttpClient<IExposureEvaluator, TilerExposureEvaluator>(client =>
-{
-    client.BaseAddress = new Uri(config["Tiler:BaseUrl"]);
-    client.Timeout = TimeSpan.FromSeconds(3);  // Within assessment budget
-});
-```
-
-**Failure:** If TiTiler returns non-2xx or times out, the `AssessmentService` catches the exception and returns HTTP 500 `INTERNAL_ERROR` to the client. There is no fallback assessment path.
-
-### 3.4 Blob URL Construction
-
-The COG URL passed to TiTiler is constructed from the `blob_path` stored in the database:
-
-```csharp
-private string BuildBlobUrl(string blobPath)
-{
-    // blobPath: "layers/v1.0/ssp2-45/2050.tif"
-    // Construct a SAS URL or use connection string-based GDAL VSIAZ path
-    // Option A: TiTiler VSIAZ (Azure connection string configured in TiTiler env)
-    return $"az://geospatial/{blobPath}";   // GDAL VSIAZ URI scheme
-
-    // Option B: HTTPS blob URL (if TiTiler has network access + storage is public-readable)
-    // return $"https://{storageAccount}.blob.core.windows.net/geospatial/{blobPath}";
-}
-```
-
-**Note:** The GDAL VSIAZ scheme (`az://container/path`) requires `AZURE_STORAGE_CONNECTION_STRING` or managed identity configured in TiTiler's environment. The blob container must not be publicly accessible (security requirement).
-
----
-
-## 4. Browser → TiTiler Tile Integration
-
-### 4.1 Pattern: XYZ Tile URL Template
-
-The API returns a `layerTileUrlTemplate` in the assess response (only for `ModeledExposureDetected`):
-
-```
-https://tiler.searise-europe.example.com/cog/tiles/{z}/{x}/{y}.png
-  ?url=https://sa.blob.core.windows.net/geospatial/layers/v1.0/ssp2-45/2050.tif
-  &colormap_name=reds
-  &rescale=0,1
-```
-
-MapLibre uses this template to fetch tiles directly from TiTiler. The API is not in this path.
-
-### 4.2 CORS Requirements
-
-TiTiler must allow tile requests from the frontend domain:
-```
-TITILER_API_CORS_ORIGINS=https://www.searise-europe.example.com
-```
-
-### 4.3 Tile Caching
-
-TiTiler itself does not cache tiles. The browser caches tile responses via standard HTTP caching. COG files are static (`Cache-Control: max-age=86400, public`) — tile responses can be aggressively cached.
-
-If `layerTileUrlTemplate` changes (new methodology version), MapLibre's tile cache is effectively invalidated because the URL changes.
-
----
-
-## 5. PostgreSQL Integration
-
-### 5.1 Connection Management
-
-```csharp
-// Registered in Program.cs
-services.AddNpgsqlDataSource(
-    connectionString,
-    builder => builder
-        .EnableDynamicJson()
-        .ConfigureJsonOptions(options => { /* PostGIS geometry handling */ }));
-```
-
-**Connection pool settings:**
-```
-Maximum Pool Size = 20    // Per API replica; Container Apps may run 1–5 replicas
-Minimum Pool Size = 1
-Connection Idle Lifetime = 300s
-Connection Lifetime = 600s
-```
-
-### 5.2 PostGIS Query Pattern
-
-```csharp
-// Geography check — parameterized, no string interpolation
-const string europeQuery = @"
-    SELECT ST_Within(
-        ST_SetSRID(ST_Point(@Lng, @Lat), 4326),
-        geom
-    ) FROM geography_boundaries WHERE name = 'europe'";
-
-var isInEurope = await connection.ExecuteScalarAsync<bool>(
-    europeQuery,
-    new { Lat = latitude, Lng = longitude });
-```
-
-**Performance:** GIST index on `geography_boundaries.geom` ensures spatial lookups complete in ~20ms.
-
-### 5.3 Health Check
-
-```csharp
-services.AddHealthChecks()
-    .AddNpgsql(connectionString, name: "postgres");
-```
-
-The health check executes `SELECT 1` against PostgreSQL. Failure causes `GET /health` to return HTTP 503.
-
----
-
-## 6. Azure Blob Storage Integration
-
-### 6.1 TiTiler Access (GDAL VSIAZ)
-
-TiTiler reads COGs via GDAL's VSIAZ virtual filesystem driver. This is configured entirely via environment variables — no code changes required:
-
-```
-AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;...
-# OR (preferred): use managed identity via AZURE_CLIENT_ID + AZURE_TENANT_ID
-```
-
-GDAL VSIAZ performs HTTP range requests against the Blob Storage REST API, reading only the COG bytes needed for the requested tile or point query.
-
-### 6.2 API Access (Azure SDK — Integrity Check)
-
-The API may optionally verify blob existence during layer registration (not a runtime check per assessment):
-
-```csharp
-var blobClient = new BlobServiceClient(connectionString);
-var containerClient = blobClient.GetBlobContainerClient("geospatial");
-var blobExists = await containerClient.GetBlobClient(blobPath).ExistsAsync();
-```
-
-This is not in the critical assessment path.
-
----
-
-## 7. Resilience Patterns Summary
-
-| Integration | Timeout | Retry | Circuit Breaker | Fallback |
-|---|---|---|---|---|
-| Geocoding provider | 5s | None (manual retry via UI) | None (MVP) | None — returns `GEOCODING_PROVIDER_ERROR` |
-| TiTiler `/point` | 3s | None | None (MVP) | None — returns `INTERNAL_ERROR` |
-| PostgreSQL | Connection timeout: 5s | Npgsql built-in retry on transient | None explicit | None — returns `INTERNAL_ERROR` |
-| Azure Blob (TiTiler via GDAL) | GDAL default (~30s) | GDAL retry | None | None — TiTiler returns error |
-
-**Phase 2 consideration:** Add Polly-based circuit breaker for geocoding provider. If provider is down for > 60s, fail fast without waiting for individual request timeouts.
-
----
-
-## 8. Frontend Integration Patterns
-
-### 8.1 TanStack Query Configuration
-
-```typescript
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,                  // One automatic retry for transient failures
-      refetchOnWindowFocus: false,
-      staleTime: 0,              // Default — overridden per query
-    },
-  },
-})
-
-// Config query — session-cached
-const { data: config } = useQuery({
-  queryKey: ['config', 'scenarios'],
-  queryFn: fetchScenarios,
-  staleTime: Infinity,           // Never refetch during session
-})
-
-// Assessment query — short-lived cache
-const { data: result } = useQuery({
-  queryKey: ['assess', lat, lng, scenarioId, horizonYear],
-  queryFn: ({ signal }) => fetchAssessment({ lat, lng, scenarioId, horizonYear, signal }),
-  staleTime: 60_000,             // 60s — covers rapid control changes
-  enabled: !!selectedLocation,
-})
-```
-
-### 8.2 Request Cancellation
-
-TanStack Query passes an `AbortSignal` to the `queryFn`. The fetch call forwards this signal:
-
-```typescript
-async function fetchAssessment(
-  params: AssessParams & { signal: AbortSignal }
-): Promise<AssessmentResult> {
-  const response = await fetch('/v1/assess', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-    signal: params.signal,       // AbortController signal from TanStack Query
-  })
-  if (!response.ok) {
-    const error = await response.json()
-    throw new ApiError(error.error.code, error.error.message)
-  }
-  return response.json()
-}
-```
-
-When the query key changes (scenario change), TanStack Query automatically aborts the previous request via the signal.
-
-### 8.3 Error Boundary Strategy
-
-```typescript
-// Two-level error handling:
-// 1. TanStack Query isError state — renders ErrorBanner in the component
-// 2. React ErrorBoundary at page level — catches unexpected render errors
-
-// ErrorBanner receives the error code from the API and shows appropriate copy
-<ErrorBanner
-  code={assessError?.code}   // "INTERNAL_ERROR" | "GEOCODING_PROVIDER_ERROR"
-  onRetry={() => refetch()}
-/>
-```
+The data origin must return correct `Content-Type`, `Content-Length`, `ETag`,
+and `Accept-Ranges: bytes`; a valid partial request returns `206` and
+`Content-Range`. HTML and a mutable discovery pointer are short-lived and
+revalidated. Content-hashed application assets and release-versioned data are
+immutable.
+
+Production and preview CORS origins are explicit. Public open-data access with
+`Access-Control-Allow-Origin: *` would be a product/distribution decision and
+must not be introduced accidentally as a hosting workaround.
+
+## Build-time ingestion pattern
+
+Each upstream adapter follows the same deterministic sequence:
+
+1. Resolve the source only from a reviewed source manifest.
+2. Download into an ignored, isolated cache; never commit raw data by default.
+3. Verify expected size and SHA-256 before parsing.
+4. Inspect actual schema, dimensions, CRS, datum, units, nodata, and licence.
+5. Normalize through a pinned toolchain without modifying the cached original.
+6. Record row/pixel counts, exclusions, transformations, and warnings.
+7. Produce candidate artifacts in a new release workspace.
+8. Pass scientific, contract, licence, and release-diff checks.
+
+Acquisition retries use bounded exponential backoff with jitter for transient
+network/5xx failures. Authentication errors, checksum mismatch, unexpected
+schema, or licence uncertainty fail immediately and require review. A cached
+source may be reused only when its recorded hash matches the requested
+snapshot.
+
+## Publication pattern
+
+Publication is append-only and two-phase:
+
+1. Upload and verify a new immutable release prefix.
+2. Deploy/activate the application build that pins that verified release.
+
+An interrupted upload cannot affect the active app. If post-deploy smoke tests
+fail, redeploy the previous application/release pair. Do not patch or overwrite
+a released object; corrections receive a new `dataReleaseId` and provenance.
+
+OpenTofu owns buckets, domains, CORS, cache policy, and publication identities.
+CI owns release content and activation. Neither the browser nor a developer
+workstation has publish credentials.
+
+## Browser integration and failure semantics
+
+The browser assessment order is stable:
+
+1. Validate coordinates and supported geometry.
+2. Return `UnsupportedGeography` outside the Europe support geometry.
+3. Return `OutOfScope` inside Europe but outside the coastal zone.
+4. Resolve the scenario/horizon artifact from the pinned manifest.
+5. Read the exact classified pixel.
+6. Map nodata, `1`, or `0` to `DataUnavailable`,
+   `ModeledExposureDetected`, or `NoModeledExposureDetected`.
+
+Technical failures do not masquerade as domain results. A missing uncached
+range, malformed manifest, checksum/schema mismatch, unsupported version, or
+network outage displays an explicit technical availability message. Domain
+states keep the meanings defined by ADR-021.
+
+The service worker namespaces caches by application and `dataReleaseId`.
+Previously loaded core data can work offline; the app does not promise that all
+nine Europe-wide layers are cached. Search and assessment remain usable without
+the basemap when required authoritative artifacts are available.
+
+## Compatibility and contract testing
+
+Release CI and production smoke tests must cover:
+
+- JSON Schema and STAC validation;
+- exactly nine complete scenario/horizon combinations;
+- artifact existence, size, SHA-256, role, bounds, and licence lineage;
+- PMTiles and COG structural verification;
+- public `HEAD` and beginning/middle/end range requests;
+- CORS, cache, content type, ETag, and security headers;
+- GeoParquet/search schema, stable IDs, valid coordinates, duplicates, feature
+  codes, aliases, and deterministic ranking;
+- shared Python/TypeScript coordinate-to-cell golden cases;
+- browser network assertions proving zero `/assess`, `/geocode`, and `/config`
+  requests;
+- cached offline success and honest uncached failure;
+- restore of the previous immutable application/release pair.
+
+## Explicit non-patterns
+
+Do not introduce:
+
+- a “temporary” runtime API for deterministic static configuration or lookup;
+- direct browser access to raw IPCC, DEM, or GeoNames source files;
+- runtime fallback to a different dataset, scenario, or release;
+- database or bucket polling for “latest” during a session;
+- rendered pixel-colour interpretation as scientific assessment;
+- silent suppression of schema, source, CORS, or range failures;
+- synchronous search/index work on the UI thread;
+- provider-specific Worker logic that makes static artifacts non-portable.
+
+If a measured requirement cannot be met by these static contracts, document the
+evidence and make the new runtime boundary explicit in a separate ADR.

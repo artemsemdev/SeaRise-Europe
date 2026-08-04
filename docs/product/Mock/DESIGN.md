@@ -1,5 +1,13 @@
 # Design System: The Precision Observatory
 
+> **Status:** Active visual direction
+>
+> **Behaviour and copy:** [PRD](../PRD.md) and [Content guidelines](../CONTENT_GUIDELINES.md)
+
+This document defines visual language only. It does not authorize result copy,
+scenario names, horizons, precision, or functional behaviour that differs from
+the current product requirements.
+
 ## 1. Overview & Creative North Star
 **Creative North Star: The Precision Observatory**
 This design system is built to transform complex geospatial data into an authoritative, editorial experience. It eschews the "cluttered dashboard" trope in favor of a sophisticated, layered environment where scientific caution is reflected through intentional white space and tonal depth.
@@ -31,7 +39,7 @@ For primary Action Buttons or high-level climate indicators, use a subtle **Sign
 We utilize a dual-typeface system to balance editorial authority with scientific legibility.
 
 - **Editorial/Display:** **Manrope** is used for `display`, `headline`, and `title` scales. Its modern, geometric construction feels architectural and premium. Use `headline-lg` (2rem) for location names to create a strong visual anchor.
-- **Technical/Data:** **Inter** is used for all `body` and `label` scales. Inter’s high x-height and neutral character make it the gold standard for reading technical sea-level metrics (e.g., "0.85m Rise by 2100").
+- **Technical/Data:** **Inter** is used for all `body` and `label` scales. Inter’s high x-height and neutral character supports compact scenario, horizon, release, and source metadata (for example, “SSP2-4.5 · 2050”).
 
 **Hierarchy Tip:** Use `label-sm` (Inter, 0.6875rem) in uppercase with 0.05em letter spacing for metadata tags to evoke the feel of a precision instrument.
 
@@ -48,22 +56,22 @@ Hierarchy is achieved through **Tonal Layering** rather than drop shadows.
 Forbid divider lines. Use `spacing-6` (1.3rem) of vertical white space to separate data points.
 - **Background:** `surface_container_low`.
 - **Corner Radius:** `md` (0.375rem) for a crisp, professional edge.
-- **Metric Emphasis:** Place the primary sea-level value in `title-lg` (Inter) colored with `primary` (#9dcaff).
+- **Result Emphasis:** Place the cautious result heading in `title-lg` (Inter) colored with the state-appropriate accessible token. Do not invent a numeric value that is absent from the release contract.
 
 ### Map Location Markers
 - **Style:** A double-ringed "Precision Target."
 - **Outer Ring:** `primary` (#9dcaff) at 30% opacity.
 - **Inner Dot:** Solid `primary`.
-- **Active State:** The outer ring pulses and expands, while the color shifts to `tertiary` (#ffba38) if an exposure alert is active.
+- **Active State:** The outer ring may pulse briefly on selection. When modeled exposure is displayed, a `tertiary` (#ffba38) accent may reinforce the textual state without presenting it as an emergency alert.
 
 ### Control Toggles (Scenarios/Time Horizons)
 - **Container:** `surface_container_highest`.
 - **Selected State:** Use the `primary_container` (#002b4b) background with `primary` text.
 - **Interaction:** A subtle `0.2s` ease-in-out transition on background color shifts. No heavy shadows on toggle buttons.
 
-### Exposure Alerts
-- Use the **Amber Alert System**: `tertiary` (#ffba38) for warning text.
-- **Container:** `tertiary_container` (#392500) with `on_tertiary_container` (#bf8500) text. This provides a "cautious" warning that is highly legible without being "alarmist" (avoiding bright reds).
+### Modeled Exposure Emphasis
+- Use the **Amber Exposure System**: `tertiary` (#ffba38) for the modeled-exposure state, always paired with text.
+- **Container:** `tertiary_container` (#392500) with an accessible foreground token. This provides cautious emphasis without implying an emergency alert or observed flooding.
 
 ## 6. Do's and Don'ts
 
@@ -75,4 +83,4 @@ Forbid divider lines. Use `spacing-6` (1.3rem) of vertical white space to separa
 ### Don't
 - **Don't** use 100% white (#FFFFFF) for text. Use `on_surface` (#dfe3e9) to reduce eye strain in high-contrast dark environments.
 - **Don't** use `none` or `full` roundedness for primary UI panels. Stick to `md` (0.375rem) or `lg` (0.5rem) to maintain a modern, balanced silhouette.
-- **Don't** use "Alert Red" for scientific risks. Use the `tertiary` (Amber) scale to maintain a tone of "Scientific Caution" rather than "Panic."
+- **Don't** use “Alert Red” for modeled exposure. Use the `tertiary` (Amber) scale to maintain scientific caution rather than urgency.

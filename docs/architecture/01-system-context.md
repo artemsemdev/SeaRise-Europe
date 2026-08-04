@@ -1,193 +1,154 @@
 # 01 — System Context
 
-> **Status:** Proposed Architecture
-> **Source of truth:** PRD v0.1 — all FR, BR, NFR, and OQ references below are from `docs/product/PRD.md`
-> **Companion decision baseline:** For the current proposed resolutions of the referenced open questions, see [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
+> **Status:** Accepted target architecture
+> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Implementation:** Migration target; the existing service-based implementation remains temporary until the ADR-021 validation gates pass
 
----
+## Purpose
 
-## 1. System Purpose
+SeaRise Europe is a public, read-only explorer that answers:
 
-SeaRise Europe is a public, anonymous, read-only web application that accepts a free-text European location query and returns a scenario-based coastal sea-level exposure assessment for that location. The system combines precomputed sea-level projection layers with an interactive map to communicate whether a selected point falls within a modeled exposure zone under a chosen climate scenario and future time horizon.
+> Is this European coastal location modeled as exposed to sea-level rise for
+> the selected scenario and time horizon?
 
-The system does **not**:
-- Store user data or personalize responses (BR-001, BR-016)
-- Perform real-time sensor readings or live weather integration (Non-goal #4)
-- Make parcel-level, engineering, legal, insurance, or financial determinations (Non-goal #3, FR-024, FR-025)
-- Cover geographies outside Europe (BR-003)
-- Assess inland hazards other than coastal sea-level exposure (BR-004)
-- Allow user authentication, saved searches, or exports (Non-goals #8, #9)
+The product makes precomputed scientific results understandable and
+inspectable. It does not forecast property-level flooding, guarantee safety,
+estimate probability, or recommend adaptation measures.
 
-These non-goals directly shape the architecture: no auth system, no user database, no real-time pipeline, no export service.
+The target system is a static geospatial data product. Scientific processing
+occurs before publication; a browser searches places, checks scope, reads the
+selected classified value, and renders the result without an application API.
 
----
+## People and systems
 
-## 2. Actors and Users
+| Actor or system | Relationship to SeaRise Europe |
+|---|---|
+| Public visitor | Searches for a settlement, selects a scenario and horizon, explores the map, and reads methodology and limitations. No account is required. |
+| Portfolio reviewer | Inspects the architecture page, release provenance, fitness results, open formats, cost model, and source code. |
+| Maintainer | Pins source snapshots, runs and reviews the offline build, publishes an immutable release, and can roll back to an earlier app/release pair. |
+| IPCC, Copernicus, GeoNames, Natural Earth | Versioned upstream sources used only by the offline build plane. They are not request-time dependencies. |
+| Static host and object storage/CDN | Deliver the application shell, metadata, search indexes, and byte ranges from large geospatial artifacts. |
+| OpenFreeMap | Supplies non-authoritative visual context. Search and assessment remain functional if it is unavailable. |
+| GitHub Actions | Validates and publishes reviewed releases; it is outside the user request path. |
 
-### Human Users
+## System boundary
 
-| Actor | Type | Interaction | Key Requirement |
-|---|---|---|---|
-| Anonymous end user | Human — primary | Enters location query; selects candidate; views result; changes scenario/horizon; opens methodology panel | FR-001–FR-042 collectively |
-| Climate-aware resident / researcher (P-01) | Human — primary persona | Searches specific European coastal address; reads result and methodology | Honest result framing; clear result-state distinction |
-| Educator / communicator (P-02) | Human — secondary persona | Demonstrates tool live; expects methodology panel to be substantive | FR-033 methodology panel; visual clarity at projection size |
-| Portfolio reviewer / technical evaluator (P-03) | Human — secondary persona | Reviews GitHub repo and live demo; tests edge cases | Graceful error handling; real data; documented limitations |
+Inside the SeaRise Europe product boundary:
 
-All human users interact through the same anonymous public interface — no role differentiation in MVP (BR-002).
+- a static React application and its service worker;
+- browser-side search, scope validation, and assessment logic;
+- immutable, versioned release artifacts and their public contracts;
+- an offline data pipeline, scientific QA, provenance, and publication steps;
+- infrastructure-as-code for static hosting, object storage, caching, CORS,
+  and DNS;
+- the public architecture and methodology presentation.
 
-### External Systems (Runtime)
+Outside the product boundary:
 
-| System | Type | Direction | Runtime? | Key Requirement |
-|---|---|---|---|---|
-| Geocoding provider | External HTTP API | Outbound from API container | Yes | FR-004; ADR-019 (Azure Maps Search) |
-| Basemap tile provider | Azure Maps | Outbound from browser | Yes | FR-026; ADR-020 (Azure Maps Light) |
-| Azure Blob Storage | Managed cloud service | Read by TiTiler + API | Yes | NFR-020 (COG format); stores precomputed raster assets |
-| Azure Database for PostgreSQL | Managed cloud service | Read by API container | Yes | Stores scenario config, layer metadata, geography boundaries |
+- upstream source production and scientific stewardship;
+- the OpenFreeMap public service;
+- browser implementation and device storage quotas;
+- Cloudflare's platform and the public Internet;
+- address-level geocoding, user accounts, saved projects, payments, and
+  collaboration features.
 
-### External Systems (Offline / Upstream Pipeline)
-
-| System | Type | Direction | Runtime? | Key Requirement |
-|---|---|---|---|---|
-| NASA AR6 Sea Level Projection Tool | External data source | Inbound to pipeline (manual download) | No — offline only | Dependency #1; source for sea-level projection data |
-| Copernicus DEM (GLO-30) | External data source | Inbound to pipeline (manual download) | No — offline only | Elevation source for Europe; 30m resolution |
-| Copernicus CDS | External data API | Inbound to pipeline | No — offline only | Supporting/contextual data (optional for MVP layers) |
-
----
-
-## 3. System Boundary
-
-```
-┌─────────────────────── SeaRise Europe System ───────────────────────────┐
-│                                                                           │
-│  ┌─────────────┐    ┌────────────────┐    ┌──────────┐                  │
-│  │  Frontend   │    │   API          │    │  TiTiler │                  │
-│  │  (Next.js)  │◄──►│  (ASP.NET Core)│    │          │                  │
-│  └─────────────┘    └────────────────┘    └──────────┘                  │
-│                             │                   │                        │
-│                    ┌────────┴──────┐    ┌───────┴──────┐               │
-│                    │  PostgreSQL   │    │  Blob Storage│               │
-│                    │  (PostGIS)    │    │  (COG files) │               │
-│                    └───────────────┘    └──────────────┘               │
-│                                                                           │
-└───────────────────────────────────────────────────────────────────────────┘
-         │                              │                     ▲
-         ▼                              ▼                     │
-  Geocoding provider           Basemap tile provider    Offline pipeline
-  (Azure Maps — ADR-019)       (Azure Maps — ADR-020)   (NASA AR6 + Copernicus DEM)
-```
-
-**Inside the boundary**: Next.js frontend, ASP.NET Core API, TiTiler, PostgreSQL, Azure Blob Storage, Azure Container Registry, Azure Key Vault.
-
-**Outside the boundary**: Geocoding provider (external API, runtime dependency), basemap tile provider (external CDN, runtime dependency), IPCC AR6 data source (offline, pipeline input), Copernicus DEM data source (offline, pipeline input), CI/CD pipeline infrastructure (GitHub Actions).
-
----
-
-## 4. System Context Diagram
+## Context diagram
 
 ```mermaid
-graph TD
-    User["👤 Anonymous End User\n(Browser)"]
+flowchart LR
+    Visitor[Public visitor]
+    Reviewer[Portfolio reviewer]
+    Maintainer[Maintainer]
 
-    subgraph External["External Services"]
-        Geocoder["Azure Maps Search\n(ADR-019)\nHTTPS / REST"]
-        Basemap["Azure Maps\n(ADR-020)\nVector Tiles"]
+    subgraph SRE[SeaRise Europe]
+        Browser[Static browser application]
+        Release[Immutable data release]
+        Pipeline[Offline build and QA]
+        Evidence[Architecture, methodology and provenance]
     end
 
-    subgraph Upstream["Upstream Data Sources (Offline)"]
-        AR6["NASA AR6\nSea Level Projections\n(pipeline input)"]
-        DEM["Copernicus DEM GLO-30\n(pipeline input)"]
-    end
+    Sources[IPCC / Copernicus / GeoNames / Natural Earth]
+    Host[Static host + object storage/CDN]
+    Basemap[OpenFreeMap]
+    CI[GitHub Actions]
 
-    subgraph System["SeaRise Europe System"]
-        FE["Frontend\nNext.js 14+"]
-        API["API\nASP.NET Core"]
-        Tiler["Tile Server\nTiTiler"]
-        PG["PostgreSQL\n(PostGIS)"]
-        Blob["Azure Blob Storage\n(COG files)"]
-    end
-
-    User -->|"HTTPS — search, results, map"| FE
-    FE -->|"REST JSON"| API
-    FE -->|"XYZ tile requests"| Tiler
-    FE -->|"basemap tiles"| Basemap
-    API -->|"geocoding requests"| Geocoder
-    API -->|"reads scenario/layer/geography data"| PG
-    API -->|"integrity checks"| Blob
-    Tiler -->|"COG range requests"| Blob
-    AR6 -->|"offline pipeline → uploads COGs"| Blob
-    DEM -->|"offline pipeline → uploads COGs"| Blob
-
-    style System fill:#f0f4ff,stroke:#4a6fa5
-    style External fill:#fff8f0,stroke:#c8884a
-    style Upstream fill:#f0fff4,stroke:#4a9a5a
+    Visitor --> Browser
+    Reviewer --> Browser
+    Reviewer --> Evidence
+    Browser --> Release
+    Browser -. visual context .-> Basemap
+    Host --> Browser
+    Host --> Release
+    Sources --> Pipeline
+    Maintainer --> Pipeline
+    Pipeline --> Release
+    Pipeline --> Evidence
+    CI --> Pipeline
+    CI --> Host
 ```
 
----
+## Request-time and release-time boundaries
 
-## 5. Upstream / Downstream Relationships
+The architecture separates two fundamentally different workloads.
 
-### Upstream (feeds the system)
+### Request time
 
-| Source | Relationship | Timing | Notes |
-|---|---|---|---|
-| IPCC AR6 sea-level projections | Offline pipeline input | Phase 0 (initial setup) + periodic refresh (OQ-09) | Consumed via NASA AR6 web tool; license confirmation required (Dependency #1) |
-| Copernicus DEM GLO-30 | Offline pipeline input | Phase 0 + as needed | Free with attribution; 30m resolution |
-| Geocoding provider | Synchronous runtime dependency | Every user search | ADR-019: Azure Maps Search for production; Nominatim for dev only |
+The browser performs bounded, deterministic operations:
 
-### Downstream (the system feeds)
+1. Load the static shell and its pinned release manifest.
+2. Search a prebuilt settlement index in a Web Worker.
+3. Test a selected coordinate against versioned support geometries.
+4. Read only the required byte ranges from the selected analysis artifact.
+5. Map the classified value to one of five result states.
+6. Render the synchronized map, explanation, methodology version, and source
+   attribution.
 
-| Consumer | What they receive | Notes |
-|---|---|---|
-| End user browser | Assessment result, map tiles, methodology text | The only external consumer |
+There is no request-time backend, database, tile server, geocoder, or source
+data processing.
 
-### Key Dependency: Offline Pipeline
+### Release time
 
-The offline geospatial pipeline is not a runtime service — it is a separate concern that populates Blob Storage and PostgreSQL. Once populated, the runtime system is self-contained. The pipeline must complete Phase 0 before Phase 1 development begins (ROADMAP.md Phase 0 exit criteria).
+The offline pipeline performs the expensive and stateful work:
 
----
+1. Fetch and checksum pinned source snapshots.
+2. Normalize, join, classify, and package data.
+3. Produce all nine scenario/horizon combinations and settlement indexes.
+4. Validate scientific control points, schemas, artifact integrity, licences,
+   and performance budgets.
+5. Generate STAC metadata, SLSA-compatible provenance, and a signed manifest.
+6. Publish a new immutable release only after every gate passes.
 
-## 6. Major Constraints from the PRD
+## Product invariants at the boundary
 
-These constraints from the PRD most directly shape architectural decisions:
+- Scenario IDs are `ssp1-26`, `ssp2-45`, and `ssp5-85`.
+- Horizons are `2030`, `2050`, and `2100`.
+- Defaults are `ssp2-45` and `2050`.
+- Every assessment returns exactly one of:
+  `ModeledExposureDetected`, `NoModeledExposureDetected`,
+  `DataUnavailable`, `OutOfScope`, or `UnsupportedGeography`.
+- `OutOfScope` and `UnsupportedGeography` are domain results, not failures.
+- Every visible result is tied to a methodology version and immutable data
+  release.
+- Searches and selected coordinates are not sent to a project-controlled
+  server.
 
-| Constraint | Source | Architectural Impact |
-|---|---|---|
-| Europe-only coverage | BR-003 | Geography validation must be server-side (PostGIS) — client-side is bypassable |
-| Coastal-only scope | BR-004, ADR-018 | Coastal analysis zone is Copernicus Coastal Zones 2018, ~10 km inland, seeded in PostGIS |
-| No user data persistence | BR-016, NFR-007 | No user tables, no session storage, no address logging |
-| Anonymous access | BR-001 | No auth infrastructure, no JWT, no session tokens |
-| COG/PMTiles format required | NFR-020 | TiTiler required; full-file raster transfer is not acceptable |
-| Methodology versioning | NFR-021, FR-035 | Every assess response carries a methodology version identifier; version is displayed in UI |
-| No Kubernetes | NFR-023 | Azure Container Apps is the hosting ceiling |
-| Stateless services | NFR-019 | No sticky sessions, no local state between replicas |
-| WCAG 2.2 AA | NFR-015 | Accessibility is a first-class implementation requirement, not an afterthought |
-| Performance NFRs | NFR-001–NFR-004 | Architecture choices (lazy loading, COG overviews, client-side caching) are driven by specific latency targets |
-| No silent substitution | BR-014 | If a requested scenario/horizon has no data, return DataUnavailable — never fall back to another combination |
-| Scientific honesty | VISION Pillar 1, FR-024, FR-025 | All result copy must use modeled language; no definitive claims permitted |
+## Dependency posture
 
----
+An upstream source outage can delay a new release but cannot break an already
+published one. A basemap outage removes visual context but not the authoritative
+assessment. A static-host or object-storage outage affects delivery and is
+detected by synthetic checks. Previously cached core resources remain usable
+within the documented offline scope.
 
-## 7. Non-Goals That Shape the Architecture
+Every scientific and browser artifact uses portable formats: JSON, PMTiles,
+COG, GeoParquet, STAC, and Sigstore bundles. Cloudflare is the reference host,
+not part of the product's scientific contract.
 
-| Non-Goal | Source | Architectural impact |
-|---|---|---|
-| No user accounts or saved searches | PRD §5 #8 | No identity provider, no session management, no user tables |
-| No native mobile app | PRD §5 #7 | Web-only; no PWA requirements; responsive design sufficient |
-| No parcel-level claims | PRD §5 #3 | Assessment returns a zone-level binary result, not a property-level determination |
-| No real-time data | PRD §5 #4 | All results are derived from precomputed static assets; no streaming pipeline |
-| No Kubernetes | PRD §5 #10, NFR-023 | Container Apps is the hosting model; no Helm charts, no AKS |
-| No admin UI | PRD §7 out-of-scope #7 | Dataset management is a pipeline operation, not a product feature |
-| No export / PDF | PRD §7 out-of-scope #4 | No document generation service needed |
+## Current-to-target transition
 
----
-
-## 8. Key Assumptions at System Context Level
-
-| # | Assumption | Risk if Wrong | Status |
-|---|---|---|---|
-| A-01 | Azure is the cloud provider | All infrastructure choices are Azure-specific | Confirmed by product docs |
-| A-02 | Hosting region is EU (West Europe or North Europe) | GDPR data residency concern | Assumption — confirm before deployment |
-| A-03 | Geocoding provider is a single configured external HTTP service | Architecture assumes one provider; multi-provider fallback not designed | Confirmed: Azure Maps Search (ADR-019) |
-| A-04 | Data refresh is a manual operational workflow in MVP | Dataset update process is undocumented if assumed to be automated | Confirmed — BR-018 |
-| A-05 | The offline pipeline runs outside the container runtime | Pipeline is not a Container App; it is a separate script set | Assumption — aligns with ROADMAP Phase 0 scope |
-| A-06 | Europe boundary geometry from a standard public source is sufficient | Islands, overseas territories, or ambiguous borders may produce unexpected results | Assumption — validate edge cases during Phase 0 |
+The repository still contains a Next.js runtime, ASP.NET Core API,
+PostgreSQL/PostGIS, TiTiler, and local storage scaffolding. These describe the
+current implementation, not the accepted production target. They are removed
+only after real-source validation, client/server parity checks, artifact range
+tests, browser performance tests, and the remaining ADR-021 migration gates
+pass.

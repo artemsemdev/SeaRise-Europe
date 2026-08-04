@@ -17,10 +17,15 @@ What problem does this solve or what value does it add?
 ## Affected area
 
 - Product
-- Architecture
-- Repository hygiene
-- Future implementation
+- Browser application
+- Data pipeline or scientific method
+- Data contracts or release artifacts
+- Hosting, security, or operations
+- Architecture or documentation
 
 ## Notes
 
 Add links, references, or constraints that should be considered.
+
+For architectural changes, explain whether the proposal is compatible with
+ADR-021 or requires a superseding ADR.

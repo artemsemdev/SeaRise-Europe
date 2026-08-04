@@ -1,6 +1,6 @@
-"""Step 4: Convert exposure rasters to Cloud-Optimized GeoTIFF (S03-05).
+"""Legacy pipeline step: convert exposure rasters to Cloud-Optimized GeoTIFF.
 
-COG properties (architecture doc section 8):
+Current migration-fixture properties:
   - CRS:         EPSG:4326
   - Pixel type:  Float32 (0.0, 1.0, NaN)
   - Compression: deflate

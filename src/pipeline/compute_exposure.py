@@ -1,4 +1,4 @@
-"""Step 3: Compute binary exposure rasters (S03-04).
+"""Legacy pipeline step: compute provisional binary exposure rasters.
 
 For each scenario/horizon combination, compares projected sea-level rise
 against terrain elevation and classifies every coastal pixel as:
@@ -6,7 +6,8 @@ against terrain elevation and classifies every coastal pixel as:
   0.0 = not exposed (SLR < DEM)
   NaN = outside coastal analysis zone or DEM NoData
 
-This is the core scientific computation of the pipeline (ADR-015).
+This implements the provisional ADR-015 candidate and is not a validated
+scientific release until the ADR-021 Phase 0 gate passes.
 
 Limitations (documented in methodology panel text):
   - Static inundation model only.

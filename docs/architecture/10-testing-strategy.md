@@ -1,534 +1,246 @@
 # 10 — Testing Strategy
 
-> **Status:** Proposed Architecture | **Last updated:** 2026-04-02
-> **Philosophy:** Test the things that are genuinely risky. The domain layer (result state determination, geography validation logic) is high-risk and fully unit-testable. Infrastructure adapters are tested through integration tests. The UI is tested through component tests, a small authored end-to-end suite, and agent-driven exploratory validation with `playwright-cli`.
+> **Status:** Accepted target strategy; migration in progress
 >
-> **Local-first principle:** All tests run against the local Docker Compose environment during development. Staging and Azure are used only for the final release validation pass (Epic 08).
+> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Quality rule:** no artifact is publishable merely because it builds. Scientific validity, contracts, browser parity, and delivery behaviour are release gates.
 
----
+## 1. Testing model
 
-## 1. Testing Pyramid
+Testing follows the complete data path rather than the boundaries of the
+legacy API, database, and tile server:
 
-```
-           ┌──────────┐
-           │  E2E /   │  5–10 tests
-           │  Smoke   │  (Playwright — demo-critical paths)
-           └────┬─────┘
-          ┌─────┴──────┐
-          │Integration │  ~30 tests
-          │  Tests     │  (API against real Postgres, TiTiler mock)
-          └─────┬──────┘
-         ┌──────┴───────┐
-         │  Unit Tests  │  ~80 tests
-         │  (domain +   │  (fast, no I/O, in-process)
-         │  components) │
-         └──────────────┘
-```
+```mermaid
+flowchart LR
+    Source["Source snapshots"] --> Inspect["Source inspection"]
+    Inspect --> Transform["Deterministic transforms"]
+    Transform --> Artifacts["COG / PMTiles / indexes"]
+    Artifacts --> Publish["Object delivery"]
+    Publish --> Browser["Search + local assessment"]
 
----
-
-## 2. Backend Unit Tests
-
-### 2.1 ResultStateDeterminator (Critical — BR-010)
-
-The `ResultStateDeterminator` is a pure function. Every combination of `(GeographyClassification, ExposureLayer?, bool?)` maps to exactly one `ResultState`. This is the most safety-critical logic in the system — a wrong mapping would display misleading results.
-
-**Test matrix (all 8 meaningful combinations):**
-
-```csharp
-[Theory]
-[InlineData(OutsideEurope, LayerPresent, true, ResultState.UnsupportedGeography)]
-[InlineData(OutsideEurope, LayerPresent, false, ResultState.UnsupportedGeography)]
-[InlineData(OutsideEurope, null, null, ResultState.UnsupportedGeography)]
-[InlineData(InEuropeOutsideCoastalZone, LayerPresent, true, ResultState.OutOfScope)]
-[InlineData(InEuropeOutsideCoastalZone, null, null, ResultState.OutOfScope)]
-[InlineData(InEuropeAndCoastalZone, null, null, ResultState.DataUnavailable)]
-[InlineData(InEuropeAndCoastalZone, LayerPresent, true, ResultState.ModeledExposureDetected)]
-[InlineData(InEuropeAndCoastalZone, LayerPresent, false, ResultState.NoModeledExposureDetected)]
-public void Determine_AllCombinations_ReturnExpectedState(
-    GeographyClassification geo,
-    ExposureLayer? layer,
-    bool? isExposed,
-    ResultState expected)
-{
-    var result = ResultStateDeterminator.Determine(geo, layer, isExposed);
-    Assert.Equal(expected, result);
-}
+    Contracts["Schemas + checksums"] -. gate .-> Inspect
+    Science["Golden points + review"] -. gate .-> Transform
+    Integrity["Format + range tests"] -. gate .-> Artifacts
+    E2E["Browser + offline tests"] -. gate .-> Browser
 ```
 
-**Coverage target:** 100% branch coverage on `ResultStateDeterminator`.
-
-### 2.2 Geocoding Candidate Normalization
-
-```csharp
-[Fact]
-public void GeocodeAdapter_TruncatesAt5Candidates_WhenProviderReturnsMore()
-{
-    // Arrange: provider returns 8 candidates
-    // Act: normalize
-    // Assert: result has exactly 5 (BR-007)
-}
-
-[Fact]
-public void GeocodeAdapter_PreservesProviderRankOrder(...)
-{
-    // BR-006: rank order must be preserved
-}
-```
-
-### 2.3 Input Validation
-
-```csharp
-[Theory]
-[InlineData("", false)]           // empty — invalid (BR-008)
-[InlineData("A", true)]           // min length
-[InlineData("...200chars...", true)] // max length
-[InlineData("...201chars...", false)] // over limit
-public void GeocodeRequest_Validation_RejectsOutOfBounds(string query, bool isValid)
-
-[Theory]
-[InlineData(-91.0, 0.0, false)]  // lat out of range
-[InlineData(91.0, 0.0, false)]
-[InlineData(0.0, -181.0, false)] // lng out of range
-[InlineData(0.0, 181.0, false)]
-[InlineData(52.3, 4.9, true)]    // valid
-public void AssessRequest_Validation_CoordinateBounds(double lat, double lng, bool isValid)
-
-[Theory]
-[InlineData(2030, true)]
-[InlineData(2050, true)]
-[InlineData(2100, true)]
-[InlineData(2040, false)]   // not a valid horizon (FR-015)
-[InlineData(1990, false)]
-public void AssessRequest_Validation_HorizonYear(int year, bool isValid)
-```
-
-### 2.4 AssessmentService Orchestration
-
-Tested with mocked dependencies (`IGeographyRepository`, `ILayerResolver`, `IExposureEvaluator`):
-
-```csharp
-[Fact]
-public async Task AssessAsync_WhenOutsideEurope_ReturnsUnsupportedGeography_WithoutLayerLookup()
-{
-    // geography repo returns IsWithinEurope=false
-    // Assert: layerResolver never called (early exit)
-    // Assert: resultState == UnsupportedGeography
-}
-
-[Fact]
-public async Task AssessAsync_WhenNoLayerExists_ReturnsDataUnavailable_WithoutTilerCall()
-{
-    // geography repo returns InEuropeAndCoastalZone
-    // layer resolver returns null
-    // Assert: exposure evaluator never called (BR-014)
-    // Assert: resultState == DataUnavailable
-}
-
-[Fact]
-public async Task AssessAsync_AlwaysIncludesMethodologyVersion()
-{
-    // FR-035: methodologyVersion must be in every result
-}
-
-[Fact]
-public async Task AssessAsync_AlwaysIncludesScenarioAndHorizon()
-{
-    // FR-020
-}
-```
-
----
-
-## 3. Backend Integration Tests
-
-Integration tests run against a **real PostgreSQL+PostGIS** database (via Testcontainers or a local Docker instance). No mocked databases — the project was explicit about not mocking DB access after prior incidents with mock/prod divergence.
-
-### 3.1 Geography Repository
-
-```csharp
-// Requires: geography_boundaries table seeded with 'europe' and 'coastal_analysis_zone' geometries
-
-[Fact]
-public async Task IsWithinEurope_Amsterdam_ReturnsTrue()
-{
-    // lat: 52.37, lng: 4.90 (Amsterdam — confirmed European coastal city)
-    var result = await repo.IsWithinEuropeAsync(52.37, 4.90, ct);
-    Assert.True(result);
-}
-
-[Fact]
-public async Task IsWithinEurope_NewYork_ReturnsFalse()
-{
-    var result = await repo.IsWithinEuropeAsync(40.71, -74.00, ct);
-    Assert.False(result);
-}
-
-[Fact]
-public async Task IsWithinCoastalZone_InlandEuropeanCity_ReturnsFalse()
-{
-    // ADR-018: requires coastal_analysis_zone seeded (Copernicus Coastal Zones 2018)
-    // Prague: lat 50.07, lng 14.43
-}
-```
-
-### 3.2 Layer Repository
-
-```csharp
-[Fact]
-public async Task LayerResolver_ReturnsActiveVersionLayer_WhenValidLayerExists()
-{
-    // Insert methodology_version (is_active=true) and layer (layer_valid=true)
-    // Assert: resolves correct layer for scenario+horizon
-}
-
-[Fact]
-public async Task LayerResolver_ReturnsNull_WhenLayerValidIsFalse()
-{
-    // layer_valid=false should not be served (BR-014)
-}
-
-[Fact]
-public async Task LayerResolver_ReturnsNull_WhenNoLayerForCombination()
-{
-    // Missing scenario+horizon combination → DataUnavailable
-}
-```
-
-### 3.3 API Endpoint Integration (ASP.NET Core WebApplicationFactory)
-
-```csharp
-// Full in-process API test with real DB and mocked TiTiler
-
-[Fact]
-public async Task PostGeocode_ValidQuery_Returns200WithCandidates()
-
-[Fact]
-public async Task PostGeocode_EmptyQuery_Returns400ValidationError()
-
-[Fact]
-public async Task PostAssess_OutsideEurope_Returns200UnsupportedGeography()
-
-[Fact]
-public async Task PostAssess_UnknownScenario_Returns400UnknownScenario()
-
-[Fact]
-public async Task PostAssess_ResponseAlwaysIncludesRequestId()
-
-[Fact]
-public async Task GetHealth_WhenDbHealthy_Returns200Healthy()
-
-[Fact]
-public async Task GetConfigScenarios_ReturnsConfirmedHorizons()
-{
-    // Must contain 2030, 2050, 2100 (FR-015)
-}
-```
-
----
-
-## 4. Frontend Unit/Component Tests
-
-**Framework:** Vitest + React Testing Library
-
-### 4.1 AppPhase State Machine
-
-The AppPhase state transitions are the frontend's equivalent of `ResultStateDeterminator` — they control all visible UI states.
-
-```typescript
-// useAppStore state transitions
-describe('AppPhase transitions', () => {
-  it('transitions idle → geocoding on search submit')
-  it('transitions geocoding → candidate_selection on multiple results')
-  it('transitions geocoding → assessing on single result (auto-select)')
-  it('transitions geocoding → no_geocoding_results on empty candidates')
-  it('transitions candidate_selection → assessing on candidate click')
-  it('transitions assessing → result on successful assess')
-  it('transitions assessing → assessment_error on API 500')
-  it('transitions result → result_updating on scenario change')
-  it('transitions result → idle on reset (FR-041)')
-  it('aborts in-flight request on rapid control change (FR-040)')
-})
-```
-
-### 4.2 ResultPanel
-
-```typescript
-describe('ResultPanel', () => {
-  it('renders ModeledExposureDetected state with correct copy (CONTENT_GUIDELINES §3)')
-  it('renders NoModeledExposureDetected state with disclaimer (CONTENT_GUIDELINES §3)')
-  it('renders OutOfScope state copy')
-  it('renders UnsupportedGeography state copy')
-  it('renders DataUnavailable state with try-different-scenario guidance')
-  it('never renders prohibited language — "will flood", "is safe", "no risk" (CONTENT_GUIDELINES §2)')
-  it('always displays scenario + horizon in result (FR-020)')
-  it('always displays methodologyVersion (FR-035)')
-  it('shows MethodologyEntryPoint button (FR-032)')
-})
-```
-
-### 4.3 Accessibility Tests
-
-```typescript
-describe('Keyboard and ARIA', () => {
-  it('SearchBar submit fires on Enter key (FR-005)')
-  it('CandidateList items are focusable and activatable with Enter/Space')
-  it('MethodologyPanel traps focus while open (WCAG 2.2 AA)')
-  it('MethodologyPanel returns focus to trigger on close (FR-034)')
-  it('ErrorBanner retry button is focusable (FR-039)')
-  it('All interactive controls have visible focus indicator')
-  it('Map has aria-label (decorative landmark, not interactive for screen readers)')
-})
-```
-
-### 4.4 API Client
-
-```typescript
-describe('API client (useGeocode, useAssess)', () => {
-  it('aborts previous request when a new one starts (FR-040)')
-  it('applies requestSeq guard — ignores stale responses')
-  it('retries on user-initiated retry click')
-  it('never logs query string in console or error reporting')
-})
-```
-
----
-
-## 5. Browser-Based UI Testing
-
-This project uses two complementary Playwright-based tools for browser testing. They serve different purposes and are not interchangeable.
-
-### 5.1 Playwright CLI — Exploratory and Agent-Driven Testing
-
-**Package:** `@playwright/cli` ([github.com/microsoft/playwright-cli](https://github.com/microsoft/playwright-cli))
-
-**What it is:** A token-efficient command-line tool for agent-driven browser automation. It does not require authored test files. A developer or coding agent issues CLI commands to navigate, interact, inspect, and screenshot the running application.
-
-**Install:**
-```bash
-# Preferred: local execution via npx (no global install)
-npx playwright-cli --help
-
-# Fallback: global install
-npm install -g @playwright/cli@latest
-playwright-cli --help
-```
-
-**When to use:**
-- Ad-hoc local smoke checks during development (e.g., "does the search flow work after my last change?")
-- Agent-driven exploratory validation — a coding agent can use `playwright-cli` to verify UI behavior without writing test files
-- Capturing screenshots for visual inspection or documentation evidence
-- Interactive debugging of UI states (loading, error, result rendering)
-- Quick validation of accessibility behavior (focus order, visible focus indicators)
-
-**Example workflow (local development):**
-```bash
-# Start the local stack
-docker compose up -d
-
-# Open the app and take a screenshot
-npx playwright-cli goto http://localhost:3000
-npx playwright-cli screenshot --full-page homepage.png
-
-# Exercise the search flow
-npx playwright-cli fill '[role="searchbox"]' 'Amsterdam'
-npx playwright-cli press '[role="searchbox"]' Enter
-npx playwright-cli snapshot   # inspect the DOM state
-npx playwright-cli screenshot search-result.png
-
-# Visual dashboard for monitoring
-npx playwright-cli show
-```
-
-**What it does not replace:** `playwright-cli` does not produce repeatable, CI-integrated test suites. It is not a substitute for authored `@playwright/test` tests.
-
-### 5.2 Playwright Test Runner — Authored E2E Test Suite
-
-**Package:** `@playwright/test`
-
-**What it is:** The standard Playwright testing framework. Tests are authored TypeScript files that run deterministically and produce structured reports. This is the tool used for CI gating and release verification.
-
-**When to use:**
-- Repeatable E2E coverage for all 28 acceptance criteria (AC-001 through AC-028) and 10 demo scenarios (D-01 through D-10)
-- CI pipeline test gating (every PR must pass)
-- Accessibility scanning with `@axe-core/playwright`
-- NFR performance measurement (LCP, latency)
-- Screenshot evidence for release readiness checklist
-
-**Test target:**
-- During development (Epics 05-07): tests run against the local Docker Compose environment (`baseURL = http://localhost:3000`)
-- During release hardening (Epic 08): tests run against the Azure staging deployment
-
-### 5.3 Authored E2E Tests (Demo Script Coverage)
-
-A small smoke suite covering the demo script (ROADMAP.md D-01 to D-10). During development these run locally against Docker Compose; during release hardening they run against the staging deployment.
-
-```typescript
-// playwright.config.ts: baseURL = process.env.BASE_URL ?? 'http://localhost:3000'
-
-test('D-01: App loads and shows EmptyState', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('main')).toContainText('Enter a location')
-  // map renders, no errors in console
-})
-
-test('D-02+D-03: Search → single result auto-selects → assessment runs', async ({ page }) => {
-  await page.getByRole('searchbox').fill('Amsterdam')
-  await page.keyboard.press('Enter')
-  // Wait for result panel
-  await expect(page.getByTestId('result-panel')).toBeVisible({ timeout: 10000 })
-})
-
-test('D-04: Multiple candidates shown for ambiguous query', async ({ page }) => {
-  await page.getByRole('searchbox').fill('Valencia')
-  await page.keyboard.press('Enter')
-  await expect(page.getByTestId('candidate-list')).toBeVisible()
-  await expect(page.getByRole('listitem')).toHaveCount.greaterThanOrEqual(2)
-})
-
-test('D-05: Scenario change triggers re-assessment', async ({ page }) => {
-  // Start at result state
-  // Change scenario control
-  // Wait for result panel to update
-})
-
-test('D-06: Horizon change triggers re-assessment')
-
-test('D-07: Inland European location returns OutOfScope', async ({ page }) => {
-  // Search for Prague → assess → resultState == OutOfScope
-  await expect(page.getByText('Outside MVP Coverage Area')).toBeVisible()
-})
-
-test('D-08: Non-European location returns UnsupportedGeography', async ({ page }) => {
-  // New York → UnsupportedGeography copy
-})
-
-test('D-09: Methodology panel opens and closes (FR-032, FR-033)', async ({ page }) => {
-  // Open panel → verify content visible
-  // Press Escape → verify panel closed, focus returned
-})
-
-test('D-10: Reset returns to EmptyState (FR-041)', async ({ page }) => {
-  // From result state → click Reset
-  // Verify EmptyState shown, no marker, no result panel
-})
-```
-
----
-
-## 6. Geospatial Pipeline Tests
-
-The offline pipeline (see [16-geospatial-data-pipeline.md](16-geospatial-data-pipeline.md)) is tested separately with Python pytest:
-
-```python
-# test_cog_validation.py
-
-def test_cog_is_valid_format(cog_path):
-    """Output file passes rio-cogeo validate check"""
-    from rio_cogeo.cogeo import cog_validate
-    assert cog_validate(cog_path)[0] == True
-
-def test_cog_crs_is_epsg4326(cog_path):
-    """COG is projected in WGS84 (EPSG:4326) for TiTiler compatibility"""
-    import rasterio
-    with rasterio.open(cog_path) as src:
-        assert src.crs.to_epsg() == 4326
-
-def test_cog_pixel_values_binary(cog_path):
-    """Pixel values are 0, 1, or NoData — not continuous (NFR-020 binary layer)"""
-    import rasterio
-    import numpy as np
-    with rasterio.open(cog_path) as src:
-        data = src.read(1, masked=True)
-        unique_values = set(np.unique(data.compressed()))
-        assert unique_values.issubset({0, 1})
-
-def test_layer_registered_in_db(db, scenario_id, horizon_year, version):
-    """After pipeline run, layer row exists in DB with layer_valid=False (awaiting QA)"""
-    layer = db.execute(
-        "SELECT layer_valid FROM layers WHERE scenario_id=%s AND horizon_year=%s AND methodology_version=%s",
-        (scenario_id, horizon_year, version)
-    ).fetchone()
-    assert layer is not None
-    assert layer['layer_valid'] == False  # QA not yet run
-```
-
----
-
-## 7. Acceptance Criteria Test Mapping
-
-The PRD defines 28 acceptance criteria (AC-001 to AC-028). High-risk ACs and their primary test coverage:
-
-| AC | Description | Primary Coverage |
-|---|---|---|
-| AC-001 | App loads in < 4s (NFR-001) | Playwright + Lighthouse CI |
-| AC-002 | Geocoding returns results in < 2.5s (NFR-002) | Playwright network timing |
-| AC-003 | Assessment returns in < 3.5s (NFR-003) | Playwright + API integration timing |
-| AC-004 | Control switch re-assesses in < 1.5s (NFR-004) | Playwright |
-| AC-009 | No more than 5 geocoding candidates (BR-007) | Unit test — geocoding adapter |
-| AC-010 | Rank order preserved (BR-006) | Unit test — geocoding adapter |
-| AC-012 | Result state one of 5 fixed values (BR-010) | Unit test — ResultStateDeterminator (100% branch coverage) |
-| AC-013 | No substitution for DataUnavailable (BR-014) | Unit test — AssessmentService |
-| AC-015 | WCAG 2.2 AA (NFR-015) | Accessibility component tests + axe-core in Playwright |
-| AC-016 | Raw addresses never logged (NFR-007) | Log audit (manual) + code review |
-| AC-020 | methodologyVersion always present (FR-035) | Integration test — assess endpoint |
-| AC-024 | Geography validation server-side only (FR-009) | Integration test — API directly with non-EU coords |
-| AC-026 | Reset returns to idle state (FR-041) | Playwright D-10 |
-| AC-028 | Rapid control changes handled without stale results (FR-040) | Component test — useAssess hook |
-
----
-
-## 8. Test Data Strategy
-
-### Test Coordinates
-
-| Location | Lat | Lng | Expected Result |
-|---|---|---|---|
-| Amsterdam | 52.3676 | 4.9041 | ModeledExposureDetected (coastal NL) |
-| Prague | 50.0755 | 14.4378 | OutOfScope (inland) |
-| New York | 40.7128 | -74.0060 | UnsupportedGeography |
-| Ostend, Belgium | 51.2298 | 2.9186 | ModeledExposureDetected (coastal) |
-
-**Note:** Exact results for `ModeledExposureDetected` vs `NoModeledExposureDetected` depend on the Copernicus Coastal Zones 2018 geometry (ADR-018) and binary exposure methodology (ADR-015). Test coordinates above are illustrative; actual values require real COG data to be present.
-
-### Database Seeding for Tests
-
-Integration tests use a `TestDbFixture` that:
-1. Spins up Testcontainers PostgreSQL with PostGIS
-2. Runs `infra/db/init.sql` (schema creation)
-3. Seeds test scenarios, horizons, methodology version, and geometry for Europe boundary
-4. Tears down after test run
-
-Coastal zone geometry is stubbed as a simplified bounding box for Europe's coastline in tests. Production uses Copernicus Coastal Zones 2018 (ADR-018).
-
----
-
-## 9. CI Gate
-
-Tests must pass before merging to `main`:
-
-```yaml
-# .github/workflows/ci.yml (outline)
-jobs:
-  test-api:
-    steps:
-      - dotnet test --filter "Category!=Integration"  # unit tests: fast
-      - dotnet test --filter "Category=Integration"   # integration: needs Testcontainers
-
-  test-frontend:
-    steps:
-      - npx vitest run                                 # unit + component
-      - npx tsc --noEmit                               # type check
-
-  e2e-local:
-    steps:
-      - docker compose up -d                           # spin up local stack
-      - npx playwright test                            # run against localhost
-      - docker compose down
-```
-
-> **Note:** During Epics 05-07, all Playwright tests run against the local Docker Compose environment. The staging deployment is not required until Epic 08. During Epic 08 (release hardening), an additional `e2e-staging` job runs the same test suite against the Azure staging URL to confirm parity between local and cloud environments.
-
-### 9.1 Local Exploratory Validation (Not CI-Gated)
-
-`playwright-cli` is used during development for ad-hoc validation but is not part of the CI pipeline. It is an interactive tool, not an automated gate. Developers and coding agents use it to verify UI behavior before committing changes. Its output (screenshots, snapshots) may be attached as evidence artifacts but is not required to pass any CI check.
+Fast unit and contract tests run on every change. Representative regional
+artifacts run in normal CI. The expensive Europe-wide build runs only after
+the smaller gates pass and still cannot publish without the full release gate.
+
+## 2. Phase 0 scientific gate
+
+Phase 0 precedes the static migration and uses real, licensed inputs for a
+small representative region. It must answer questions the existing synthetic
+pipeline cannot answer:
+
+1. Inspect the actual IPCC AR6 dimensions, coordinate model, quantiles, units,
+   and missing values.
+2. Document how location-based projections become an analysis grid; do not
+   assume a regular latitude/longitude raster.
+3. Confirm DEM product/resolution, CRS, vertical datum, resampling, and nodata
+   treatment.
+4. Compare the checked-in coastal approximation with the intended canonical
+   coastal product.
+5. Test coastline connectivity and disconnected inland false positives in the
+   binary `sea-level projection >= terrain elevation` model.
+6. Compare independently reviewed control locations with the derived array
+   and browser lookup.
+7. Measure COG/PMTiles size, byte-range count, lookup latency, map quality, and
+   browser memory.
+8. Complete redistribution and attribution review.
+
+A failed or ambiguous result stops publication. If it invalidates methodology
+v1.0, the methodology and ADR must be superseded before Europe-wide output is
+built.
+
+## 3. Test layers
+
+### 3.1 Pipeline unit tests
+
+Pure functions and small fixture files cover:
+
+- source metadata parsing, URL pinning, and SHA-256 verification;
+- CRS and coordinate normalization;
+- grid alignment, nearest-neighbour class resampling, and nodata propagation;
+- binary result classification;
+- shoreline distance and spatial predicates;
+- GeoNames feature-code filters, normalization, aliases, and deduplication;
+- deterministic search ranking;
+- manifest construction and release path generation.
+
+The same input and parameter set must yield byte-identical logical arrays and
+stable records. Container/image and tool versions are recorded where file
+encoders may legitimately change physical bytes.
+
+### 3.2 Property-based and boundary tests
+
+Generated inputs exercise:
+
+- coordinates immediately inside, outside, and on geometry boundaries;
+- pixel, tile, and COG-block edges;
+- negative longitudes and longitude normalization;
+- nodata masks, empty regions, malformed values, and non-finite coordinates;
+- duplicate and accent-equivalent place names;
+- deterministic tie-breaking for equal search scores;
+- cache/release namespace isolation.
+
+Binary class lookup always uses nearest-neighbour semantics. Tests fail if an
+interpolation path invents a fractional class.
+
+### 3.3 Data-contract tests
+
+Validate all public contracts before packaging and again after upload:
+
+- `manifest.json` and config JSON against versioned JSON Schemas;
+- static STAC catalog, collection, items, links, assets, and roles;
+- GeoParquet schema, geometry type, CRS metadata, and required columns;
+- unique settlement IDs, finite coordinates, allowed feature codes, valid
+  country/admin references, and no orphan aliases;
+- exactly nine unique scenario/horizon layer pairs;
+- every artifact URL, byte size, SHA-256, licence, and attribution mapping;
+- manifest release ID equal to the path and application pin.
+
+The settlement build also emits accepted/rejected counts per rule. The sum
+must reconcile with the pinned source snapshot.
+
+### 3.4 Scientific and geospatial tests
+
+Required checks include:
+
+- approved exposed, non-exposed, nodata, inland, and unsupported control
+  locations;
+- known coastal cities, small villages, islands, ports, estuaries, and low
+  terrain;
+- source-unit and plausible-range checks before calculation;
+- raster bounds, dimensions, transform, CRS, class domain, nodata, and coverage;
+- topology validity for support/coastal geometry;
+- connectivity checks designed to reveal isolated inland exposure;
+- scenario/horizon monotonicity checks only where scientifically justified;
+- summary-statistic and spatial-difference reports against the prior release.
+
+Large changes are review evidence, not automatically failures. They must be
+explained by an intentional source or methodology change.
+
+### 3.5 Artifact and delivery tests
+
+For every published candidate:
+
+- validate analysis GeoTIFFs as Cloud-Optimized GeoTIFFs;
+- run PMTiles structural verification and sample tiles at multiple zooms;
+- prove visual PMTiles classes agree with the corresponding COG samples;
+- compare local and uploaded sizes and SHA-256 values;
+- issue `HEAD` and partial `GET` requests and verify `Accept-Ranges`,
+  `Content-Range`, `ETag`, cache headers, and allowed CORS origin;
+- verify immutable paths are not overwritten;
+- verify SLSA provenance and the keyless Cosign/Sigstore signature bundle.
+
+### 3.6 Search tests
+
+Search fixtures cover multilingual names, diacritics, ASCII fallbacks,
+alternate names, duplicate names across countries, capitals, small villages,
+zero-population records, and transcontinental boundary cases.
+
+Assertions cover the ranking contract:
+
+1. exact canonical name;
+2. exact localized or alternate name;
+3. prefix;
+4. fuzzy match;
+5. population and administrative importance;
+6. coastal proximity as the final tie-breaker.
+
+`europe-core` loads first; merging `europe-coastal` must not reorder a better
+exact match incorrectly or create duplicate results.
+
+### 3.7 Browser integration and end-to-end tests
+
+Playwright exercises the production static build against release fixtures:
+
+- load shell, focus search, initialize worker, and find a place;
+- select a result and obtain each of the five domain states;
+- switch all scenarios and horizons and keep map/assessment in sync;
+- share a URL, reload it, and reproduce the same pinned result;
+- show methodology, release, limitations, and source attribution;
+- handle missing/corrupt artifacts and basemap failure without inventing a
+  scientific result;
+- assert zero calls to `/assess`, `/geocode`, and `/config`.
+
+Browser lookup and Python pipeline sampling run against shared golden fixtures.
+Any difference in coordinate-to-cell conversion, nodata, or result state fails
+the parity gate.
+
+### 3.8 Offline, accessibility, and visual tests
+
+Offline tests warm only the explicitly supported cache, disable the network,
+and repeat shell, configuration, boundary, search, and cached-layer flows. An
+uncached required range must produce an honest connectivity/data-availability
+message. Tests must not imply that all nine Europe-wide layers are always
+offline.
+
+Accessibility and visual coverage includes keyboard search, focus order,
+screen-reader result messaging, contrast, reduced motion, responsive layouts,
+map alternatives, and visible data/basemap attribution.
+
+## 4. Shared fixtures and test data
+
+Fixtures are small, licensed or generated, deterministic, and labelled by
+purpose:
+
+- `synthetic`: proves code behaviour only;
+- `source-sample`: a pinned excerpt of a real source where redistribution is
+  permitted;
+- `golden`: independently reviewed expected result with methodology/release;
+- `invalid`: deliberately corrupt schema, geometry, COG, PMTiles, or index.
+
+Each golden coordinate records longitude, latitude, expected support/coastal
+classification, expected pixel class or nodata, scenario, horizon,
+methodology, and rationale. Python and TypeScript consume the same serialized
+fixture. Synthetic results must never be presented as evidence that the real
+Europe-wide data is valid.
+
+## 5. CI and release fitness functions
+
+| Gate | Required target |
+|---|---:|
+| Initial JavaScript, Brotli | <= 250 KiB, excluding lazy map/search chunks |
+| Lighthouse performance/accessibility/best-practices/SEO | >= 90 each on agreed mobile profile |
+| Search p95 after worker initialization | < 50 ms |
+| Local assessment p95 after required data is cached | < 100 ms |
+| Search worker initialization on reference mobile | < 1,000 ms |
+| Runtime application API calls | 0 to `/assess`, `/geocode`, `/config` |
+| Scenario/horizon coverage | Exactly 9 validated combinations |
+| Large-object range support | `HEAD` and partial `GET` pass for every artifact |
+| Manifest integrity | Schema, size, and SHA-256 all match |
+| Scientific regression | Every approved golden point passes |
+| Licence completeness | Every artifact resolves to source/licence metadata |
+| Offline core | Shell, config, boundaries, and loaded index survive network removal |
+
+Use a production-like browser and a documented hardware/network profile.
+Store machine-readable results with the candidate release and expose the
+current summary on `/about/architecture`.
+
+## 6. CI stages
+
+1. **Fast checks:** format, lint, type check, unit, property, schema, and small
+   artifact tests.
+2. **Regional candidate:** Phase 0/reference-region transform, shared golden
+   tests, search build, browser integration, and performance budgets.
+3. **Full release build:** all sources and nine layer combinations, full data
+   QA, diff report, inventory, STAC, provenance, and signatures.
+4. **Staged delivery:** upload immutable prefix; verify hashes, range requests,
+   headers, CORS, and browser smoke tests from the public origin.
+5. **Promotion:** approval after evidence review; retain the prior app/release
+   pair for rollback.
+
+A waiver must identify the failed budget, measured regression, rationale,
+owner, and expiry date. Scientific, integrity, licence, scenario completeness,
+and zero-runtime-API gates are not silently waivable.
+
+## 7. Legacy parity and removal gate
+
+Until ADR-021 Phases 0–3 pass, the legacy and static paths run against common
+golden coordinates. Every mismatch is investigated; neither path is assumed
+correct. Backend/database-specific tests may be deleted only with the Phase 4
+components they protect. Their long-term replacements are artifact, browser,
+scientific, and delivery-contract tests described here.

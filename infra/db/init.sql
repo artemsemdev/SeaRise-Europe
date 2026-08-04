@@ -1,10 +1,9 @@
 -- =============================================================================
 -- SeaRise Europe -- Database Initialization Script
 -- =============================================================================
--- Epic:     E-02 (Local Development Environment)
--- Story:    S02-02
--- Sources:  docs/architecture/05-data-architecture.md (section 2)
---           docs/delivery/artifacts/seed-data-spec.sql
+-- Status:   Legacy local migration baseline. ADR-021 removes the runtime
+--           database; retain this schema only for parity until that gate passes.
+-- Source:   docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md
 --
 -- This script runs automatically on first `docker compose up` via the
 -- PostgreSQL docker-entrypoint-initdb.d mechanism.
@@ -18,7 +17,7 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 
 -- ---------------------------------------------------------------------------
 -- 1. scenarios
---    Source: ADR-016 (S01-01, OQ-02)
+--    Source: ADR-016, as retained by ADR-021
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE scenarios (
@@ -35,7 +34,7 @@ CREATE UNIQUE INDEX scenarios_default_idx ON scenarios (is_default) WHERE is_def
 
 -- ---------------------------------------------------------------------------
 -- 2. horizons
---    Source: ADR-017 (S01-02, OQ-03), FR-015
+--    Source: ADR-017 and the current PRD
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE horizons (
@@ -49,7 +48,7 @@ CREATE UNIQUE INDEX horizons_default_idx ON horizons (is_default) WHERE is_defau
 
 -- ---------------------------------------------------------------------------
 -- 3. methodology_versions
---    Source: ADR-015 (S01-04, OQ-05)
+--    Source: provisional ADR-015 methodology; not publication evidence
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE methodology_versions (
@@ -89,7 +88,7 @@ CREATE INDEX layers_lookup_idx ON layers (scenario_id, horizon_year, methodology
 
 -- ---------------------------------------------------------------------------
 -- 5. geography_boundaries
---    Source: ADR-018 (S01-03, OQ-04)
+--    Source: ADR-018, amended and gated by ADR-021
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE geography_boundaries (
@@ -103,7 +102,7 @@ CREATE TABLE geography_boundaries (
 CREATE INDEX geography_boundaries_geom_idx ON geography_boundaries USING GIST(geom);
 
 -- ===========================================================================
--- Seed Data (from docs/delivery/artifacts/seed-data-spec.sql)
+-- Legacy Seed Data (values retained for migration parity)
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
