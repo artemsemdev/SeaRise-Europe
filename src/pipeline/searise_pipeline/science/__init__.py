@@ -1,6 +1,7 @@
 """Fail-closed scientific contracts for the offline pipeline."""
 
 from .ar6 import Ar6GridSlice, bilinear_sample, extract_projection_grid, validate_ar6_schema
+from .connectivity import connectivity_comparison, ocean_connected_cells
 from .contracts import (
     ScienceContractError,
     ScienceContracts,
@@ -26,8 +27,10 @@ __all__ = [
     "bilinear_sample",
     "compare_dem_samples",
     "canonical_geojson_bytes",
+    "connectivity_comparison",
     "extract_projection_grid",
     "load_science_contracts",
+    "ocean_connected_cells",
     "inspect_dem_sample",
     "inspect_geometry_assets",
     "projection_mapping",
