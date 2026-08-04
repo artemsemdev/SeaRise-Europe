@@ -24,6 +24,8 @@ import rasterio
 from rasterio.mask import mask as raster_mask
 from shapely.geometry import mapping
 
+from searise_pipeline.science import assert_publication_ready, load_science_contracts
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +42,8 @@ def compute_binary_exposure(
     slr_tif: Path,
     coastal_zone_geojson: Path,
     output_tif: Path,
+    *,
+    allow_blocked_methodology: bool = False,
 ) -> Path:
     """Compute a binary exposure raster.
 
@@ -48,10 +52,16 @@ def compute_binary_exposure(
         slr_tif:  Aligned SLR GeoTIFF (projected rise in metres, on DEM grid).
         coastal_zone_geojson: GeoJSON of the coastal analysis zone (ADR-018).
         output_tif: Destination for the raw exposure raster.
+        allow_blocked_methodology: Explicitly permit mechanics-only fixtures.
 
     Returns:
         *output_tif* (convenience for chaining).
     """
+    if allow_blocked_methodology:
+        logger.warning("Running blocked provisional exposure methodology")
+    else:
+        assert_publication_ready(load_science_contracts())
+
     output_tif.parent.mkdir(parents=True, exist_ok=True)
 
     with rasterio.open(dem_tif) as dem_src, rasterio.open(slr_tif) as slr_src:
