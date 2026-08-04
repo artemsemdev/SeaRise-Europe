@@ -61,6 +61,35 @@ As the static frontend and release pipeline are introduced, their checked-in
 scripts and CI jobs become authoritative. Do not rely on documentation-only
 claims when an executable check can enforce the contract.
 
+## TDD and test migration
+
+Before implementation, identify in the PR:
+
+- the invariant and first target test;
+- the command/output proving the intended red failure;
+- the legacy test, if any, that characterizes the same behavior;
+- the approved issue gate and target evidence that would later permit deletion.
+
+Then run red, green, refactor, and independent compare before promoting a target
+suite. The executable rules and examples are in
+[`docs/testing/README.md`](docs/testing/README.md). For focused feedback:
+
+```bash
+python scripts/tests/validate_test_inventory.py
+python scripts/tests/changed_suites.py --changed path/to/changed-file
+python scripts/tests/changed_suites.py --base-ref origin/master
+```
+
+Use `--run` only for the listed credential-free fast suites. Regional, release,
+browser, public-delivery, and scheduled gates remain separate and mandatory for
+their promotion stage.
+
+Do not delete or disable a useful test when adding its replacement. A later
+retirement PR must update the exact `baselineTests` entry in
+`tests/test-inventory.json`, cite the approved removal issue, and link
+equivalent-or-stronger evidence. A flake needs an owner, defect issue, expiry,
+and inventory record; retrying until green is not an acceptance result.
+
 ## Documentation
 
 - `docs/architecture/` describes the accepted target, not the legacy runtime.
