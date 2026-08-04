@@ -4,6 +4,7 @@
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** ADR-015, amended by [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and proposed [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md)
 > **Blocking gate:** Phase 0.2 found unresolved vertical compatibility and geography decisions
+> **Latest gate evidence:** [Phase 0.3 regional gate](evidence/phase-0-regional-fixture.md) — `blocked`
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
@@ -128,6 +129,12 @@ versioned Europe support geometry.
 
 ## Known limitations
 
+The [Phase 0.3 regional evidence](evidence/phase-0-regional-fixture.md)
+confirmed that relative AR6 change cannot currently be compared directly with
+absolute EGM2008 DEM height. It also records why connectivity, scientific
+goldens, nine classified layers, and PMTiles were not generated. Those are
+active stop conditions, not accepted residual limitations.
+
 Unless validation produces a materially different method, the UI and manifest
 must disclose at least:
 
@@ -209,3 +216,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-04-03 | Proposed | Initial binary comparison |
 | `v1.0` | 2026-08-04 | Provisional | Added real-data, datum, connectivity, provenance, and browser-parity approval gates |
 | `v1.0` | 2026-08-05 | Blocked | Phase 0.2 replaced source heuristics and stopped direct AR6-change versus EGM2008-height publication |
+| `v1.0` | 2026-08-05 | Blocked | Phase 0.3 found no reviewed AR6-baseline-to-EGM2008 reconciliation; no classification release generated |

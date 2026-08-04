@@ -178,6 +178,12 @@ Publish the current results and artifact-size breakdown on
 `/about/architecture`. Until these measurements exist, documentation must say
 “target” rather than claim the budgets have been achieved.
 
+The [Phase 0.3 regional measurement](../evidence/phase-0-regional-fixture.md)
+proves exact `206` ranges and lookup mechanics only for a 143,754-byte real DEM
+derivative on a loopback reference profile. It explicitly does not validate
+production-network latency, mobile performance, PMTiles, or nine-layer scale;
+the scientific gate blocked those measurements before class generation.
+
 ## 9. Failure and degradation rules
 
 - If a required uncached range is unavailable, return a clear
