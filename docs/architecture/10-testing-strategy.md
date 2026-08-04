@@ -5,6 +5,9 @@
 > **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Quality rule:** no artifact is publishable merely because it builds. Scientific validity, contracts, browser parity, and delivery behaviour are release gates.
 
+The executable inventory, changed-path commands, fixture ownership, and legacy
+removal rules are defined in [`../testing/README.md`](../testing/README.md).
+
 ## 1. Testing model
 
 Testing follows the complete data path rather than the boundaries of the
