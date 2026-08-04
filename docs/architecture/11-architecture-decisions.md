@@ -1,7 +1,7 @@
 # Architecture Decision Register
 
 > **Status:** Current
-> **Last reviewed:** 2026-08-04
+> **Last reviewed:** 2026-08-05
 
 This register contains only decisions that remain active in the accepted target
 architecture. [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
@@ -21,6 +21,12 @@ not as active guidance in this document.
 | ADR-017 | Default to SSP2-4.5 / 2050 | Accepted | Defaults remain `ssp2-45` and `2050`; the URL makes them explicit when shared. |
 | ADR-018 | Use a 25 km coastal analysis zone | Accepted with validation gate | The current Natural Earth-derived zone is explicitly approximate. Reconfirm or replace it after comparison with the canonical Copernicus coastal product. |
 | ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; authoritative** | Offline build plane, immutable open artifacts, React/Vite browser runtime, local search/assessment, Cloudflare Static Assets + R2, and no runtime API/database/tile server. |
+
+## Proposed decisions enforced as safety gates
+
+| ID | Decision | Status | Current interpretation |
+|---|---|---|---|
+| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed; gate enforced | Exact AR6 mapping replaces heuristics, but vertical reconciliation, DEM resolution, canonical geography, and named approvals remain blocking. |
 
 ## Decisions superseded by ADR-021
 
