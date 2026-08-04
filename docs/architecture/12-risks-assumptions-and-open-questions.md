@@ -27,6 +27,12 @@
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
 | R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Certain / Critical | The build now refuses this operation by default. Exit requires a pinned baseline water/tidal surface, reviewed transformation to EGM2008, combined uncertainty controls, and scientific/data approval. |
 
+The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
+records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
+and R-13. It proves a small real COG and lookup/range mechanics, but closes none
+of those risks: datum compatibility, scientific controls, connectivity,
+canonical coastal scope, PMTiles, public hosting, and human review remain open.
+
 ## Assumptions that require evidence
 
 | ID | Assumption | Required validation |

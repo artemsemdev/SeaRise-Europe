@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "north-sea-n52-e004-real-source-v1",
+  "measuredAt": "2026-08-04T22:32:26.814Z",
+  "scientificClassificationStatus": "blocked",
+  "referenceProfile": {
+    "runtime": "v20.20.1",
+    "operatingSystem": "darwin 25.5.0",
+    "architecture": "x64",
+    "cpu": "Apple M1 Max",
+    "totalMemoryBytes": 68719476736,
+    "freeMemoryBytesAtStart": 1043148800,
+    "transport": "Node fetch against loopback HTTP/1.1 immutable static server"
+  },
+  "artifacts": {
+    "cogByteSize": 143754,
+    "cogSha256": "d200cd6448fa673467068e312e1b41771c9b0e5ace5db9818f3431491d5b736a",
+    "pmtiles": {
+      "status": "not-generated",
+      "reason": "scientific classification gate blocked"
+    }
+  },
+  "lookup": {
+    "parseMilliseconds": 18.4185,
+    "warmIterations": 10000,
+    "warmMedianMilliseconds": 0.000209,
+    "warmP95Milliseconds": 0.0005
+  },
+  "byteRanges": {
+    "requestCount": 3,
+    "measurements": [
+      {
+        "label": "cold-header",
+        "requestedRange": "bytes=0-16383",
+        "status": 206,
+        "contentRange": "bytes 0-16383/143754",
+        "responseBytes": 16384,
+        "exactBytes": true,
+        "elapsedMilliseconds": 39.001458
+      },
+      {
+        "label": "cold-tail",
+        "requestedRange": "bytes=127370-143753",
+        "status": 206,
+        "contentRange": "bytes 127370-143753/143754",
+        "responseBytes": 16384,
+        "exactBytes": true,
+        "elapsedMilliseconds": 4.8515
+      },
+      {
+        "label": "warm-header",
+        "requestedRange": "bytes=0-16383",
+        "status": 206,
+        "contentRange": "bytes 0-16383/143754",
+        "responseBytes": 16384,
+        "exactBytes": true,
+        "elapsedMilliseconds": 4.360125
+      }
+    ]
+  },
+  "interpretation": {
+    "supportsExactCogRangesOnReferenceProfile": true,
+    "supportsProductionNetworkLatencyClaim": false,
+    "supportsPmtilesClaim": false
+  }
+}

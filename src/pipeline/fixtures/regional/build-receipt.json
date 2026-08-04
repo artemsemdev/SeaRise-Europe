@@ -1,0 +1,134 @@
+{
+  "buildKind": "real-source-domain-mechanics-only",
+  "demStatistics": {
+    "cellCount": 65536,
+    "maximumMetres": 32.12576675415039,
+    "medianMetres": 4.470795631408691,
+    "minimumMetres": -8.137821197509766,
+    "negativeCellCount": 336
+  },
+  "fixtureId": "north-sea-n52-e004-real-source-v1",
+  "measurements": {
+    "elapsedSeconds": 0.079105,
+    "peakResidentBytes": 96747520,
+    "sourceBytes": 17037271,
+    "workingArrayBytes": 393216
+  },
+  "methodologyGate": {
+    "blockers": [
+      "projection-archive-sha256",
+      "vertical-datum-reconciliation",
+      "dem-resolution-review",
+      "supported-geography-approval",
+      "canonical-coastal-source",
+      "connectivity-review",
+      "vertical-compatibility",
+      "projection-scientific-review",
+      "support-geography-review",
+      "coastal-geography-review",
+      "connectivity-scientific-review"
+    ],
+    "decision": "Stop: do not classify, package, publish, or begin Europe-scale work.",
+    "generatedScientificArtifacts": [],
+    "layerMatrix": [
+      {
+        "horizon": 2030,
+        "scenario": "ssp1-26",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2050,
+        "scenario": "ssp1-26",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2100,
+        "scenario": "ssp1-26",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2030,
+        "scenario": "ssp2-45",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2050,
+        "scenario": "ssp2-45",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2100,
+        "scenario": "ssp2-45",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2030,
+        "scenario": "ssp5-85",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2050,
+        "scenario": "ssp5-85",
+        "status": "blocked"
+      },
+      {
+        "horizon": 2100,
+        "scenario": "ssp5-85",
+        "status": "blocked"
+      }
+    ],
+    "missingEvidence": [
+      "a pinned local baseline sea-surface or tidal datum",
+      "a reviewed transformation from that datum to EGM2008",
+      "uncertainty controls demonstrating that the combined vertical error is fit for classification"
+    ],
+    "sourceLineage": {
+      "projection": "ipcc-ar6-sea-level/20210809",
+      "projectionUnits": "mm",
+      "quantile": 0.5,
+      "terrain": "copernicus-dem/2021_1",
+      "terrainUnits": "m",
+      "variable": "sea_level_change"
+    },
+    "state": "blocked",
+    "unlocksPhase1": false
+  },
+  "outputs": {
+    "copernicus-dem-window.cog.tif": {
+      "byteSize": 143754,
+      "cogValid": true,
+      "cogWarnings": [],
+      "sha256": "d200cd6448fa673467068e312e1b41771c9b0e5ace5db9818f3431491d5b736a"
+    },
+    "golden-vectors.json": {
+      "byteSize": 3899,
+      "sha256": "b363ccef4b97a41c13ec00a9a42c24f27e50d6dad881777abc34576213a478e8"
+    },
+    "lookup-fixture.json": {
+      "byteSize": 180045,
+      "sha256": "46f8940eac410ba126110dc9f8a744832593bb442d02542ecf65d78fd68abc31"
+    }
+  },
+  "schemaVersion": 1,
+  "software": {
+    "numpy": "1.26.4",
+    "python": "3.9.6",
+    "rasterio": "1.4.3"
+  },
+  "source": {
+    "asset": "Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+    "attribution": "produced using Copernicus WorldDEM-30 \u00a9 DLR e.V. 2010-2014 and \u00a9 Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "byteSize": 17037271,
+    "liability": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "release": "2021_1",
+    "sha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1",
+    "sourceId": "copernicus-dem",
+    "verticalCrs": "EGM2008 (EPSG:3855)"
+  },
+  "window": {
+    "columnOffset": 544,
+    "height": 256,
+    "rowOffset": 3112,
+    "width": 256
+  }
+}
