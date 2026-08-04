@@ -63,6 +63,10 @@ def _discover_test_files() -> set[str]:
         str(path.relative_to(ROOT))
         for path in (ROOT / "src/frontend/src").rglob("*.test.tsx")
     )
+    files.update(
+        str(path.relative_to(ROOT))
+        for path in (ROOT / "tests/harness").rglob("test_*.py")
+    )
     for path in (ROOT / "src/api/SeaRise.Api.Tests").rglob("*.cs"):
         content = path.read_text(encoding="utf-8")
         if "[Fact]" in content or "[Theory]" in content:
