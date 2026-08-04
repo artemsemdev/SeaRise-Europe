@@ -9,6 +9,12 @@
       "reference": "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/30949490661",
       "environment": "GitHub Actions ubuntu-latest; successful master run"
     },
+    "ci-30959043087": {
+      "kind": "github-actions",
+      "observedAt": "2026-08-04T23:09:44Z",
+      "reference": "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/30959043087",
+      "environment": "GitHub Actions ubuntu-latest; successful combined Phase 0.2/0.3 PR run"
+    },
     "codeql-27532482321": {
       "kind": "github-actions",
       "observedAt": "2026-06-15T08:05:47Z",
@@ -98,6 +104,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "11 tests passed in 1.04 seconds with fixed fixture input." }
+    },
+    {
+      "id": "frontend-regional-fixture-parity",
+      "layer": "contract",
+      "owner": "frontend",
+      "purpose": "Keep browser-oriented lookup bit-exact with the real-source regional fixture and independent golden vectors.",
+      "sourcePaths": ["src/frontend/src/lib/regional-fixture/*.test.ts"],
+      "changedPaths": ["src/frontend/src/lib/regional-fixture/**", "src/pipeline/fixtures/regional/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent cross-runtime real-fixture parity gate; deletion is not allowed." },
+      "commands": { "focused": "cd src/frontend && npm test -- src/lib/regional-fixture", "full": "cd src/frontend && npm test" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 5, "class": "fast", "evidenceRef": "ci-30959043087", "scope": "shared-ci-job" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed checked-in fixture and vectors passed in the successful combined Phase 0.2/0.3 run." }
     },
     {
       "id": "frontend-static-checks",
@@ -210,6 +230,34 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 27, "class": "fast", "evidenceRef": "ci-30949490661", "scope": "shared-ci-job" },
       "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Acquisition tests use deterministic loopback HTTP; 74-test pipeline baseline passed locally in 8.88 seconds." }
+    },
+    {
+      "id": "pipeline-science-contracts",
+      "layer": "scientific",
+      "owner": "science",
+      "purpose": "Enforce exact AR6 semantics, DEM evidence, geography controls, and connectivity rules without heuristic fallback.",
+      "sourcePaths": ["src/pipeline/tests/science/test_*.py"],
+      "changedPaths": ["src/pipeline/science/**", "src/pipeline/searise_pipeline/science/**", "src/pipeline/tests/science/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent scientific source, datum, geography, and connectivity contract." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/science -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "ci-30959043087", "scope": "shared-ci-job" },
+      "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic checked-in contracts and evidence passed in the successful combined Phase 0.2/0.3 run." }
+    },
+    {
+      "id": "pipeline-regional-fixture",
+      "layer": "scientific",
+      "owner": "science",
+      "purpose": "Validate real-source regional lineage, COG structure, lookup parity, and the fail-closed methodology gate.",
+      "sourcePaths": ["src/pipeline/tests/regional_fixture/test_*.py"],
+      "changedPaths": ["src/pipeline/fixtures/regional/**", "src/pipeline/searise_pipeline/regional_fixture/**", "src/pipeline/tests/regional_fixture/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent real-source fixture, provenance, parity, and blocked-release contract." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/regional_fixture -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "ci-30959043087", "scope": "shared-ci-job" },
+      "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Fixed checksums, COG metadata, receipts, and vectors passed in the successful combined Phase 0.2/0.3 run." }
     },
     {
       "id": "pipeline-legacy-transform",
@@ -380,6 +428,16 @@
     { "path": "src/frontend/src/__tests__/stores/appStore.test.ts", "suite": "frontend-stores", "status": "active", "removalGate": 70, "replacementEvidence": null },
     { "path": "src/frontend/src/__tests__/stores/mapStore.test.ts", "suite": "frontend-stores", "status": "active", "removalGate": 70, "replacementEvidence": null },
     { "path": "src/frontend/src/__tests__/stores/uiStore.test.ts", "suite": "frontend-stores", "status": "active", "removalGate": 70, "replacementEvidence": null },
+    { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/regional_fixture/test_evidence.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/regional_fixture/test_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/regional_fixture/test_lookup.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_connectivity.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_contracts.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_dem.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_geography.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/tdd/test_result_state_characterization.py", "suite": "pipeline-five-state-characterization", "status": "active", "removalGate": null, "replacementEvidence": null },
