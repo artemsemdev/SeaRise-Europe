@@ -25,4 +25,10 @@
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\..\tests\fixtures\tdd\five-state-characterization-v1.json"
+          Link="Fixtures\five-state-characterization-v1.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
