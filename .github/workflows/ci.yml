@@ -119,8 +119,17 @@ jobs:
           pip install -e ".[dev]"
           pip install ruff mypy pytest
 
+      - name: Validate test migration contracts
+        run: |
+          PYTHONPATH=../.. python ../../scripts/tests/validate_test_inventory.py
+          PYTHONPATH=../.. python -m unittest discover -s ../../tests/harness -p 'test_*.py'
+          PYTHONPATH=../.. python ../../scripts/tests/run_mutation_pilot.py --verify-report ../../tests/evidence/mutation-pilot-result-state.json
+
       - name: Lint (ruff)
         run: ruff check .
+
+      - name: Type check target domain
+        run: mypy searise_pipeline/domain
 
       - name: Validate audited source registry
         run: |

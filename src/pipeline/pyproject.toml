@@ -34,6 +34,7 @@ dev = [
 packages = [
     "pipeline",
     "searise_pipeline",
+    "searise_pipeline.domain",
     "searise_pipeline.regional_fixture",
     "searise_pipeline.science",
     "searise_pipeline.sources",
@@ -60,3 +61,4 @@ exclude = ["tests/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

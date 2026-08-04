@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "measuredAt": "2026-08-05T00:24:00+02:00",
+  "pilotId": "pipeline-result-state-v1",
+  "target": "src/pipeline/searise_pipeline/domain/result_state.py",
+  "fixture": "tests/fixtures/tdd/five-state-characterization-v1.json",
+  "initialRun": {
+    "total": 7,
+    "killed": 6,
+    "scorePercent": 85.7,
+    "runtimeMs": 7.48,
+    "survivingCriticalMutations": ["accept-unknown-coastal-scope"]
+  },
+  "remediation": {
+    "mutation": "accept-unknown-coastal-scope",
+    "evidence": "Added unknown-coastal-membership to the shared fixture and all three language controls.",
+    "commitIntent": "test(domain): cover unknown coastal membership"
+  },
+  "total": 7,
+  "killed": 7,
+  "scorePercent": 100.0,
+  "survivingCriticalMutations": [],
+  "runtimeMs": 8.09,
+  "mutants": [
+    { "id": "invert-europe-support", "status": "killed" },
+    { "id": "invert-coastal-scope", "status": "killed" },
+    { "id": "accept-unknown-coastal-scope", "status": "killed" },
+    { "id": "invert-nodata-check", "status": "killed" },
+    { "id": "swap-exposed-class", "status": "killed" },
+    { "id": "collapse-non-exposed-state", "status": "killed" },
+    { "id": "drop-class-interpretation", "status": "killed" }
+  ],
+  "decision": {
+    "outcome": "keep",
+    "tier": "scheduled",
+    "rationale": "The bounded pilot ran in under 10 ms, found one critical missing boundary, and reached 100% after adding independent fixture evidence. Keep it as a scheduled diagnostic rather than a blanket PR mutation gate."
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/test-inventory.schema.json",
+  "title": "SeaRise test inventory and migration matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "updatedAt", "evidence", "suites", "baselineTests", "knownGaps"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": "1.0.0" },
+    "updatedAt": { "type": "string", "format": "date" },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "observedAt", "reference"],
+        "properties": {
+          "kind": { "enum": ["github-actions", "local-measurement", "repository-inspection"] },
+          "observedAt": { "type": "string", "format": "date-time" },
+          "reference": { "type": "string", "minLength": 1 },
+          "environment": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "suites": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/suite" }
+    },
+    "baselineTests": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/baselineTest" }
+    },
+    "knownGaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner", "targetIssue", "description"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+          "owner": { "$ref": "#/$defs/owner" },
+          "targetIssue": { "type": "integer", "minimum": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "owner": {
+      "enum": ["data", "frontend", "platform", "science", "security"]
+    },
+    "baselineTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "suite", "status", "removalGate", "replacementEvidence"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "suite": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+        "status": { "enum": ["active", "retired"] },
+        "removalGate": { "type": ["integer", "null"], "minimum": 1 },
+        "replacementEvidence": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "layer",
+        "owner",
+        "purpose",
+        "sourcePaths",
+        "changedPaths",
+        "disposition",
+        "replacementGate",
+        "commands",
+        "execution",
+        "cost",
+        "flakiness"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+        "layer": {
+          "enum": [
+            "unit",
+            "component",
+            "contract",
+            "integration",
+            "container",
+            "e2e",
+            "scientific",
+            "static-analysis",
+            "security"
+          ]
+        },
+        "owner": { "$ref": "#/$defs/owner" },
+        "purpose": { "type": "string", "minLength": 1 },
+        "sourcePaths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "changedPaths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "disposition": {
+          "enum": [
+            "retain-characterization",
+            "port-first",
+            "rewrite-public-contract",
+            "delete-after-gate",
+            "keep-permanently"
+          ]
+        },
+        "replacementGate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["issue", "evidenceRequired"],
+          "properties": {
+            "issue": { "type": ["integer", "null"], "minimum": 1 },
+            "evidenceRequired": { "type": "string", "minLength": 1 }
+          }
+        },
+        "commands": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["focused", "full"],
+          "properties": {
+            "focused": { "type": ["string", "null"], "minLength": 1 },
+            "full": { "type": "string", "minLength": 1 }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier", "ciWorkflow", "ciJob", "requiresDocker", "requiresCredentials"],
+          "properties": {
+            "tier": { "enum": ["fast", "regional", "release", "scheduled"] },
+            "ciWorkflow": { "type": ["string", "null"] },
+            "ciJob": { "type": ["string", "null"] },
+            "requiresDocker": { "type": "boolean" },
+            "requiresCredentials": { "type": "boolean" }
+          }
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["estimatedSeconds", "class", "evidenceRef", "scope"],
+          "properties": {
+            "estimatedSeconds": { "type": "integer", "minimum": 0 },
+            "class": { "enum": ["fast", "medium", "slow"] },
+            "evidenceRef": { "type": "string", "minLength": 1 },
+            "scope": { "enum": ["focused-suite", "shared-ci-job", "ci-job"] }
+          }
+        },
+        "flakiness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "owner", "issue", "expiresAt", "evidence"],
+          "properties": {
+            "status": { "enum": ["none-observed", "environment-sensitive", "quarantined"] },
+            "owner": { "$ref": "#/$defs/owner" },
+            "issue": { "type": ["integer", "null"], "minimum": 1 },
+            "expiresAt": { "type": ["string", "null"], "format": "date" },
+            "evidence": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

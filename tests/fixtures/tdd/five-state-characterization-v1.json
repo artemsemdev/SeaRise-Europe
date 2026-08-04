@@ -1,0 +1,48 @@
+{
+  "$schema": "../../contracts/shared-fixture.schema.json",
+  "schemaVersion": "1.0.0",
+  "fixtureId": "five-state-characterization-v1",
+  "kind": "synthetic",
+  "owner": "science",
+  "reviewStatus": "characterization-only",
+  "methodologyVersion": "legacy-v1.0-characterization",
+  "purpose": "Capture the legacy five-state precedence without claiming scientific validation.",
+  "cases": [
+    {
+      "id": "outside-europe-wins",
+      "rationale": "The legacy domain returns unsupported before inspecting coastal or class data.",
+      "input": { "inEurope": false, "inCoastalZone": true, "classValue": 1 },
+      "expectedState": "UnsupportedGeography"
+    },
+    {
+      "id": "inside-europe-outside-coast",
+      "rationale": "A supported inland location is out of the product coastal scope.",
+      "input": { "inEurope": true, "inCoastalZone": false, "classValue": 1 },
+      "expectedState": "OutOfScope"
+    },
+    {
+      "id": "coastal-nodata",
+      "rationale": "A supported coastal location with no class must not invent exposure.",
+      "input": { "inEurope": true, "inCoastalZone": true, "classValue": null },
+      "expectedState": "DataUnavailable"
+    },
+    {
+      "id": "unknown-coastal-membership",
+      "rationale": "Unknown coastal membership must fail closed before any exact class is interpreted.",
+      "input": { "inEurope": true, "inCoastalZone": null, "classValue": 1 },
+      "expectedState": "DataUnavailable"
+    },
+    {
+      "id": "coastal-exposed",
+      "rationale": "The exact class value 1 maps to modeled exposure detected.",
+      "input": { "inEurope": true, "inCoastalZone": true, "classValue": 1 },
+      "expectedState": "ModeledExposureDetected"
+    },
+    {
+      "id": "coastal-not-exposed",
+      "rationale": "The exact class value 0 maps to no modeled exposure detected.",
+      "input": { "inEurope": true, "inCoastalZone": true, "classValue": 0 },
+      "expectedState": "NoModeledExposureDetected"
+    }
+  ]
+}
