@@ -1,0 +1,176 @@
+{
+  "$schema": "./source-lock.schema.json",
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "ipcc-ar6-sea-level",
+      "selectionStatus": "selected",
+      "publisher": "IPCC AR6 projection authors via Zenodo",
+      "canonicalRecord": "https://zenodo.org/records/6382554",
+      "version": "20210809",
+      "snapshotDate": "2021-08-09",
+      "licence": {
+        "name": "Creative Commons Attribution 4.0 International",
+        "url": "https://creativecommons.org/licenses/by/4.0/",
+        "spdx": "CC-BY-4.0",
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-04",
+        "requiredAcknowledgements": [
+          "Cite IPCC AR6 Working Group I Chapter 9, the FACTS model description, and dataset version 20210809.",
+          "Thank the projection authors, supporting funding agencies, and NASA Sea Level Change Team as required by the canonical record."
+        ]
+      },
+      "assets": [
+        {
+          "id": "location-list",
+          "url": "https://zenodo.org/api/records/6382554/files/location_list.lst/content",
+          "resolvedUrl": "https://zenodo.org/api/records/6382554/files/location_list.lst/content",
+          "resolvedVersion": "20210809",
+          "mediaType": "application/octet-stream",
+          "byteSize": 2659137,
+          "sha256": "431bf1a682b5938290565fb4c1969e56cfbb7c4b1fb08bc7459d9b2dc758d88d",
+          "upstreamChecksum": "md5:f536e05937342f1183cc04f48294270d",
+          "cachePath": "location_list.lst",
+          "availability": "locked"
+        }
+      ]
+    },
+    {
+      "id": "geonames-cities15000",
+      "selectionStatus": "selected",
+      "publisher": "GeoNames",
+      "canonicalRecord": "https://download.geonames.org/export/dump/",
+      "version": "2026-08-04",
+      "snapshotDate": "2026-08-04",
+      "licence": {
+        "name": "Creative Commons Attribution 4.0 International",
+        "url": "https://creativecommons.org/licenses/by/4.0/",
+        "spdx": "CC-BY-4.0",
+        "attribution": "GeoNames geographical database, https://www.geonames.org/.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-04",
+        "requiredAcknowledgements": [
+          "Retain GeoNames attribution and the CC BY 4.0 licence link in derived settlement indexes."
+        ],
+        "notes": "GeoNames exposes a mutable daily URL. A changed upstream snapshot must fail checksum verification and be updated only by reviewed PR."
+      },
+      "assets": [
+        {
+          "id": "cities15000",
+          "url": "https://download.geonames.org/export/dump/cities15000.zip",
+          "resolvedUrl": "https://download.geonames.org/export/dump/cities15000.zip",
+          "resolvedVersion": "2026-08-04",
+          "mediaType": "application/zip",
+          "byteSize": 3304425,
+          "sha256": "e61d9aeb5990582608d25deea8f5f9d73fe4fef5099429e15c5e95f630fa75c2",
+          "cachePath": "cities15000.zip",
+          "availability": "locked"
+        }
+      ]
+    },
+    {
+      "id": "natural-earth-10m",
+      "selectionStatus": "selected",
+      "publisher": "Natural Earth",
+      "canonicalRecord": "https://www.naturalearthdata.com/downloads/10m-physical-vectors/",
+      "version": "5.1.1",
+      "snapshotDate": "2022-05-13",
+      "licence": {
+        "name": "Natural Earth public domain dedication",
+        "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+        "spdx": "LicenseRef-Natural-Earth-Public-Domain",
+        "attribution": "Made with Natural Earth.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-04",
+        "requiredAcknowledgements": [],
+        "notes": "Attribution is not required by the terms, but SeaRise Europe retains the recommended short credit."
+      },
+      "assets": [
+        {
+          "id": "admin-0-countries",
+          "url": "https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip",
+          "resolvedUrl": "https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip",
+          "resolvedVersion": "5.1.1",
+          "mediaType": "application/zip",
+          "byteSize": 4930492,
+          "sha256": "ce1ac7036499a0edd641fbc093cd209a98f96a49d2eca8480aaacad35138a7f6",
+          "upstreamChecksum": "etag:0bc33f3e6f9ab457917430e57f6122a9",
+          "cachePath": "ne_10m_admin_0_countries.zip",
+          "availability": "locked"
+        },
+        {
+          "id": "ocean",
+          "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_ocean.zip",
+          "resolvedUrl": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_ocean.zip",
+          "resolvedVersion": "5.1.1",
+          "mediaType": "application/zip",
+          "byteSize": 3189765,
+          "sha256": "db626fcd5d50b096b156c78a2cc95011b39f32a61b4e47d147e3f7a77b8b2719",
+          "upstreamChecksum": "etag:c5ee907d7e0aaae198cbb74a04d8c2b0",
+          "cachePath": "ne_10m_ocean.zip",
+          "availability": "locked"
+        }
+      ]
+    },
+    {
+      "id": "copernicus-dem-glo30",
+      "selectionStatus": "candidate",
+      "publisher": "European Union and ESA; DLR/Airbus source data",
+      "canonicalRecord": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "version": "2021_1",
+      "snapshotDate": "2026-08-04",
+      "licence": {
+        "name": "Licence for Copernicus DEM instance COP-DEM-GLO-30-F",
+        "url": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "spdx": "LicenseRef-Copernicus-DEM-GLO30",
+        "attribution": "Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-04",
+        "requiredAcknowledgements": [
+          "Use the mandatory modified-derivative notice for outputs produced from GLO-30.",
+          "Cite https://doi.org/10.5270/ESA-c5d3d65 where applicable."
+        ],
+        "notes": "Candidate only: Phase 0 must still confirm release lineage, vertical datum suitability, access continuity, and the GLO-30 versus GLO-90 decision."
+      },
+      "assets": [
+        {
+          "id": "netherlands-n52-e004-sample",
+          "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_E004_00_DEM/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+          "resolvedUrl": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_E004_00_DEM/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+          "resolvedVersion": "2021_1",
+          "mediaType": "image/tiff",
+          "byteSize": 17037271,
+          "sha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1",
+          "upstreamChecksum": "etag:5d566daa39fbe2ebb43f5dc0a547c900",
+          "cachePath": "samples/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+          "availability": "locked"
+        }
+      ]
+    },
+    {
+      "id": "copernicus-coastal-zones-2018",
+      "selectionStatus": "candidate",
+      "publisher": "Copernicus Land Monitoring Service",
+      "canonicalRecord": "https://land.copernicus.eu/en/products/coastal-zones/coastal-zones-2018",
+      "version": "V1-2018",
+      "snapshotDate": "2026-08-04",
+      "licence": {
+        "name": "Copernicus Land Monitoring Service data policy",
+        "url": "https://land.copernicus.eu/en/data-policy",
+        "spdx": "LicenseRef-Copernicus-CLMS-Review-Required",
+        "attribution": "European Union, Copernicus Land Monitoring Service 2018, European Environment Agency (EEA).",
+        "redistributionStatus": "review-required",
+        "reviewer": "Unassigned",
+        "reviewedAt": null,
+        "requiredAcknowledgements": [],
+        "notes": "The full download requires an authenticated CLMS workflow and the product page reports validation as incomplete. Do not acquire or publish derivatives until rights, exact asset identity, and scientific role are reviewed."
+      },
+      "assets": []
+    }
+  ]
+}

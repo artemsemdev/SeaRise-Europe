@@ -17,7 +17,11 @@ dependencies = [
     "geopandas>=0.14,<2.0",
     "psycopg2-binary>=2.9,<3.0",
     "azure-storage-blob>=12.19,<13.0",
+    "jsonschema[format]>=4.23,<5.0",
 ]
+
+[project.scripts]
+searise-sources = "searise_pipeline.sources.cli:cli"
 
 [project.optional-dependencies]
 dev = [
@@ -27,10 +31,11 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["pipeline"]
+packages = ["pipeline", "searise_pipeline", "searise_pipeline.sources"]
 
 [tool.setuptools.package-dir]
 pipeline = "."
+searise_pipeline = "searise_pipeline"
 
 [tool.ruff]
 target-version = "py39"
