@@ -257,12 +257,12 @@
       "id": "pipeline-static-checks",
       "layer": "static-analysis",
       "owner": "data",
-      "purpose": "Enforce Python style, type boundaries, and the audited source registry contract.",
+      "purpose": "Enforce Python style, target-domain typing, and the audited source registry contract.",
       "sourcePaths": ["src/pipeline/pyproject.toml", "src/pipeline/sources/source-lock.json", "src/pipeline/sources/source-lock.schema.json"],
       "changedPaths": ["src/pipeline/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent authoring and source-integrity gate." },
-      "commands": { "focused": "cd src/pipeline && ruff check . && mypy searise_pipeline", "full": "cd src/pipeline && ruff check . && mypy searise_pipeline && python -m searise_pipeline.sources validate && python -m searise_pipeline.sources publication-check" },
+      "commands": { "focused": "cd src/pipeline && ruff check . && mypy searise_pipeline/domain && python -m searise_pipeline.sources validate", "full": "cd src/pipeline && ruff check . && mypy searise_pipeline/domain && python -m searise_pipeline.sources validate && python -m searise_pipeline.sources publication-check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 27, "class": "fast", "evidenceRef": "ci-30949490661", "scope": "shared-ci-job" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Static checks do not use time, network, or random inputs." }
@@ -399,6 +399,12 @@
       "owner": "science",
       "targetIssue": 47,
       "description": "No current suite transforms and validates a reviewed real-source regional candidate end to end."
+    },
+    {
+      "id": "pipeline-legacy-mypy",
+      "owner": "data",
+      "targetIssue": 68,
+      "description": "Repository-wide strict mypy is not yet a green baseline: legacy sources/cli.py has four pre-existing missing-annotation errors; target domain typing is enforced meanwhile."
     },
     {
       "id": "production-static-browser",
