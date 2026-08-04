@@ -1,231 +1,215 @@
 # 02 — Container View
 
-> **Status:** Proposed Architecture
-> **Level:** C4 Container
-> This document maps to the C4 Architecture "Container" level — the independently deployable or runnable units of the system.
+> **Status:** Accepted target architecture
+> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
----
+In this document, a container is an independently executed or deployed unit.
+It does not necessarily mean a Docker container. The target production system
+has two deployed origins and no continuously running application service.
 
-## 1. Container Overview
+## Container inventory
 
-SeaRise Europe is composed of three runtime containers (frontend, api, tiler) and two managed data services (PostgreSQL, Blob Storage). All three runtime containers are stateless (NFR-019) and deploy to Azure Container Apps. An Azure Container Registry stores all Docker images. An offline geospatial pipeline (not a runtime container) populates the data services during Phase 0.
+| Container | Technology | Runs where | Responsibility |
+|---|---|---|---|
+| Web application | React 19, TypeScript, Vite 8 | Cloudflare Workers Static Assets; browser | Delivers the shell, user interface, local domain logic, and architecture page. |
+| Browser search worker | Web Worker, serialized MiniSearch-compatible index | Browser | Loads, normalizes, ranks, and returns settlement matches off the UI thread. |
+| Browser assessment engine | TypeScript, geometry and COG/PMTiles readers | Browser | Validates scope and maps an exact classified value to a domain result. |
+| Map renderer | MapLibre GL JS with PMTiles protocol | Browser | Renders basemap, selected location, support geometry, and exposure overlay. |
+| Service worker | Web platform Cache API | Browser | Precaches the shell and caches versioned search/geospatial resources within a bounded policy. |
+| Release artifact store | R2 through a custom domain/CDN | Cloudflare edge/object storage | Serves immutable PMTiles, COG, GeoParquet, STAC, manifest, and provenance objects with byte-range support. |
+| Offline build pipeline | Python, GDAL, Rasterio, DuckDB Spatial, packaging/signing tools | Developer workstation or GitHub Actions | Acquires sources, produces artifacts, runs QA, records provenance, and publishes a complete release. |
+| Source cache | Ignored local/CI filesystem | Build environment only | Holds pinned raw inputs; it is never served to visitors or committed by default. |
 
----
+OpenFreeMap is an external visual dependency, not a SeaRise Europe container.
 
-## 2. Containers Reference
-
-| Container | Technology | Responsibility | Hosting | Status |
-|---|---|---|---|---|
-| **frontend** | Next.js 14+ (TypeScript) | Serves the web application shell, map interface, search, result panel, methodology panel | Azure Container Apps | Proposed Architecture |
-| **api** | ASP.NET Core .NET 8+ (Minimal API) | Geocoding proxy, exposure assessment, scenario/methodology config, geography validation | Azure Container Apps | Proposed Architecture |
-| **tiler** | TiTiler (Python/FastAPI) | Serves XYZ map tiles from COG files in Blob Storage | Azure Container Apps | Proposed Architecture |
-| **postgres** | Azure Database for PostgreSQL Flexible Server (PostGIS) | Scenarios, horizons, layer metadata, methodology versions, geography boundaries | Azure Managed Service | Proposed Architecture |
-| **blob** | Azure Blob Storage | COG raster files (one per scenario × horizon × methodology version) | Azure Managed Service | Proposed Architecture |
-| **registry** | Azure Container Registry | Docker images for frontend, api, tiler | Azure Managed Service | Proposed Architecture |
-| **cdn** *(optional)* | Azure CDN / Front Door | Caches Next.js static assets | Azure Managed Service | Assumption |
-| Geocoding provider | Azure Maps Search (ADR-019) | Geocodes free-text queries to coordinates | External service | Confirmed |
-| Basemap tile provider | Azure Maps (ADR-020) | Serves vector basemap tiles (Light style) | Azure service | Confirmed |
-
----
-
-## 3. Container Diagram
+## Production container diagram
 
 ```mermaid
-graph TD
-    User["👤 Browser"]
+flowchart LR
+    U[Visitor]
 
-    subgraph Azure["Azure — Container Apps Environment"]
-        FE["frontend\nNext.js 14+\nPort 3000"]
-        API["api\nASP.NET Core .NET 8\nPort 8080"]
-        Tiler["tiler\nTiTiler / FastAPI\nPort 8000"]
+    subgraph Edge[Cloudflare delivery plane]
+        Static[Workers Static Assets\nHTML / JS / CSS / small JSON]
+        Objects[R2 custom domain\nPMTiles / COG / GeoParquet / STAC]
     end
 
-    subgraph DataServices["Azure Managed Data Services"]
-        PG["postgres\nPostgreSQL + PostGIS"]
-        Blob["blob\nAzure Blob Storage\nCOG files"]
+    subgraph Browser[Browser runtime]
+        App[React application]
+        Search[Search Web Worker]
+        Assess[Assessment engine]
+        Map[MapLibre + PMTiles]
+        SW[Service worker + caches]
     end
 
-    subgraph External["External Services"]
-        Geocoder["Azure Maps Search\n(ADR-019)"]
-        Basemap["Azure Maps\n(ADR-020)"]
-    end
+    Base[OpenFreeMap\nvisual context only]
 
-    CDN["Azure CDN\n(optional)"]
-    Registry["Azure Container Registry\nDocker images"]
-    Pipeline["Offline Pipeline\nPython / GDAL\n(Phase 0 — not a runtime service)"]
-
-    User -->|"HTTPS"| CDN
-    CDN -->|"cached static assets"| FE
-    User -->|"HTTPS — REST JSON"| API
-    User -->|"HTTPS — XYZ tiles"| Tiler
-    User -->|"HTTPS — basemap tiles"| Basemap
-    FE -->|"REST JSON"| API
-    FE -->|"XYZ tile requests"| Tiler
-    API -->|"outbound geocoding"| Geocoder
-    API -->|"reads scenario/layer/geography"| PG
-    API -->|"metadata checks"| Blob
-    Tiler -->|"COG range requests (GDAL VSIAZ)"| Blob
-    Registry -->|"image pull on deploy"| FE
-    Registry -->|"image pull on deploy"| API
-    Registry -->|"image pull on deploy"| Tiler
-    Pipeline -->|"uploads COG files"| Blob
-    Pipeline -->|"registers layer metadata"| PG
-
-    style Azure fill:#dde8f5,stroke:#4a6fa5
-    style DataServices fill:#e8f5dd,stroke:#4a9a5a
-    style External fill:#fff3e0,stroke:#e08c2a
+    U --> App
+    Static --> App
+    App --> Search
+    App --> Assess
+    App --> Map
+    SW --- App
+    SW --- Search
+    SW --- Assess
+    Objects --> Search
+    Objects --> Assess
+    Objects --> Map
+    Base -.-> Map
 ```
 
----
+No production arrow terminates at an application API, relational database,
+geocoding service, or tile-rendering service.
 
-## 4. Container Responsibilities — Detail
+## Offline build container diagram
 
-### frontend (Next.js 14+)
+```mermaid
+flowchart LR
+    IPCC[IPCC AR6]
+    Cop[Copernicus data]
+    Geo[GeoNames]
+    NE[Natural Earth]
 
-**Primary responsibility:** Serve the interactive web application. Handles all user-facing UI: search bar, candidate list, map surface with MapLibre GL JS and deck.gl, result panel, scenario/horizon controls, methodology panel, all result states, and all error states.
+    subgraph Build[Offline build environment]
+        Fetch[Acquisition + checksums]
+        Cache[Ignored source cache]
+        Raster[Raster processing\nPython / GDAL / Rasterio]
+        Spatial[Spatial joins\nDuckDB Spatial]
+        QA[Scientific + contract QA]
+        Pack[Artifact packaging]
+        Evidence[STAC + manifest + provenance]
+    end
 
-**What it does NOT do:**
-- Does not perform geocoding — delegates to the api container
-- Does not perform geography validation — delegates to the api container
-- Does not perform exposure assessment — delegates to the api container
-- Does not store user data — no database, no localStorage for sensitive data (BR-016)
-- Does not expose API keys for geocoding (NFR-006) — the api container owns that
+    Release[Versioned release directory]
+    Static[Static Assets]
+    R2[R2]
 
-**Key technical characteristics:**
-- App Router with server components for the HTML shell/layout; client components for the interactive surface (map, search, results require browser APIs)
-- MapLibre GL JS dynamically imported (SSR disabled) to avoid server-side WebGL dependency
-- deck.gl TileLayer for exposure overlay — fetches XYZ tiles directly from tiler container
-- TanStack Query for API request management (caching, cancellation, error handling)
-- Zustand for UI state (panel visibility, application phase)
-- AbortController for stale request cancellation (FR-040)
+    IPCC --> Fetch
+    Cop --> Fetch
+    Geo --> Fetch
+    NE --> Fetch
+    Fetch --> Cache
+    Cache --> Raster
+    Cache --> Spatial
+    Raster --> QA
+    Spatial --> QA
+    QA --> Pack
+    QA --> Evidence
+    Pack --> Release
+    Evidence --> Release
+    Release --> Static
+    Release --> R2
+```
 
-**State:** Stateless container. Any instance serves any request. Map viewport and application state live in the browser only. (NFR-019)
+The build environment may be comparatively heavy. Its dependencies are
+release tooling, not production services.
 
-**Why separate from api:** The Next.js + mapping stack is a distinct concern from the API. Separation enables independent deployment, independent scaling, and clean team boundaries. The frontend is the user-facing portfolio artifact that must be high quality (P-03).
+## Runtime responsibilities
 
----
+### Web application
 
-### api (ASP.NET Core .NET 8+)
+- Pins one `dataReleaseId` at build/deploy time.
+- Loads and validates the release manifest before enabling assessment.
+- Owns navigation, accessible UI, externalized copy, and URL state.
+- Coordinates search, assessment, and map presentation without duplicating
+  domain rules in components.
+- Presents sources, methodology, limitations, release identity, and portfolio
+  evidence.
 
-**Primary responsibility:** Backend API that orchestrates geocoding, assessment, and configuration. Acts as the single integration point between the browser and all backend services.
+### Search worker
 
-**Core operations:**
-1. Proxy geocoding requests to the configured provider (hiding provider details and API key from the browser)
-2. Perform Europe geography validation via PostGIS (FR-009)
-3. Perform coastal zone validation via PostGIS (FR-011, ADR-018)
-4. Resolve scenario + horizon + active methodology version to an exposure layer
-5. Evaluate point-in-exposure-zone using TiTiler or direct COG query
-6. Return an AssessmentResult with the result state and methodology version
-7. Serve scenario/horizon/methodology configuration (FR-014, FR-015, FR-033)
-8. Expose a health/readiness endpoint (NFR-011)
+- Initializes lazily on search focus or browser idle.
+- Loads the smaller `europe-core` shard before the larger
+  `europe-coastal` shard.
+- Normalizes text and ranks exact canonical, exact alias, prefix, then fuzzy
+  matches.
+- Uses population, administrative importance, and coastal distance only as
+  documented tie-breakers.
+- Returns immutable settlement records with coordinates and disambiguating
+  administration/country labels.
 
-**What it does NOT do:**
-- Does not serve map tiles — that is tiler's responsibility
-- Does not store raw user addresses (BR-016, NFR-007)
-- Does not perform client-side JavaScript — it is a pure JSON HTTP API
+### Assessment engine
 
-**Key technical characteristics:**
-- Minimal API style in ASP.NET Core — no MVC controller scaffolding
-- Clean layered architecture: HTTP endpoints → Application services → Domain logic → Infrastructure adapters
-- IGeocodingService abstraction — dev implementation against Nominatim, production against Azure Maps Search (ADR-019)
-- Parameterized PostGIS queries via Npgsql (no SQL injection risk)
-- All requests include a correlation ID in logs and responses (NFR-013)
-- Raw addresses never written to logs (NFR-007)
+- Rejects invalid coordinates and unsupported configuration before reading a
+  layer.
+- Evaluates Europe support geometry before coastal scope.
+- Resolves exactly one of nine artifacts from the pinned manifest.
+- Uses nearest-neighbour lookup of the classified value; it never infers a
+  result from display colours.
+- Maps nodata, zero, and one to the fixed result-state vocabulary.
+- Supplies the same artifact identity to the result panel and map.
 
-**State:** Stateless. Any replica can handle any request. No in-memory shared state between replicas. (NFR-019)
+### Map renderer
 
-**Why proxy geocoding:** Avoids exposing the geocoding provider's API key to the browser (NFR-006). Allows provider swap without any frontend changes. Normalizes provider response format to the internal GeocodingCandidate model.
+- Uses OpenFreeMap solely as visual context.
+- Reads PMTiles byte ranges from the release origin.
+- Shows a marker for every assessed coordinate.
+- Keeps scenario, horizon, release, overlay, legend, and result text in sync.
+- Degrades honestly if the basemap is unavailable.
 
----
+### Service worker
 
-### tiler (TiTiler)
+- Namespaces all entries by application and data release.
+- Precaches the shell and minimal configuration.
+- Caches the core search index after first use and coastal data
+  opportunistically.
+- Caches geospatial byte ranges with a bounded policy.
+- Never claims a layer is available offline unless the required data is
+  present.
 
-**Primary responsibility:** Serve XYZ map tiles (/{z}/{x}/{y}.png) from Cloud-Optimized GeoTIFF files stored in Azure Blob Storage. The frontend requests tiles for the active exposure layer; TiTiler handles range-request-based COG reading, colormap application, and tile rendering.
+## Artifact responsibilities
 
-**What it does NOT do:**
-- Does not know about users, sessions, scenarios, or assessments
-- Does not validate geography or perform any application-layer logic
-- Does not write to any data store
+The manifest is the release entry point and contract. It locates configuration,
+support geometries, both search shards, all nine visual and analysis layers,
+STAC metadata, hashes, source attribution, and quality summaries.
 
-**Key technical characteristics:**
-- TiTiler is an off-the-shelf open-source tile server (FastAPI-based) — no custom Python code needed
-- Reads COGs from Azure Blob Storage using the GDAL VSIAZ virtual filesystem driver
-- The frontend constructs tile URLs with the COG path (which encodes methodology version, scenario, horizon) received from the api's assess response
-- The tile URL template returned in the assess response prevents the frontend from constructing arbitrary layer URLs
-- Colormap applied server-side by TiTiler based on request parameters
+Versioned objects use immutable paths and long-lived cache headers. Mutable
+pointers use short caching and cannot switch the release used by an active
+session. Large artifacts must support `HEAD` and byte-range `GET`, expose range
+headers through CORS, and be served from one canonical public URL.
 
-**State:** Stateless. (NFR-019)
+## Communication patterns
 
-**Why TiTiler instead of custom tile server:** TiTiler implements the COG tile-serving pattern correctly and is production-grade. Building a custom tile server would duplicate substantial geospatial engineering work without benefit. TiTiler adds one Python runtime to the system but eliminates a major implementation risk.
+| Interaction | Protocol | Pattern |
+|---|---|---|
+| Static host to browser | HTTPS | Whole-file GET for content-addressed app assets. |
+| Artifact store to browser | HTTPS | Whole-file GET for small metadata; `HEAD` and range GET for large artifacts. |
+| Application to search worker | Structured clone/message channel | Request/response with a monotonically increasing query token. |
+| Application to assessment engine | In-process typed call | Pure domain evaluation plus abortable artifact reads. |
+| Application to service worker | Fetch/Cache APIs | Version-aware cache lookup and revalidation. |
+| Map renderer to OpenFreeMap | HTTPS | Non-authoritative style/tile requests with required attribution. |
+| Build pipeline to sources | HTTPS | Release-time download of pinned snapshots followed by checksum verification. |
+| Publication to hosting | Provider API/CLI | CI-only upload to a new immutable prefix, then app deployment. |
 
----
+## Failure isolation
 
-### postgres (Azure Database for PostgreSQL Flexible Server)
+- A source outage blocks only a future build.
+- A QA failure blocks publication and leaves the previous release intact.
+- A basemap failure does not change search or assessment results.
+- A missing or corrupt manifest disables assessment with an explicit technical
+  error; the client never guesses artifact URLs.
+- An unavailable, missing, or uncached range yields a connectivity/data access
+  error. It is not converted into a scientific result state.
+- A release rollback changes the app/release pairing; published objects are
+  never edited in place.
 
-**Primary responsibility:** Persistent relational store for all structured application data.
+## Deliberately absent from production
 
-**Stored data:**
-- `scenarios`: configured scenario set (ADR-016: ssp1-26, ssp2-45, ssp5-85)
-- `horizons`: 2030, 2050, 2100 (FR-015 — confirmed)
-- `methodology_versions`: active and historical methodology records
-- `layers`: layer metadata mapping scenario × horizon × version → blob path
-- `geography_boundaries`: Europe boundary and coastal analysis zone geometries (PostGIS, ADR-018)
+- ASP.NET Core API;
+- PostgreSQL/PostGIS;
+- TiTiler;
+- Azure Blob/Azurite runtime scaffolding;
+- external runtime geocoder and its keys;
+- Next.js server, React Server Components, and server actions;
+- server-side session, identity, and application logs.
 
-**What it does NOT store:** User data, raw addresses, search logs, or any session state.
+These components may remain temporarily in the repository during migration,
+but new target behaviour must not depend on them. Removal occurs only after the
+ADR-021 scientific, parity, performance, and deployment gates pass.
 
-**Why PostgreSQL / PostGIS:** The geography validation requirement (FR-009–FR-012) needs `ST_Within` point-in-polygon queries. PostGIS is the standard tool for this. Azure Flexible Server is a managed service with built-in backups, HA, and patching — aligned with the low-ops MVP goal (NFR-023).
+## Local development
 
----
-
-### blob (Azure Blob Storage)
-
-**Primary responsibility:** Durable object store for Cloud-Optimized GeoTIFF files. One COG per scenario × horizon × methodology version.
-
-**Path convention:** `geospatial/layers/{methodologyVersion}/{scenarioId}/{horizonYear}.tif`
-
-**Written by:** Offline geospatial pipeline (Phase 0) — not the runtime containers.
-
-**Read by:** tiler container (via GDAL VSIAZ, HTTP range requests); api container (integrity checks).
-
-**Why Blob Storage for COGs:** COG files can be tens to hundreds of MB. Azure Blob supports HTTP range requests natively, which is the mechanism COGs use for tile serving. Blob Storage scales without capacity planning and integrates directly with TiTiler via GDAL's VSIAZ driver.
-
----
-
-## 5. Communication Patterns
-
-| From | To | Protocol | Notes |
-|---|---|---|---|
-| Browser | frontend | HTTPS | TLS terminated at Azure Container Apps ingress |
-| Browser | api | HTTPS | Direct REST calls (Option A — see below) |
-| Browser | tiler | HTTPS | Direct XYZ tile requests |
-| Browser | Basemap provider | HTTPS | Client-side, Azure Maps |
-| frontend | api | HTTPS REST/JSON | Same as browser→api in Option A |
-| api | PostgreSQL | TCP/PostgreSQL | Private network within Container Apps Environment |
-| api | Blob Storage | HTTPS (Azure SDK) | Managed identity preferred |
-| api | Geocoding provider | HTTPS | Outbound; API key in env var only |
-| tiler | Blob Storage | HTTPS (GDAL VSIAZ) | HTTP range requests for COG byte ranges |
-
-**Option A vs Option B for API access:**
-
-> **Option A (Recommended for MVP):** External ingress on api — browser calls api directly.
-> Simpler, no BFF overhead. Acceptable because the API serves public data with no auth.
->
-> **Option B:** Internal ingress on api — Next.js server-side route handlers proxy to api (Backend-for-Frontend pattern).
-> More secure (api not publicly accessible), but adds complexity and a Next.js server-side dependency.
->
-> **Decision:** Option A for MVP. If auth or sensitive operations are added in future phases, reconsider Option B. Document this as a known tradeoff.
-
----
-
-## 6. Why This Container Split Fits the Low-Ops MVP Goal
-
-This topology requires no cluster management, no container orchestration beyond what Container Apps provides, and relies on Azure managed services for all stateful persistence:
-
-- **Azure Container Apps** handles: auto-scaling, health probes, revision management, TLS termination, internal service discovery — no Kubernetes YAML needed (NFR-023)
-- **PostgreSQL Flexible Server** handles: automated backups, patching, high availability — no database administration needed
-- **Azure Blob Storage** handles: durability, redundancy, access control — no storage management needed
-- **TiTiler** is off-the-shelf — no custom tile server code needed
-- All three runtime containers are stateless — rolling deployments are safe, any replica handles any request (NFR-019)
-- No message queues, no caches, no sidecar containers, no service mesh required for MVP
-
-A single developer can set up and maintain this entire topology.
+Developers use fixture releases or a validated local release directory. The
+development static server must implement the same CORS and range behaviour used
+in production; a plain file URL is not an adequate integration test. Raw source
+downloads remain in the ignored build cache. Routine UI work must not require a
+database, API, tile server, or cloud account.

@@ -1,41 +1,65 @@
 # Security Policy
 
-## Current Status
+## Project status
 
-As of March 30, 2026, this repository is primarily documentation and planning material. The production application described in `docs/architecture/` does not exist in this repository yet.
+SeaRise Europe has no supported production release yet. The default branch
+contains a legacy local demonstration stack and an accepted static-first target
+architecture. The demo uses synthetic exposure data and is not an operational
+climate or emergency service.
 
-Even so, security issues can still matter here, especially if they involve:
+Security review applies to all tracked code, data-processing logic,
+infrastructure, dependencies, generated artifact contracts, and documentation.
 
-- accidentally committed secrets
-- unsafe example configuration
-- misleading security guidance in architecture documents
-- future implementation code added to the repository
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Do not open a public issue for a suspected vulnerability.
 
-Please do not open a public issue for suspected vulnerabilities.
+1. Use GitHub private vulnerability reporting for this repository when
+   available.
+2. Otherwise contact the maintainer privately through GitHub before disclosure.
 
-Preferred path:
+Include the affected revision and paths, reproduction steps, realistic impact,
+and any known workaround. Do not include real credentials or sensitive user
+data in the report.
 
-1. Use GitHub private vulnerability reporting for this repository if it is enabled.
-2. If private reporting is not available, contact the maintainer directly through GitHub before public disclosure.
+Target response times:
 
-Include:
+- acknowledgement within 5 business days;
+- initial triage within 10 business days.
 
-- a short description of the issue
-- affected file paths or components
-- reproduction steps, if applicable
-- impact assessment
+## Security boundaries
 
-## Response Expectations
+The accepted production architecture has no application API, user accounts, or
+runtime database. Public static files are intentionally readable. Integrity,
+privacy, supply chain, and hosting configuration remain security concerns.
 
-- Initial acknowledgement target: within 5 business days
-- Initial triage target: within 10 business days
+Report issues involving:
 
-## Disclosure
+- committed or exposed secrets;
+- dependency or build-pipeline compromise;
+- malicious or substituted release artifacts;
+- incorrect checksums, provenance, or signatures;
+- overly broad cloud credentials, CORS, or Content Security Policy;
+- cross-site scripting or unsafe rendering of search/data fields;
+- service-worker cache poisoning or mixed data releases;
+- unintended collection of search queries or coordinates;
+- source-licence or attribution errors that make publication unsafe;
+- denial-of-wallet behaviour in object-storage requests.
 
-Please allow time for review and remediation before public disclosure.
+## Secret handling
 
-## Supported Versions
+- No real secret belongs in Git, frontend build variables, public manifests, or
+  generated static assets.
+- Local secrets use ignored environment files.
+- CI publishing uses protected environments and least-privilege credentials.
+- Keyless Cosign signing is preferred so no long-lived signing key is stored in
+  the repository.
+- If a credential is committed, revoke it first, then remove it from the current
+  tree and coordinate history cleanup privately.
 
-There are no versioned software releases yet. Security review currently applies to the default branch contents of this repository.
+## Supported versions
+
+There are no versioned public releases. Security fixes target the default branch
+until the first signed static release is published. Each future release manifest
+must identify the application commit, data release, dependency/build versions,
+checksums, and provenance used to create it.

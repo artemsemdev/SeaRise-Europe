@@ -1,144 +1,144 @@
-# SeaRise Europe — Product Vision & Strategy
+# SeaRise Europe — Product Vision and Strategy
 
-## Document Metadata
+> **Owner:** Artem Sem
+>
+> **Status:** Active
+>
+> **Version:** 1.0
+>
+> **Last updated:** 2026-08-04
 
-| Field | Value |
-|---|---|
-| Owner | Artem Sem |
-| Status | Draft |
-| Version | 0.1 |
-| Last updated | 2026-03-30 |
+## Vision
 
-**Version History**
+> Make scenario-based coastal sea-level exposure understandable for people
+> exploring European places, without overstating what the science can say.
 
-| Version | Date | Author | Summary of Changes |
-|---|---|---|---|
-| 0.1 | 2026-03-30 | Artem Sem | Initial draft |
+SeaRise Europe connects authoritative climate data to a familiar city, town,
+or village. It gives a non-specialist a clear result, visible assumptions, and
+an honest reason when the product cannot answer.
 
----
+The project has a second, equally explicit purpose: it is a portfolio case
+study in architectural judgement. Its engineering story is that deterministic
+geospatial work is moved out of the user request path, published as verifiable
+open artifacts, and delivered quickly without a runtime backend, database, or
+tile server.
 
-## 1. Vision Statement
+## The problem
 
-> **Make coastal sea-level exposure understandable for anyone, anywhere in Europe — without overpromising what the science can say.**
+Climate tools commonly fail in one of two ways:
 
-SeaRise Europe closes the gap between authoritative climate science and the question every coastal resident eventually asks: *"What does this mean for where I live?"*
+- authoritative research interfaces require substantial domain knowledge;
+- simple consumer maps hide methodology or imply property-level certainty.
 
----
+SeaRise Europe occupies the space between them: consumer-level clarity with
+scientific restraint and inspectable evidence. It is not trying to turn a
+regional scenario model into an address-level prediction.
 
-## 2. Problem We Are Solving
+The former multi-service architecture created a similar mismatch on the
+engineering side. A read-only data product did not need a database and several
+request-time services. Static-first delivery improves the first interaction,
+offline resilience, cost, and explainability while keeping the complex
+scientific work in a reproducible build pipeline.
 
-### The core tension
+## Strategic pillars
 
-Climate change projections are increasingly precise at a regional scale, but the tools that expose them to the public fall into two failure modes:
+### 1. Scientific honesty
 
-| Failure Mode | Examples | Problem |
+Every result is scenario-based, release-specific, and bounded by known
+limitations. The five result states remain distinct. “No modeled exposure” is
+never presented as “safe,” and missing data is never treated as a zero result.
+
+### 2. Place-based clarity
+
+The primary interaction is “find a settlement, compare scenarios, understand
+the result.” Users do not need to know coordinates, file formats, or projection
+terminology before they can start. Search includes coastal villages as well as
+larger cities and inland places needed to explain scope.
+
+### 3. Transparency as product value
+
+Every result links to source versions, methodology, limitations, attribution,
+and the pinned data release. The architecture page exposes artifact sizes,
+quality gates, performance, cost, STAC metadata, and signed provenance.
+
+### 4. Fast and offline-capable by design
+
+The application shell and search are local after download. Assessment reads
+only the required immutable artifact ranges. Cached places and data remain
+usable without a connection, while uncached data fails honestly rather than
+being guessed.
+
+### 5. Minimal scope, maximum depth
+
+The baseline is Europe, coastal sea-level exposure, three scenarios, and three
+horizons. Street addresses, inland hazards, accounts, and live alerts are not
+quietly pulled into the MVP.
+
+### 6. Modern technology with a reason
+
+React, Vite, MapLibre, PMTiles, COG, DuckDB Spatial, GeoParquet, STAC,
+OpenTofu, SLSA, and Sigstore are used where they improve user experience,
+portability, reproducibility, or trust. Component count is not treated as a
+measure of seniority.
+
+## Audience
+
+| Audience | Primary need | Product promise |
 |---|---|---|
-| **Too technical** | NASA AR6 projection tool, PROTECT, raw IPCC datasets | Valuable but built for scientists; require domain knowledge to interpret |
-| **Too confident** | Many consumer flood maps and media visualizations | Visually compelling but imply parcel-level certainty the data cannot support |
+| Climate-aware resident or place researcher | Understand a European place without GIS expertise | A quick, cautious first-pass result with visible limitations |
+| Educator or science communicator | Explain scenarios and uncertainty reliably | Stable visual comparison with citable sources and methodology |
+| Portfolio reviewer or technical evaluator | Assess end-to-end judgement | Measured evidence of product, data, architecture, and operational quality |
 
-Neither mode serves the growing population of non-specialist users — residents, renters, researchers, journalists — who want a *trustworthy*, *place-based*, *accessible* view of coastal exposure.
+These audiences are working hypotheses until validated through research; see
+[PERSONAS.md](PERSONAS.md).
 
-### Why Europe, why now
+## Positioning
 
-- The EEA documents that extreme sea levels have increased at many European coastline locations and that small mean sea-level rises can substantially amplify the frequency of historically rare flood events.
-- Europe has strong authoritative data coverage (Copernicus DEM, IPCC AR6, PROTECT) but no single consumer-grade explorer that combines projection scenarios with elevation data for a specific address.
-- European coastal populations are dense and diverse — from Amsterdam to Naples to Lisbon — yet most tools treat the continent as context rather than focus.
+SeaRise Europe is a transparent, scenario-based coastal exposure explorer for
+European settlements. It combines a simple place-search experience with
+versioned scientific artifacts and explicit limitations. Unlike a conventional
+request-time application, it precomputes deterministic geospatial work and
+delivers a portable, backend-free browser experience.
 
----
+This is a positioning hypothesis, not a claim that no other product shares any
+of these attributes. Comparative claims require current evidence; see
+[COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md).
 
-## 3. Strategic Pillars
+## Product principles
 
-### Pillar 1 — Scientific Honesty
-Every result is scenario-based, model-based, and bounded by clearly stated limitations. The product never implies certainty the underlying data does not support. Disclaimer language, methodology versioning, and explicit result-state taxonomy enforce this at every layer.
+1. **Honest before dramatic.** Remove or qualify a visualization that implies
+   unsupported certainty.
+2. **Answer before detail.** Give the result first; make methodology easy to
+   inspect without blocking the core journey.
+3. **Explicit state before silent fallback.** Show scope, nodata, connectivity,
+   and degraded-map conditions directly.
+4. **Version what a user can rely on.** Pin the data release, methodology,
+   scenarios, horizons, and source attribution.
+5. **Local computation before operational infrastructure.** Add a runtime
+   service only after measurement proves a static solution insufficient and a
+   separate ADR accepts the trade-off.
+6. **Evidence before portfolio claims.** Show actual checks, sizes, timings,
+   licences, and provenance; label planned work as planned.
+7. **Portability before provider lock-in.** The product contract is static
+   HTTPS plus open formats, not a particular cloud API.
 
-### Pillar 2 — Place-Based Clarity
-The primary UX pattern is simple: enter a place, get a result for that place. The product does not ask users to understand IPCC terminology, GIS coordinates, or percentile bands before they can see a useful answer.
+## Long-term direction
 
-### Pillar 3 — Data Transparency
-Users can always trace any result back to its source dataset, methodology version, and key limitations. Transparency is not an afterthought or a footer link — it is a first-class feature.
+Possible future modules include storm-surge context, land subsidence,
+adaptation infrastructure, additional geographies, localization, and
+user-controlled regional offline packs. Each requires suitable data,
+methodology, licences, performance evidence, and a product decision. The
+baseline must not present these as implied coverage.
 
-### Pillar 4 — Engineering Quality
-The architecture, data pipeline, and frontend are built to professional standards. This directly serves the portfolio goal: demonstrating that strong product thinking and strong engineering can coexist.
+Exact street-address search is a separate future capability because it changes
+privacy, dataset requirements, offline behaviour, and cost.
 
-### Pillar 5 — Minimal Scope, Maximum Depth
-MVP covers one problem well rather than many problems poorly. Europe. Coastal. Sea-level exposure. Three time horizons. That constraint is a feature, not a limitation.
+## What the product is not
 
----
-
-## 4. Target Market
-
-### Primary audience (MVP)
-
-**Climate-aware individuals evaluating European coastal locations.** This includes property researchers, renters, homeowners, and curious residents who want to understand coastal exposure for a specific place in a way that is honest about what is and is not known.
-
-### Secondary audience (MVP)
-
-**Educators, researchers, and journalists** who need a transparent, citable visualization tool to support communication about coastal risk.
-
-**Portfolio reviewers and technical evaluators** who use the product to assess the creator's capability across product design, geospatial engineering, and data communication.
-
-### Audience growth path (post-MVP)
-
-As the product matures: climate-adjacent professionals (urban planners, NGO analysts, local government staff), and eventually a broader European public audience if the product achieves sufficient trust and distribution.
-
----
-
-## 5. Product Positioning
-
-| Dimension | SeaRise Europe |
-|---|---|
-| **What it is** | A scenario-based coastal sea-level exposure explorer for European locations |
-| **Who it is for** | Non-specialist individuals who want a place-based, honest view of coastal risk |
-| **What makes it different** | Scientific caution is a product feature, not a caveat; methodology is transparent and versioned; Europe-only focus produces depth over breadth |
-| **What it is not** | An engineering assessment tool, an insurance product, a real-time flood alert, or a parcel-level guarantee |
-
----
-
-## 6. Design Principles
-
-These principles govern product and design decisions at every level. When a decision is unclear, return to these.
-
-### 1. Honest over impressive
-If a visualization could mislead, simplify it. If copy implies more certainty than the data supports, rewrite it. A trustworthy product is more valuable than a visually dramatic one.
-
-### 2. Explain without overwhelming
-The methodology is accessible to anyone who wants it, but the primary user flow does not require reading it. Surface complexity on demand, not by default.
-
-### 3. Explicit states over silent behavior
-Every meaningful system state — loading, empty, error, out-of-scope, data unavailable — is shown clearly. The product never silently substitutes a different result or fails without telling the user why.
-
-### 4. Europe and coastlines as identity
-The product does not aspire to be everything. Saying "we cover Europe coastal exposure" is a positioning statement, not a limitation.
-
-### 5. Version everything the user sees
-Methodology, result states, and source attributions are versioned. A user should be able to understand, retroactively, which methodology version produced a result they saw.
-
-### 6. Defaults are decisions
-Default scenario, default time horizon, and default map view are product decisions, not engineering defaults. They shape what most users see first and must be chosen deliberately.
-
----
-
-## 7. Long-Term Vision
-
-The MVP is a focused, high-quality starting point. The long-term direction — if the product proves valuable — is toward a broader European climate-risk explorer that can:
-
-- Extend to additional coastal hazard layers (storm surge frequency, tidal range interaction).
-- Add inland climate-risk modes (river flooding, heat stress) as separate, clearly scoped modules.
-- Offer country-specific contextual overlays (coastal adaptation infrastructure, protected zones).
-- Support shareable results and public methodology documentation for research use cases.
-- Expand globally if authoritative data reaches comparable quality and licensing terms.
-
-In every phase, the same principles apply: scientific honesty, transparent methodology, and a user experience built for non-specialists.
-
----
-
-## 8. What This Product Is Not
-
-This section is as important as the vision itself. Keeping these boundaries explicit prevents scope drift and user expectation errors.
-
-- **Not an engineering assessment.** Results are not suitable for construction, infrastructure, or planning decisions.
-- **Not an insurance or mortgage tool.** No result implies financial risk quantification or property valuation impact.
-- **Not a real-time system.** Results are based on pre-processed model runs, not live sensor data or weather feeds.
-- **Not a flood prediction service.** The product shows scenario-based modeled exposure, not probabilistic flood event forecasting.
-- **Not a global product (MVP).** Coverage is Europe only.
-- **Not a scientific research platform.** It communicates science; it does not replace peer-reviewed analysis.
+- Not a property, engineering, insurance, mortgage, legal, or financial tool.
+- Not a real-time weather, flood-alert, or emergency service.
+- Not a probabilistic forecast of a specific flood event.
+- Not a claim to enumerate every real-world European settlement.
+- Not a global or inland-hazard product in the baseline.
+- Not a scientific research environment or substitute for peer review.
+- Not a showcase of infrastructure for its own sake.

@@ -1,208 +1,129 @@
-# SeaRise Europe — Competitive & Landscape Analysis
+# SeaRise Europe — Product Landscape and Positioning
 
-## Document Metadata
+> **Owner:** Artem Sem
+>
+> **Status:** Active positioning hypothesis
+>
+> **Version:** 1.0
+>
+> **Last updated:** 2026-08-04
 
-| Field | Value |
-|---|---|
-| Owner | Artem Sem |
-| Status | Draft |
-| Version | 0.1 |
-| Last updated | 2026-03-30 |
+## Purpose and limits
 
-**Version History**
+This document guides positioning and product priorities. It is not a complete
+or continuously monitored market survey. Features, availability, licences, and
+geographic coverage of external tools can change; verify them against the
+provider's current documentation before publishing a comparative claim.
 
-| Version | Date | Author | Summary of Changes |
+SeaRise Europe should not claim to be “the only” product with a feature unless
+a fresh, documented review supports it. Its defensible portfolio story does
+not require that claim.
+
+## Landscape
+
+| Category | Representative products | Typical strength | Gap relevant to SeaRise Europe |
 |---|---|---|---|
-| 0.1 | 2026-03-30 | Artem Sem | Initial draft |
+| Scientific projection explorers | NASA/IPCC AR6 Sea Level Projection Tool; PROTECT | Authoritative scenario exploration and scientific depth | Higher learning curve for a simple place-first journey |
+| Institutional climate portals | Climate-ADAPT and national portals | Broad, curated policy and adaptation context | Discovery breadth can outweigh one focused interaction |
+| Consumer coastal-risk maps | Climate Central Coastal Risk Screening Tool and similar products | Immediate visual exploration and broad reach | Methodology/state distinctions may not be central to the interaction |
+| Simplified elevation “water level” maps | FloodMap-style tools | Very low interaction cost | Can encourage users to infer hydrodynamics or precision not represented by a simple threshold |
+| Commercial property-risk products | Market-specific real-estate risk services | Property workflow integration and report-like outputs | Different geography, commercial model, and claims from this public educational product |
 
-> **Scope note:** This analysis covers the landscape of publicly available sea-level and coastal flood visualization tools that a target user might encounter. It is not an exhaustive academic survey. The goal is to identify the gap that SeaRise Europe fills and ensure the product's differentiation is deliberate.
+Useful primary starting points for periodic review:
 
----
+- [NASA Sea Level Projection Tool](https://sealevel.nasa.gov/ipcc-ar6-sea-level-projection-tool/)
+- [Climate-ADAPT sea-level projection tool record](https://climate-adapt.eea.europa.eu/en/metadata/tools/sea-level-projection-tool)
+- [PROTECT project](https://protect-slr.eu/)
+- [Climate Central Coastal Risk Screening Tool](https://coastal.climatecentral.org/)
 
-## 1. Landscape Overview
+These products are references, not endorsed dependencies of the target
+runtime.
 
-The tools in this space fall into four broad categories:
+## Positioning axes
 
-| Category | Characteristics | Examples |
-|---|---|---|
-| **Scientific / Research Tools** | Built for climate scientists and researchers; technically authoritative; not designed for public-facing UX | NASA AR6 Sea Level Projection Tool, PROTECT |
-| **Authoritative Institutional Tools** | Built by government or inter-governmental bodies; comprehensive coverage; complex interface | Climate-ADAPT, EEA indicators, Copernicus Climate Data Store |
-| **Consumer Flood Maps** | Designed for a general public; visually immediate; often sacrifice scientific rigor for accessibility | Climate Central Surging Seas, Flood Map (floodmap.net), CoastalDEM-based visualizations |
-| **Property / Financial Risk Tools** | Designed for real estate, insurance, or mortgage professionals; focused on financial impact quantification | First Street Foundation (US), Moody's RMS, SwissRe Climate tools |
+SeaRise Europe aims to combine four qualities:
 
-SeaRise Europe occupies a position that does not currently exist cleanly in this landscape: **consumer-grade UX + scientific caution + Europe-focus + transparent methodology.**
+1. **Scientific restraint:** five explicit outcomes, cautious copy, and no
+   property-level claim.
+2. **Place-based clarity:** local settlement search across European cities,
+   towns, and coastal villages.
+3. **Inspectable evidence:** source snapshots, licences, methodology, STAC,
+   checksums, quality results, and signed provenance.
+4. **Static-first delivery:** no application backend, runtime database,
+   geocoding request, or tile server in the normal production path.
 
----
+This combination is the product hypothesis to test. It should be described as
+a deliberate focus, not as proof that every alternative lacks one of these
+qualities.
 
-## 2. Tool Profiles
+## Differentiation
 
-### 2.1 NASA IPCC AR6 Sea Level Projection Tool
+### For a place researcher
 
-| Dimension | Assessment |
+- A settlement search reaches a result without requiring SSP or GIS knowledge
+  up front.
+- `NoModeledExposureDetected`, `DataUnavailable`, `OutOfScope`, and
+  `UnsupportedGeography` are visibly different.
+- The result always carries scenario, horizon, release, resolution limits, and
+  methodology.
+
+### For an educator
+
+- Shareable state pins a reproducible data release rather than silently moving
+  to a later dataset.
+- The experience can remain usable with cached shell, search, and data ranges.
+- Sources and limitations are in the product, not only in repository notes.
+
+### For a portfolio reviewer
+
+- Architecture complexity is concentrated in a reproducible offline pipeline,
+  where it creates value, and removed from the user request path.
+- Open formats keep the product portable across static/object hosts.
+- Executable budgets and signed provenance turn architecture claims into
+  inspectable evidence.
+- The product states whether the current data is synthetic, provisional, or a
+  validated release.
+
+## What is intentionally not a differentiator
+
+- Parcel or street-address precision.
+- Real-time flood warnings.
+- A proprietary risk score.
+- Global coverage.
+- Photorealistic inundation simulation.
+- A large cloud-service topology.
+
+Competing on these dimensions would change the method, audience, risk, and
+cost, and would require a separate product decision.
+
+## Strategic risks
+
+| Risk | Response |
 |---|---|
-| **URL** | https://sealevel.nasa.gov/ipcc-ar6-sea-level-projection-tool |
-| **Owner** | NASA Sea Level Change Team / IPCC AR6 |
-| **Primary audience** | Climate researchers, policy analysts |
-| **Coverage** | Global |
-| **Data** | IPCC AR6 sea-level projections; highly authoritative |
-| **Scenarios** | SSP1-1.9, SSP2-4.5, SSP3-7.0, SSP5-8.5 and others |
-| **Time horizons** | 2050, 2100, and others; selectable |
-| **Visualization** | Charts and tabular data; not a map-first explorer |
-| **Methodology transparency** | Very high — full IPCC documentation available |
-| **UX accessibility** | Low — requires understanding of SSP scenarios, probabilistic projections, and confidence intervals |
-| **Mobile-friendly** | No |
-| **Address search** | No — users select from pre-defined gauge stations or regions |
+| Institutional or consumer tools improve place-first UX and transparency | Compete on the complete evidence chain, offline/static delivery, and focused Europe experience; avoid unsupported exclusivity claims |
+| Local settlement search feels less precise than an address geocoder | Set expectations clearly, retain map refinement, improve aliases/ranking, and treat exact address search as a separately justified capability |
+| Static artifacts are mistaken for stale data | Show snapshot/build dates and release history; define an intentional refresh process |
+| “Free” hosting becomes paid with traffic or dataset growth | Publish a dated cost model and portable host contract; do not promise free forever |
+| Public basemap availability changes | Keep it non-authoritative and replaceable; assessment and search must degrade independently |
+| Scientific method cannot support the intended visual claim | Let Phase 0 evidence change the method or block publication; visual ambition does not override validation |
 
-**Gap it leaves:** No free-text address search; no Europe-focused consumer experience; SSP terminology is opaque to non-specialists; no integrated elevation overlay; no plain-language result.
+## Positioning statement
 
----
+For people who want to explore what scenario-based sea-level data means for a
+European place, SeaRise Europe offers a clear, scientifically cautious result
+with inspectable sources and limitations. It prebuilds and verifies the
+geospatial data product, then delivers it through a fast, portable,
+offline-capable browser experience without a request-time application backend.
 
-### 2.2 PROTECT Sea Level Projection Tool
+## Review checklist
 
-| Dimension | Assessment |
-|---|---|
-| **Owner** | EU-funded PROTECT project / Horizon 2020 |
-| **Primary audience** | Policy makers, researchers, coastal managers |
-| **Coverage** | Global with European focus |
-| **Data** | PROTECT multi-model sea-level projections |
-| **Scenarios** | RCP/SSP-aligned |
-| **Visualization** | Charts and time series; limited map integration |
-| **Methodology transparency** | High |
-| **UX accessibility** | Low — similar to AR6 tool in complexity |
+Before using this document in public copy:
 
-**Gap it leaves:** No address-level UX; European focus is an orientation, not a consumer product; not designed for a non-specialist user completing a 2-minute task.
-
----
-
-### 2.3 Climate-ADAPT (EEA)
-
-| Dimension | Assessment |
-|---|---|
-| **URL** | https://climate-adapt.eea.europa.eu |
-| **Owner** | European Environment Agency |
-| **Primary audience** | EU policy makers, national adaptation planners, researchers |
-| **Coverage** | Europe |
-| **Data** | Aggregates many datasets including sea-level indicators |
-| **Visualization** | Indicator dashboards, maps, and reports |
-| **Methodology transparency** | High — EEA documentation |
-| **UX accessibility** | Low — built for policy professionals; not a consumer tool |
-| **Address search** | No |
-
-**Gap it leaves:** No address-level search; not a direct exposure explorer; designed for institutional users preparing adaptation strategies, not individuals evaluating a location.
-
----
-
-### 2.4 Climate Central — Surging Seas Risk Zone Map
-
-| Dimension | Assessment |
-|---|---|
-| **URL** | https://ss2.climatecentral.org |
-| **Owner** | Climate Central (US nonprofit) |
-| **Primary audience** | General public, journalists, educators |
-| **Coverage** | Global (with better coverage in US; European coverage varies) |
-| **Data** | CoastalDEM elevation model + sea-level projections |
-| **Scenarios** | 1.5°C, 2°C, 3°C, 4°C warming-based |
-| **Visualization** | Map with flood zone overlay; street-level zoom |
-| **Methodology transparency** | Partial — methodology page exists but is not in-product |
-| **UX accessibility** | High — public-facing, address-searchable |
-| **Mobile-friendly** | Yes |
-| **European coverage quality** | Variable; CoastalDEM accuracy varies by country |
-
-**Strengths:** Most accessible existing tool; address-level search; visually impactful.
-
-**Weaknesses:** Global-first tool, not Europe-optimized; CoastalDEM has known accuracy issues in some European coastal areas; warming-degree scenarios are harder to interpret than time-horizon scenarios; methodology is documented externally, not surfaced in-product; European coverage and data freshness are not consistently communicated.
-
-**Gap it leaves:** Europe-first data quality and sourcing; in-product methodology transparency; scenario framing aligned with IPCC AR6 European projections; explicit scientific caution in result copy.
-
----
-
-### 2.5 FloodMap.net and Similar Elevation-Based Web Tools
-
-| Dimension | Assessment |
-|---|---|
-| **Primary audience** | General public |
-| **Coverage** | Global |
-| **Data** | SRTM and similar public elevation datasets |
-| **Methodology transparency** | Very low — no explanation of data source or methodology |
-| **UX accessibility** | High — simple, fast |
-| **Accuracy** | Low — SRTM has known biases, particularly over vegetation and buildings |
-| **Scientific credibility** | Low |
-
-**Gap it leaves:** These tools are often the first result a non-specialist finds. Their visual simplicity creates high perceived precision with very low actual accuracy. They represent the "false certainty" failure mode that SeaRise Europe explicitly avoids.
-
----
-
-### 2.6 First Street Foundation — Flood Factor (US-only reference)
-
-| Dimension | Assessment |
-|---|---|
-| **Owner** | First Street Foundation |
-| **Coverage** | United States only |
-| **Primary audience** | Homeowners, real estate professionals |
-| **Data** | Proprietary flood model |
-| **Visualization** | Property-level flood risk score + map |
-| **Methodology transparency** | Moderate — public methodology report available |
-| **UX accessibility** | High |
-
-**Relevance to SeaRise Europe:** This is the closest example of a well-executed consumer-grade coastal/flood risk product. It demonstrates that scientific credibility and consumer UX are compatible. However, it is US-only, property-value-focused, and does not align with the scientific caution positioning SeaRise Europe requires. It represents a future state SeaRise Europe could grow toward — not a direct competitor for MVP.
-
----
-
-## 3. Feature Comparison Matrix
-
-| Feature | SeaRise Europe (MVP) | NASA AR6 | Surging Seas | FloodMap.net | First Street |
-|---|---|---|---|---|---|
-| Address-level search | Yes | No | Yes | Yes | Yes |
-| Europe focus | Yes | Global | Global | Global | US only |
-| Authoritative projection data | Yes (AR6/Copernicus) | Yes | Partial | No | Proprietary |
-| Scenario selector | Yes | Yes | Yes (warming) | No | No |
-| Time horizon selector | Yes | Yes | Partial | No | No |
-| In-product methodology | Yes | External | External | None | External |
-| Plain-language result summary | Yes | No | Partial | No | Yes |
-| Scientific caution as UX feature | Yes | N/A (research tool) | Partial | No | Partial |
-| Explicit limitation disclosure | Yes | Yes | Partial | No | Partial |
-| Mobile responsive | Yes | No | Yes | Yes | Yes |
-| Europe data quality | High (Copernicus DEM) | N/A | Variable | Low (SRTM) | N/A |
-
----
-
-## 4. SeaRise Europe's Differentiation
-
-Based on this landscape, SeaRise Europe holds a defensible and currently unoccupied position at the intersection of four attributes:
-
-```
-Scientific Caution × Consumer UX × Europe Depth × In-Product Transparency
-```
-
-No existing tool combines all four:
-- Research tools have scientific rigor but not consumer UX.
-- Consumer tools have UX but sacrifice rigor or transparency.
-- Institutional tools have coverage but not address-level experience.
-- US-market products like First Street have the right UX model but wrong geography and a different risk framing.
-
-### Differentiation statements
-
-1. **Europe-first data:** SeaRise Europe uses Copernicus DEM (recommended by EEA) rather than global SRTM-derived products with known accuracy gaps in European urban and coastal contexts.
-
-2. **Scientific caution as a feature:** The product's result-state taxonomy, result copy rules, and in-product disclaimers are a product design decision, not an afterthought. This is the single strongest differentiator from most consumer tools.
-
-3. **In-product methodology:** The methodology panel surfaces source names, version, assumptions, and limitations inside the product — not as an external PDF. This directly serves both P-01 (Marina wants to trust the result) and P-02 (Tobias needs to explain it in a classroom).
-
-4. **Honest scope restriction:** The product's explicit MVP scope — Europe, coastal, sea-level only — is an integrity signal. Saying "we do not cover inland risk" is more trustworthy than a tool that implies it covers everything.
-
----
-
-## 5. Risks from the Competitive Landscape
-
-| Risk | Detail |
-|---|---|
-| Climate Central expands European data quality | If Surging Seas significantly improves European coverage and adds in-product methodology, it closes the main differentiation gap. Mitigation: SeaRise Europe's AR6/Copernicus combination and scientific caution positioning would still differentiate. |
-| EEA or Copernicus launches a consumer tool | An authoritative European agency launching a consumer-grade explorer would be a direct competitive threat. Mitigation: Unlikely in the MVP timeframe; government tools typically move slowly into consumer UX. |
-| Google or similar platform adds sea-level layers | A major platform adding projected flood zones would commoditize address-level search. Mitigation: Methodology transparency and scientific caution would remain differentiated; large platforms typically do not take strong scientific caution positions. |
-| Data licensing changes | If IPCC AR6 or Copernicus licensing changes affect redistribution rights, the data pipeline could be disrupted. Mitigation: Monitor licensing terms; ensure attribution is compliant from the start (Dependency #1 in PRD). |
-
----
-
-## 6. Positioning Statement
-
-SeaRise Europe is the only European coastal sea-level exposure explorer that treats scientific honesty as a design constraint — not a disclaimer. For climate-aware individuals who want to understand what sea-level projections actually mean for a specific European address, SeaRise Europe provides a scenario-based, methodology-transparent result that is clear about what the data can and cannot say, backed by authoritative European datasets.
+- [ ] Re-open each referenced product and record the review date.
+- [ ] Verify current geographic coverage, methodology, pricing, and licence
+  claims from provider-owned sources.
+- [ ] Remove “only,” “best,” or superiority language not supported by evidence.
+- [ ] Compare equivalent capabilities rather than a research tool's scientific
+  depth with a consumer tool's interaction speed.
+- [ ] Re-check whether SeaRise Europe's claimed capabilities are implemented
+  and measured, not merely accepted in ADR-021.

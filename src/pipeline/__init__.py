@@ -1,1 +1,1 @@
-# SeaRise Europe — Geospatial Data Pipeline (Epic 03)
+# SeaRise Europe — legacy geospatial pipeline migration baseline

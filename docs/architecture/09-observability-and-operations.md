@@ -1,307 +1,200 @@
-# 09 — Observability and Operations
+# Observability and Operations
 
-> **Status:** Proposed Architecture
-> **References:** NFR-008 (request/response logging), NFR-009 (no PII in logs), NFR-013 (correlation IDs), METRICS_PLAN.md (product metric taxonomy)
+> **Status:** Accepted target operating model
+> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
----
+## Operating principle
 
-## 1. Observability Goals
+SeaRise Europe operates a versioned data product and static application, not a
+request-processing service. There are no application-server logs, database
+health checks, background queues, or tile-server dashboards. Operational
+evidence must answer four questions:
 
-1. **Diagnose failures quickly** — a broken assessment or geocoding error should be traceable via `requestId` within minutes
-2. **Confirm NFR compliance** — p95 latencies measurable against NFR-001 through NFR-004 targets
-3. **Privacy-preserving** — no raw addresses, no precise coordinates, no user identifiers in any log or metric
-4. **Demo-ready** — the system's health is visibly demonstrable to portfolio evaluators (P-03 Yuki)
+1. Was this release built from the declared sources and code?
+2. Are its artifacts intact and deliverable through byte-range HTTP?
+3. Can representative browsers search and assess correctly and quickly?
+4. Can the previous application/release pair be restored safely?
 
----
+Observability is release-centric, synthetic, and privacy-minimizing.
 
-## 2. Logging
+## Evidence layers
 
-### 2.1 Log Format
-
-All containers emit structured JSON logs to stdout. Azure Container Apps routes stdout to the attached Log Analytics Workspace.
-
-**Standard log envelope:**
-```json
-{
-  "timestamp": "2026-03-30T12:00:00.123Z",
-  "level": "Information",
-  "requestId": "req_abc123",
-  "service": "searise-api",
-  "event": "AssessmentCompleted",
-  "properties": {
-    "resultState": "ModeledExposureDetected",
-    "scenarioId": "ssp2-45",
-    "horizonYear": 2050,
-    "countryCode": "NL",
-    "durationMs": 412,
-    "methodologyVersion": "v1.0"
-  }
-}
-```
-
-**ASP.NET Core configuration (Serilog):**
-```csharp
-Log.Logger = new LoggerConfiguration()
-    .Enrich.FromLogContext()
-    .Enrich.WithProperty("service", "searise-api")
-    .WriteTo.Console(new JsonFormatter())
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-    .CreateLogger();
-```
-
-### 2.2 Correlation ID Middleware
-
-Every request gets a `requestId` (UUID v4) either from the incoming `X-Correlation-Id` header or generated fresh. It is:
-1. Injected into the `ILogger` scope for all downstream log calls
-2. Returned in every API response body as `requestId`
-
-```csharp
-app.Use(async (context, next) =>
-{
-    var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault()
-                        ?? $"req_{Guid.NewGuid():N}"[..16];
-    using var _ = logger.BeginScope(new Dictionary<string, object>
-        { ["requestId"] = correlationId });
-    context.Response.Headers["X-Correlation-Id"] = correlationId;
-    await next();
-});
-```
-
-### 2.3 Log Events by Endpoint
-
-| Event | Level | Key Properties | Never Log |
-|---|---|---|---|
-| `GeocodeRequested` | Debug | `requestId` | query string |
-| `GeocodeCompleted` | Info | `requestId`, `candidateCount`, `durationMs` | query string |
-| `GeocodeProviderError` | Error | `requestId`, `providerStatusCode`, `durationMs` | — |
-| `AssessmentRequested` | Debug | `requestId`, `scenarioId`, `horizonYear` | lat/lng |
-| `AssessmentCompleted` | Info | `requestId`, `resultState`, `scenarioId`, `horizonYear`, `countryCode`, `durationMs`, `methodologyVersion` | lat/lng |
-| `AssessmentError` | Error | `requestId`, `errorCode`, `durationMs` | lat/lng |
-| `GeographyCheckCompleted` | Debug | `requestId`, `isEurope`, `isCoastal` | lat/lng |
-| `LayerResolved` | Debug | `requestId`, `layerId`, `blobPath` | — |
-| `LayerNotFound` | Info | `requestId`, `scenarioId`, `horizonYear` | — |
-| `TilerQueryCompleted` | Debug | `requestId`, `pixelValue`, `durationMs` | lat/lng |
-| `HealthCheckCompleted` | Debug | `postgres`, `blobStorage` | — |
-
-**Privacy enforcement:** `lat`/`lng` coordinates and query strings must never appear in any log field. This is enforced by: (a) not logging request bodies, (b) using event-specific log statements (not generic request/response body dump middleware), (c) code review.
-
-### 2.4 Log Levels by Environment
-
-| Environment | Minimum Level |
-|---|---|
-| Development | Debug |
-| Staging | Information |
-| Production | Information |
-
----
-
-## 3. Metrics
-
-### 3.1 Infrastructure Metrics (Azure Monitor — automatic)
-
-Azure Container Apps and Azure Database for PostgreSQL emit these metrics automatically:
-
-| Metric | Source | Alert Threshold |
+| Layer | Evidence | Retention/use |
 |---|---|---|
-| `ReplicaCount` | Container Apps | > 0 when traffic exists |
-| `RequestCount` | Container Apps | — |
-| `RequestLatencyP95` | Container Apps | > 4000 ms (NFR-003 + buffer) |
-| `FailedRequestCount` | Container Apps | > 5/min (alert) |
-| `CpuUsage` | Container Apps | > 80% (scaling signal) |
-| `MemoryUsage` | Container Apps | > 80% (alert) |
-| `active_connections` | PostgreSQL | > 80 (near limit) |
-| `cpu_percent` | PostgreSQL | > 80% |
-| `storage_percent` | PostgreSQL | > 70% |
+| Build | Source hashes, tool versions, parameters, test summaries, CI logs | Attached to release/provenance and CI retention |
+| Artifact | Manifest/STAC schemas, sizes, SHA-256, PMTiles/COG verification, licences | Immutable with each release |
+| Delivery | Public `HEAD`/range probes, cache/CORS/security headers, aggregate R2/CDN metrics | Continuous checks and release report |
+| Browser | Synthetic search/assessment/offline flows, Web Vitals, console/network errors | Versioned run results; no user query collection |
+| Portfolio | Current release, commit, performance budgets, cost assumptions, provenance links | `/about/architecture` |
 
-### 3.2 Application Metrics (Derived from Logs)
+The release manifest is the inventory source of truth. A dashboard or log entry
+must reference `dataReleaseId` and application commit so evidence from different
+versions cannot be combined accidentally.
 
-Extracted from structured logs via KQL queries in Log Analytics:
+## Service indicators and targets
 
-```kql
-// Assessment p95 latency (last 1 hour)
-AppTraces
-| where Properties.event == "AssessmentCompleted"
-| summarize p95 = percentile(todouble(Properties.durationMs), 95) by bin(TimeGenerated, 5m)
-| render timechart
+The baseline targets are release gates rather than a claim of contractual SLA:
 
-// Result state distribution
-AppTraces
-| where Properties.event == "AssessmentCompleted"
-| summarize count() by tostring(Properties.resultState), bin(TimeGenerated, 1h)
-| render columnchart
+| Indicator | Target | Measurement |
+|---|---:|---|
+| Site reachability | >= 99.9% monthly observation success | Multi-region HTTPS synthetic probe |
+| Manifest reachability and validity | >= 99.9% monthly observation success | Fetch, schema, release-ID check |
+| Large-object range delivery | >= 99.9% monthly observation success | `HEAD` and representative partial `GET` |
+| Search p95 after worker initialization | < 50 ms | Production browser profile in CI/synthetic run |
+| Local assessment p95 after data is cached | < 100 ms | Production browser profile |
+| Search worker initialization | < 1,000 ms on reference mobile hardware | Release benchmark |
+| Initial JavaScript, Brotli | <= 250 KiB, excluding lazy chunks | Bundle report |
+| Lighthouse performance/accessibility/best-practices/SEO | >= 90 each | Agreed mobile profile |
+| Runtime application API calls | 0 | Browser network assertion |
+| Valid scenario/horizon combinations | exactly 9 | Manifest and artifact validation |
 
-// Error rate
-AppTraces
-| where Properties.event in ("AssessmentError", "GeocodeProviderError")
-| summarize errors = count() by bin(TimeGenerated, 5m)
-```
+The deployment pipeline fails on a budget regression unless the pull request
+contains a measured waiver with rationale, owner, and expiry date. Waivers are
+not silently carried into the next release.
 
-### 3.3 Product Metrics
+## Release-time monitoring
 
-Per [METRICS_PLAN.md](../product/METRICS_PLAN.md), the following are Tier 1 health metrics tracked via log-derived queries:
+Every candidate release produces a machine-readable and human-readable report
+containing:
 
-| Metric | Source |
-|---|---|
-| Assessment completion rate | `AssessmentCompleted` / (`AssessmentCompleted` + `AssessmentError`) |
-| Geocoding success rate | `GeocodeCompleted` / (`GeocodeCompleted` + `GeocodeProviderError`) |
-| Result state distribution | `resultState` field in `AssessmentCompleted` events |
-| p95 assessment latency | `durationMs` in `AssessmentCompleted` |
-| p95 geocoding latency | `durationMs` in `GeocodeCompleted` |
+- code revision, `dataReleaseId`, source snapshot hashes, and build environment;
+- scientific golden-point and release-to-release diff results;
+- schema, STAC, GeoParquet, PMTiles, COG, licence, and checksum results;
+- application bundle sizes and browser performance results;
+- search corpus counts, duplicates, exclusions, index bytes, and ranking tests;
+- storage bytes and estimated range-request/transfer cost;
+- SLSA-compatible provenance and Cosign verification result;
+- the prior verified application/release rollback pair.
 
----
+Publication stops if any required result is missing. “CI passed” without this
+versioned evidence is insufficient for a scientific data release.
 
-## 4. Distributed Tracing
+## Production synthetics
 
-For MVP, full distributed tracing (OpenTelemetry) is **not implemented**. The `requestId` correlation ID propagated through all log events provides sufficient traceability for:
-- Linking a geocode request to its provider call
-- Linking an assess request through geography checks, layer resolution, and TiTiler query
-- Frontend-to-API correlation when the browser sends `X-Correlation-Id`
+Run lightweight probes from at least two European regions after deployment and
+on a schedule:
 
-**Phase 2 consideration:** Add OpenTelemetry SDK to API + TiTiler for end-to-end trace spans. Export to Azure Monitor Application Insights or Jaeger.
+1. Fetch the HTML shell and verify the expected commit/release marker.
+2. Fetch `manifest.json`, validate its schema, and verify exactly nine layers.
+3. `HEAD` a search index, PMTiles archive, and analysis COG; verify content
+   length, ETag, media type, cache headers, and range support.
+4. Request representative beginning, middle, and ending byte ranges and verify
+   `206 Partial Content` plus `Content-Range`.
+5. Run a browser flow: local search, select, assess, switch scenario/horizon,
+   share URL, and reload.
+6. Assert that no request targets `/assess`, `/geocode`, `/config`, a database,
+   or a tile server.
+7. Warm the core cache, disable the network, and repeat the explicitly supported
+   offline flow.
+8. Verify that an uncached layer fails honestly rather than returning a guessed
+   result.
 
----
+OpenFreeMap is probed separately. Its failure is a degraded basemap state, not
+an assessment outage.
 
-## 5. Alerting
+## Platform metrics
 
-### 5.1 Alert Rules (Proposed)
+Use Cloudflare's aggregate platform metrics for:
 
-| Alert | Condition | Severity | Action |
-|---|---|---|---|
-| High error rate | > 10% of assess requests return 500 in a 5-min window | High | Email / notify |
-| Geocoding provider down | > 3 consecutive `GeocodeProviderError` events | High | Email / notify |
-| PostgreSQL connection failure | `/health` returns `postgres: unhealthy` | Critical | Email / notify |
-| High latency | `RequestLatencyP95` > 5000ms on ca-api for 10 min | Medium | Email |
-| Container restart loop | Replica restart count > 3 in 10 min | High | Email |
+- static-site and R2 request volume, response status, latency, and cache ratio;
+- R2 stored bytes, Class A/Class B operations, and public transfer;
+- errors by application or data origin;
+- usage relative to dated free-tier and budget assumptions;
+- suspicious request-rate or range-request patterns.
 
-### 5.2 Health Endpoint as Probe
+Alerts should trigger on sustained synthetic failure, unexpected 4xx/5xx
+changes, missing range support, rapid storage/operation growth, and projected
+budget breach. Traffic spikes alone are context, not proof of an incident.
 
-The `GET /health` endpoint (see [06-api-and-contracts.md](06-api-and-contracts.md) §2) serves both:
-1. **Azure Container Apps readiness/liveness probes** — platform automatically restarts unhealthy replicas
-2. **External uptime monitoring** — can be pinged by an uptime service (e.g., Azure Monitor availability test, UptimeRobot, or similar)
+## Browser errors and privacy
 
----
+The baseline does not require real-user analytics or client error reporting.
+CI browser runs and synthetics provide the first line of evidence.
 
-## 6. Operations Runbook (Key Scenarios)
+If client reporting is added later, it must be privacy-reviewed and scrub:
 
-### 6.1 Geocoding Provider Outage
+- search text and settlement selection;
+- latitude/longitude and map bounds;
+- full URLs, fragments, and query parameters;
+- local-storage, IndexedDB, and cache contents;
+- stable user/device identifiers.
 
-**Symptom:** `GeocodeProviderError` events spike; frontend shows "Search temporarily unavailable."
+Prefer aggregate Web Vitals and coarse browser/version counts. Sampling,
+retention, processor, purpose, and user opt-out must be documented. A telemetry
+provider may not become required for search or assessment.
 
-**Diagnosis:**
-```kql
-AppTraces
-| where Properties.event == "GeocodeProviderError"
-| order by TimeGenerated desc
-| take 20
-```
+## Runbooks
 
-**Action:** Check Azure Maps status page. No automated fallback at MVP. If sustained, consider temporarily surfacing a static message. Provider is configured in `GEOCODING_API_KEY` env var (ADR-019: Azure Maps Search).
+### Site or manifest unavailable
 
-### 6.2 TiTiler Returning No Pixel Values
+1. Confirm the failure from multiple regions and separate DNS, static origin,
+   and data origin.
+2. Check the last deployment and provider status.
+3. If a deploy caused the issue, redeploy the previous known-good application.
+4. Verify the prior manifest and browser flow before resolving the alert.
 
-**Symptom:** `resultState` unexpectedly high `DataUnavailable`; `TilerQueryCompleted` logs show `pixelValue: null`.
+### Range requests or CORS fail
 
-**Diagnosis:**
-1. Check `GET /health` — is `blobStorage` healthy?
-2. Check TiTiler logs for GDAL VSIAZ errors
-3. Verify COG blob path exists: `az storage blob exists --container-name geospatial --name layers/v1.0/...`
+1. Reproduce with public `HEAD` and partial `GET` requests.
+2. Compare OpenTofu plan/state and current bucket/domain rules.
+3. Restore the last reviewed CORS/cache configuration.
+4. Re-run PMTiles/COG range probes and a real browser assessment.
 
-**Action:** Re-upload affected COG if missing. Check `layers.layer_valid` flag in PostgreSQL.
+### Scientific or data-quality defect
 
-### 6.3 Assessment Latency Spike
+1. Stop further publication and identify affected release IDs from manifests.
+2. Redeploy the previous application/release pair.
+3. Keep the defective immutable release for investigation unless security or
+   legal requirements require removal.
+4. Correct the pipeline, rerun the full validation set, and publish a new
+   release ID; never repair released objects in place.
+5. Publish a concise impact note if users could have seen incorrect results.
 
-**Symptom:** p95 > 3500ms on `/v1/assess` (NFR-003 violation).
+### Unexpected cost growth
 
-**Diagnosis:**
-```kql
-AppTraces
-| where Properties.event == "AssessmentCompleted"
-| extend tilerMs = todouble(Properties.tilerDurationMs)
-| extend dbMs = todouble(Properties.dbDurationMs)
-| summarize avg(tilerMs), avg(dbMs) by bin(TimeGenerated, 5m)
-```
+1. Compare storage growth, request count, range size, and cache ratio to the
+   release cost model.
+2. Check automated abuse and accidental whole-object downloads.
+3. Improve caching/range locality or temporarily constrain abusive traffic at
+   the edge without changing scientific behaviour.
+4. Create an ADR before adding paid always-on compute or proprietary data
+   services.
 
-**Common causes:**
-- TiTiler cold start (scale-from-zero adds 10–20s latency on first request)
-- PostgreSQL connection pool exhausted (check `active_connections`)
-- GDAL VSIAZ cache miss causing full COG scan
+### Compromised publication path
 
-**Action:** Set TiTiler min replicas to 1 if cold start is unacceptable for demo. Tune `VSI_CACHE_SIZE`.
+1. Revoke the credential and freeze production publication.
+2. Audit DNS, bucket configuration, static deployments, and object inventory.
+3. Verify manifests, signatures, and hashes from a trusted checkout.
+4. Restore a verified pair and rotate least-privilege credentials.
+5. Record affected releases and remediation in the incident report.
 
-### 6.4 Database Schema Migration
+## Rollback readiness
 
-The schema is stable for MVP. For future methodology version addition:
-```sql
--- Add new methodology version row
-INSERT INTO methodology_versions (version, is_active, ...) VALUES ('v2.0', false, ...);
--- Upload new COGs to Blob
--- Register new layer rows
-UPDATE layers SET layer_valid = true WHERE methodology_version = 'v2.0';
--- Atomic activation swap (see 05-data-architecture.md §6)
-BEGIN;
-  UPDATE methodology_versions SET is_active = false WHERE is_active = true;
-  UPDATE methodology_versions SET is_active = true WHERE version = 'v2.0';
-COMMIT;
-```
+At all times the release inventory identifies:
 
-No API code changes required for new methodology version.
+- current and previous application commit;
+- corresponding `dataReleaseId` values;
+- deployable static build or reproducible build reference;
+- public manifest/provenance URLs;
+- last successful smoke-test time.
 
-### 6.5 Deployment Rollback
+Rollback means redeploying an immutable pair, not editing data. Test the
+procedure before decommissioning the old architecture and periodically after
+hosting/IaC changes.
 
-```bash
-# List recent revisions
-az containerapp revision list --name ca-api --resource-group rg-searise-europe-prod
+## Ownership and review cadence
 
-# Activate previous revision
-az containerapp revision activate \
-  --revision ca-api--{previous-revision-suffix} \
-  --resource-group rg-searise-europe-prod
+The project owner owns release approval, incident severity, and cost decisions.
+Automation owns deterministic gates but cannot waive them. Review:
 
-# Or: redeploy previous image tag
-az containerapp update \
-  --name ca-api \
-  --resource-group rg-searise-europe-prod \
-  --image acr-seariseeurope.azurecr.io/searise-api:{previous-sha}
-```
+- on every release: all scientific, contract, delivery, performance, and cost
+  evidence;
+- weekly while actively developing: failing synthetics and usage anomalies;
+- monthly in production: dependency alerts, provider cost assumptions, access
+  credentials, and rollback freshness;
+- on every source or methodology change: licence, attribution, golden points,
+  and scientific review.
 
----
-
-## 7. Log Retention
-
-| Log Type | Retention | Rationale |
-|---|---|---|
-| Application logs (Log Analytics) | 30 days (default) | Sufficient for incident diagnosis at MVP scale |
-| Azure activity logs (resource changes) | 90 days (Azure default) | Compliance / audit |
-| Container Apps system logs | 30 days | |
-| PostgreSQL audit logs | Not enabled at MVP | No sensitive operations; reconsider if admin access widens |
-
----
-
-## 8. Observability Architecture Diagram
-
-```mermaid
-graph LR
-    subgraph "Runtime Containers"
-        FE["Frontend\n(stdout)"]
-        API["API\n(Serilog JSON)"]
-        TILER["TiTiler\n(stdout)"]
-    end
-
-    subgraph "Azure Monitor"
-        LAW["Log Analytics\nWorkspace"]
-        ALERTS["Alert Rules"]
-        DASH["Workbook / Dashboard\n(KQL queries)"]
-    end
-
-    FE -->|"Container Apps log routing"| LAW
-    API -->|"Container Apps log routing"| LAW
-    TILER -->|"Container Apps log routing"| LAW
-
-    LAW --> ALERTS
-    LAW --> DASH
-
-    ALERTS -->|"Email / webhook"| ONCALL["On-call notification"]
-
-    DASH -->|"viewed by"| DEMO["Demo / Portfolio\nviewer"]
-```
+The observability system is successful when it provides enough evidence to
+publish or roll back confidently without creating a new runtime platform to
+observe.

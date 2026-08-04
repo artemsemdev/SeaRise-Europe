@@ -1,582 +1,289 @@
-# 16 — Geospatial Data Pipeline
+# 16 — Offline Geospatial Data Pipeline
 
-> **Status:** Implemented
-> **Scope:** The offline pipeline that transforms raw climate and elevation data into Cloud-Optimized GeoTIFF (COG) exposure layers. This is **not a runtime service** — it runs on demand before Phase 0 and on methodology version updates.
-> **Dependencies:** ADR-015 (exposure methodology — binary v1.0), ADR-016 (scenario set — ssp1-26, ssp2-45, ssp5-85), ADR-018 (coastal analysis zone — Copernicus Coastal Zones 2018)
+> **Status:** Accepted target design; not yet implemented end to end with real sources
+>
+> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Publication warning:** the repository's current `demo.tif` and synthetic tests prove software mechanics only. They are not scientific evidence or a production data release.
 
----
+## 1. Purpose
 
-## 1. Pipeline Purpose and Context
+The pipeline moves expensive and stateful work out of user requests. It
+downloads a pinned source snapshot once, transforms it reproducibly, validates
+scientific and technical contracts, and publishes an immutable release that a
+static browser application can query directly.
 
-The runtime API serves precomputed binary raster layers. These layers are the output of the offline pipeline. The pipeline:
-
-1. Downloads raw data from public sources (IPCC AR6 projections, Copernicus DEM)
-2. Processes the data to compute exposure zones per scenario × horizon
-3. Converts the output to Cloud-Optimized GeoTIFF format
-4. Uploads to Azure Blob Storage
-5. Registers the layer metadata in PostgreSQL
-
-**The pipeline runs:**
-- Phase 0: Bootstrap (first data generation for all scenarios × horizons)
-- On methodology version change (e.g., new IPCC data release, revised threshold)
-- Optionally: on a schedule to incorporate updated source data
-
-**The pipeline does NOT run at request time.** All assessment results are derived from precomputed layers.
-
----
-
-## 2. Input Data Sources
-
-### 2.1 IPCC AR6 Sea-Level Projections
-
-| Property | Value |
-|---|---|
-| Source | NASA Sea Level Change Team |
-| URL | https://sealevel.nasa.gov/ipcc-ar6-sea-level-projection-tool |
-| Format | NetCDF (.nc) |
-| Coverage | Global; Europe subset extracted |
-| Scenarios | SSP1-2.6, SSP2-4.5, SSP5-8.5 (ADR-016: confirmed) |
-| Time horizons | Median projections for 2030, 2050, 2100 (FR-015) |
-| Units | Meters (sea-level rise above 2020 baseline) |
-| License | CC BY 4.0 (cite in `methodology_versions.sea_level_source_name`) |
-
-**Key value extracted:** For each scenario+horizon, a spatial grid of projected mean sea-level rise values (meters) at each grid point.
-
-### 2.2 Copernicus Digital Elevation Model (DEM)
-
-| Property | Value |
-|---|---|
-| Source | Copernicus Land Monitoring Service / DLR |
-| URL | https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM |
-| Product | GLO-30 (30m resolution, global) |
-| Format | GeoTIFF tiles |
-| Coverage | Europe coverage used |
-| Units | Meters above sea level (ellipsoidal height) |
-| License | See Copernicus DEM license; attribution required |
-| Note | This is a Digital Surface Model (DSM) — includes vegetation and buildings (documented in `resolutionNote`) |
-
-**Key value:** Terrain elevation in meters at each ~30m grid cell.
-
----
-
-## 3. Processing Logic (ADR-015 Confirmed)
-
-> **Confirmed (ADR-015):** Binary exposure methodology approved. A location is "exposed" if the projected mean sea-level rise meets or exceeds the terrain elevation within the coastal analysis zone.
-
-### 3.1 Conceptual Algorithm
-
-```python
-# For each scenario (e.g., ssp2-45) and horizon (e.g., 2050):
-#
-# 1. Get SLR value for this scenario+horizon at each grid point
-#    slr_grid[lat, lon] = projected sea-level rise (meters)
-#
-# 2. Get terrain elevation at each grid point
-#    dem[lat, lon] = terrain elevation (meters above sea level)
-#
-# 3. Compute exposure: location is exposed if SLR ≥ DEM elevation
-#    exposure[lat, lon] = 1 if slr_grid[lat, lon] >= dem[lat, lon] else 0
-#
-# 4. Mask: apply coastal analysis zone mask (ADR-018: Copernicus Coastal Zones 2018)
-#    NoData outside coastal_analysis_zone
-#
-# Result: binary raster (0 = not exposed, 1 = exposed, NoData = out of zone)
+```mermaid
+flowchart LR
+    Pin["Pin sources + licences"] --> Fetch["Fetch + SHA-256"]
+    Fetch --> Inspect["Inspect real schemas/units"]
+    Inspect --> Geo["Normalize geometry + settlements"]
+    Inspect --> Raster["Normalize raster/projection inputs"]
+    Geo --> Compute["Build classified arrays"]
+    Raster --> Compute
+    Compute --> Pack["COG + PMTiles + GeoParquet + indexes"]
+    Pack --> QA["Scientific + contract + artifact QA"]
+    QA --> Metadata["Manifest + STAC + provenance + signature"]
+    Metadata --> Stage["Upload immutable staging prefix"]
+    Stage --> Verify["Public range/hash/browser verification"]
+    Verify --> Promote["Pin/promote release"]
 ```
 
-**Note on interpretation:** This is a simplified static inundation model. It does NOT account for flood defenses, hydrodynamic connectivity, or storm surge (documented in `whatItDoesNotAccountFor` — CONTENT_GUIDELINES §5).
+The pipeline may use Python, GDAL, Rasterio, rio-pmtiles, DuckDB Spatial, and
+other pinned command-line tools. Its native dependencies do not run in
+production.
 
-### 3.2 Spatial Resolution and Alignment
+## 2. Current implementation boundary
 
-- IPCC AR6 projections are on a coarse grid (~0.25° or ~25km)
-- Copernicus DEM is at 30m resolution
-- Approach: interpolate IPCC SLR values to DEM grid resolution (nearest-neighbor or bilinear)
-- Output CRS: **EPSG:4326** (WGS84 geographic) — required for TiTiler and MapLibre compatibility
+The current modules under `src/pipeline/` implement the legacy Azure/PostGIS/
+TiTiler flow: they assume an IPCC grid, create COGs, upload to Blob Storage,
+register database rows, and optionally spot-check TiTiler. That code remains a
+migration input, not the target pipeline described here.
 
----
+Known gaps that prohibit a production claim:
 
-## 4. Pipeline Technology Stack
+- the real IPCC AR6 source has not passed end-to-end schema and methodology
+  validation in this repository;
+- checked-in demo output is synthetic;
+- current acquisition/alignment assumptions may not match the source's actual
+  location-based dimensions;
+- the checked-in 25 km coastal zone is a Natural Earth approximation;
+- PMTiles, GeoNames catalogs/indexes, GeoParquet, manifest/STAC generation,
+  release signing, and R2 publication are not yet the proven end-to-end path.
 
-| Component | Technology | Purpose |
+The target pipeline is introduced incrementally. Legacy upload/register steps
+are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
+
+## 3. Inputs and pinning
+
+| Source | Role | Pinning requirements |
 |---|---|---|
-| Runtime | Python 3.11+ | Scripting, orchestration |
-| Raster I/O | `rasterio` | Read/write GeoTIFF; CRS handling |
-| NetCDF I/O | `xarray` + `netCDF4` | Read IPCC AR6 projection data |
-| Raster analysis | `numpy` | Array operations (SLR ≥ DEM comparison) |
-| COG conversion | `rio-cogeo` | Validate and convert output to COG format |
-| Geospatial | `GDAL` (via rasterio) | Reproject, resample, warp |
-| Spatial analysis | `geopandas` / `shapely` | Coastal zone masking (ADR-018: Copernicus Coastal Zones 2018) |
-| Upload | `azure-storage-blob` (Python SDK) | Upload COGs to Azure Blob Storage |
-| DB registration | `psycopg2` or `asyncpg` | INSERT into `layers` table |
+| IPCC AR6 sea-level projections | Scenario/horizon projection input | Authoritative release/version, exact asset URL, size, SHA-256, citation, licence/acknowledgements |
+| Copernicus DEM | Terrain input | Product edition, GLO-30 or GLO-90 decision, tiles, datum/CRS, size, SHA-256, derivative attribution |
+| Copernicus coastal product or approved replacement | Canonical analysis-zone evidence | Product/version, acquisition record, interpretation rule, licence, SHA-256 |
+| GeoNames dump + `alternateNamesV2` | Places and multilingual search | Snapshot date, exact dump files, sizes, SHA-256, CC BY 4.0 attribution |
+| Natural Earth | Support/shoreline seed and labels | Dataset/release, layer names, public-domain provenance, SHA-256 |
 
-### 4.1 Environment Setup
+Acquisition writes to an ignored cache such as `data/raw/{source}/{version}/`.
+It never relies on an unversioned “latest” response without capturing the
+resolved version and checksum. A second run reuses only a matching verified
+file. HTML login pages, truncated ranges, unexpected media types, and checksum
+mismatches fail immediately.
 
-```bash
-# requirements-pipeline.txt
-rasterio>=1.3
-rio-cogeo>=3.0
-xarray>=2024.0
-netCDF4>=1.6
-numpy>=1.26
-geopandas>=0.14
-shapely>=2.0
-azure-storage-blob>=12.0
-psycopg2-binary>=2.9
-click>=8.0          # CLI argument parsing
+Before download, the build records whether the raw source and intended
+derivatives may be stored, redistributed, and publicly attributed. No licence
+means no publication.
+
+## 4. Phase 0 — prove the science first
+
+Phase 0 uses a small region that includes straightforward coast, a port or
+estuary, low terrain, inland low terrain, nodata, and an island. It must:
+
+1. Inspect the exact IPCC variables, dimensions, coordinates/locations,
+   quantiles, units, and missing-value semantics.
+2. Document and test the transformation from projection locations to the
+   analysis grid. A regular lat/lon raster must not be assumed.
+3. Inspect the DEM grid, horizontal and vertical datum, resolution, units,
+   masks, voids, and resampling requirements.
+4. Define the target CRS/grid and every reprojection/resampling operation.
+5. Compare the current coastal approximation with the intended canonical
+   coastal product.
+6. Test whether the binary exposure model creates disconnected inland regions
+   that should not be considered coastal exposure.
+7. Compare independently reviewed control locations with array values and
+   exact browser lookup.
+8. Measure source, intermediate, COG, PMTiles, and index size; build time;
+   browser range requests; latency; and memory.
+
+Results and reviewer decisions are committed as methodology documentation and
+machine-readable golden fixtures. If the binary model is not defensible, stop
+and supersede the methodology/ADR before building Europe.
+
+## 5. Workspace and release directories
+
+Recommended local/CI layout:
+
+```text
+data/
+├── raw/                         # ignored, checksum-verified source cache
+├── work/{buildId}/              # ignored, resumable intermediates
+├── geometry/                    # checked-in migration/reference fixtures
+└── releases/{dataReleaseId}/    # candidate immutable release tree
 ```
 
----
+`dataReleaseId` must be stable and unique, for example a source-date plus a
+short content hash. A stage may be resumed only when its input hashes,
+parameters, code version, and tool-image digest match its recorded receipt.
+Partial or failed releases are never promoted.
 
-## 5. Pipeline Steps (Detailed)
+## 6. Processing stages
 
-### Step 1: Download Source Data
+### 6.1 Inspect and normalize sources
 
-```python
-# pipeline/download.py
+- validate expected files, variables, columns, geometry types, CRS, units, and
+  ranges before transformation;
+- normalize timestamps, nodata, longitude convention, field names, and text
+  encoding explicitly;
+- write a machine-readable inspection report and row/cell counts;
+- retain source-native identifiers throughout lineage.
 
-def download_ipcc_ar6(scenario: str, horizon: int, output_dir: Path) -> Path:
-    """
-    Download IPCC AR6 SLR projection data for a specific scenario.
-    Source: NASA Sea Level Change portal (AR6 netCDF files).
-    Returns: path to downloaded .nc file
-    """
-    ...
+Unexpected source schema is a hard failure. The code must not “best effort” a
+scientific interpretation.
 
-def download_copernicus_dem(bbox: tuple, output_dir: Path) -> Path:
-    """
-    Download Copernicus DEM GLO-30 tiles covering the bounding box.
-    Mosaic tiles into a single GeoTIFF for the processing extent.
-    Returns: path to mosaicked DEM GeoTIFF
-    """
-    ...
+### 6.2 Build support and coastal geometry
+
+Use valid polygonal geometry in the chosen analysis CRS for metric operations,
+then derive WGS84/browser forms. Record source layers, filters, clipping,
+buffer distances, simplification tolerances, and topology repairs.
+
+Validate:
+
+- geometry validity and expected bounds;
+- known inside/outside/boundary controls;
+- islands, ports, estuaries, and transcontinental edge cases;
+- area and spatial differences against the previous release;
+- explicit treatment of Russia, Turkey, and other open support-boundary cases.
+
+The current Natural Earth-derived 25 km zone is labelled `approximation` in
+all candidate metadata until replaced or re-confirmed by a methodology
+decision.
+
+### 6.3 Build the settlement catalog
+
+DuckDB Spatial performs the reproducible joins:
+
+1. ingest pinned GeoNames places and alternate names;
+2. retain active populated-place feature codes defined in ADR-021;
+3. normalize canonical/ASCII/alternate names and administrative labels;
+4. intersect records with the versioned Europe support geometry;
+5. compute metric `distanceToCoastMeters` and `isCoastal` against the versioned
+   coastal rule;
+6. create `europe-core` and `europe-coastal` logical sets;
+7. reconcile accepted, duplicate, and rejected counts;
+8. write canonical `settlements.parquet` and deterministic serialized indexes;
+9. Brotli-compress `europe-core.index.br` and `europe-coastal.index.br`.
+
+The core set uses population >= 500 plus national/administrative capitals. The
+coastal set keeps every qualifying active place in the coastal zone, including
+villages with zero or missing population. Catalog membership is a statement
+about the pinned GeoNames snapshot, not a claim of perfect real-world coverage.
+
+### 6.4 Normalize projection and terrain inputs
+
+The output grid, CRS, resolution, extent, transform, vertical reference, and
+nodata rule are fixed by methodology metadata. Projection and DEM values are
+converted to compatible units and references using transformations proven in
+Phase 0.
+
+Continuous values may use a scientifically approved interpolation during
+normalization. The final binary class is never bilinearly/cubically resampled;
+categorical reprojection and browser lookup use nearest neighbour.
+
+### 6.5 Compute classified exposure arrays
+
+The current methodology candidate is:
+
+```text
+classified = 1      where projected sea level >= terrain elevation
+classified = 0      where projected sea level < terrain elevation
+classified = nodata where inputs are unavailable or outside analysis scope
 ```
 
-**Source data is cached locally** — re-running the pipeline does not re-download if files exist.
-
----
-
-### Step 2: Reproject and Align
-
-```python
-# pipeline/preprocess.py
-
-def align_to_dem_grid(slr_nc: Path, dem_tif: Path, output_tif: Path):
-    """
-    Interpolate IPCC SLR projection to match DEM spatial grid.
-    - Reprojects SLR from WGS84 geographic to match DEM
-    - Resamples to DEM resolution (~30m)
-    - Output: SLR values (float32) on DEM grid
-    """
-    import rasterio
-    from rasterio.warp import reproject, Resampling
-
-    with rasterio.open(dem_tif) as dem:
-        target_crs = dem.crs       # EPSG:4326
-        target_transform = dem.transform
-        target_shape = dem.shape
-
-    # Read IPCC AR6 median SLR for this scenario+horizon from NetCDF
-    slr_array = extract_slr_from_netcdf(slr_nc, scenario, horizon)  # [lat, lon] float array
-
-    # Reproject SLR array to DEM grid
-    reproject(
-        source=slr_array,
-        src_crs=source_crs,
-        src_transform=source_transform,
-        destination=aligned_slr,
-        dst_crs=target_crs,
-        dst_transform=target_transform,
-        dst_shape=target_shape,
-        resampling=Resampling.bilinear
-    )
-    ...
-```
-
----
-
-### Step 3: Compute Exposure
-
-```python
-# pipeline/compute_exposure.py
-
-def compute_binary_exposure(
-    dem_tif: Path,
-    slr_tif: Path,        # SLR values aligned to DEM grid
-    coastal_zone_geom,    # shapely geometry for coastal_analysis_zone (ADR-018)
-    output_tif: Path
-):
-    """
-    Compute binary exposure raster:
-      1 = SLR projection >= terrain elevation (exposed)
-      0 = SLR projection < terrain elevation (not exposed)
-      NoData = outside coastal_analysis_zone
-    """
-    import numpy as np
-    import rasterio
-    from rasterio.mask import mask as raster_mask
-
-    with rasterio.open(dem_tif) as dem_src, rasterio.open(slr_tif) as slr_src:
-        dem = dem_src.read(1, masked=True)   # terrain elevation (masked array)
-        slr = slr_src.read(1, masked=True)   # sea-level rise projection
-
-        # Binary comparison: exposed where SLR >= terrain elevation
-        # ADR-015: binary exposure — SLR >= DEM (no separate threshold)
-        exposure = np.where(
-            dem.mask | slr.mask,            # NoData regions
-            np.nan,
-            np.where(slr >= dem, 1, 0)     # 1 = exposed, 0 = not exposed
-        ).astype('float32')
-
-        profile = dem_src.profile.copy()
-        profile.update(dtype='float32', nodata=np.nan)
-
-    # Mask to coastal analysis zone only
-    with rasterio.open(output_tif, 'w', **profile) as dst:
-        dst.write(exposure, 1)
-
-    apply_coastal_zone_mask(output_tif, coastal_zone_geom)
-```
-
----
-
-### Step 4: Convert to Cloud-Optimized GeoTIFF
-
-```python
-# pipeline/cogify.py
-from rio_cogeo.cogeo import cog_translate
-from rio_cogeo.profiles import cog_profiles
-
-def cogify(input_tif: Path, output_cog: Path):
-    """
-    Convert GeoTIFF to Cloud-Optimized GeoTIFF with:
-    - Internal overviews (for fast tile serving at all zoom levels)
-    - Tiled layout (256x256 tiles, required for efficient range requests)
-    - Deflate compression (lossless, small file size)
-    - EPSG:4326 (required for TiTiler + MapLibre compatibility)
-    """
-    cog_profile = cog_profiles.get("deflate")
-    cog_profile.update({
-        "blockxsize": 256,
-        "blockysize": 256,
-        "overview_resampling": "nearest",  # Binary values — nearest is correct
-        "overview_level": [2, 4, 8, 16, 32, 64, 128],
-    })
-
-    cog_translate(
-        input=str(input_tif),
-        output=str(output_cog),
-        profile=cog_profile,
-        in_memory=False,
-        config={"GDAL_TIFF_INTERNAL_MASK": True}
-    )
-
-    # Validate the output is a valid COG
-    from rio_cogeo.cogeo import cog_validate
-    is_valid, errors, warnings = cog_validate(str(output_cog))
-    if not is_valid:
-        raise ValueError(f"COG validation failed: {errors}")
-```
-
----
-
-### Step 5: QA Validation
-
-```python
-# pipeline/validate.py
-
-def validate_layer(cog_path: Path, scenario: str, horizon: int) -> bool:
-    """
-    QA checks before marking layer as valid in the database.
-    Returns True if all checks pass.
-    """
-    import rasterio
-    import numpy as np
-    from rio_cogeo.cogeo import cog_validate
-
-    # Check 1: Valid COG structure
-    is_valid, errors, _ = cog_validate(str(cog_path))
-    assert is_valid, f"Not a valid COG: {errors}"
-
-    # Check 2: CRS is EPSG:4326
-    with rasterio.open(cog_path) as src:
-        assert src.crs.to_epsg() == 4326, f"Expected EPSG:4326, got {src.crs}"
-
-        # Check 3: Binary pixel values (0, 1, NoData only)
-        data = src.read(1, masked=True)
-        unique_values = set(np.unique(data.compressed()).astype(int))
-        assert unique_values.issubset({0, 1}), f"Non-binary pixel values: {unique_values}"
-
-        # Check 4: File is not empty (has at least some exposure area)
-        exposure_pixels = np.sum(data.compressed() == 1)
-        assert exposure_pixels > 0, "No exposure pixels found — suspicious"
-
-        # Check 5: Spatial extent covers expected area (Europe coastal zone)
-        bounds = src.bounds
-        assert bounds.left >= -30 and bounds.right <= 40, "Unexpected extent"
-        assert bounds.bottom >= 30 and bounds.top <= 75, "Unexpected extent"
-
-    return True
-```
-
----
-
-### Step 6: Upload to Azure Blob Storage
-
-```python
-# pipeline/upload.py
-from azure.storage.blob import BlobServiceClient
-
-def upload_cog(
-    cog_path: Path,
-    scenario: str,
-    horizon: int,
-    methodology_version: str,
-    connection_string: str
-) -> str:
-    """
-    Upload COG to Azure Blob Storage.
-    Returns: blob_path for registration in database.
-    """
-    # Blob path convention: layers/{version}/{scenario}/{horizon}.tif
-    blob_path = f"layers/{methodology_version}/{scenario}/{horizon}.tif"
-
-    client = BlobServiceClient.from_connection_string(connection_string)
-    blob = client.get_blob_client(container="geospatial", blob=blob_path)
-
-    blob.upload_blob(
-        cog_path.read_bytes(),
-        overwrite=True,
-        content_settings=ContentSettings(
-            content_type="image/tiff",
-            cache_control="max-age=86400, public"
-        )
-    )
-
-    return blob_path
-```
-
----
-
-### Step 7: Register Layer in PostgreSQL
-
-```python
-# pipeline/register.py
-import psycopg2
-
-def register_layer(
-    conn_string: str,
-    scenario_id: str,
-    horizon_year: int,
-    methodology_version: str,
-    blob_path: str,
-    legend_colormap: dict
-) -> str:
-    """
-    Insert layer record into PostgreSQL with layer_valid=False.
-    Returns: UUID of inserted layer row.
-    """
-    conn = psycopg2.connect(conn_string)
-    with conn.cursor() as cur:
-        cur.execute("""
-            INSERT INTO layers
-                (scenario_id, horizon_year, methodology_version, blob_path, generated_at, legend_colormap)
-            VALUES (%s, %s, %s, %s, now(), %s)
-            ON CONFLICT (scenario_id, horizon_year, methodology_version)
-            DO UPDATE SET
-                blob_path = EXCLUDED.blob_path,
-                generated_at = EXCLUDED.generated_at,
-                layer_valid = false,
-                legend_colormap = EXCLUDED.legend_colormap
-            RETURNING id
-        """, (scenario_id, horizon_year, methodology_version, blob_path,
-              json.dumps(legend_colormap)))
-        layer_id = cur.fetchone()[0]
-    conn.commit()
-    return str(layer_id)
-
-
-def mark_layer_valid(conn_string: str, layer_id: str):
-    """Called after QA validation passes."""
-    conn = psycopg2.connect(conn_string)
-    with conn.cursor() as cur:
-        cur.execute(
-            "UPDATE layers SET layer_valid = true WHERE id = %s",
-            (layer_id,)
-        )
-    conn.commit()
-```
-
----
-
-## 6. Pipeline Orchestration
-
-The full pipeline is orchestrated by a CLI script:
-
-```python
-# pipeline/run_pipeline.py
-import click
-
-@click.command()
-@click.option('--scenario', multiple=True, help='Scenario ID(s) to process')
-@click.option('--horizon', multiple=True, type=int, help='Horizon year(s) to process')
-@click.option('--methodology-version', required=True)
-@click.option('--activate', is_flag=True, help='Activate new version after pipeline completes')
-def run(scenario, horizon, methodology_version, activate):
-    """
-    Run the geospatial data pipeline for the specified scenarios and horizons.
-
-    Example:
-        python run_pipeline.py \\
-            --scenario ssp1-26 --scenario ssp2-45 --scenario ssp5-85 \\
-            --horizon 2030 --horizon 2050 --horizon 2100 \\
-            --methodology-version v1.0
-    """
-    for sc in scenario:
-        for yr in horizon:
-            click.echo(f"Processing {sc} / {yr}...")
-
-            # Step 1: Download
-            slr_nc = download_ipcc_ar6(sc, yr, DOWNLOAD_DIR)
-            dem_tif = download_copernicus_dem(EUROPE_BBOX, DOWNLOAD_DIR)
-
-            # Step 2: Preprocess
-            aligned_slr = align_to_dem_grid(slr_nc, dem_tif, WORK_DIR / f"{sc}_{yr}_slr.tif")
-
-            # Step 3: Compute exposure
-            raw_exposure = compute_binary_exposure(
-                dem_tif, aligned_slr, COASTAL_ZONE_GEOM, WORK_DIR / f"{sc}_{yr}_raw.tif")
-
-            # Step 4: COGify
-            cog_path = OUTPUT_DIR / f"{sc}_{yr}.tif"
-            cogify(raw_exposure, cog_path)
-
-            # Step 5: QA
-            assert validate_layer(cog_path, sc, yr), f"QA failed for {sc}/{yr}"
-
-            # Step 6: Upload
-            blob_path = upload_cog(cog_path, sc, yr, methodology_version, BLOB_CONN_STR)
-
-            # Step 7: Register
-            layer_id = register_layer(DB_CONN_STR, sc, yr, methodology_version, blob_path,
-                                       LEGEND_COLORMAP)
-            mark_layer_valid(DB_CONN_STR, layer_id)
-            click.echo(f"  ✓ Layer {layer_id} registered and validated")
-
-    if activate:
-        activate_methodology_version(DB_CONN_STR, methodology_version)
-        click.echo(f"✓ Methodology version {methodology_version} activated")
-```
-
----
-
-## 7. Pipeline Execution Environments
-
-| Environment | When | How |
-|---|---|---|
-| Developer workstation | Phase 0 bootstrap, testing | `python run_pipeline.py ...` with local `.env` |
-| GitHub Actions (manual trigger) | Data refresh | `workflow_dispatch` event; Azure credentials via repository secrets |
-| Azure Container Instance | Scheduled run | Disposable container; run-to-completion |
-
-**Estimated run time:** Downloading and processing 9 combinations (3 scenarios × 3 horizons) at 30m resolution for Europe: approximately 30–90 minutes (dominated by DEM download and raster computation).
-
----
-
-## 8. COG File Properties
-
-Each output COG must have:
-
-| Property | Value | Reason |
-|---|---|---|
-| CRS | EPSG:4326 (WGS84) | TiTiler requires geographic CRS for XYZ tile serving |
-| Pixel type | Float32 (0.0, 1.0, NaN) | Rasterio binary; NaN = NoData |
-| Compression | Deflate | Lossless; good compression ratio for binary rasters |
-| Tile size | 256×256 | Standard for HTTP range request efficiency |
-| Overview levels | 2, 4, 8, 16, 32, 64, 128 | Zoom levels 0–14 served efficiently |
-| File size (estimate) | 1–10 MB per scenario+horizon | Depends on coastal zone extent |
-| Spatial extent | Europe coastal zone | No global data needed |
-
----
-
-## 9. Blob Storage Layout
-
-```
-Container: geospatial (private)
-  layers/
-    v1.0/                         ← methodology_version
-      ssp1-26/                    ← scenario_id
-        2030.tif                  ← COG for horizon 2030
-        2050.tif
-        2100.tif
-      ssp2-45/
-        2030.tif
-        2050.tif
-        2100.tif
-      ssp5-85/
-        2030.tif
-        2050.tif
-        2100.tif
-    v2.0/                         ← future methodology version
-      ...
-```
-
-**Path construction** (used by both pipeline upload and API layer resolution):
-```python
-blob_path = f"layers/{methodology_version}/{scenario_id}/{horizon_year}.tif"
-```
-
----
-
-## 10. Legend Colormap
-
-Each layer is stored with a `legend_colormap` (JSONB in `layers` table) used by:
-- The API to return `legendSpec` in the assess response
-- TiTiler URL parameters (`colormap` param for tile colorization)
-
-**Default colormap for binary exposure:**
-```json
-{
-  "colorStops": [
-    { "value": 1, "color": "#E85D04", "label": "Modeled exposure zone" }
-  ]
-}
-```
-
-**TiTiler colormap URL parameter:**
-```
-&colormap={"1":[232,93,4,255]}    ← RGB(A) for value 1
-```
-
-The colormap is stored per-layer (not hardcoded in the API) so it can be updated when a new methodology version introduces a different visual convention.
-
----
-
-## 11. Methodology Version Activation
-
-After all layers for a new version are uploaded and validated, the version is activated atomically:
-
-```sql
-BEGIN;
-  UPDATE methodology_versions SET is_active = false WHERE is_active = true;
-  UPDATE methodology_versions SET is_active = true WHERE version = 'v1.0';
-COMMIT;
-```
-
-This is the **only** step that makes new layers visible to users. No container restart required.
-
-To roll back: run the same transaction swapping the version strings.
-
----
-
-## 12. Pipeline Checklist (Pre-Activation)
-
-- [ ] All 9 COG files generated (3 scenarios × 3 horizons: ssp1-26, ssp2-45, ssp5-85 — ADR-016)
-- [ ] All COGs pass `rio-cogeo validate` (no errors)
-- [ ] All COGs are EPSG:4326
-- [ ] All COGs contain only binary pixel values (0, 1, NoData)
-- [ ] All COGs have exposure pixels (non-empty)
-- [ ] All COGs uploaded to `geospatial` container in correct paths
-- [ ] All `layers` rows in PostgreSQL have `layer_valid = true`
-- [ ] `methodology_versions` row for `v1.0` exists with all required fields populated
-- [ ] Spot-check: TiTiler `/point` returns expected pixel value for Amsterdam (should be 1)
-- [ ] Spot-check: TiTiler `/point` returns 0 for an inland coastal zone location
-- [ ] Spot-check: tile request returns visible red overlay for known exposure location
-- [ ] Methodology version activated atomically
+This formula is not considered validated until Phase 0 establishes the
+projection-to-grid method, vertical compatibility, coastal masking, and
+connectivity behaviour. Calculations use chunked arrays, preserve masks, and
+write statistics for each of the nine scenario/horizon combinations.
+
+### 6.6 Package scientific and visual artifacts
+
+From the same validated class array, produce:
+
+- a lossless analysis COG for exact lookup;
+- visual PMTiles for MapLibre overlay rendering;
+- browser PMTiles and analytical GeoParquet for support/coastal geometry;
+- canonical settlement GeoParquet and compact search indexes.
+
+COG validation covers tiling, overviews, compression, CRS/transform, nodata,
+and class domain. PMTiles validation covers archive structure, zoom/bounds,
+sample tiles, byte ranges, and parity with sampled COG classes. Rendered colour
+is never a source value.
+
+### 6.7 Generate contracts and evidence
+
+After data QA passes, generate:
+
+- scenario, methodology, and source-attribution JSON;
+- versioned `manifest.schema.json` and valid `manifest.json`;
+- a static STAC catalog, collection, and item for each relevant spatial asset;
+- source/build inspection and data-quality summaries;
+- SLSA-compatible `provenance.intoto.jsonl`;
+- keyless Cosign/Sigstore signature bundle for the manifest/provenance
+  inventory.
+
+The final manifest is generated after artifact bytes are stable so sizes and
+SHA-256 values are exact.
+
+## 7. Release validation gates
+
+The candidate fails unless all of these pass:
+
+- source schemas, units, coordinates, checksums, and licences;
+- exactly 3 scenarios x 3 horizons, with unique and complete layer pairs;
+- approved scientific golden points and Python/browser lookup parity;
+- raster statistics, topology, connectivity, nodata, and release-diff review;
+- COG, PMTiles, GeoParquet, search-index, JSON Schema, and STAC validation;
+- settlement reconciliation and required search ranking cases;
+- manifest inventory, sizes, checksums, source/licence mappings, provenance,
+  and signature verification;
+- initial bundle, worker, search, assessment, Lighthouse, and offline budgets;
+- zero browser calls to `/assess`, `/geocode`, or `/config`.
+
+See [10 — Testing Strategy](10-testing-strategy.md) for fixtures and exact
+fitness functions.
+
+## 8. Staging, publication, and rollback
+
+1. Upload to a new `releases/{dataReleaseId}/` prefix in Cloudflare R2/static
+   assets; never overwrite a prior path.
+2. Compare every uploaded size and hash with the local manifest.
+3. Verify public `HEAD`, byte-range `GET`, `Content-Range`, `ETag`, immutable
+   cache headers, and narrow CORS from the production origin.
+4. Run browser smoke tests against the public candidate from at least two
+   European regions.
+5. Promote by deploying an application build pinned to the release, or by
+   atomically changing the small release pointer.
+6. Retain the prior application/release pair. Roll back by repinning it, never
+   by mutating artifacts.
+
+The target recurring infrastructure cost is zero while the workload fits the
+documented Cloudflare allowances. Every candidate records total bytes,
+estimated range operations, retained releases, and a dated cost model before
+promotion.
+
+## 9. Reproducibility and supply-chain rules
+
+- Pin Python and native tool versions, lock dependencies, and record the build
+  image digest.
+- Record source and intermediate receipts, parameters, code commit, commands,
+  timings, and output hashes.
+- Make stages deterministic and side-effect free until the explicit staging
+  step.
+- Give publishing credentials only to the protected CI environment, with
+  least-privilege write access to new release paths.
+- Sign from CI with keyless identity; do not place long-lived signing keys in
+  the repository.
+- Never publish from an unreviewed local working tree.
+
+## 10. Implementation sequence
+
+1. Implement the Phase 0 regional spike and source-inspection reports.
+2. Define schemas and shared Python/TypeScript golden fixtures.
+3. Add DuckDB Spatial boundary/GeoNames processing and GeoParquet/index output.
+4. Produce COG and PMTiles from one classified array and prove exact parity.
+5. Generate manifest, static STAC, provenance, and signature bundle.
+6. Publish a non-production immutable release and run public delivery tests.
+7. Build all nine real-data layers and complete old/new browser parity.
+8. Only then remove Azure Blob registration, PostgreSQL/PostGIS, TiTiler,
+   Azurite, and the legacy pipeline branches.
+
+This sequence keeps scientific proof ahead of presentation and makes every
+portfolio claim traceable to release evidence.

@@ -1,4 +1,7 @@
-"""Step 5: QA validation for COG layers (S03-05).
+"""Legacy pipeline step: mechanical QA validation for COG layers.
+
+These checks do not satisfy the scientific, licence, provenance, or browser
+parity gates required by ADR-021.
 
 Five checks — all must pass before a layer is marked valid:
   1. Valid COG structure  (rio-cogeo validate)

@@ -1,4 +1,8 @@
-"""Step 2: Reproject and align SLR projections to the DEM grid (S03-03).
+"""Legacy pipeline step: reproject and align assumed SLR data to a DEM grid.
+
+The regular ~0.25 degree source-grid assumption below is not validated against
+the pinned real AR6 release. ADR-021 Phase 0 must confirm or replace it before
+publication.
 
 Interpolates coarse IPCC AR6 sea-level rise values (~0.25 deg) onto the
 Copernicus DEM grid (~30 m) using bilinear resampling so that a pixel-level

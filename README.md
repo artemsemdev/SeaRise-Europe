@@ -3,153 +3,193 @@
 [![CI](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/ci.yml/badge.svg)](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/codeql.yml/badge.svg)](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/codeql.yml)
 
-**Make coastal sea-level exposure understandable for anyone, anywhere in Europe — without overpromising what the science can say.**
+**Make coastal sea-level exposure understandable without overstating what the
+science can say.**
 
-SeaRise Europe is a web application that lets users search for a European location and view scenario-based coastal sea-level exposure on an interactive map across selectable future time horizons (+10 to +100 years). It bridges the gap between authoritative but fragmented climate datasets and a clear, scientifically cautious user experience.
+SeaRise Europe is a public, portfolio-grade explorer for comparing modeled
+coastal exposure across three IPCC scenarios and the 2030, 2050, and 2100
+horizons. It combines a cautious user experience with a reproducible geospatial
+data-product architecture.
 
 <p align="center">
-  <img src="docs/product/Mock/preview-exposure.png" alt="SeaRise Europe — exposure detected for Bordeaux, France" width="720">
+  <img src="docs/product/Mock/preview-exposure.png" alt="SeaRise Europe modeled-exposure result" width="720">
 </p>
-<p align="center"><em>Bordeaux, France — IPCC worst-case scenario, +100 years</em></p>
 
----
+> **Migration status:** ADR-021 was accepted on 2026-08-04. The repository still
+> contains the legacy distributed implementation while the static-first path is
+> built and scientifically validated. Current demo rasters are synthetic; this
+> is not yet a validated real-data release.
 
-## Tech Stack
+## Accepted architecture
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 14+, TypeScript, TailwindCSS, MapLibre GL JS, Zustand, TanStack Query |
-| Backend | ASP.NET Core .NET 8, Minimal API, Npgsql |
-| Tile Server | TiTiler (Python / FastAPI) |
-| Database | PostgreSQL 16 + PostGIS 3.4 |
-| Pipeline | Python 3.9+, GDAL, rasterio, rio-cogeo |
-| Infrastructure | Docker Compose (local), Azure Container Apps (planned) |
-| CI | GitHub Actions — lint, type-check, test, Docker build |
-
----
-
-## Architecture Overview
+SeaRise Europe is moving to a static-first model: authoritative source data is
+downloaded once, processed before release, and published as immutable
+browser-ready artifacts. A normal user request requires no application API,
+database, tile server, or geocoding service.
 
 ```mermaid
-graph TD
-    Browser["Browser<br/>Next.js · MapLibre GL JS · Zustand"]
+flowchart LR
+    Sources[IPCC + Copernicus + GeoNames + Natural Earth]
+    Build[Offline pipeline<br/>Python + GDAL + DuckDB Spatial]
+    QA[Scientific QA<br/>STAC + checksums + provenance]
+    Edge[Static assets + R2<br/>immutable releases]
+    Browser[React + MapLibre<br/>PMTiles + local search/assessment]
 
-    Browser -- "REST API" --> API["ASP.NET Core<br/>Minimal API · .NET 8"]
-    Browser -- "Raster tiles" --> Tiler["TiTiler<br/>Python · FastAPI · GDAL"]
-
-    API --> DB["PostgreSQL + PostGIS<br/>Scenarios · Layers · Geography"]
-    Tiler --> Blob["Azure Blob / Azurite<br/>Cloud-Optimized GeoTIFFs"]
-
-    Pipeline["Geospatial Pipeline<br/>Python · rasterio · rio-cogeo"] -.->|"generates COGs"| Blob
-    Pipeline -.->|"seeds metadata"| DB
-
-    style Browser fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style API fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style Tiler fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style DB fill:#1e293b,stroke:#059669,color:#e2e8f0
-    style Blob fill:#1e293b,stroke:#059669,color:#e2e8f0
-    style Pipeline fill:#1e293b,stroke:#8b5cf6,color:#e2e8f0
+    Sources --> Build --> QA --> Edge --> Browser
 ```
 
----
+The target stack is:
 
-## Quick Start
+| Concern | Decision |
+|---|---|
+| Web application | React 19, TypeScript, Vite 8; static output |
+| Map | MapLibre GL JS with OpenFreeMap visual basemap |
+| Exposure display | Nine raster PMTiles archives |
+| Exact assessment | Browser lookup in lossless analysis COGs |
+| Settlement search | Pinned GeoNames snapshot, prebuilt index, Web Worker |
+| Spatial build work | DuckDB Spatial, GeoParquet, Python/GDAL/Rasterio |
+| Data catalog | Static STAC catalog and release manifest |
+| Hosting | Cloudflare Workers Static Assets + R2 custom domain |
+| Infrastructure | OpenTofu |
+| Supply-chain evidence | SHA-256, SLSA provenance, keyless Cosign signature |
+
+The architectural goal is deliberately not “more cloud.” It demonstrates how
+to move deterministic geospatial computation out of the request path and ship
+a faster, cheaper, inspectable product using open formats.
+
+Read the complete [accepted architecture decision](docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md).
+
+## Product scope
+
+- Three scenarios: SSP1-2.6, SSP2-4.5, and SSP5-8.5.
+- Three horizons: 2030, 2050, and 2100.
+- Five explicit result states, including out-of-scope and unavailable data.
+- Local search over European places, including every active coastal settlement
+  that qualifies in the pinned GeoNames snapshot.
+- A versioned coastal analysis boundary. The current checked-in 25 km geometry
+  is an approximation pending comparison with the canonical Copernicus source.
+- No property-level forecast, probability, engineering conclusion, or safety
+  guarantee.
+
+## Why static-first
+
+| Legacy runtime | Accepted runtime |
+|---|---|
+| Next.js server | Static React assets |
+| ASP.NET Core API | Browser domain engine |
+| PostgreSQL/PostGIS | DuckDB Spatial during offline builds only |
+| TiTiler | PMTiles and COG byte-range reads |
+| Runtime geocoder | Local indexed GeoNames data |
+| Multiple always-on services | CDN/object delivery only |
+| Backend cold starts | No backend request |
+
+Expected idle hosting cost is EUR 0/month while storage and traffic remain in
+the provider's free allowances, excluding domain registration. The architecture
+is portable to any static host and object store that supports CORS and HTTP
+range requests.
+
+## Repository status
+
+| Area | Status |
+|---|---|
+| Static-first ADR and technical documentation | Accepted/current |
+| Legacy interactive application | Implemented with synthetic demo data |
+| Real IPCC/Copernicus end-to-end validation | Not complete; blocks publication |
+| GeoNames coastal settlement catalog | Planned |
+| Static React/Vite browser path | Planned |
+| Cloudflare/OpenTofu deployment | Planned |
+| Legacy service removal | Gated on parity and release evidence |
+
+The active sequence and exit gates are in the
+[static-first migration plan](docs/delivery/README.md).
+
+## Run the current local baseline
+
+The migration has not yet replaced the checked-in legacy stack. To inspect the
+current implementation:
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- An Azure Maps API key (for geocoding and basemap tiles)
+- Docker with Docker Compose
+- optional Azure Maps credentials; the local baseline has limited fallbacks
 
-### Run locally
+### Start
 
 ```bash
-# 1. Copy the environment template and fill in your API keys
 cp .env.local.example .env.local
-
-# 2. Start all services
 docker compose up --build
 ```
 
 | Service | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| API | http://localhost:8080 |
-| TiTiler | http://localhost:8000 |
+|---|---|
+| Frontend | <http://localhost:3000> |
+| API | <http://localhost:8080> |
+| TiTiler | <http://localhost:8000> |
 
-To reset the database: `docker compose down -v && docker compose up --build`
+This path exists for migration comparison. It uses a synthetic COG and must not
+be used as evidence that the real scientific data pipeline is complete.
 
----
-
-## Project Status
-
-```text
-██████████████████░░  81%  ·  47 of 58 stories  ·  7 of 8 epics complete
-```
-
-| Wave | Epic | Status |
-|:----:|------|:------:|
-| 1 | Decision Closure | Done |
-| 2 | Local Dev Environment | Done |
-| 3 | Geospatial Pipeline | Done |
-| 4 | Backend API Core | Done |
-| 5 | Frontend Search | Done |
-| 6 | Assessment UX | Done |
-| 7 | Transparency & Accessibility | Done |
-| 8 | Azure Release | Planned |
-
-Full delivery details: [docs/delivery/ROADMAP.md](docs/delivery/ROADMAP.md)
-
----
-
-## Repository Structure
+## Target repository shape
 
 ```text
 SeaRise Europe/
 ├── src/
-│   ├── frontend/          Next.js App Router (TypeScript)
-│   ├── api/               ASP.NET Core Minimal API (C#)
-│   └── pipeline/          Geospatial data pipeline (Python)
-├── infra/db/              PostgreSQL schema + PostGIS + seed data
-├── docs/
-│   ├── product/           PRD, vision, personas, content guidelines, mocks
-│   ├── architecture/      19 architecture docs, ADRs, diagrams
-│   └── delivery/          Roadmap and 8 epic files
-├── data/geometry/         Coastal analysis zone specification
-├── docker-compose.yml     5-service local dev stack
-└── .env.local.example     Environment variable documentation
+│   ├── frontend/          Static React/TypeScript application
+│   └── pipeline/          Offline data-release builder
+├── data/
+│   ├── geometry/          Versioned support/coastal source geometry
+│   └── fixtures/          Small, committed test release
+├── infra/                 OpenTofu for static hosting and object delivery
+└── docs/
+    ├── product/           Product intent, language, personas, and mocks
+    ├── architecture/      Current architecture and ADR register
+    └── delivery/          Active migration plan and quality evidence
 ```
 
----
+The API, database, tile server, and legacy container scaffolding will be
+deleted only after the new flow passes scientific, parity, browser,
+accessibility, performance, cost, and rollback gates.
 
 ## Documentation
 
 | Topic | Document |
-|-------|----------|
-| Product vision | [docs/product/VISION.md](docs/product/VISION.md) |
-| Product requirements | [docs/product/PRD.md](docs/product/PRD.md) |
-| Architecture index | [docs/architecture/README.md](docs/architecture/README.md) |
-| Architecture decisions | [docs/architecture/11-architecture-decisions.md](docs/architecture/11-architecture-decisions.md) |
-| Delivery roadmap | [docs/delivery/ROADMAP.md](docs/delivery/ROADMAP.md) |
+|---|---|
+| Architecture decision | [ADR-021](docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) |
+| Architecture index | [Architecture documentation](docs/architecture/README.md) |
+| Migration and removal gates | [Delivery plan](docs/delivery/README.md) |
+| Provisional scientific method | [Methodology candidate](docs/methodology.md) |
+| Product requirements | [PRD](docs/product/PRD.md) |
+| Product language | [Content guidelines](docs/product/CONTENT_GUIDELINES.md) |
 
----
+## Architecture fitness goals
 
-## What This Project Is Not
+- zero runtime calls to `/assess`, `/geocode`, or `/config`;
+- exactly nine complete scenario/horizon layers;
+- local search p95 below 50 ms after worker initialization;
+- local assessment p95 below 100 ms after required data is cached;
+- Lighthouse scores of at least 90 on the agreed mobile profile;
+- schema-valid manifests, matching checksums, valid STAC, complete licences, and
+  passing scientific golden points;
+- shell, configuration, boundaries, and loaded search index usable after the
+  network is removed.
 
-- A live public service or operational tool
-- An engineering, insurance, mortgage, or legal risk assessment
-- A parcel-level guarantee or real-time flood forecast
-- A global coverage product (Europe only for MVP)
+## What this project is not
 
----
+- a live emergency or operational planning service;
+- an engineering, insurance, mortgage, financial, or legal assessment;
+- a parcel-level guarantee or real-time flood forecast;
+- proof of a real-data result until the scientific release gate is complete.
 
 ## Contributing
 
-Contributions are welcome — especially corrections, clarifications, and architecture feedback. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Contributions are welcome, especially scientific corrections, data-quality
+improvements, and architecture feedback. Read [CONTRIBUTING.md](CONTRIBUTING.md)
+and `AGENTS.md` before changing the repository.
 
 ## Security
 
-Please do not report vulnerabilities in public issues. See [SECURITY.md](SECURITY.md).
+Do not report vulnerabilities in public issues. See [SECURITY.md](SECURITY.md).
 
-## License
+## Licence
 
 [MIT](LICENSE) — Copyright (c) 2026 Artem Sem

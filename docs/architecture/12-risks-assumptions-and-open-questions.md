@@ -1,190 +1,87 @@
-# 12 — Risks, Assumptions, and Open Questions
-
-> **Status:** Confirmed (known state) | Proposed Architecture (mitigations)
-> **Note:** This document consolidates all blocking open questions from the PRD with their architectural impact, tracks working assumptions that must be validated before Phase 1 launch, and documents risks with mitigations.
-> **Companion document:** For the closure proposal and rationale, see [17-open-question-closure-proposal.md](17-open-question-closure-proposal.md)
-> **Update 2026-04-03:** OQ-02 through OQ-07 resolved and converted to ADRs (ADR-015 through ADR-020). See [11-architecture-decisions.md](11-architecture-decisions.md).
-
----
-
-## 1. Blocking Open Questions
-
-These must be resolved before Phase 1 (MVP) launch. Architecture structure is ready; specific values and decisions are pending.
-
-### OQ-02 — Scenario Set Definition (RESOLVED)
-
-**Resolution:** ADR-016 (S01-01, approved 2026-04-03)
-
-Three scenarios confirmed: `ssp1-26` / "Lower emissions (SSP1-2.6)", `ssp2-45` / "Intermediate emissions (SSP2-4.5)", `ssp5-85` / "Higher emissions (SSP5-8.5)". IDs are stable keys across database, API, and blob paths. See seed data specification: [`docs/delivery/artifacts/seed-data-spec.sql`](../delivery/artifacts/seed-data-spec.sql).
-
----
-
-### OQ-03 — Default Scenario and Horizon (RESOLVED)
-
-**Resolution:** ADR-017 (S01-02, approved 2026-04-03)
-
-Default scenario: `ssp2-45` (middle-of-the-road). Default horizon: `2050` (mid-century). `is_default = true` set on the corresponding rows in `scenarios` and `horizons` tables.
-
----
-
-### OQ-04 — Coastal Analysis Zone Definition (RESOLVED)
-
-**Resolution:** ADR-018 (S01-03, approved 2026-04-03)
-
-Source: Copernicus Land Monitoring Service — Coastal Zones 2018 dataset, dissolved into a single multipolygon, ~10 km inland extent. Validated against 10 reference coordinates (5 coastal, 5 inland). Geometry file: `data/geometry/coastal_analysis_zone.geojson` (produced during pipeline bootstrap). Source documented in `geography_boundaries.source` column.
-
----
-
-### OQ-05 — Exposure Threshold Methodology (RESOLVED)
-
-**Resolution:** ADR-015 (S01-04, approved 2026-04-03)
-
-Binary exposure methodology confirmed for v1.0. Pixel value `1` = modeled exposure (SLR >= DEM within coastal analysis zone), `0` = no exposure, `NoData` = outside zone. No runtime threshold — exposure is precomputed offline. Full specification: [`docs/delivery/artifacts/methodology-spec.md`](../delivery/artifacts/methodology-spec.md).
-
----
-
-### OQ-06 — Production Geocoding Provider (RESOLVED)
-
-**Resolution:** ADR-019 (S01-05, approved 2026-04-03)
-
-Azure Maps Search selected as production geocoder. Nominatim retained for development only. Field mapping to `GeocodingCandidate` model documented in ADR-019. API key stored server-side in Key Vault as `geocoding-provider-api-key`. Fallback: HERE Geocoding if European coverage proves insufficient.
-
----
-
-### OQ-07 — Basemap Tile Provider (RESOLVED)
-
-**Resolution:** ADR-020 (S01-06, approved 2026-04-03)
-
-Azure Maps selected with Light vector style, CORS origin-restricted subscription key, and MapLibre GL JS rendering. Attribution: "© Microsoft, © OpenStreetMap contributors". Style URL via `NEXT_PUBLIC_BASEMAP_STYLE_URL` environment variable. Key management: CORS origin-restricted (production + staging domains). Amended 2026-04-03 from MapTiler to Azure Maps to keep all runtime services under Azure credit coverage.
-
----
-
-### OQ-10 — Analytics Implementation (Non-blocking for MVP, blocking for metrics)
-
-**Question:** Should product analytics be implemented? If yes, which provider and what consent model?
-
-**Architectural impact:**
-- If enabled: analytics event calls added to frontend for key interactions (see METRICS_PLAN.md §6)
-- Privacy: only `country_code` allowed in events — no coordinates, no query strings, no user identifiers (GDPR)
-- Consent: if using cookies, ePrivacy consent banner required for EU visitors
-- Provider options: Plausible (GDPR-friendly, no cookies), Fathom, Posthog, custom
-- If server-side events only (via API logs + KQL): no consent required
-
-**Action needed:** Product decision on analytics. Architecture is ready to accommodate either path.
-
----
-
-## 2. Working Assumptions
-
-These are architectural decisions made based on incomplete information. Each must be validated before Phase 1.
-
-### A-01: TiTiler `/point` Latency is Acceptable
-
-**Assumption:** TiTiler's `/point/{lng},{lat}` endpoint responds in ≤ 200ms for a warm COG (already cached in GDAL's VSI cache).
-
-**Risk if wrong:** Assessment p95 latency exceeds NFR-003 (3.5s). TiTiler `/point` has variable latency depending on COG spatial indexing, GDAL cache state, and Azure Blob I/O.
-
-**Validation:** Phase 0 spike — measure `/point` latency against real COG files on Azure Blob Storage from the API container.
-
-**Fallback:** Implement Option C (pre-materialized point lookup in PostGIS raster table) if TiTiler `/point` latency is insufficient.
-
----
-
-### A-02: PostGIS ST_Within Performance is ≤ 20ms
-
-**Assumption:** With GIST index, `ST_Within` against the Europe boundary geometry completes in ≤ 20ms.
-
-**Risk if wrong:** Two `ST_Within` checks at 50ms each would consume 100ms of the 3.5s assessment budget.
-
-**Validation:** Benchmark `ST_Within` against the actual Europe boundary geometry (Natural Earth or EEA) in the target PostgreSQL SKU (Burstable B1ms).
-
-**Fallback:** Simplify geometry (reduce polygon vertices), upgrade PostgreSQL SKU, or cache geography results per coordinate.
-
----
-
-### A-03: Container Apps Cold Start is Acceptable for Demo
-
-**Assumption:** Scale-to-zero cold starts (typically 10–30s for .NET containers) are acceptable because the demo will have the app warmed up before presentation.
-
-**Risk if wrong:** If P-03 Yuki opens the app without prior warm-up, the first request may time out or appear slow.
-
-**Validation:** Measure cold start times for API and TiTiler containers on Azure Container Apps Consumption plan.
-
-**Fallback:** Set `minReplicas: 1` on API and TiTiler containers to prevent scale-to-zero (adds ~$10–20/month).
-
----
-
-### A-04: Europe Boundary Geometry is Correct and Complete
-
-**Assumption:** The `europe` geometry in `geography_boundaries` correctly classifies all intended European countries as in-scope.
-
-**Risk if wrong:** Edge cases: Kosovo, Russia-in-Europe, Kaliningrad, Cyprus, Canary Islands, Azores. Classification errors could produce confusing results for users.
-
-**Validation:** Manual spot-check of 20 representative coordinates against the seeded geometry.
-
----
-
-### A-05: Single TiTiler Instance Handles Both Tile and Point Requests
-
-**Assumption:** A single TiTiler container serves both browser tile requests (`/{z}/{x}/{y}.png`) and assessment point queries (`/point/{lng},{lat}`) without performance interference.
-
-**Risk if wrong:** A burst of tile requests (user panning the map) could starve assessment point queries, increasing assessment latency.
-
-**Validation:** Load test with concurrent tile and point requests.
-
-**Fallback:** Deploy two TiTiler instances (one internal-only for assessment, one public for tiles).
-
----
-
-### A-06: COG Files Are Binary (0/1) — Not Continuous (CONFIRMED)
-
-**Confirmed by ADR-015 (2026-04-03).** The exposure layers are pre-computed binary rasters: 1 = exposure zone, 0 = no exposure zone, NoData = outside analysis area. No longer an assumption — this is the approved methodology for v1.0.
-
----
-
-## 3. Architecture Risks
-
-| ID | Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|---|
-| R-01 | TiTiler `/point` latency too high for assessment p95 target | Medium | High | Phase 0 latency spike (A-01); fallback Option C |
-| R-02 | Azure Maps (ADR-019) doesn't return `displayContext`-equivalent field | Medium | Medium | Map `locality` + admin fields to `displayContext`; accept degraded disambiguation |
-| R-03 | Azure Container Apps cold start breaks demo | Medium | High | Warm up containers before demo; set `minReplicas: 1` as fallback |
-| R-04 | Coastal zone geometry (ADR-018: Copernicus Coastal Zones) is too large / too small | Medium | High | ~10 km inland extent is conservative; iterate after Phase 0 data review |
-| R-05 | COG files too large for acceptable tile serving speed | Low | Medium | Ensure correct COG tiling and overview levels during pipeline (see doc 16) |
-| R-06 | Basemap provider attribution requirements missed | Low | Medium | ADR-020: Azure Maps + OSM attribution required; add before Phase 1 launch |
-| R-07 | GDAL VSIAZ driver not configured correctly for Azure Blob | Medium | High | Phase 0 spike: verify TiTiler can read COG from Azure Blob with managed identity |
-| R-08 | `results` cache (60s TanStack Query) serves stale data after methodology version change | Low | Medium | Methodology version changes are rare + manual; acceptable to restart containers to clear in-process cache |
-| R-09 | DB connection pool exhaustion at concurrent demo traffic | Low | Medium | Monitor `active_connections`; set Npgsql `Maximum Pool Size = 20` per API instance |
-| R-10 | MapLibre `unsafe-eval` CSP requirement blocked by hosting security policy | Low | Low | MapLibre requires `unsafe-eval`; document explicitly in security checklist |
-
----
-
-## 4. Non-Blocking Open Questions
-
-These don't block MVP but must be addressed before or during Phase 2.
-
-| OQ | Question | Phase |
+# Risks, Assumptions, and Open Questions
+
+> **Status:** Current migration register
+> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Review rule:** Update evidence and disposition; do not silently convert an
+> assumption into a fact.
+
+## Current risk register
+
+| ID | Risk | Likelihood / impact | Mitigation and exit evidence |
+|---|---|---|---|
+| R-01 | The IPCC AR6 source is location-based or otherwise differs from the current pipeline's assumed regular 2D grid | High / Critical | Inspect the pinned real source in Phase 0; document dimensions, coordinates, units, quantiles, and transformation method; pass a regional end-to-end spike. |
+| R-02 | The binary elevation comparison creates disconnected inland false positives or misrepresents coastal pathways | High / Critical | Review connectivity, datum, coastline, nodata, and scientific limitations against independent control locations; supersede methodology ADR if invalid. |
+| R-03 | Source or derivative redistribution terms are incomplete | Medium / Critical | Licence review for each source and derivative; manifest attribution; block publication until all rights and required wording are documented. |
+| R-04 | Browser exact lookup disagrees with the build array because of CRS, tile, row/column, resampling, or nodata differences | Medium / Critical | Shared golden fixtures across Python and TypeScript; nearest-neighbour binary lookup; bit-exact parity tests at cell edges and nodata. |
+| R-05 | Search indexes are too large or slow on mobile | Medium / High | Core/coastal shards, Brotli, lazy Web Worker load, representative mobile benchmarks, size/count report, deterministic ranking tests. |
+| R-06 | GeoNames misses, duplicates, or misclassifies settlements implied by “all coastal cities and villages” | High / High | Publish the operational definition, snapshot/date, feature-code rules, exclusions, corpus counts, duplicate/transcontinental QA, and limitations. |
+| R-07 | The approximate 25 km coastal zone is mistaken for flood reach | Medium / High | Label it as product scope, store distance to coast, compare with canonical Copernicus product, and keep methodology language explicit. |
+| R-08 | PMTiles plus analysis COGs exceed free storage or cause excessive R2 range operations | Medium / Medium | Regional size/request spike, range-locality measurement, cache tuning, release cost model, usage alerts; consolidate only after exact-lookup proof. |
+| R-09 | Service Worker mixes application and data releases | Medium / High | Namespace caches by app version and `dataReleaseId`; atomic activation; offline/mid-update tests; fail closed on mismatch. |
+| R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
+| R-11 | Cloudflare pricing, limits, or custom-domain behaviour changes | Medium / Medium | Date the cost model, alert on usage, avoid proprietary runtime services, and retain a static host + byte-range object storage portability test. |
+| R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
+| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claim and decommissioning until ADR-021 Phase 0–3 gates pass. |
+| R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
+
+## Assumptions that require evidence
+
+| ID | Assumption | Required validation |
 |---|---|---|
-| OQ-01 | What is the supported browser matrix? (NFR-022) | Phase 1 |
-| OQ-08 | Should a CDN be used for frontend assets? | Phase 3 |
-| OQ-09 | Is server-side rendering required for SEO? (Note: `noindex` is default for portfolio demos) | Phase 2 |
-| OQ-10 | Analytics provider and consent model (see also §1 OQ-10 above) | Phase 2 |
-| OQ-11 | Multi-language support (i18n)? | Not in scope for MVP (BR-003 — English only) |
-| OQ-12 | Mobile-first vs desktop-first priority for responsive layout? | Phase 1 (UX decision) |
+| A-01 | A static browser path can preserve all five domain result states | Golden tests across Europe support, inland coast scope, nodata, exposed, and non-exposed locations |
+| A-02 | Nine Europe-wide visual PMTiles and exact lookup artifacts are practical to publish and query | Regional spike extrapolation plus full-build size, range-count, memory, and latency measurements |
+| A-03 | GeoNames CC BY 4.0 data and selected alternate names can be redistributed in derived indexes | Recorded licence review and complete attribution in manifest/product |
+| A-04 | Cloudflare Workers Static Assets + R2 can remain at or near EUR 0/month for portfolio traffic | Current provider allowance/pricing snapshot and measured release/traffic model |
+| A-05 | R2 custom-domain delivery returns correct `HEAD`, `206`, CORS, ETag, and immutable cache behaviour | Staging probes from public origins and representative browsers |
+| A-06 | React 19 + Vite 8 meets the static shell, accessibility, and bundle budget | Production build, Lighthouse profile, network assertions, and browser compatibility matrix |
+| A-07 | A core-first local index gives useful results before the complete coastal shard loads | Search relevance tests and reference-mobile worker/load measurement |
+| A-08 | Cached core behaviour is useful without promising all nine layers offline | User-visible cache state, warm-cache browser tests, and honest uncached-layer failure |
 
----
+## Decisions deliberately open
 
-## 5. Dependency Map
+These are not blockers to documenting the target architecture, but they must
+be resolved by the named evidence before their implementation is fixed:
 
-The following diagram shows which Phase 0 / Phase 1 tasks are blocked by each open question:
+| Question | Decision evidence | Resolution mechanism |
+|---|---|---|
+| What is the final Europe support polygon and how are transcontinental states treated? | Product scope plus boundary QA and corpus counts | Product/methodology decision; ADR if domain outcomes change |
+| Copernicus DEM GLO-30 or GLO-90? | Data quality, storage, build time, browser range count, control-point accuracy | Phase 0 spike; record in methodology/release contract |
+| What coastline-connectivity algorithm is scientifically acceptable? | Independent controls, false-positive review, reproducible parameters | Superseding methodology ADR if v1.0 changes |
+| MiniSearch or another compact open-source search engine? | Index bytes, initialization, p95 query latency, multilingual relevance, licence | Implementation design note and pinned tests |
+| Can exact PMTiles lookup replace companion COGs? | Bit-exact parity over golden and edge cases plus range/size improvement | New ADR before COG removal |
+| Should users be able to download a regional offline pack? | Storage quota behaviour, UX, privacy, failure/recovery, artifact size | Product decision after browser spike |
+| Should optional analytics or error reporting exist? | Concrete learning need, privacy review, provider/retention/opt-out | Separate privacy decision before integration |
+| Which registrar/custom domain is used? | Annual price, DNSSEC, account recovery, Cloudflare integration | Operational choice recorded with cost model |
 
-```
-OQ-02 (Scenarios) ──► RESOLVED (ADR-016): ssp1-26, ssp2-45, ssp5-85
-OQ-03 (Defaults)  ──► RESOLVED (ADR-017): ssp2-45, 2050
-OQ-04 (Coastal)   ──► RESOLVED (ADR-018): Copernicus Coastal Zones 2018
-OQ-05 (Threshold) ──► RESOLVED (ADR-015): Binary, SLR >= DEM
-OQ-06 (Geocoding) ──► RESOLVED (ADR-019): Azure Maps Search
-OQ-07 (Basemap)   ──► RESOLVED (ADR-020): Azure Maps Light
+Exact street-address search, accounts, uploads, personalized saved places, and
+server-side analytics are out of scope. They are not “open implementation
+questions”; each would change privacy, cost, and runtime boundaries and needs a
+new ADR.
 
-All blocking questions resolved 2026-04-03. Downstream implementation unblocked.
-```
+## Migration stop conditions
+
+Do not remove the old runtime implementation or present the static path as the
+validated production product until all of these are true:
+
+- real IPCC, Copernicus DEM, and coastal source snapshots pass licence and
+  source-shape review;
+- a representative regional pipeline passes independent scientific controls;
+- Python and TypeScript exact lookup are bit-exact for approved fixtures;
+- browser, artifact, offline, performance, and accessibility gates pass;
+- staging proves public byte-range/CORS/cache behaviour;
+- old/new path differences are explained and approved;
+- rollback to a known application/release pair has been tested;
+- current cost and source limitations are visible on `/about/architecture`.
+
+If the scientific spike invalidates the binary methodology, pause the
+Europe-wide build and write a superseding ADR. Simpler infrastructure never
+overrides scientific correctness.
+
+## Risk review cadence
+
+- Update this register at each migration phase and data release.
+- Link material evidence from release reports rather than marking a risk
+  “closed” by assertion.
+- Escalate a new Critical risk into an ADR or explicit stop condition.
+- Move resolved implementation facts into the owning technical document and
+  remove the corresponding assumption from the next reviewed version.

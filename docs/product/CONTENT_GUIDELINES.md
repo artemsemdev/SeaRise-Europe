@@ -1,347 +1,260 @@
-# SeaRise Europe — UX Content & Writing Guidelines
+# SeaRise Europe — UX Content Guidelines
 
-## Document Metadata
-
-| Field | Value |
-|---|---|
-| Owner | Artem Sem |
-| Status | Draft |
-| Version | 0.1 |
-| Last updated | 2026-03-30 |
-
-**Version History**
-
-| Version | Date | Author | Summary of Changes |
-|---|---|---|---|
-| 0.1 | 2026-03-30 | Artem Sem | Initial draft |
-
-> **Audience for this document:** Anyone writing UI copy, error messages, result summaries, disclaimers, or methodology content for SeaRise Europe. Applies to all surfaces: labels, tooltips, inline validation, results panel, methodology drawer, and empty/error states.
-
----
-
-## 1. Voice and Tone
-
-### Voice (consistent across all contexts)
-
-SeaRise Europe's voice is:
-
-- **Clear.** Uses plain language accessible to a non-specialist. Avoids scientific jargon unless the term is immediately explained.
-- **Honest.** Never implies more certainty than the data supports. Acknowledges limitations as a matter of course, not as a legal disclaimer hidden in fine print.
-- **Calm.** Coastal risk is a serious subject. The product does not dramatize, catastrophize, or use alarmist language. It also does not minimize or dismiss.
-- **Direct.** Gets to the answer. Does not over-explain before delivering the result. Methodology is available on demand, not forced on the user before they see the result.
-- **Precise about uncertainty.** There is a difference between "we don't know" and "this model shows no exposure." Both are specific. Use the specific language.
-
-### Tone (adjusts by context)
-
-| Context | Tone Adjustments |
-|---|---|
-| Landing / empty state | Welcoming, brief; invites action without overpromising |
-| Loading state | Neutral, factual; acknowledges the user is waiting |
-| Result summary | Measured and specific; factual, not dramatic |
-| Methodology panel | Informative, slightly more technical; assumes the user wants detail |
-| Out of scope / unsupported geography states | Matter-of-fact; no apology, no drama; clear next step |
-| Error states | Calm; acknowledges the failure; offers a path forward |
-| Disclaimers | Formal and precise; must not be vague or legalistic |
-
----
-
-## 2. Scientific Language Rules
-
-These rules apply to every result-related string in the product. They exist to prevent false precision and to maintain trust.
-
-### 2.1 Always use modeled language for results
-
-Every result must make clear that the output is based on a model, not a measurement of actual future conditions.
-
-| Correct | Incorrect |
-|---|---|
-| "This location shows modeled coastal exposure under the selected scenario." | "This location will be flooded." |
-| "No coastal exposure was modeled for this location under the selected scenario and horizon." | "This location is safe." |
-| "Based on the active scenario and time horizon, the model indicates coastal exposure." | "Sea levels will reach this location by 2050." |
-
-### 2.2 Always attribute results to the active scenario and time horizon
-
-A result without its scenario and horizon context is meaningless. Every result summary must include both.
-
-| Correct | Incorrect |
-|---|---|
-| "Modeled coastal exposure detected for [Location] under [Scenario] by [Year]." | "Exposure detected." |
-| "No modeled exposure for [Location] in [Scenario] by [Year]." | "No flood risk found." |
-
-### 2.3 Never imply parcel-level accuracy
-
-The product works at a dataset resolution that cannot support property-level or address-precise claims.
-
-| Correct | Incorrect |
-|---|---|
-| "This location falls within a modeled exposure zone at the resolution of the active dataset." | "This property is in a flood zone." |
-| "Results reflect dataset resolution and are not suitable for site-specific engineering decisions." | "Your home is at risk." |
-
-### 2.4 Use "exposure" not "flooding"
-
-"Flooding" implies a specific hydrological event. "Exposure" reflects the product's actual claim: that a location intersects a modeled zone derived from sea-level projections and elevation data.
-
-| Correct | Incorrect |
-|---|---|
-| "Modeled coastal exposure detected." | "Modeled flooding detected." |
-| "Coastal sea-level exposure zone." | "Flood zone." |
-
-### 2.5 Never describe a "No Exposure" result as safe
-
-"No modeled exposure" is a specific technical statement about what the model shows. It is not a safety assurance.
-
-| Correct | Incorrect |
-|---|---|
-| "No modeled coastal exposure detected under the selected scenario and horizon." | "This location is not at risk." |
-| "The selected location does not intersect the active exposure layer for this scenario and time horizon." | "You're safe here." |
-
-### 2.6 Distinguish "Data Unavailable" from "No Exposure"
-
-These are different states. "Data Unavailable" means the model could not be evaluated — not that the result is zero.
-
-| Correct | Incorrect |
-|---|---|
-| "Data is not available for this location under the selected scenario and horizon. This does not mean the location is unexposed." | "No data, so no risk." |
-
----
-
-## 2.7 Simplified User-Facing Language (Mock Visual Spec)
-
-The clickable prototype (`docs/product/Mock/pages/`) establishes simplified user-facing language that replaces the formal scientific terminology in the UI. This is an intentional design decision to maximize comprehensibility for non-specialist users (§1 Voice: "Clear", "Direct").
-
-**The production application must use the simplified labels below for all user-facing surfaces.** The formal terminology in sections 3–5 below remains the canonical internal/API vocabulary and the basis for copy review. The `lib/i18n/en.ts` string file maps API result states to simplified display strings.
-
-| Formal (API / Internal) | Simplified (User-Facing) | Mock Reference |
-|---|---|---|
-| Modeled Coastal Exposure Detected | **Risk detected** | `06-exposure.html` |
-| No Modeled Coastal Exposure Detected | **No risk detected** | `07-no-exposure.html` |
-| Data Unavailable | **Data not available** | `08-data-unavailable.html` |
-| Outside MVP Coverage Area | **This location is too far from the coast** | `09-inland.html` |
-| Location Outside Supported Area | **This location is outside Europe** | `10-unsupported.html` |
-| Scenario | **Forecast model** | Sidebar in `06-exposure.html` |
-| Time horizon | **How far into the future?** | Sidebar in `06-exposure.html` |
-| SSP1-1.9 / optimistic scenario | **NASA (optimistic)** | Sidebar in `06-exposure.html` |
-| SSP2-4.5 / moderate scenario | **Copernicus (moderate)** | Sidebar in `06-exposure.html` |
-| SSP5-8.5 / worst-case scenario | **IPCC (worst case)** | Sidebar in `06-exposure.html` |
-
-> **Copy review rule:** When auditing UI strings (S07-02), verify that user-facing surfaces use the simplified labels above, and that internal/API strings use the formal vocabulary. Both forms are correct in their respective contexts.
-
----
-
-## 3. Result State Copy
-
-### 3.1 Modeled Coastal Exposure Detected
-
-> **Mock reference:** `06-exposure.html` — User-facing headline: "Risk detected"
-
-**Headline (internal):** `Modeled Coastal Exposure Detected`
-
-**Summary template:**
-> Based on the **[Scenario]** scenario and the **[Year]** time horizon, the selected location falls within a modeled coastal exposure zone. This result is based on **[Dataset Name]** sea-level projections and **[Elevation Dataset]** elevation data.
+> **Owner:** Artem Sem
 >
-> This result is a model estimate, not a site-specific engineering assessment. See the methodology for assumptions, resolution, and limitations.
+> **Status:** Active
+>
+> **Version:** 1.0
+>
+> **Last updated:** 2026-08-04
 
-**Dos:**
-- State the scenario and horizon explicitly.
-- Name the data source.
-- Link to methodology.
+This document governs user-facing labels, result summaries, map legends,
+loading and offline states, methodology text, and architecture-page claims.
+The canonical domain states and product scope come from
+[ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+and the [PRD](PRD.md).
 
-**Don'ts:**
-- Do not use "will," "certain," or "definite."
-- Do not describe the outcome as "flooding."
-- Do not imply the result is suitable for legal, insurance, or property decisions.
+## 1. Voice
 
----
+- **Clear:** plain language; explain a scientific term when first used.
+- **Honest:** name limitations next to the claim they qualify.
+- **Calm:** neither dramatize exposure nor minimize it.
+- **Direct:** lead with the selected result and its context.
+- **Precise about uncertainty:** distinguish no modeled exposure, nodata,
+  product scope, delivery failure, and unsupported geography.
 
-### 3.2 No Modeled Coastal Exposure Detected
+## 2. Non-negotiable scientific rules
 
-> **Mock reference:** `07-no-exposure.html` — User-facing headline: "No risk detected"
+### Say what the model supports
 
-**Headline (internal):** `No Modeled Coastal Exposure Detected`
-
-**Summary template:**
-> Based on the **[Scenario]** scenario and the **[Year]** time horizon, the selected location does not fall within the active modeled exposure zone. This result reflects the resolution and assumptions of the current methodology and does not constitute a safety determination.
-
-**Dos:**
-- State the scenario and horizon explicitly.
-- Acknowledge what the result does not mean (not a safety guarantee).
-
-**Don'ts:**
-- Do not say "safe," "protected," "no risk," or "nothing to worry about."
-- Do not imply the location is guaranteed to be unaffected by sea-level rise.
-
----
-
-### 3.3 Data Unavailable
-
-> **Mock reference:** `08-data-unavailable.html` — User-facing headline: "Data not available"
-
-**Headline (internal):** `Data Unavailable`
-
-**Summary template:**
-> Data is not available for this location under the **[Scenario]** scenario and **[Year]** time horizon. The system has not substituted another scenario, horizon, or dataset. Try a different scenario or time horizon, or check the methodology for coverage notes.
-
-**Dos:**
-- Confirm that no substitution has occurred.
-- Offer a clear next action.
-
-**Don'ts:**
-- Do not imply the location is unexposed because data is missing.
-- Do not leave the user with no path forward.
-
----
-
-### 3.4 Out of Scope
-
-> **Mock reference:** `09-inland.html` — User-facing headline: "This location is too far from the coast"
-
-**Headline (internal):** `Outside MVP Coverage Area`
-
-**Summary template:**
-> The selected location is within Europe but outside the coastal analysis area covered by this tool. SeaRise Europe currently covers coastal sea-level exposure only. Inland locations are not in scope for MVP. Try a location closer to the coast.
-
-**Dos:**
-- Be specific about what scope means: coastal only.
-- Offer a clear next action (search a different location).
-
-**Don'ts:**
-- Do not say "no risk" or "not affected."
-- Do not leave the user with no way to recover.
-
----
-
-### 3.5 Unsupported Geography
-
-> **Mock reference:** `10-unsupported.html` — User-facing headline: "This location is outside Europe"
-
-**Headline (internal):** `Location Outside Supported Area`
-
-**Summary template:**
-> The selected location is outside the area supported by SeaRise Europe. This tool covers European coastal locations only. Please search a European address or location.
-
-**Dos:**
-- Be direct about the geographic scope constraint.
-- Offer a clear next action.
-
-**Don'ts:**
-- Do not apologize for the limitation.
-- Do not say "we can't help you here" — say what the tool *does* support.
-
----
-
-## 4. Disclaimer Copy
-
-The following disclaimer must appear on every result view. It must not be minimized into a single footer line with no explanation.
-
-**Required disclaimer:**
-> This result is a scenario-based model estimate for informational purposes only. It is not an engineering assessment, structural survey, legal determination, insurance evaluation, mortgage guidance, or financial advice. Do not rely on this result for decisions requiring professional expertise.
-
-This exact text — or a minor editorial revision that preserves all enumerated exclusions — must pass copy review before implementation.
-
-**Mandatory inclusions:**
-- Engineering assessment
-- Legal determination
-- Insurance evaluation
-- Mortgage guidance
-- Financial advice
-
-None of these may be removed or combined into a vague phrase like "professional purposes."
-
----
-
-## 5. Methodology Panel Copy
-
-The methodology panel must include the following elements. Each has specific content requirements.
-
-| Element | Content Requirement |
+| Use | Do not use |
 |---|---|
-| **Methodology version** | The version identifier used in the assessment response. E.g., "Methodology v1.0" |
-| **Sea-level projection source** | Full name of the dataset, version, and licensing entity. E.g., "IPCC AR6 sea-level projections (NASA Sea Level Change Team)" |
-| **Elevation data source** | Full name of the dataset. E.g., "Copernicus DEM (Digital Surface Model, GLO-30)" |
-| **What this methodology does** | 2–4 sentence plain-language explanation of how projection data and elevation data are combined to produce a result |
-| **What this methodology does not account for** | Explicit list: flood defenses, hydrodynamic connectivity, storm surge, land subsidence, local drainage infrastructure |
-| **Dataset resolution note** | The approximate spatial resolution of the active dataset, and what this means for result accuracy at a street or property level |
-| **Interpretation guidance** | "Modeled exposure means…" and "No modeled exposure means…" — each in 1–2 sentences |
+| “The model indicates coastal exposure for this point under SSP2-4.5 in 2050.” | “This place will flood by 2050.” |
+| “No modeled coastal exposure was detected at this point for the selected scenario and year.” | “No risk detected.” |
+| “The marker identifies the assessed point; result precision is limited by the source data.” | “This property is outside the flood zone.” |
 
----
+Use **modeled exposure**, not “flooding,” unless explaining that the product
+does not model a specific flood event. Never call an output a regulatory flood
+zone.
 
-## 6. Empty State Copy
+### Keep scenario and horizon visible
 
-### Landing / Initial State
+Every completed result names:
 
-**Heading:** `Explore coastal sea-level exposure in Europe`
+- the selected place or point;
+- the SSP scenario;
+- the absolute horizon (`2030`, `2050`, or `2100`);
+- the methodology version and data release.
 
-**Body:**
-> Enter a European address, city, or location to see how it appears in scenario-based sea-level projections. Choose a scenario and time horizon to compare different outlooks.
+Do not use relative horizons such as “+50 years.” They become ambiguous and do
+not match the accepted artifact contract.
 
-**Subtext:**
-> Results are model-based estimates, not engineering assessments. See methodology for details.
+### Name scenarios accurately
 
----
-
-### No Geocoding Results
-
-**Heading:** `No locations found`
-
-**Body:**
-> We could not find a match for "[query]". Try a more specific address, a city name, or a well-known landmark.
-
----
-
-## 7. Loading State Copy
-
-| Context | Copy |
-|---|---|
-| Geocoding in progress | `Searching for locations…` |
-| Assessment in progress | `Calculating exposure for [Location]…` |
-
-Loading states must not say "Almost there!" or make predictions about how long the request will take.
-
----
-
-## 8. Error State Copy
-
-| Error Type | Heading | Body |
+| ID | Preferred short label | Supporting description |
 |---|---|---|
-| Recoverable geocoding failure | `Search temporarily unavailable` | `We could not complete your search right now. Please try again.` [Retry button] |
-| Recoverable assessment failure | `Result temporarily unavailable` | `We could not calculate the exposure for this location right now. Please try again.` [Retry button] |
-| Unrecoverable / unexpected | `Something went wrong` | `An unexpected error occurred. Reload the page and try again. If this continues, try a different browser.` |
+| `ssp1-26` | Lower-emissions scenario (SSP1-2.6) | One possible pathway with lower emissions than the other product scenarios |
+| `ssp2-45` | Intermediate-emissions scenario (SSP2-4.5) | The default comparison pathway; not a prediction or “most likely” future |
+| `ssp5-85` | Higher-emissions scenario (SSP5-8.5) | One possible pathway with higher emissions than the other product scenarios |
 
-**Rules for error copy:**
-- Never expose raw error codes or stack traces to the user.
-- Never say "contact support" unless a support channel actually exists.
-- Always provide a next action (retry, reload, try another query).
-- Never blame the user.
+Do not label these “NASA,” “Copernicus,” or “IPCC” forecasts. Those names
+identify organizations or data roles, not three competing scenario models.
+Avoid “optimistic,” “moderate,” and “worst case” unless approved scientific
+review establishes exact meanings.
 
----
+## 3. Five result states
 
-## 9. Prohibited Language
+Internal state IDs must remain stable. User-facing headlines may be localized,
+but must preserve the meaning below.
 
-The following phrases are banned from all product copy. Any instance discovered in a QA review is an automatic finding.
+### `ModeledExposureDetected`
 
-| Prohibited | Reason |
+**Headline:** `Modeled coastal exposure detected`
+
+**Template:**
+
+> Under **[Scenario label]** in **[Year]**, the selected point falls within the
+> modeled coastal exposure area in data release **[Release]**. This is a
+> scenario-based model result at the source dataset's resolution, not a
+> site-specific flood forecast.
+
+Do not shorten the headline to “Risk detected.” The product does not calculate
+overall or probabilistic risk.
+
+### `NoModeledExposureDetected`
+
+**Headline:** `No modeled coastal exposure detected`
+
+**Template:**
+
+> Under **[Scenario label]** in **[Year]**, the selected point does not
+> intersect the active modeled exposure area in data release **[Release]**.
+> This does not mean the place is safe or unaffected by coastal hazards.
+
+Do not use “No risk detected,” a green safety badge, “safe,” or “protected.”
+
+### `DataUnavailable`
+
+**Headline:** `Model data unavailable for this point`
+
+**Template:**
+
+> The active dataset has no usable value for this point under **[Scenario
+> label]** in **[Year]**. No other scenario, year, or dataset was substituted.
+> This is not a no-exposure result.
+
+Nodata is a scientific domain state. A failed network request is described
+separately as a delivery problem.
+
+### `OutOfScope`
+
+**Headline:** `Outside the coastal analysis area`
+
+**Template:**
+
+> This point is inside the supported Europe geometry but outside the versioned
+> coastal analysis area. SeaRise Europe does not assess inland hazards. Search
+> another settlement or choose a point closer to the coast.
+
+Do not imply that “too far from the coast” means no coastal or climate risk.
+
+### `UnsupportedGeography`
+
+**Headline:** `Outside the supported Europe area`
+
+**Template:**
+
+> This point is outside the geography supported by the current SeaRise Europe
+> release. Search a supported European settlement or choose another point.
+
+Do not describe this as an application error.
+
+## 4. Transient and degraded states
+
+Transient states are not additional scientific outcomes.
+
+| Context | Preferred copy |
 |---|---|
-| "will flood" / "will be underwater" | States future certainty the model cannot support |
-| "is safe" / "not at risk" | States a safety guarantee the product cannot provide |
-| "no risk" | Same as above |
-| "100% accurate" | No geospatial model achieves this |
-| "predicts" (in place of "models" or "projects") | Implies precision and specificity the data does not have |
-| "shows" (without "model" or "scenario" qualifier) | Ambiguous — makes it sound like fact, not projection |
-| "flood zone" | Implies regulatory or legal designation |
-| "your home" / "your property" | The product assesses a point, not a legal property |
-| "by [year], this area will..." | Implies certainty; use "under [scenario] by [year], the model shows..." |
+| Search index initialization | `Loading the place index…` |
+| Query processing | `Searching places…` |
+| Local boundary/point lookup | `Checking [Place] against the selected data…` |
+| Search index unavailable | `Place search data could not be loaded. Check your connection and try again.` |
+| Required range not cached while offline | `This result is not available offline yet. Reconnect to load the selected data.` |
+| Artifact request failed online | `The selected data could not be loaded. Try again.` |
+| Basemap unavailable | `The background map is unavailable. Search and assessment can still be used.` |
+| Release/schema invalid | `This data release cannot be used safely. Try again later.` |
 
----
+Never say “the server is calculating,” “geocoding,” or “calling the assessment
+service” in the target product. Search and assessment are local; network waits
+are for immutable data artifacts or optional map context.
 
-## 10. Glossary of Terms in Product Copy
+## 5. Search copy
 
-Use these definitions consistently. If a term appears in the UI, it should match these definitions.
+### Initial state
 
-| Term | Definition for UI Copy |
+**Heading:** `Explore modeled coastal exposure across Europe`
+
+**Body:**
+
+> Search for a European city, town, or village, then compare three emissions
+> scenarios for 2030, 2050, and 2100.
+
+**Support text:**
+
+> Results are scenario-based estimates, not property or engineering
+> assessments.
+
+### Search control
+
+- Label: `Find a city, town, or village`
+- Placeholder: `Try Rotterdam, Porto, or Galway`
+- No matches: `No matching places found. Check the spelling or try a nearby
+  city, town, or village.`
+
+Do not promise street addresses, postcodes, landmarks, or every real-world
+settlement. Results come from a versioned local GeoNames catalog.
+
+Candidate rows show place name, country, and first-level administration.
+
+## 6. Required disclaimer
+
+Show this disclaimer, or an editorial revision preserving every exclusion, on
+every completed assessment:
+
+> This scenario-based model result is for informational and educational use.
+> It is not a site-specific flood forecast, engineering assessment, structural
+> survey, legal determination, insurance evaluation, mortgage guidance, or
+> financial advice. Do not use it as a substitute for appropriate professional
+> or local evidence.
+
+The disclaimer supports, but does not replace, cautious result language.
+
+## 7. Methodology and source content
+
+The methodology surface includes:
+
+| Element | Requirement |
 |---|---|
-| **Scenario** | A pathway describing possible future greenhouse gas emissions and their associated sea-level projections. Different scenarios represent different possible futures, from lower to higher emissions. |
-| **Time horizon** | A future year for which the projection is evaluated (e.g., 2050 means the model projection as of the year 2050). |
-| **Modeled exposure** | The intersection of a location with a sea-level exposure zone derived from projection data and elevation data, under a specific scenario and time horizon. |
-| **Coastal analysis zone** | The geographic area within which this tool evaluates coastal sea-level exposure. Locations outside this zone are shown as Out of Scope. |
-| **Methodology version** | The labeled version of the technical approach used to produce results. Versioning ensures that result comparisons are meaningful and that changes to the methodology are tracked. |
-| **Data Unavailable** | The system could not evaluate exposure for this location/scenario/horizon combination because required data is missing. This is distinct from a result of zero or no exposure. |
+| Release identity | Data release ID, build date, and methodology version |
+| Scenario/horizon | Exact SSP pathway and absolute year |
+| Sea-level source | Dataset name, version/snapshot, role, licence, and required acknowledgement |
+| Elevation source | Copernicus product/version, datum/resolution where validated, derivative attribution |
+| Support/coastal geometry | Source/version and the current coastal-zone rule |
+| Method summary | Plain-language description of preprocessing and exact point lookup |
+| Not modeled | Flood defences, storm surge, local drainage, hydrodynamic connectivity, subsidence, and other omitted effects as applicable |
+| Resolution | What source resolution permits and why a precise marker is not property precision |
+| Integrity | Manifest, STAC catalog, checksums, and signed provenance links |
+
+Before the scientific validation gate passes, explicitly state that checked-in
+data is synthetic or provisional. Do not use a planned source or method in the
+past tense.
+
+## 8. Architecture page claims
+
+Lead with outcomes:
+
+> SeaRise Europe precomputes deterministic geospatial work, publishes
+> verifiable data artifacts, and lets the browser search and assess locally—so
+> the normal user journey has no application backend, database, or tile server.
+
+Then support the statement with measured bundle size, timings, network traces,
+artifact sizes, current cost model, release identity, licences, and provenance.
+
+Use “target,” “planned,” or “migration in progress” until an architecture
+fitness function has passed in production-like conditions. Use “zero or
+near-zero idle cost within current free allowances,” not “free forever.” Use
+“offline-capable after required data is cached,” not “works fully offline.”
+
+## 9. Visual mock status
+
+The HTML mocks in `docs/product/Mock/pages/` are visual direction only. They
+contain legacy geocoder/API states, five relative horizons, provider-named
+scenarios, and unsafe “risk/no risk” result labels. None of those elements is
+approved product copy or behaviour. See
+[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for reconciliation.
+
+## 10. Prohibited language
+
+| Prohibited wording | Why |
+|---|---|
+| `will flood`, `will be underwater` | Claims future certainty |
+| `safe`, `protected`, `no risk`, `risk detected` | Claims a risk or safety determination the product does not make |
+| `flood zone` | Can imply a regulatory or legal designation |
+| `your home`, `your property` | The product evaluates a point at dataset resolution |
+| `100% accurate` | Unsupported precision |
+| `all European settlements` | Overstates a source-defined catalog |
+| `fully offline` | Overstates uncached layer availability |
+| `free forever` | Hosting terms and usage can change |
+| `real data` without release evidence | Hides fixture/provisional status |
+
+## 11. Glossary
+
+| Term | Product definition |
+|---|---|
+| Scenario | One possible emissions pathway used to select a sea-level projection; not a forecast of which future will occur |
+| Horizon | The absolute year (`2030`, `2050`, or `2100`) evaluated for the selected scenario |
+| Modeled exposure | The selected point intersects the classified exposure data for one scenario, horizon, methodology, and release |
+| Coastal analysis area | The versioned product geometry within which exposure assessment is attempted; it is a scope rule, not a flood-reach claim |
+| Support geometry | The versioned boundary defining which European coordinates the product supports |
+| Data release | An immutable, identified set of artifacts, metadata, checksums, and provenance |
+| Available offline | The browser has cached every artifact required for the stated interaction |

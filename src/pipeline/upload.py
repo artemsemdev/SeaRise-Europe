@@ -1,12 +1,14 @@
-"""Step 6: Upload COGs to Azure Blob Storage (S03-06).
+"""Legacy adapter: upload COGs to Azure Blob Storage.
+
+ADR-021 replaces this production destination with immutable release artifacts
+in R2. Retain this adapter only for migration parity.
 
 Blob path convention (architecture doc section 9):
   layers/{methodology_version}/{scenario_id}/{horizon_year}.tif
 
 Container: ``geospatial`` (private).
 
-During local development the target is Azurite (Azure Blob emulator).
-The same path structure is used in production Azure Blob Storage.
+During current local development the target is Azurite (Azure Blob emulator).
 """
 
 import logging

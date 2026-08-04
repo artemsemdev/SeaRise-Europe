@@ -1,15 +1,16 @@
 # =============================================================================
-# SeaRise Europe — Local Development Environment
+# SeaRise Europe — Legacy Local Migration Baseline
 # =============================================================================
-# Epic:   E-02 (Local Development Environment)
-# Story:  S02-01
-# Source: docs/architecture/08-deployment-topology.md section 5.1
+# Status: Current implementation for parity tests; not the accepted production
+#         topology. ADR-021 replaces this stack with a static browser runtime
+#         and offline release pipeline. Remove only after migration gates pass.
+# Source: docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md
 #
 # Usage:
 #   cp .env.local.example .env.local   # first time only
 #   docker compose up --build
 #
-# Services:
+# Legacy services:
 #   frontend  — Next.js 14+         → http://localhost:3000
 #   api       — ASP.NET Core .NET 8 → http://localhost:8080
 #   tiler     — TiTiler / FastAPI   → http://localhost:8000
