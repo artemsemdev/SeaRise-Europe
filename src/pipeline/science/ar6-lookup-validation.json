@@ -60,6 +60,12 @@
       "distanceKm"
     ]
   },
+  "publicationMetadata": {
+    "confidence": "medium",
+    "nativeResolutionDegrees": 1,
+    "methodVersion": "ar6-regional-projection-v1",
+    "sourceRelease": "20210809"
+  },
   "validation": {
     "referenceStrategy": "offline-independent-netcdf4-read-of-sha256-locked-source-members",
     "numericToleranceMetres": 1e-6,

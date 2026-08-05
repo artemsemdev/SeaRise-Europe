@@ -26,6 +26,11 @@ class Ar6GridSlice:
 class Ar6ProjectionInterval:
     """Exact lower, central, and upper AR6 projection grids."""
 
+    scenario: str
+    horizon: int
+    baseline: str
+    source_release: str
+    member_sha256: str
     lower: Ar6GridSlice
     central: Ar6GridSlice
     upper: Ar6GridSlice
@@ -194,6 +199,11 @@ def extract_projection_interval(
         raise ScienceContractError("AR6 member SHA-256 differs from the source lock")
     statistics = projection["mapping"]["intervalStatistics"]
     interval = Ar6ProjectionInterval(
+        scenario=scenario,
+        horizon=year,
+        baseline=projection["mapping"]["baseline"],
+        source_release=projection["version"],
+        member_sha256=member_identity.sha256,
         lower=extract_projection_grid(
             dataset,
             projection,

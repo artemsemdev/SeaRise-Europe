@@ -13,6 +13,7 @@
     "source",
     "lookup",
     "resultContract",
+    "publicationMetadata",
     "validation"
   ],
   "properties": {
@@ -153,6 +154,22 @@
           "minItems": 5,
           "maxItems": 5
         }
+      }
+    },
+    "publicationMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence",
+        "nativeResolutionDegrees",
+        "methodVersion",
+        "sourceRelease"
+      ],
+      "properties": {
+        "confidence": { "const": "medium" },
+        "nativeResolutionDegrees": { "const": 1 },
+        "methodVersion": { "const": "ar6-regional-projection-v1" },
+        "sourceRelease": { "const": "20210809" }
       }
     },
     "validation": {

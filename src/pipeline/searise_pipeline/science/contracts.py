@@ -46,6 +46,7 @@ class ScienceContracts:
     final_gate: Mapping[str, Any]
     uncertainty_budget: Mapping[str, Any] | None = None
     projection_contract: Mapping[str, Any] | None = None
+    lookup_validation: Mapping[str, Any] | None = None
 
 
 def _default_contract_dir() -> Path:
@@ -84,6 +85,7 @@ def load_science_contracts(contract_dir: Path | None = None) -> ScienceContracts
     return ScienceContracts(
         source_semantics=_load_document("source-semantics", root),
         projection_contract=_load_document("ar6-projection-contract", root),
+        lookup_validation=_load_document("ar6-lookup-validation", root),
         geography_rules=_load_document("geography-rules", root),
         vertical_methodology=_load_document("vertical-methodology", root),
         uncertainty_budget=uncertainty_budget,

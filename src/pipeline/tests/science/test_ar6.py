@@ -128,6 +128,13 @@ def test_bilinear_sampling_does_not_bridge_nodata() -> None:
 def test_exact_likely_interval_uses_source_quantiles_without_rounding() -> None:
     interval = _interval(_dataset())
 
+    assert (interval.scenario, interval.horizon, interval.baseline) == (
+        "ssp2-45",
+        2050,
+        "1995-2014 mean",
+    )
+    assert interval.source_release == "20210809"
+    assert interval.member_sha256 == "b" * 64
     np.testing.assert_allclose(interval.lower.values_m[0], [0.5, 1.5, 2.5])
     np.testing.assert_allclose(interval.central.values_m[0], [1.0, 2.0, 3.0])
     np.testing.assert_allclose(interval.upper.values_m[0], [1.5, 2.5, 3.5])
