@@ -3,8 +3,8 @@
 > **Status:** Blocked; not approved for a real-data public release
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
-> **Blocking gate:** Phase 0.5 selected the vertical strategy; inputs, implementation, terrain/connectivity controls, and independent review remain blocking
-> **Latest evidence:** [Phase 0.5 vertical methodology](science/phase-0-5-vertical-methodology-evidence.md) — strategy `accepted`, publication `blocked`
+> **Blocking gate:** Exact inputs are locked; implementation, terrain/connectivity controls, and independent review remain blocking
+> **Latest evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
@@ -51,16 +51,16 @@ scientific values; the browser reads the exact classification artifact.
 | Required layer matrix | 3 scenarios × 3 horizons = 9 layers |
 
 Phase 0.2 fixed the median source variable mapping. ADR-023 adds the exact
-0.17/0.50/0.83 quantiles for interval decisions. Their presence still requires
-direct inspection of the SHA-256-locked regional archive and scientific/data
-review before use.
+0.167/0.500/0.833 source coordinates for interval decisions. Phase 0.6
+confirmed them in each SHA-256-locked regional member; scientific/data review
+of their implemented use remains required.
 
 ## Source candidates
 
 | Role | Candidate source | Required release evidence |
 |---|---|---|
 | Sea-level projection | IPCC AR6 projections distributed by the NASA Sea Level Change Team | Exact record/version, files, variables, units, quantile, location/grid model, licence, acknowledgements, SHA-256 |
-| Baseline water surface | Copernicus Marine `SEALEVEL_EUR_PHY_L4_MY_008_068` `adt`, duration-weighted over 1995–2014 | Exact dataset/version/files, `adt`/`sla`/error variables, complete interval, coverage, licence, attribution, SHA-256 |
+| Baseline water surface | Copernicus Marine `008_068` monthly `sla` plus static European `008_070` `mdt`, calendar-day weighted over 1995–2014 | Exact dataset/version/files, complete interval, `err_mdt` and QUID error evidence, coverage, licence, attribution, SHA-256 |
 | Source geoid | GOCO06S used by European MDT `008_070` | Exact coefficients, zero-tide metadata, reference epoch, normalization, evaluation software, error bound, licence, SHA-256 |
 | Target geoid | NGA EGM2008 / EPSG:3855 | Exact coefficients or grid, tide-free convention, ellipsoid, interpolation, propagated error, terms, SHA-256 |
 | Terrain | Copernicus DEM GLO-30 or GLO-90 | Product edition, resolution choice, horizontal/vertical reference, nodata, licence, modified-product attribution, SHA-256 |
@@ -113,6 +113,19 @@ assumed equivalence. It remains blocked until exact inputs and independent
 controls validate the numerical chain. No independent project reviewer has
 yet approved or rejected it.
 
+## Phase 0.6 input result
+
+[Phase 0.6 evidence](science/phase-0-6-vertical-source-evidence.md) locks the
+full AR6 archive and exact scenario members, all 240 monthly SLA objects, the
+static MDT with `err_mdt`, GOCO06S and EGM2008 coefficients, and five-layer
+GLO-30/GLO-90 terrain controls. The official monthly product is a simple mean
+of daily L4 SLA, so calendar-day weighting plus the static MDT reconstructs the
+selected daily-ADT mean without changing its statistic.
+
+This closes source identity, licensing, and coverage evidence. It does not
+close numerical transformation, uncertainty-bound, DEM selection, or
+independent-review gates.
+
 ## Required preprocessing record
 
 Before approval, the pipeline must record and test:
@@ -122,7 +135,7 @@ Before approval, the pipeline must record and test:
 - exact ADT/MDT, GOCO06S, and EGM2008 reference surfaces and tide conventions;
 - duration-weighted 1995–2014 baseline construction and missing-interval rule;
 - projection units and conversion to terrain-elevation units;
-- 0.17/0.50/0.83 projection quantiles and UI wording;
+- exact 0.167/0.500/0.833 projection coordinates and q17/q50/q83 UI wording;
 - separate baseline, datum/tide, interpolation, DEM, and DSM uncertainty bounds;
 - spatial interpolation used for a continuous projection field;
 - nearest-neighbour handling for binary output;
@@ -135,8 +148,8 @@ Before approval, the pipeline must record and test:
 The former claim that AR6 is a regular approximately 0.25-degree raster is
 rejected. The pinned location list proves a complete one-degree grid stored on
 the same flattened location dimension as tide gauges. The exact transformation
-is enforced in code and tests; direct archive inspection and review remain
-publication gates.
+is enforced in code and tests. Direct archive/member inspection is complete;
+review of the implemented interval transform remains a publication gate.
 
 ## Coastal analysis scope
 
@@ -249,3 +262,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-08-05 | Blocked | Phase 0.2 replaced source heuristics and stopped direct AR6-change versus EGM2008-height publication |
 | `v1.0` | 2026-08-05 | Blocked | Phase 0.3 found no reviewed AR6-baseline-to-EGM2008 reconciliation; no classification release generated |
 | `v1.0` | 2026-08-05 | Selected; publication blocked | ADR-023 selected the 1995–2014 ADT/GOCO06S-to-EGM2008 interval method; exact inputs, validation, controls, and independent review remain open |
+| `v1.0` | 2026-08-05 | Inputs locked; publication blocked | Phase 0.6 pinned the exact AR6, SLA/MDT, GOCO06S, EGM2008, and terrain-control evidence; implementation and review remain open |

@@ -14,12 +14,16 @@ All notable changes to this project will be documented in this file.
   exact COG range measurements, and shared Python/TypeScript lookup vectors.
 - Added the TDD characterization and migration harness for tracking permanent
   tests, shared fixtures, parity evidence, and mutation controls.
+- Added checksum-locked AR6 interval members, a complete 1995–2014 monthly
+  Copernicus Marine SLA/MDT baseline, GOCO06S and EGM2008 models, and compact
+  GLO-30/GLO-90 terrain-control manifests with licence and coverage evidence.
 
 ### Changed
 
 - Selected an uncertainty-aware vertical methodology that constructs a
   1995–2014 mean water surface on EGM2008 and returns ambiguous cells as data
-  unavailable; publication remains blocked pending exact inputs and review.
+  unavailable; exact inputs are now locked, while implementation and
+  independent review remain blocking.
 - Pull requests now route CI and CodeQL by changed component, so
   documentation-only changes resolve lightweight gates without running
   frontend, API, pipeline, Docker, or full-stack tests.

@@ -8,12 +8,14 @@
 > **Phase 0.2 evidence:** [source semantics, datum, DEM, and geometry QA](../science/phase-0-2-source-and-geography-evidence.md)
 >
 > **Phase 0.5 evidence:** [selected vertical methodology](../science/phase-0-5-vertical-methodology-evidence.md)
+>
+> **Phase 0.6 evidence:** [locked vertical inputs](../science/phase-0-6-vertical-source-evidence.md)
 
 ## Current risk register
 
 | ID | Risk | Likelihood / impact | Mitigation and exit evidence |
 |---|---|---|---|
-| R-01 | The exact IPCC AR6 archive member differs from the documented binding schema | Medium / Critical | Heuristics have been removed and the documented `20210809` mapping fails closed. Exit requires SHA-256 locking the regional archive and a direct member inspection report matching the contract. |
+| R-01 | The exact IPCC AR6 archive member differs from the documented binding schema | Low / Critical | The full `20210809` archive and three exact scenario members now have byte, CRC/MD5 where available, SHA-256, and NetCDF inspection evidence. The contract fails closed on any changed identity; independent use review remains required. |
 | R-02 | The binary elevation comparison creates disconnected inland false positives or misrepresents coastal pathways | High / Critical | Publication now fails closed. Compare the tested eight-neighbour ocean-seeded candidate with unfiltered output and independent controls; supersede methodology ADR if invalid. |
 | R-03 | Source or derivative redistribution terms are incomplete | Medium / Critical | Licence review for each source and derivative; manifest attribution; block publication until all rights and required wording are documented. |
 | R-04 | Browser exact lookup disagrees with the build array because of CRS, tile, row/column, resampling, or nodata differences | Medium / Critical | Shared golden fixtures across Python and TypeScript; nearest-neighbour binary lookup; bit-exact parity tests at cell edges and nodata. |
@@ -27,7 +29,7 @@
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
 | R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claim and decommissioning until ADR-021 Phase 0–3 gates pass. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
-| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Certain / Critical | The build refuses this operation. ADR-023 replaces it with a 1995–2014 ADT baseline transformed to EGM2008 and an interval rule; exit still requires pinned inputs, validated implementation, controls, and independent approval. |
+| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Certain / Critical | The build refuses this operation. ADR-023 replaces it with a 1995–2014 baseline transformed to EGM2008 and an interval rule; Phase 0.6 pins all inputs, while validated implementation, controls, and independent approval remain required. |
 | R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | Evaluate both pinned models on the same ellipsoid and tide-free convention, record the full transformation receipt and uncertainty, compare independent controls across European basins, and fail closed on any unsupported cell or missing bound. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
@@ -36,7 +38,9 @@ and R-13. It proves a small real COG and lookup/range mechanics, but closes none
 of those risks: datum compatibility, scientific controls, connectivity,
 canonical coastal scope, PMTiles, public hosting, and human review remain open.
 Phase 0.5 selects the vertical strategy but closes none of these measured or
-human-review risks by documentation alone.
+human-review risks by documentation alone. Phase 0.6 closes the exact-input
+identity gap for R-01 and R-15 but does not lower the transformation or
+publication consequence.
 
 ## Assumptions that require evidence
 
