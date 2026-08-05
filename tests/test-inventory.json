@@ -235,7 +235,7 @@
       "id": "pipeline-science-contracts",
       "layer": "scientific",
       "owner": "science",
-      "purpose": "Enforce exact AR6 semantics, DEM evidence, geography controls, and connectivity rules without heuristic fallback.",
+      "purpose": "Enforce exact AR6, baseline, vertical-reference, uncertainty, DEM, geography, connectivity, and receipt contracts without heuristic fallback.",
       "sourcePaths": ["src/pipeline/tests/science/test_*.py"],
       "changedPaths": ["src/pipeline/science/**", "src/pipeline/searise_pipeline/science/**", "src/pipeline/tests/science/**"],
       "disposition": "keep-permanently",
@@ -434,10 +434,15 @@
     { "path": "src/pipeline/tests/regional_fixture/test_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_lookup.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_baseline.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_connectivity.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_contracts.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_dem.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_geography.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_geoid.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_receipt.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_uncertainty.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_vertical.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical_source_evidence.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -477,6 +482,12 @@
       "owner": "platform",
       "targetIssue": 61,
       "description": "Current CI has fast legacy jobs but no regional/release promotion workflow consuming this classification yet."
+    },
+    {
+      "id": "vertical-reconciliation-publication-evidence",
+      "owner": "science",
+      "targetIssue": 85,
+      "description": "The fail-closed interval implementation is characterized, but EGM2008 evaluation conventions, QUID and terrain bounds, Baltic/Black Sea controls, cross-environment reproducibility, and independent review remain incomplete."
     }
   ]
 }
