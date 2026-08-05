@@ -1,0 +1,127 @@
+{
+  "$schema": "./vertical-methodology.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.5-vertical-methodology",
+  "methodId": "absolute-mean-water-surface-egm2008-interval-v1",
+  "decision": "accepted",
+  "decisionScope": "Selected for checksum locking and validation; not approved for publication",
+  "targetReference": {
+    "surface": "EGM2008 geoid",
+    "verticalCrs": "EPSG:3855",
+    "units": "m",
+    "tideSystem": "tide_free"
+  },
+  "baseline": {
+    "productId": "SEALEVEL_EUR_PHY_L4_MY_008_068",
+    "variable": "adt",
+    "units": "m",
+    "sourceSurface": "GOCO06S geoid",
+    "sourceGeoidModelTideSystem": "zero_tide",
+    "supportingMdtProductId": "SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070",
+    "supportingMdtReferencePeriod": "1993-01-01/2013-01-01",
+    "referencePeriod": {
+      "startInclusive": "1995-01-01",
+      "endExclusive": "2015-01-01",
+      "aggregation": "duration-weighted mean over complete source intervals",
+      "missingIntervals": "nodata"
+    },
+    "geoidTransformation": {
+      "sourceModel": "GOCO06S",
+      "targetModel": "EGM2008",
+      "requiredTideConvention": "tide_free",
+      "rule": "evaluate both geoid undulations on the same ellipsoid and tide convention before differencing"
+    },
+    "equation": "B_EGM2008 = mean_1995_2014(ADT_GOCO06S) + N_GOCO06S_tide_free - N_EGM2008_tide_free"
+  },
+  "projection": {
+    "sourceId": "ipcc-ar6-sea-level",
+    "version": "20210809",
+    "variable": "sea_level_change",
+    "baseline": "1995-2014 mean",
+    "sourceUnits": "mm",
+    "unitToMetres": 0.001,
+    "quantiles": {
+      "lower": 0.17,
+      "central": 0.5,
+      "upper": 0.83
+    },
+    "equation": "W_q = B_EGM2008 + 0.001 * AR6_q"
+  },
+  "terrain": {
+    "required": true,
+    "sourceId": "copernicus-dem",
+    "release": "2021_1",
+    "type": "digital-surface-model",
+    "verticalCrs": "EPSG:3855",
+    "units": "m",
+    "resolutionDecision": "pending-phase-0.8",
+    "representationBias": "required-uncertainty-term"
+  },
+  "interpolation": {
+    "continuousFields": "bilinear inside source support only",
+    "categoricalFields": "nearest-neighbour",
+    "extrapolation": "none",
+    "nodata": "propagate if any required value or interpolation neighbour is unavailable",
+    "analysisGrid": "approved native Copernicus DEM grid"
+  },
+  "uncertainty": {
+    "coverage": "AR6 likely range plus separately bounded non-projection errors",
+    "nonProjectionAggregation": "sum absolute bounds; do not assume independence",
+    "baselineTerms": [
+      "adt-mapping",
+      "mdt-mapping",
+      "geoid-model-difference",
+      "permanent-tide-conversion",
+      "reference-period-aggregation",
+      "horizontal-interpolation"
+    ],
+    "terrainTerms": [
+      "dem-vertical-error",
+      "dsm-representation-bias",
+      "terrain-resampling"
+    ],
+    "lowerClearance": "C_low = (B_EGM2008 - U_B) + 0.001 * AR6_q17 - (Z_DSM_EGM2008 + U_Z)",
+    "upperClearance": "C_high = (B_EGM2008 + U_B) + 0.001 * AR6_q83 - (Z_DSM_EGM2008 - U_Z)",
+    "classification": {
+      "verticalEligible": "C_low >= 0",
+      "exposed": "C_low >= 0 and approved connectivity passes",
+      "notExposed": "C_high < 0 or (C_low >= 0 and approved connectivity rejects)",
+      "ambiguous": "C_low < 0 and C_high >= 0",
+      "ambiguousState": "DataUnavailable",
+      "ambiguousReason": "uncertain-threshold",
+      "missingConnectivityState": "DataUnavailable"
+    },
+    "missingBoundRule": "DataUnavailable"
+  },
+  "physicalScope": {
+    "included": [
+      "long-term baseline mean water surface",
+      "AR6 total relative sea-level change",
+      "EGM2008-referenced DSM elevation"
+    ],
+    "excluded": [
+      "astronomical tides",
+      "storm surge",
+      "waves and wave setup",
+      "river and pluvial flooding",
+      "drainage",
+      "flood defences and adaptation"
+    ],
+    "verticalLandMotion": "use the contribution already present in AR6 total; do not add an unreviewed second correction",
+    "connectivity": "required post-vertical filter pending Phase 0.8 approval"
+  },
+  "review": {
+    "status": "pending",
+    "requiredRole": "independent scientific/data reviewer",
+    "record": "No independent project review has been recorded"
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "blockingDecisions": [
+      "vertical-methodology-review",
+      "pinned-vertical-inputs",
+      "validated-vertical-transform",
+      "terrain-and-connectivity-controls"
+    ]
+  }
+}

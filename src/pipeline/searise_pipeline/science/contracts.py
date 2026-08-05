@@ -21,6 +21,7 @@ class ScienceContracts:
 
     source_semantics: Mapping[str, Any]
     geography_rules: Mapping[str, Any]
+    vertical_methodology: Mapping[str, Any]
 
 
 def _default_contract_dir() -> Path:
@@ -55,6 +56,7 @@ def load_science_contracts(contract_dir: Path | None = None) -> ScienceContracts
     return ScienceContracts(
         source_semantics=_load_document("source-semantics", root),
         geography_rules=_load_document("geography-rules", root),
+        vertical_methodology=_load_document("vertical-methodology", root),
     )
 
 
@@ -91,7 +93,11 @@ def verify_geometry_assets(contracts: ScienceContracts, repo_root: Path) -> None
 def assert_publication_ready(contracts: ScienceContracts) -> None:
     """Fail while any scientific or geography decision remains blocking."""
     blockers: list[str] = []
-    for document in (contracts.source_semantics, contracts.geography_rules):
+    for document in (
+        contracts.source_semantics,
+        contracts.geography_rules,
+        contracts.vertical_methodology,
+    ):
         gate = document["publicationGate"]
         if gate["status"] != "approved":
             blockers.extend(str(item) for item in gate["blockingDecisions"])

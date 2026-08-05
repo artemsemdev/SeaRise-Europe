@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/vertical-methodology-v1.json",
+  "title": "SeaRise Europe vertical methodology contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "contractId",
+    "methodId",
+    "decision",
+    "decisionScope",
+    "targetReference",
+    "baseline",
+    "projection",
+    "terrain",
+    "interpolation",
+    "uncertainty",
+    "physicalScope",
+    "review",
+    "publicationGate"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0.5-vertical-methodology" },
+    "methodId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
+    "decision": { "const": "accepted" },
+    "decisionScope": { "const": "Selected for checksum locking and validation; not approved for publication" },
+    "targetReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "verticalCrs", "units", "tideSystem"],
+      "properties": {
+        "surface": { "const": "EGM2008 geoid" },
+        "verticalCrs": { "const": "EPSG:3855" },
+        "units": { "const": "m" },
+        "tideSystem": { "const": "tide_free" }
+      }
+    },
+    "baseline": { "$ref": "#/$defs/baseline" },
+    "projection": { "$ref": "#/$defs/projection" },
+    "terrain": { "$ref": "#/$defs/terrain" },
+    "interpolation": { "$ref": "#/$defs/interpolation" },
+    "uncertainty": { "$ref": "#/$defs/uncertainty" },
+    "physicalScope": { "$ref": "#/$defs/physicalScope" },
+    "review": { "$ref": "#/$defs/review" },
+    "publicationGate": { "$ref": "#/$defs/gate" }
+  },
+  "$defs": {
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "productId", "variable", "units", "sourceSurface", "sourceGeoidModelTideSystem",
+        "supportingMdtProductId", "supportingMdtReferencePeriod", "referencePeriod",
+        "geoidTransformation", "equation"
+      ],
+      "properties": {
+        "productId": { "const": "SEALEVEL_EUR_PHY_L4_MY_008_068" },
+        "variable": { "const": "adt" },
+        "units": { "const": "m" },
+        "sourceSurface": { "const": "GOCO06S geoid" },
+        "sourceGeoidModelTideSystem": { "const": "zero_tide" },
+        "supportingMdtProductId": { "const": "SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070" },
+        "supportingMdtReferencePeriod": { "const": "1993-01-01/2013-01-01" },
+        "referencePeriod": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startInclusive", "endExclusive", "aggregation", "missingIntervals"],
+          "properties": {
+            "startInclusive": { "const": "1995-01-01" },
+            "endExclusive": { "const": "2015-01-01" },
+            "aggregation": { "const": "duration-weighted mean over complete source intervals" },
+            "missingIntervals": { "const": "nodata" }
+          }
+        },
+        "geoidTransformation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceModel", "targetModel", "requiredTideConvention", "rule"],
+          "properties": {
+            "sourceModel": { "const": "GOCO06S" },
+            "targetModel": { "const": "EGM2008" },
+            "requiredTideConvention": { "const": "tide_free" },
+            "rule": { "const": "evaluate both geoid undulations on the same ellipsoid and tide convention before differencing" }
+          }
+        },
+        "equation": { "const": "B_EGM2008 = mean_1995_2014(ADT_GOCO06S) + N_GOCO06S_tide_free - N_EGM2008_tide_free" }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "version", "variable", "baseline", "sourceUnits", "unitToMetres", "quantiles", "equation"],
+      "properties": {
+        "sourceId": { "const": "ipcc-ar6-sea-level" },
+        "version": { "const": "20210809" },
+        "variable": { "const": "sea_level_change" },
+        "baseline": { "const": "1995-2014 mean" },
+        "sourceUnits": { "const": "mm" },
+        "unitToMetres": { "const": 0.001 },
+        "quantiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "central", "upper"],
+          "properties": {
+            "lower": { "const": 0.17 },
+            "central": { "const": 0.5 },
+            "upper": { "const": 0.83 }
+          }
+        },
+        "equation": { "const": "W_q = B_EGM2008 + 0.001 * AR6_q" }
+      }
+    },
+    "terrain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "sourceId", "release", "type", "verticalCrs", "units", "resolutionDecision", "representationBias"],
+      "properties": {
+        "required": { "const": true },
+        "sourceId": { "const": "copernicus-dem" },
+        "release": { "const": "2021_1" },
+        "type": { "const": "digital-surface-model" },
+        "verticalCrs": { "const": "EPSG:3855" },
+        "units": { "const": "m" },
+        "resolutionDecision": { "const": "pending-phase-0.8" },
+        "representationBias": { "const": "required-uncertainty-term" }
+      }
+    },
+    "interpolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["continuousFields", "categoricalFields", "extrapolation", "nodata", "analysisGrid"],
+      "properties": {
+        "continuousFields": { "const": "bilinear inside source support only" },
+        "categoricalFields": { "const": "nearest-neighbour" },
+        "extrapolation": { "const": "none" },
+        "nodata": { "const": "propagate if any required value or interpolation neighbour is unavailable" },
+        "analysisGrid": { "const": "approved native Copernicus DEM grid" }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage", "nonProjectionAggregation", "baselineTerms", "terrainTerms", "lowerClearance", "upperClearance", "classification", "missingBoundRule"],
+      "properties": {
+        "coverage": { "const": "AR6 likely range plus separately bounded non-projection errors" },
+        "nonProjectionAggregation": { "const": "sum absolute bounds; do not assume independence" },
+        "baselineTerms": { "type": "array", "minItems": 6, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "terrainTerms": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "lowerClearance": { "const": "C_low = (B_EGM2008 - U_B) + 0.001 * AR6_q17 - (Z_DSM_EGM2008 + U_Z)" },
+        "upperClearance": { "const": "C_high = (B_EGM2008 + U_B) + 0.001 * AR6_q83 - (Z_DSM_EGM2008 - U_Z)" },
+        "classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verticalEligible", "exposed", "notExposed", "ambiguous", "ambiguousState", "ambiguousReason", "missingConnectivityState"],
+          "properties": {
+            "verticalEligible": { "const": "C_low >= 0" },
+            "exposed": { "const": "C_low >= 0 and approved connectivity passes" },
+            "notExposed": { "const": "C_high < 0 or (C_low >= 0 and approved connectivity rejects)" },
+            "ambiguous": { "const": "C_low < 0 and C_high >= 0" },
+            "ambiguousState": { "const": "DataUnavailable" },
+            "ambiguousReason": { "const": "uncertain-threshold" },
+            "missingConnectivityState": { "const": "DataUnavailable" }
+          }
+        },
+        "missingBoundRule": { "const": "DataUnavailable" }
+      }
+    },
+    "physicalScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["included", "excluded", "verticalLandMotion", "connectivity"],
+      "properties": {
+        "included": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "excluded": { "type": "array", "minItems": 6, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "verticalLandMotion": { "const": "use the contribution already present in AR6 total; do not add an unreviewed second correction" },
+        "connectivity": { "const": "required post-vertical filter pending Phase 0.8 approval" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRole", "record"],
+      "properties": {
+        "status": { "const": "pending" },
+        "requiredRole": { "const": "independent scientific/data reviewer" },
+        "record": { "const": "No independent project review has been recorded" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockingDecisions"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "blockingDecisions": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "vertical-methodology-review" },
+            { "const": "pinned-vertical-inputs" },
+            { "const": "validated-vertical-transform" },
+            { "const": "terrain-and-connectivity-controls" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    }
+  }
+}
