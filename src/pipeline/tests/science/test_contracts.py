@@ -24,8 +24,14 @@ def test_contracts_validate_and_geometry_bytes_match() -> None:
 
     verify_geometry_assets(contracts, REPO_ROOT)
     assert contracts.source_semantics["verticalCompatibility"]["status"] == "blocked"
-    assert contracts.geography_rules["support"]["status"] == "approximation"
-    assert contracts.geography_rules["coastal"]["status"] == "approximation"
+    assert (
+        contracts.geography_rules["support"]["status"]
+        == "selected-scope-approximation"
+    )
+    assert (
+        contracts.geography_rules["coastal"]["status"]
+        == "selected-scope-approximation"
+    )
     assert contracts.geography_rules["predicate"] == "covers"
     assert contracts.vertical_methodology["decision"] == "accepted"
     assert (
@@ -144,5 +150,5 @@ def test_publication_gate_reports_every_visible_blocker() -> None:
     message = str(exc_info.value)
     assert "vertical-datum-reconciliation" in message
     assert "vertical-methodology-review" in message
-    assert "supported-geography-approval" in message
-    assert "canonical-coastal-source" in message
+    assert "product-owner-geography-approval" in message
+    assert "independent-connectivity-review" in message

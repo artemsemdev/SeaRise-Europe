@@ -1,52 +1,70 @@
 {
   "$schema": "./geography-rules.schema.json",
-  "schemaVersion": 1,
-  "contractId": "phase-0.2-geography-rules",
+  "schemaVersion": 2,
+  "contractId": "phase-0.8-geography-rules",
   "predicate": "covers",
   "support": {
     "id": "europe-support",
-    "version": "natural-earth-5.1.1-approximation-v1",
-    "status": "approximation",
+    "version": "natural-earth-5.1.1-explicit-scope-v2",
+    "status": "selected-scope-approximation",
     "path": "data/geometry/europe.geojson",
-    "sha256": "1d13eea0db9100bc4b8d97ba513ac43def1cba4be4c13c58654f90d0aecefe5e",
+    "sha256": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
     "source": {
       "sourceId": "natural-earth-10m",
       "version": "5.1.1",
       "assetId": "admin-0-countries"
     },
     "recipe": {
-      "filter": "CONTINENT == 'Europe' AND NAME != 'Russia'",
+      "selectionAttribute": "ADM0_A3",
+      "includedAdmin0A3": [
+        "ALB", "ALD", "AND", "AUT", "BEL", "BGR", "BIH", "BLR", "CHE", "CZE",
+        "DEU", "DNK", "ESP", "EST", "FIN", "FRA", "FRO", "GBR", "GGY", "GIB",
+        "GRC", "HRV", "HUN", "IMN", "IRL", "ISL", "ITA", "JEY", "KOS", "LIE",
+        "LTU", "LUX", "LVA", "MCO", "MDA", "MKD", "MLT", "MNE", "NLD", "NOR",
+        "POL", "PRT", "ROU", "SMR", "SRB", "SVK", "SVN", "SWE", "UKR", "VAT"
+      ],
       "selectedFeatureCount": 50,
       "clipBoundsWgs84": [-30, 30, 45, 75],
       "metricCrs": "EPSG:3035",
-      "legacyBufferDegrees": 0.02,
-      "legacySimplifyDegrees": 0.02,
-      "coordinatePrecision": 4
+      "topologyRepair": "make-valid-polygonal-union-set-precision",
+      "precisionMetres": 1,
+      "coastlineToleranceMetres": 1000,
+      "bufferQuadSegments": 8,
+      "simplifyMetres": 500,
+      "coordinatePrecision": 6
     },
     "outcomes": {
       "included": [
-        "Natural Earth countries classified as Europe except Russia",
-        "Iceland and European islands retained by the clip",
-        "Azores retained by the clip"
+        "The 50 explicit Natural Earth ADM0_A3 features in the recipe",
+        "Iceland, Malta, the Azores, Madeira, Faroe Islands, Aland, Channel Islands, and Isle of Man inside the clip"
       ],
       "excluded": [
-        "Russia",
-        "Turkey",
-        "Canary Islands",
+        "Russia, including Kaliningrad and Saint Petersburg",
+        "Turkey, including European Turkey",
+        "Cyprus and trans-Caucasus states",
+        "Canary Islands, Svalbard, and territories outside the clip",
         "French overseas departments and territories outside the clip"
       ]
     },
+    "decision": {
+      "status": "selected-for-external-review",
+      "reason": "An explicit feature allow-list, fixed clip, and declared 1 km coastline tolerance make the MVP product scope reproducible without silently including whole transcontinental states or remote territories.",
+      "evidence": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json"
+    },
     "review": {
-      "status": "pending",
-      "requiredRole": "product owner"
+      "status": "pending-external",
+      "requiredRole": "product owner",
+      "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/84"
     }
   },
   "coastal": {
     "id": "coastal-analysis-zone",
-    "version": "natural-earth-5.1.1-25km-approximation-v1",
-    "status": "approximation",
+    "version": "natural-earth-5.1.1-25km-scope-v2",
+    "status": "selected-scope-approximation",
+    "role": "product-eligibility-only",
+    "hazardExtentClaim": false,
     "path": "data/geometry/coastal_analysis_zone.geojson",
-    "sha256": "a437d66c24e8883c1c759aeecb81812ee32c747807c0ebfafe6053e10c3313d1",
+    "sha256": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
     "source": {
       "sourceId": "natural-earth-10m",
       "version": "5.1.1",
@@ -56,40 +74,64 @@
       "oceanClipBoundsWgs84": [-35, 28, 48, 77],
       "metricCrs": "EPSG:3035",
       "bufferMetres": 25000,
-      "operation": "intersection(buffer(ocean, 25000), europe-support)",
-      "legacySimplifyDegrees": 0.02,
-      "coordinatePrecision": 4
+      "bufferQuadSegments": 8,
+      "operation": "intersection(buffer(ocean,25000m),europe-support)",
+      "topologyRepair": "make-valid-polygonal-union-set-precision",
+      "precisionMetres": 1,
+      "simplifyMetres": 500,
+      "coordinatePrecision": 6,
+      "containmentInsetMetres": 2,
+      "serializationContainmentInsetDegrees": 0.00001,
+      "containmentInvariant": "support.covers(coastal)"
     },
     "canonicalSourceComparison": {
       "sourceId": "copernicus-coastal-zones-2018",
       "version": "V1-2018",
-      "status": "blocked",
-      "reason": "No checksum-locked downloadable asset or completed rights/scientific-role review exists in the source registry; the publisher also labels the product not yet validated."
+      "doi": "10.2909/205e2db2-4e35-4b1b-bf84-271c4a82248c",
+      "licenceStatus": "full-open-free-with-attribution",
+      "validationStatus": "not-yet-validated",
+      "publishedInlandDepthMetres": 10000,
+      "selectionStatus": "rejected-as-hazard-or-connectivity-geometry",
+      "reason": "Copernicus Coastal Zones is a 10 km land-cover/land-use mapping extent derived from EU-Hydro. It is useful comparison evidence but is not a validated flood-reach or ocean-connectivity geometry."
+    },
+    "decision": {
+      "status": "selected-for-external-review",
+      "reason": "The rebuilt 25 km band preserves the existing product eligibility contract and named port/estuary controls while remaining explicitly an approximation with no hazard-extent claim.",
+      "evidence": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json"
     },
     "review": {
-      "status": "pending",
-      "requiredRole": "scientific/data reviewer"
+      "status": "pending-external",
+      "requiredRole": "product owner",
+      "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/84"
     }
   },
   "connectivity": {
-    "id": "ocean-connected-eight-neighbour-v1",
-    "status": "candidate",
+    "id": "ocean-seeded-eight-neighbour-v1",
+    "status": "selected-for-external-review",
+    "methodologyId": "absolute-mean-water-surface-egm2008-interval-v1",
     "neighbourhood": 8,
-    "seedRule": "eligible cells intersecting the pinned ocean geometry at the analysis boundary",
-    "traversalRule": "flood-fill only through edge- or corner-adjacent eligible cells",
-    "nodataRule": "nodata cells are barriers",
-    "publicationRule": "report differences from unfiltered classification; do not select until scientific review",
+    "verticalInput": "confidently-exposed interval cells only; connectivity never changes C_low or C_high",
+    "seedRule": "eligible land cells sharing an edge or corner with a pinned GLO-30 WBM ocean cell",
+    "traversalRule": "breadth-first flood fill through edge- or corner-adjacent eligible land cells",
+    "barrierRule": "not-exposed, uncertain-threshold, nodata, rejected-quality, and explicit barrier cells are not traversable",
+    "nodataRule": "nodata is a barrier and is never bridged",
+    "tileEdgeRule": "stitch the complete analysis mosaic before traversal; tile edges are not seeds and a missing neighbour makes edge connectivity unavailable",
+    "publicationRule": "publish connected land cells only and report pre/post cell counts; this is a screening control, not hydrodynamic modelling",
+    "controls": {
+      "path": "src/pipeline/science/connectivity-controls.json",
+      "sha256": "f77b99e64c61485bbc9c32f079004472756b820349eeaf327632bd437b169cb4"
+    },
     "review": {
-      "status": "pending",
-      "requiredRole": "scientific/data reviewer"
+      "status": "pending-external",
+      "requiredRole": "scientific/data reviewer",
+      "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/84"
     }
   },
   "publicationGate": {
     "status": "blocked",
     "blockingDecisions": [
-      "supported-geography-approval",
-      "canonical-coastal-source",
-      "connectivity-review"
+      "product-owner-geography-approval",
+      "independent-connectivity-review"
     ]
   }
 }

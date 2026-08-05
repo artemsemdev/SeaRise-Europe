@@ -25,7 +25,8 @@ def test_current_contracts_end_in_explicit_blocked_state() -> None:
     assert "vertical-compatibility" in gate.blockers
     assert "projection-archive-sha256" not in gate.blockers
     assert "uncertainty-bound-validation" in gate.blockers
-    assert "canonical-coastal-source" in gate.blockers
+    assert "product-owner-geography-approval" in gate.blockers
+    assert "independent-connectivity-review" in gate.blockers
     assert "vertical-methodology-review" in gate.blockers
     assert gate.missing_evidence
 

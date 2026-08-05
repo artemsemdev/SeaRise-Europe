@@ -30,7 +30,9 @@ def test_checked_in_geometry_passes_all_named_controls() -> None:
 
     assert report["support"]["valid"] is True
     assert report["coastal"]["valid"] is True
-    assert report["controls"]["passed"] == report["controls"]["count"] == 19
+    assert report["controls"]["passed"] == report["controls"]["count"] == 27
+    assert report["topology"]["supportCoversCoastal"] is True
+    assert report["topology"]["coastalOutsideSupportSquareMetres"] == 0
     assert report["topology"]["boundaryControl"]["covers"] is True
     assert report["topology"]["boundaryControl"]["contains"] is False
 
@@ -42,19 +44,24 @@ def test_rebuild_and_serialization_are_deterministic(tmp_path: Path) -> None:
         {
             "CONTINENT": ["Europe", "Asia"],
             "NAME": ["Example", "Other"],
-            "geometry": [box(0, 0, 1, 1), box(2, 2, 3, 3)],
+            "ADM0_A3": ["EXP", "OTH"],
+            "geometry": [box(10, 50, 11, 51), box(12, 52, 13, 53)],
         },
         crs=4326,
     ).to_file(admin_path, driver="GeoJSON")
     gpd.GeoDataFrame(
-        {"geometry": [box(-1, -1, 0.2, 2)]},
+        {"geometry": [box(9, 49, 10.2, 52)]},
         crs=4326,
     ).to_file(ocean_path, driver="GeoJSON")
     rules = deepcopy(load_science_contracts(CONTRACT_DIR).geography_rules)
     rules["support"]["recipe"].update(
-        {"selectedFeatureCount": 1, "clipBoundsWgs84": [-2, -2, 2, 2]}
+        {
+            "includedAdmin0A3": ["EXP"],
+            "selectedFeatureCount": 1,
+            "clipBoundsWgs84": [8, 48, 12, 52],
+        }
     )
-    rules["coastal"]["recipe"]["oceanClipBoundsWgs84"] = [-2, -2, 2, 2]
+    rules["coastal"]["recipe"]["oceanClipBoundsWgs84"] = [8, 48, 12, 52]
 
     first = rebuild_approximation(admin_path, ocean_path, rules)
     second = rebuild_approximation(admin_path, ocean_path, rules)

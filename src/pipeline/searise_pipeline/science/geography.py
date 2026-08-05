@@ -48,6 +48,25 @@ def _precision(geometry: BaseGeometry, decimals: int) -> BaseGeometry:
     )
 
 
+def _metric_geometry(
+    geometry: BaseGeometry,
+    metric_crs: str,
+    precision_metres: float,
+    simplify_metres: float,
+) -> BaseGeometry:
+    """Repair, quantize, and simplify polygonal geometry in a metric CRS."""
+    metric = gpd.GeoSeries([_polygonal(geometry)], crs=4326).to_crs(metric_crs).iloc[0]
+    metric = _polygonal(metric)
+    metric = _polygonal(
+        shapely.set_precision(metric, grid_size=precision_metres, mode="valid_output")
+    )
+    if simplify_metres:
+        metric = _polygonal(metric.simplify(simplify_metres, preserve_topology=True))
+    return _polygonal(
+        shapely.set_precision(metric, grid_size=precision_metres, mode="valid_output")
+    )
+
+
 def rebuild_approximation(
     admin_path: Path,
     ocean_path: Path,
@@ -60,38 +79,123 @@ def rebuild_approximation(
         raise ScienceContractError("Natural Earth admin source is not EPSG:4326")
     if ocean.crs is None or ocean.crs.to_epsg() != 4326:
         raise ScienceContractError("Natural Earth ocean source is not EPSG:4326")
-    if not {"CONTINENT", "NAME"}.issubset(admin.columns):
+    if not {"CONTINENT", "NAME", "ADM0_A3"}.issubset(admin.columns):
         raise ScienceContractError("Natural Earth admin schema is missing required fields")
 
     support_recipe = rules["support"]["recipe"]
-    if support_recipe["filter"] != "CONTINENT == 'Europe' AND NAME != 'Russia'":
-        raise ScienceContractError("Unsupported Europe filter expression")
-    selected = admin[(admin["CONTINENT"] == "Europe") & (admin["NAME"] != "Russia")]
+    if "includedAdmin0A3" in support_recipe:
+        included = set(support_recipe["includedAdmin0A3"])
+        selected = admin[admin["ADM0_A3"].isin(included)]
+        actual = set(str(value) for value in selected["ADM0_A3"])
+        if actual != included:
+            missing = ", ".join(sorted(included - actual))
+            raise ScienceContractError(f"Natural Earth support codes changed: {missing}")
+    else:
+        if support_recipe["filter"] != "CONTINENT == 'Europe' AND NAME != 'Russia'":
+            raise ScienceContractError("Unsupported Europe filter expression")
+        selected = admin[(admin["CONTINENT"] == "Europe") & (admin["NAME"] != "Russia")]
     if len(selected) != support_recipe["selectedFeatureCount"]:
         raise ScienceContractError("Natural Earth Europe feature count changed")
 
     support_clip = box(*support_recipe["clipBoundsWgs84"])
-    support = shapely.union_all(selected.geometry.intersection(support_clip).array)
-    support = support.buffer(support_recipe["legacyBufferDegrees"])
-    support = support.simplify(
-        support_recipe["legacySimplifyDegrees"], preserve_topology=True
+    support_wgs84 = _polygonal(
+        shapely.union_all(selected.geometry.intersection(support_clip).array)
     )
-    support = _precision(support, support_recipe["coordinatePrecision"])
+    metric_crs = support_recipe["metricCrs"]
+    if "precisionMetres" in support_recipe:
+        support_metric = _metric_geometry(
+            support_wgs84,
+            metric_crs,
+            support_recipe["precisionMetres"],
+            0,
+        )
+        support_metric = _polygonal(
+            support_metric.buffer(
+                support_recipe["coastlineToleranceMetres"],
+                quad_segs=support_recipe["bufferQuadSegments"],
+            )
+        )
+        support_metric = _polygonal(
+            shapely.set_precision(
+                support_metric,
+                grid_size=support_recipe["precisionMetres"],
+                mode="valid_output",
+            ).simplify(
+                support_recipe["simplifyMetres"], preserve_topology=True
+            )
+        )
+    else:
+        # Compatibility path for the Phase 0.2 characterization fixture.
+        support = support_wgs84.buffer(support_recipe["legacyBufferDegrees"])
+        support = support.simplify(
+            support_recipe["legacySimplifyDegrees"], preserve_topology=True
+        )
+        support = _precision(support, support_recipe["coordinatePrecision"])
+        support_metric = gpd.GeoSeries([support], crs=4326).to_crs(metric_crs).iloc[0]
 
     coastal_recipe = rules["coastal"]["recipe"]
     ocean_clip = box(*coastal_recipe["oceanClipBoundsWgs84"])
-    clipped_ocean = _polygonal(shapely.union_all(ocean.geometry.array).intersection(ocean_clip))
-    metric_crs = coastal_recipe["metricCrs"]
-    metric_ocean = gpd.GeoSeries([clipped_ocean], crs=4326).to_crs(metric_crs).iloc[0]
-    metric_support = gpd.GeoSeries([support], crs=4326).to_crs(metric_crs).iloc[0]
-    metric_coastal = metric_ocean.buffer(coastal_recipe["bufferMetres"]).intersection(
-        metric_support
+    clipped_ocean = _polygonal(
+        shapely.union_all(ocean.geometry.array).intersection(ocean_clip)
     )
+    if coastal_recipe["metricCrs"] != metric_crs:
+        raise ScienceContractError("Support and coastal metric CRS must match")
+    if "precisionMetres" in coastal_recipe:
+        metric_ocean = _metric_geometry(
+            clipped_ocean,
+            metric_crs,
+            coastal_recipe["precisionMetres"],
+            0,
+        )
+    else:
+        metric_ocean = gpd.GeoSeries([clipped_ocean], crs=4326).to_crs(metric_crs).iloc[0]
+    metric_coastal = metric_ocean.buffer(
+        coastal_recipe["bufferMetres"],
+        quad_segs=coastal_recipe.get("bufferQuadSegments", 8),
+    ).intersection(support_metric)
+    if "precisionMetres" in coastal_recipe:
+        metric_coastal = _polygonal(
+            shapely.set_precision(
+                metric_coastal,
+                grid_size=coastal_recipe["precisionMetres"],
+                mode="valid_output",
+            )
+        )
+        metric_coastal = metric_coastal.simplify(
+            coastal_recipe["simplifyMetres"], preserve_topology=True
+        ).intersection(
+            support_metric.buffer(-coastal_recipe["containmentInsetMetres"])
+        )
+        metric_coastal = _polygonal(
+            shapely.set_precision(
+                metric_coastal,
+                grid_size=coastal_recipe["precisionMetres"],
+                mode="valid_output",
+            )
+        )
     coastal = gpd.GeoSeries([metric_coastal], crs=metric_crs).to_crs(4326).iloc[0]
-    coastal = coastal.simplify(
-        coastal_recipe["legacySimplifyDegrees"], preserve_topology=True
-    )
-    coastal = _precision(coastal, coastal_recipe["coordinatePrecision"])
+    if "precisionMetres" in coastal_recipe:
+        support = gpd.GeoSeries([support_metric], crs=metric_crs).to_crs(4326).iloc[0]
+        support = _precision(support, support_recipe["coordinatePrecision"])
+        coastal = _precision(coastal, coastal_recipe["coordinatePrecision"])
+        # Rounding each geometry independently can reintroduce zero-width
+        # topology artifacts. Apply the declared serialization inset before
+        # the final intersection so the persisted geometry is exactly covered.
+        coastal = shapely.normalize(
+            shapely.make_valid(
+                coastal.buffer(
+                    -coastal_recipe["serializationContainmentInsetDegrees"],
+                    quad_segs=1,
+                ).intersection(support)
+            )
+        )
+        if not isinstance(coastal, (Polygon, MultiPolygon)):
+            raise ScienceContractError("Final coastal geometry is not polygonal")
+    else:
+        coastal = coastal.simplify(
+            coastal_recipe["legacySimplifyDegrees"], preserve_topology=True
+        )
+        coastal = _precision(coastal, coastal_recipe["coordinatePrecision"])
     return CandidateGeometries(support, coastal, len(selected))
 
 
@@ -167,6 +271,12 @@ def inspect_geometry_assets(
     boundary_point = geometries["support"].boundary.representative_point()
     report["topology"] = {
         "supportCoversCoastal": geometries["support"].covers(geometries["coastal"]),
+        "coastalOutsideSupportSquareMetres": gpd.GeoSeries(
+            [geometries["coastal"].difference(geometries["support"])], crs=4326
+        )
+        .to_crs(rules["support"]["recipe"]["metricCrs"])
+        .iloc[0]
+        .area,
         "boundaryControl": {
             "longitude": boundary_point.x,
             "latitude": boundary_point.y,
