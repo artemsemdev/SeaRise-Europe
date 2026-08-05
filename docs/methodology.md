@@ -47,9 +47,16 @@ locations covered by the versioned coastal scope in all three members found no
 real in-scope nodata location, so the required nodata path remains a declared
 synthetic mutation control rather than a manufactured real-source golden.
 
-A live web UI is not a required oracle. Automated evidence has passed without
-authorizing publication; #110 and an explicit project-owner release decision
-remain required.
+The NASA/Rutgers IPCC AR6 Sea Level Projection Tool is a supplementary manual
+cross-check only, not the CI oracle. Automated source/implementation parity for
+#135 has passed without authorizing publication; #110 and an explicit
+project-owner release decision remain required.
+
+The hash-bound `ar6-projection-contract.json` is the accepted pre-run decision
+snapshot. Its `publicationGate` therefore still records `automatedValidation`
+as `pending` and lists #135 with #110; those fields are not the final release
+gate or the current #135 evidence status. Issue #110 owns the measured final
+gate and records the separate owner-controlled release disposition.
 
 The remainder of this document preserves the v1 binary investigation and why
 it was not publishable. It is historical evidence, not an alternative active
