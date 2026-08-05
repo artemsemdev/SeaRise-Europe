@@ -36,6 +36,13 @@ from .geoid import (
     evaluate_geoid_correction,
     reconcile_baseline_to_egm2008,
 )
+from .receipt import (
+    assert_vertical_receipt_publishable,
+    canonical_vertical_receipt_bytes,
+    load_vertical_receipt,
+    validate_vertical_receipt,
+    vertical_receipt_sha256,
+)
 from .uncertainty import (
     UncertaintyAggregate,
     UncertaintyTerm,
@@ -86,6 +93,11 @@ __all__ = [
     "projection_member_identity",
     "reconstruct_baseline_surface",
     "reconcile_baseline_to_egm2008",
+    "assert_vertical_receipt_publishable",
+    "canonical_vertical_receipt_bytes",
+    "load_vertical_receipt",
+    "validate_vertical_receipt",
+    "vertical_receipt_sha256",
     "reconcile_vertical_interval",
     "rebuild_approximation",
     "verify_geometry_assets",

@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/vertical-transformation-receipt.schema.json",
+  "title": "Vertical transformation evidence receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "receiptId",
+    "issue",
+    "recordedAt",
+    "status",
+    "methodologyId",
+    "inputContracts",
+    "sourceInputs",
+    "transform",
+    "uncertainty",
+    "outputs",
+    "validation",
+    "blockers"
+  ],
+  "properties": {
+    "$schema": { "const": "../vertical-transformation-receipt.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "receiptId": { "type": "string", "minLength": 1 },
+    "issue": { "const": 83 },
+    "recordedAt": { "type": "string", "format": "date" },
+    "status": {
+      "enum": ["publishable", "implementation-complete-publication-blocked", "failed"]
+    },
+    "methodologyId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
+    "inputContracts": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/hashedPath" }
+    },
+    "sourceInputs": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceId", "version", "assetId", "sha256", "verification"],
+        "properties": {
+          "sourceId": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "assetId": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "memberSha256": { "$ref": "#/$defs/sha256" },
+          "verification": { "const": "locked-and-verified" }
+        }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baselineEquation",
+        "geoidEquation",
+        "waterEquations",
+        "clearanceEquations",
+        "projectionQuantiles",
+        "nodataClass",
+        "reasonCodeContract"
+      ],
+      "properties": {
+        "baselineEquation": { "type": "string", "minLength": 1 },
+        "geoidEquation": { "type": "string", "minLength": 1 },
+        "waterEquations": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "clearanceEquations": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "projectionQuantiles": {
+          "type": "array",
+          "prefixItems": [{ "const": 0.167 }, { "const": 0.5 }, { "const": 0.833 }],
+          "items": false
+        },
+        "nodataClass": { "const": 255 },
+        "reasonCodeContract": { "type": "string", "minLength": 1 }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aggregation",
+        "baselineTerms",
+        "terrainTerms",
+        "numericBoundsStatus",
+        "maximumTotalUncertaintyMetres"
+      ],
+      "properties": {
+        "aggregation": { "const": "sum-absolute-bounds" },
+        "baselineTerms": { "$ref": "#/$defs/termIds" },
+        "terrainTerms": { "$ref": "#/$defs/termIds" },
+        "numericBoundsStatus": { "enum": ["complete", "blocked"] },
+        "maximumTotalUncertaintyMetres": {
+          "type": ["number", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "artifacts"],
+      "properties": {
+        "status": { "enum": ["generated", "not-generated"] },
+        "artifacts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/hashedPath" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "generated" } } },
+          "then": { "properties": { "artifacts": { "minItems": 1 } } },
+          "else": { "properties": { "artifacts": { "maxItems": 0 } } }
+        }
+      ]
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["automatedTests", "independentReview", "crossEnvironment", "basinControls"],
+      "properties": {
+        "automatedTests": { "$ref": "#/$defs/checkStatus" },
+        "independentReview": { "$ref": "#/$defs/checkStatus" },
+        "crossEnvironment": { "$ref": "#/$defs/checkStatus" },
+        "basinControls": { "$ref": "#/$defs/checkStatus" }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner", "requiredEvidence"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string", "minLength": 1 },
+          "requiredEvidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "publishable" } } },
+      "then": {
+        "properties": {
+          "blockers": { "maxItems": 0 },
+          "outputs": { "properties": { "status": { "const": "generated" } } },
+          "uncertainty": {
+            "properties": {
+              "numericBoundsStatus": { "const": "complete" },
+              "maximumTotalUncertaintyMetres": { "type": "number" }
+            }
+          },
+          "validation": {
+            "properties": {
+              "automatedTests": { "const": "passed" },
+              "independentReview": { "const": "passed" },
+              "crossEnvironment": { "const": "passed" },
+              "basinControls": { "const": "passed" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "hashedPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "termIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "checkStatus": { "enum": ["passed", "pending", "failed", "not-applicable"] }
+  }
+}
