@@ -18,6 +18,7 @@ class Ar6GridSlice:
 
     latitudes: NDArray[np.float64]
     longitudes: NDArray[np.float64]
+    location_ids: NDArray[np.int64]
     values_m: NDArray[np.float64]
 
 
@@ -161,9 +162,18 @@ def extract_projection_grid(
 
     lat_index = np.searchsorted(latitudes, source_lats)
     lon_index = np.searchsorted(longitudes, source_lons)
+    location_grid = np.full((latitudes.size, longitudes.size), -1, dtype=np.int64)
     grid = np.full((latitudes.size, longitudes.size), np.nan, dtype=np.float64)
+    location_grid[lat_index, lon_index] = np.asarray(location_ids[selected], dtype=np.int64)
     grid[lat_index, lon_index] = values
-    return Ar6GridSlice(latitudes=latitudes, longitudes=longitudes, values_m=grid)
+    if np.any(location_grid < 0):
+        raise ScienceContractError("AR6 native grid is missing source location identities")
+    return Ar6GridSlice(
+        latitudes=latitudes,
+        longitudes=longitudes,
+        location_ids=location_grid,
+        values_m=grid,
+    )
 
 
 def extract_projection_interval(
@@ -210,6 +220,7 @@ def extract_projection_interval(
         if not (
             np.array_equal(candidate.latitudes, interval.lower.latitudes)
             and np.array_equal(candidate.longitudes, interval.lower.longitudes)
+            and np.array_equal(candidate.location_ids, interval.lower.location_ids)
         ):
             raise ScienceContractError("AR6 interval grids do not share coordinates")
     complete = (

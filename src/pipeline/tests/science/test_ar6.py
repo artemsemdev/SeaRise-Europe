@@ -95,6 +95,10 @@ def test_exact_mapping_reconstructs_complete_grid_in_metres() -> None:
 
     np.testing.assert_array_equal(grid.latitudes, [0, 1])
     np.testing.assert_array_equal(grid.longitudes, [-1, 0, 1])
+    np.testing.assert_array_equal(
+        grid.location_ids,
+        [[1000000000, 1000000010, 1000000020], [1000010000, 1000010010, 1000010020]],
+    )
     np.testing.assert_allclose(grid.values_m, [[1, 2, 3], [4, 5, 6]])
 
 
