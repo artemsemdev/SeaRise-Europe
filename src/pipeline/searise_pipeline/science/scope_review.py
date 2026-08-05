@@ -204,6 +204,16 @@ def validate_scope_connectivity_review(
     )
     if bool(review["approvalReady"]) != approval_complete:
         raise ScienceContractError("Phase 0.13 approvalReady differs from review evidence")
+    if disposition == "approved" and not approval_complete:
+        raise ScienceContractError("Phase 0.13 approved disposition lacks approval evidence")
+    if disposition == "rejected" and not any(
+        record["decision"] == "rejected" for record in reviewer_records
+    ):
+        raise ScienceContractError("Phase 0.13 rejected disposition lacks a rejection")
+    if disposition == "blocked" and not any(
+        record["decision"] == "blocked" for record in reviewer_records
+    ):
+        raise ScienceContractError("Phase 0.13 blocked disposition lacks a blocked review")
     if decided:
         expected_decision_binding = decision_binding_sha256(
             str(disposition), document["evidenceBundleSha256"], review["reviewedCommit"]
@@ -264,6 +274,19 @@ def verify_independent_review_proofs(
             raise ScienceContractError(
                 f"Independent {key} reviewer signature is invalid"
             ) from exc
+
+
+def assert_scope_connectivity_approved(
+    document: Mapping[str, Any], repo_root: Path
+) -> None:
+    """Require a complete, byte-bound, independently signed approval."""
+    validate_scope_connectivity_review(document)
+    if document["review"]["disposition"] != "approved" or not document["review"][
+        "approvalReady"
+    ]:
+        raise ScienceContractError("Phase 0.13 scope/connectivity review is not approved")
+    verify_evidence_bindings(document, repo_root)
+    verify_independent_review_proofs(document, repo_root)
 
 
 def load_scope_connectivity_review(path: Path) -> Mapping[str, Any]:

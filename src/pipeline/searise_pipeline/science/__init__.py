@@ -54,6 +54,7 @@ from .receipt import (
     vertical_receipt_sha256,
 )
 from .scope_review import (
+    assert_scope_connectivity_approved,
     build_pending_scope_connectivity_review,
     canonical_json_bytes,
     decision_binding_sha256,
@@ -99,6 +100,7 @@ __all__ = [
     "VerticalResult",
     "MonthlySlaField",
     "assert_publication_ready",
+    "assert_scope_connectivity_approved",
     "aggregate_absolute_bounds",
     "bilinear_sample",
     "build_geoid_requests",
