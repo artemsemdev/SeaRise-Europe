@@ -10,7 +10,7 @@
 >
 > **Required reviewer:** Independent scientific/data reviewer (`pending`)
 >
-> **Evidence:** [Phase 0.5 vertical methodology evidence](../../science/phase-0-5-vertical-methodology-evidence.md)
+> **Evidence:** [Phase 0.5 methodology decision](../../science/phase-0-5-vertical-methodology-evidence.md), [Phase 0.7 implementation evidence](../../science/phase-0-7-vertical-reconciliation-evidence.md)
 
 ## Decision
 
@@ -26,8 +26,8 @@ unsupported cells return `DataUnavailable`; they cannot become binary `0` or
 
 This decision supersedes the direct comparison in ADR-015 and the affected
 candidate-method language in ADR-021/ADR-022. It does not approve a source
-snapshot, numeric transform, DEM resolution, coastal scope, connectivity
-algorithm, classified layer, release, or Phase 1.
+snapshot, executed numeric transform, DEM resolution, coastal scope,
+connectivity algorithm, classified layer, release, or Phase 1.
 
 ## Binding model
 
@@ -93,6 +93,14 @@ Costs and limitations:
 - Exact coastal coverage may block this strategy and trigger the documented
   MSS or published-hazard fallback.
 
+Phase 0.7 implements the exact AR6 interval, complete baseline aggregation,
+geoid adapter boundary, explicit absolute-bound aggregation, interval
+classifier, and deterministic transformation receipt. The adapter will not
+call an external harmonic engine unless both models' evaluation constants and
+one common engine/ellipsoid/tide policy are locked. The checked-in receipt is
+therefore evidence of a blocked implementation, not evidence of a numerical
+GOCO06S-to-EGM2008 result.
+
 ## Gate and review
 
 The strategy decision is accepted, but no independent scientific/data reviewer
@@ -100,9 +108,13 @@ has reviewed this project's cross-product equation. The machine gate remains
 `blocked` on:
 
 - `vertical-methodology-review`;
-- `pinned-vertical-inputs`;
 - `validated-vertical-transform`;
 - `terrain-and-connectivity-controls`.
+
+`validated-vertical-transform` specifically includes the pending EGM2008
+constants and engine policy, numeric QUID/terrain bounds, Baltic and Black Sea
+controls, cross-environment reproducibility, and independent scientific/data
+review.
 
 Phase 1 remains blocked. CI success, source download, or code completion cannot
 substitute for the named review and validation evidence.
