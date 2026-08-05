@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import searise_pipeline.release.pmtiles as pmtiles_module
 from searise_pipeline.release import (
     load_source_fixture,
     validate_vector_toolchain,
@@ -40,6 +41,34 @@ def test_vector_toolchain_fails_closed_when_binary_is_absent(tmp_path: Path) -> 
             pmtiles_distribution_asset_path=missing,
             pmtiles_distribution_platform="darwin-arm64",
             contract=contract(),
+        )
+
+
+def test_decoder_rejects_an_unexpected_mvt_layer_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decoded = {
+        "features": [
+            {
+                "features": [
+                    {
+                        "properties": {"layer": "not-projection"},
+                        "features": [
+                            {"id": 1, "properties": {"source_location_id": 1}}
+                        ],
+                    }
+                ]
+            }
+        ]
+    }
+    monkeypatch.setattr(pmtiles_module, "_run", lambda _command: json.dumps(decoded))
+
+    with pytest.raises(ScienceContractError, match="layer ID differs"):
+        pmtiles_module._decode_properties(
+            tmp_path / "decode",
+            tmp_path / "archive.pmtiles",
+            6,
+            "projection",
         )
 
 
