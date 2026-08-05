@@ -1,8 +1,10 @@
 # ADR-023 — Vertical-reference methodology
 
-> **Status:** Accepted for acquisition and validation; publication blocked
+> **Status:** Superseded as a publication path; historical validation decision retained
 >
-> **Decision result:** `accepted`
+> **Historical decision result:** `accepted` for acquisition and validation
+>
+> **Current result:** Phase 0 `complete-with-no-go`; automated publication recommendation `rejected`; authoritative scientific disposition `blocked`
 >
 > **Decision date:** 2026-08-05
 >
@@ -10,11 +12,27 @@
 >
 > **Required reviewer:** Independent scientific/data reviewer (`pending`)
 >
-> **Evidence:** [Phase 0.5 methodology decision](../../science/phase-0-5-vertical-methodology-evidence.md), [Phase 0.7 implementation evidence](../../science/phase-0-7-vertical-reconciliation-evidence.md), [Phase 0.9 final gate](../../evidence/phase-0-9-regional-gate.md)
+> **Evidence:** [Phase 0.5 methodology decision](../../science/phase-0-5-vertical-methodology-evidence.md), [Phase 0.7 implementation evidence](../../science/phase-0-7-vertical-reconciliation-evidence.md), [Phase 0.9 historical gate](../../evidence/phase-0-9-regional-gate.md), [Phase 0.14 final no-go](../../evidence/phase-0-14-final-no-go.md)
+
+## Current disposition
+
+Phase 0.14 completed the investigation without a publishable scientific
+result. Issue #95 found that the pinned evidence cannot provide finite bounds
+for coastal SLA representativeness or GLO-30 DSM-to-bare-earth error. Its
+automated recommendation is therefore `rejected`. Because independent review
+is still pending, the authoritative scientific and release disposition remains
+`blocked`; automation cannot turn that state into a human rejection.
+
+This ADR remains the immutable explanation of the v1 acquisition and
+validation path. It is superseded for publication by the Phase 0.14 recovery
+decision, which starts at
+[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106). No replacement
+method is accepted yet, and Phase 1 remains locked.
 
 ## Decision
 
-Adopt `absolute-mean-water-surface-egm2008-interval-v1` as the only vertical
+The historical decision adopted
+`absolute-mean-water-surface-egm2008-interval-v1` as the only vertical
 methodology allowed to proceed to source acquisition and validation.
 
 Construct a duration-weighted 1995–2014 baseline by deriving absolute dynamic
@@ -55,9 +73,9 @@ The complete variable meanings, interpolation, reference periods, physical
 scope, and uncertainty components are binding in
 [`vertical-methodology.json`](../../../src/pipeline/science/vertical-methodology.json).
 
-## Rationale
+## Historical rationale
 
-The selected family is the only inspected option that:
+At the time of selection, this family was the only inspected option that:
 
 - preserves the required AR6 scenarios and horizons;
 - supplies an observed absolute baseline with an exact route to the AR6
@@ -96,6 +114,16 @@ Costs and limitations:
 - Exact coastal coverage may block this strategy and trigger the documented
   MSS or published-hazard fallback.
 
+Terminal consequence:
+
+- The locked evidence confirmed that mandatory coastal water and bare-earth
+  terrain terms are unbounded for the binary product. The method may remain in
+  tests and evidence for reproducibility, but it cannot produce a release.
+- No threshold, all-nodata layer, synthetic substitute, or successful CI run
+  may convert the no-go into a scientific class.
+- Future publication requires the new contract and evidence chain
+  #106 → (#107, #108) → #109 → #110.
+
 Phase 0.7 implements the exact AR6 interval, complete baseline aggregation,
 geoid adapter boundary, explicit absolute-bound aggregation, interval
 classifier, and deterministic transformation receipt. The adapter will not
@@ -106,9 +134,13 @@ GOCO06S-to-EGM2008 result.
 
 ## Gate and review
 
-The strategy decision is accepted, but no independent scientific/data reviewer
-has reviewed this project's cross-product equation. The machine gate remains
-`blocked` on:
+The historical acquisition/validation decision was accepted, but no independent
+scientific/data reviewer has reviewed this project's cross-product equation.
+The final v1 machine gate is terminal `complete-with-no-go`; its authoritative
+scientific and release disposition remains `blocked` on independent review and
+finite source-backed uncertainty evidence.
+
+The original gate was blocked on:
 
 - `vertical-methodology-review`;
 - `validated-vertical-transform`;
@@ -119,17 +151,31 @@ constants and engine policy, numeric QUID/terrain bounds, Baltic and Black Sea
 controls, cross-environment reproducibility, and independent scientific/data
 review.
 
-Phase 1 remains blocked. CI success, source download, or code completion cannot
+Phase 1 remains locked. CI success, source download, or code completion cannot
 substitute for the named review and validation evidence.
 
 ## Rollback and replacement
 
-If source inspection shows that ADT is not tied to the documented GOCO06S
-reference, the tide conversion is not reproducible, coastal coverage is
-insufficient, uncertainty prevents useful classifications, or independent
-controls fail, stop the build. Write a superseding ADR selecting the direct-MSS
-fallback or a contract-changing validated hazard product. Do not return to the
-legacy direct comparison.
+The stop condition has fired: uncertainty prevents defensible binary
+classification with the pinned coastal SLA and GLO-30 DSM evidence. Keep the
+build stopped and do not return to the legacy direct comparison.
+
+Recovery follows this dependency order:
+
+1. [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) selects a
+   post-no-go scientific product contract and produces the superseding ADR.
+2. [#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107) validates a
+   datum-safe coastal mean-water reference while
+   [#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108) validates
+   bare-earth coastal terrain.
+3. [#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) implements
+   and independently reviews methodology v2 from approved inputs.
+4. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) rebuilds
+   the regional proof and records the recovery gate.
+
+Only an independently reviewed `approved` #110 with zero blockers may unlock
+[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48). A `blocked` or
+`rejected` outcome remains a valid no-go and authorizes no release.
 
 ## Subsequent Phase 0.8 evidence
 
@@ -147,12 +193,15 @@ Phase 0.9 attempted all nine scenario/horizon combinations with exact lineage
 and returned `BLOCKED` before array creation. It produced no scientific classes
 or release artifacts. The final gate additionally names missing reviewed golden
 vectors and product, connectivity, cross-environment, Baltic, and Black Sea
-evidence. ADR-023 remains the selected candidate methodology, but Phase 1 is
-not authorized. Resolve
-[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94),
-[#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95),
-[#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96), and
-[#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) in order. The
-corrected Phase 0.9 evidence is immutable; only
-[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
-the final gate and possibly unlock Phase 1 after all blockers and reviews pass.
+evidence. ADR-023 remained the selected candidate methodology at that
+historical boundary, but Phase 1 was not authorized. The corrected Phase 0.9
+evidence remains immutable.
+
+## Phase 0.14 final disposition
+
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) completed the v1
+investigation as `complete-with-no-go`. The automated recommendation is
+`rejected`, while the authoritative disposition remains `blocked` pending
+independent review. No scientific arrays or release artifacts were generated.
+ADR-023 is therefore superseded for publication, not retroactively erased or
+relabelled as an independently reviewed rejection.

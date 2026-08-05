@@ -4,7 +4,7 @@
 > **Decision date:** 2026-08-04
 > **Decision owner:** Project owner
 > **Scope:** Production architecture, data distribution, search, hosting, delivery pipeline, and portfolio presentation
-> **Implementation state:** Accepted target architecture; migration is incremental and must pass the gates in this ADR
+> **Implementation state:** Accepted target architecture; Phase 0 investigation complete with no-go, Phase 1 locked pending an approved recovery gate
 
 ## 1. Decision
 
@@ -586,6 +586,17 @@ If the spike disproves the current binary methodology, update the methodology
 and create a superseding ADR before producing Europe-wide data. Architecture
 simplicity is not permission to weaken scientific correctness.
 
+The stop condition has fired. Phase 0.14 records the investigation as
+`complete-with-no-go`: #95 automatically recommends rejecting v1 because its
+mandatory coastal water and bare-earth terrain uncertainty terms cannot be
+finitely bounded from the locked evidence. Independent review is pending, so
+the authoritative scientific and release disposition remains `blocked`. No
+scientific arrays or release artifacts were generated.
+
+Recovery is #106 → (#107, #108) → #109 → #110. Only an independently reviewed
+`approved` #110 with zero blockers may unlock #48 and Phase 1. CI, a synthetic
+fixture, or an all-nodata artifact cannot satisfy this gate.
+
 ## 15. Performance budgets and architecture fitness functions
 
 The following are executable release gates, measured in a production-like
@@ -684,17 +695,22 @@ path is proven.
 - Measure COG and PMTiles sizes, R2 requests, and browser memory.
 - Validate exact client-side lookup against the pipeline array.
 
-**Current disposition (2026-08-05): `BLOCKED`.** The
-[Phase 0.9 gate](../../evidence/phase-0-9-regional-gate.md) attempted all nine
-scenario/horizon combinations with exact lineage but stopped before arrays.
-No scientific artifacts or performance/parity claims were produced. Phase 1
-is locked. Resolve [#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94)
-through [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) in the
-documented order; only
-[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
-the final gate and possibly unlock Phase 1 with zero blockers and completed
-independent reviews. The corrected Phase 0.9 evidence remains immutable, and
-CI success cannot unlock it.
+**Current project disposition (2026-08-05): `COMPLETE-WITH-NO-GO`.** The
+[Phase 0.14 gate](../../evidence/phase-0-14-final-no-go.md) preserves the
+earlier [Phase 0.9 `BLOCKED` evidence](../../evidence/phase-0-9-regional-gate.md)
+and stops all nine combinations before arrays. The automated v1 recommendation
+is `REJECTED`; the authoritative scientific and release disposition is
+`BLOCKED` because independent review is pending. No scientific artifacts or
+performance/parity claims were produced, and Phase 1 remains locked.
+
+The recovery dependency order is
+[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) →
+([#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107),
+[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108)) →
+[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) →
+[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Only an
+independently reviewed `approved` #110 with zero blockers may unlock
+[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48) and Phase 1.
 
 ### Phase 1 — define public artifacts
 
