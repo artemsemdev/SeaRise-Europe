@@ -120,9 +120,10 @@ def evaluate_methodology_gate(contracts: ScienceContracts) -> MethodologyGate:
 
 def assert_scientific_release_allowed(gate: MethodologyGate) -> None:
     """Guard every classification, package, publication, and Phase 1 entrypoint."""
-    if gate.state != "approved":
+    if gate.state != "approved" or not gate.unlocks_phase_1:
+        reason = ", ".join(gate.blockers) or "explicit Phase 0.9 approval is absent"
         raise MethodologyGateBlocked(
-            f"Methodology gate is {gate.state}: {', '.join(gate.blockers)}"
+            f"Methodology gate is {gate.state}: {reason}"
         )
 
 
