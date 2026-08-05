@@ -37,6 +37,7 @@ packages = [
     "searise_pipeline",
     "searise_pipeline.domain",
     "searise_pipeline.regional_fixture",
+    "searise_pipeline.release",
     "searise_pipeline.science",
     "searise_pipeline.sources",
 ]
