@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
   receipts.
 - Added an explicit Phase 0.9 gate and reproducible nine-combination preflight
   record that cannot treat CI success as scientific approval.
+- Added a machine-readable 90% coastal uncertainty budget with source hashes,
+  eligibility masks, sensitivity controls, and mutation-resistant fail-closed
+  semantics.
 
 ### Changed
 
@@ -44,3 +47,6 @@ All notable changes to this project will be documented in this file.
   artifacts; the Phase 0 scientific gate and Phase 1 stay blocked until the
   named numerical, control, reproducibility, golden-vector, and review issues
   are resolved and the final gate is re-evaluated.
+- Rejected the current coastal binary publication method after calibration
+  found no finite SLA shoreline-representativeness or GLO-30
+  DSM-to-bare-earth bound; missing evidence now remains `DataUnavailable`.
