@@ -46,6 +46,13 @@ from .geoid import (
     evaluate_geoid_correction,
     reconcile_baseline_to_egm2008,
 )
+from .geoid_evidence import (
+    canonical_geoid_evidence_bytes,
+    evaluator_disagreement_term,
+    geoid_evidence_sha256,
+    load_geoid_evaluator_evidence,
+    load_geoid_evaluator_policy,
+)
 from .receipt import (
     assert_vertical_receipt_publishable,
     canonical_vertical_receipt_bytes,
@@ -97,6 +104,11 @@ __all__ = [
     "extract_projection_grid",
     "extract_projection_interval",
     "evaluate_geoid_correction",
+    "evaluator_disagreement_term",
+    "canonical_geoid_evidence_bytes",
+    "geoid_evidence_sha256",
+    "load_geoid_evaluator_evidence",
+    "load_geoid_evaluator_policy",
     "load_science_contracts",
     "ocean_connected_cells",
     "inspect_dem_sample",
