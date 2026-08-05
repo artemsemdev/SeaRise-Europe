@@ -74,19 +74,20 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _parser().parse_args()
     workflow_started = time.perf_counter()
-    ensure_outside_candidate(
-        args.output,
+    candidate_output = args.output.resolve(strict=False)
+    failure_gate = ensure_outside_candidate(
+        candidate_output,
         args.failure_gate,
         label="Failure gate",
         require_new=True,
     )
-    ensure_outside_candidate(
-        args.output,
+    timing_evidence = ensure_outside_candidate(
+        candidate_output,
         args.timing_evidence,
         label="Build timing evidence",
         require_new=True,
     )
-    if args.failure_gate.resolve(strict=False) == args.timing_evidence.resolve(strict=False):
+    if failure_gate == timing_evidence:
         raise ScienceContractError("Failure and timing evidence paths must be distinct")
     try:
         repository = Path(__file__).resolve().parents[2]
@@ -114,7 +115,7 @@ def main() -> None:
             )
         result = build_regional_release(
             regional_source,
-            args.output,
+            candidate_output,
             release_id=args.release_id,
             contract=contract,
             tippecanoe_path=args.tippecanoe,
@@ -131,10 +132,10 @@ def main() -> None:
             workflow_started_monotonic=workflow_started,
         )
         write_new_json_record(
-            args.timing_evidence,
+            timing_evidence,
             {
                 "schemaVersion": 1,
-                "candidate": candidate_binding(result.output_directory),
+                "candidate": candidate_binding(result.output_directory, contract=contract),
                 "timer": "python-time-perf-counter",
                 "startedBeforeSourceVerification": True,
                 "endedAfterAtomicCandidatePublish": True,
@@ -156,7 +157,7 @@ def main() -> None:
             "failure": {"type": type(exc).__name__, "message": str(exc)},
             "emittedScientificArtifacts": [],
         }
-        write_new_json_record(args.failure_gate, blocked)
+        write_new_json_record(failure_gate, blocked)
         raise SystemExit(1) from exc
     print(
         json.dumps(

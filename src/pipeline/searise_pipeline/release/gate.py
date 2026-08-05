@@ -87,9 +87,18 @@ def evaluate_recovery_gate(
         contract["budgets"],
     )
     failed_checks = [name for name, passed in checks.items() if not passed]
-    missing_external = reproducibility_report is None or delivery_report is None
+    reproducibility_pending = (
+        reproducibility_report is not None
+        and reproducibility_report.get("status") == "pending-external-provenance"
+    )
+    missing_external = (
+        reproducibility_report is None
+        or reproducibility_pending
+        or delivery_report is None
+    )
     supplied_external_failed = (
         reproducibility_report is not None
+        and not reproducibility_pending
         and not checks["crossEnvironmentReproducibility"]
     ) or (delivery_report is not None and not checks["deliveryMeasurements"])
     if any(not checks[name] for name in _BUILD_CHECKS) or supplied_external_failed:
