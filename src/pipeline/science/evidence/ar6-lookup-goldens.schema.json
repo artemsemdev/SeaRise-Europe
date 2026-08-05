@@ -13,6 +13,8 @@
     "scopeGeometry",
     "provenance",
     "numericToleranceMetres",
+    "publicationMetadata",
+    "nodataSearchEvidence",
     "results"
   ],
   "properties": {
@@ -69,6 +71,37 @@
       }
     },
     "numericToleranceMetres": { "const": 1e-6 },
+    "publicationMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confidence", "nativeResolutionDegrees", "methodVersion", "sourceRelease"],
+      "properties": {
+        "confidence": { "const": "medium" },
+        "nativeResolutionDegrees": { "const": 1 },
+        "methodVersion": { "const": "ar6-regional-projection-v1" },
+        "sourceRelease": { "const": "20210809" }
+      }
+    },
+    "nodataSearchEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "searchRule",
+        "inScopeGridLocationCount",
+        "scenarioLocationChecks",
+        "sourceNodataLocationCount",
+        "conclusion",
+        "syntheticControlId"
+      ],
+      "properties": {
+        "searchRule": { "type": "string", "minLength": 1 },
+        "inScopeGridLocationCount": { "type": "integer", "minimum": 1 },
+        "scenarioLocationChecks": { "type": "integer", "minimum": 3 },
+        "sourceNodataLocationCount": { "const": 0 },
+        "conclusion": { "const": "no-real-in-scope-source-nodata-location-exists" },
+        "syntheticControlId": { "const": "nearest-location-is-nodata" }
+      }
+    },
     "results": {
       "type": "array",
       "minItems": 9,
@@ -115,15 +148,21 @@
         "scenario",
         "horizon",
         "lowerMetres",
+        "lowerMillimetres",
         "centralMetres",
-        "upperMetres"
+        "centralMillimetres",
+        "upperMetres",
+        "upperMillimetres"
       ],
       "properties": {
         "scenario": { "enum": ["ssp1-26", "ssp2-45", "ssp5-85"] },
         "horizon": { "enum": [2030, 2050, 2100] },
         "lowerMetres": { "type": "number" },
+        "lowerMillimetres": { "type": "integer" },
         "centralMetres": { "type": "number" },
-        "upperMetres": { "type": "number" }
+        "centralMillimetres": { "type": "integer" },
+        "upperMetres": { "type": "number" },
+        "upperMillimetres": { "type": "integer" }
       }
     },
     "result": {

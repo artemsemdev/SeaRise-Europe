@@ -15,6 +15,7 @@ from typing import Any
 import geopandas as gpd  # type: ignore[import-untyped]
 import netCDF4  # type: ignore[import-untyped]
 import numpy as np
+import shapely  # type: ignore[import-untyped]
 from shapely.geometry import Point  # type: ignore[import-untyped]
 
 CHUNK_BYTES = 1024 * 1024
@@ -157,11 +158,11 @@ def _projection_values(
     quantiles: Mapping[str, float],
     unit_to_metres: float,
     fill_value: int,
-) -> dict[str, float] | None:
+) -> dict[str, float | int] | None:
     years = np.asarray(dataset.variables["years"][:])
     source_quantiles = np.asarray(dataset.variables["quantiles"][:])
     year_index = _coordinate_index(years, horizon, "year")
-    values: dict[str, float] = {}
+    values: dict[str, float | int] = {}
     for statistic in ("lower", "central", "upper"):
         quantile_index = _coordinate_index(
             source_quantiles, quantiles[statistic], f"{statistic} quantile"
@@ -173,10 +174,61 @@ def _projection_values(
         )
         if raw == fill_value:
             return None
-        values[f"{statistic}Metres"] = raw * unit_to_metres
+        values[f"{statistic}Millimetres"] = raw
+        values[f"{statistic}Metres"] = round(raw * unit_to_metres, 6)
     if not values["lowerMetres"] <= values["centralMetres"] <= values["upperMetres"]:
         raise ValueError("AR6 likely interval is not monotonic")
     return values
+
+
+def _nodata_search_evidence(
+    datasets: Mapping[str, netCDF4.Dataset],
+    reference_grid: tuple[
+        np.ndarray[Any, Any],
+        np.ndarray[Any, Any],
+        np.ndarray[Any, Any],
+        np.ndarray[Any, Any],
+    ],
+    support: Any,
+    coastal: Any,
+    source_binding: Mapping[str, Any],
+) -> dict[str, Any]:
+    source_indexes, _, latitudes, longitudes = reference_grid
+    shapely.prepare(support)
+    shapely.prepare(coastal)
+    points = shapely.points(longitudes, latitudes)
+    in_scope = shapely.covers(support, points) & shapely.covers(coastal, points)
+    scoped_source_indexes = source_indexes[in_scope]
+    any_missing = np.zeros(scoped_source_indexes.size, dtype=bool)
+    for dataset in datasets.values():
+        years = np.asarray(dataset.variables["years"][:])
+        quantiles = np.asarray(dataset.variables["quantiles"][:])
+        for horizon in source_binding["horizons"]:
+            year_index = _coordinate_index(years, horizon, "year")
+            for quantile in source_binding["quantiles"].values():
+                quantile_index = _coordinate_index(quantiles, quantile, "quantile")
+                values = np.asarray(
+                    dataset.variables["sea_level_change"][
+                        quantile_index, year_index, scoped_source_indexes
+                    ]
+                )
+                any_missing |= values == source_binding["fillValue"]
+    missing_count = int(np.count_nonzero(any_missing))
+    if missing_count:
+        raise ValueError(
+            "A real in-scope AR6 nodata location exists and must be added to the golden set"
+        )
+    return {
+        "searchRule": (
+            "all native grid locations covered by the versioned Europe support and coastal "
+            "scope across all required scenarios, horizons, and quantiles"
+        ),
+        "inScopeGridLocationCount": int(scoped_source_indexes.size),
+        "scenarioLocationChecks": int(scoped_source_indexes.size * len(datasets)),
+        "sourceNodataLocationCount": missing_count,
+        "conclusion": "no-real-in-scope-source-nodata-location-exists",
+        "syntheticControlId": "nearest-location-is-nodata",
+    }
 
 
 def build_goldens(
@@ -237,6 +289,13 @@ def build_goldens(
                     raise ValueError(f"AR6 native grids differ for {scenario}")
 
             source_indexes, location_ids, latitudes, longitudes = reference_grid
+            nodata_search = _nodata_search_evidence(
+                datasets,
+                reference_grid,
+                support,
+                coastal,
+                source_binding,
+            )
             for declared in validation["validation"]["goldenPoints"]:
                 coordinates = declared["coordinates"]
                 state, reason = _scope_state(
@@ -338,6 +397,8 @@ def build_goldens(
             "onlineReferenceRole": "supplementary-manual-cross-check-only",
         },
         "numericToleranceMetres": decision["validation"]["absoluteToleranceMetres"],
+        "publicationMetadata": validation["publicationMetadata"],
+        "nodataSearchEvidence": nodata_search,
         "results": results,
     }
 
