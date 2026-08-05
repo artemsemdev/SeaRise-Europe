@@ -183,6 +183,34 @@ def test_vector_toolchain_rejects_unrelated_embedded_pmtiles_binary(
         validate_vector_toolchain(contract=release, **tools)
 
 
+def test_decoder_rejects_an_unexpected_mvt_layer_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decoded = {
+        "features": [
+            {
+                "features": [
+                    {
+                        "properties": {"layer": "not-projection"},
+                        "features": [
+                            {"id": 1, "properties": {"source_location_id": 1}}
+                        ],
+                    }
+                ]
+            }
+        ]
+    }
+    monkeypatch.setattr(pmtiles_module, "_run", lambda _command: json.dumps(decoded))
+
+    with pytest.raises(ScienceContractError, match="layer ID differs"):
+        pmtiles_module._decode_properties(
+            tmp_path / "decode",
+            tmp_path / "archive.pmtiles",
+            6,
+            "projection",
+        )
+
+
 TOOL_ENVIRONMENT = (
     "SEARISE_TIPPECANOE",
     "SEARISE_TIPPECANOE_DECODE",
