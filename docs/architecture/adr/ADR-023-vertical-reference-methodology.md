@@ -89,7 +89,8 @@ Costs and limitations:
   scientific result, not permission to shrink uncertainty.
 - Mean-water exposure excludes tides, surge, waves, drainage, defences, and
   river/pluvial flooding.
-- Connectivity and terrain resolution remain separate Phase 0.8 decisions.
+- Phase 0.8 selects connectivity and terrain-resolution candidates, but their
+  external reviews and terrain uncertainty bounds remain open.
 - Exact coastal coverage may block this strategy and trigger the documented
   MSS or published-hazard fallback.
 
@@ -109,7 +110,7 @@ has reviewed this project's cross-product equation. The machine gate remains
 
 - `vertical-methodology-review`;
 - `validated-vertical-transform`;
-- `terrain-and-connectivity-controls`.
+- `terrain-uncertainty-bounds-and-control-reviews`.
 
 `validated-vertical-transform` specifically includes the pending EGM2008
 constants and engine policy, numeric QUID/terrain bounds, Baltic and Black Sea

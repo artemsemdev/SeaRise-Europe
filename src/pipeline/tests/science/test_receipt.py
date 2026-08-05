@@ -81,6 +81,21 @@ def _receipt() -> dict:  # type: ignore[type-arg]
             "extrapolation": "none",
             "nodataRule": "propagate-any-missing-source-or-neighbour",
         },
+        "terrain": {
+            "status": "selected-for-external-review",
+            "sourceId": "copernicus-dem-glo30",
+            "release": "2021_1",
+            "decisionContract": {"path": "terrain-decision.json", "sha256": digest},
+            "numericBoundsStatus": "blocked",
+        },
+        "connectivity": {
+            "status": "selected-for-external-review",
+            "method": "ocean-seeded-eight-neighbour-v1",
+            "rulesContract": {"path": "geography-rules.json", "sha256": digest},
+            "controlsContract": {"path": "connectivity-controls.json", "sha256": digest},
+            "automatedControls": "passed",
+            "independentReview": "pending",
+        },
         "geoid": {
             "status": "blocked",
             "commonEllipsoid": None,
@@ -204,6 +219,15 @@ def test_checked_in_receipt_binds_exact_contract_and_source_bytes() -> None:
         assert hashlib.sha256((REPO_ROOT / contract["path"]).read_bytes()).hexdigest() == contract[
             "sha256"
         ]
+    control_contracts = [
+        receipt["terrain"]["decisionContract"],
+        receipt["connectivity"]["rulesContract"],
+        receipt["connectivity"]["controlsContract"],
+    ]
+    for contract in control_contracts:
+        assert hashlib.sha256((REPO_ROOT / contract["path"]).read_bytes()).hexdigest() == contract[
+            "sha256"
+        ]
 
     source_lock = json.loads(
         (REPO_ROOT / "src/pipeline/sources/source-lock.json").read_text(encoding="utf-8")
@@ -228,15 +252,36 @@ def test_checked_in_receipt_records_complete_blocked_execution_context() -> None
 
     assert receipt["baseline"]["monthlyObjectCount"] == 240
     assert receipt["baseline"]["calendarDayWeight"] == 7305
-    assert receipt["grid"]["shape"] is None
-    assert receipt["grid"]["affine"] is None
+    assert receipt["grid"] == {
+        "status": "selected-phase-0.8-release-mosaic-pending",
+        "horizontalCrs": "WGS84-G1150 (EPSG:4326)",
+        "verticalCrs": "EPSG:3855",
+        "shape": None,
+        "affine": None,
+        "pixelInterpretation": "RasterPixelIsPoint",
+        "continuousInterpolation": "bilinear-inside-source-support",
+        "categoricalInterpolation": "nearest-neighbour",
+        "extrapolation": "none",
+        "nodataRule": "propagate-any-missing-source-or-neighbour",
+    }
+    assert receipt["terrain"]["status"] == "selected-for-external-review"
+    assert receipt["terrain"]["numericBoundsStatus"] == "blocked"
+    assert receipt["connectivity"]["status"] == "selected-for-external-review"
+    assert receipt["connectivity"]["automatedControls"] == "passed"
+    assert receipt["connectivity"]["independentReview"] == "pending"
     assert receipt["software"]["externalGeoidEngine"]["status"] == "pending"
     assert receipt["geoid"]["target"]["earthGravityConstant"] is None
     assert receipt["outputs"] == {"status": "not-generated", "artifacts": []}
     terms = receipt["uncertainty"]["baselineTerms"] + receipt["uncertainty"][
         "terrainTerms"
     ]
-    assert {term["status"] for term in terms} == {"pending-bound"}
+    assert {term["status"] for term in terms} == {"bounded", "pending-bound"}
+    random_error = next(
+        term for term in receipt["uncertainty"]["terrainTerms"]
+        if term["id"] == "dem-random-error"
+    )
+    assert random_error["status"] == "bounded"
+    assert "1.645*HEM" in random_error["provenance"]
     assert all(
         term["units"] == "m"
         and term["provenance"]
@@ -247,7 +292,7 @@ def test_checked_in_receipt_records_complete_blocked_execution_context() -> None
     assert {blocker["id"] for blocker in receipt["blockers"]} == {
         "egm2008-evaluation-conventions",
         "quid-mapping-bounds",
-        "phase-0.8-terrain-connectivity-controls",
+        "terrain-connectivity-control-review",
         "baltic-black-sea-controls",
         "cross-environment-reproducibility",
         "independent-scientific-review",

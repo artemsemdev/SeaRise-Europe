@@ -49,12 +49,12 @@
   },
   "terrain": {
     "required": true,
-    "sourceId": "copernicus-dem",
+    "sourceId": "copernicus-dem-glo30",
     "release": "2021_1",
     "type": "digital-surface-model",
     "verticalCrs": "EPSG:3855",
     "units": "m",
-    "resolutionDecision": "pending-phase-0.8",
+    "resolutionDecision": "GLO-30-selected-for-external-review",
     "representationBias": "required-uncertainty-term"
   },
   "interpolation": {
@@ -62,7 +62,7 @@
     "categoricalFields": "nearest-neighbour",
     "extrapolation": "none",
     "nodata": "propagate if any required value or interpolation neighbour is unavailable",
-    "analysisGrid": "approved native Copernicus DEM grid"
+    "analysisGrid": "selected native Copernicus DEM GLO-30 grid; regional shape and affine pending Phase 0.9 rebuild"
   },
   "uncertainty": {
     "coverage": "AR6 likely range plus separately bounded non-projection errors",
@@ -108,7 +108,7 @@
       "flood defences and adaptation"
     ],
     "verticalLandMotion": "use the contribution already present in AR6 total; do not add an unreviewed second correction",
-    "connectivity": "required post-vertical filter pending Phase 0.8 approval"
+    "connectivity": "ocean-seeded eight-neighbour candidate selected for external review; rejected connectivity is NoModeledExposureDetected and unknown connectivity is DataUnavailable"
   },
   "review": {
     "status": "pending",
@@ -120,7 +120,7 @@
     "blockingDecisions": [
       "vertical-methodology-review",
       "validated-vertical-transform",
-      "terrain-and-connectivity-controls"
+      "terrain-uncertainty-bounds-and-control-reviews"
     ]
   }
 }
