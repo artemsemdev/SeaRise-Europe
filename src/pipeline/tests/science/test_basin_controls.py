@@ -4,20 +4,18 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import importlib.util
 import json
+import sys
 from copy import deepcopy
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker
-from scripts.science import build_basin_control_evidence as evidence_builder
-from scripts.science.build_basin_control_evidence import (
-    EvidenceBuildError,
-    _canonical_bytes,
-    validate_checked_in_evidence,
-)
 
 REPO_ROOT = Path(__file__).parents[4]
+BUILDER_PATH = REPO_ROOT / "scripts/science/build_basin_control_evidence.py"
 SCIENCE_DIR = REPO_ROOT / "src/pipeline/science"
 CONTRACT_PATH = SCIENCE_DIR / "basin-controls.json"
 SCHEMA_PATH = SCIENCE_DIR / "basin-controls.schema.json"
@@ -25,6 +23,24 @@ EVIDENCE_PATH = SCIENCE_DIR / "evidence/phase-0-12-basin-controls.json"
 EVIDENCE_SCHEMA_PATH = (
     SCIENCE_DIR / "evidence/phase-0-12-basin-controls.schema.json"
 )
+
+
+def _load_evidence_builder() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "build_basin_control_evidence", BUILDER_PATH
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load evidence builder: {BUILDER_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+evidence_builder = _load_evidence_builder()
+EvidenceBuildError = evidence_builder.EvidenceBuildError
+_canonical_bytes = evidence_builder._canonical_bytes
+validate_checked_in_evidence = evidence_builder.validate_checked_in_evidence
 
 
 def _load(path: Path) -> dict:
