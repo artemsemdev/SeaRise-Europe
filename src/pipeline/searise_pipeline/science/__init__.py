@@ -24,7 +24,12 @@ from .contracts import (
     projection_mapping,
     verify_geometry_assets,
 )
-from .dem import compare_dem_samples, inspect_dem_sample
+from .dem import (
+    compare_dem_samples,
+    compare_dem_windows,
+    inspect_dem_sample,
+    inspect_dem_window,
+)
 from .geography import (
     CandidateGeometries,
     canonical_geojson_bytes,
@@ -84,6 +89,7 @@ __all__ = [
     "bilinear_sample",
     "build_geoid_requests",
     "compare_dem_samples",
+    "compare_dem_windows",
     "canonical_geojson_bytes",
     "connectivity_comparison",
     "evaluate_connectivity_controls",
@@ -93,6 +99,7 @@ __all__ = [
     "load_science_contracts",
     "ocean_connected_cells",
     "inspect_dem_sample",
+    "inspect_dem_window",
     "inspect_geometry_assets",
     "projection_mapping",
     "projection_member_identity",
