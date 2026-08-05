@@ -81,8 +81,9 @@ artifact for the independent comparison.
    `automatedValidation=pending` while the comparison is absent; set it to
    `failed` when a supplied comparison fails.
 4. After integration reaches `master`, the project owner records
-   `releaseDisposition=approved`, `rejected`, or `blocked`. CI cannot make that
-   decision.
+   `ownerDecision=approved` or `rejected`. The gate derives the effective
+   `releaseDisposition`; failed automation produces `blocked`. CI cannot write
+   the owner decision or derive approval.
 
 Until all four steps are complete, the fallback is
 `do-not-publish-or-unlock-phase-1`.

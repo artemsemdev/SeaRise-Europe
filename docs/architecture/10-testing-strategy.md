@@ -63,7 +63,7 @@ Recovery tests follow #106 → #135 → #110. #106 and #135 are complete. The #1
 macOS candidate and browser measurements pass their local checks; native Linux
 reproducibility, final integration evidence, and the owner disposition remain
 pending. Before `automatedValidation=passed` and owner-controlled
-`releaseDisposition=approved`:
+`ownerDecision=approved` derive an effective `releaseDisposition=approved`:
 
 - v1 contract tests continue rejecting direct
   AR6-relative-versus-absolute-terrain comparison;
@@ -254,8 +254,8 @@ current summary on `/about/architecture`.
 4. **Staged delivery:** upload immutable prefix; verify hashes, range requests,
    headers, CORS, and browser smoke tests from the public origin.
 5. **Promotion:** automation may pass validation, but only the project owner
-   records `releaseDisposition=approved`; retain the prior app/release pair for
-   rollback.
+   records `ownerDecision=approved`; the gate derives the effective release
+   disposition. Retain the prior app/release pair for rollback.
 
 A waiver must identify the failed budget, measured regression, rationale,
 owner, and expiry date. Scientific, integrity, licence, scenario completeness,

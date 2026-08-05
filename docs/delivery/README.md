@@ -106,8 +106,8 @@ pending, so `automatedValidation` remains `pending` and the candidate remains
 unpublished. See the
 [regional release evidence](../evidence/phase-0r-regional-release.md).
 
-Only a zero-blocker #110 with passing automated evidence and a separate
-project-owner `releaseDisposition=approved` may unlock
+Only a zero-blocker #110 with passing automated evidence, project-owner
+`ownerDecision=approved`, and an effective `releaseDisposition=approved` may unlock
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48), Workstream 1,
 and Phase 1. Green CI cannot authorize that decision.
 

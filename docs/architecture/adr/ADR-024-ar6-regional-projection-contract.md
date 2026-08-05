@@ -68,6 +68,14 @@ Low-confidence projections and the approximately 1,030 tide-gauge locations
 are outside this product contract. The source archive and scenario-member
 hashes remain authoritative in the source lock and source-semantics contract.
 
+`source-semantics.json` is also an immutable Phase 0.2 record for the
+superseded v1 terrain path. ADR-024 consumes only its projection source
+identity, archive, mapping, and native-coordinate sections. Its
+`projection.transformation` (`bilinear` to GLO-30), review, terrain, and
+vertical-input sections are historical and non-operative for this product.
+The active release contract requires `scientificResampling=none`, and a test
+prevents release modules from reading the historical transformation field.
+
 ## Spatial lookup
 
 Map and point results use the same source-native 1° grid family.
@@ -113,9 +121,12 @@ Validation is offline and source-bound:
 
 The NASA/Rutgers tool and published reader may support a documented manual
 cross-check, but a mutable or unavailable web interface is not a CI oracle.
-CI may report `automatedValidation=passed`; it cannot set the owner-controlled
-`releaseDisposition=approved` or describe the product as scientifically
-approved.
+Automation sets `automatedValidation` to `pending`, `passed`, or `failed`. Only
+the project owner sets `ownerDecision` to `approved` or `rejected`; CI leaves
+it `pending-owner`. `releaseDisposition` is the derived effective state: failed
+automation produces fail-closed `blocked`, while `approved` requires passing
+automation and `ownerDecision=approved`. CI can never derive approval or
+describe the product as scientifically approved.
 
 ## Superseded decisions
 

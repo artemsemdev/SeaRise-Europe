@@ -5,7 +5,7 @@
 > **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Machine contract:** [`ar6-projection-contract.json`](../src/pipeline/science/ar6-projection-contract.json)
 > **Blocking gate:** #110 requires native Linux reproducibility, final integration, and owner disposition
-> **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's release disposition
+> **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's decision
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
@@ -24,6 +24,12 @@ haversine distance, a fixed `6371.0088 km` Earth radius, a `100 km` maximum,
 and lowest-location-ID tie-break. It never interpolates, falls back to a tide
 gauge, or skips source nodata in favour of a farther cell. Reported distance is
 rounded to six decimal places after selection.
+
+The shared `source-semantics.json` still preserves the historical v1 bilinear
+terrain-target transformation. That section is not active under ADR-024. The
+projection release binds only source identity, archive, mapping, and
+native-coordinate semantics, and its own contract requires zero scientific
+resampling.
 
 An available result shows the median, likely range, scenario, horizon,
 baseline, source location and distance, native resolution, method, and source
@@ -298,7 +304,8 @@ The original recovery plan through #107–#109 was superseded when ADR-024
 removed the absolute-water and terrain comparison. #135 source/implementation
 parity is complete. #110 has a complete measured macOS candidate; native Linux
 comparison and final integration remain. CI may record automated validation,
-but only the project owner may set the `releaseDisposition` that unlocks
+but only the project owner may set `ownerDecision=approved`; the gate then
+derives the effective `releaseDisposition` that unlocks
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
 
 ## Historical v1 required preprocessing record

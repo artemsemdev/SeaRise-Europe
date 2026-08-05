@@ -42,7 +42,7 @@
 | R-15 | Relative AR6 change is compared directly with absolute terrain height | Inapplicable to ADR-024 / Historical Critical | ADR-024 prohibits terrain comparison and reports relative change directly. Tests must continue to reject any reintroduction of the legacy operation. |
 | R-16 | A geoid or vertical transform mixes model realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Inapplicable to ADR-024 / Historical Critical | The active path performs no geoid or vertical transform. Phase 0.10 remains immutable evidence for the superseded v1 path. |
 | R-17 | A DSM, HEM, MAE, or product accuracy target is treated as bare-earth terrain or a complete per-cell upper bound | Inapplicable to ADR-024 / Historical Critical | The active path consumes no terrain. Phase 0.11 remains immutable evidence and terrain cannot return without a new ADR. |
-| R-18 | Green CI or source-integrity checks are mistaken for scientific or release approval | Medium / Critical | The projection contract separates `automatedValidation` from the owner-controlled `releaseDisposition`. Only the project owner may approve a zero-blocker #110 gate and unlock #48. |
+| R-18 | Green CI or source-integrity checks are mistaken for scientific or release approval | Medium / Critical | The projection contract separates `automatedValidation` from owner-controlled `ownerDecision`. The effective `releaseDisposition` is derived: failed automation is `blocked`, and only an owner-approved zero-blocker gate can become `approved` and unlock #48. |
 | R-19 | An offshore mean-sea-surface grid, land filler, or ordinary tide-gauge record is treated as a datum-safe shoreline water reference | Inapplicable to ADR-024 / Historical Critical | ADR-024 does not construct an absolute water reference and prohibits tide-gauge fallback. Retain the v1 finding as historical evidence. |
 | R-20 | A global coastal DTM or multi-source mosaic is assumed to have finite European per-cell uncertainty from MAE/RMSE alone | Inapplicable to ADR-024 / Historical Critical | ADR-024 consumes no DTM or terrain uncertainty. Retain the v1 finding as historical evidence. |
 
@@ -78,7 +78,7 @@ contract decision without reinterpreting that evidence. #135 passed offline
 source/implementation parity and lowers R-01 and R-04 to permanent regression
 risks. #110 produced the complete macOS candidate and passed candidate-local
 and delivery budgets, lowering R-08 and A-02. Native Linux reproducibility and
-an explicit project-owner `releaseDisposition` still block #48.
+an explicit project-owner `ownerDecision` still block #48.
 
 ## Assumptions that require evidence
 
@@ -135,8 +135,8 @@ overrides scientific correctness.
 That stop condition fired for binary exposure. #135 is complete and #110 has a
 measured macOS candidate, but Phase 1 remains paused through native Linux
 comparison and final integration. Passing CI records automated validation
-only; the project owner must separately approve the zero-blocker
-`releaseDisposition` before #48 unlocks.
+only; the project owner must separately set `ownerDecision=approved` before the
+gate can derive `releaseDisposition=approved` and unlock #48.
 
 ## Risk review cadence
 
