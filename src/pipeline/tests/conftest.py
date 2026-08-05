@@ -94,16 +94,9 @@ def coastal_zone_geojson(tmp_path: Path) -> Path:
 
 
 @pytest.fixture()
-def exposure_tif(tmp_path: Path, dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path) -> Path:
-    """Pre-computed exposure raster (uses compute_binary_exposure)."""
-    from pipeline.compute_exposure import compute_binary_exposure
-
-    out = tmp_path / "exposure_raw.tif"
-    compute_binary_exposure(
-        dem_tif,
-        slr_tif,
-        coastal_zone_geojson,
-        out,
-        allow_blocked_methodology=True,
-    )
-    return out
+def exposure_tif(tmp_path: Path) -> Path:
+    """Fixed synthetic class raster for downstream format mechanics tests."""
+    classes = np.full(TEST_SHAPE, np.nan, dtype=np.float32)
+    classes[50:, :50] = 0.0
+    classes[80:, :50] = 1.0
+    return _make_raster(tmp_path / "exposure_raw.tif", classes)

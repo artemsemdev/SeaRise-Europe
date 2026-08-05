@@ -1,19 +1,19 @@
-"""Tests for pipeline.compute_exposure — binary exposure logic."""
+"""Regression tests for the prohibited legacy exposure operation."""
 
+import ast
+import inspect
 from pathlib import Path
 
-import numpy as np
 import pytest
-import rasterio
 
 from pipeline.compute_exposure import compute_binary_exposure
 from searise_pipeline.science import ScienceContractError
 
 
-def test_exposure_fails_while_scientific_gate_is_blocked(
+def test_legacy_exposure_inputs_are_always_rejected(
     dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path, tmp_path: Path
-):
-    with pytest.raises(ScienceContractError, match="publication gate is blocked"):
+) -> None:
+    with pytest.raises(ScienceContractError, match="relative sea-level change"):
         compute_binary_exposure(
             dem_tif,
             slr_tif,
@@ -22,70 +22,10 @@ def test_exposure_fails_while_scientific_gate_is_blocked(
         )
 
 
-def test_exposure_produces_binary_values(
-    dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path, tmp_path: Path
-):
-    """Output should contain only 0.0, 1.0, and NaN."""
-    out = tmp_path / "exposure.tif"
-    compute_binary_exposure(
-        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
-    )
+def test_no_opt_in_or_direct_relative_change_comparison_remains() -> None:
+    signature = inspect.signature(compute_binary_exposure)
+    source = inspect.getsource(compute_binary_exposure)
+    tree = ast.parse(source)
 
-    with rasterio.open(out) as src:
-        data = src.read(1)
-
-    valid = data[~np.isnan(data)]
-    unique = set(np.unique(valid))
-    assert unique.issubset({0.0, 1.0}), f"Non-binary values found: {unique}"
-
-
-def test_low_elevation_is_exposed(
-    dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path, tmp_path: Path
-):
-    """Pixels with elevation < SLR (2 m) inside the coastal zone should be 1."""
-    out = tmp_path / "exposure.tif"
-    compute_binary_exposure(
-        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
-    )
-
-    with rasterio.open(out) as src:
-        data = src.read(1)
-
-    valid = data[~np.isnan(data)]
-    assert np.any(valid == 1.0), "Expected some exposed pixels"
-
-
-def test_high_elevation_not_exposed(
-    dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path, tmp_path: Path
-):
-    """Pixels with elevation >> SLR inside the coastal zone should be 0."""
-    out = tmp_path / "exposure.tif"
-    compute_binary_exposure(
-        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
-    )
-
-    with rasterio.open(out) as src:
-        data = src.read(1)
-
-    valid = data[~np.isnan(data)]
-    assert np.any(valid == 0.0), "Expected some non-exposed pixels"
-
-
-def test_outside_coastal_zone_is_nodata(
-    dem_tif: Path, slr_tif: Path, coastal_zone_geojson: Path, tmp_path: Path
-):
-    """Pixels outside the coastal zone polygon should be NaN."""
-    out = tmp_path / "exposure.tif"
-    compute_binary_exposure(
-        dem_tif, slr_tif, coastal_zone_geojson, out, allow_blocked_methodology=True
-    )
-
-    with rasterio.open(out) as src:
-        data = src.read(1)
-
-    # The coastal zone covers only the bottom-left quadrant,
-    # so at least some of the raster should be NaN.
-    nan_count = int(np.sum(np.isnan(data)))
-    total = data.size
-    assert nan_count > 0, "Expected NoData pixels outside coastal zone"
-    assert nan_count < total, "Entire raster is NoData — masking too aggressive"
+    assert "allow_blocked_methodology" not in signature.parameters
+    assert not any(isinstance(node, ast.Compare) for node in ast.walk(tree))
