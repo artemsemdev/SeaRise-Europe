@@ -153,7 +153,7 @@ def _aligned_layer(path: Path, dem: rasterio.io.DatasetReader, name: str) -> np.
             raise ScienceContractError(f"{name} grid does not align with DEM")
         if dataset.tags().get("AREA_OR_POINT") != "Point":
             raise ScienceContractError(f"Unexpected {name} pixel interpretation")
-        values = dataset.read(1)
+        values = np.asarray(dataset.read(1))
     if name in {"EDM", "FLM", "WBM"} and values.dtype != np.uint8:
         raise ScienceContractError(f"Unexpected {name} data type")
     if name == "HEM" and values.dtype != np.float32:
