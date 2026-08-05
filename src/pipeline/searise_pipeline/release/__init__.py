@@ -10,18 +10,28 @@ from .model import (
     load_source_fixture,
     write_source_fixture,
 )
+from .pmtiles import (
+    PmtilesEvidence,
+    VectorToolchainEvidence,
+    validate_vector_toolchain,
+    write_visual_pmtiles,
+)
 
 __all__ = [
     "CogEvidence",
     "GeoParquetEvidence",
     "RegionalLayer",
     "RegionalReleaseSource",
+    "PmtilesEvidence",
+    "VectorToolchainEvidence",
     "build_source_from_verified_archive",
     "load_release_contract",
     "load_source_fixture",
     "validate_analysis_cog",
     "validate_geoparquet",
+    "validate_vector_toolchain",
     "write_analysis_cog",
     "write_geoparquet",
+    "write_visual_pmtiles",
     "write_source_fixture",
 ]
