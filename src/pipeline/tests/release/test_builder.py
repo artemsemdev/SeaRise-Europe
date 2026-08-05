@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import sys
 from pathlib import Path
 
 import pytest
-import scripts.science.build_ar6_regional_release as release_cli
 
 from searise_pipeline.release import (
     build_regional_release,
@@ -22,6 +22,19 @@ from .test_recovery_gate import DELIVERY, REPRODUCIBILITY
 from .test_source_fixture import FIXTURE_DIR, GOLDENS_PATH, contract
 
 REPO_ROOT = Path(__file__).parents[4]
+
+
+def _load_release_cli():
+    script_path = REPO_ROOT / "scripts/science/build_ar6_regional_release.py"
+    spec = importlib.util.spec_from_file_location("searise_ar6_release_cli", script_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load release CLI from {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+release_cli = _load_release_cli()
 
 
 def _source():
