@@ -118,6 +118,17 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             workflow,
         )
 
+    def test_release_evidence_preflights_before_fresh_source_download(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        preflight = workflow.index("Preflight exact release environment and fixture")
+        acquire = workflow.index("Acquire and verify locked AR6 archive")
+        self.assertLess(preflight, acquire)
+        self.assertIn("--fixture src/pipeline/fixtures/ar6-regional-release", workflow)
+        self.assertNotIn("ar6-archive-cache", workflow)
+
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])
 

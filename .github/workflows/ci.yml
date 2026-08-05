@@ -314,6 +314,33 @@ jobs:
               -C "${tool_cache}" pmtiles
           fi
 
+      - name: Preflight exact release environment and fixture
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          python -c 'import searise_pipeline.release'
+          python scripts/science/build_ar6_regional_release.py \
+            --fixture src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz \
+            --fixture-receipt src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json \
+            --source-lock src/pipeline/sources/source-lock.json \
+            --source-semantics src/pipeline/science/source-semantics.json \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --lookup-goldens src/pipeline/science/evidence/ar6-lookup-goldens.json \
+            --tippecanoe "${tool_cache}/tippecanoe" \
+            --tippecanoe-decode "${tool_cache}/tippecanoe-decode" \
+            --pmtiles "${tool_cache}/pmtiles" \
+            --tippecanoe-source-archive "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+            --tippecanoe-build-receipt src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json \
+            --pmtiles-distribution-asset "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" \
+            --pmtiles-distribution-platform linux-x86_64 \
+            --python-lock src/pipeline/requirements-release.lock \
+            --build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64-preflight" \
+            --release-id phase-0r-ar6-preflight \
+            --output /tmp/phase-0r-ar6-preflight \
+            --failure-gate /tmp/ar6-release-preflight-failure.json \
+            --timing-evidence /tmp/build-timing-preflight.json
+
       - name: Acquire and verify locked AR6 archive
         run: |
           curl --fail --location --retry 8 --retry-all-errors \
