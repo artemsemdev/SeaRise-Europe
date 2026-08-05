@@ -445,6 +445,7 @@
     { "path": "src/pipeline/tests/science/test_geography.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_geoid.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_phase_0_8_evidence.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/science/test_projection_contract.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_receipt.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_uncertainty.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

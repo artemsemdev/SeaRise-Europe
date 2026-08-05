@@ -10,13 +10,19 @@ are active, amended, or superseded.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-021](ADR-021-static-first-offline-geospatial-architecture.md) | Accepted | Adopt the static-first offline geospatial architecture |
-| [ADR-023](ADR-023-vertical-reference-methodology.md) | Accepted for validation; publication blocked | Build an EGM2008 baseline water surface and classify only outside the complete uncertainty interval |
+| [ADR-024](ADR-024-ar6-regional-projection-contract.md) | Accepted; implementation blocked | Report source-native AR6 regional projection values without terrain exposure classification |
+
+## Superseded publication decisions
+
+| ADR | Status | Historical decision |
+|---|---|---|
+| [ADR-023](ADR-023-vertical-reference-methodology.md) | Superseded for publication by ADR-024 | Build an EGM2008 baseline water surface and classify only outside the complete uncertainty interval |
 
 ## Proposed ADRs
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-022](ADR-022-phase-0-source-and-geography-gate.md) | Proposed; safety gate enforced | Terrain/geography/connectivity candidates are selected; stop publication until uncertainty and named external approvals pass |
+| [ADR-022](ADR-022-phase-0-source-and-geography-gate.md) | Proposed; historical safety gate retained | Terrain/geography/connectivity controls apply to the superseded binary path; its evidence remains immutable |
 
 ## Conventions
 
