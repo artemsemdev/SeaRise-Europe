@@ -199,13 +199,12 @@
           "type": "array",
           "prefixItems": [
             { "const": "vertical-methodology-review" },
-            { "const": "pinned-vertical-inputs" },
             { "const": "validated-vertical-transform" },
             { "const": "terrain-and-connectivity-controls" }
           ],
           "items": false,
-          "minItems": 4,
-          "maxItems": 4
+          "minItems": 3,
+          "maxItems": 3
         }
       }
     }

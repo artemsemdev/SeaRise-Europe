@@ -211,7 +211,7 @@
     "verticalInputs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["baseline", "sourceGeoid", "targetGeoid", "terrainControls", "evidence"],
+        "required": ["baseline", "sourceGeoid", "targetGeoid", "terrainControls", "evidence", "implementationEvidence"],
       "properties": {
         "baseline": {
           "type": "object",
@@ -300,7 +300,8 @@
             "regionalControlCountPerResolution": { "const": 25 }
           }
         },
-        "evidence": { "const": "src/pipeline/science/evidence/vertical-source-inspection.json" }
+        "evidence": { "const": "src/pipeline/science/evidence/vertical-source-inspection.json" },
+        "implementationEvidence": { "const": "src/pipeline/science/evidence/vertical-transformation-implementation.json" }
       }
     },
     "blockingDecision": {
