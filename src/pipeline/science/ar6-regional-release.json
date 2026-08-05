@@ -1,0 +1,114 @@
+{
+  "$schema": "./ar6-regional-release.schema.json",
+  "schemaVersion": 1,
+  "releaseContractId": "ar6-europe-regional-release-v1",
+  "issue": 110,
+  "source": {
+    "sourceId": "ipcc-ar6-sea-level",
+    "version": "20210809",
+    "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+    "licence": "CC-BY-4.0",
+    "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709."
+  },
+  "matrix": {
+    "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
+    "horizons": [2030, 2050, 2100],
+    "quantiles": {"lower": 0.167, "central": 0.5, "upper": 0.833}
+  },
+  "grid": {
+    "crs": "EPSG:4326",
+    "nativeResolutionDegrees": 1,
+    "longitudeCentres": [-30, 45],
+    "latitudeCentres": [30, 75],
+    "width": 76,
+    "height": 46,
+    "bounds": [-30.5, 29.5, 45.5, 75.5],
+    "scientificResampling": "none"
+  },
+  "values": {
+    "storageType": "int16",
+    "storageUnits": "mm",
+    "publishedUnits": "m",
+    "scaleToMetres": 0.001,
+    "nodata": -32768,
+    "baseline": "1995-2014 mean",
+    "confidence": "medium"
+  },
+  "artifacts": {
+    "cog": {
+      "role": "exact-browser-lookup",
+      "count": 9,
+      "bands": ["q0.167", "q0.5", "q0.833"],
+      "blockSize": 256,
+      "compression": "DEFLATE",
+      "predictor": 2,
+      "overviewResampling": "NEAREST"
+    },
+    "geoparquet": {
+      "role": "analytical-parity",
+      "count": 1,
+      "schemaVersion": "1.1.0",
+      "geometryEncoding": "WKB",
+      "geometryType": "Point",
+      "crs": "OGC:CRS84",
+      "compression": "zstd",
+      "rowGroupSize": 1024,
+      "rows": "valid-source-locations-only",
+      "nearestSelection": "prohibited"
+    },
+    "pmtiles": {
+      "role": "visual-only",
+      "count": 9,
+      "layerId": "projection",
+      "tileType": "mvt",
+      "tileCompression": "gzip",
+      "minimumZoom": 0,
+      "maximumZoom": 6,
+      "rows": "valid-source-locations-only",
+      "scientificLookup": "prohibited",
+      "canonicalMetadataRequired": true
+    }
+  },
+  "toolchain": {
+    "tippecanoe": {
+      "version": "2.79.0",
+      "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+      "sourceUrl": "https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz",
+      "sourceByteSize": 25910834,
+      "sourceSha256": "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d"
+    },
+    "pmtiles": {
+      "version": "1.31.2",
+      "commit": "a3e4951ea6a0477b784c27c1dcbfd9c130878c5a",
+      "assets": {
+        "darwin-arm64": "40528f7f616fcbf91207cd48c8fc023d213f6d86c0cbf1f748732803d1880f3d",
+        "linux-arm64": "f8bd47e7ea866863489cad588fbaf2f31f42e5821f7a03f009b3769f05801cb1",
+        "linux-x86_64": "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f"
+      }
+    },
+    "python": {
+      "numpy": "1.26.4",
+      "rasterio": "1.4.3",
+      "rioCogeo": "5.4.2",
+      "geopandas": "1.0.1",
+      "pyarrow": "16.1.0"
+    }
+  },
+  "reproducibility": {
+    "scientificValueToleranceMillimetres": 0,
+    "validIdSetDifference": 0,
+    "byteIdentityWithinPinnedToolchain": true,
+    "minimumIndependentEnvironments": 2
+  },
+  "budgets": {
+    "cogTotalBytes": 262144,
+    "pmtilesTotalBytes": 6291456,
+    "geoparquetBytes": 1048576,
+    "coreArtifactsTotalBytes": 8388608,
+    "buildDurationSeconds": 120,
+    "browserHeapBytes": 67108864,
+    "rangeRequestCount": 12,
+    "lookupP95Milliseconds": 50
+  },
+  "scientificDisposition": "projection-only"
+}
