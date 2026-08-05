@@ -1141,6 +1141,8 @@ def build_regional_release(
             "notice": notice,
             "sourceContentSha256": source.content_sha256,
         }
+        vector_identity = asdict(toolchain)
+        vector_identity.pop("pmtiles_binary_sha256")
         build_receipt = {
             "schemaVersion": 1,
             "releaseId": release_id,
@@ -1149,7 +1151,7 @@ def build_regional_release(
             "environmentIdentity": {
                 "buildRunId": build_environment_id,
                 "python": asdict(python_toolchain),
-                "vector": asdict(toolchain),
+                "vector": vector_identity,
             },
             "normalizedParameters": {
                 "nativeResolutionDegrees": 1,

@@ -11,19 +11,25 @@ import rasterio
 
 from searise_pipeline.science.contracts import ScienceContractError
 
-from .evidence import candidate_binding, load_json
+from .evidence import binding_sha256, candidate_binding, load_json
 
 
-def _independence_profile(environment: Mapping[str, Any]) -> tuple[str, str, str, str]:
-    """Return immutable dimensions that distinguish two release environments."""
+def _independence_profile(binding: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    """Return only contract-validated receipt dimensions, never mutable labels."""
     try:
-        python = environment["python"]
-        vector = environment["vector"]
+        profile = binding["validatedEnvironmentProfile"]
+        if type(profile) is not dict or set(profile) != {
+            "pythonPlatform",
+            "pythonLockSha256",
+            "vectorPlatform",
+            "tippecanoeBinarySha256",
+        }:
+            raise KeyError("validatedEnvironmentProfile")
         profile = (
-            python["platform"],
-            python["lock_sha256"],
-            vector["pmtiles_distribution_platform"],
-            vector["tippecanoe_binary_sha256"],
+            profile["pythonPlatform"],
+            profile["pythonLockSha256"],
+            profile["vectorPlatform"],
+            profile["tippecanoeBinarySha256"],
         )
     except (KeyError, TypeError) as exc:
         raise ScienceContractError(
@@ -107,8 +113,8 @@ def compare_release_candidates(
 ) -> Mapping[str, Any]:
     """Hash real bytes and compare scientific values and valid-ID sets exactly."""
     started = time.perf_counter()
-    first_binding = candidate_binding(first)
-    second_binding = candidate_binding(second)
+    first_binding = candidate_binding(first, contract=contract)
+    second_binding = candidate_binding(second, contract=contract)
     first_manifest = load_json(first / "manifest.json")
     second_manifest = load_json(second / "manifest.json")
     if (
@@ -121,18 +127,12 @@ def compare_release_candidates(
     _validate_matrix(second_manifest, contract)
     first_environment = first_binding["environmentIdentity"]
     second_environment = second_binding["environmentIdentity"]
-    if first_environment.get("buildRunId") == second_environment.get("buildRunId"):
-        raise ScienceContractError("Two distinct clean build run identities are required")
     if first_binding["sourceRevision"] != second_binding["sourceRevision"]:
         raise ScienceContractError("Independent candidates must build the same source revision")
-    independence_profiles = {
-        _independence_profile(first_environment),
-        _independence_profile(second_environment),
+    receipt_profiles = {
+        _independence_profile(first_binding),
+        _independence_profile(second_binding),
     }
-    if len(independence_profiles) != 2:
-        raise ScienceContractError(
-            "Two genuinely independent pinned environment profiles are required"
-        )
     first_artifacts = {item["path"]: item for item in first_manifest["artifacts"]}
     second_artifacts = {item["path"]: item for item in second_manifest["artifacts"]}
     if first_artifacts.keys() != second_artifacts.keys():
@@ -156,28 +156,55 @@ def compare_release_candidates(
     second_ids = _valid_ids(second / "analysis/projections.parquet")
     valid_id_difference = len(first_ids.symmetric_difference(second_ids))
     tolerance = contract["reproducibility"]
-    status = (
+    local_status = (
         "passed"
         if maximum_difference == tolerance["scientificValueToleranceMillimetres"]
         and valid_id_difference == tolerance["validIdSetDifference"]
         and byte_identical == tolerance["byteIdentityWithinPinnedToolchain"]
         else "failed"
     )
+    candidate_bindings = [first_binding, second_binding]
+    required_external_bindings = [
+        {
+            "candidateBindingSha256": binding_sha256(binding),
+            "releaseId": binding["releaseId"],
+            "sourceRevision": binding["sourceRevision"],
+            "receiptBuildRunId": binding["environmentIdentity"]["buildRunId"],
+            "validatedEnvironmentProfile": binding["validatedEnvironmentProfile"],
+        }
+        for binding in candidate_bindings
+    ]
+    status = "failed" if local_status == "failed" else "pending-external-provenance"
     return {
         "schemaVersion": 1,
         "status": status,
-        "candidates": [first_binding, second_binding],
+        "localComparisonStatus": local_status,
+        "externalProvenanceStatus": "required",
+        "candidates": candidate_bindings,
         "environments": [first_environment, second_environment],
-        "independentEnvironmentCount": len(independence_profiles),
-        "independenceProfiles": [
+        "independentEnvironmentCount": 0,
+        "receiptProfileCount": len(receipt_profiles),
+        "receiptProfiles": [
             {
                 "pythonPlatform": profile[0],
                 "pythonLockSha256": profile[1],
                 "vectorPlatform": profile[2],
                 "tippecanoeBinarySha256": profile[3],
             }
-            for profile in sorted(independence_profiles)
+            for profile in sorted(receipt_profiles)
         ],
+        "requiredExternalBindings": required_external_bindings,
+        "externalProvenanceRequirement": {
+            "provider": "github-actions",
+            "candidateBindingRequired": True,
+            "distinctTrustedRunCount": contract["reproducibility"][
+                "minimumIndependentEnvironments"
+            ],
+            "distinctValidatedProfileCount": contract["reproducibility"][
+                "minimumIndependentEnvironments"
+            ],
+            "receiptProfilesAreProof": False,
+        },
         "maximumScientificValueDifferenceMillimetres": maximum_difference,
         "validIdSetDifference": valid_id_difference,
         "byteIdentityWithinPinnedToolchain": byte_identical,

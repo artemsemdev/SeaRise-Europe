@@ -4,10 +4,29 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
 from searise_pipeline.science.contracts import ScienceContractError
+
+_HEX40 = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _same_json_value(observed: Any, expected: Any) -> bool:
+    if type(observed) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return set(observed) == set(expected) and all(
+            _same_json_value(observed[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return len(observed) == len(expected) and all(
+            _same_json_value(left, right)
+            for left, right in zip(observed, expected)
+        )
+    return observed == expected
 
 
 def sha256(path: Path) -> str:
@@ -56,7 +75,135 @@ def safe_candidate_path(root: Path, relative: str) -> Path:
     return resolved
 
 
-def candidate_binding(root: Path) -> Mapping[str, Any]:
+def _validate_build_receipt(
+    receipt: Mapping[str, Any],
+    *,
+    manifest: Mapping[str, Any],
+    contract: Mapping[str, Any],
+) -> Mapping[str, str]:
+    expected_keys = {
+        "schemaVersion",
+        "releaseId",
+        "sourceRevision",
+        "toolchainPins",
+        "environmentIdentity",
+        "normalizedParameters",
+    }
+    if type(receipt) is not dict or set(receipt) != expected_keys:
+        raise ScienceContractError("Build receipt fields differ from the exact schema")
+    release_id = manifest.get("releaseId")
+    source_revision = receipt.get("sourceRevision")
+    if (
+        type(receipt.get("schemaVersion")) is not int
+        or receipt["schemaVersion"] != 1
+        or not isinstance(release_id, str)
+        or type(receipt.get("releaseId")) is not str
+        or receipt["releaseId"] != release_id
+        or type(source_revision) is not str
+        or _HEX40.fullmatch(source_revision) is None
+    ):
+        raise ScienceContractError("Build receipt identity is invalid")
+    if not _same_json_value(receipt["toolchainPins"], contract["toolchain"]):
+        raise ScienceContractError("Build receipt toolchain pins differ from the contract")
+    expected_parameters = {
+        "nativeResolutionDegrees": contract["grid"]["nativeResolutionDegrees"],
+        "pmtilesMaximumZoom": contract["artifacts"]["pmtiles"]["maximumZoom"],
+        "scientificResampling": "none",
+        "pmtilesCanonicalMetadata": True,
+    }
+    if not _same_json_value(receipt["normalizedParameters"], expected_parameters):
+        raise ScienceContractError("Build receipt parameters differ from the contract")
+
+    environment = receipt["environmentIdentity"]
+    if type(environment) is not dict or set(environment) != {
+        "buildRunId",
+        "python",
+        "vector",
+    }:
+        raise ScienceContractError("Build environment fields differ from the exact schema")
+    build_run_id = environment["buildRunId"]
+    if (
+        type(build_run_id) is not str
+        or not build_run_id
+        or len(build_run_id) > 128
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]*", build_run_id) is None
+    ):
+        raise ScienceContractError("Build run label is invalid")
+
+    python = environment["python"]
+    if type(python) is not dict:
+        raise ScienceContractError("Python environment evidence must be an exact object")
+    python_platform = python.get("platform")
+    python_profiles = contract["toolchain"]["python"]["profiles"]
+    if type(python_platform) is not str or python_platform not in python_profiles:
+        raise ScienceContractError("Python environment is not an allowed pinned profile")
+    python_pin = python_profiles[python_platform]
+    expected_python = {
+        "platform": python_platform,
+        "python_version": python_pin["pythonVersion"],
+        "lock_path": python_pin["lockPath"],
+        "lock_sha256": python_pin["lockSha256"],
+        "packages": contract["toolchain"]["python"]["packageVersions"],
+        "gdal_version": python_pin["gdal"],
+        "rasterio_proj_version": python_pin["rasterioProj"],
+        "pyproj_proj_version": python_pin["pyprojProj"],
+    }
+    if not _same_json_value(python, expected_python):
+        raise ScienceContractError("Python environment evidence differs from its pinned profile")
+
+    vector = environment["vector"]
+    expected_vector_platform = python_platform.rsplit("-cp", 1)[0].replace(
+        "macos-", "darwin-", 1
+    )
+    tippecanoe = contract["toolchain"]["tippecanoe"]
+    pmtiles = contract["toolchain"]["pmtiles"]
+    reference_build = tippecanoe["referenceBuilds"].get(expected_vector_platform)
+    distribution_asset = pmtiles["assets"].get(expected_vector_platform)
+    expected_vector_keys = {
+        "tippecanoe_version",
+        "tippecanoe_source_sha256",
+        "tippecanoe_binary_sha256",
+        "pmtiles_version",
+        "pmtiles_commit",
+        "pmtiles_distribution_platform",
+        "pmtiles_distribution_sha256",
+        "decode_binary_sha256",
+    }
+    if (
+        type(vector) is not dict
+        or set(vector) != expected_vector_keys
+        or reference_build is None
+        or distribution_asset is None
+    ):
+        raise ScienceContractError("Vector environment is not an allowed pinned profile")
+    expected_vector = {
+        "tippecanoe_version": tippecanoe["version"],
+        "tippecanoe_source_sha256": tippecanoe["sourceSha256"],
+        "tippecanoe_binary_sha256": reference_build["tippecanoeBinarySha256"],
+        "pmtiles_version": pmtiles["version"],
+        "pmtiles_commit": pmtiles["commit"],
+        "pmtiles_distribution_platform": expected_vector_platform,
+        "pmtiles_distribution_sha256": distribution_asset["sha256"],
+        "decode_binary_sha256": reference_build["decodeBinarySha256"],
+    }
+    if any(
+        not _same_json_value(vector[key], value)
+        for key, value in expected_vector.items()
+    ):
+        raise ScienceContractError("Vector environment evidence differs from its pinned profile")
+    return {
+        "pythonPlatform": python_platform,
+        "pythonLockSha256": python_pin["lockSha256"],
+        "vectorPlatform": expected_vector_platform,
+        "tippecanoeBinarySha256": reference_build["tippecanoeBinarySha256"],
+    }
+
+
+def candidate_binding(
+    root: Path,
+    *,
+    contract: Mapping[str, Any],
+) -> Mapping[str, Any]:
     """Hash every declared artifact and the receipts before accepting evidence."""
     try:
         candidate_entries = list(root.rglob("*"))
@@ -137,8 +284,11 @@ def candidate_binding(root: Path) -> Mapping[str, Any]:
     load_json(source_receipt_path)
     load_json(statistics_path)
     load_json(gate_path)
-    if receipt.get("releaseId") != manifest.get("releaseId"):
-        raise ScienceContractError("Build receipt and manifest release IDs differ")
+    validated_profile = _validate_build_receipt(
+        receipt,
+        manifest=manifest,
+        contract=contract,
+    )
     candidate_files = {
         **actual_files,
         "checksums.txt": sha256(checksum_path),
@@ -154,4 +304,5 @@ def candidate_binding(root: Path) -> Mapping[str, Any]:
         "candidateFileHashes": candidate_files,
         "sourceRevision": receipt["sourceRevision"],
         "environmentIdentity": receipt["environmentIdentity"],
+        "validatedEnvironmentProfile": validated_profile,
     }

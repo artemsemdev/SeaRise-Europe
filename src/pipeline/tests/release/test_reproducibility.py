@@ -54,16 +54,17 @@ def test_matrix_inventory_rejects_an_unknown_role() -> None:
 
 
 def test_environment_independence_uses_immutable_profile_dimensions() -> None:
-    environment = {
-        "buildRunId": "arbitrary-label",
-        "python": {"platform": "linux-x86_64-cp311", "lock_sha256": "a" * 64},
-        "vector": {
-            "pmtiles_distribution_platform": "linux-x86_64",
-            "tippecanoe_binary_sha256": "b" * 64,
+    binding = {
+        "environmentIdentity": {"buildRunId": "arbitrary-label"},
+        "validatedEnvironmentProfile": {
+            "pythonPlatform": "linux-x86_64-cp311",
+            "pythonLockSha256": "a" * 64,
+            "vectorPlatform": "linux-x86_64",
+            "tippecanoeBinarySha256": "b" * 64,
         },
     }
 
-    assert _independence_profile(environment) == (
+    assert _independence_profile(binding) == (
         "linux-x86_64-cp311",
         "a" * 64,
         "linux-x86_64",

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Mapping
@@ -538,8 +539,64 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     )
     assert source_grid["path"] == "analysis/source-grid.json.gz"
     assert first_result.manifest == second_result.manifest
-    with pytest.raises(ScienceContractError, match="genuinely independent"):
-        compare_release_candidates(first, second, contract=contract())
+    comparison = compare_release_candidates(first, second, contract=contract())
+    assert comparison["status"] == "pending-external-provenance"
+    assert comparison["localComparisonStatus"] == "passed"
+    assert comparison["independentEnvironmentCount"] == 0
+    assert comparison["receiptProfileCount"] == 1
+    assert comparison["externalProvenanceRequirement"]["receiptProfilesAreProof"] is False
+    assert comparison["externalProvenanceRequirement"][
+        "distinctValidatedProfileCount"
+    ] == 2
+
+    forged = tmp_path / "forged-copy"
+    shutil.copytree(first, forged)
+    release = contract()
+    receipt_path = forged / "build-receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    python_pin = release["toolchain"]["python"]
+    python_profile = python_pin["profiles"]["linux-x86_64-cp311"]
+    tippecanoe = release["toolchain"]["tippecanoe"]
+    vector_reference = tippecanoe["referenceBuilds"]["linux-x86_64"]
+    pmtiles = release["toolchain"]["pmtiles"]
+    pmtiles_asset = pmtiles["assets"]["linux-x86_64"]
+    receipt["environmentIdentity"] = {
+        "buildRunId": "forged-linux-build",
+        "python": {
+            "platform": "linux-x86_64-cp311",
+            "python_version": python_profile["pythonVersion"],
+            "lock_path": python_profile["lockPath"],
+            "lock_sha256": python_profile["lockSha256"],
+            "packages": python_pin["packageVersions"],
+            "gdal_version": python_profile["gdal"],
+            "rasterio_proj_version": python_profile["rasterioProj"],
+            "pyproj_proj_version": python_profile["pyprojProj"],
+        },
+        "vector": {
+            "tippecanoe_version": tippecanoe["version"],
+            "tippecanoe_source_sha256": tippecanoe["sourceSha256"],
+            "tippecanoe_binary_sha256": vector_reference["tippecanoeBinarySha256"],
+            "pmtiles_version": pmtiles["version"],
+            "pmtiles_commit": pmtiles["commit"],
+            "pmtiles_distribution_platform": "linux-x86_64",
+            "pmtiles_distribution_sha256": pmtiles_asset["sha256"],
+            "decode_binary_sha256": vector_reference["decodeBinarySha256"],
+        },
+    }
+    _write_json(receipt_path, receipt)
+    release_builder._checksums(forged)
+    forged_comparison = compare_release_candidates(first, forged, contract=release)
+    assert forged_comparison["status"] == "pending-external-provenance"
+    assert forged_comparison["localComparisonStatus"] == "passed"
+    assert forged_comparison["independentEnvironmentCount"] == 0
+    assert forged_comparison["receiptProfileCount"] == 2
+    assert len(forged_comparison["requiredExternalBindings"]) == 2
+    assert len(
+        {
+            binding["candidateBindingSha256"]
+            for binding in forged_comparison["requiredExternalBindings"]
+        }
+    ) == 2
     assert first_result.gate["disposition"] == "blocked"
     assert first_result.gate["blockingChecks"] == [
         "sourceArchiveAndMembersVerified",
