@@ -19,6 +19,7 @@ from .pmtiles import (
     validate_vector_toolchain,
     write_visual_pmtiles,
 )
+from .promotion import finalize_recovery_gate
 from .reproducibility import compare_release_candidates
 
 __all__ = [
@@ -34,6 +35,7 @@ __all__ = [
     "create_delivery_report",
     "build_regional_release",
     "evaluate_recovery_gate",
+    "finalize_recovery_gate",
     "load_release_contract",
     "load_source_fixture",
     "validate_analysis_cog",

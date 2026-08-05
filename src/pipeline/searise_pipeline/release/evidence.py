@@ -39,14 +39,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def load_json(path: Path) -> Mapping[str, Any]:
+def load_json_snapshot(path: Path) -> tuple[Mapping[str, Any], str]:
+    """Read one JSON byte snapshot and return its object and SHA-256 digest."""
     try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        encoded = path.read_bytes()
+        document = json.loads(encoded.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ScienceContractError(f"Cannot read release evidence: {exc}") from exc
     if not isinstance(document, dict):
         raise ScienceContractError("Release evidence must be a JSON object")
-    return document
+    return document, hashlib.sha256(encoded).hexdigest()
+
+
+def load_json(path: Path) -> Mapping[str, Any]:
+    """Read a release-evidence JSON object from one byte snapshot."""
+    return load_json_snapshot(path)[0]
 
 
 def ensure_outside_candidate(
@@ -63,7 +70,7 @@ def ensure_outside_candidate(
     resolved = path.resolve(strict=False)
     if resolved == candidate_root or candidate_root in resolved.parents:
         raise ScienceContractError(f"{label} must be outside the immutable candidate")
-    if require_new and path.exists():
+    if require_new and resolved.exists():
         raise ScienceContractError(f"{label} already exists and cannot be overwritten")
     return resolved
 

@@ -13,7 +13,7 @@ import numpy as np
 
 from searise_pipeline.science.contracts import ScienceContractError
 
-from .evidence import candidate_binding, load_json, sha256
+from .evidence import candidate_binding, load_json, load_json_snapshot, sha256
 
 _TRACE_KEYS = {
     "schemaVersion",
@@ -129,7 +129,7 @@ def create_delivery_report(
         or sha256(harness_path) != specification["harnessSha256"]
     ):
         raise ScienceContractError("Browser delivery harness differs from the contract")
-    trace = load_json(trace_path)
+    trace, trace_sha256 = load_json_snapshot(trace_path)
     binding = candidate_binding(candidate, contract=contract)
     manifest = load_json(candidate / "manifest.json")
     artifacts = manifest.get("artifacts")
@@ -147,7 +147,7 @@ def create_delivery_report(
         raise ScienceContractError("Release manifest has invalid delivery artifact sizes") from exc
     if len(artifact_byte_sizes) != len(artifacts):
         raise ScienceContractError("Release manifest has invalid delivery artifact sizes")
-    build_timing = load_json(build_timing_path)
+    build_timing, build_timing_sha256 = load_json_snapshot(build_timing_path)
     if (
         build_timing.get("candidate") != binding
         or build_timing.get("timer") != "python-time-perf-counter"
@@ -367,10 +367,10 @@ def create_delivery_report(
         "schemaVersion": 1,
         "status": "passed" if passed else "failed",
         "candidate": binding,
-        "trace": {"path": trace_path.name, "sha256": sha256(trace_path)},
+        "trace": {"path": trace_path.name, "sha256": trace_sha256},
         "buildTiming": {
             "path": build_timing_path.name,
-            "sha256": sha256(build_timing_path),
+            "sha256": build_timing_sha256,
         },
         "harness": {
             "path": specification["harnessPath"],
