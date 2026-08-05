@@ -9,6 +9,7 @@ from searise_pipeline.science.contracts import ScienceContractError
 _BUILD_CHECKS = (
     "sourceArchiveAndMembersVerified",
     "completeScenarioHorizonMatrix",
+    "sourceGridIdentity",
     "cogStructureAndValues",
     "geoparquetSchemaAndValues",
     "pmtilesStructureAndProperties",
