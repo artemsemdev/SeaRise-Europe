@@ -1,0 +1,112 @@
+"""Tests that freeze the AR6 lookup validation set before reference extraction."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from jsonschema import Draft202012Validator
+
+SCIENCE_DIR = Path(__file__).parents[2] / "science"
+
+
+def _document(name: str) -> dict[str, object]:
+    return json.loads((SCIENCE_DIR / name).read_text(encoding="utf-8"))
+
+
+def test_lookup_validation_contract_matches_schema() -> None:
+    contract = _document("ar6-lookup-validation.json")
+    schema = _document("ar6-lookup-validation.schema.json")
+
+    Draft202012Validator(schema).validate(contract)
+
+
+def test_member_hashes_are_bound_to_source_lock() -> None:
+    contract = _document("ar6-lookup-validation.json")
+    source_lock = json.loads(
+        (SCIENCE_DIR.parent / "sources/source-lock.json").read_text(encoding="utf-8")
+    )
+    source = next(
+        item
+        for item in source_lock["sources"]
+        if item["id"] == contract["source"]["sourceId"]
+        and item["version"] == contract["source"]["version"]
+    )
+    archive = next(
+        item
+        for item in source["assets"]
+        if item["sha256"] == contract["source"]["archiveSha256"]
+    )
+    upstream_to_product = {
+        "ssp126": "ssp1-26",
+        "ssp245": "ssp2-45",
+        "ssp585": "ssp5-85",
+    }
+    locked = {
+        upstream_to_product[member["scenario"]]: member["sha256"]
+        for member in archive["members"]
+    }
+
+    assert contract["source"]["memberSha256ByScenario"] == locked
+
+
+def test_golden_set_and_tolerance_are_predeclared() -> None:
+    contract = _document("ar6-lookup-validation.json")
+    validation = contract["validation"]
+
+    assert validation["numericToleranceMetres"] == 1e-12
+    assert validation["scenarioHorizonMatrix"] == {
+        "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
+        "horizons": [2030, 2050, 2100],
+    }
+    points = validation["goldenPoints"]
+    assert len({point["id"] for point in points}) == len(points)
+    coverage = {point["coverage"] for point in points}
+    assert {
+        "Atlantic and North Sea",
+        "Baltic Sea",
+        "Mediterranean and Adriatic Sea",
+        "Black Sea",
+    }.issubset(coverage)
+    kinds = {point["kind"] for point in points}
+    assert {"port", "estuary", "island", "high-latitude", "scope-control"} <= kinds
+
+
+def test_algorithmic_controls_freeze_fail_closed_edges() -> None:
+    contract = _document("ar6-lookup-validation.json")
+    controls = {
+        item["purpose"]: (item["expectedState"], item["expectedReasonCode"])
+        for item in contract["validation"]["algorithmicControls"]
+    }
+
+    assert controls == {
+        "nodata": ("DataUnavailable", "source-value-nodata"),
+        "distance-boundary": ("ProjectionAvailable", "projection-available"),
+        "beyond-maximum-distance": (
+            "DataUnavailable",
+            "source-grid-beyond-maximum-distance",
+        ),
+        "tie-break": ("ProjectionAvailable", "projection-available"),
+    }
+
+
+def test_lookup_is_grid_only_and_never_skips_nodata() -> None:
+    lookup = _document("ar6-lookup-validation.json")["lookup"]
+
+    assert lookup == {
+        "sourceFamily": "native-one-degree-grid",
+        "locationSelection": "nearest-source-grid-location",
+        "maximumDistanceKm": 100,
+        "distance": {
+            "algorithm": "haversine",
+            "earthMeanRadiusKm": 6371.0088,
+            "boundary": "inclusive",
+        },
+        "tieBreak": "lowest-source-location-id",
+        "requiredQuantiles": [0.167, 0.5, 0.833],
+        "nodataRule": (
+            "resolve-nearest-location-first-then-fail-if-any-required-quantile-is-fill"
+        ),
+        "interpolation": "forbidden",
+        "extrapolation": "forbidden",
+    }
