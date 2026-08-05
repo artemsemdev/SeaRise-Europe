@@ -34,12 +34,18 @@ def _tool_paths() -> dict[str, Path]:
         "tippecanoe_path": Path(os.environ["SEARISE_TIPPECANOE"]),
         "decode_path": Path(os.environ["SEARISE_TIPPECANOE_DECODE"]),
         "pmtiles_path": Path(os.environ["SEARISE_PMTILES"]),
+        "python_lock_path": Path(os.environ["SEARISE_PYTHON_LOCK"]),
     }
 
 
 EXTERNAL_TOOLS_AVAILABLE = all(
     os.environ.get(name)
-    for name in ("SEARISE_TIPPECANOE", "SEARISE_TIPPECANOE_DECODE", "SEARISE_PMTILES")
+    for name in (
+        "SEARISE_TIPPECANOE",
+        "SEARISE_TIPPECANOE_DECODE",
+        "SEARISE_PMTILES",
+        "SEARISE_PYTHON_LOCK",
+    )
 )
 
 
@@ -115,4 +121,50 @@ def test_builder_refuses_to_overwrite_immutable_release(tmp_path: Path) -> None:
             tippecanoe_path=Path("missing"),
             decode_path=Path("missing"),
             pmtiles_path=Path("missing"),
+            python_lock_path=Path("missing"),
         )
+
+
+def test_builder_rejects_source_mutation_before_artifact_generation(
+    tmp_path: Path,
+) -> None:
+    source = _source()
+    layer = source.layers[0]
+    layer.central_mm.flags.writeable = True
+    layer.central_mm[0, 0] = layer.central_mm[0, 0] + 1
+
+    with pytest.raises(ScienceContractError, match="changed after verification"):
+        build_regional_release(
+            source,
+            tmp_path / "candidate",
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            tippecanoe_path=Path("missing"),
+            decode_path=Path("missing"),
+            pmtiles_path=Path("missing"),
+            python_lock_path=Path("missing"),
+        )
+
+    assert not (tmp_path / "candidate").exists()
+
+
+def test_builder_rejects_unbound_python_environment_before_vector_tools(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "candidate"
+
+    with pytest.raises(ScienceContractError, match="release lock differs"):
+        build_regional_release(
+            _source(),
+            output,
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            tippecanoe_path=Path("missing"),
+            decode_path=Path("missing"),
+            pmtiles_path=Path("missing"),
+            python_lock_path=Path("missing"),
+        )
+
+    assert not output.exists()

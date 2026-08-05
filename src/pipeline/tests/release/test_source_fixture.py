@@ -114,3 +114,18 @@ def test_source_content_seal_rejects_post_verification_array_mutation() -> None:
 
     with pytest.raises(ScienceContractError, match="changed after verification"):
         assert_source_integrity(source, contract(), require_verified_archive=False)
+
+
+def test_fixture_writer_rejects_mutated_source_before_creating_output(
+    tmp_path: Path,
+) -> None:
+    source = fixture_source()
+    layer = source.layers[0]
+    layer.central_mm.flags.writeable = True
+    layer.central_mm[0, 0] = layer.central_mm[0, 0] + 1
+    output = tmp_path / "mutated.json.gz"
+
+    with pytest.raises(ScienceContractError, match="changed after verification"):
+        write_source_fixture(source, output)
+
+    assert not output.exists()

@@ -213,6 +213,11 @@ def assert_source_integrity(
     if require_verified_archive and not source.archive_and_members_verified_this_build:
         raise ScienceContractError("Scientific release requires freshly verified archive bytes")
     _validate_source(source, contract)
+    _assert_source_content_seal(source)
+
+
+def _assert_source_content_seal(source: RegionalReleaseSource) -> None:
+    """Reject any array mutation after source verification or fixture loading."""
     observed = _source_content_sha256(
         source.latitudes, source.longitudes, source.location_ids, source.layers
     )
@@ -331,6 +336,7 @@ def _fixture_document(source: RegionalReleaseSource) -> Mapping[str, Any]:
 
 def write_source_fixture(source: RegionalReleaseSource, path: Path) -> Mapping[str, Any]:
     """Write a deterministic gzip fixture derived from already verified bytes."""
+    _assert_source_content_seal(source)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = _canonical_json(_fixture_document(source))
     with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as temporary:
