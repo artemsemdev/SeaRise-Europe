@@ -34,7 +34,93 @@
           "sha256": "431bf1a682b5938290565fb4c1969e56cfbb7c4b1fb08bc7459d9b2dc758d88d",
           "upstreamChecksum": "md5:f536e05937342f1183cc04f48294270d",
           "cachePath": "location_list.lst",
-          "availability": "locked"
+          "availability": "locked",
+          "roles": [
+            "projection-location-index"
+          ]
+        },
+        {
+          "id": "regional-confidence-archive",
+          "kind": "file",
+          "url": "https://zenodo.org/api/records/6382554/files/ar6-regional-confidence.zip/content",
+          "resolvedUrl": "https://zenodo.org/api/records/6382554/files/ar6-regional-confidence.zip/content",
+          "resolvedVersion": "20210809",
+          "mediaType": "application/zip",
+          "cachePath": "ar6-regional-confidence.zip",
+          "availability": "locked",
+          "byteSize": 9243771601,
+          "sha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+          "roles": [
+            "projection-change",
+            "likely-interval"
+          ],
+          "upstreamChecksum": "md5:fec362a2385079fac32fa736d4a39944",
+          "members": [
+            {
+              "id": "ssp126-medium-total",
+              "path": "ar6-regional-confidence/regional/confidence_output_files/medium_confidence/ssp126/total_ssp126_medium_confidence_values.nc",
+              "role": "medium-confidence-total-projection",
+              "byteSize": 72061982,
+              "compressedByteSize": 70766903,
+              "crc32": "ed514be9",
+              "sha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+              "scenario": "ssp126",
+              "variables": [
+                "sea_level_change"
+              ],
+              "quantiles": [
+                0.167,
+                0.5,
+                0.833
+              ]
+            },
+            {
+              "id": "ssp245-medium-total",
+              "path": "ar6-regional-confidence/regional/confidence_output_files/medium_confidence/ssp245/total_ssp245_medium_confidence_values.nc",
+              "role": "medium-confidence-total-projection",
+              "byteSize": 72943754,
+              "compressedByteSize": 71691928,
+              "crc32": "6ee89877",
+              "sha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+              "scenario": "ssp245",
+              "variables": [
+                "sea_level_change"
+              ],
+              "quantiles": [
+                0.167,
+                0.5,
+                0.833
+              ]
+            },
+            {
+              "id": "ssp585-medium-total",
+              "path": "ar6-regional-confidence/regional/confidence_output_files/medium_confidence/ssp585/total_ssp585_medium_confidence_values.nc",
+              "role": "medium-confidence-total-projection",
+              "byteSize": 74968632,
+              "compressedByteSize": 73773939,
+              "crc32": "7c423b60",
+              "sha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+              "scenario": "ssp585",
+              "variables": [
+                "sea_level_change"
+              ],
+              "quantiles": [
+                0.167,
+                0.5,
+                0.833
+              ]
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "region": "global-grid",
+          "status": "global",
+          "roles": [
+            "projection-change"
+          ],
+          "reason": "The selected members expose the source-native complete one-degree global grid; interpolation remains limited to valid source support."
         }
       ]
     },
@@ -117,6 +203,402 @@
           "upstreamChecksum": "etag:c5ee907d7e0aaae198cbb74a04d8c2b0",
           "cachePath": "ne_10m_ocean.zip",
           "availability": "locked"
+        }
+      ]
+    },
+    {
+      "id": "copernicus-marine-eur-sla-monthly",
+      "selectionStatus": "selected",
+      "publisher": "European Union Copernicus Marine Service; CLS/CNES producer",
+      "canonicalRecord": "https://data.marine.copernicus.eu/product/SEALEVEL_EUR_PHY_L4_MY_008_068/description",
+      "version": "202411",
+      "snapshotDate": "2026-08-05",
+      "licence": {
+        "name": "Copernicus Marine Service products licence",
+        "url": "https://marine.copernicus.eu/user-corner/service-commitments-and-licence",
+        "spdx": "LicenseRef-Copernicus-Marine-Service",
+        "attribution": "European Union, Copernicus Marine Service Information; DOI supplied with the product.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-05",
+        "requiredAcknowledgements": [
+          "For publications: This study has been conducted using E.U. Copernicus Marine Service Information and the product DOI.",
+          "For derived products: Generated using E.U. Copernicus Marine Service Information and the product DOI.",
+          "For redistribution: E.U. Copernicus Marine Service Information and the product DOI."
+        ],
+        "notes": "The licence permits use, adaptation, distribution, and reproduction subject to source identification and avoiding misleading endorsement or official-status claims."
+      },
+      "assets": [
+        {
+          "id": "monthly-sla-1995-2014",
+          "kind": "object-set",
+          "url": "https://s3.waw3-1.cloudferro.com/mdl-native-07",
+          "resolvedUrl": "https://s3.waw3-1.cloudferro.com/mdl-native-07",
+          "resolvedVersion": "202411",
+          "nativeVersion": "cmems_obs-sl_eur_phy-ssh_my_allsat-l4-duacs-0.0625deg_P1M-m_202411",
+          "mediaType": "application/x-netcdf",
+          "cachePath": "monthly-sla-1995-2014",
+          "availability": "locked",
+          "roles": [
+            "baseline-water-sla",
+            "monthly-simple-mean"
+          ],
+          "objectSet": {
+            "contract": "monthly-series-v1",
+            "manifestPath": "manifests/cmems-eur-monthly-sla-1995-2014-v202411.jsonl.gz",
+            "manifestMediaType": "application/gzip",
+            "manifestByteSize": 20380,
+            "manifestSha256": "94364fcb281bc3e0e3ee7d74c769f2dee5ad630305e040e5940603f1cecee5a7",
+            "payloadSha256": "77c8294956444b78c0d5d9127692f77ec597f2ec93476e71c296700cebbdda18",
+            "objectCount": 240,
+            "totalByteSize": 137971876,
+            "keyPrefix": "native/SEALEVEL_EUR_PHY_L4_MY_008_068/cmems_obs-sl_eur_phy-ssh_my_allsat-l4-duacs-0.0625deg_P1M-m_202411",
+            "referencePeriod": {
+              "startInclusive": "1995-01-01",
+              "endExclusive": "2015-01-01"
+            }
+          }
+        },
+        {
+          "id": "product-user-manual",
+          "kind": "file",
+          "url": "https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-046-047-060-068.pdf",
+          "resolvedUrl": "https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-046-047-060-068.pdf",
+          "resolvedVersion": "202411",
+          "mediaType": "application/pdf",
+          "cachePath": "documentation/CMEMS-SL-PUM-008-046-047-060-068.pdf",
+          "availability": "locked",
+          "byteSize": 730431,
+          "sha256": "75fa6dcee4910cb2a3fae25fbf565c56af7d3800d3586d3a196dd672d22115cf",
+          "roles": [
+            "aggregation-semantics",
+            "variable-contract"
+          ],
+          "nativeVersion": "issue-1.0-2025-11"
+        },
+        {
+          "id": "quality-information-document",
+          "kind": "file",
+          "url": "https://documentation.marine.copernicus.eu/QUID/CMEMS-SL-QUID-008-033-068.pdf",
+          "resolvedUrl": "https://documentation.marine.copernicus.eu/QUID/CMEMS-SL-QUID-008-033-068.pdf",
+          "resolvedVersion": "202411",
+          "mediaType": "application/pdf",
+          "cachePath": "documentation/CMEMS-SL-QUID-008-033-068.pdf",
+          "availability": "locked",
+          "byteSize": 6768390,
+          "sha256": "0be07a469ea5aeb6c03579df5c2ab80a2a83635e94204fa8c90cd1ba59bcd48e",
+          "roles": [
+            "mapping-error-evidence",
+            "validation-evidence"
+          ],
+          "nativeVersion": "issue-15.0-2026-05-26"
+        }
+      ],
+      "coverage": [
+        {
+          "region": "atlantic",
+          "status": "covered",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "Within the locked -30.03125 to 42.03125 longitude and 19.96875 to 66.03125 latitude grid support at valid ocean cells."
+        },
+        {
+          "region": "north-sea",
+          "status": "covered",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "Inside the product grid and named European Seas scope."
+        },
+        {
+          "region": "baltic-sea",
+          "status": "covered",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "Inside the product grid and named European Seas scope, subject to valid ocean cells and ice flags in the daily parent product."
+        },
+        {
+          "region": "mediterranean",
+          "status": "covered",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "Inside the product grid and named European Seas scope."
+        },
+        {
+          "region": "black-sea",
+          "status": "covered",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "Inside the product grid and named European Seas scope."
+        },
+        {
+          "region": "ports-estuaries",
+          "status": "partial",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "Altimetry-derived 0.0625-degree ocean grids do not establish valid values for every narrow port, estuary, or immediate shoreline cell."
+        },
+        {
+          "region": "northern-europe-above-66n",
+          "status": "not-covered",
+          "roles": [
+            "baseline-water-sla"
+          ],
+          "reason": "The locked product grid ends at 66.03125 degrees north."
+        }
+      ]
+    },
+    {
+      "id": "copernicus-marine-eur-mdt",
+      "selectionStatus": "selected",
+      "publisher": "European Union Copernicus Marine Service; CLS producer",
+      "canonicalRecord": "https://data.marine.copernicus.eu/product/SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070/description",
+      "version": "202411",
+      "snapshotDate": "2026-08-05",
+      "licence": {
+        "name": "Copernicus Marine Service products licence",
+        "url": "https://marine.copernicus.eu/user-corner/service-commitments-and-licence",
+        "spdx": "LicenseRef-Copernicus-Marine-Service",
+        "attribution": "European Union, Copernicus Marine Service Information; DOI supplied with the product.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-05",
+        "requiredAcknowledgements": [
+          "For publications: This study has been conducted using E.U. Copernicus Marine Service Information and the product DOI.",
+          "For derived products: Generated using E.U. Copernicus Marine Service Information and the product DOI.",
+          "For redistribution: E.U. Copernicus Marine Service Information and the product DOI."
+        ],
+        "notes": "The licence permits use, adaptation, distribution, and reproduction subject to source identification and avoiding misleading endorsement or official-status claims."
+      },
+      "assets": [
+        {
+          "id": "europe-mdt",
+          "kind": "file",
+          "url": "https://s3.waw3-1.cloudferro.com/mdl-native-07/native/SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070/cmems_obs-sl_eur_phy-mdt_my_l4-0.0625deg_P20Y_202411/mdt_cmems_2024_europe.nc",
+          "resolvedUrl": "https://s3.waw3-1.cloudferro.com/mdl-native-07/native/SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070/cmems_obs-sl_eur_phy-mdt_my_l4-0.0625deg_P20Y_202411/mdt_cmems_2024_europe.nc",
+          "resolvedVersion": "202411",
+          "mediaType": "application/x-netcdf",
+          "cachePath": "mdt_cmems_2024_europe.nc",
+          "availability": "locked",
+          "byteSize": 22840797,
+          "sha256": "397cdca04e899ceb9eb3182f87cab64498357881407b3ab769796ce756249682",
+          "roles": [
+            "baseline-water-mdt",
+            "mdt-formal-error",
+            "land-water-mask"
+          ],
+          "upstreamChecksum": "etag:c5efac6b56b187b816c87722fc8da009-3",
+          "nativeVersion": "1.0"
+        },
+        {
+          "id": "product-user-manual",
+          "kind": "file",
+          "url": "https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-063-066-067-70.pdf",
+          "resolvedUrl": "https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-063-066-067-70.pdf",
+          "resolvedVersion": "202411",
+          "mediaType": "application/pdf",
+          "cachePath": "documentation/CMEMS-SL-PUM-008-063-066-067-70.pdf",
+          "availability": "locked",
+          "byteSize": 745253,
+          "sha256": "640736fc0927ab2bb5d2e7574596f4c3c27c1894621fddcc66e6bbc8fc846425",
+          "roles": [
+            "variable-contract",
+            "formal-error-semantics"
+          ],
+          "nativeVersion": "issue-4.0-2024-11"
+        },
+        {
+          "id": "quality-information-document",
+          "kind": "file",
+          "url": "https://documentation.marine.copernicus.eu/QUID/CMEMS-SL-QUID-008-063-066-067-70.pdf",
+          "resolvedUrl": "https://documentation.marine.copernicus.eu/QUID/CMEMS-SL-QUID-008-063-066-067-70.pdf",
+          "resolvedVersion": "202411",
+          "mediaType": "application/pdf",
+          "cachePath": "documentation/CMEMS-SL-QUID-008-063-066-067-70.pdf",
+          "availability": "locked",
+          "byteSize": 3934800,
+          "sha256": "679102497dc139b38b7fc184f66a685f80207c9bc74fa1360c0810f38bfe5933",
+          "roles": [
+            "goco06s-lineage",
+            "mdt-validation-evidence"
+          ],
+          "nativeVersion": "issue-4.0-2024-10-09"
+        }
+      ],
+      "coverage": [
+        {
+          "region": "european-seas",
+          "status": "covered",
+          "roles": [
+            "baseline-water-mdt",
+            "mdt-formal-error"
+          ],
+          "reason": "The 0.0625-degree grid covers -31.96875 to 42.09375 longitude and 19.03125 to 66.96875 latitude at valid water-mask cells."
+        },
+        {
+          "region": "ports-estuaries",
+          "status": "partial",
+          "roles": [
+            "baseline-water-mdt",
+            "mdt-formal-error"
+          ],
+          "reason": "The grid and land-water mask do not guarantee support inside every narrow coastal water body."
+        }
+      ]
+    },
+    {
+      "id": "goco06s-gravity-model",
+      "selectionStatus": "selected",
+      "publisher": "International Centre for Global Earth Models (GFZ) and GOCO consortium",
+      "canonicalRecord": "https://icgem.gfz.de/tom_longtime",
+      "version": "GOCO06S-2019-12-13",
+      "snapshotDate": "2026-08-05",
+      "licence": {
+        "name": "Creative Commons Attribution 4.0 International",
+        "url": "https://creativecommons.org/licenses/by/4.0/",
+        "spdx": "CC-BY-4.0",
+        "attribution": "Kvas et al. (2021), GOCO06s – a satellite-only global gravity field model, doi:10.5194/essd-13-99-2021; ICGEM doi:10.5880/ICGEM.2019.002.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-05",
+        "requiredAcknowledgements": [
+          "Retain the model citations and CC BY 4.0 notice embedded in GOCO06s.gfc."
+        ]
+      },
+      "assets": [
+        {
+          "id": "goco06s-coefficients",
+          "kind": "file",
+          "url": "https://icgem.gfz.de/getmodel/zip/32ec2884630a02670476f752d2a2bf1c395d8c8d6d768090ed95b4f04b0d5863/GOCO06s.zip",
+          "resolvedUrl": "https://icgem.gfz.de/getmodel/zip/32ec2884630a02670476f752d2a2bf1c395d8c8d6d768090ed95b4f04b0d5863/GOCO06s.zip",
+          "resolvedVersion": "GOCO06S-2019-12-13",
+          "mediaType": "application/zip",
+          "cachePath": "GOCO06s.zip",
+          "availability": "locked",
+          "byteSize": 3763873,
+          "sha256": "980e00abdb126994ff0a682fe7de4226acd77b35ed247bf1732783759fb600b6",
+          "roles": [
+            "source-geoid-coefficients",
+            "formal-coefficient-errors"
+          ],
+          "members": [
+            {
+              "id": "goco06s-gfc",
+              "path": "GOCO06s.gfc",
+              "role": "zero-tide-time-dependent-coefficients",
+              "nativeVersion": "degree-300-reference-epoch-2010-01-01",
+              "byteSize": 10451091,
+              "sha256": "351d9d20b84cd2c0f52ce77146b1e3b774f408200b579ffaf98593cf3d271819",
+              "variables": [
+                "C",
+                "S",
+                "sigmaC",
+                "sigmaS"
+              ]
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "region": "global-gravity-field",
+          "status": "global",
+          "roles": [
+            "source-geoid-coefficients"
+          ],
+          "reason": "Spherical-harmonic model through degree 300; numerical use remains subject to tide, epoch, ellipsoid, truncation, and coefficient-error controls."
+        }
+      ]
+    },
+    {
+      "id": "egm2008-gravity-model",
+      "selectionStatus": "selected",
+      "publisher": "United States National Geospatial-Intelligence Agency",
+      "canonicalRecord": "https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84",
+      "version": "EGM2008-2008-07",
+      "snapshotDate": "2026-08-05",
+      "licence": {
+        "name": "NGA EGM2008 official public release; United States Government work",
+        "url": "https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84",
+        "spdx": "LicenseRef-US-Government-Work-Public-Release",
+        "attribution": "National Geospatial-Intelligence Agency EGM2008; Pavlis et al. (2012), doi:10.1029/2011JB008916.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-05",
+        "requiredAcknowledgements": [
+          "Identify NGA EGM2008 and cite Pavlis et al. (2012) in scientific derivatives."
+        ],
+        "notes": "NGA publishes the model for free public download. The source bytes remain outside Git; only hashes and inspection metadata are redistributed here."
+      },
+      "assets": [
+        {
+          "id": "spherical-harmonics",
+          "kind": "file",
+          "url": "https://earth-info.nga.mil/php/download.php?file=egm-08spherical",
+          "resolvedUrl": "https://earth-info.nga.mil/php/download.php?file=egm-08spherical",
+          "resolvedVersion": "EGM2008-2008-07",
+          "mediaType": "application/zip",
+          "cachePath": "EGM2008_Spherical_Harmonics.zip",
+          "availability": "locked",
+          "byteSize": 109351360,
+          "sha256": "65a9072f337f156e8cbd76ffd773f536e6fb0de18697ea6726ecdb790fac0fbd",
+          "roles": [
+            "target-geoid-coefficients",
+            "calibrated-coefficient-errors"
+          ],
+          "members": [
+            {
+              "id": "egm2008-coefficients",
+              "path": "EGM2008_to2190_TideFree",
+              "role": "tide-free-spherical-harmonic-coefficients",
+              "nativeVersion": "degree-2190-order-2159",
+              "byteSize": 242534633,
+              "sha256": "7e448aac4e1b8e63955890cbca08286018ecc6d203e074a64ba5bde21851438a",
+              "variables": [
+                "C",
+                "S",
+                "sigmaC",
+                "sigmaS"
+              ]
+            },
+            {
+              "id": "zeta-to-n-terms",
+              "path": "Zeta-to-N_to2160_egm2008",
+              "role": "height-anomaly-to-geoid-undulation-terms",
+              "nativeVersion": "degree-2160",
+              "byteSize": 142498501,
+              "sha256": "464ca875a86a5eba8e7dbb8f3cd18196c02375a318b77bc3a0294abf073b07b8",
+              "variables": [
+                "conversion-coefficients"
+              ]
+            },
+            {
+              "id": "readme-wgs84",
+              "path": "README_WGS84_2.pdf",
+              "role": "datum-and-error-documentation",
+              "nativeVersion": "2008-07-22",
+              "byteSize": 348694,
+              "sha256": "e17ee6311c24f3ee60802c6af84e9b773819178cb60cd3c57aaa8f15cca6b33c",
+              "variables": [
+                "documentation"
+              ]
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "region": "global-gravity-field",
+          "status": "global",
+          "roles": [
+            "target-geoid-coefficients"
+          ],
+          "reason": "Tide-free spherical-harmonic model through degree 2190/order 2159 with calibrated coefficient errors and WGS84 evaluation guidance."
         }
       ]
     },

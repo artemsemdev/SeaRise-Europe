@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -91,6 +92,9 @@ def _write_lock_with_object_set(tmp_path: Path, object_set: dict) -> Path:
         asset.pop(field, None)
     lock = tmp_path / "source-lock.json"
     lock.write_text(json.dumps(document), encoding="utf-8")
+    shutil.copytree(
+        PIPELINE_ROOT / "sources" / "manifests", tmp_path / "manifests", dirs_exist_ok=True
+    )
     return lock
 
 
@@ -104,8 +108,12 @@ def test_committed_source_lock_is_valid_and_covers_required_publishers():
         "copernicus-dem-glo30",
         "copernicus-dem-glo90",
         "copernicus-coastal-zones-2018",
+        "copernicus-marine-eur-sla-monthly",
+        "copernicus-marine-eur-mdt",
+        "goco06s-gravity-model",
+        "egm2008-gravity-model",
     }
-    assert len(registry.targets()) == 4
+    assert len(registry.targets()) == 13
     assert registry.publication_issues() == ()
 
 
@@ -143,6 +151,7 @@ def test_resolved_version_mismatch_is_rejected(tmp_path: Path):
     document["sources"][0]["assets"][0]["resolvedVersion"] = "changed"
     lock = tmp_path / "source-lock.json"
     lock.write_text(json.dumps(document), encoding="utf-8")
+    shutil.copytree(PIPELINE_ROOT / "sources" / "manifests", tmp_path / "manifests")
 
     with pytest.raises(RegistryError, match="Resolved version mismatch"):
         load_registry(lock)
@@ -157,6 +166,7 @@ def test_selected_source_with_uncertain_rights_blocks_publication(tmp_path: Path
     )
     lock = tmp_path / "source-lock.json"
     lock.write_text(json.dumps(document), encoding="utf-8")
+    shutil.copytree(PIPELINE_ROOT / "sources" / "manifests", tmp_path / "manifests")
 
     issues = load_registry(lock).publication_issues()
 
