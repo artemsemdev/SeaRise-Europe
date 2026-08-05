@@ -1,0 +1,1208 @@
+{
+  "connectivity": {
+    "count": 9,
+    "outcomes": [
+      {
+        "connectedCellCount": 4,
+        "id": "open-coast-corridor",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 3,
+        "id": "diagonal-channel",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 3,
+        "id": "nodata-barrier",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 2,
+        "id": "quality-barrier",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 5,
+        "id": "disconnected-inland-depression",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 1,
+        "id": "steep-coast-blocks-inland-low",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 2,
+        "id": "small-island-seed",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 7,
+        "id": "estuary-lagoon-corridor",
+        "passed": true
+      },
+      {
+        "connectedCellCount": 5,
+        "id": "internal-tile-edge-after-mosaic",
+        "passed": true
+      }
+    ],
+    "passed": 9
+  },
+  "evidenceDate": "2026-08-05",
+  "geography": {
+    "coastal": {
+      "areaSquareKilometres": 1136684.7875671878,
+      "boundsWgs84": [
+        -28.850986,
+        30.021210999999997,
+        38.314159,
+        74.536318
+      ],
+      "componentCount": 301,
+      "geometryType": "MultiPolygon",
+      "perimeterKilometres": 110214.67927603351,
+      "sha256": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
+      "status": "selected-scope-approximation",
+      "valid": true,
+      "validityReason": "Valid Geometry",
+      "version": "natural-earth-5.1.1-25km-scope-v2"
+    },
+    "controls": {
+      "count": 27,
+      "outcomes": [
+        {
+          "kind": "estuary-city",
+          "name": "Amsterdam",
+          "passed": true
+        },
+        {
+          "kind": "port",
+          "name": "Rotterdam",
+          "passed": true
+        },
+        {
+          "kind": "estuary-port",
+          "name": "Hamburg",
+          "passed": true
+        },
+        {
+          "kind": "lagoon-port",
+          "name": "Venice",
+          "passed": true
+        },
+        {
+          "kind": "port",
+          "name": "Barcelona",
+          "passed": true
+        },
+        {
+          "kind": "strait-city",
+          "name": "Copenhagen",
+          "passed": true
+        },
+        {
+          "kind": "estuary-port",
+          "name": "Lisbon",
+          "passed": true
+        },
+        {
+          "kind": "island-city",
+          "name": "Reykjavik",
+          "passed": true
+        },
+        {
+          "kind": "small-island-port",
+          "name": "Valletta",
+          "passed": true
+        },
+        {
+          "kind": "remote-island-port",
+          "name": "Ponta Delgada",
+          "passed": true
+        },
+        {
+          "kind": "remote-island-port",
+          "name": "Funchal",
+          "passed": true
+        },
+        {
+          "kind": "remote-island-port",
+          "name": "Torshavn",
+          "passed": true
+        },
+        {
+          "kind": "inland-city",
+          "name": "Prague",
+          "passed": true
+        },
+        {
+          "kind": "inland-city",
+          "name": "Vienna",
+          "passed": true
+        },
+        {
+          "kind": "inland-city",
+          "name": "Berlin",
+          "passed": true
+        },
+        {
+          "kind": "inland-low-city",
+          "name": "Utrecht",
+          "passed": true
+        },
+        {
+          "kind": "included-east-boundary",
+          "name": "Kyiv",
+          "passed": true
+        },
+        {
+          "kind": "excluded-russia",
+          "name": "Saint Petersburg",
+          "passed": true
+        },
+        {
+          "kind": "excluded-russia-enclave",
+          "name": "Kaliningrad",
+          "passed": true
+        },
+        {
+          "kind": "excluded-russia",
+          "name": "Moscow",
+          "passed": true
+        },
+        {
+          "kind": "excluded-transcontinental-state",
+          "name": "Istanbul",
+          "passed": true
+        },
+        {
+          "kind": "excluded-cyprus",
+          "name": "Nicosia",
+          "passed": true
+        },
+        {
+          "kind": "excluded-caucasus",
+          "name": "Tbilisi",
+          "passed": true
+        },
+        {
+          "kind": "excluded-canary-islands",
+          "name": "Las Palmas de Gran Canaria",
+          "passed": true
+        },
+        {
+          "kind": "excluded-svalbard",
+          "name": "Longyearbyen",
+          "passed": true
+        },
+        {
+          "kind": "excluded-overseas-territory",
+          "name": "Cayenne",
+          "passed": true
+        },
+        {
+          "kind": "outside-europe",
+          "name": "New York City",
+          "passed": true
+        }
+      ],
+      "passed": 27
+    },
+    "predicate": "covers",
+    "schemaVersion": 1,
+    "support": {
+      "areaSquareKilometres": 5933973.228521994,
+      "boundsWgs84": [
+        -28.851018,
+        30.021175999999997,
+        40.173396,
+        74.53634699999999
+      ],
+      "componentCount": 308,
+      "geometryType": "MultiPolygon",
+      "perimeterKilometres": 87313.45480330806,
+      "sha256": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
+      "status": "selected-scope-approximation",
+      "valid": true,
+      "validityReason": "Valid Geometry",
+      "version": "natural-earth-5.1.1-explicit-scope-v2"
+    },
+    "topology": {
+      "boundaryControl": {
+        "contains": false,
+        "covers": true,
+        "latitude": 54.936429999999994,
+        "longitude": 10.684168
+      },
+      "coastalOutsideSupportSquareMetres": 0.0,
+      "supportCoversCoastal": true
+    }
+  },
+  "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/84",
+  "primaryReferences": [
+    {
+      "title": "Copernicus DEM product page",
+      "url": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM"
+    },
+    {
+      "title": "Copernicus DEM Product Handbook, issue 5.0",
+      "url": "https://dataspace.copernicus.eu/sites/default/files/media/files/2024-06/geo1988-copernicusdem-spe-002_producthandbook_i5.0.pdf"
+    },
+    {
+      "title": "Copernicus Coastal Zones 2018",
+      "url": "https://land.copernicus.eu/en/products/coastal-zones/coastal-zones-2018"
+    },
+    {
+      "title": "Copernicus Land Monitoring Service data policy",
+      "url": "https://land.copernicus.eu/en/data-policy"
+    }
+  ],
+  "publicationGate": {
+    "reason": "Terrain uncertainty bounds and external terrain/geography/connectivity approvals are not complete.",
+    "status": "blocked"
+  },
+  "review": {
+    "requiredRoles": [
+      "scientific/data reviewer",
+      "product owner"
+    ],
+    "status": "pending-external"
+  },
+  "schemaVersion": 1,
+  "terrain": {
+    "aggregateChecks": {
+      "classifiedByteRatioGlo30ToGlo90": 6.731247708664304,
+      "glo30P95HemLowerInEveryWindow": true,
+      "rawPixelCountRatioGlo30ToGlo90": 9,
+      "sourceByteRatioGlo30ToGlo90": 8.05949786285182,
+      "thresholdDisagreementObservedInEveryWindow": true,
+      "totalFiveLayerSourceBytes": {
+        "GLO-30": 165670216,
+        "GLO-90": 20555898
+      },
+      "totalGlo90WaterCellsContainingGlo30LandPresence": 35891,
+      "totalLosslessLandElevationClass2mGeoTiffBytes": {
+        "GLO-30": 550818,
+        "GLO-90": 81830
+      },
+      "windowCount": 5
+    },
+    "decision": "select GLO-30 for external review",
+    "limitations": [
+      "The compared grids are not independent vertical truth.",
+      "HEM excludes systematic, editing, filling, and DSM representation errors.",
+      "The sample supports resolution selection but cannot bound U_DSM or U_edit."
+    ],
+    "sampleDesign": "Five coastal one-degree windows selected before comparison to cover low coast, lagoon, steep estuary, small islands, and steep island terrain.",
+    "windows": [
+      {
+        "comparison": {
+          "glo30LandPresenceLostByGlo90WaterMaskCells": 896,
+          "maximumAbsoluteDifferenceMetres": 16.21678924560547,
+          "meanAbsoluteDifferenceMetres": 0.35495424270629883,
+          "p95AbsoluteDifferenceMetres": 1.1549053192138672,
+          "p99AbsoluteDifferenceMetres": 2.25520191192627,
+          "rootMeanSquareDifferenceMetres": 0.6101837754249573,
+          "signedMeanDifferenceMetres": -0.046750206500291824,
+          "thresholdClassDisagreement": {
+            "0": 2,
+            "1": 15,
+            "2": 42,
+            "5": 94
+          },
+          "validCommonLandPixelCount": 35346
+        },
+        "id": "malta-small-islands",
+        "resolutions": {
+          "GLO-30": {
+            "assets": {
+              "DEM": {
+                "asset": "10_N35_00_E014_00_DEM.tif",
+                "byteSize": 1394973,
+                "sha256": "5cf508b5e8e699abcfec8cd4d7c577b319cfbfb52f234be569f4dac7932972a2"
+              },
+              "EDM": {
+                "asset": "10_N35_00_E014_00_EDM.tif",
+                "byteSize": 87295,
+                "sha256": "2fc0a79a9e66db6be7f4dcdcf6467d3aff7dfaacfd6d52da52b20da01c330848"
+              },
+              "FLM": {
+                "asset": "10_N35_00_E014_00_FLM.tif",
+                "byteSize": 85800,
+                "sha256": "f57a645157471b7f9e3f82558660f6c6a0a8d6814c0abe3758481de5ef9ccaa7"
+              },
+              "HEM": {
+                "asset": "10_N35_00_E014_00_HEM.tif",
+                "byteSize": 1625550,
+                "sha256": "4c030dfa2e59265c41c206372395153d50f6e341bea06eac26d879e2c1e6cbb1"
+              },
+              "WBM": {
+                "asset": "10_N35_00_E014_00_WBM.tif",
+                "byteSize": 79893,
+                "sha256": "05137cc7868aa7a930db0040b586fd9626fe80f53ace48b15dcb59a620b2b76a"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 1.0,
+              "longitudeSpacingArcSeconds": 1.0,
+              "pixelCount": 12960000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                3600,
+                3600
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 22574,
+            "quality": {
+              "editedOrFilledLandPixelCount": 6388,
+              "editingMaskCounts": {
+                "1": 312755,
+                "11": 656,
+                "2": 2471,
+                "3": 345,
+                "4": 1323,
+                "5": 1527,
+                "6": 66,
+                "8": 12640718,
+                "9": 139
+              },
+              "fillingMaskCounts": {
+                "1": 12644774,
+                "2": 312755,
+                "5": 2471
+              },
+              "heightError": {
+                "maximumSigmaMetres": 2.739527702331543,
+                "meanSigmaMetres": 0.5618873834609985,
+                "p50SigmaMetres": 0.481950044631958,
+                "p90SigmaMetres": 0.867140543460846,
+                "p95SigmaMetres": 1.1255207419395445,
+                "p99SigmaMetres": 1.7736963033676147,
+                "sentinelPixelCount": 12647245,
+                "validLandPixelCount": 312755
+              },
+              "shorelineEditedPixelCount": 656,
+              "uneditedUnfilledLandPixelCount": 312755,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 319143,
+                "1": 12640718,
+                "2": 139
+              }
+            }
+          },
+          "GLO-90": {
+            "assets": {
+              "DEM": {
+                "asset": "30_N35_00_E014_00_DEM.tif",
+                "byteSize": 213530,
+                "sha256": "26233d94356c5efb0baf91e654e3d2d4f6aae4ebee60dfca23fdc1f6e1802cbc"
+              },
+              "EDM": {
+                "asset": "30_N35_00_E014_00_EDM.tif",
+                "byteSize": 26582,
+                "sha256": "30ecc0dc1b11119c826fcad922fbbf2975e4dbe44abc96d282cb0915fc04f223"
+              },
+              "FLM": {
+                "asset": "30_N35_00_E014_00_FLM.tif",
+                "byteSize": 26499,
+                "sha256": "b322840cf8e881235babcb1c39f6e6746e290a4e73cdfbae0f2c524e6b6f67df"
+              },
+              "HEM": {
+                "asset": "30_N35_00_E014_00_HEM.tif",
+                "byteSize": 251403,
+                "sha256": "2bd7e34dacdfaa6316fe12e316ef66dd8d4d5a035a1e7c7330cd2d6b467c0ee1"
+              },
+              "WBM": {
+                "asset": "30_N35_00_E014_00_WBM.tif",
+                "byteSize": 25821,
+                "sha256": "a1095fb9679861c4d923c3ad5e6ad78ed47794505000b43878fda283970b052c"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 3.0,
+              "longitudeSpacingArcSeconds": 3.0,
+              "pixelCount": 1440000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                1200,
+                1200
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 3302,
+            "quality": {
+              "editedOrFilledLandPixelCount": 513,
+              "editingMaskCounts": {
+                "1": 34862,
+                "11": 72,
+                "2": 234,
+                "4": 54,
+                "5": 148,
+                "6": 5,
+                "8": 1404614,
+                "9": 11
+              },
+              "fillingMaskCounts": {
+                "1": 1404904,
+                "2": 34862,
+                "5": 234
+              },
+              "heightError": {
+                "maximumSigmaMetres": 4.115463733673096,
+                "meanSigmaMetres": 0.7437138557434082,
+                "p50SigmaMetres": 0.6072399020195007,
+                "p90SigmaMetres": 1.285203754901886,
+                "p95SigmaMetres": 1.6296386957168578,
+                "p99SigmaMetres": 2.167133331298828,
+                "sentinelPixelCount": 1405138,
+                "validLandPixelCount": 34862
+              },
+              "shorelineEditedPixelCount": 72,
+              "uneditedUnfilledLandPixelCount": 34862,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 35375,
+                "1": 1404614,
+                "2": 11
+              }
+            }
+          }
+        }
+      },
+      {
+        "comparison": {
+          "glo30LandPresenceLostByGlo90WaterMaskCells": 2495,
+          "maximumAbsoluteDifferenceMetres": 8.002532958984375,
+          "meanAbsoluteDifferenceMetres": 0.4716699719429016,
+          "p95AbsoluteDifferenceMetres": 1.455169677734375,
+          "p99AbsoluteDifferenceMetres": 2.30016174316406,
+          "rootMeanSquareDifferenceMetres": 0.6853423714637756,
+          "signedMeanDifferenceMetres": -0.007124955300241709,
+          "thresholdClassDisagreement": {
+            "0": 118,
+            "1": 202,
+            "2": 191,
+            "5": 373
+          },
+          "validCommonLandPixelCount": 248161
+        },
+        "id": "lisbon-steep-estuary",
+        "resolutions": {
+          "GLO-30": {
+            "assets": {
+              "DEM": {
+                "asset": "10_N38_00_W010_00_DEM.tif",
+                "byteSize": 8966215,
+                "sha256": "5679589263f12d21ece43c475fd7fe17fb69854b41e513cb9aee25c9441d1c9f"
+              },
+              "EDM": {
+                "asset": "10_N38_00_W010_00_EDM.tif",
+                "byteSize": 165521,
+                "sha256": "9b2460f6bbcee4766b43c8c6f997915ae29316f2ca9973a0be106dc418125664"
+              },
+              "FLM": {
+                "asset": "10_N38_00_W010_00_FLM.tif",
+                "byteSize": 158850,
+                "sha256": "7d25e28466b48b88b032561f9c2570a0c6c874866a8a5ebc6a7af67b249a19ea"
+              },
+              "HEM": {
+                "asset": "10_N38_00_W010_00_HEM.tif",
+                "byteSize": 9542016,
+                "sha256": "df4ef955f0bca60a2246fd22ffab3819a237e623dfc22ee438498e94d2f9c270"
+              },
+              "WBM": {
+                "asset": "10_N38_00_W010_00_WBM.tif",
+                "byteSize": 91318,
+                "sha256": "3123b03539c2a6428387506fbc341abcd4f2c419ff7d2957621724fe0a4ec174"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 1.0,
+              "longitudeSpacingArcSeconds": 1.0,
+              "pixelCount": 12960000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                3600,
+                3600
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 36819,
+            "quality": {
+              "editedOrFilledLandPixelCount": 47889,
+              "editingMaskCounts": {
+                "1": 2188223,
+                "10": 8722,
+                "11": 4077,
+                "2": 20919,
+                "3": 4809,
+                "4": 13376,
+                "5": 4708,
+                "8": 10712642,
+                "9": 2524
+              },
+              "fillingMaskCounts": {
+                "1": 10750858,
+                "2": 2188223,
+                "3": 713,
+                "5": 20206
+              },
+              "heightError": {
+                "maximumSigmaMetres": 13.04809856414795,
+                "meanSigmaMetres": 0.8216462731361389,
+                "p50SigmaMetres": 0.6552677750587463,
+                "p90SigmaMetres": 1.4238763809204102,
+                "p95SigmaMetres": 1.796284556388855,
+                "p99SigmaMetres": 2.990458765029887,
+                "sentinelPixelCount": 10771777,
+                "validLandPixelCount": 2188223
+              },
+              "shorelineEditedPixelCount": 4077,
+              "uneditedUnfilledLandPixelCount": 2188223,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 2236112,
+                "1": 10712642,
+                "2": 2524,
+                "3": 8722
+              }
+            }
+          },
+          "GLO-90": {
+            "assets": {
+              "DEM": {
+                "asset": "30_N38_00_W010_00_DEM.tif",
+                "byteSize": 1113417,
+                "sha256": "4b0004eb35b09f1e02d12da58650887368c3a419107b304e0cd36bbc8605e9c4"
+              },
+              "EDM": {
+                "asset": "30_N38_00_W010_00_EDM.tif",
+                "byteSize": 36727,
+                "sha256": "aa398b5a9d502e98345541f9d0062194687d7665b075389c1baa5601a9d0b802"
+              },
+              "FLM": {
+                "asset": "30_N38_00_W010_00_FLM.tif",
+                "byteSize": 36343,
+                "sha256": "8494cb2c17a647b9a1b8140465476e3f419ead8df825e13aba5498b2a21f193f"
+              },
+              "HEM": {
+                "asset": "30_N38_00_W010_00_HEM.tif",
+                "byteSize": 1189447,
+                "sha256": "20c365aa60fecd481ee633ac5136349a23ab86cc07be2b816f626dd925a7ce66"
+              },
+              "WBM": {
+                "asset": "30_N38_00_W010_00_WBM.tif",
+                "byteSize": 29278,
+                "sha256": "9decf71eb65cbe0602b413168b57904bf0a0c52a2edafc0a424e59cb27246698"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 3.0,
+              "longitudeSpacingArcSeconds": 3.0,
+              "pixelCount": 1440000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                1200,
+                1200
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 5878,
+            "quality": {
+              "editedOrFilledLandPixelCount": 3306,
+              "editingMaskCounts": {
+                "1": 245045,
+                "10": 939,
+                "11": 422,
+                "2": 1984,
+                "4": 421,
+                "5": 479,
+                "8": 1190464,
+                "9": 246
+              },
+              "fillingMaskCounts": {
+                "1": 1192971,
+                "2": 245045,
+                "3": 65,
+                "5": 1919
+              },
+              "heightError": {
+                "maximumSigmaMetres": 13.84659194946289,
+                "meanSigmaMetres": 1.2548604011535645,
+                "p50SigmaMetres": 0.9393945932388306,
+                "p90SigmaMetres": 2.3399466037750245,
+                "p95SigmaMetres": 3.33146333694458,
+                "p99SigmaMetres": 5.354925823211669,
+                "sentinelPixelCount": 1194955,
+                "validLandPixelCount": 245045
+              },
+              "shorelineEditedPixelCount": 422,
+              "uneditedUnfilledLandPixelCount": 245045,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 248351,
+                "1": 1190464,
+                "2": 246,
+                "3": 939
+              }
+            }
+          }
+        }
+      },
+      {
+        "comparison": {
+          "glo30LandPresenceLostByGlo90WaterMaskCells": 19190,
+          "maximumAbsoluteDifferenceMetres": 21.853759765625,
+          "meanAbsoluteDifferenceMetres": 0.18115592002868652,
+          "p95AbsoluteDifferenceMetres": 0.68687732219696,
+          "p99AbsoluteDifferenceMetres": 1.9123651123047054,
+          "rootMeanSquareDifferenceMetres": 0.44151726365089417,
+          "signedMeanDifferenceMetres": -0.007005711551755667,
+          "thresholdClassDisagreement": {
+            "0": 4459,
+            "1": 4101,
+            "2": 4017,
+            "5": 3264
+          },
+          "validCommonLandPixelCount": 850884
+        },
+        "id": "venice-lagoon",
+        "resolutions": {
+          "GLO-30": {
+            "assets": {
+              "DEM": {
+                "asset": "10_N45_00_E012_00_DEM.tif",
+                "byteSize": 32057745,
+                "sha256": "9f546e3190f513568715bc9646cd69db3073f76165b67377eb0227bae35d0d08"
+              },
+              "EDM": {
+                "asset": "10_N45_00_E012_00_EDM.tif",
+                "byteSize": 330005,
+                "sha256": "b035b9915713bf7f3af80dcfd2564ed0d8749f5a5d831ef6d67b0d9b524fe65f"
+              },
+              "FLM": {
+                "asset": "10_N45_00_E012_00_FLM.tif",
+                "byteSize": 278592,
+                "sha256": "7c57ae7f88d2fdc1a1dc1169200f64d8f946560af6291b20b862e45a64434873"
+              },
+              "HEM": {
+                "asset": "10_N45_00_E012_00_HEM.tif",
+                "byteSize": 31522080,
+                "sha256": "d5cc28df2dfa26f0ff33df21143507a3984e7027d9305ef91edbe174dd4ec841"
+              },
+              "WBM": {
+                "asset": "10_N45_00_E012_00_WBM.tif",
+                "byteSize": 245681,
+                "sha256": "33753d5a67a9132613951a6bfdee25b4d081c6c3f8e431c9932814730751db12"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 1.0,
+              "longitudeSpacingArcSeconds": 1.0,
+              "pixelCount": 12960000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                3600,
+                3600
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 229460,
+            "quality": {
+              "editedOrFilledLandPixelCount": 54181,
+              "editingMaskCounts": {
+                "1": 7624644,
+                "10": 97659,
+                "11": 32855,
+                "2": 5771,
+                "3": 2884,
+                "4": 3912,
+                "5": 2822,
+                "6": 5934,
+                "7": 3,
+                "8": 4969729,
+                "9": 213787
+              },
+              "fillingMaskCounts": {
+                "1": 5329585,
+                "2": 7624644,
+                "3": 1603,
+                "5": 4168
+              },
+              "heightError": {
+                "maximumSigmaMetres": 13.765101432800293,
+                "meanSigmaMetres": 0.44333815574645996,
+                "p50SigmaMetres": 0.3786996603012085,
+                "p90SigmaMetres": 0.6725876152515413,
+                "p95SigmaMetres": 0.8509697318077083,
+                "p99SigmaMetres": 1.3849141597747803,
+                "sentinelPixelCount": 5335356,
+                "validLandPixelCount": 7624644
+              },
+              "shorelineEditedPixelCount": 32855,
+              "uneditedUnfilledLandPixelCount": 7624644,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 7678825,
+                "1": 4969729,
+                "2": 213787,
+                "3": 97659
+              }
+            }
+          },
+          "GLO-90": {
+            "assets": {
+              "DEM": {
+                "asset": "30_N45_00_E012_00_DEM.tif",
+                "byteSize": 3751349,
+                "sha256": "9adf78772a8601d57f8562aa0d6dec84a400d941f467f2ebcc096bb6a2c8b073"
+              },
+              "EDM": {
+                "asset": "30_N45_00_E012_00_EDM.tif",
+                "byteSize": 69489,
+                "sha256": "9a972d98b1666a431223876511b2504da503a4bea700e131abc09da078b4aa65"
+              },
+              "FLM": {
+                "asset": "30_N45_00_E012_00_FLM.tif",
+                "byteSize": 60896,
+                "sha256": "5a8280c063068a79857f8641c5f20a30d92bf377b06a35809d6934fbaa1f7b05"
+              },
+              "HEM": {
+                "asset": "30_N45_00_E012_00_HEM.tif",
+                "byteSize": 3844331,
+                "sha256": "f20a0203d3825c9f2226311b7cb02e8f95aebc60dff65537121987c17b1d0808"
+              },
+              "WBM": {
+                "asset": "30_N45_00_E012_00_WBM.tif",
+                "byteSize": 54602,
+                "sha256": "c7349347afe036807fa5108ee61ee459d001bbf3a746dd829865725d9979caf1"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 3.0,
+              "longitudeSpacingArcSeconds": 3.0,
+              "pixelCount": 1440000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                1200,
+                1200
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 34941,
+            "quality": {
+              "editedOrFilledLandPixelCount": 4973,
+              "editingMaskCounts": {
+                "1": 849790,
+                "10": 8659,
+                "11": 3524,
+                "2": 554,
+                "3": 1,
+                "4": 112,
+                "5": 271,
+                "6": 511,
+                "8": 552307,
+                "9": 24271
+              },
+              "fillingMaskCounts": {
+                "1": 589656,
+                "2": 849790,
+                "3": 186,
+                "5": 368
+              },
+              "heightError": {
+                "maximumSigmaMetres": 13.765101432800293,
+                "meanSigmaMetres": 0.569840133190155,
+                "p50SigmaMetres": 0.47489385306835175,
+                "p90SigmaMetres": 0.9394379496574401,
+                "p95SigmaMetres": 1.2104333043098423,
+                "p99SigmaMetres": 1.8498951101303098,
+                "sentinelPixelCount": 590210,
+                "validLandPixelCount": 849790
+              },
+              "shorelineEditedPixelCount": 3524,
+              "uneditedUnfilledLandPixelCount": 849790,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 854763,
+                "1": 552307,
+                "2": 24271,
+                "3": 8659
+              }
+            }
+          }
+        }
+      },
+      {
+        "comparison": {
+          "glo30LandPresenceLostByGlo90WaterMaskCells": 7380,
+          "maximumAbsoluteDifferenceMetres": 4.7997894287109375,
+          "meanAbsoluteDifferenceMetres": 0.1678784191608429,
+          "p95AbsoluteDifferenceMetres": 0.6332542896270751,
+          "p99AbsoluteDifferenceMetres": 1.1702583885192863,
+          "rootMeanSquareDifferenceMetres": 0.2924979627132416,
+          "signedMeanDifferenceMetres": -0.009319201111793518,
+          "thresholdClassDisagreement": {
+            "0": 6019,
+            "1": 5595,
+            "2": 5024,
+            "5": 2772
+          },
+          "validCommonLandPixelCount": 407727
+        },
+        "id": "netherlands-low-coast",
+        "resolutions": {
+          "GLO-30": {
+            "assets": {
+              "DEM": {
+                "asset": "10_N52_00_E004_00_DEM.tif",
+                "byteSize": 17037271,
+                "sha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1"
+              },
+              "EDM": {
+                "asset": "10_N52_00_E004_00_EDM.tif",
+                "byteSize": 329552,
+                "sha256": "841c72e13158d57d71fd7156bed6558cd2e4fb7bd5f37af209381ed0cb211b5a"
+              },
+              "FLM": {
+                "asset": "10_N52_00_E004_00_FLM.tif",
+                "byteSize": 299419,
+                "sha256": "98545b6b65352dce025e5389e67daae028191a2abb1c6fb4fd5eb5c02c777f78"
+              },
+              "HEM": {
+                "asset": "10_N52_00_E004_00_HEM.tif",
+                "byteSize": 15621064,
+                "sha256": "59656d0c20ddd1abef4d21579f71e0fd1344b39ae138f33e301f5b298dce8ece"
+              },
+              "WBM": {
+                "asset": "10_N52_00_E004_00_WBM.tif",
+                "byteSize": 167609,
+                "sha256": "96b964d4633d09f076cfc54528a0c8d66ea82b9ce8b3e718a7a4cbdcd6386de3"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 1.0,
+              "longitudeSpacingArcSeconds": 1.5,
+              "pixelCount": 8640000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                3600,
+                2400
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 238301,
+            "quality": {
+              "editedOrFilledLandPixelCount": 105893,
+              "editingMaskCounts": {
+                "1": 3575253,
+                "10": 53881,
+                "11": 7634,
+                "13": 23,
+                "2": 49829,
+                "3": 7357,
+                "4": 34343,
+                "5": 6606,
+                "6": 100,
+                "7": 1,
+                "8": 4796315,
+                "9": 108658
+              },
+              "fillingMaskCounts": {
+                "1": 5014918,
+                "2": 3575253,
+                "3": 1,
+                "5": 49779,
+                "9": 49
+              },
+              "heightError": {
+                "maximumSigmaMetres": 9.700995445251465,
+                "meanSigmaMetres": 0.7076377272605896,
+                "p50SigmaMetres": 0.5786523222923279,
+                "p90SigmaMetres": 1.255766439437867,
+                "p95SigmaMetres": 1.5568569183349605,
+                "p99SigmaMetres": 2.072348756790161,
+                "sentinelPixelCount": 5064747,
+                "validLandPixelCount": 3575253
+              },
+              "shorelineEditedPixelCount": 7634,
+              "uneditedUnfilledLandPixelCount": 3575253,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 3681146,
+                "1": 4796315,
+                "2": 108658,
+                "3": 53881
+              }
+            }
+          },
+          "GLO-90": {
+            "assets": {
+              "DEM": {
+                "asset": "30_N52_00_E004_00_DEM.tif",
+                "byteSize": 1998003,
+                "sha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2"
+              },
+              "EDM": {
+                "asset": "30_N52_00_E004_00_EDM.tif",
+                "byteSize": 59452,
+                "sha256": "9312849d8c5a530c5b4a96bd958b5968b2b6e62528d2eac46f9ccb70250a7011"
+              },
+              "FLM": {
+                "asset": "30_N52_00_E004_00_FLM.tif",
+                "byteSize": 56380,
+                "sha256": "7c602696fce0b1f2bb5730d46eb577347d44b4505887f59db0d0d167ebded465"
+              },
+              "HEM": {
+                "asset": "30_N52_00_E004_00_HEM.tif",
+                "byteSize": 1923143,
+                "sha256": "b3998486418f5313aa2892270eae32e1a55a983d588341d50eba66f403efcf0d"
+              },
+              "WBM": {
+                "asset": "30_N52_00_E004_00_WBM.tif",
+                "byteSize": 40740,
+                "sha256": "be43bceeb7681eb7453578e7909534633d5cd295c01d33048fc044b6b4861669"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 3.0,
+              "longitudeSpacingArcSeconds": 4.5,
+              "pixelCount": 960000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                1200,
+                800
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 33665,
+            "quality": {
+              "editedOrFilledLandPixelCount": 7983,
+              "editingMaskCounts": {
+                "1": 402447,
+                "10": 4394,
+                "11": 1552,
+                "13": 2,
+                "2": 4711,
+                "3": 1,
+                "4": 1042,
+                "5": 675,
+                "8": 533590,
+                "9": 11586
+              },
+              "fillingMaskCounts": {
+                "1": 552842,
+                "2": 402447,
+                "5": 4707,
+                "9": 4
+              },
+              "heightError": {
+                "maximumSigmaMetres": 9.700995445251465,
+                "meanSigmaMetres": 0.967081606388092,
+                "p50SigmaMetres": 0.7903784513473511,
+                "p90SigmaMetres": 1.8115928173065192,
+                "p95SigmaMetres": 2.0585736989974976,
+                "p99SigmaMetres": 2.359644570350647,
+                "sentinelPixelCount": 557553,
+                "validLandPixelCount": 402447
+              },
+              "shorelineEditedPixelCount": 1552,
+              "uneditedUnfilledLandPixelCount": 402447,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 410430,
+                "1": 533590,
+                "2": 11586,
+                "3": 4394
+              }
+            }
+          }
+        }
+      },
+      {
+        "comparison": {
+          "glo30LandPresenceLostByGlo90WaterMaskCells": 5930,
+          "maximumAbsoluteDifferenceMetres": 11.569427490234375,
+          "meanAbsoluteDifferenceMetres": 0.3708840012550354,
+          "p95AbsoluteDifferenceMetres": 1.32928466796875,
+          "p99AbsoluteDifferenceMetres": 2.5339988708496115,
+          "rootMeanSquareDifferenceMetres": 0.635943591594696,
+          "signedMeanDifferenceMetres": -0.005221348721534014,
+          "thresholdClassDisagreement": {
+            "0": 0,
+            "1": 61,
+            "2": 198,
+            "5": 278
+          },
+          "validCommonLandPixelCount": 651996
+        },
+        "id": "reykjavik-steep-island",
+        "resolutions": {
+          "GLO-30": {
+            "assets": {
+              "DEM": {
+                "asset": "10_N64_00_W022_00_DEM.tif",
+                "byteSize": 21395489,
+                "sha256": "234699c9e4990e032f2875671e3fbd6d2c6c3cce1a7c3ddfde2aec8b0f2652cb"
+              },
+              "EDM": {
+                "asset": "10_N64_00_W022_00_EDM.tif",
+                "byteSize": 165567,
+                "sha256": "104b48a34d3a0a1c560502d2039ae794eb24476c5b057e95c24879d27a0a992b"
+              },
+              "FLM": {
+                "asset": "10_N64_00_W022_00_FLM.tif",
+                "byteSize": 157263,
+                "sha256": "ba5a4d7aeeca1d1b4d9d2927ad4a9e48d0bd8abd7bec0c1bcdc13a1fb3ffa51a"
+              },
+              "HEM": {
+                "asset": "10_N64_00_W022_00_HEM.tif",
+                "byteSize": 23770004,
+                "sha256": "5e222305099a867032fa644cb132e24b669ee32c1fbbbcc8a0ea509357eb2e51"
+              },
+              "WBM": {
+                "asset": "10_N64_00_W022_00_WBM.tif",
+                "byteSize": 95444,
+                "sha256": "c692a451504f4822990fc16cb2ab36c3cdcb01687b753a6ab57fbafa217ca82d"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 1.0,
+              "longitudeSpacingArcSeconds": 2.0,
+              "pixelCount": 6480000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                3600,
+                1800
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 23664,
+            "quality": {
+              "editedOrFilledLandPixelCount": 42435,
+              "editingMaskCounts": {
+                "1": 5832359,
+                "10": 21911,
+                "11": 1393,
+                "2": 32587,
+                "3": 1492,
+                "4": 6566,
+                "5": 397,
+                "8": 400419,
+                "9": 182876
+              },
+              "fillingMaskCounts": {
+                "1": 615054,
+                "2": 5832359,
+                "3": 32439,
+                "6": 148
+              },
+              "heightError": {
+                "maximumSigmaMetres": 5.0665364265441895,
+                "meanSigmaMetres": 0.4555997848510742,
+                "p50SigmaMetres": 0.4163634479045868,
+                "p90SigmaMetres": 0.5932653903961183,
+                "p95SigmaMetres": 0.7218062996864318,
+                "p99SigmaMetres": 1.3883954095840436,
+                "sentinelPixelCount": 647641,
+                "validLandPixelCount": 5832359
+              },
+              "shorelineEditedPixelCount": 1393,
+              "uneditedUnfilledLandPixelCount": 5832359,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 5874794,
+                "1": 400419,
+                "2": 182876,
+                "3": 21911
+              }
+            }
+          },
+          "GLO-90": {
+            "assets": {
+              "DEM": {
+                "asset": "30_N64_00_W022_00_DEM.tif",
+                "byteSize": 2693734,
+                "sha256": "e9822927ff7a73db209e65541583f18862ee1ecf71269cf06a3f7c6bd16f4c7a"
+              },
+              "EDM": {
+                "asset": "30_N64_00_W022_00_EDM.tif",
+                "byteSize": 47754,
+                "sha256": "5329bc89f9fe7690e09901bd577ead46a364fcb31cd4884f3767ace1a6f717ce"
+              },
+              "FLM": {
+                "asset": "30_N64_00_W022_00_FLM.tif",
+                "byteSize": 45847,
+                "sha256": "9ea48457e791e2f5457f122eaadd39364c7562fa5d5959493b4def07f7ccd200"
+              },
+              "HEM": {
+                "asset": "30_N64_00_W022_00_HEM.tif",
+                "byteSize": 2928501,
+                "sha256": "286ca870bcb4d5bdcb8d9de5a652762328aea94b764a5cfead07b5bb67de8e67"
+              },
+              "WBM": {
+                "asset": "30_N64_00_W022_00_WBM.tif",
+                "byteSize": 32630,
+                "sha256": "503102712e098bb77bb098add4d4d85114b3ce3c04d142953dd3d2d1f4b63c8f"
+              }
+            },
+            "grid": {
+              "horizontalCrs": "EPSG:4326",
+              "latitudeSpacingArcSeconds": 3.0,
+              "longitudeSpacingArcSeconds": 6.0,
+              "pixelCount": 720000,
+              "pixelInterpretation": "Point",
+              "shape": [
+                1200,
+                600
+              ]
+            },
+            "losslessLandElevationClass2mGeoTiffBytes": 4044,
+            "quality": {
+              "editedOrFilledLandPixelCount": 3807,
+              "editingMaskCounts": {
+                "1": 648984,
+                "10": 2018,
+                "11": 97,
+                "2": 3403,
+                "4": 268,
+                "5": 39,
+                "8": 44777,
+                "9": 20414
+              },
+              "fillingMaskCounts": {
+                "1": 67613,
+                "2": 648984,
+                "3": 3388,
+                "6": 15
+              },
+              "heightError": {
+                "maximumSigmaMetres": 5.0665364265441895,
+                "meanSigmaMetres": 0.5534903407096863,
+                "p50SigmaMetres": 0.48064327239990234,
+                "p90SigmaMetres": 0.7633045077323919,
+                "p95SigmaMetres": 1.0667770981788631,
+                "p99SigmaMetres": 1.9453622996807103,
+                "sentinelPixelCount": 71016,
+                "validLandPixelCount": 648984
+              },
+              "shorelineEditedPixelCount": 97,
+              "uneditedUnfilledLandPixelCount": 648984,
+              "voidPixelCount": 0,
+              "waterBodyMaskCounts": {
+                "0": 652791,
+                "1": 44777,
+                "2": 20414,
+                "3": 2018
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
