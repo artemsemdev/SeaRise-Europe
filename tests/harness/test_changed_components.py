@@ -233,6 +233,10 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         ):
             self.assertIn(action, macos_evidence)
+        self.assertIn(
+            "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            macos_evidence,
+        )
         self.assertIn("required_kib=10599985", macos_evidence)
         self.assertLess(
             macos_evidence.index("df -Pk /tmp"),
@@ -269,6 +273,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertIn("/tmp/build-timing-linux.json", linux)
         self.assertNotIn("/tmp/build-timing-macos-arm64.json", linux)
+        self.assertNotIn("browser-trace", linux)
         self.assertNotIn("-macos-arm64", linux)
 
         self.assertIn("name: Full-source macOS ARM64 AR6 candidate", macos)
@@ -287,10 +292,58 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             macos,
         )
         self.assertIn("/tmp/build-timing-macos-arm64.json", macos)
+        self.assertIn("/tmp/browser-trace-macos-arm64.json", macos)
         self.assertNotIn("/tmp/build-timing-linux.json", macos)
         self.assertNotIn("-linux-x86_64", macos)
         self.assertEqual(linux.count("/tmp/phase-0r-ar6-v1"), 4)
-        self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 4)
+        self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 5)
+
+    def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        macos = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
+
+        build = macos.index("Build full real-source candidate")
+        setup_node = macos.index(
+            "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"
+        )
+        measure = macos.index("Measure trusted browser delivery")
+        upload = macos.index("Upload independently built candidate and timing")
+        self.assertLess(build, setup_node)
+        self.assertLess(
+            macos.index("rm -f -- /tmp/ar6-regional-confidence.zip", build),
+            setup_node,
+        )
+        self.assertLess(setup_node, measure)
+        self.assertLess(measure, upload)
+        self.assertIn("node-version: 20", macos)
+        self.assertIn(
+            "cache-dependency-path: src/frontend/package-lock.json",
+            macos,
+        )
+        self.assertIn("working-directory: src/frontend", macos)
+        self.assertIn("run: npm ci", macos)
+        self.assertIn(
+            "run: ./node_modules/.bin/playwright install chromium",
+            macos,
+        )
+        self.assertNotIn("npx playwright", macos)
+        command = (
+            "node scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 "
+            "/tmp/browser-trace-macos-arm64.json"
+        )
+        self.assertIn(command, macos)
+        self.assertIn("test -s /tmp/browser-trace-macos-arm64.json", macos)
+        self.assertIn("            /tmp/browser-trace-macos-arm64.json", macos)
+        self.assertLess(
+            macos.index("test -s /tmp/browser-trace-macos-arm64.json"),
+            upload,
+        )
 
     def test_release_evidence_uses_only_hashed_python_install(self) -> None:
         workflow = (

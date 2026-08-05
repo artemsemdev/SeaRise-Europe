@@ -619,6 +619,30 @@ jobs:
             --failure-gate /tmp/ar6-release-failure.json \
             --timing-evidence /tmp/build-timing-macos-arm64.json
 
+      - name: Release source archive before browser measurement
+        run: rm -f -- /tmp/ar6-regional-confidence.zip
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install locked browser measurement environment
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Install package-lock-owned Playwright Chromium
+        working-directory: src/frontend
+        run: ./node_modules/.bin/playwright install chromium
+
+      - name: Measure trusted browser delivery
+        working-directory: src/frontend
+        run: |
+          rm -f -- /tmp/browser-trace-macos-arm64.json
+          node scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 /tmp/browser-trace-macos-arm64.json
+          test -s /tmp/browser-trace-macos-arm64.json
+
       - name: Summarize candidate
         run: |
           {
@@ -638,6 +662,7 @@ jobs:
           path: |
             /tmp/phase-0r-ar6-v1
             /tmp/build-timing-macos-arm64.json
+            /tmp/browser-trace-macos-arm64.json
           if-no-files-found: error
           overwrite: false
           retention-days: 14
