@@ -42,6 +42,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tippecanoe", type=Path, required=True)
     parser.add_argument("--tippecanoe-decode", type=Path, required=True)
     parser.add_argument("--pmtiles", type=Path, required=True)
+    parser.add_argument("--tippecanoe-source-archive", type=Path, required=True)
+    parser.add_argument("--tippecanoe-build-receipt", type=Path, required=True)
+    parser.add_argument("--pmtiles-distribution-asset", type=Path, required=True)
+    parser.add_argument("--pmtiles-distribution-platform", required=True)
     parser.add_argument("--python-lock", type=Path, required=True)
     parser.add_argument("--release-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -84,6 +88,10 @@ def main() -> None:
             tippecanoe_path=args.tippecanoe,
             decode_path=args.tippecanoe_decode,
             pmtiles_path=args.pmtiles,
+            tippecanoe_source_archive_path=args.tippecanoe_source_archive,
+            tippecanoe_build_receipt_path=args.tippecanoe_build_receipt,
+            pmtiles_distribution_asset_path=args.pmtiles_distribution_asset,
+            pmtiles_distribution_platform=args.pmtiles_distribution_platform,
             python_lock_path=args.python_lock,
             lookup_goldens_path=args.lookup_goldens,
             reproducibility_report=(
