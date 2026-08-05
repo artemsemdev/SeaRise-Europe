@@ -24,7 +24,8 @@
     },
     "decisionContract": {
       "contractId": "ar6-regional-projection-v1",
-      "path": "src/pipeline/science/ar6-projection-contract.json"
+      "path": "src/pipeline/science/ar6-projection-contract.json",
+      "sha256": "2ad74bf75376effff355114fcc8a24bd6b5da796b4e093ba4f869ec274a8c8ba"
     }
   },
   "lookup": {
@@ -34,7 +35,8 @@
     "distance": {
       "algorithm": "haversine",
       "earthMeanRadiusKm": 6371.0088,
-      "boundary": "inclusive"
+      "boundary": "inclusive",
+      "reportedDistanceDecimalPlaces": 6
     },
     "tieBreak": "lowest-source-location-id",
     "requiredQuantiles": [0.167, 0.5, 0.833],
@@ -46,7 +48,7 @@
     "availableState": "ProjectionAvailable",
     "stableReasonCodes": {
       "sourceValueNodata": "source-value-nodata",
-      "sourceGridBeyondMaximumDistance": "source-grid-beyond-maximum-distance",
+      "sourceGridBeyondMaximumDistance": "source-location-too-distant",
       "outsideCoastalScope": "outside-coastal-scope",
       "outsideEuropeSupport": "outside-europe-support"
     },
@@ -58,9 +60,15 @@
       "distanceKm"
     ]
   },
+  "publicationMetadata": {
+    "confidence": "medium",
+    "nativeResolutionDegrees": 1,
+    "methodVersion": "ar6-regional-projection-v1",
+    "sourceRelease": "20210809"
+  },
   "validation": {
     "referenceStrategy": "offline-independent-netcdf4-read-of-sha256-locked-source-members",
-    "numericToleranceMetres": 1e-12,
+    "numericToleranceMetres": 1e-6,
     "scenarioHorizonMatrix": {
       "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
       "horizons": [2030, 2050, 2100]
@@ -147,7 +155,7 @@
         "id": "beyond-maximum-distance",
         "purpose": "beyond-maximum-distance",
         "expectedState": "DataUnavailable",
-        "expectedReasonCode": "source-grid-beyond-maximum-distance"
+        "expectedReasonCode": "source-location-too-distant"
       },
       {
         "id": "equidistant-lowest-location-id",
