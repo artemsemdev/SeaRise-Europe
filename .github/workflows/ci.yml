@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       release_evidence:
-        description: Build the full-source AR6 Linux evidence candidate
+        description: Build both full-source AR6 evidence candidates
         required: true
         default: false
         type: boolean
@@ -57,6 +57,14 @@ jobs:
           if [[ "${RELEASE_EVIDENCE}" == "true" ]]; then
             if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
               echo "release_source_revision must be one exact lowercase commit SHA" >&2
+              exit 1
+            fi
+            if [[ "${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}" ]]; then
+              echo "release_source_revision must equal the dispatched ref SHA" >&2
+              exit 1
+            fi
+            if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
+              echo "release evidence must use the first workflow run attempt" >&2
               exit 1
             fi
           elif [[ -n "${RELEASE_SOURCE_REVISION}" ]]; then
@@ -249,6 +257,14 @@ jobs:
         run: |
           if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "release_source_revision must be one exact lowercase commit SHA" >&2
+            exit 1
+          fi
+          if [[ "${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}" ]]; then
+            echo "release_source_revision must equal the dispatched ref SHA" >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
+            echo "release evidence must use the first workflow run attempt" >&2
             exit 1
           fi
 

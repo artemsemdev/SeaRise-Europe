@@ -125,6 +125,8 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("release_source_revision:\n", dispatch)
         self.assertIn("--release-only", changes)
         self.assertIn("^[0-9a-f]{40}$", changes)
+        self.assertIn('"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"', changes)
+        self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', changes)
         self.assertLess(
             changes.index("Validate manual workflow request"),
             changes.index("uses: actions/checkout"),
@@ -132,6 +134,8 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("inputs.release_evidence == true", evidence)
         self.assertIn("needs: changes", evidence)
         self.assertIn("^[0-9a-f]{40}$", evidence)
+        self.assertIn('"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"', evidence)
+        self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', evidence)
         self.assertLess(
             evidence.index("Validate exact release source revision"),
             evidence.index("uses: actions/checkout"),
