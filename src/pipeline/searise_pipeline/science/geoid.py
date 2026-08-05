@@ -31,7 +31,11 @@ class GeoidModelRequest:
     output_tide_system: str
     evaluation_epoch: str | None
     maximum_degree: int
-    maximum_order: int | None
+    maximum_order: int
+    normalization: str
+    earth_gravity_constant: float | None
+    reference_radius_m: float | None
+    evaluation_constants_status: str
     conversion_member_sha256: str | None
     requires_permanent_tide_conversion: bool
     requires_height_anomaly_to_geoid: bool
@@ -48,6 +52,12 @@ class GeoidEvaluation:
     engine_version: str
     ellipsoid: str
     output_tide_system: str
+    maximum_degree: int
+    maximum_order: int
+    normalization: str
+    earth_gravity_constant: float
+    reference_radius_m: float
+    permanent_tide_rule: str | None
     permanent_tide_conversion_applied: bool
     height_anomaly_to_geoid_applied: bool
 
@@ -130,7 +140,11 @@ def build_geoid_requests(
         output_tide_system="tide_free",
         evaluation_epoch=source_spec["evaluationEpoch"],
         maximum_degree=source_spec["maximumDegree"],
-        maximum_order=None,
+        maximum_order=source_spec["maximumOrder"],
+        normalization=source_spec["normalization"],
+        earth_gravity_constant=source_spec["earthGravityConstant"],
+        reference_radius_m=source_spec["referenceRadiusMetres"],
+        evaluation_constants_status=source_spec["evaluationConstantsStatus"],
         conversion_member_sha256=None,
         requires_permanent_tide_conversion=True,
         requires_height_anomaly_to_geoid=False,
@@ -146,12 +160,34 @@ def build_geoid_requests(
         evaluation_epoch=None,
         maximum_degree=target_spec["maximumDegree"],
         maximum_order=target_spec["maximumOrder"],
+        normalization=target_spec["normalization"],
+        earth_gravity_constant=target_spec["earthGravityConstant"],
+        reference_radius_m=target_spec["referenceRadiusMetres"],
+        evaluation_constants_status=target_spec["evaluationConstantsStatus"],
         conversion_member_sha256=conversion_member["sha256"],
         requires_permanent_tide_conversion=False,
         requires_height_anomaly_to_geoid=True,
         policy=policy,
     )
     return source_request, target_request
+
+
+def _validate_request(request: GeoidModelRequest) -> None:
+    if (
+        request.evaluation_constants_status != "locked"
+        or request.earth_gravity_constant is None
+        or request.reference_radius_m is None
+    ):
+        raise ScienceContractError(
+            f"{request.model} evaluation constants are not pinned"
+        )
+    if (
+        not request.normalization
+        or request.maximum_degree < 1
+        or request.maximum_order < 0
+        or request.maximum_order > request.maximum_degree
+    ):
+        raise ScienceContractError(f"{request.model} harmonic convention is invalid")
 
 
 def _validate_evaluation(evaluation: GeoidEvaluation) -> None:
@@ -165,6 +201,21 @@ def _validate_evaluation(evaluation: GeoidEvaluation) -> None:
         raise ScienceContractError("Geoid evaluation engine or ellipsoid differs from policy")
     if evaluation.output_tide_system != "tide_free":
         raise ScienceContractError("Geoid evaluation is not tide-free")
+    if (
+        evaluation.maximum_degree != request.maximum_degree
+        or evaluation.maximum_order != request.maximum_order
+        or evaluation.normalization != request.normalization
+        or evaluation.earth_gravity_constant != request.earth_gravity_constant
+        or evaluation.reference_radius_m != request.reference_radius_m
+    ):
+        raise ScienceContractError("Geoid harmonic constants differ from request")
+    required_tide_rule = (
+        policy.permanent_tide_rule
+        if request.requires_permanent_tide_conversion
+        else None
+    )
+    if evaluation.permanent_tide_rule != required_tide_rule:
+        raise ScienceContractError("Geoid permanent-tide rule differs from policy")
     if (
         evaluation.permanent_tide_conversion_applied
         != request.requires_permanent_tide_conversion
@@ -186,6 +237,8 @@ def evaluate_geoid_correction(
         raise ScienceContractError("Geoid coordinate arrays do not share a shape")
     if source_request.policy != target_request.policy:
         raise ScienceContractError("Geoid models do not share one evaluation policy")
+    _validate_request(source_request)
+    _validate_request(target_request)
     source = evaluator.evaluate(source_request, latitudes, longitudes)
     target = evaluator.evaluate(target_request, latitudes, longitudes)
     _validate_evaluation(source)

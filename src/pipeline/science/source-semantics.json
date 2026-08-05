@@ -129,6 +129,11 @@
       "nativeTideSystem": "zero_tide",
       "evaluationEpoch": "2010-01-01",
       "maximumDegree": 300,
+      "maximumOrder": 300,
+      "normalization": "fully_normalized",
+      "earthGravityConstant": 398600441500000.0,
+      "referenceRadiusMetres": 6378136.3,
+      "evaluationConstantsStatus": "locked",
       "coefficientErrors": "formal"
     },
     "targetGeoid": {
@@ -138,6 +143,10 @@
       "nativeTideSystem": "tide_free",
       "maximumDegree": 2190,
       "maximumOrder": 2159,
+      "normalization": "fully_normalized",
+      "earthGravityConstant": null,
+      "referenceRadiusMetres": null,
+      "evaluationConstantsStatus": "pending-locked-readme-inspection",
       "coefficientErrors": "calibrated-standard-deviations"
     },
     "terrainControls": {
