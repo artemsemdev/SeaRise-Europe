@@ -174,6 +174,11 @@ def _first_stac_item(root: Path) -> tuple[Path, dict[str, object]]:
     return path, json.loads(path.read_text(encoding="utf-8"))
 
 
+def _stac_collection(root: Path) -> tuple[Path, dict[str, object]]:
+    path = root / "stac/collection.json"
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
 EXTERNAL_TOOLS_AVAILABLE = all(
     os.environ.get(name)
     for name in (
@@ -187,6 +192,39 @@ EXTERNAL_TOOLS_AVAILABLE = all(
         "SEARISE_PYTHON_LOCK",
     )
 )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing-extent", "wrong-bbox", "wrong-temporal", "extra-field"],
+)
+def test_stac_validator_rejects_mutated_collection_envelope(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    artifacts, source = _stac_candidate(tmp_path)[:2]
+    collection_path, collection = _stac_collection(tmp_path)
+    if mutation == "missing-extent":
+        collection.pop("extent")
+    elif mutation == "extra-field":
+        collection["unexpected"] = True
+    else:
+        extent = collection["extent"]
+        assert isinstance(extent, dict)
+        section = "spatial" if mutation == "wrong-bbox" else "temporal"
+        value = extent[section]
+        assert isinstance(value, dict)
+        value["bbox" if section == "spatial" else "interval"] = []
+    _write_json(collection_path, collection)
+
+    with pytest.raises(ScienceContractError, match="Collection envelope"):
+        _validate_stac(
+            tmp_path,
+            artifacts,
+            release_id="ar6-europe-fixture-v1",
+            source=source,
+            contract=contract(),
+        )
 
 
 @pytest.mark.parametrize("mutation", ["empty", "missing", "extra", "swapped"])
