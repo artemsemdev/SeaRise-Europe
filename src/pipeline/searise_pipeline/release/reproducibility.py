@@ -14,6 +14,28 @@ from searise_pipeline.science.contracts import ScienceContractError
 from .evidence import candidate_binding, load_json
 
 
+def _independence_profile(environment: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    """Return immutable dimensions that distinguish two release environments."""
+    try:
+        python = environment["python"]
+        vector = environment["vector"]
+        profile = (
+            python["platform"],
+            python["lock_sha256"],
+            vector["pmtiles_distribution_platform"],
+            vector["tippecanoe_binary_sha256"],
+        )
+    except (KeyError, TypeError) as exc:
+        raise ScienceContractError(
+            "Release environment lacks immutable independence dimensions"
+        ) from exc
+    if not all(isinstance(value, str) and value for value in profile):
+        raise ScienceContractError(
+            "Release environment has invalid independence dimensions"
+        )
+    return profile
+
+
 def _maximum_cog_difference(first: Path, second: Path) -> int:
     with rasterio.open(first) as left, rasterio.open(second) as right:
         left_values = left.read()
@@ -101,6 +123,16 @@ def compare_release_candidates(
     second_environment = second_binding["environmentIdentity"]
     if first_environment.get("buildRunId") == second_environment.get("buildRunId"):
         raise ScienceContractError("Two distinct clean build run identities are required")
+    if first_binding["sourceRevision"] != second_binding["sourceRevision"]:
+        raise ScienceContractError("Independent candidates must build the same source revision")
+    independence_profiles = {
+        _independence_profile(first_environment),
+        _independence_profile(second_environment),
+    }
+    if len(independence_profiles) != 2:
+        raise ScienceContractError(
+            "Two genuinely independent pinned environment profiles are required"
+        )
     first_artifacts = {item["path"]: item for item in first_manifest["artifacts"]}
     second_artifacts = {item["path"]: item for item in second_manifest["artifacts"]}
     if first_artifacts.keys() != second_artifacts.keys():
@@ -136,7 +168,16 @@ def compare_release_candidates(
         "status": status,
         "candidates": [first_binding, second_binding],
         "environments": [first_environment, second_environment],
-        "independentEnvironmentCount": 2,
+        "independentEnvironmentCount": len(independence_profiles),
+        "independenceProfiles": [
+            {
+                "pythonPlatform": profile[0],
+                "pythonLockSha256": profile[1],
+                "vectorPlatform": profile[2],
+                "tippecanoeBinarySha256": profile[3],
+            }
+            for profile in sorted(independence_profiles)
+        ],
         "maximumScientificValueDifferenceMillimetres": maximum_difference,
         "validIdSetDifference": valid_id_difference,
         "byteIdentityWithinPinnedToolchain": byte_identical,

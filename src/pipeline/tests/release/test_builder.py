@@ -89,19 +89,13 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
         source_revision="a" * 40,
         **_tool_paths(),
     )
-    comparison = compare_release_candidates(
-        first,
-        second,
-        contract=contract(),
-    )
-
     assert len(list(first.glob("analysis/*/*.tif"))) == 9
     assert len(list(first.glob("layers/*/*.pmtiles"))) == 9
     assert (first / "analysis/projections.parquet").is_file()
     assert len(first_result.manifest["artifacts"]) == 31
     assert first_result.manifest == second_result.manifest
-    assert comparison["status"] == "passed"
-    assert comparison["comparedArtifactCount"] == 31
+    with pytest.raises(ScienceContractError, match="genuinely independent"):
+        compare_release_candidates(first, second, contract=contract())
     assert first_result.gate["automatedValidation"] == "failed"
     assert first_result.gate["releaseDisposition"] == "blocked"
     assert first_result.gate["blockers"] == [
