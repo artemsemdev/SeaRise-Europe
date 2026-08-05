@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -42,8 +43,16 @@ def _write(path: Path, document: object) -> None:
 def _sample(*, cold: bool) -> dict[str, object]:
     requests = (
         [
-            {"kind": "cog", "status": 206, "responseBytes": 100, "range": "bytes=0-99"},
-            {"kind": "source-grid", "status": 200, "responseBytes": 50, "range": None},
+            {
+                "kind": "cog", "path": "/projection.tif",
+                "artifactPath": "analysis/ssp2-45/2050.tif", "status": 206,
+                "responseBytes": 100, "range": "bytes=0-99",
+            },
+            {
+                "kind": "source-grid", "path": "/source-grid.json.gz",
+                "artifactPath": "analysis/source-grid.json.gz", "status": 200,
+                "responseBytes": 50, "range": None,
+            },
         ]
         if cold
         else []
@@ -69,6 +78,12 @@ def _inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         harness.read_bytes()
     ).hexdigest()
     candidate = tmp_path / "candidate"
+    source_ids = [-1] * (76 * 46)
+    source_ids[5 * 76 + 7] = TARGET["sourceLocationId"]
+    source_grid_path = candidate / "analysis/source-grid.json.gz"
+    source_grid_path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(source_grid_path, "wt", encoding="utf-8") as stream:
+        json.dump({"width": 76, "height": 46, "locationIds": source_ids}, stream)
     _write(
         candidate / "build-evidence.json",
         {"lookupGoldenEvidence": {"sha256": "1" * 64, "browserBenchmarkTarget": TARGET}},
@@ -91,7 +106,15 @@ def _inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "geotiffVersion": release["deliveryMeasurement"]["geotiffVersion"],
             "packageLockSha256": release["deliveryMeasurement"]["packageLockSha256"],
         },
-        "target": {**TARGET, "goldenEvidenceSha256": "1" * 64},
+        "target": {
+            **TARGET,
+            "cogPath": "analysis/ssp2-45/2050.tif",
+            "sourceGridPath": "analysis/source-grid.json.gz",
+            "sourceRow": 5,
+            "sourceColumn": 7,
+            "cogRow": 40,
+            "goldenEvidenceSha256": "1" * 64,
+        },
         "coldLookupSamples": [_sample(cold=True) for _ in range(10)],
         "warmLookupSamples": [_sample(cold=False) for _ in range(100)],
     }
@@ -127,7 +150,10 @@ def test_observed_browser_trace_passes_declared_budgets(
     assert report["browserHeapBytes"] == 300
 
 
-@pytest.mark.parametrize("mutation", ["target", "negative-bytes", "negative-duration"])
+@pytest.mark.parametrize(
+    "mutation",
+    ["target", "wrong-cog", "pmtiles-path", "negative-bytes", "negative-duration"],
+)
 def test_delivery_trace_tamper_fails_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
 ) -> None:
@@ -136,6 +162,12 @@ def test_delivery_trace_tamper_fails_closed(
     )
     if mutation == "target":
         trace["target"]["expectedValuesMillimetres"] = [1, 2, 3]
+    elif mutation == "wrong-cog":
+        trace["target"]["cogPath"] = "analysis/ssp5-85/2100.tif"
+    elif mutation == "pmtiles-path":
+        trace["coldLookupSamples"][0]["requests"][0]["path"] = (
+            "/layers/ssp2-45/2050.pmtiles"
+        )
     elif mutation == "negative-bytes":
         trace["coldLookupSamples"][0]["requests"][0]["responseBytes"] = -1
     else:

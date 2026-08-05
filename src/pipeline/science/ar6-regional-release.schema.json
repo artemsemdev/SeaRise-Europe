@@ -137,7 +137,7 @@
     "deliveryMeasurement": {
       "const": {
         "harnessPath": "src/frontend/scripts/measure-ar6-release.mjs",
-        "harnessSha256": "37fb32e04937f85cce31e18089d71c4231881c0542b3e302955413e772bffe45",
+        "harnessSha256": "5c84881cc6f7e13d790c7ce624d604961abd1e1b8a5ac1af30306e58871e3c95",
         "packageLockPath": "src/frontend/package-lock.json",
         "packageLockSha256": "0cf125d429ffb54cd52342bbcfac73f5fee1eebf53a7111a2329dd64d099b979",
         "playwrightVersion": "1.62.1", "geotiffVersion": "3.0.5",

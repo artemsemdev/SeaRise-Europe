@@ -54,13 +54,23 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function record(sample, kind, status, responseBytes, range) {
+function record(sample, kind, path, artifactPath, status, responseBytes, range) {
   const list = requests.get(sample) ?? [];
-  list.push({ kind, status, responseBytes, range: range ?? null });
+  list.push({ kind, path, artifactPath, status, responseBytes, range: range ?? null });
   requests.set(sample, list);
 }
 
-function serveBytes(request, response, bytes, sample, kind, contentType, contentEncoding) {
+function serveBytes(
+  request,
+  response,
+  bytes,
+  sample,
+  kind,
+  path,
+  artifactPath,
+  contentType,
+  contentEncoding,
+) {
   const range = request.headers.range;
   response.setHeader("Accept-Ranges", "bytes");
   response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
@@ -70,7 +80,7 @@ function serveBytes(request, response, bytes, sample, kind, contentType, content
   if (!match) {
     response.writeHead(200, { "Content-Length": bytes.length });
     response.end(bytes);
-    record(sample, kind, 200, bytes.length, range);
+    record(sample, kind, path, artifactPath, 200, bytes.length, range);
     return;
   }
   const start = Number(match[1]);
@@ -82,7 +92,7 @@ function serveBytes(request, response, bytes, sample, kind, contentType, content
     "Content-Range": `bytes ${start}-${end}/${bytes.length}`,
   });
   response.end(body);
-  record(sample, kind, 206, body.length, range);
+  record(sample, kind, path, artifactPath, 206, body.length, range);
 }
 
 const server = createServer((request, response) => {
@@ -95,9 +105,28 @@ const server = createServer((request, response) => {
     response.writeHead(200, { "Content-Type": "text/javascript" });
     response.end(browserBundle);
   } else if (url.pathname === "/projection.tif") {
-    serveBytes(request, response, cog, sample, "cog", "image/tiff");
+    serveBytes(
+      request,
+      response,
+      cog,
+      sample,
+      "cog",
+      url.pathname,
+      cogRelative,
+      "image/tiff",
+    );
   } else if (url.pathname === "/source-grid.json.gz") {
-    serveBytes(request, response, gridGzip, sample, "source-grid", "application/json", "gzip");
+    serveBytes(
+      request,
+      response,
+      gridGzip,
+      sample,
+      "source-grid",
+      url.pathname,
+      gridRelative,
+      "application/json",
+      "gzip",
+    );
   } else {
     response.writeHead(200, { "Content-Type": "text/html" });
     response.end("<!doctype html><script src='/geotiff.js'></script>");

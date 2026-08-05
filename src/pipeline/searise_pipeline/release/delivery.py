@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import gzip
+import json
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -65,10 +67,38 @@ def create_delivery_report(
     target = trace.get("target", {})
     lookup_evidence = load_json(candidate / "build-evidence.json")["lookupGoldenEvidence"]
     sealed_target = lookup_evidence["browserBenchmarkTarget"]
-    if (
-        target.get("goldenEvidenceSha256") != lookup_evidence["sha256"]
-        or any(target.get(key) != value for key, value in sealed_target.items())
-    ):
+    expected_cog_path = (
+        f"analysis/{sealed_target['scenario']}/{sealed_target['horizon']}.tif"
+    )
+    expected_grid_path = "analysis/source-grid.json.gz"
+    try:
+        with gzip.open(candidate / expected_grid_path, "rt", encoding="utf-8") as stream:
+            source_grid = json.load(stream)
+        location_ids = source_grid["locationIds"]
+        matching_indexes = [
+            index
+            for index, location_id in enumerate(location_ids)
+            if location_id == sealed_target["sourceLocationId"]
+        ]
+        if len(matching_indexes) != 1:
+            raise ValueError("benchmark source ID is absent or duplicated")
+        source_index = matching_indexes[0]
+        source_row, source_column = divmod(source_index, source_grid["width"])
+        cog_row = source_grid["height"] - 1 - source_row
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(
+            "Cannot derive the browser target from the sealed source-grid"
+        ) from exc
+    expected_target = {
+        **sealed_target,
+        "cogPath": expected_cog_path,
+        "sourceGridPath": expected_grid_path,
+        "sourceRow": source_row,
+        "sourceColumn": source_column,
+        "cogRow": cog_row,
+        "goldenEvidenceSha256": lookup_evidence["sha256"],
+    }
+    if target != expected_target:
         raise ScienceContractError("Browser target is detached from independent goldens")
     cold = trace.get("coldLookupSamples", [])
     warm = trace.get("warmLookupSamples", [])
@@ -84,9 +114,37 @@ def create_delivery_report(
         requests = sample.get("requests")
         if not isinstance(requests, list):
             raise ScienceContractError("Browser delivery sample lacks observed HTTP requests")
+        expected_request_paths = {
+            "cog": ("/projection.tif", expected_cog_path),
+            "source-grid": ("/source-grid.json.gz", expected_grid_path),
+        }
+        if any(
+            item.get("kind") not in expected_request_paths
+            or (
+                item.get("path"), item.get("artifactPath")
+            ) != expected_request_paths[item["kind"]]
+            for item in requests
+        ):
+            raise ScienceContractError(
+                "Browser request trace is detached from the exact COG or source-grid"
+            )
         range_requests = [item for item in requests if item.get("kind") == "cog"]
+        grid_requests = [
+            item for item in requests if item.get("kind") == "source-grid"
+        ]
         if any(item.get("status") != 206 or not item.get("range") for item in range_requests):
             raise ScienceContractError("COG lookup did not use successful HTTP Range responses")
+        if (
+            cold_sample
+            and (
+                len(grid_requests) != 1
+                or grid_requests[0].get("status") != 200
+                or grid_requests[0].get("range") is not None
+            )
+        ) or (not cold_sample and requests):
+            raise ScienceContractError(
+                "Browser lookup requests differ from the cold/warm cache contract"
+            )
         observed_count = len(range_requests)
         response_bytes = [int(item["responseBytes"]) for item in requests]
         if any(value < 0 for value in response_bytes):
