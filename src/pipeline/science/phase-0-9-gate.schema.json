@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/phase-0-9-gate.schema.json",
+  "title": "Phase 0.9 final scientific gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "gateId", "issue", "recordedAt", "methodologyId",
+    "historicalEvidence", "decision", "decisionReason", "attemptEvidence",
+    "attemptSummary", "reviews", "automation", "blockerIds", "deliverables", "phase1"
+  ],
+  "properties": {
+    "$schema": { "const": "./phase-0-9-gate.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "gateId": { "const": "phase-0.9-final-scientific-gate" },
+    "issue": { "const": 85 },
+    "recordedAt": { "type": "string", "format": "date" },
+    "methodologyId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
+    "historicalEvidence": { "const": "docs/evidence/phase-0-regional-fixture.md" },
+    "decision": { "enum": ["approved", "rejected", "blocked"] },
+    "decisionReason": { "type": "string", "minLength": 1 },
+    "attemptEvidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "status"],
+      "properties": {
+        "path": { "const": "src/pipeline/science/evidence/phase-0-9-regional-attempt.json" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["completed", "preflight-blocked", "failed"] }
+      }
+    },
+    "attemptSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["totalCombinations", "completedCombinations", "blockedCombinations", "emittedScientificClassValues", "emittedArtifactCount"],
+      "properties": {
+        "totalCombinations": { "const": 9 },
+        "completedCombinations": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "blockedCombinations": { "type": "integer", "minimum": 0, "maximum": 9 },
+        "emittedScientificClassValues": {
+          "type": "array", "uniqueItems": true,
+          "items": { "enum": [0, 1] }
+        },
+        "emittedArtifactCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "reviews": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scientificData", "dataLicence", "productScope", "connectivity", "engineering", "crossEnvironment", "goldenVectors"],
+      "properties": {
+        "scientificData": { "$ref": "#/$defs/review" },
+        "dataLicence": { "$ref": "#/$defs/review" },
+        "productScope": { "$ref": "#/$defs/review" },
+        "connectivity": { "$ref": "#/$defs/review" },
+        "engineering": { "$ref": "#/$defs/review" },
+        "crossEnvironment": { "$ref": "#/$defs/review" },
+        "goldenVectors": { "$ref": "#/$defs/review" }
+      }
+    },
+    "automation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "canAuthorizeDecision"],
+      "properties": {
+        "status": { "enum": ["passed", "failed"] },
+        "canAuthorizeDecision": { "const": false }
+      }
+    },
+    "blockerIds": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "deliverables": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scientificArrays", "analysisCogs", "visualPmtiles", "geoParquet", "statistics", "receipts"],
+      "properties": {
+        "scientificArrays": { "$ref": "#/$defs/artifacts" },
+        "analysisCogs": { "$ref": "#/$defs/artifacts" },
+        "visualPmtiles": { "$ref": "#/$defs/artifacts" },
+        "geoParquet": { "$ref": "#/$defs/artifacts" },
+        "statistics": { "$ref": "#/$defs/artifacts" },
+        "receipts": { "$ref": "#/$defs/artifacts" }
+      }
+    },
+    "phase1": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "unlocked", "nextDecision"],
+      "properties": {
+        "status": { "enum": ["unlocked", "blocked"] },
+        "unlocked": { "type": "boolean" },
+        "nextDecision": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "decision": { "const": "approved" } } },
+      "then": {
+        "properties": {
+          "attemptEvidence": { "properties": { "status": { "const": "completed" } } },
+          "attemptSummary": { "properties": { "completedCombinations": { "const": 9 }, "blockedCombinations": { "const": 0 }, "emittedArtifactCount": { "minimum": 9 } } },
+          "blockerIds": { "maxItems": 0 },
+          "reviews": { "$ref": "#/$defs/approvedReviews" },
+          "deliverables": {
+            "properties": {
+              "scientificArrays": { "minItems": 9 },
+              "analysisCogs": { "minItems": 9 },
+              "visualPmtiles": { "minItems": 1 },
+              "geoParquet": { "minItems": 1 },
+              "statistics": { "minItems": 1 },
+              "receipts": { "minItems": 1 }
+            }
+          },
+          "phase1": { "properties": { "status": { "const": "unlocked" }, "unlocked": { "const": true } } }
+        }
+      },
+      "else": {
+        "properties": {
+          "blockerIds": { "minItems": 1 },
+          "phase1": { "properties": { "status": { "const": "blocked" }, "unlocked": { "const": false } } }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "artifacts": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/artifact" } },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": { "enum": ["approved", "pending", "rejected"] },
+        "evidence": { "type": ["string", "null"], "minLength": 1 }
+      }
+    },
+    "approvedReview": {
+      "type": "object", "properties": { "status": { "const": "approved" }, "evidence": { "type": "string" } }
+    },
+    "approvedReviews": {
+      "type": "object",
+      "properties": {
+        "scientificData": { "$ref": "#/$defs/approvedReview" },
+        "dataLicence": { "$ref": "#/$defs/approvedReview" },
+        "productScope": { "$ref": "#/$defs/approvedReview" },
+        "connectivity": { "$ref": "#/$defs/approvedReview" },
+        "engineering": { "$ref": "#/$defs/approvedReview" },
+        "crossEnvironment": { "$ref": "#/$defs/approvedReview" },
+        "goldenVectors": { "$ref": "#/$defs/approvedReview" }
+      }
+    }
+  }
+}
