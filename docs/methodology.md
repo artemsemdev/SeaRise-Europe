@@ -232,10 +232,12 @@ intended coastal land result, they become `DataUnavailable`; a maximum-total
 threshold is deliberately absent because it cannot repair missing evidence.
 
 The resulting automated recommendation is `rejected`, as required by #95 when
-the selected binary method is indefensible. An independent scientific/data
-reviewer must still record the human disposition. Until the method is
-superseded with a finite coastal water reference and defensible bare-earth
-terrain source, #98 cannot authorize a regional binary release.
+the selected binary method is indefensible. This is not an authoritative
+reviewed rejection: the human disposition remains `pending` and the
+publication gate remains `blocked` until an independent scientific/data
+reviewer records it. Until the method is superseded with a finite coastal water
+reference and defensible bare-earth terrain source, #98 cannot authorize a
+regional binary release.
 
 ## Required preprocessing record
 

@@ -47,6 +47,7 @@ All notable changes to this project will be documented in this file.
   artifacts; the Phase 0 scientific gate and Phase 1 stay blocked until the
   named numerical, control, reproducibility, golden-vector, and review issues
   are resolved and the final gate is re-evaluated.
-- Rejected the current coastal binary publication method after calibration
-  found no finite SLA shoreline-representativeness or GLO-30
-  DSM-to-bare-earth bound; missing evidence now remains `DataUnavailable`.
+- Automated methodology analysis now recommends rejecting the current coastal
+  binary method because the locked evidence provides no finite SLA shoreline
+  or GLO-30 DSM-to-bare-earth bound. The authoritative disposition remains
+  pending independent review, and publication remains blocked.

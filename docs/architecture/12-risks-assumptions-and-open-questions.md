@@ -64,8 +64,9 @@ basin controls, and #97 scope/connectivity review in order. The corrected Phase
 possibly unlock Phase 1.
 Phase 0.11 quantifies the finite source terms but confirms that coastal SLA
 representativeness and DSM-to-bare-earth error are not finitely bounded by the
-locked evidence. The automated disposition is therefore `rejected`, not
-`approved`; an independent reviewer and a superseding method remain required.
+locked evidence. The automated recommendation is therefore `rejected`, not
+`approved`; the authoritative disposition remains pending independent review,
+publication stays blocked, and a superseding method remains required.
 
 ## Assumptions that require evidence
 
