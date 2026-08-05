@@ -313,6 +313,59 @@ def test_ndjson_rejects_a_shrunken_interior_source_cell(
         pmtiles_module._write_ndjson(tmp_path / "tampered.ndjson", source, layer)
 
 
+def test_pmtiles_rejects_common_mode_metadata_tampering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _real_source()
+    layer = source.layers[4]
+    release = contract()
+    original = pmtiles_module._canonical_metadata
+    edited_metadata: dict[str, object] = {}
+
+    def tampered_metadata(source, layer, contract):
+        metadata = deepcopy(original(source, layer, contract))
+        metadata["searise"]["baseline"] = "wrong-baseline"
+        return metadata
+
+    def fake_run(command: list[str]) -> str:
+        output = next(
+            (argument for argument in command if argument.startswith("--output=")),
+            None,
+        )
+        if output is not None:
+            Path(output.removeprefix("--output=")).write_bytes(b"pmtiles")
+        metadata_argument = next(
+            (argument for argument in command if argument.startswith("--metadata=")),
+            None,
+        )
+        if metadata_argument is not None:
+            metadata_path = Path(metadata_argument.removeprefix("--metadata="))
+            edited_metadata.update(json.loads(metadata_path.read_text(encoding="utf-8")))
+        if "show" in command and "--metadata" in command:
+            return json.dumps(edited_metadata)
+        return ""
+
+    monkeypatch.setattr(pmtiles_module, "_canonical_metadata", tampered_metadata)
+    monkeypatch.setattr(pmtiles_module, "validate_vector_toolchain", lambda **_kwargs: None)
+    monkeypatch.setattr(pmtiles_module, "_run", fake_run)
+
+    dummy = tmp_path / "unused"
+    with pytest.raises(ScienceContractError, match="metadata differs"):
+        write_visual_pmtiles(
+            source,
+            layer,
+            tmp_path / "tampered.pmtiles",
+            contract=release,
+            tippecanoe_path=dummy,
+            decode_path=dummy,
+            pmtiles_path=dummy,
+            tippecanoe_source_archive_path=dummy,
+            tippecanoe_build_receipt_path=dummy,
+            pmtiles_distribution_asset_path=dummy,
+            pmtiles_distribution_platform="test-platform",
+        )
+
+
 TOOL_ENVIRONMENT = (
     "SEARISE_TIPPECANOE",
     "SEARISE_TIPPECANOE_DECODE",
