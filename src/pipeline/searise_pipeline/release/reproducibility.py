@@ -1,8 +1,8 @@
-"""Cross-environment comparison for complete AR6 release candidates."""
+"""Evidence-bound comparison of complete AR6 release candidates."""
 
 from __future__ import annotations
 
-import json
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -11,15 +11,7 @@ import rasterio
 
 from searise_pipeline.science.contracts import ScienceContractError
 
-
-def _load(path: Path) -> Mapping[str, Any]:
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ScienceContractError(f"Cannot read release comparison input: {exc}") from exc
-    if not isinstance(document, dict):
-        raise ScienceContractError("Release comparison input must be an object")
-    return document
+from .evidence import candidate_binding, load_json
 
 
 def _maximum_cog_difference(first: Path, second: Path) -> int:
@@ -37,25 +29,78 @@ def _maximum_cog_difference(first: Path, second: Path) -> int:
         return int(np.max(np.abs(left_values[left_valid] - right_values[right_valid])))
 
 
+def _valid_ids(path: Path) -> set[tuple[str, int, int]]:
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise ScienceContractError("Reproducibility comparison requires pinned pyarrow") from exc
+    table = pq.read_table(
+        path,
+        columns=["scenario", "horizon", "source_location_id"],
+    ).to_pydict()
+    return set(zip(table["scenario"], table["horizon"], table["source_location_id"]))
+
+
+def _validate_matrix(manifest: Mapping[str, Any], contract: Mapping[str, Any]) -> None:
+    artifacts = manifest.get("artifacts", [])
+    by_role: dict[str, list[Mapping[str, Any]]] = {}
+    for item in artifacts:
+        by_role.setdefault(item["role"], []).append(item)
+    allowed_roles = {
+        "exact-browser-lookup",
+        "visual-only",
+        "stac-item",
+        "analytical-parity",
+        "source-grid-identity",
+        "licence-notice",
+        "stac-collection",
+    }
+    if set(by_role) != allowed_roles or len(artifacts) != 31:
+        raise ScienceContractError("Candidate artifact role inventory differs from the contract")
+    expected = {
+        (scenario, horizon)
+        for scenario in contract["matrix"]["scenarios"]
+        for horizon in contract["matrix"]["horizons"]
+    }
+    for role in ("exact-browser-lookup", "visual-only", "stac-item"):
+        records = by_role[role]
+        observed = {(item.get("scenario"), item.get("horizon")) for item in records}
+        if len(records) != 9 or observed != expected:
+            raise ScienceContractError(f"Candidate {role} artifacts differ from the 3 x 3 matrix")
+    singleton_roles = {
+        "analytical-parity",
+        "source-grid-identity",
+        "licence-notice",
+        "stac-collection",
+    }
+    if any(len(by_role.get(role, [])) != 1 for role in singleton_roles):
+        raise ScienceContractError("Candidate singleton artifacts are incomplete")
+
+
 def compare_release_candidates(
     first: Path,
     second: Path,
     *,
-    first_environment: str,
-    second_environment: str,
     contract: Mapping[str, Any],
 ) -> Mapping[str, Any]:
-    """Compare independent outputs using the predeclared zero-value tolerance."""
-    if not first_environment or not second_environment or first_environment == second_environment:
-        raise ScienceContractError("Two distinct build environment identities are required")
-    first_manifest = _load(first / "manifest.json")
-    second_manifest = _load(second / "manifest.json")
+    """Hash real bytes and compare scientific values and valid-ID sets exactly."""
+    started = time.perf_counter()
+    first_binding = candidate_binding(first)
+    second_binding = candidate_binding(second)
+    first_manifest = load_json(first / "manifest.json")
+    second_manifest = load_json(second / "manifest.json")
     if (
-        first_manifest["releaseContractId"] != contract["releaseContractId"]
-        or second_manifest["releaseContractId"] != contract["releaseContractId"]
+        first_binding["releaseContractId"] != contract["releaseContractId"]
+        or second_binding["releaseContractId"] != contract["releaseContractId"]
         or first_manifest["matrix"] != second_manifest["matrix"]
     ):
         raise ScienceContractError("Release candidates use different contracts or matrices")
+    _validate_matrix(first_manifest, contract)
+    _validate_matrix(second_manifest, contract)
+    first_environment = first_binding["environmentIdentity"]
+    second_environment = second_binding["environmentIdentity"]
+    if first_environment.get("buildRunId") == second_environment.get("buildRunId"):
+        raise ScienceContractError("Two distinct clean build run identities are required")
     first_artifacts = {item["path"]: item for item in first_manifest["artifacts"]}
     second_artifacts = {item["path"]: item for item in second_manifest["artifacts"]}
     if first_artifacts.keys() != second_artifacts.keys():
@@ -75,20 +120,26 @@ def compare_release_candidates(
             maximum_difference,
             _maximum_cog_difference(first / relative_path, second / relative_path),
         )
+    first_ids = _valid_ids(first / "analysis/projections.parquet")
+    second_ids = _valid_ids(second / "analysis/projections.parquet")
+    valid_id_difference = len(first_ids.symmetric_difference(second_ids))
     tolerance = contract["reproducibility"]
     status = (
         "passed"
         if maximum_difference == tolerance["scientificValueToleranceMillimetres"]
+        and valid_id_difference == tolerance["validIdSetDifference"]
         and byte_identical == tolerance["byteIdentityWithinPinnedToolchain"]
         else "failed"
     )
     return {
         "schemaVersion": 1,
         "status": status,
+        "candidates": [first_binding, second_binding],
         "environments": [first_environment, second_environment],
         "independentEnvironmentCount": 2,
         "maximumScientificValueDifferenceMillimetres": maximum_difference,
-        "validIdSetDifference": 0,
+        "validIdSetDifference": valid_id_difference,
         "byteIdentityWithinPinnedToolchain": byte_identical,
         "comparedArtifactCount": len(first_artifacts),
+        "comparisonDurationSeconds": round(time.perf_counter() - started, 6),
     }
