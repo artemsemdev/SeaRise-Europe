@@ -18,12 +18,14 @@ from searise_pipeline.regional_fixture.phase_0_14_gate import (
     assert_phase_1_unlocked,
     build_phase_0_14_no_go,
     canonical_phase_0_14_no_go_bytes,
+    load_phase_0_14_no_go,
     validate_phase_0_14_no_go,
     verify_phase_0_14_bindings,
 )
 from searise_pipeline.science.contracts import ScienceContractError
 
 REPO_ROOT = Path(__file__).parents[4]
+EVIDENCE_PATH = REPO_ROOT / "src/pipeline/science/evidence/phase-0-14-final-no-go.json"
 
 
 def _gate() -> dict:  # type: ignore[type-arg]
@@ -258,3 +260,19 @@ def test_canonical_bytes_are_mapping_order_independent(tmp_path: Path) -> None:
     reordered = dict(reversed(list(gate.items())))
 
     assert canonical_phase_0_14_no_go_bytes(gate) == canonical_phase_0_14_no_go_bytes(reordered)
+
+
+def test_checked_final_evidence_rebuilds_byte_for_byte() -> None:
+    rebuilt = build_phase_0_14_no_go(REPO_ROOT)
+
+    assert rebuilt["recordStatus"] == "final"
+    assert canonical_phase_0_14_no_go_bytes(rebuilt) == EVIDENCE_PATH.read_bytes()
+
+
+def test_checked_final_evidence_loads_and_verifies_all_bindings() -> None:
+    evidence = load_phase_0_14_no_go(EVIDENCE_PATH)
+
+    verify_phase_0_14_bindings(evidence, REPO_ROOT)
+    assert evidence["authoritativeScientificDisposition"] == "blocked"
+    assert evidence["phase0Disposition"] == "complete-with-no-go"
+    assert evidence["phase1"]["unlocked"] is False
