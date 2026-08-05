@@ -121,9 +121,9 @@ def build_blocked_phase_0_9_attempt(
         {
             "sourceId": source_id,
             "version": _source(source_lock, source_id)["version"],
-            "redistributionStatus": _source(source_lock, source_id)["licence"][
-                "redistributionStatus"
-            ],
+            "registryRedistributionStatus": _source(source_lock, source_id)[
+                "licence"
+            ]["redistributionStatus"],
         }
         for source_id in used_source_ids
     ]
@@ -148,7 +148,7 @@ def build_blocked_phase_0_9_attempt(
         "contractLineage": [_binding(repo_root, path) for path in contract_paths],
         "sourceAndLicence": {
             "integrity": "locked-and-verified",
-            "review": "registry-checked-independent-review-pending",
+            "review": "project-registry-evidence-independent-licence-review-pending",
             "usedSources": source_licences,
         },
         "lineage": {
