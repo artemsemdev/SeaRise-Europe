@@ -1,0 +1,58 @@
+{
+  "$schema": "./phase-0-9-gate.schema.json",
+  "schemaVersion": 1,
+  "gateId": "phase-0.9-final-scientific-gate",
+  "issue": 85,
+  "recordedAt": "2026-08-05",
+  "methodologyId": "absolute-mean-water-surface-egm2008-interval-v1",
+  "historicalEvidence": "docs/evidence/phase-0-regional-fixture.md",
+  "decision": "blocked",
+  "decisionReason": "All nine exact scenario/horizon attempts stop before array creation because mandatory numerical, control, reproducibility, golden-vector, and independent-review evidence is unavailable.",
+  "attemptEvidence": {
+    "path": "src/pipeline/science/evidence/phase-0-9-regional-attempt.json",
+    "sha256": "6c27f1b2c2d00b06d6225cb19b55c51c9c4392043da915505996196317c05fda",
+    "status": "preflight-blocked"
+  },
+  "attemptSummary": {
+    "totalCombinations": 9,
+    "completedCombinations": 0,
+    "blockedCombinations": 9,
+    "emittedScientificClassValues": [],
+    "emittedArtifactCount": 0
+  },
+  "reviews": {
+    "scientificData": { "status": "pending", "evidence": null },
+    "dataLicence": { "status": "pending", "evidence": null },
+    "productScope": { "status": "pending", "evidence": null },
+    "connectivity": { "status": "pending", "evidence": null },
+    "engineering": { "status": "pending", "evidence": null },
+    "crossEnvironment": { "status": "pending", "evidence": null },
+    "goldenVectors": { "status": "pending", "evidence": null }
+  },
+  "automation": {
+    "status": "passed",
+    "canAuthorizeDecision": false
+  },
+  "blockerIds": [
+    "egm2008-evaluator-conventions",
+    "numerical-uncertainty-bounds",
+    "independent-scientific-data-review",
+    "baltic-black-sea-controls",
+    "product-scope-connectivity-approval",
+    "cross-environment-reproducibility",
+    "reviewed-golden-vectors"
+  ],
+  "deliverables": {
+    "scientificArrays": [],
+    "analysisCogs": [],
+    "visualPmtiles": [],
+    "geoParquet": [],
+    "statistics": [],
+    "receipts": []
+  },
+  "phase1": {
+    "status": "blocked",
+    "unlocked": false,
+    "nextDecision": "Resolve every named scientific and review evidence gap, then repeat Phase 0.9; do not begin Phase 1 or substitute an implementation workaround."
+  }
+}
