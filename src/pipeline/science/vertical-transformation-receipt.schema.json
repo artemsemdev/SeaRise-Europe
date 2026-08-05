@@ -7,7 +7,8 @@
   "required": [
     "$schema", "schemaVersion", "receiptId", "issue", "recordedAt", "status",
     "methodologyId", "inputContracts", "sourceInputs", "software", "baseline",
-    "grid", "geoid", "transform", "uncertainty", "outputs", "validation", "blockers"
+    "grid", "terrain", "connectivity", "geoid", "transform", "uncertainty",
+    "outputs", "validation", "blockers"
   ],
   "properties": {
     "$schema": { "const": "../vertical-transformation-receipt.schema.json" },
@@ -95,7 +96,7 @@
       "type": "object", "additionalProperties": false,
       "required": ["status", "horizontalCrs", "verticalCrs", "shape", "affine", "pixelInterpretation", "continuousInterpolation", "categoricalInterpolation", "extrapolation", "nodataRule"],
       "properties": {
-        "status": { "enum": ["locked", "pending-phase-0.8"] },
+        "status": { "enum": ["locked", "pending-phase-0.8", "selected-phase-0.8-release-mosaic-pending"] },
         "horizontalCrs": { "type": ["string", "null"], "minLength": 1 },
         "verticalCrs": { "const": "EPSG:3855" },
         "shape": {
@@ -115,6 +116,29 @@
         "categoricalInterpolation": { "const": "nearest-neighbour" },
         "extrapolation": { "const": "none" },
         "nodataRule": { "const": "propagate-any-missing-source-or-neighbour" }
+      }
+    },
+    "terrain": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "sourceId", "release", "decisionContract", "numericBoundsStatus"],
+      "properties": {
+        "status": { "enum": ["selected-for-external-review", "approved"] },
+        "sourceId": { "const": "copernicus-dem-glo30" },
+        "release": { "const": "2021_1" },
+        "decisionContract": { "$ref": "#/$defs/hashedPath" },
+        "numericBoundsStatus": { "enum": ["blocked", "complete"] }
+      }
+    },
+    "connectivity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "method", "rulesContract", "controlsContract", "automatedControls", "independentReview"],
+      "properties": {
+        "status": { "enum": ["selected-for-external-review", "approved"] },
+        "method": { "const": "ocean-seeded-eight-neighbour-v1" },
+        "rulesContract": { "$ref": "#/$defs/hashedPath" },
+        "controlsContract": { "$ref": "#/$defs/hashedPath" },
+        "automatedControls": { "$ref": "#/$defs/checkStatus" },
+        "independentReview": { "$ref": "#/$defs/checkStatus" }
       }
     },
     "geoid": {
@@ -195,6 +219,8 @@
         "blockers": { "maxItems": 0 },
         "outputs": { "properties": { "status": { "const": "generated" } } },
         "grid": { "properties": { "status": { "const": "locked" } } },
+        "terrain": { "properties": { "status": { "const": "approved" }, "numericBoundsStatus": { "const": "complete" } } },
+        "connectivity": { "properties": { "status": { "const": "approved" }, "automatedControls": { "const": "passed" }, "independentReview": { "const": "passed" } } },
         "geoid": { "properties": { "status": { "const": "ready" } } },
         "uncertainty": { "properties": { "numericBoundsStatus": { "const": "complete" }, "maximumTotalUncertaintyMetres": { "type": "number" } } },
         "validation": { "properties": { "automatedTests": { "const": "passed" }, "independentReview": { "const": "passed" }, "crossEnvironment": { "const": "passed" }, "basinControls": { "const": "passed" } } }

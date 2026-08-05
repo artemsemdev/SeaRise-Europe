@@ -119,12 +119,12 @@
       "required": ["required", "sourceId", "release", "type", "verticalCrs", "units", "resolutionDecision", "representationBias"],
       "properties": {
         "required": { "const": true },
-        "sourceId": { "const": "copernicus-dem" },
+        "sourceId": { "const": "copernicus-dem-glo30" },
         "release": { "const": "2021_1" },
         "type": { "const": "digital-surface-model" },
         "verticalCrs": { "const": "EPSG:3855" },
         "units": { "const": "m" },
-        "resolutionDecision": { "const": "pending-phase-0.8" },
+        "resolutionDecision": { "const": "GLO-30-selected-for-external-review" },
         "representationBias": { "const": "required-uncertainty-term" }
       }
     },
@@ -137,7 +137,7 @@
         "categoricalFields": { "const": "nearest-neighbour" },
         "extrapolation": { "const": "none" },
         "nodata": { "const": "propagate if any required value or interpolation neighbour is unavailable" },
-        "analysisGrid": { "const": "approved native Copernicus DEM grid" }
+        "analysisGrid": { "const": "selected native Copernicus DEM GLO-30 grid; regional shape and affine pending Phase 0.9 rebuild" }
       }
     },
     "uncertainty": {
@@ -176,7 +176,7 @@
         "included": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "excluded": { "type": "array", "minItems": 6, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
         "verticalLandMotion": { "const": "use the contribution already present in AR6 total; do not add an unreviewed second correction" },
-        "connectivity": { "const": "required post-vertical filter pending Phase 0.8 approval" }
+        "connectivity": { "const": "ocean-seeded eight-neighbour candidate selected for external review; rejected connectivity is NoModeledExposureDetected and unknown connectivity is DataUnavailable" }
       }
     },
     "review": {
@@ -200,7 +200,7 @@
           "prefixItems": [
             { "const": "vertical-methodology-review" },
             { "const": "validated-vertical-transform" },
-            { "const": "terrain-and-connectivity-controls" }
+            { "const": "terrain-uncertainty-bounds-and-control-reviews" }
           ],
           "items": false,
           "minItems": 3,

@@ -67,6 +67,11 @@ def test_vertical_methodology_binds_reference_epoch_and_uncertainty() -> None:
         "ambiguousReason": "uncertain-threshold",
         "missingConnectivityState": "DataUnavailable",
     }
+    assert methodology["physicalScope"]["connectivity"] == (
+        "ocean-seeded eight-neighbour candidate selected for external review; "
+        "rejected connectivity is NoModeledExposureDetected and unknown "
+        "connectivity is DataUnavailable"
+    )
     assert methodology["review"]["status"] == "pending"
 
 

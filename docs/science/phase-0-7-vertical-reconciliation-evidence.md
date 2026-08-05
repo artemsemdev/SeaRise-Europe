@@ -67,8 +67,9 @@ remain required:
    evaluator, and the reviewed zero-tide-to-tide-free rule.
 2. Pin QUID-derived SLA mapping evidence and approve all baseline, datum,
    interpolation, terrain, DSM, and maximum-total uncertainty bounds.
-3. Complete Phase 0.8 approval of DEM resolution, target grid/affine, coastal
-   scope, terrain controls, and connectivity.
+3. Complete external review of the Phase 0.8 GLO-30, coastal-scope, and
+   connectivity candidates; bound the remaining terrain terms; and lock the
+   Phase 0.9 regional mosaic shape and affine.
 4. Validate independent controls in the Baltic and Black Sea.
 5. Reproduce the transform and receipts in an approved second environment.
 6. Record independent scientific/data reviewer approval.
