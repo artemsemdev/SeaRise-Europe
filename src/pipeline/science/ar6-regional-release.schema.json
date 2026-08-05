@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/ar6-regional-release.schema.json",
+  "title": "SeaRise AR6 regional release contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "releaseContractId", "issue", "source",
+    "matrix", "grid", "values", "artifacts", "toolchain",
+    "reproducibility", "budgets", "scientificDisposition"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"const": 1},
+    "releaseContractId": {"const": "ar6-europe-regional-release-v1"},
+    "issue": {"const": 110},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "version", "archiveSha256", "licence", "attribution"],
+      "properties": {
+        "sourceId": {"const": "ipcc-ar6-sea-level"},
+        "version": {"const": "20210809"},
+        "archiveSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "licence": {"const": "CC-BY-4.0"},
+        "attribution": {"type": "string", "minLength": 20}
+      }
+    },
+    "matrix": {"$ref": "#/$defs/matrix"},
+    "grid": {"$ref": "#/$defs/grid"},
+    "values": {"$ref": "#/$defs/values"},
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cog", "geoparquet", "pmtiles"],
+      "properties": {
+        "cog": {"type": "object"},
+        "geoparquet": {"type": "object"},
+        "pmtiles": {"type": "object"}
+      }
+    },
+    "toolchain": {"type": "object"},
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scientificValueToleranceMillimetres", "validIdSetDifference",
+        "byteIdentityWithinPinnedToolchain", "minimumIndependentEnvironments"
+      ],
+      "properties": {
+        "scientificValueToleranceMillimetres": {"const": 0},
+        "validIdSetDifference": {"const": 0},
+        "byteIdentityWithinPinnedToolchain": {"const": true},
+        "minimumIndependentEnvironments": {"minimum": 2, "type": "integer"}
+      }
+    },
+    "budgets": {"type": "object"},
+    "scientificDisposition": {"const": "projection-only"}
+  },
+  "$defs": {
+    "matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenarios", "horizons", "quantiles"],
+      "properties": {
+        "scenarios": {"const": ["ssp1-26", "ssp2-45", "ssp5-85"]},
+        "horizons": {"const": [2030, 2050, 2100]},
+        "quantiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "central", "upper"],
+          "properties": {
+            "lower": {"const": 0.167},
+            "central": {"const": 0.5},
+            "upper": {"const": 0.833}
+          }
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crs", "nativeResolutionDegrees", "longitudeCentres",
+        "latitudeCentres", "width", "height", "bounds", "scientificResampling"
+      ],
+      "properties": {
+        "crs": {"const": "EPSG:4326"},
+        "nativeResolutionDegrees": {"const": 1},
+        "longitudeCentres": {"const": [-30, 45]},
+        "latitudeCentres": {"const": [30, 75]},
+        "width": {"const": 76},
+        "height": {"const": 46},
+        "bounds": {"const": [-30.5, 29.5, 45.5, 75.5]},
+        "scientificResampling": {"const": "none"}
+      }
+    },
+    "values": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storageType", "storageUnits", "publishedUnits", "scaleToMetres",
+        "nodata", "baseline", "confidence"
+      ],
+      "properties": {
+        "storageType": {"const": "int16"},
+        "storageUnits": {"const": "mm"},
+        "publishedUnits": {"const": "m"},
+        "scaleToMetres": {"const": 0.001},
+        "nodata": {"const": -32768},
+        "baseline": {"const": "1995-2014 mean"},
+        "confidence": {"const": "medium"}
+      }
+    }
+  }
+}
