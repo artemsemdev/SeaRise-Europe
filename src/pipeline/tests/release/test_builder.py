@@ -11,7 +11,9 @@ from pathlib import Path
 
 import pytest
 
+import searise_pipeline.release.builder as release_builder
 from searise_pipeline.release import (
+    RegionalReleaseSource,
     build_regional_release,
     compare_release_candidates,
     load_source_fixture,
@@ -86,7 +88,9 @@ def _write_json(path: Path, document: object) -> None:
     )
 
 
-def _stac_candidate(root: Path) -> list[dict[str, object]]:
+def _stac_candidate(
+    root: Path,
+) -> tuple[list[dict[str, object]], RegionalReleaseSource]:
     artifacts: list[dict[str, object]] = []
 
     def add_artifact(
@@ -94,6 +98,8 @@ def _stac_candidate(root: Path) -> list[dict[str, object]]:
         *,
         media_type: str,
         role: str,
+        scenario: str | None = None,
+        horizon: int | None = None,
         member_sha256: str | None = None,
     ) -> None:
         path = root / relative
@@ -108,11 +114,20 @@ def _stac_candidate(root: Path) -> list[dict[str, object]]:
         }
         if member_sha256 is not None:
             record["source"] = {"memberSha256": member_sha256}
+        if scenario is not None:
+            record["scenario"] = scenario
+        if horizon is not None:
+            record["horizon"] = horizon
         artifacts.append(record)
 
     release = contract()
+    source = _source()
+    member_by_scenario = {
+        layer.scenario: layer.member_sha256
+        for layer in source.layers
+        if layer.horizon == release["matrix"]["horizons"][0]
+    }
     for scenario in release["matrix"]["scenarios"]:
-        member_sha256 = hashlib.sha256(scenario.encode()).hexdigest()
         for horizon in release["matrix"]["horizons"]:
             add_artifact(
                 f"analysis/{scenario}/{horizon}.tif",
@@ -120,12 +135,16 @@ def _stac_candidate(root: Path) -> list[dict[str, object]]:
                     "image/tiff; application=geotiff; profile=cloud-optimized"
                 ),
                 role="exact-browser-lookup",
-                member_sha256=member_sha256,
+                scenario=scenario,
+                horizon=horizon,
+                member_sha256=member_by_scenario[scenario],
             )
             add_artifact(
                 f"layers/{scenario}/{horizon}.pmtiles",
                 media_type="application/vnd.pmtiles",
                 role="visual-only",
+                scenario=scenario,
+                horizon=horizon,
             )
     add_artifact(
         "analysis/projections.parquet",
@@ -141,9 +160,10 @@ def _stac_candidate(root: Path) -> list[dict[str, object]]:
         root,
         artifacts,
         release_id="ar6-europe-fixture-v1",
+        source=source,
         contract=release,
     )
-    return artifacts
+    return artifacts, source
 
 
 def _first_stac_item(root: Path) -> tuple[Path, dict[str, object]]:
@@ -174,7 +194,7 @@ def test_stac_validator_rejects_mutated_asset_inventory(
     tmp_path: Path,
     mutation: str,
 ) -> None:
-    artifacts = _stac_candidate(tmp_path)
+    artifacts, source = _stac_candidate(tmp_path)
     item_path, item = _first_stac_item(tmp_path)
     assets = item["assets"]
     if mutation == "empty":
@@ -192,6 +212,7 @@ def test_stac_validator_rejects_mutated_asset_inventory(
             tmp_path,
             artifacts,
             release_id="ar6-europe-fixture-v1",
+            source=source,
             contract=contract(),
         )
 
@@ -211,7 +232,7 @@ def test_stac_validator_rejects_mutated_item_contract(
     mutation: str,
     message: str,
 ) -> None:
-    artifacts = _stac_candidate(tmp_path)
+    artifacts, source = _stac_candidate(tmp_path)
     item_path, item = _first_stac_item(tmp_path)
     if mutation == "properties":
         item["properties"]["unexpected"] = True
@@ -224,6 +245,7 @@ def test_stac_validator_rejects_mutated_item_contract(
             tmp_path,
             artifacts,
             release_id="ar6-europe-fixture-v1",
+            source=source,
             contract=contract(),
         )
 
@@ -296,6 +318,50 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
         expected, relative_path = line.split("  ", 1)
         actual = hashlib.sha256((first / relative_path).read_bytes()).hexdigest()
         assert actual == expected
+
+
+@pytest.mark.skipif(
+    not EXTERNAL_TOOLS_AVAILABLE,
+    reason="set the pinned vector-tool paths for the complete release integration",
+)
+def test_builder_rejects_artifact_record_member_lineage_common_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = release_builder._artifact_record
+
+    def corrupted_artifact_record(*args, **kwargs):
+        record = original(*args, **kwargs)
+        if kwargs.get("scenario") is None:
+            return record
+        return {
+            **record,
+            "source": {
+                **record["source"],
+                "memberSha256": "0" * 64,
+            },
+        }
+
+    monkeypatch.setattr(
+        release_builder,
+        "_artifact_record",
+        corrupted_artifact_record,
+    )
+    output = tmp_path / "candidate"
+
+    with pytest.raises(ScienceContractError, match="STAC Item lineage"):
+        build_regional_release(
+            _source(),
+            output,
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            build_environment_id="lineage-mutation",
+            source_revision="a" * 40,
+            **_tool_paths(),
+        )
+
+    assert not output.exists()
 
 
 def test_builder_refuses_to_overwrite_immutable_release(tmp_path: Path) -> None:

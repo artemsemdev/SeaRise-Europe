@@ -294,6 +294,7 @@ def _write_stac(
     artifacts: list[Mapping[str, Any]],
     *,
     release_id: str,
+    source: RegionalReleaseSource,
     contract: Mapping[str, Any],
 ) -> list[Mapping[str, Any]]:
     """Write a deterministic STAC Collection and one Item per projection layer."""
@@ -418,7 +419,13 @@ def _write_stac(
         },
         *item_records,
     ]
-    _validate_stac(root, artifacts, release_id=release_id, contract=contract)
+    _validate_stac(
+        root,
+        artifacts,
+        release_id=release_id,
+        source=source,
+        contract=contract,
+    )
     return records
 
 
@@ -427,6 +434,7 @@ def _validate_stac(
     artifacts: list[Mapping[str, Any]],
     *,
     release_id: str,
+    source: RegionalReleaseSource,
     contract: Mapping[str, Any],
 ) -> None:
     """Offline validation of collection, 3x3 Items, links, and bound assets."""
@@ -474,7 +482,16 @@ def _validate_stac(
             raise ScienceContractError("STAC item link escapes the candidate")
         item = json.loads(item_path.read_text(encoding="utf-8"))
         observed.add((scenario, horizon))
-        cog_record = by_path[f"analysis/{scenario}/{horizon}.tif"]
+        source_layer = next(
+            (
+                item
+                for item in source.layers
+                if item.scenario == scenario and item.horizon == horizon
+            ),
+            None,
+        )
+        if source_layer is None:
+            raise ScienceContractError("STAC Item has no matching verified source layer")
         west, south, east, north = contract["grid"]["bounds"]
         expected_geometry = {
             "type": "Polygon",
@@ -508,7 +525,7 @@ def _validate_stac(
             "scientific_disposition": contract["scientificDisposition"],
             "source_release": contract["source"]["version"],
             "source_archive_sha256": contract["source"]["archiveSha256"],
-            "source_member_sha256": cog_record["source"]["memberSha256"],
+            "source_member_sha256": source_layer.member_sha256,
             "method_version": "ar6-regional-projection-v1",
             "quantiles": contract["matrix"]["quantiles"],
             "storage_units": contract["values"]["storageUnits"],
@@ -730,6 +747,7 @@ def build_regional_release(
             root,
             artifacts,
             release_id=release_id,
+            source=source,
             contract=contract,
         )
         artifacts.extend(
