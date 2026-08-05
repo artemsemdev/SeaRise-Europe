@@ -3,16 +3,18 @@
 > **Status:** Blocked; not approved for a real-data public release
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
-> **Blocking gate:** Exact inputs are locked; implementation, terrain/connectivity controls, and independent review remain blocking
-> **Latest evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
+> **Blocking gate:** Fail-closed interval mechanics are implemented; numerical geoid conventions, uncertainty bounds, terrain/connectivity controls, reproducibility, and independent review remain blocking
+> **Latest evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
 
 This document specifies the selected candidate methodology and the evidence
 needed before it can become a published methodology version. The strategy is
-binding for acquisition and validation, but the repository has not implemented
-or independently reviewed it against the exact real source snapshots.
+binding for acquisition and validation. The repository implements its
+fail-closed computational contracts, but cannot execute a publishable numerical
+transform until the explicitly missing conventions, bounds, controls, and
+review evidence are supplied.
 
 No UI, README, or portfolio page may describe methodology `v1.0` as validated
 until every approval condition in this document passes.
@@ -90,9 +92,9 @@ The gate also established that the candidate formula cannot currently be
 evaluated scientifically. AR6 supplies relative sea-level change from the
 1995–2014 baseline; Copernicus DEM supplies absolute orthometric height.
 Converting units does not provide the missing baseline water surface or datum
-transformation. The pipeline therefore fails by default before producing a
-binary exposure raster. Synthetic and migration tests must opt into the
-blocked methodology explicitly.
+transformation. The pipeline therefore fails before producing a binary exposure
+raster. The legacy direct comparison is disabled, including for synthetic or
+migration callers.
 
 ## Phase 0.5 strategy result
 
@@ -125,6 +127,32 @@ selected daily-ADT mean without changing its statistic.
 This closes source identity, licensing, and coverage evidence. It does not
 close numerical transformation, uncertainty-bound, DEM selection, or
 independent-review gates.
+
+## Phase 0.7 implementation result
+
+[Phase 0.7 evidence](science/phase-0-7-vertical-reconciliation-evidence.md)
+implements and tests the deterministic parts of the selected method:
+
+- exact `0.167`, `0.5`, and `0.833` AR6 extraction bound to the locked scenario
+  member and verified member SHA-256;
+- a complete 240-month, 7305-calendar-day baseline plus static MDT;
+- a geoid-evaluator boundary that rejects changed model degree/order,
+  normalization, GM, radius, ellipsoid, engine version, tide output, or
+  conversion evidence;
+- conservative absolute-bound aggregation with no missing term treated as
+  zero;
+- interval classification with stable nodata reason codes and required
+  connectivity for positive exposure;
+- a deterministic evidence-receipt schema binding software, sources, members,
+  grid/reference semantics, equations, uncertainty provenance, outputs, and
+  residual blockers.
+
+The checked-in receipt intentionally records no classified artifacts. EGM2008
+evaluation constants and a versioned evaluator/tide rule are not yet locked;
+QUID-derived and terrain bounds are not approved; the Phase 0.8 target grid,
+affine, terrain and connectivity controls are pending; and Baltic/Black Sea,
+cross-environment, and independent-review evidence is absent. Those conditions
+produce `DataUnavailable` or stop the build rather than guessed values.
 
 ## Required preprocessing record
 
@@ -174,7 +202,8 @@ versioned Europe support geometry.
 The [Phase 0.3 regional evidence](evidence/phase-0-regional-fixture.md)
 records why the legacy comparison, connectivity, scientific goldens, nine
 classified layers, and PMTiles were blocked. ADR-023 selects a replacement
-vertical design but does not close those implementation and review gates.
+vertical design, and Phase 0.7 characterizes its fail-closed mechanics, but
+does not close the numerical or review gates.
 
 Unless validation produces a materially different method, the UI and manifest
 must disclose at least:
@@ -263,3 +292,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-08-05 | Blocked | Phase 0.3 found no reviewed AR6-baseline-to-EGM2008 reconciliation; no classification release generated |
 | `v1.0` | 2026-08-05 | Selected; publication blocked | ADR-023 selected the 1995–2014 ADT/GOCO06S-to-EGM2008 interval method; exact inputs, validation, controls, and independent review remain open |
 | `v1.0` | 2026-08-05 | Inputs locked; publication blocked | Phase 0.6 pinned the exact AR6, SLA/MDT, GOCO06S, EGM2008, and terrain-control evidence; implementation and review remain open |
+| `v1.0` | 2026-08-05 | Mechanics implemented; publication blocked | Phase 0.7 added the fail-closed interval implementation and receipt; numerical conventions, bounds, controls, reproducibility, and review remain open |

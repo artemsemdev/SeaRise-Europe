@@ -10,6 +10,8 @@
 > **Phase 0.5 evidence:** [selected vertical methodology](../science/phase-0-5-vertical-methodology-evidence.md)
 >
 > **Phase 0.6 evidence:** [locked vertical inputs](../science/phase-0-6-vertical-source-evidence.md)
+>
+> **Phase 0.7 evidence:** [fail-closed vertical reconciliation implementation](../science/phase-0-7-vertical-reconciliation-evidence.md)
 
 ## Current risk register
 
@@ -29,8 +31,8 @@
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
 | R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claim and decommissioning until ADR-021 Phase 0–3 gates pass. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
-| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Certain / Critical | The build refuses this operation. ADR-023 replaces it with a 1995–2014 baseline transformed to EGM2008 and an interval rule; Phase 0.6 pins all inputs, while validated implementation, controls, and independent approval remain required. |
-| R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | Evaluate both pinned models on the same ellipsoid and tide-free convention, record the full transformation receipt and uncertainty, compare independent controls across European basins, and fail closed on any unsupported cell or missing bound. |
+| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Low / Critical | The legacy build path now always refuses this operation. Phase 0.7 implements the 1995–2014 baseline and interval contract, but publication remains blocked until the numerical transform and controls validate it. |
+| R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | The adapter now verifies locked model/member hashes and echoed harmonic metadata before differencing. It fails before engine execution while EGM2008 constants, common ellipsoid, engine version, permanent-tide rule, numeric bounds, basin controls, reproducibility, and review remain missing. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
 records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
@@ -40,7 +42,9 @@ canonical coastal scope, PMTiles, public hosting, and human review remain open.
 Phase 0.5 selects the vertical strategy but closes none of these measured or
 human-review risks by documentation alone. Phase 0.6 closes the exact-input
 identity gap for R-01 and R-15 but does not lower the transformation or
-publication consequence.
+publication consequence. Phase 0.7 removes the direct-comparison implementation
+path and makes every remaining vertical blocker machine-readable; it does not
+lower R-16 until numerical controls and independent review pass.
 
 ## Assumptions that require evidence
 
