@@ -13,10 +13,12 @@ from searise_pipeline.science import (
     load_science_contracts,
     projection_mapping,
     verify_geometry_assets,
+    verify_terrain_source_bindings,
 )
 
 REPO_ROOT = Path(__file__).parents[4]
 CONTRACT_DIR = REPO_ROOT / "src" / "pipeline" / "science"
+SOURCE_LOCK_PATH = REPO_ROOT / "src" / "pipeline" / "sources" / "source-lock.json"
 
 
 def test_contracts_validate_and_geometry_bytes_match() -> None:
@@ -78,6 +80,24 @@ def test_terrain_decision_fails_closed_on_unbounded_error_terms() -> None:
     )
     assert terrain["publicationGate"]["status"] == "blocked"
     assert "systematic-error-bound" in terrain["publicationGate"]["blockingDecisions"]
+
+
+def test_terrain_decision_binds_exact_locked_control_manifests(
+    tmp_path: Path,
+) -> None:
+    contracts = load_science_contracts(CONTRACT_DIR)
+
+    verify_terrain_source_bindings(contracts, SOURCE_LOCK_PATH)
+
+    source_lock = json.loads(SOURCE_LOCK_PATH.read_text(encoding="utf-8"))
+    glo30 = next(
+        source for source in source_lock["sources"] if source["id"] == "copernicus-dem-glo30"
+    )
+    glo30["assets"][0]["objectSet"]["manifestSha256"] = "0" * 64
+    changed_path = tmp_path / "source-lock.json"
+    changed_path.write_text(json.dumps(source_lock), encoding="utf-8")
+    with pytest.raises(ScienceContractError, match="manifest identity"):
+        verify_terrain_source_bindings(contracts, changed_path)
 
 
 def test_projection_mapping_is_keyed_by_exact_source_version() -> None:

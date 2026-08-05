@@ -23,6 +23,7 @@ from .contracts import (
     load_science_contracts,
     projection_mapping,
     verify_geometry_assets,
+    verify_terrain_source_bindings,
 )
 from .dem import (
     compare_dem_samples,
@@ -113,5 +114,6 @@ __all__ = [
     "reconcile_vertical_interval",
     "rebuild_approximation",
     "verify_geometry_assets",
+    "verify_terrain_source_bindings",
     "validate_ar6_schema",
 ]

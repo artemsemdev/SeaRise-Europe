@@ -43,6 +43,11 @@ The five DEM windows and all four auxiliary layers per resolution are locked
 by exact URL, byte size, and SHA-256 in the source registry. The evidence
 builder refuses a missing, misaligned, mistyped, or unexpected-code layer.
 
+| Resolution | Source-lock asset | Manifest SHA-256 | Objects / bytes |
+|---|---|---|---:|
+| GLO-30 | `copernicus-dem-glo30:regional-control-set` | `4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6` | 25 / 165,670,216 |
+| GLO-90 | `copernicus-dem-glo90:regional-control-set` | `5c2d1848c5fefb81d9a280afbaaeb745490444ff7b5faded052f9eddc93d3e85` | 25 / 20,555,898 |
+
 ## Terrain resolution decision
 
 Five one-degree windows were chosen before comparison to exercise distinct

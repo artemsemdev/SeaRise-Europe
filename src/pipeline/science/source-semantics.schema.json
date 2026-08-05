@@ -162,7 +162,7 @@
         "gridConstruction": { "const": "validate explicit lat/lon coordinates, then reshape by coordinate value" },
         "extrapolation": { "const": "none" },
         "nodata": { "const": "propagate when the requested point or any required interpolation neighbour is missing" },
-        "targetGrid": { "const": "pending-dem-resolution-review" }
+        "targetGrid": { "const": "copernicus-dem-glo30/2021_1" }
       }
     },
     "terrain": {
@@ -186,7 +186,7 @@
             "GLO-90": { "$ref": "#/$defs/demInstance" }
           }
         },
-        "productionChoice": { "const": "pending-scientific-review" }
+        "productionChoice": { "const": "GLO-30-selected-for-external-review" }
       }
     },
     "demInstance": {
@@ -280,7 +280,7 @@
         "terrainControls": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["release", "candidateSourceIds", "requiredLayers", "regionalControlCountPerResolution"],
+          "required": ["release", "candidateSourceIds", "selectedSourceId", "requiredLayers", "regionalControlCountPerResolution", "decisionContract"],
           "properties": {
             "release": { "const": "2021_1" },
             "candidateSourceIds": {
@@ -290,6 +290,7 @@
               "minItems": 2,
               "maxItems": 2
             },
+            "selectedSourceId": { "const": "copernicus-dem-glo30" },
             "requiredLayers": {
               "type": "array",
               "prefixItems": [{ "const": "DEM" }, { "const": "EDM" }, { "const": "FLM" }, { "const": "HEM" }, { "const": "WBM" }],
@@ -297,7 +298,8 @@
               "minItems": 5,
               "maxItems": 5
             },
-            "regionalControlCountPerResolution": { "const": 25 }
+            "regionalControlCountPerResolution": { "const": 25 },
+            "decisionContract": { "const": "src/pipeline/science/terrain-decision.json" }
           }
         },
         "evidence": { "const": "src/pipeline/science/evidence/vertical-source-inspection.json" },

@@ -28,6 +28,28 @@
       }
     ]
   },
+  "controlEvidence": {
+    "selected": {
+      "sourceId": "copernicus-dem-glo30",
+      "assetId": "regional-control-set",
+      "release": "2021_1",
+      "manifestPath": "manifests/cop-dem-glo-30-regional-controls-v2021_1.jsonl.gz",
+      "manifestSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+      "payloadSha256": "a70daa87beeda161ae1ea6015ea908c817df63f21d159c730391c45a48373254",
+      "objectCount": 25,
+      "totalByteSize": 165670216
+    },
+    "comparator": {
+      "sourceId": "copernicus-dem-glo90",
+      "assetId": "regional-control-set",
+      "release": "2021_1",
+      "manifestPath": "manifests/cop-dem-glo-90-regional-controls-v2021_1.jsonl.gz",
+      "manifestSha256": "5c2d1848c5fefb81d9a280afbaaeb745490444ff7b5faded052f9eddc93d3e85",
+      "payloadSha256": "f1241cf9ee02f8eb5c1e5d7686f7810a802f9a8a78a7314a59836becd884a899",
+      "objectCount": 25,
+      "totalByteSize": 20555898
+    }
+  },
   "uncertainty": {
     "requiredLayers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
     "heightError": {
