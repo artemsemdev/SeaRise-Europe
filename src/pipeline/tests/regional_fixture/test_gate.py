@@ -9,6 +9,7 @@ import pytest
 from searise_pipeline.regional_fixture.gate import (
     HORIZONS,
     SCENARIOS,
+    MethodologyGate,
     MethodologyGateBlocked,
     assert_scientific_release_allowed,
     evaluate_methodology_gate,
@@ -96,3 +97,18 @@ def test_no_go_is_not_implicitly_promoted_after_contract_edits() -> None:
     assert gate.unlocks_phase_1 is False
     assert "vertical-methodology-review" in gate.blockers
     assert all(item.status == "blocked" for item in gate.layers)
+
+
+def test_approved_inputs_cannot_replace_explicit_phase_0_9_decision() -> None:
+    preflight = MethodologyGate(
+        state="approved",
+        decision="Inputs passed preflight; final review has not decided the gate.",
+        blockers=(),
+        missing_evidence=(),
+        layers=(),
+        generated_scientific_artifacts=(),
+        unlocks_phase_1=False,
+    )
+
+    with pytest.raises(MethodologyGateBlocked, match="explicit Phase 0.9 approval"):
+        assert_scientific_release_allowed(preflight)
