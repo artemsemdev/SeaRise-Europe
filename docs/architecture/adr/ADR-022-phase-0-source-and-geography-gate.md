@@ -5,7 +5,7 @@
 > **Decision owner:** Project owner, scientific/data reviewer, and product owner
 > **Scope:** AR6 semantics, vertical reference, DEM grid, Europe support,
 > coastal scope, connectivity, and boundary predicates
-> **Evidence:** [Phase 0.2 source and geography evidence](../../science/phase-0-2-source-and-geography-evidence.md)
+> **Evidence:** [Phase 0.2 source and geography evidence](../../science/phase-0-2-source-and-geography-evidence.md) and [Phase 0.8 terrain, geography, and connectivity controls](../../science/phase-0-8-terrain-geography-controls.md)
 
 ## 1. Decision
 
@@ -27,9 +27,10 @@ pending interpretation:
 - mechanics-only tests may opt into the blocked methodology explicitly, but
   those outputs cannot be published or described as validated.
 
-This ADR accepts the **stop decision and evidence contract**. It does not
-approve the candidate scientific methodology, supported geography, coastal
-product, connectivity algorithm, or production DEM resolution.
+This ADR accepts the **stop decision and evidence contract**. Phase 0.8 selects
+supported-geography, coastal-product-scope, connectivity, and DEM candidates
+for external review; it does not claim that the required reviewers approved
+them or that the terrain uncertainty is complete.
 
 ## 2. Binding decision log
 
@@ -42,14 +43,14 @@ product, connectivity algorithm, or production DEM resolution.
 | Coordinate model | Select IDs `>= 1,000,000,000`; validate and reshape explicit complete 1° lat/lon coordinates | Enforced and tested |
 | Interpolation | Bilinear for the continuous change field, inside native coverage only; required nodata neighbours propagate | Enforced and tested |
 | Vertical datum | Unit conversion is insufficient; an approved baseline water surface and transformation to EGM2008 are absent | **Blocked**; scientific/data reviewer required |
-| DEM resolution | GLO-30 is 9× the pixels and 8.53× the source bytes in the inspected window; one window has no independent truth | **Pending** representative evidence and scientific review |
-| Target grid | Must be the approved DEM grid; no implicit legacy grid | **Pending** DEM resolution decision |
-| Europe rule | Natural Earth 5.1.1 Europe filter excluding Russia, clipped to migration bounds | `approximation`; product-owner approval required |
+| DEM resolution | GLO-30 selected after five DEM/EDM/FLM/HEM/WBM windows; nine times the pixels and 8.06 times the five-layer source bytes | Selected for external scientific review; independent truth and full error bounds remain blocking |
+| Target grid | Exact pinned GLO-30 grid with PixelIsPoint semantics and quality layers; no implicit legacy grid | Selected for external scientific review |
+| Europe rule | Explicit 50-feature Natural Earth 5.1.1 `ADM0_A3` allow-list, fixed clip, EPSG:3035 coastline tolerance, and deterministic serialization | Selected-scope approximation; product-owner approval required |
 | Russia and Turkey | Excluded by the current candidate; no silent whole-country inclusion | Product-owner approval required |
-| Territories | Azores included; Canary Islands and out-of-clip French territories excluded | Product-owner approval required |
-| Coastal rule | Natural Earth ocean buffered 25 km in EPSG:3035 and intersected with support | `approximation`; not a flood-reach claim |
-| Canonical coastal source | Copernicus Coastal Zones V1-2018 cannot be selected without a locked asset, rights review, and scientific-role review | **Blocked** |
-| Connectivity | Compare eight-neighbour ocean-seeded flood fill; nodata is a barrier | Candidate only; scientific review required |
+| Territories | Azores/Madeira/Faroe and named in-clip islands included; Canary Islands, Svalbard, and out-of-clip overseas territories excluded | Product-owner approval required |
+| Coastal rule | Natural Earth ocean buffered 25 km in EPSG:3035 and intersected with support; product eligibility only | Selected-scope approximation; not a flood-reach claim; product-owner approval required |
+| Canonical coastal evidence | Copernicus Coastal Zones V1-2018 is an open 10 km inland land-cover scope with “not yet validated” status | Compared and rejected as flood-reach/connectivity geometry; external review required |
+| Connectivity | Eight-neighbour ocean-seeded traversal after the vertical interval; nodata/uncertain/rejected-quality cells are barriers; mosaic before traversal | Selected for external scientific review; nine mechanism controls pass |
 | Boundary predicate | Use `covers`, so boundary points are included | Enforced and tested |
 
 No unresolved row is converted into a default. Release metadata must expose
@@ -83,7 +84,7 @@ scientifically authoritative merely because the software is deterministic.
 |---|---|
 | Keep legacy guesses for compatibility | Rejected; reproducible guessing is still scientifically wrong |
 | Convert AR6 millimetres to metres and compare directly with DEM | Rejected; unit conversion does not reconcile relative change with absolute orthometric height |
-| Select GLO-30 because it has more pixels | Rejected without representative accuracy and delivery evidence |
+| Select GLO-30 because it has more pixels | Rejected as a rationale; the later selection also requires five-window HEM, mask/detail, threshold, and delivery evidence |
 | Select GLO-90 because it is smaller | Rejected without coastal-feature and independent-control evidence |
 | Promote current geometry because controls pass | Rejected; approvals, canonical comparison, rebuild parity, and topology remain open |
 | Treat `contains` and `covers` as interchangeable | Rejected; boundary outcomes differ |
@@ -106,7 +107,7 @@ Costs and limitations:
 - the nine-gigabyte AR6 archive requires a reviewed SHA-256 acquisition path;
 - a baseline sea-surface/tidal product and vertical transformation are new
   required inputs;
-- additional DEM windows and independent vertical controls are required;
+- independent vertical controls and complete systematic/edit/DSM/resolution bounds are required;
 - product and scientific reviewers must decide the open geography rows;
 - the existing fixtures remain useful only as explicitly approximate migration
   and performance fixtures.
@@ -120,14 +121,13 @@ This ADR can move from `Proposed` only when:
    schema report matches the contract;
 3. a local baseline water surface and EGM2008 transformation are pinned,
    reproduced, and uncertainty-tested;
-4. GLO-30/GLO-90 evidence covers representative coastal terrain and
-   independent controls, then records one production choice;
+4. an independent reviewer accepts or changes the GLO-30 selection and every
+   systematic/edit/DSM/resolution uncertainty term is bounded;
 5. the product owner approves transcontinental and territory outcomes;
-6. a canonical coastal asset is locked and compared, or an alternative is
-   approved explicitly;
+6. the product owner accepts or changes the documented Natural Earth/Copernicus
+   Coastal Zones comparison and 25 km eligibility scope;
 7. connectivity and boundary semantics receive scientific review;
-8. rebuilt geometry resolves parity/topology findings and passes the control
-   corpus;
+8. the rebuilt v2 geometry and 27 controls receive product-owner approval;
 9. the real-source regional fixture passes without the blocked-methodology
    override.
 

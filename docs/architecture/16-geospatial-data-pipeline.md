@@ -44,12 +44,13 @@ Known gaps that prohibit a production claim (see the
 
 - the documented IPCC AR6 mapping is now fail-closed and tested, but the large
   regional archive still needs a SHA-256 lock and direct member inspection;
-- relative AR6 change has no reviewed baseline water surface or transformation
-  to the DEM's absolute EGM2008 vertical reference;
+- the selected ADT/GOCO06S-to-EGM2008 interval method still lacks a reviewed
+  complete transform and terrain uncertainty chain;
 - checked-in demo output is synthetic;
 - AR6 alignment now validates the actual flattened one-degree location model;
-  the production target grid remains pending the DEM-resolution decision;
-- the checked-in 25 km coastal zone is a Natural Earth approximation;
+  GLO-30 is the selected target grid pending external review;
+- the checked-in Natural Earth 25 km product scope is selected as an explicit
+  approximation pending product-owner review;
 - PMTiles, GeoNames catalogs/indexes, GeoParquet, manifest/STAC generation,
   release signing, and R2 publication are not yet the proven end-to-end path.
 
@@ -61,7 +62,7 @@ are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
 | Source | Role | Pinning requirements |
 |---|---|---|
 | IPCC AR6 sea-level projections | Scenario/horizon projection input | Authoritative release/version, exact asset URL, size, SHA-256, citation, licence/acknowledgements |
-| Copernicus DEM | Terrain input | Product edition, GLO-30 or GLO-90 decision, tiles, datum/CRS, size, SHA-256, derivative attribution |
+| Copernicus DEM GLO-30 | Selected terrain input | Release `2021_1`, exact DEM/EDM/FLM/HEM/WBM tiles, datum/CRS, size, SHA-256, derivative attribution, and reviewed error bounds |
 | Copernicus coastal product or approved replacement | Canonical analysis-zone evidence | Product/version, acquisition record, interpretation rule, licence, SHA-256 |
 | GeoNames dump + `alternateNamesV2` | Places and multilingual search | Snapshot date, exact dump files, sizes, SHA-256, CC BY 4.0 attribution |
 | Natural Earth | Support/shoreline seed and labels | Dataset/release, layer names, public-domain provenance, SHA-256 |
@@ -146,9 +147,9 @@ Validate:
 - area and spatial differences against the previous release;
 - explicit treatment of Russia, Turkey, and other open support-boundary cases.
 
-The current Natural Earth-derived 25 km zone is labelled `approximation` in
-all candidate metadata until replaced or re-confirmed by a methodology
-decision.
+The Natural Earth-derived 25 km zone remains labelled a product-scope
+`approximation`. Phase 0.8 re-confirms it as the external-review candidate
+after comparison with Copernicus Coastal Zones; it is not a hazard extent.
 
 ### 6.3 Build the settlement catalog
 
@@ -183,12 +184,16 @@ categorical reprojection and browser lookup use nearest neighbour.
 
 ### 6.5 Compute classified exposure arrays
 
-The current methodology candidate is:
+The current methodology candidate is the uncertainty-aware interval selected
+by ADR-023:
 
 ```text
-classified = 1      where projected sea level >= terrain elevation
-classified = 0      where projected sea level < terrain elevation
-classified = nodata where inputs are unavailable or outside analysis scope
+C_low  = (B_EGM2008 - U_B) + 0.001 * AR6_q17 - (Z_DSM_EGM2008 + U_Z)
+C_high = (B_EGM2008 + U_B) + 0.001 * AR6_q83 - (Z_DSM_EGM2008 - U_Z)
+
+classified = 1      where C_low >= 0 and approved connectivity passes
+classified = 0      where C_high < 0, or eligible terrain is disconnected
+classified = nodata where the interval crosses zero or required evidence is absent
 ```
 
 This formula is not considered validated until Phase 0 establishes the

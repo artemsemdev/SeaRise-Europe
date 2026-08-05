@@ -12,18 +12,20 @@
 > **Phase 0.6 evidence:** [locked vertical inputs](../science/phase-0-6-vertical-source-evidence.md)
 >
 > **Phase 0.7 evidence:** [fail-closed vertical reconciliation implementation](../science/phase-0-7-vertical-reconciliation-evidence.md)
+>
+> **Phase 0.8 evidence:** [terrain, geography, and connectivity controls](../science/phase-0-8-terrain-geography-controls.md)
 
 ## Current risk register
 
 | ID | Risk | Likelihood / impact | Mitigation and exit evidence |
 |---|---|---|---|
 | R-01 | The exact IPCC AR6 archive member differs from the documented binding schema | Low / Critical | The full `20210809` archive and three exact scenario members now have byte, CRC/MD5 where available, SHA-256, and NetCDF inspection evidence. The contract fails closed on any changed identity; independent use review remains required. |
-| R-02 | The binary elevation comparison creates disconnected inland false positives or misrepresents coastal pathways | High / Critical | Publication now fails closed. Compare the tested eight-neighbour ocean-seeded candidate with unfiltered output and independent controls; supersede methodology ADR if invalid. |
+| R-02 | The binary elevation comparison creates disconnected inland false positives or misrepresents coastal pathways | High / Critical | Nine mechanism controls now exercise the selected eight-neighbour ocean-seeded algorithm, but they are not hydrodynamic validation. Exit requires independent scientific review, regional pre/post counts, and a superseding methodology ADR if the control is invalid. |
 | R-03 | Source or derivative redistribution terms are incomplete | Medium / Critical | Licence review for each source and derivative; manifest attribution; block publication until all rights and required wording are documented. |
 | R-04 | Browser exact lookup disagrees with the build array because of CRS, tile, row/column, resampling, or nodata differences | Medium / Critical | Shared golden fixtures across Python and TypeScript; nearest-neighbour binary lookup; bit-exact parity tests at cell edges and nodata. |
 | R-05 | Search indexes are too large or slow on mobile | Medium / High | Core/coastal shards, Brotli, lazy Web Worker load, representative mobile benchmarks, size/count report, deterministic ranking tests. |
 | R-06 | GeoNames misses, duplicates, or misclassifies settlements implied by “all coastal cities and villages” | High / High | Publish the operational definition, snapshot/date, feature-code rules, exclusions, corpus counts, duplicate/transcontinental QA, and limitations. |
-| R-07 | The approximate 25 km coastal zone is mistaken for flood reach | Medium / High | Contract and evidence label it `approximation`; 19 controls pass, but canonical Copernicus comparison, rebuild parity, and topology remain blocking. Keep product-scope language explicit. |
+| R-07 | The approximate 25 km coastal zone is mistaken for flood reach | Medium / High | The deterministic v2 recipe, 27 named-place controls, topology invariant, and Copernicus Coastal Zones comparison are recorded. Keep product-scope language explicit; product-owner approval and release wording remain blocking. |
 | R-08 | PMTiles plus analysis COGs exceed free storage or cause excessive R2 range operations | Medium / Medium | Regional size/request spike, range-locality measurement, cache tuning, release cost model, usage alerts; consolidate only after exact-lookup proof. |
 | R-09 | Service Worker mixes application and data releases | Medium / High | Namespace caches by app version and `dataReleaseId`; atomic activation; offline/mid-update tests; fail closed on mismatch. |
 | R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
@@ -33,6 +35,7 @@
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
 | R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Low / Critical | The legacy build path now always refuses this operation. Phase 0.7 implements the 1995–2014 baseline and interval contract, but publication remains blocked until the numerical transform and controls validate it. |
 | R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | The adapter now verifies locked model/member hashes and echoed harmonic metadata before differencing. It fails before engine execution while EGM2008 constants, common ellipsoid, engine version, permanent-tide rule, numeric bounds, basin controls, reproducibility, and review remain missing. |
+| R-17 | Copernicus DSM/HEM is treated as bare-earth terrain or as a complete per-pixel error bound | High / Critical | GLO-30 is selected, but HEM is used only for random error on valid unedited pixels. `U_systematic`, `U_edit`, `U_DSM`, and `U_resolution` never default to zero; publication stays blocked until each term is independently bounded and reviewed. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
 records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
@@ -45,6 +48,9 @@ identity gap for R-01 and R-15 but does not lower the transformation or
 publication consequence. Phase 0.7 removes the direct-comparison implementation
 path and makes every remaining vertical blocker machine-readable; it does not
 lower R-16 until numerical controls and independent review pass.
+Phase 0.8 selects terrain, product-scope, and connectivity candidates and adds
+executable controls. It reduces implementation ambiguity but does not close
+R-02, R-07, or R-17 without the named external reviews and regional evidence.
 
 ## Assumptions that require evidence
 
@@ -66,9 +72,9 @@ be resolved by the named evidence before their implementation is fixed:
 
 | Question | Decision evidence | Resolution mechanism |
 |---|---|---|
-| What is the final Europe support polygon and how are transcontinental states treated? | Candidate explicitly excludes Russia/Turkey, includes Azores, and excludes out-of-clip territories; 19 controls and `covers` boundary semantics are recorded | Product-owner approval; ADR if domain outcomes change |
-| Copernicus DEM GLO-30 or GLO-90? | One real window measures 9× pixels, 8.53× bytes, and local differences but lacks representative independent truth | More representative windows and scientific review; record one choice in the contract |
-| What coastline-connectivity algorithm is scientifically acceptable? | Eight-neighbour ocean-seeded comparison is deterministic and tested but unreviewed | Independent controls and scientific review; superseding methodology ADR if v1.0 changes |
+| What is the final Europe support polygon and how are transcontinental states treated? | The v2 candidate uses an explicit 50-feature allow-list, fixed clip/tolerance, 27 controls, and `covers`; Russia/Turkey and named territories have explicit outcomes | Product-owner approval; ADR if domain outcomes change |
+| Copernicus DEM GLO-30 or GLO-90? | GLO-30 is selected after five quality-aware windows measured HEM, mask/detail loss, threshold disagreement, and delivery bytes; independent vertical truth is still absent | Scientific review plus independent systematic, edit/fill, DSM, and resolution bounds |
+| What coastline-connectivity algorithm is scientifically acceptable? | Eight-neighbour ocean-seeded traversal is specified and passes nine mechanism controls, but corner connectivity and real barriers remain unreviewed | Regional comparisons and independent scientific review; superseding methodology ADR if v1.0 changes |
 | MiniSearch or another compact open-source search engine? | Index bytes, initialization, p95 query latency, multilingual relevance, licence | Implementation design note and pinned tests |
 | Can exact PMTiles lookup replace companion COGs? | Bit-exact parity over golden and edge cases plus range/size improvement | New ADR before COG removal |
 | Should users be able to download a regional offline pack? | Storage quota behaviour, UX, privacy, failure/recovery, artifact size | Product decision after browser spike |

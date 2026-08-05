@@ -1,129 +1,90 @@
-# Geometry Reference Fixtures
+# Phase 0.8 Geography Fixtures
 
-> **Status:** checked-in migration and test fixtures, not validated production geometry
+> **Status:** selected product-scope approximation pending external review
+>
 > **Architecture:** [ADR-021](../../docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+>
+> **Evidence:** [Phase 0.8 terrain, geography, and connectivity controls](../../docs/science/phase-0-8-terrain-geography-controls.md)
 
-This directory contains small WGS84 GeoJSON geometries used by the existing
-implementation and by migration tests. In the static-first architecture, the
-offline pipeline versions the chosen source geometry, validates it, and
-publishes browser PMTiles plus analytical GeoParquet inside an immutable data
-release. The browser then performs support/coastal predicates locally.
-
-These files are not loaded into a production database. Their presence does not
-mean that the Europe support rule or canonical coastal source has passed the
-ADR-021 Phase 0 scientific gate.
-
-Phase 0.2 added a deterministic rebuild implementation, a 19-point control
-corpus, and measured QA. The results are recorded in
-[`geometry-approximation-qa.json`](../../src/pipeline/science/evidence/geometry-approximation-qa.json).
-They confirm the fixtures are useful migration approximations but also expose
-rebuild and topology differences that block promotion.
+These WGS84 GeoJSON files are the deterministic Phase 0.8 support and coastal
+product-scope fixtures. They may support migration, QA, and the blocked
+regional rebuild. They are not a flood extent, validated hazard product, or
+authorization for a public scientific release.
 
 ## Files
 
-| File | Built | Source | Role and limitation |
+| File | Version | Source | Role |
 |---|---|---|---|
-| `europe.geojson` | 2026-04-14 | Natural Earth 1:10m Admin 0 Countries | Approximate support geometry; excludes Russia and Turkey under the recipe below |
-| `coastal_analysis_zone.geojson` | 2026-04-14 | Natural Earth 1:10m Ocean + `europe.geojson` | Approximate 25 km band; not the canonical Copernicus coastal product |
+| `europe.geojson` | `natural-earth-5.1.1-explicit-scope-v2` | Natural Earth 1:10m Admin 0 Countries 5.1.1 | Europe/territory eligibility |
+| `coastal_analysis_zone.geojson` | `natural-earth-5.1.1-25km-scope-v2` | Natural Earth 1:10m Ocean 5.1.1 + support | Product eligibility only; no hazard-extent claim |
 
-The final treatment of transcontinental states, canonical coastal product, and
-coastal-connectivity method remain measured methodology decisions. A
-production release must state the exact rules in `manifest.json` and include
-source/version/checksum/licence metadata.
+Exact output hashes, inputs, parameters, approvals, and blockers live in
+[`geography-rules.json`](../../src/pipeline/science/geography-rules.json).
 
-## `europe.geojson` recipe
+## Europe support rule
 
-**Source:** `ne_10m_admin_0_countries.shp` from
-[Natural Earth](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/),
-public domain.
+The v2 recipe:
 
-**Current fixture filter:** `CONTINENT == 'Europe' AND NAME != 'Russia'` (50
-countries). Natural Earth classifies Turkey as Asia, so it is also excluded.
-This is a documented fixture rule, not the final Europe product definition.
+1. selects the 50 exact `ADM0_A3` values in the machine contract;
+2. clips to `[-30, 30, 45, 75]` in WGS84;
+3. repairs, unions, and quantizes polygons in EPSG:3035 at one-metre precision;
+4. applies a declared 1 km coastline tolerance for generalized source
+   shorelines;
+5. simplifies by 500 m with topology preservation;
+6. serializes normalized GeoJSON with six-decimal coordinates.
 
-Processing:
+Russia, Turkey, Cyprus, the Caucasus, Canary Islands, Svalbard, and out-of-clip
+overseas territories are excluded. The rule includes the named European
+countries and islands listed in the contract, subject to the fixed clip. These
+outcomes remain pending product-owner review.
 
-1. Filter with the rule above.
-2. Clip to `(-30, 30, 45, 75)` to remove French overseas geometry.
-3. Union the remaining country polygons.
-4. Buffer by `0.02` degrees to retain near-coast cities after simplification.
-5. Simplify by `0.02` degrees with topology preservation.
-6. Round coordinates to four decimal places.
-7. Normalize to a MultiPolygon FeatureCollection in CRS84/EPSG:4326.
+## Coastal product-scope rule
 
-The buffer is a pragmatic fixture transformation, not a precise metric
-operation. Production geometry must use an appropriate projected CRS for
-metric operations and report the resulting spatial difference.
+The v2 recipe:
 
-Current control points:
+1. clips the Natural Earth ocean to `[-35, 28, 48, 77]`;
+2. repairs, unions, and quantizes in EPSG:3035;
+3. buffers the ocean by 25,000 m with fixed buffer segments;
+4. intersects it with Europe support;
+5. simplifies by 500 m and applies the declared containment insets;
+6. serializes normalized GeoJSON with six-decimal coordinates.
 
-| Expected inside | Expected outside |
-|---|---|
-| Amsterdam, Barcelona, Copenhagen, Lisbon, Venice | New York |
-| Prague, Zurich, Vienna, Munich, Bratislava | Moscow, Istanbul |
-| Reykjavik, Malta | — |
+The 25 km value preserves the existing product eligibility around generalized
+estuaries, waterways, ports, and islands. It does not claim that sea-level
+effects extend 25 km inland.
 
-The explicit candidate predicate is `covers`: boundary points are included.
-Tests prove the same point is covered but not contained.
+Copernicus Coastal Zones V1-2018 was compared as canonical evidence. Its
+published 10 km inland extent is a land-cover/land-use mapping scope and is
+officially marked “not yet validated”; it is not a flood-reach or connectivity
+geometry. The Phase 0.8 candidate therefore retains the transparent 25 km
+approximation pending product-owner review.
 
-## `coastal_analysis_zone.geojson` recipe
+## Quality controls
 
-The intended canonical evidence is the Copernicus Land Monitoring Service
-[Coastal Zones product](https://land.copernicus.eu/en/products/coastal-zones).
-The checked-in file is a local approximation because that source was not
-acquired and validated in the existing automated pipeline.
+The checked-in outputs are valid MultiPolygons, the coastal geometry has zero
+area outside support, and `support.covers(coastal)` is true. The `covers`
+predicate intentionally includes boundary points.
 
-**Fixture inputs:** Natural Earth `ne_10m_ocean.shp` (public domain) and the
-`europe.geojson` fixture above.
+Twenty-seven independent named-place controls come from the pinned GeoNames
+`cities15000` 2026-08-04 snapshot and are not inputs to the geometry build.
+They cover ports, estuaries, lagoons, islands, inland cities, Russia/Turkey,
+excluded territories, and outside-Europe locations. All controls pass the v2
+candidate.
 
-Processing:
+These checks establish deterministic scope behaviour. They do not constitute
+scientific or product-owner approval.
 
-1. Clip the ocean geometry to `(-35, 28, 48, 77)`.
-2. Union the clipped ocean polygons.
-3. Reproject to EPSG:3035 (ETRS89 / LAEA Europe).
-4. Buffer by 25,000 metres.
-5. Intersect with the Europe fixture in EPSG:3035.
-6. Reproject to EPSG:4326, simplify by `0.02` degrees, and round to four
-   decimals.
+## Rebuild
 
-Why 25 km: the Natural Earth 1:10m ocean geometry is too coarse around some
-estuaries, waterways, and ports. In the fixture, a 25 km band includes
-Amsterdam and Rotterdam while leaving selected inland controls outside. It is
-a product-scope approximation and says nothing about the physical reach of
-flooding.
+Use the checked-in builder with source-lock-verified Natural Earth archives:
 
-Current control points:
+```bash
+PYTHONPATH=src/pipeline python scripts/science/rebuild_phase_0_8_geography.py \
+  --admin-archive /path/to/ne_10m_admin_0_countries.zip \
+  --ocean-archive /path/to/ne_10m_ocean.zip
+```
 
-| Expected inside the fixture zone | Expected outside the fixture zone |
-|---|---|
-| Amsterdam, Rotterdam, Barcelona, Copenhagen | Prague, Zurich, Vienna, Munich |
-| Lisbon, Venice, Hamburg, Reykjavik | Bratislava, Berlin, Warsaw, Utrecht |
-
-## Use in the target offline pipeline
-
-Until canonical geometry passes Phase 0, these files may be used only for:
-
-- deterministic unit and browser fixtures;
-- migration parity comparisons with the legacy implementation;
-- regional packaging and byte-range performance spikes;
-- demonstrating geometry-to-PMTiles/GeoParquet mechanics with an explicit
-  `approximation` label.
-
-They must not be used to claim complete or scientifically validated European
-coastal coverage. A real candidate release must:
-
-1. pin the source snapshot and SHA-256;
-2. record all filters, CRS operations, tolerances, and repairs;
-3. validate topology, known points, islands, ports, estuaries, and support
-   boundary cases;
-4. compare areas and spatial differences with these fixtures and the prior
-   release;
-5. publish derived `geography/*.pmtiles` and `boundaries.parquet`;
-6. record the support/coastal rule and QA summary in the release manifest.
-
-## Rebuilding the fixtures
-
-Rebuild only through a checked-in, deterministic pipeline stage that pins the
-Natural Earth release and verifies input checksums. Do not rely on an
-unversioned one-off script as provenance. Review all control points and commit
-the updated fixture plus its source/checksum record together.
+Without `--write`, the command compares regenerated bytes with the checked-in
+files and fails on any difference. Use `--write` only when intentionally
+creating a new reviewed geography version; update hashes, controls, evidence,
+and changelog in the same pull request.

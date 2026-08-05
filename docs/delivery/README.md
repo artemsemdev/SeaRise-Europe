@@ -1,7 +1,7 @@
 # Static-First Migration Plan
 
 > **Status:** Active
-> **Last updated:** 2026-08-04
+> **Last updated:** 2026-08-05
 > **Decision source:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
 ## Purpose
@@ -65,7 +65,7 @@ legacy assessment path.
 - [ ] Inspect its actual dimensions, coordinate model, quantiles, units, and
   missing values.
 - [ ] Pin the Copernicus DEM product and document vertical datum and licence.
-- [ ] Compare the current Natural Earth-derived 25 km coastal approximation
+- [x] Compare the current Natural Earth-derived 25 km coastal approximation
   with the canonical Copernicus coastal product.
 - [ ] Decide and version the Europe support geometry, including
   transcontinental-state handling.
@@ -75,6 +75,11 @@ legacy assessment path.
   methodology `v1.0` remains valid.
 - [ ] Record artifact size, build duration, browser memory, range-request count,
   and lookup latency.
+
+Phase 0.8 selected GLO-30, the explicit Natural Earth v2 Europe/25 km product
+scope, and eight-neighbour ocean connectivity for external review. The checks
+above remain open where product/scientific approval, terrain uncertainty
+bounds, or the real regional rebuild is still required.
 
 Exit evidence:
 

@@ -16,7 +16,7 @@ are active, amended, or superseded.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-022](ADR-022-phase-0-source-and-geography-gate.md) | Proposed; safety gate enforced | Stop publication until source, datum, DEM, and geography decisions receive their named evidence and approvals |
+| [ADR-022](ADR-022-phase-0-source-and-geography-gate.md) | Proposed; safety gate enforced | Terrain/geography/connectivity candidates are selected; stop publication until uncertainty and named external approvals pass |
 
 ## Conventions
 

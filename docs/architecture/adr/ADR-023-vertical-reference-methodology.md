@@ -127,3 +127,13 @@ insufficient, uncertainty prevents useful classifications, or independent
 controls fail, stop the build. Write a superseding ADR selecting the direct-MSS
 fallback or a contract-changing validated hazard product. Do not return to the
 legacy direct comparison.
+
+## Subsequent Phase 0.8 evidence
+
+[Phase 0.8](../../science/phase-0-8-terrain-geography-controls.md) selects
+GLO-30 and an eight-neighbour ocean-seeded connectivity screen for external
+review. It also decomposes `U_Z` into random, systematic, edit/fill,
+DSM-representation, and resolution terms. The systematic, edit/fill, DSM, and
+resolution terms remain unbounded, and neither the terrain nor connectivity
+selection has external approval. The original publication block therefore
+remains in force even though the implementation choices are now explicit.
