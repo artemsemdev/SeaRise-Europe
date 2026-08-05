@@ -1,0 +1,15 @@
+{
+  "buildCommand": [
+    "make",
+    "-j4",
+    "tippecanoe",
+    "tippecanoe-decode"
+  ],
+  "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+  "decodeBinarySha256": "d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076",
+  "platform": "darwin-arm64",
+  "schemaVersion": 1,
+  "sourceSha256": "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d",
+  "tippecanoeBinarySha256": "12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92",
+  "version": "2.79.0"
+}
