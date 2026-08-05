@@ -29,6 +29,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Replaced the blocked binary terrain-exposure contract with a source-native
+  IPCC AR6 regional projection contract that reports the median and published
+  likely range, uses one grid-only lookup rule, and keeps release approval
+  separate from automated validation.
 - Selected fail-closed GLO-30 terrain, explicit Europe and 25 km coastal
   product-scope rules, and an ocean-seeded connectivity screen backed by
   measured controls; scientific publication remains blocked pending complete
