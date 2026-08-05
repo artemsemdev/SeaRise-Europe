@@ -74,6 +74,34 @@ def _records(source: RegionalReleaseSource) -> tuple[dict[str, list[Any]], dict[
     return columns, counts
 
 
+def _expected_records(source: RegionalReleaseSource) -> dict[str, list[Any]]:
+    """Derive validation rows directly, independently of the writer oracle."""
+    expected: dict[str, list[Any]] = {
+        "scenario": [],
+        "horizon": [],
+        "source_location_id": [],
+        "lower_mm": [],
+        "median_mm": [],
+        "upper_mm": [],
+        "longitude": [],
+        "latitude": [],
+    }
+    for layer in source.layers:
+        for row in range(layer.valid.shape[0]):
+            for column in range(layer.valid.shape[1]):
+                if not bool(layer.valid[row, column]):
+                    continue
+                expected["scenario"].append(str(layer.scenario))
+                expected["horizon"].append(int(layer.horizon))
+                expected["source_location_id"].append(int(source.location_ids[row, column]))
+                expected["lower_mm"].append(int(layer.lower_mm[row, column]))
+                expected["median_mm"].append(int(layer.central_mm[row, column]))
+                expected["upper_mm"].append(int(layer.upper_mm[row, column]))
+                expected["longitude"].append(float(source.longitudes[column]))
+                expected["latitude"].append(float(source.latitudes[row]))
+    return expected
+
+
 def write_geoparquet(
     source: RegionalReleaseSource,
     path: Path,
@@ -231,7 +259,7 @@ def validate_geoparquet(
         ):
             raise ScienceContractError("GeoParquet columns must all use ZSTD compression")
     actual = gpd.read_parquet(path)
-    expected_columns, _ = _records(source)
+    expected_columns = _expected_records(source)
     expected = gpd.GeoDataFrame(
         {
             "scenario": expected_columns["scenario"],
