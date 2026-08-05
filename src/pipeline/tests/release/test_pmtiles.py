@@ -183,18 +183,21 @@ def test_vector_toolchain_rejects_unrelated_embedded_pmtiles_binary(
         validate_vector_toolchain(contract=release, **tools)
 
 
+TOOL_ENVIRONMENT = (
+    "SEARISE_TIPPECANOE",
+    "SEARISE_TIPPECANOE_DECODE",
+    "SEARISE_PMTILES",
+    "SEARISE_TIPPECANOE_SOURCE",
+    "SEARISE_TIPPECANOE_BUILD_RECEIPT",
+    "SEARISE_PMTILES_ASSET",
+    "SEARISE_VECTOR_PLATFORM",
+)
+
+
 @pytest.mark.skipif(
     not all(
         os.environ.get(name)
-        for name in (
-            "SEARISE_TIPPECANOE",
-            "SEARISE_TIPPECANOE_DECODE",
-            "SEARISE_PMTILES",
-            "SEARISE_TIPPECANOE_SOURCE",
-            "SEARISE_TIPPECANOE_BUILD_RECEIPT",
-            "SEARISE_PMTILES_ASSET",
-            "SEARISE_VECTOR_PLATFORM",
-        )
+        for name in TOOL_ENVIRONMENT
     ),
     reason="set the three pinned vector-tool paths for the external integration",
 )
@@ -228,4 +231,8 @@ def test_visual_pmtiles_is_byte_deterministic_and_property_exact(tmp_path: Path)
     assert first_evidence.sha256 == second_evidence.sha256
     assert first_evidence.source_feature_count == 3054
     assert first_evidence.decoded_fragment_count >= first_evidence.source_feature_count
+    assert first_evidence.metadata["searise"]["method_version"] == (
+        "ar6-regional-projection-v1"
+    )
+    assert "generator_options" not in first_evidence.metadata
     assert first_evidence.byte_size <= contract()["budgets"]["pmtilesTotalBytes"] / 9
