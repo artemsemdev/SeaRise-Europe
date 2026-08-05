@@ -75,6 +75,3 @@ tmp/
 # Keep Claude machine-local state out of git by default.
 .claude/
 CLAUDE.md
-
-# Internal agent instructions
-/AGENTS.md
