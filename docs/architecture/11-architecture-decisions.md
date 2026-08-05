@@ -16,17 +16,18 @@ not as active guidance in this document.
 | ADR-002 | Keep client state minimal | Accepted | Use React local state by default; Zustand only for genuinely shared state. Immutable files are not a reason to add a server-state cache. |
 | ADR-010 | Model five domain result states | Accepted | Preserve `ModeledExposureDetected`, `NoModeledExposureDetected`, `DataUnavailable`, `OutOfScope`, and `UnsupportedGeography` in the local browser engine. |
 | ADR-014 | Keep explorer state in the URL | Accepted, amended | Browser URL APIs carry location, scenario, horizon, and pinned release; there is no dependency on Next.js routing. |
-| ADR-015 | Use binary exposure methodology v1.0 | Accepted with validation gate | Remains provisional until ADR-021 Phase 0 proves source shape, datum, coastline connectivity, nodata, and representative control points. A failed spike requires a superseding methodology ADR. |
+| ADR-015 | Use binary exposure methodology v1.0 | Superseded by ADR-023 | The direct AR6-change versus DEM comparison is prohibited. |
 | ADR-016 | Support three SSP scenarios | Accepted | `ssp1-26`, `ssp2-45`, and `ssp5-85`. |
 | ADR-017 | Default to SSP2-4.5 / 2050 | Accepted | Defaults remain `ssp2-45` and `2050`; the URL makes them explicit when shared. |
 | ADR-018 | Use a 25 km coastal analysis zone | Accepted with validation gate | The current Natural Earth-derived zone is explicitly approximate. Reconfirm or replace it after comparison with the canonical Copernicus coastal product. |
 | ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; authoritative** | Offline build plane, immutable open artifacts, React/Vite browser runtime, local search/assessment, Cloudflare Static Assets + R2, and no runtime API/database/tile server. |
+| ADR-023 | Use an uncertainty-aware EGM2008 mean-water baseline | **Accepted for validation; publication blocked** | Transform a 1995–2014 Copernicus Marine ADT mean to EGM2008, add AR6 relative change, and fail ambiguous cells closed; independent review and implementation evidence remain blocking. |
 
 ## Proposed decisions enforced as safety gates
 
 | ID | Decision | Status | Current interpretation |
 |---|---|---|---|
-| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed; gate enforced | Exact AR6 mapping replaces heuristics, but vertical reconciliation, DEM resolution, canonical geography, and named approvals remain blocking. |
+| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed; gate enforced, amended by ADR-023 | A vertical strategy is selected, but its inputs, transform, uncertainty, terrain/connectivity controls, and named approvals remain blocking. |
 
 ## Decisions superseded by ADR-021
 
