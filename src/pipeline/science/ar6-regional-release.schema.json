@@ -100,20 +100,31 @@
         },
         "python": {
           "packageVersions": {
-            "xarray": "2024.7.0", "netCDF4": "1.7.2", "cftime": "1.6.4.post1",
-            "numpy": "1.26.4", "pandas": "2.3.2", "rasterio": "1.4.3",
-            "rio-cogeo": "5.4.2", "geopandas": "1.0.1", "pyarrow": "16.1.0",
-            "shapely": "2.0.7", "pyproj": "3.6.1", "pyogrio": "0.11.1"
+            "affine": "2.4.0", "annotated-types": "0.7.0", "attrs": "26.1.0",
+            "certifi": "2026.7.22", "cffi": "2.0.0", "cftime": "1.6.4.post1",
+            "click": "8.1.8", "click-plugins": "1.1.1.2", "cligj": "0.7.2",
+            "cryptography": "50.0.0", "geopandas": "1.0.1", "importlib-metadata": "8.7.1",
+            "jsonschema": "4.25.1",
+            "jsonschema-specifications": "2025.9.1", "morecantile": "6.2.0",
+            "netCDF4": "1.7.2", "numpy": "1.26.4", "packaging": "26.3",
+            "pandas": "2.3.2", "pyarrow": "16.1.0", "pycparser": "2.23",
+            "pydantic": "2.13.4", "pydantic-core": "2.46.4", "pyogrio": "0.11.1",
+            "pyparsing": "3.3.2", "pyproj": "3.6.1",
+            "python-dateutil": "2.9.0.post0", "pytz": "2026.3.post1",
+            "rasterio": "1.4.3", "referencing": "0.36.2", "rio-cogeo": "5.4.2",
+            "rpds-py": "0.27.1", "shapely": "2.0.7", "six": "1.17.0",
+            "typing-extensions": "4.16.0", "typing-inspection": "0.4.2",
+            "tzdata": "2026.3", "xarray": "2024.7.0", "zipp": "3.23.1"
           },
           "profiles": {
             "linux-x86_64-cp311": {
               "pythonVersion": "3.11.9", "lockPath": "src/pipeline/requirements-release.lock",
-              "lockSha256": "bac71aaa7aef03fda483c6345446361c53ec2ce2821c845b921bca1a856838be",
+              "lockSha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f",
               "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
             },
             "macos-arm64-cp39": {
               "pythonVersion": "3.9.6", "lockPath": "src/pipeline/requirements-release-macos-arm64.lock",
-              "lockSha256": "52134b618da0193ab99e7a52f6c741d2b36011da0ca742c899c58885e11ec2c9",
+              "lockSha256": "3f8160b8aee8d9fae73da298703fb00c1869a02def181316b75b1d6a917e7bed",
               "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
             }
           }

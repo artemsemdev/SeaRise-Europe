@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -26,7 +28,7 @@ def test_current_release_environment_matches_every_locked_distribution() -> None
     assert evidence.lock_sha256 == contract()["toolchain"]["python"]["profiles"][
         evidence.platform
     ]["lockSha256"]
-    assert len(evidence.packages) == 35
+    assert evidence.packages == contract()["toolchain"]["python"]["packageVersions"]
 
 
 def test_python_toolchain_rejects_a_mutated_lock(tmp_path: Path) -> None:
@@ -35,6 +37,24 @@ def test_python_toolchain_rejects_a_mutated_lock(tmp_path: Path) -> None:
 
     with pytest.raises(ScienceContractError, match="release lock differs"):
         validate_python_toolchain(mutated, contract=contract())
+
+
+def test_python_toolchain_rejects_missing_runtime_import(tmp_path: Path) -> None:
+    release = deepcopy(contract())
+    original = _lock_path().read_text(encoding="utf-8")
+    mutated = tmp_path / _lock_path().name
+    mutated.write_text(
+        "\n".join(
+            line for line in original.splitlines() if not line.startswith("cryptography==")
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    profile = release["toolchain"]["python"]["profiles"][current_python_platform()]
+    profile["lockSha256"] = hashlib.sha256(mutated.read_bytes()).hexdigest()
+
+    with pytest.raises(ScienceContractError, match="package-version pins"):
+        validate_python_toolchain(mutated, contract=release)
 
 
 def test_python_toolchain_rejects_the_other_platform_lock() -> None:
