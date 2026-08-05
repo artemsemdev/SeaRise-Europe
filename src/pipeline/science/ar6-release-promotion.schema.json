@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/ar6-release-promotion.schema.json",
+  "title": "Owner-controlled AR6 release promotion",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "releaseId", "releaseContractSha256",
+    "candidateBindingSha256", "ownerEvidenceSha256",
+    "integrationMergeEvidenceSha256", "repository", "baseBranch"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "releaseId": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "releaseContractSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidateBindingSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "ownerEvidenceSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "integrationMergeEvidenceSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "repository": {"const": "artemsemdev/SeaRise-Europe"},
+    "baseBranch": {"const": "master"}
+  }
+}
