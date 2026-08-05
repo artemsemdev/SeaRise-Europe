@@ -1,10 +1,16 @@
 # ADR-021 — Static-First Offline Geospatial Architecture
 
-> **Status:** Accepted
+> **Status:** Accepted; product and scientific contract amended by [ADR-024](ADR-024-ar6-regional-projection-contract.md)
 > **Decision date:** 2026-08-04
 > **Decision owner:** Project owner
 > **Scope:** Production architecture, data distribution, search, hosting, delivery pipeline, and portfolio presentation
-> **Implementation state:** Accepted target architecture; Phase 0 investigation complete with no-go, Phase 1 locked pending an approved recovery gate
+> **Implementation state:** Static-first target retained; projection implementation and recovery gate remain blocked on #135 and #110
+
+> **Amendment:** ADR-024 supersedes this record's five-state, binary exposure,
+> terrain-comparison, connectivity, and classified-pixel requirements. The
+> static runtime, artifact delivery, search, offline, provenance, security,
+> performance, and operability decisions remain authoritative. Original text
+> below is retained as the decision that Phase 0 tested.
 
 ## 1. Decision
 
