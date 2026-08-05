@@ -109,10 +109,10 @@
         "expectedState": "ProjectionAvailable"
       },
       {
-        "id": "tromso-high-latitude-port",
+        "id": "bodo-high-latitude-port",
         "kind": "high-latitude",
         "coverage": "High-latitude Norwegian Sea",
-        "coordinates": { "latitude": 69.6492, "longitude": 18.9553 },
+        "coordinates": { "latitude": 67.2804, "longitude": 14.4049 },
         "expectedState": "ProjectionAvailable"
       },
       {

@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import geopandas as gpd  # type: ignore[import-untyped]
 from jsonschema import Draft202012Validator
+from shapely.geometry import Point  # type: ignore[import-untyped]
 
 SCIENCE_DIR = Path(__file__).parents[2] / "science"
 
@@ -110,3 +112,22 @@ def test_lookup_is_grid_only_and_never_skips_nodata() -> None:
         "interpolation": "forbidden",
         "extrapolation": "forbidden",
     }
+
+
+def test_golden_scope_states_match_the_versioned_geometries() -> None:
+    repo_root = SCIENCE_DIR.parents[2]
+    contract = _document("ar6-lookup-validation.json")
+    support = gpd.read_file(repo_root / "data/geometry/europe.geojson").geometry.union_all()
+    coastal = gpd.read_file(
+        repo_root / "data/geometry/coastal_analysis_zone.geojson"
+    ).geometry.union_all()
+
+    for golden in contract["validation"]["goldenPoints"]:
+        coordinates = golden["coordinates"]
+        point = Point(coordinates["longitude"], coordinates["latitude"])
+        observed = "ProjectionAvailable"
+        if not support.covers(point):
+            observed = "UnsupportedGeography"
+        elif not coastal.covers(point):
+            observed = "OutOfScope"
+        assert observed == golden["expectedState"], golden["id"]
