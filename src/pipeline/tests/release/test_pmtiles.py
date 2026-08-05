@@ -174,9 +174,7 @@ def test_vector_toolchain_rejects_tampered_pmtiles_asset(
 def test_vector_toolchain_rejects_unrelated_embedded_pmtiles_binary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    release, tools = _pinned_toolchain(
-        tmp_path, embedded_pmtiles=b"unrelated-pmtiles-binary"
-    )
+    release, tools = _pinned_toolchain(tmp_path, embedded_pmtiles=b"unrelated-pmtiles-binary")
     monkeypatch.setattr(pmtiles_module, "_run", lambda _command: "tippecanoe v2.79.0")
 
     with pytest.raises(ScienceContractError, match="official distribution"):
@@ -192,9 +190,7 @@ def test_decoder_rejects_an_unexpected_mvt_layer_id(
                 "features": [
                     {
                         "properties": {"layer": "not-projection"},
-                        "features": [
-                            {"id": 1, "properties": {"source_location_id": 1}}
-                        ],
+                        "features": [{"id": 1, "properties": {"source_location_id": 1}}],
                     }
                 ]
             }
@@ -211,6 +207,112 @@ def test_decoder_rejects_an_unexpected_mvt_layer_id(
         )
 
 
+@pytest.mark.parametrize(
+    ("tamper", "message"),
+    [
+        ("string-id", "exact integer"),
+        ("float-median", "properties or types"),
+        ("numeric-scenario", "properties or types"),
+    ],
+)
+def test_decoder_rejects_coerced_feature_types(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tamper: str,
+    message: str,
+) -> None:
+    feature = {
+        "id": 1,
+        "properties": {
+            "horizon": 2050,
+            "lower_mm": 100,
+            "median_mm": 200,
+            "scenario": "ssp2-45",
+            "source_location_id": 1,
+            "upper_mm": 300,
+        },
+    }
+    if tamper == "string-id":
+        feature["id"] = "1"
+    elif tamper == "float-median":
+        feature["properties"]["median_mm"] = 200.0
+    else:
+        feature["properties"]["scenario"] = 245
+    decoded = {
+        "features": [
+            {
+                "features": [
+                    {
+                        "properties": {"layer": "projection"},
+                        "features": [feature],
+                    }
+                ]
+            }
+        ]
+    }
+    monkeypatch.setattr(pmtiles_module, "_run", lambda _command: json.dumps(decoded))
+
+    with pytest.raises(ScienceContractError, match=message):
+        pmtiles_module._decode_properties(
+            tmp_path / "decode",
+            tmp_path / "archive.pmtiles",
+            6,
+            "projection",
+        )
+
+
+def test_ndjson_rejects_common_mode_property_tampering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _real_source()
+    layer = source.layers[4]
+    original = pmtiles_module._feature
+
+    def tampered_feature(source, layer, row, column):
+        feature = deepcopy(original(source, layer, row, column))
+        feature["properties"]["median_mm"] += 1
+        return feature
+
+    monkeypatch.setattr(pmtiles_module, "_feature", tampered_feature)
+
+    with pytest.raises(ScienceContractError, match="properties differ"):
+        pmtiles_module._write_ndjson(tmp_path / "tampered.ndjson", source, layer)
+
+
+def test_ndjson_rejects_a_shrunken_interior_source_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _real_source()
+    layer = source.layers[4]
+    target_row, target_column = next(
+        (int(row), int(column))
+        for row, column in zip(*layer.valid.nonzero())
+        if 0 < row < layer.valid.shape[0] - 1 and 0 < column < layer.valid.shape[1] - 1
+    )
+    original = pmtiles_module._feature
+
+    def tampered_feature(source, layer, row, column):
+        feature = deepcopy(original(source, layer, row, column))
+        if (row, column) == (target_row, target_column):
+            longitude = float(source.longitudes[column])
+            latitude = float(source.latitudes[row])
+            feature["geometry"]["coordinates"] = [
+                [
+                    [longitude - 0.1, latitude - 0.1],
+                    [longitude + 0.1, latitude - 0.1],
+                    [longitude + 0.1, latitude + 0.1],
+                    [longitude - 0.1, latitude + 0.1],
+                    [longitude - 0.1, latitude - 0.1],
+                ]
+            ]
+        return feature
+
+    monkeypatch.setattr(pmtiles_module, "_feature", tampered_feature)
+
+    with pytest.raises(ScienceContractError, match="geometry differs"):
+        pmtiles_module._write_ndjson(tmp_path / "tampered.ndjson", source, layer)
+
+
 TOOL_ENVIRONMENT = (
     "SEARISE_TIPPECANOE",
     "SEARISE_TIPPECANOE_DECODE",
@@ -223,10 +325,7 @@ TOOL_ENVIRONMENT = (
 
 
 @pytest.mark.skipif(
-    not all(
-        os.environ.get(name)
-        for name in TOOL_ENVIRONMENT
-    ),
+    not all(os.environ.get(name) for name in TOOL_ENVIRONMENT),
     reason="set the three pinned vector-tool paths for the external integration",
 )
 def test_visual_pmtiles_is_byte_deterministic_and_property_exact(tmp_path: Path) -> None:
@@ -240,15 +339,9 @@ def test_visual_pmtiles_is_byte_deterministic_and_property_exact(tmp_path: Path)
         "tippecanoe_path": Path(os.environ["SEARISE_TIPPECANOE"]),
         "decode_path": Path(os.environ["SEARISE_TIPPECANOE_DECODE"]),
         "pmtiles_path": Path(os.environ["SEARISE_PMTILES"]),
-        "tippecanoe_source_archive_path": Path(
-            os.environ["SEARISE_TIPPECANOE_SOURCE"]
-        ),
-        "tippecanoe_build_receipt_path": Path(
-            os.environ["SEARISE_TIPPECANOE_BUILD_RECEIPT"]
-        ),
-        "pmtiles_distribution_asset_path": Path(
-            os.environ["SEARISE_PMTILES_ASSET"]
-        ),
+        "tippecanoe_source_archive_path": Path(os.environ["SEARISE_TIPPECANOE_SOURCE"]),
+        "tippecanoe_build_receipt_path": Path(os.environ["SEARISE_TIPPECANOE_BUILD_RECEIPT"]),
+        "pmtiles_distribution_asset_path": Path(os.environ["SEARISE_PMTILES_ASSET"]),
         "pmtiles_distribution_platform": os.environ["SEARISE_VECTOR_PLATFORM"],
     }
 
@@ -259,8 +352,6 @@ def test_visual_pmtiles_is_byte_deterministic_and_property_exact(tmp_path: Path)
     assert first_evidence.sha256 == second_evidence.sha256
     assert first_evidence.source_feature_count == 3054
     assert first_evidence.decoded_fragment_count >= first_evidence.source_feature_count
-    assert first_evidence.metadata["searise"]["method_version"] == (
-        "ar6-regional-projection-v1"
-    )
+    assert first_evidence.metadata["searise"]["method_version"] == ("ar6-regional-projection-v1")
     assert "generator_options" not in first_evidence.metadata
     assert first_evidence.byte_size <= contract()["budgets"]["pmtilesTotalBytes"] / 9

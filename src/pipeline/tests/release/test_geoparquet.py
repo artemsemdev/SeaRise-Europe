@@ -9,6 +9,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
+import searise_pipeline.release.geoparquet as geoparquet_module
 from searise_pipeline.release import (
     load_source_fixture,
     validate_geoparquet,
@@ -60,6 +61,24 @@ def test_geoparquet_is_byte_deterministic_and_exact(tmp_path: Path) -> None:
         "ssp5-85/2050": 3054,
         "ssp5-85/2100": 3054,
     }
+
+
+def test_geoparquet_rejects_common_mode_writer_tampering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _real_source()
+    original = geoparquet_module._records
+
+    def tampered_records(source):
+        columns, counts = original(source)
+        altered = {name: list(values) for name, values in columns.items()}
+        altered["median_mm"][0] += 1
+        return altered, counts
+
+    monkeypatch.setattr(geoparquet_module, "_records", tampered_records)
+
+    with pytest.raises(ScienceContractError, match="median_mm values differ"):
+        write_geoparquet(source, tmp_path / "tampered.parquet", contract=contract())
 
 
 @pytest.mark.parametrize(
