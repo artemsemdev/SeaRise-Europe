@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 import time
 from dataclasses import asdict, dataclass
@@ -16,14 +17,17 @@ import numpy as np
 from searise_pipeline.science.contracts import ScienceContractError
 
 from .cog import CogEvidence, write_analysis_cog
-from .gate import evaluate_recovery_gate
 from .geoparquet import GeoParquetEvidence, write_geoparquet
-from .model import RegionalLayer, RegionalReleaseSource
+from .model import RegionalLayer, RegionalReleaseSource, assert_source_integrity
 from .pmtiles import (
     PmtilesEvidence,
     validate_vector_toolchain,
     write_visual_pmtiles,
 )
+from .source_grid import SourceGridEvidence, write_source_grid
+from .toolchain import validate_python_toolchain
+
+_RELEASE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
 
 
 def _sha256(path: Path) -> str:
@@ -74,8 +78,10 @@ def _layer_statistics(layer: RegionalLayer) -> Mapping[str, Any]:
 
 
 def _artifact_record(
-    evidence: CogEvidence | GeoParquetEvidence | PmtilesEvidence,
+    evidence: CogEvidence | GeoParquetEvidence | PmtilesEvidence | SourceGridEvidence,
     *,
+    source: RegionalReleaseSource,
+    contract: Mapping[str, Any],
     media_type: str,
     role: str,
     scenario: str | None = None,
@@ -87,12 +93,97 @@ def _artifact_record(
         "role": role,
         "byteSize": evidence.byte_size,
         "sha256": evidence.sha256,
+        "source": {
+            "sourceId": contract["source"]["sourceId"],
+            "release": contract["source"]["version"],
+            "archiveSha256": source.archive_sha256,
+        },
+        "method": {
+            "methodVersion": "ar6-regional-projection-v1",
+            "scientificResampling": "none",
+        },
+        "rights": {
+            "licence": contract["source"]["licence"],
+            "attribution": contract["source"]["attribution"],
+            "notice": "NOTICE.md",
+        },
+        "valueSemantics": {
+            "baseline": contract["values"]["baseline"],
+            "confidence": contract["values"]["confidence"],
+            "quantiles": contract["matrix"]["quantiles"],
+            "storageUnits": contract["values"]["storageUnits"],
+            "publishedUnits": contract["values"]["publishedUnits"],
+            "scaleToMetres": contract["values"]["scaleToMetres"],
+            "scientificDisposition": contract["scientificDisposition"],
+        },
     }
     if scenario is not None:
         record["scenario"] = scenario
     if horizon is not None:
         record["horizon"] = horizon
+    if scenario is not None:
+        member = next(
+            layer.member_sha256
+            for layer in source.layers
+            if layer.scenario == scenario
+        )
+        record["source"] = {**record["source"], "memberSha256": member}
+    else:
+        record["source"] = {
+            **record["source"],
+            "memberSha256": {
+                layer.scenario: layer.member_sha256
+                for layer in source.layers
+                if layer.horizon == 2030
+            },
+        }
     return record
+
+
+def _attach_lineage(
+    record: Mapping[str, Any],
+    *,
+    source: RegionalReleaseSource,
+    contract: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    scenario = record.get("scenario")
+    source_lineage: dict[str, Any] = {
+        "sourceId": contract["source"]["sourceId"],
+        "release": contract["source"]["version"],
+        "archiveSha256": source.archive_sha256,
+    }
+    if scenario:
+        source_lineage["memberSha256"] = next(
+            layer.member_sha256 for layer in source.layers if layer.scenario == scenario
+        )
+    else:
+        source_lineage["memberSha256"] = {
+            layer.scenario: layer.member_sha256
+            for layer in source.layers
+            if layer.horizon == 2030
+        }
+    return {
+        **record,
+        "source": source_lineage,
+        "method": {
+            "methodVersion": "ar6-regional-projection-v1",
+            "scientificResampling": "none",
+        },
+        "rights": {
+            "licence": contract["source"]["licence"],
+            "attribution": contract["source"]["attribution"],
+            "notice": "NOTICE.md",
+        },
+        "valueSemantics": {
+            "baseline": contract["values"]["baseline"],
+            "confidence": contract["values"]["confidence"],
+            "quantiles": contract["matrix"]["quantiles"],
+            "storageUnits": contract["values"]["storageUnits"],
+            "publishedUnits": contract["values"]["publishedUnits"],
+            "scaleToMetres": contract["values"]["scaleToMetres"],
+            "scientificDisposition": contract["scientificDisposition"],
+        },
+    }
 
 
 def _validate_lookup_goldens(
@@ -117,6 +208,7 @@ def _validate_lookup_goldens(
     layers = {(layer.scenario, layer.horizon): layer for layer in source.layers}
     available_count = 0
     declared_states = set()
+    benchmark_target: Mapping[str, Any] | None = None
     for result in goldens["results"]:
         declared_states.add(result["state"])
         if result["state"] != "ProjectionAvailable":
@@ -140,6 +232,17 @@ def _validate_lookup_goldens(
             )
             if actual != expected:
                 raise ScienceContractError("Regional values differ from independent goldens")
+            if (
+                benchmark_target is None
+                and projection["scenario"] == "ssp2-45"
+                and projection["horizon"] == 2050
+            ):
+                benchmark_target = {
+                    "scenario": "ssp2-45",
+                    "horizon": 2050,
+                    "sourceLocationId": result["source"]["locationId"],
+                    "expectedValuesMillimetres": list(expected),
+                }
     validation_binding = goldens["validationContract"]
     validation_path = goldens_path.parents[4] / validation_binding["path"]
     if _sha256(validation_path) != validation_binding["sha256"]:
@@ -154,12 +257,15 @@ def _validate_lookup_goldens(
     }
     if declared_states | controls != required_states:
         raise ScienceContractError("Lookup goldens do not cover all four product states")
+    if benchmark_target is None:
+        raise ScienceContractError("Lookup goldens lack the browser benchmark target")
     return {
-        "path": str(goldens_path),
+        "path": f"src/pipeline/science/evidence/{goldens_path.name}",
         "sha256": _sha256(goldens_path),
         "availableControlCount": available_count,
         "coveredStates": sorted(required_states),
         "numericToleranceMillimetres": 0,
+        "browserBenchmarkTarget": benchmark_target,
     }
 
 
@@ -172,6 +278,249 @@ def _checksums(root: Path) -> None:
     (root / "checksums.txt").write_text("\n".join(entries) + "\n", encoding="utf-8")
 
 
+def _write_notice(root: Path, contract: Mapping[str, Any]) -> Mapping[str, Any]:
+    source = contract["source"]
+    lines = [
+        "# Third-party notice",
+        "",
+        source["attribution"],
+        "",
+        f"Canonical record: {source['canonicalRecord']}",
+        f"Licence: {source['licence']} ({source['licenceUrl']})",
+        "",
+        "Required acknowledgements:",
+        "",
+        *[f"- {item}" for item in source["requiredAcknowledgements"]],
+        "",
+    ]
+    path = root / "NOTICE.md"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return {
+        "path": "NOTICE.md",
+        "mediaType": "text/markdown",
+        "role": "licence-notice",
+        "byteSize": path.stat().st_size,
+        "sha256": _sha256(path),
+    }
+
+
+def _write_stac(
+    root: Path,
+    artifacts: list[Mapping[str, Any]],
+    *,
+    release_id: str,
+    contract: Mapping[str, Any],
+) -> list[Mapping[str, Any]]:
+    """Write a deterministic STAC Collection and one Item per projection layer."""
+    by_path = {item["path"]: item for item in artifacts}
+    item_records: list[Mapping[str, Any]] = []
+    item_links: list[Mapping[str, Any]] = []
+    for scenario in contract["matrix"]["scenarios"]:
+        for horizon in contract["matrix"]["horizons"]:
+            item_id = f"{scenario}-{horizon}"
+            item_path = root / f"stac/items/{item_id}.json"
+            item_path.parent.mkdir(parents=True, exist_ok=True)
+            cog_path = f"analysis/{scenario}/{horizon}.tif"
+            pmtiles_path = f"layers/{scenario}/{horizon}.pmtiles"
+            assets = {}
+            for key, relative in (
+                ("analysis", cog_path),
+                ("visual", pmtiles_path),
+                ("table", "analysis/projections.parquet"),
+                ("source-grid", "analysis/source-grid.json.gz"),
+            ):
+                record = by_path[relative]
+                assets[key] = {
+                    "href": f"../../{relative}",
+                    "type": record["mediaType"],
+                    "roles": [record["role"]],
+                    "file:size": record["byteSize"],
+                    "checksum:multihash": f"1220{record['sha256']}",
+                }
+            document = {
+                "stac_version": "1.0.0",
+                "stac_extensions": [
+                    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+                    "https://stac-extensions.github.io/checksum/v1.0.0/schema.json",
+                ],
+                "type": "Feature",
+                "id": item_id,
+                "bbox": contract["grid"]["bounds"],
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [-30.5, 29.5], [45.5, 29.5], [45.5, 75.5],
+                        [-30.5, 75.5], [-30.5, 29.5]
+                    ]],
+                },
+                "properties": {
+                    "datetime": f"{horizon}-01-01T00:00:00Z",
+                    "scenario": scenario,
+                    "baseline": contract["values"]["baseline"],
+                    "confidence": contract["values"]["confidence"],
+                    "scientific_disposition": contract["scientificDisposition"],
+                    "attribution": contract["source"]["attribution"],
+                    "source_release": contract["source"]["version"],
+                    "source_archive_sha256": contract["source"]["archiveSha256"],
+                    "source_member_sha256": by_path[cog_path]["source"]["memberSha256"],
+                    "method_version": "ar6-regional-projection-v1",
+                    "quantiles": contract["matrix"]["quantiles"],
+                    "storage_units": contract["values"]["storageUnits"],
+                    "published_units": contract["values"]["publishedUnits"],
+                    "scale_to_metres": contract["values"]["scaleToMetres"],
+                },
+                "collection": release_id,
+                "links": [
+                    {"rel": "collection", "href": "../collection.json", "type": "application/json"},
+                    {"rel": "license", "href": contract["source"]["licenceUrl"]},
+                    {"rel": "cite-as", "href": contract["source"]["canonicalRecord"]},
+                ],
+                "assets": assets,
+            }
+            _write_json(item_path, document)
+            record = {
+                "path": f"stac/items/{item_id}.json",
+                "mediaType": "application/geo+json",
+                "role": "stac-item",
+                "scenario": scenario,
+                "horizon": horizon,
+                "byteSize": item_path.stat().st_size,
+                "sha256": _sha256(item_path),
+            }
+            item_records.append(record)
+            item_links.append(
+                {"rel": "item", "href": f"items/{item_id}.json", "type": "application/geo+json"}
+            )
+    collection_path = root / "stac/collection.json"
+    collection = {
+        "stac_version": "1.0.0",
+        "type": "Collection",
+        "id": release_id,
+        "description": "Projection-only IPCC AR6 regional relative sea-level change.",
+        "license": contract["source"]["licence"],
+        "providers": [
+            {
+                "name": "IPCC AR6 projection authors via Zenodo",
+                "roles": ["producer", "licensor"],
+                "url": contract["source"]["canonicalRecord"],
+            }
+        ],
+        "summaries": {
+            "source_release": [contract["source"]["version"]],
+            "source_archive_sha256": [contract["source"]["archiveSha256"]],
+            "method_version": ["ar6-regional-projection-v1"],
+            "baseline": [contract["values"]["baseline"]],
+            "confidence": [contract["values"]["confidence"]],
+        },
+        "extent": {
+            "spatial": {"bbox": [contract["grid"]["bounds"]]},
+            "temporal": {"interval": [["2030-01-01T00:00:00Z", "2100-01-01T00:00:00Z"]]},
+        },
+        "links": [
+            {"rel": "license", "href": contract["source"]["licenceUrl"]},
+            {"rel": "cite-as", "href": contract["source"]["canonicalRecord"]},
+            *item_links,
+        ],
+    }
+    _write_json(collection_path, collection)
+    records = [
+        {
+            "path": "stac/collection.json",
+            "mediaType": "application/json",
+            "role": "stac-collection",
+            "byteSize": collection_path.stat().st_size,
+            "sha256": _sha256(collection_path),
+        },
+        *item_records,
+    ]
+    _validate_stac(root, artifacts, release_id=release_id, contract=contract)
+    return records
+
+
+def _validate_stac(
+    root: Path,
+    artifacts: list[Mapping[str, Any]],
+    *,
+    release_id: str,
+    contract: Mapping[str, Any],
+) -> None:
+    """Offline validation of collection, 3x3 Items, links, and bound assets."""
+    collection = json.loads((root / "stac/collection.json").read_text(encoding="utf-8"))
+    if (
+        collection.get("stac_version") != "1.0.0"
+        or collection.get("type") != "Collection"
+        or collection.get("id") != release_id
+        or collection.get("license") != contract["source"]["licence"]
+        or collection.get("providers", [{}])[0].get("url")
+        != contract["source"]["canonicalRecord"]
+    ):
+        raise ScienceContractError("STAC Collection differs from the release contract")
+    collection_rights = {
+        link["rel"]: link["href"]
+        for link in collection.get("links", [])
+        if link.get("rel") in {"license", "cite-as"}
+    }
+    if collection_rights != {
+        "license": contract["source"]["licenceUrl"],
+        "cite-as": contract["source"]["canonicalRecord"],
+    }:
+        raise ScienceContractError("STAC Collection rights links differ from the contract")
+    expected_matrix = {
+        (scenario, horizon)
+        for scenario in contract["matrix"]["scenarios"]
+        for horizon in contract["matrix"]["horizons"]
+    }
+    links = [link for link in collection.get("links", []) if link.get("rel") == "item"]
+    if len(links) != len(expected_matrix):
+        raise ScienceContractError("STAC Collection does not link the exact 3 x 3 matrix")
+    by_path = {item["path"]: item for item in artifacts}
+    observed: set[tuple[str, int]] = set()
+    for link in links:
+        item_path = (root / "stac" / link["href"]).resolve()
+        if (root / "stac/items").resolve() not in item_path.parents:
+            raise ScienceContractError("STAC item link escapes the candidate")
+        item = json.loads(item_path.read_text(encoding="utf-8"))
+        scenario = item.get("properties", {}).get("scenario")
+        horizon = int(item.get("properties", {}).get("datetime", "0")[:4])
+        observed.add((scenario, horizon))
+        cog_record = by_path[f"analysis/{scenario}/{horizon}.tif"]
+        expected_properties = {
+            "source_release": contract["source"]["version"],
+            "source_archive_sha256": contract["source"]["archiveSha256"],
+            "source_member_sha256": cog_record["source"]["memberSha256"],
+            "method_version": "ar6-regional-projection-v1",
+            "quantiles": contract["matrix"]["quantiles"],
+            "storage_units": contract["values"]["storageUnits"],
+            "published_units": contract["values"]["publishedUnits"],
+            "scale_to_metres": contract["values"]["scaleToMetres"],
+            "attribution": contract["source"]["attribution"],
+        }
+        if any(item["properties"].get(key) != value for key, value in expected_properties.items()):
+            raise ScienceContractError("STAC Item lineage differs from its artifacts")
+        item_links = {link["rel"]: link["href"] for link in item.get("links", [])}
+        if (
+            item_links.get("license") != contract["source"]["licenceUrl"]
+            or item_links.get("cite-as") != contract["source"]["canonicalRecord"]
+        ):
+            raise ScienceContractError("STAC Item rights links differ from the contract")
+        for asset in item.get("assets", {}).values():
+            target = (item_path.parent / asset["href"]).resolve()
+            if root.resolve() not in target.parents or not target.is_file():
+                raise ScienceContractError("STAC asset target is missing or unsafe")
+            relative = target.relative_to(root.resolve()).as_posix()
+            record = by_path.get(relative)
+            if (
+                record is None
+                or asset.get("file:size") != record["byteSize"]
+                or asset.get("checksum:multihash") != f"1220{record['sha256']}"
+                or asset.get("roles") != [record["role"]]
+                or _sha256(target) != record["sha256"]
+            ):
+                raise ScienceContractError("STAC asset is not bound to manifest bytes")
+    if observed != expected_matrix:
+        raise ScienceContractError("STAC Items differ from the exact 3 x 3 matrix")
+
+
 def build_regional_release(
     source: RegionalReleaseSource,
     output_directory: Path,
@@ -181,27 +530,53 @@ def build_regional_release(
     tippecanoe_path: Path,
     decode_path: Path,
     pmtiles_path: Path,
+    tippecanoe_source_archive_path: Path,
+    tippecanoe_build_receipt_path: Path,
+    pmtiles_distribution_asset_path: Path,
+    pmtiles_distribution_platform: str,
+    python_lock_path: Path,
     lookup_goldens_path: Path,
-    reproducibility_report: Mapping[str, Any] | None = None,
-    delivery_report: Mapping[str, Any] | None = None,
-    owner_decision: str = "pending-owner",
+    build_environment_id: str,
+    source_revision: str,
+    workflow_started_monotonic: float | None = None,
 ) -> ReleaseBuildResult:
-    """Build into a private directory and publish atomically only after validation."""
+    """Build an immutable candidate; external evidence is finalized separately."""
+    started = workflow_started_monotonic or time.perf_counter()
+    if started > time.perf_counter():
+        raise ScienceContractError("Workflow start timestamp cannot be in the future")
+    if not _RELEASE_ID.fullmatch(release_id):
+        raise ScienceContractError("Release ID contains unsafe or non-canonical characters")
+    if not build_environment_id.strip():
+        raise ScienceContractError("A non-empty clean build environment ID is required")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_revision):
+        raise ScienceContractError("Source revision must be one exact Git commit SHA")
     if output_directory.exists():
         raise ScienceContractError(f"Immutable release path already exists: {output_directory}")
+    assert_source_integrity(source, contract, require_verified_archive=False)
+    if source.archive_and_members_verified_this_build and workflow_started_monotonic is None:
+        raise ScienceContractError(
+            "Verified-archive builds must time the workflow from before source verification"
+        )
     output_directory.parent.mkdir(parents=True, exist_ok=True)
+    python_toolchain = validate_python_toolchain(python_lock_path, contract=contract)
     toolchain = validate_vector_toolchain(
         tippecanoe_path=tippecanoe_path,
         decode_path=decode_path,
         pmtiles_path=pmtiles_path,
+        tippecanoe_source_archive_path=tippecanoe_source_archive_path,
+        tippecanoe_build_receipt_path=tippecanoe_build_receipt_path,
+        pmtiles_distribution_asset_path=pmtiles_distribution_asset_path,
+        pmtiles_distribution_platform=pmtiles_distribution_platform,
         contract=contract,
     )
     lookup_evidence = _validate_lookup_goldens(source, lookup_goldens_path)
-    started = time.perf_counter()
     with tempfile.TemporaryDirectory(
         prefix="searise-release-", dir=output_directory.parent
     ) as temporary:
-        root = Path(temporary) / release_id
+        temporary_root = Path(temporary).resolve()
+        root = temporary_root / release_id
+        if root.resolve().parent != temporary_root:
+            raise ScienceContractError("Release ID escapes the private staging directory")
         root.mkdir()
         cogs: list[CogEvidence] = []
         pmtiles: list[PmtilesEvidence] = []
@@ -211,6 +586,11 @@ def build_regional_release(
         geoparquet = write_geoparquet(
             source,
             root / "analysis/projections.parquet",
+            contract=contract,
+        )
+        source_grid = write_source_grid(
+            source,
+            root / "analysis/source-grid.json.gz",
             contract=contract,
         )
         for layer in source.layers:
@@ -224,9 +604,12 @@ def build_regional_release(
                     tippecanoe_path=tippecanoe_path,
                     decode_path=decode_path,
                     pmtiles_path=pmtiles_path,
+                    tippecanoe_source_archive_path=tippecanoe_source_archive_path,
+                    tippecanoe_build_receipt_path=tippecanoe_build_receipt_path,
+                    pmtiles_distribution_asset_path=pmtiles_distribution_asset_path,
+                    pmtiles_distribution_platform=pmtiles_distribution_platform,
                 )
             )
-        duration = round(time.perf_counter() - started, 6)
         statistics = {
             "schemaVersion": 1,
             "releaseId": release_id,
@@ -243,6 +626,8 @@ def build_regional_release(
             artifacts.append(
                 _artifact_record(
                     evidence,
+                    source=source,
+                    contract=contract,
                     media_type="image/tiff; application=geotiff; profile=cloud-optimized",
                     role="exact-browser-lookup",
                     scenario=parts[1],
@@ -252,6 +637,8 @@ def build_regional_release(
         artifacts.append(
             _artifact_record(
                 geoparquet,
+                source=source,
+                contract=contract,
                 media_type="application/vnd.apache.parquet",
                 role="analytical-parity",
             )
@@ -262,12 +649,39 @@ def build_regional_release(
             artifacts.append(
                 _artifact_record(
                     evidence,
+                    source=source,
+                    contract=contract,
                     media_type="application/vnd.pmtiles",
                     role="visual-only",
                     scenario=layer.scenario,
                     horizon=layer.horizon,
                 )
             )
+        artifacts.append(
+            _artifact_record(
+                source_grid,
+                source=source,
+                contract=contract,
+                media_type="application/gzip",
+                role="source-grid-identity",
+            )
+        )
+        notice = _write_notice(root, contract)
+        stac = _write_stac(
+            root,
+            artifacts,
+            release_id=release_id,
+            contract=contract,
+        )
+        artifacts.extend(
+            [
+                _attach_lineage(notice, source=source, contract=contract),
+                *[
+                    _attach_lineage(record, source=source, contract=contract)
+                    for record in stac
+                ],
+            ]
+        )
         totals = {
             "cogBytes": sum(item.byte_size for item in cogs),
             "pmtilesBytes": sum(item.byte_size for item in pmtiles),
@@ -285,9 +699,16 @@ def build_regional_release(
             "schemaVersion": 1,
             "releaseId": release_id,
             "checks": {
-                "sourceArchiveAndMembersVerified": source.source_mode == "verified-archive",
+                "sourceArchiveAndMembersVerified": (
+                    source.archive_and_members_verified_this_build
+                ),
                 "completeScenarioHorizonMatrix": len(source.layers) == 9,
+                "sourceContentSeal": True,
+                "nonAllNodataLayers": len(cogs) == 9
+                and all(item.valid_cells > 0 for item in cogs),
                 "cogStructureAndValues": len(cogs) == 9,
+                "sourceGridIdentity": source_grid.cell_count
+                == contract["grid"]["width"] * contract["grid"]["height"],
                 "geoparquetSchemaAndValues": geoparquet.row_count
                 == sum(item.source_feature_count for item in pmtiles),
                 "pmtilesStructureAndProperties": len(pmtiles) == 9,
@@ -295,25 +716,22 @@ def build_regional_release(
                     cog.valid_cells == tile.source_feature_count for cog, tile in zip(cogs, pmtiles)
                 ),
                 "lookupGoldenParity": True,
-                "licenceAndAttribution": contract["source"]["licence"] == "CC-BY-4.0"
-                and bool(contract["source"]["attribution"]),
+                "licenceNoticeAndAttribution": contract["source"]["licence"]
+                == "CC-BY-4.0"
+                and len(contract["source"]["requiredAcknowledgements"]) == 2
+                and notice["sha256"] == _sha256(root / "NOTICE.md"),
                 "artifactBudgets": budget_passed,
             },
             "lookupGoldenEvidence": lookup_evidence,
             "totals": totals,
         }
-        gate = evaluate_recovery_gate(
-            build_evidence,
-            contract=contract,
-            reproducibility_report=reproducibility_report,
-            delivery_report=delivery_report,
-            owner_decision=owner_decision,
-        )
         source_receipt = {
             "schemaVersion": 1,
             "sourceMode": source.source_mode,
             "archiveSha256": source.archive_sha256,
-            "archiveAndMembersVerifiedThisBuild": source.source_mode == "verified-archive",
+            "archiveAndMembersVerifiedThisBuild": (
+                source.archive_and_members_verified_this_build
+            ),
             "memberSha256": {
                 layer.scenario: layer.member_sha256
                 for layer in source.layers
@@ -322,12 +740,21 @@ def build_regional_release(
             "releaseContractSha256": source.contract_sha256,
             "licence": contract["source"]["licence"],
             "attribution": contract["source"]["attribution"],
+            "canonicalRecord": contract["source"]["canonicalRecord"],
+            "requiredAcknowledgements": contract["source"]["requiredAcknowledgements"],
+            "notice": notice,
+            "sourceContentSha256": source.content_sha256,
         }
         build_receipt = {
             "schemaVersion": 1,
             "releaseId": release_id,
+            "sourceRevision": source_revision,
             "toolchainPins": contract["toolchain"],
-            "observedBinaries": asdict(toolchain),
+            "environmentIdentity": {
+                "buildRunId": build_environment_id,
+                "python": asdict(python_toolchain),
+                "vector": asdict(toolchain),
+            },
             "normalizedParameters": {
                 "nativeResolutionDegrees": 1,
                 "pmtilesMaximumZoom": contract["artifacts"]["pmtiles"]["maximumZoom"],
@@ -340,7 +767,7 @@ def build_regional_release(
             "releaseId": release_id,
             "releaseContractId": contract["releaseContractId"],
             "scientificDisposition": contract["scientificDisposition"],
-            "publicationStatus": "approved" if gate["phase1Unlocked"] else "not-approved",
+            "publicationStatus": "pending-owner",
             "modeledQuantity": "regional-relative-sea-level-change",
             "baseline": contract["values"]["baseline"],
             "confidence": contract["values"]["confidence"],
@@ -362,26 +789,19 @@ def build_regional_release(
         _write_json(root / "source-receipt.json", source_receipt)
         _write_json(root / "build-receipt.json", build_receipt)
         _write_json(root / "build-evidence.json", build_evidence)
-        _write_json(root / "gate.json", gate)
-        _write_json(
-            root / "reproducibility.json",
-            reproducibility_report
-            or {"schemaVersion": 1, "status": "pending", "reason": "second-environment-required"},
-        )
-        _write_json(
-            root / "delivery-measurements.json",
-            delivery_report
-            or {
-                "schemaVersion": 1,
-                "status": "pending",
-                "buildDurationSeconds": duration,
-                "artifactBytes": totals,
-                "reason": "browser-profile-measurements-required",
-            },
-        )
         _write_json(root / "manifest.json", manifest)
+        from .gate import evaluate_recovery_gate
+
+        gate = evaluate_recovery_gate(
+            build_evidence,
+            contract=contract,
+            reproducibility_report=None,
+            delivery_report=None,
+        )
+        _write_json(root / "gate.json", gate)
         _checksums(root)
         os.replace(root, output_directory)
+    duration = round(time.perf_counter() - started, 6)
     return ReleaseBuildResult(
         output_directory=output_directory,
         manifest=manifest,

@@ -16,7 +16,6 @@ from searise_pipeline.release import (
 )
 from searise_pipeline.science import ScienceContractError
 
-from .test_recovery_gate import DELIVERY, REPRODUCIBILITY
 from .test_source_fixture import FIXTURE_DIR, GOLDENS_PATH, contract
 
 
@@ -34,12 +33,28 @@ def _tool_paths() -> dict[str, Path]:
         "tippecanoe_path": Path(os.environ["SEARISE_TIPPECANOE"]),
         "decode_path": Path(os.environ["SEARISE_TIPPECANOE_DECODE"]),
         "pmtiles_path": Path(os.environ["SEARISE_PMTILES"]),
+        "tippecanoe_source_archive_path": Path(os.environ["SEARISE_TIPPECANOE_SOURCE"]),
+        "tippecanoe_build_receipt_path": Path(
+            os.environ["SEARISE_TIPPECANOE_BUILD_RECEIPT"]
+        ),
+        "pmtiles_distribution_asset_path": Path(os.environ["SEARISE_PMTILES_ASSET"]),
+        "pmtiles_distribution_platform": os.environ["SEARISE_VECTOR_PLATFORM"],
+        "python_lock_path": Path(os.environ["SEARISE_PYTHON_LOCK"]),
     }
 
 
 EXTERNAL_TOOLS_AVAILABLE = all(
     os.environ.get(name)
-    for name in ("SEARISE_TIPPECANOE", "SEARISE_TIPPECANOE_DECODE", "SEARISE_PMTILES")
+    for name in (
+        "SEARISE_TIPPECANOE",
+        "SEARISE_TIPPECANOE_DECODE",
+        "SEARISE_PMTILES",
+        "SEARISE_TIPPECANOE_SOURCE",
+        "SEARISE_TIPPECANOE_BUILD_RECEIPT",
+        "SEARISE_PMTILES_ASSET",
+        "SEARISE_VECTOR_PLATFORM",
+        "SEARISE_PYTHON_LOCK",
+    )
 )
 
 
@@ -60,9 +75,8 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
         release_id="ar6-europe-fixture-v1",
         contract=contract(),
         lookup_goldens_path=GOLDENS_PATH,
-        reproducibility_report=REPRODUCIBILITY,
-        delivery_report=DELIVERY,
-        owner_decision="approved",
+        build_environment_id="isolated-build-a",
+        source_revision="a" * 40,
         **_tool_paths(),
     )
     second_result = build_regional_release(
@@ -71,28 +85,32 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
         release_id="ar6-europe-fixture-v1",
         contract=contract(),
         lookup_goldens_path=GOLDENS_PATH,
-        reproducibility_report=REPRODUCIBILITY,
-        delivery_report=DELIVERY,
-        owner_decision="approved",
+        build_environment_id="isolated-build-b",
+        source_revision="a" * 40,
         **_tool_paths(),
     )
     comparison = compare_release_candidates(
         first,
         second,
-        first_environment="isolated-build-a",
-        second_environment="isolated-build-b",
         contract=contract(),
     )
 
     assert len(list(first.glob("analysis/*/*.tif"))) == 9
     assert len(list(first.glob("layers/*/*.pmtiles"))) == 9
     assert (first / "analysis/projections.parquet").is_file()
-    assert len(first_result.manifest["artifacts"]) == 19
+    assert len(first_result.manifest["artifacts"]) == 31
     assert first_result.manifest == second_result.manifest
     assert comparison["status"] == "passed"
-    assert comparison["comparedArtifactCount"] == 19
-    assert first_result.gate["disposition"] == "blocked"
-    assert first_result.gate["blockingChecks"] == ["sourceArchiveAndMembersVerified"]
+    assert comparison["comparedArtifactCount"] == 31
+    assert first_result.gate["automatedValidation"] == "failed"
+    assert first_result.gate["releaseDisposition"] == "blocked"
+    assert first_result.gate["blockers"] == [
+        "sourceArchiveAndMembersVerified",
+        "crossEnvironmentReproducibility",
+        "deliveryMeasurements",
+        "projectOwnerReleaseDecision",
+        "finalIntegrationMergedToMaster",
+    ]
     assert first_result.gate["phase1Unlocked"] is False
 
     for line in (first / "checksums.txt").read_text(encoding="utf-8").splitlines():
@@ -115,4 +133,33 @@ def test_builder_refuses_to_overwrite_immutable_release(tmp_path: Path) -> None:
             tippecanoe_path=Path("missing"),
             decode_path=Path("missing"),
             pmtiles_path=Path("missing"),
+            tippecanoe_source_archive_path=Path("missing"),
+            tippecanoe_build_receipt_path=Path("missing"),
+            pmtiles_distribution_asset_path=Path("missing"),
+            pmtiles_distribution_platform="darwin-arm64",
+            python_lock_path=Path("missing"),
+            build_environment_id="test-existing-path",
+            source_revision="a" * 40,
+        )
+
+
+@pytest.mark.parametrize("release_id", ["../escape", "/absolute", "UPPER", "name/child"])
+def test_builder_rejects_unsafe_release_ids(tmp_path: Path, release_id: str) -> None:
+    with pytest.raises(ScienceContractError, match="Release ID"):
+        build_regional_release(
+            _source(),
+            tmp_path / "candidate",
+            release_id=release_id,
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            tippecanoe_path=Path("missing"),
+            decode_path=Path("missing"),
+            pmtiles_path=Path("missing"),
+            tippecanoe_source_archive_path=Path("missing"),
+            tippecanoe_build_receipt_path=Path("missing"),
+            pmtiles_distribution_asset_path=Path("missing"),
+            pmtiles_distribution_platform="darwin-arm64",
+            python_lock_path=Path("missing"),
+            build_environment_id="test-unsafe-id",
+            source_revision="a" * 40,
         )
