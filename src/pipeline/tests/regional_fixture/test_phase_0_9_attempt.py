@@ -81,6 +81,12 @@ def test_common_lineage_records_every_unavailable_numerical_control() -> None:
 
     assert lineage["baseline"]["monthlyObjectCount"] == 240
     assert lineage["baseline"]["calendarDayWeight"] == 7305
+    assert lineage["baseline"]["sourceVariable"] == "sla"
+    assert lineage["baseline"]["derivedVariable"] == "adt"
+    assert lineage["baseline"]["equation"] == (
+        "mean_1995_2014(ADT_GOCO06S) = "
+        "day_weighted_mean(monthly_SLA) + MDT_GOCO06S"
+    )
     assert lineage["geoid"]["status"] == "blocked"
     assert lineage["geoid"]["target"]["earthGravityConstant"] is None
     assert lineage["terrain"]["requiredLayers"] == ["DEM", "EDM", "FLM", "HEM", "WBM"]

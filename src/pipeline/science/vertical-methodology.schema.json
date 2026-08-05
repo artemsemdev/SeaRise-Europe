@@ -52,13 +52,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "productId", "variable", "units", "sourceSurface", "sourceGeoidModelTideSystem",
+        "sourceProductId", "sourceVariable", "derivedVariable", "units", "sourceSurface", "sourceGeoidModelTideSystem",
         "supportingMdtProductId", "supportingMdtReferencePeriod", "referencePeriod",
         "geoidTransformation", "equation"
       ],
       "properties": {
-        "productId": { "const": "SEALEVEL_EUR_PHY_L4_MY_008_068" },
-        "variable": { "const": "adt" },
+        "sourceProductId": { "const": "SEALEVEL_EUR_PHY_L4_MY_008_068" },
+        "sourceVariable": { "const": "sla" },
+        "derivedVariable": { "const": "adt" },
         "units": { "const": "m" },
         "sourceSurface": { "const": "GOCO06S geoid" },
         "sourceGeoidModelTideSystem": { "const": "zero_tide" },

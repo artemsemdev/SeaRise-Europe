@@ -97,6 +97,7 @@ def build_blocked_phase_0_9_attempt(
     terrain = _source(source_lock, "copernicus-dem-glo30")
     terrain_asset = _asset(terrain, "regional-control-set")
     mapping = contracts.source_semantics["projection"]["mapping"]
+    baseline_method = contracts.vertical_methodology["baseline"]
 
     contract_paths = (
         "src/pipeline/science/source-semantics.json",
@@ -163,14 +164,21 @@ def build_blocked_phase_0_9_attempt(
                 "extrapolation": "none",
             },
             "baseline": {
+                "sourceProductId": baseline_method["sourceProductId"],
                 "slaSourceId": sla["id"],
                 "version": sla["version"],
+                "sourceVariable": baseline_method["sourceVariable"],
+                "derivedVariable": baseline_method["derivedVariable"],
+                "supportingMdtProductId": baseline_method["supportingMdtProductId"],
                 "manifestSha256": sla_asset["objectSet"]["manifestSha256"],
                 "payloadSha256": sla_asset["objectSet"]["payloadSha256"],
                 "mdtSha256": mdt_asset["sha256"],
                 "referencePeriod": {"startInclusive": "1995-01-01", "endExclusive": "2015-01-01"},
                 "monthlyObjectCount": 240,
                 "calendarDayWeight": 7305,
+                "equation": contracts.source_semantics["verticalInputs"]["baseline"][
+                    "equation"
+                ],
             },
             "geoid": receipt["geoid"],
             "terrain": {

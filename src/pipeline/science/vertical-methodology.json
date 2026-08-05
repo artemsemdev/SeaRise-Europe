@@ -12,8 +12,9 @@
     "tideSystem": "tide_free"
   },
   "baseline": {
-    "productId": "SEALEVEL_EUR_PHY_L4_MY_008_068",
-    "variable": "adt",
+    "sourceProductId": "SEALEVEL_EUR_PHY_L4_MY_008_068",
+    "sourceVariable": "sla",
+    "derivedVariable": "adt",
     "units": "m",
     "sourceSurface": "GOCO06S geoid",
     "sourceGeoidModelTideSystem": "zero_tide",
