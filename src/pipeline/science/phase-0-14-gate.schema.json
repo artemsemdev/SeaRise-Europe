@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/phase-0-14-gate.schema.json",
+  "title": "Phase 0.14 final scientific no-go gate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "gateId", "issue", "recordStatus",
+    "recordedAt", "historicalGateBindings", "dependencyBindings",
+    "automatedMethodologyRecommendation", "authoritativeScientificDisposition",
+    "phase0Disposition", "decisionReason", "shortCircuit", "attempts",
+    "requiredReviews", "automation", "deliverables", "phase1"
+  ],
+  "properties": {
+    "$schema": { "const": "./phase-0-14-gate.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "gateId": { "const": "phase-0.14-final-scientific-no-go" },
+    "issue": { "const": 98 },
+    "recordStatus": { "enum": ["draft", "final"] },
+    "recordedAt": { "type": "string", "format": "date" },
+    "historicalGateBindings": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/boundArtifact" }
+    },
+    "dependencyBindings": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/dependency" }
+    },
+    "automatedMethodologyRecommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "authority", "disposition"],
+      "properties": {
+        "status": { "const": "complete" },
+        "authority": { "const": "automated-methodology-analysis" },
+        "disposition": { "const": "rejected" }
+      }
+    },
+    "authoritativeScientificDisposition": { "const": "blocked" },
+    "phase0Disposition": { "const": "complete-with-no-go" },
+    "decisionReason": { "type": "string", "minLength": 1 },
+    "shortCircuit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "triggerIssue", "reasonCodes", "sourcePayloadsOpened"],
+      "properties": {
+        "stage": { "const": "scientific-preflight" },
+        "triggerIssue": { "const": 95 },
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "sourcePayloadsOpened": { "const": false }
+      }
+    },
+    "attempts": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": { "$ref": "#/$defs/stoppedAttempt" }
+    },
+    "requiredReviews": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scientificData", "dataLicence", "productScope", "engineering", "crossEnvironment"],
+      "properties": {
+        "scientificData": { "$ref": "#/$defs/review" },
+        "dataLicence": { "$ref": "#/$defs/review" },
+        "productScope": { "$ref": "#/$defs/review" },
+        "engineering": { "$ref": "#/$defs/review" },
+        "crossEnvironment": { "$ref": "#/$defs/review" }
+      }
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "canApproveScience", "canActAsIndependentReviewer"],
+      "properties": {
+        "status": { "enum": ["passed", "failed"] },
+        "canApproveScience": { "const": false },
+        "canActAsIndependentReviewer": { "const": false }
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scientificArrays", "analysisCogs", "visualPmtiles", "geoParquet", "statistics", "releaseReceipts"],
+      "properties": {
+        "scientificArrays": { "const": [] },
+        "analysisCogs": { "const": [] },
+        "visualPmtiles": { "const": [] },
+        "geoParquet": { "const": [] },
+        "statistics": { "const": [] },
+        "releaseReceipts": { "const": [] }
+      }
+    },
+    "phase1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "unlocked", "reason"],
+      "properties": {
+        "status": { "const": "locked" },
+        "unlocked": { "const": false },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "boundArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "immutable"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "immutable": { "const": true }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "disposition", "reasonCode", "binding"],
+      "properties": {
+        "issue": { "enum": [94, 95, 96, 97] },
+        "disposition": { "const": "blocked" },
+        "reasonCode": { "type": "string", "minLength": 1 },
+        "binding": { "$ref": "#/$defs/dependencyBinding" }
+      }
+    },
+    "dependencyBinding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "expectedPath", "path", "sha256"],
+          "properties": {
+            "status": { "const": "pending" },
+            "expectedPath": { "type": "string", "minLength": 1 },
+            "path": { "const": null },
+            "sha256": { "const": null }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "expectedPath", "path", "sha256"],
+          "properties": {
+            "status": { "const": "bound" },
+            "expectedPath": { "type": "string", "minLength": 1 },
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "stoppedAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "horizon", "status", "failureStage", "reasonCodes", "scientificClassValues", "artifacts", "statistics"],
+      "properties": {
+        "scenario": { "enum": ["ssp1-26", "ssp2-45", "ssp5-85"] },
+        "horizon": { "enum": [2030, 2050, 2100] },
+        "status": { "const": "stopped-before-array" },
+        "failureStage": { "const": "scientific-preflight" },
+        "reasonCodes": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "scientificClassValues": { "const": [] },
+        "artifacts": { "const": [] },
+        "statistics": { "const": null }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": { "const": "pending" },
+        "evidence": { "const": null }
+      }
+    }
+  }
+}
