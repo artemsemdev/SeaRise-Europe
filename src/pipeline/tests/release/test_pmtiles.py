@@ -35,14 +35,29 @@ def test_vector_toolchain_fails_closed_when_binary_is_absent(tmp_path: Path) -> 
             tippecanoe_path=missing,
             decode_path=missing,
             pmtiles_path=missing,
+            tippecanoe_source_archive_path=missing,
+            tippecanoe_build_receipt_path=missing,
+            pmtiles_distribution_asset_path=missing,
+            pmtiles_distribution_platform="darwin-arm64",
             contract=contract(),
         )
+
+
+TOOL_ENVIRONMENT = (
+    "SEARISE_TIPPECANOE",
+    "SEARISE_TIPPECANOE_DECODE",
+    "SEARISE_PMTILES",
+    "SEARISE_TIPPECANOE_SOURCE",
+    "SEARISE_TIPPECANOE_BUILD_RECEIPT",
+    "SEARISE_PMTILES_ASSET",
+    "SEARISE_VECTOR_PLATFORM",
+)
 
 
 @pytest.mark.skipif(
     not all(
         os.environ.get(name)
-        for name in ("SEARISE_TIPPECANOE", "SEARISE_TIPPECANOE_DECODE", "SEARISE_PMTILES")
+        for name in TOOL_ENVIRONMENT
     ),
     reason="set the three pinned vector-tool paths for the external integration",
 )
@@ -57,6 +72,12 @@ def test_visual_pmtiles_is_byte_deterministic_and_property_exact(tmp_path: Path)
         "tippecanoe_path": Path(os.environ["SEARISE_TIPPECANOE"]),
         "decode_path": Path(os.environ["SEARISE_TIPPECANOE_DECODE"]),
         "pmtiles_path": Path(os.environ["SEARISE_PMTILES"]),
+        "tippecanoe_source_archive_path": Path(os.environ["SEARISE_TIPPECANOE_SOURCE"]),
+        "tippecanoe_build_receipt_path": Path(
+            os.environ["SEARISE_TIPPECANOE_BUILD_RECEIPT"]
+        ),
+        "pmtiles_distribution_asset_path": Path(os.environ["SEARISE_PMTILES_ASSET"]),
+        "pmtiles_distribution_platform": os.environ["SEARISE_VECTOR_PLATFORM"],
     }
 
     first_evidence = write_visual_pmtiles(source, layer, first, contract=contract(), **tools)
@@ -66,4 +87,8 @@ def test_visual_pmtiles_is_byte_deterministic_and_property_exact(tmp_path: Path)
     assert first_evidence.sha256 == second_evidence.sha256
     assert first_evidence.source_feature_count == 3054
     assert first_evidence.decoded_fragment_count >= first_evidence.source_feature_count
+    assert first_evidence.metadata["searise"]["method_version"] == (
+        "ar6-regional-projection-v1"
+    )
+    assert "generator_options" not in first_evidence.metadata
     assert first_evidence.byte_size <= contract()["budgets"]["pmtilesTotalBytes"] / 9

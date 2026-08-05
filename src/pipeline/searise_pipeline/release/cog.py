@@ -47,6 +47,8 @@ def write_analysis_cog(
     values = contract["values"]
     cog = contract["artifacts"]["cog"]
     path.parent.mkdir(parents=True, exist_ok=True)
+    if not np.any(layer.valid):
+        raise ScienceContractError("AR6 analysis layer cannot be entirely nodata")
     bands = np.stack(
         [np.flipud(layer.lower_mm), np.flipud(layer.central_mm), np.flipud(layer.upper_mm)]
     )
@@ -69,6 +71,7 @@ def write_analysis_cog(
         blocksize=cog["blockSize"],
         compress=cog["compression"],
         predictor=cog["predictor"],
+        overview_count=cog["overviewCount"],
         overview_resampling=cog["overviewResampling"],
     ) as dataset:
         dataset.write(bands)
@@ -79,6 +82,12 @@ def write_analysis_cog(
             NATIVE_RESOLUTION_DEGREES=str(grid["nativeResolutionDegrees"]),
             SCALE_TO_METRES=str(values["scaleToMetres"]),
             SCENARIO=layer.scenario,
+            SOURCE_ARCHIVE_SHA256=contract["source"]["archiveSha256"],
+            SOURCE_MEMBER_SHA256=layer.member_sha256,
+            SOURCE_RELEASE=contract["source"]["version"],
+            METHOD_VERSION="ar6-regional-projection-v1",
+            CONFIDENCE=values["confidence"],
+            SCIENTIFIC_DISPOSITION=contract["scientificDisposition"],
             UNITS=values["storageUnits"],
         )
     valid, errors, warnings = cog_validate(path, strict=True, quiet=True)
@@ -86,6 +95,7 @@ def write_analysis_cog(
         raise ScienceContractError(
             f"Generated AR6 COG is invalid: errors={errors}, warnings={warnings}"
         )
+    validate_analysis_cog(path, layer, contract=contract)
     valid_cells = int(layer.valid.sum())
     return CogEvidence(
         path=f"analysis/{layer.scenario}/{layer.horizon}.tif",
@@ -109,6 +119,33 @@ def validate_analysis_cog(
     grid = contract["grid"]
     values = contract["values"]
     with rasterio.open(path) as dataset:
+        expected_transform = from_origin(
+            grid["bounds"][0],
+            grid["bounds"][3],
+            grid["nativeResolutionDegrees"],
+            grid["nativeResolutionDegrees"],
+        )
+        image_structure = dataset.tags(ns="IMAGE_STRUCTURE")
+        expected_image_structure = {
+            "COMPRESSION": contract["artifacts"]["cog"]["compression"],
+            "INTERLEAVE": "PIXEL",
+            "LAYOUT": "COG",
+            "PREDICTOR": str(contract["artifacts"]["cog"]["predictor"]),
+        }
+        expected_tags = {
+            "BASELINE": values["baseline"],
+            "HORIZON": str(layer.horizon),
+            "NATIVE_RESOLUTION_DEGREES": str(grid["nativeResolutionDegrees"]),
+            "SCALE_TO_METRES": str(values["scaleToMetres"]),
+            "SCENARIO": layer.scenario,
+            "SOURCE_ARCHIVE_SHA256": contract["source"]["archiveSha256"],
+            "SOURCE_MEMBER_SHA256": layer.member_sha256,
+            "SOURCE_RELEASE": contract["source"]["version"],
+            "METHOD_VERSION": "ar6-regional-projection-v1",
+            "CONFIDENCE": values["confidence"],
+            "SCIENTIFIC_DISPOSITION": contract["scientificDisposition"],
+            "UNITS": values["storageUnits"],
+        }
         if (
             dataset.count != 3
             or dataset.width != grid["width"]
@@ -116,6 +153,14 @@ def validate_analysis_cog(
             or dataset.dtypes != ("int16", "int16", "int16")
             or dataset.nodata != values["nodata"]
             or dataset.descriptions != tuple(contract["artifacts"]["cog"]["bands"])
+            or dataset.crs is None
+            or dataset.crs.to_string() != grid["crs"]
+            or dataset.transform != expected_transform
+            or list(dataset.bounds) != grid["bounds"]
+            or dataset.block_shapes != [(256, 256)] * 3
+            or image_structure != expected_image_structure
+            or dataset.overviews(1) != contract["artifacts"]["cog"]["overviewFactors"]
+            or any(dataset.tags().get(key) != value for key, value in expected_tags.items())
         ):
             raise ScienceContractError("AR6 analysis COG schema differs from the contract")
         expected = np.stack(
