@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/geography-controls-v2.json",
+  "title": "SeaRise Europe Phase 0.8 geography controls",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "predicate", "source", "controls", "review"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"const": 2},
+    "contractId": {"const": "phase-0.8-geography-controls"},
+    "predicate": {"const": "covers"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "version", "asset", "role"],
+      "properties": {
+        "sourceId": {"const": "geonames-cities15000"},
+        "version": {"const": "2026-08-04"},
+        "asset": {"const": "cities15000.zip"},
+        "role": {"const": "independent named-place controls; not used to construct either geometry"}
+      }
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 25,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "recordId", "kind", "longitude", "latitude", "support", "coastal"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "recordId": {"type": "integer", "minimum": 1},
+          "kind": {"type": "string", "minLength": 1},
+          "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+          "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+          "support": {"type": "boolean"},
+          "coastal": {"type": "boolean"}
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRole", "issue"],
+      "properties": {
+        "status": {"const": "pending-external"},
+        "requiredRole": {"const": "product owner"},
+        "issue": {"const": "https://github.com/artemsemdev/SeaRise-Europe/issues/84"}
+      }
+    }
+  }
+}

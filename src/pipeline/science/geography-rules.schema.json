@@ -1,31 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://searise-europe.example/schemas/geography-rules-v1.json",
-  "title": "SeaRise Europe candidate geography rules",
+  "$id": "https://searise-europe.example/schemas/geography-rules-v2.json",
+  "title": "SeaRise Europe Phase 0.8 geography rules",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "contractId", "predicate", "support", "coastal", "connectivity", "publicationGate"],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
-    "contractId": { "const": "phase-0.2-geography-rules" },
+    "schemaVersion": { "const": 2 },
+    "contractId": { "const": "phase-0.8-geography-rules" },
     "predicate": { "const": "covers" },
-    "support": { "$ref": "#/$defs/geometry" },
+    "support": { "$ref": "#/$defs/support" },
     "coastal": { "$ref": "#/$defs/coastal" },
     "connectivity": { "$ref": "#/$defs/connectivity" },
     "publicationGate": { "$ref": "#/$defs/gate" }
   },
   "$defs": {
-    "nonEmpty": { "type": "string", "minLength": 1 },
+    "text": { "type": "string", "minLength": 1 },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "status": { "const": "approximation" },
     "review": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "requiredRole"],
+      "required": ["status", "requiredRole", "issue"],
       "properties": {
-        "status": { "const": "pending" },
-        "requiredRole": { "enum": ["product owner", "scientific/data reviewer"] }
+        "status": { "const": "pending-external" },
+        "requiredRole": { "enum": ["product owner", "scientific/data reviewer"] },
+        "issue": { "const": "https://github.com/artemsemdev/SeaRise-Europe/issues/84" }
       }
     },
     "source": {
@@ -38,40 +38,59 @@
         "assetId": { "enum": ["admin-0-countries", "ocean"] }
       }
     },
-    "geometry": {
+    "decision": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "version", "status", "path", "sha256", "source", "recipe", "outcomes", "review"],
+      "required": ["status", "reason", "evidence"],
+      "properties": {
+        "status": { "const": "selected-for-external-review" },
+        "reason": { "$ref": "#/$defs/text" },
+        "evidence": { "const": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json" }
+      }
+    },
+    "support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "status", "path", "sha256", "source", "recipe", "outcomes", "decision", "review"],
       "properties": {
         "id": { "const": "europe-support" },
-        "version": { "const": "natural-earth-5.1.1-approximation-v1" },
-        "status": { "$ref": "#/$defs/status" },
+        "version": { "const": "natural-earth-5.1.1-explicit-scope-v2" },
+        "status": { "const": "selected-scope-approximation" },
         "path": { "const": "data/geometry/europe.geojson" },
         "sha256": { "$ref": "#/$defs/sha256" },
         "source": { "$ref": "#/$defs/source" },
         "recipe": { "$ref": "#/$defs/supportRecipe" },
         "outcomes": { "$ref": "#/$defs/outcomes" },
+        "decision": { "$ref": "#/$defs/decision" },
         "review": { "$ref": "#/$defs/review" }
       }
     },
     "supportRecipe": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["filter", "selectedFeatureCount", "clipBoundsWgs84", "metricCrs", "legacyBufferDegrees", "legacySimplifyDegrees", "coordinatePrecision"],
+      "required": ["selectionAttribute", "includedAdmin0A3", "selectedFeatureCount", "clipBoundsWgs84", "metricCrs", "topologyRepair", "precisionMetres", "coastlineToleranceMetres", "bufferQuadSegments", "simplifyMetres", "coordinatePrecision"],
       "properties": {
-        "filter": { "const": "CONTINENT == 'Europe' AND NAME != 'Russia'" },
+        "selectionAttribute": { "const": "ADM0_A3" },
+        "includedAdmin0A3": {
+          "type": "array",
+          "minItems": 50,
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[A-Z0-9]{3}$" }
+        },
         "selectedFeatureCount": { "const": 50 },
         "clipBoundsWgs84": {
           "type": "array",
           "prefixItems": [{ "const": -30 }, { "const": 30 }, { "const": 45 }, { "const": 75 }],
-          "items": false,
-          "minItems": 4,
-          "maxItems": 4
+          "items": false
         },
         "metricCrs": { "const": "EPSG:3035" },
-        "legacyBufferDegrees": { "const": 0.02 },
-        "legacySimplifyDegrees": { "const": 0.02 },
-        "coordinatePrecision": { "const": 4 }
+        "topologyRepair": { "const": "make-valid-polygonal-union-set-precision" },
+        "precisionMetres": { "const": 1 },
+        "coastlineToleranceMetres": { "const": 1000 },
+        "bufferQuadSegments": { "const": 8 },
+        "simplifyMetres": { "const": 500 },
+        "coordinatePrecision": { "const": 6 }
       }
     },
     "outcomes": {
@@ -79,68 +98,92 @@
       "additionalProperties": false,
       "required": ["included", "excluded"],
       "properties": {
-        "included": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmpty" }, "uniqueItems": true },
-        "excluded": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmpty" }, "uniqueItems": true }
+        "included": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+        "excluded": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } }
       }
     },
     "coastal": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "version", "status", "path", "sha256", "source", "recipe", "canonicalSourceComparison", "review"],
+      "required": ["id", "version", "status", "role", "hazardExtentClaim", "path", "sha256", "source", "recipe", "canonicalSourceComparison", "decision", "review"],
       "properties": {
         "id": { "const": "coastal-analysis-zone" },
-        "version": { "const": "natural-earth-5.1.1-25km-approximation-v1" },
-        "status": { "$ref": "#/$defs/status" },
+        "version": { "const": "natural-earth-5.1.1-25km-scope-v2" },
+        "status": { "const": "selected-scope-approximation" },
+        "role": { "const": "product-eligibility-only" },
+        "hazardExtentClaim": { "const": false },
         "path": { "const": "data/geometry/coastal_analysis_zone.geojson" },
         "sha256": { "$ref": "#/$defs/sha256" },
         "source": { "$ref": "#/$defs/source" },
         "recipe": { "$ref": "#/$defs/coastalRecipe" },
         "canonicalSourceComparison": { "$ref": "#/$defs/comparison" },
+        "decision": { "$ref": "#/$defs/decision" },
         "review": { "$ref": "#/$defs/review" }
       }
     },
     "coastalRecipe": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["oceanClipBoundsWgs84", "metricCrs", "bufferMetres", "operation", "legacySimplifyDegrees", "coordinatePrecision"],
+      "required": ["oceanClipBoundsWgs84", "metricCrs", "bufferMetres", "bufferQuadSegments", "operation", "topologyRepair", "precisionMetres", "simplifyMetres", "coordinatePrecision", "containmentInsetMetres", "serializationContainmentInsetDegrees", "containmentInvariant"],
       "properties": {
         "oceanClipBoundsWgs84": {
           "type": "array",
           "prefixItems": [{ "const": -35 }, { "const": 28 }, { "const": 48 }, { "const": 77 }],
-          "items": false,
-          "minItems": 4,
-          "maxItems": 4
+          "items": false
         },
         "metricCrs": { "const": "EPSG:3035" },
         "bufferMetres": { "const": 25000 },
-        "operation": { "const": "intersection(buffer(ocean, 25000), europe-support)" },
-        "legacySimplifyDegrees": { "const": 0.02 },
-        "coordinatePrecision": { "const": 4 }
+        "bufferQuadSegments": { "const": 8 },
+        "operation": { "const": "intersection(buffer(ocean,25000m),europe-support)" },
+        "topologyRepair": { "const": "make-valid-polygonal-union-set-precision" },
+        "precisionMetres": { "const": 1 },
+        "simplifyMetres": { "const": 500 },
+        "coordinatePrecision": { "const": 6 },
+        "containmentInsetMetres": { "const": 2 },
+        "serializationContainmentInsetDegrees": { "const": 0.00001 },
+        "containmentInvariant": { "const": "support.covers(coastal)" }
       }
     },
     "comparison": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "version", "status", "reason"],
+      "required": ["sourceId", "version", "doi", "licenceStatus", "validationStatus", "publishedInlandDepthMetres", "selectionStatus", "reason"],
       "properties": {
         "sourceId": { "const": "copernicus-coastal-zones-2018" },
         "version": { "const": "V1-2018" },
-        "status": { "const": "blocked" },
-        "reason": { "$ref": "#/$defs/nonEmpty" }
+        "doi": { "const": "10.2909/205e2db2-4e35-4b1b-bf84-271c4a82248c" },
+        "licenceStatus": { "const": "full-open-free-with-attribution" },
+        "validationStatus": { "const": "not-yet-validated" },
+        "publishedInlandDepthMetres": { "const": 10000 },
+        "selectionStatus": { "const": "rejected-as-hazard-or-connectivity-geometry" },
+        "reason": { "$ref": "#/$defs/text" }
       }
     },
     "connectivity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "status", "neighbourhood", "seedRule", "traversalRule", "nodataRule", "publicationRule", "review"],
+      "required": ["id", "status", "methodologyId", "neighbourhood", "verticalInput", "seedRule", "traversalRule", "barrierRule", "nodataRule", "tileEdgeRule", "publicationRule", "controls", "review"],
       "properties": {
-        "id": { "const": "ocean-connected-eight-neighbour-v1" },
-        "status": { "const": "candidate" },
+        "id": { "const": "ocean-seeded-eight-neighbour-v1" },
+        "status": { "const": "selected-for-external-review" },
+        "methodologyId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
         "neighbourhood": { "const": 8 },
-        "seedRule": { "const": "eligible cells intersecting the pinned ocean geometry at the analysis boundary" },
-        "traversalRule": { "const": "flood-fill only through edge- or corner-adjacent eligible cells" },
-        "nodataRule": { "const": "nodata cells are barriers" },
-        "publicationRule": { "const": "report differences from unfiltered classification; do not select until scientific review" },
+        "verticalInput": { "const": "confidently-exposed interval cells only; connectivity never changes C_low or C_high" },
+        "seedRule": { "const": "eligible land cells sharing an edge or corner with a pinned GLO-30 WBM ocean cell" },
+        "traversalRule": { "const": "breadth-first flood fill through edge- or corner-adjacent eligible land cells" },
+        "barrierRule": { "const": "not-exposed, uncertain-threshold, nodata, rejected-quality, and explicit barrier cells are not traversable" },
+        "nodataRule": { "const": "nodata is a barrier and is never bridged" },
+        "tileEdgeRule": { "const": "stitch the complete analysis mosaic before traversal; tile edges are not seeds and a missing neighbour makes edge connectivity unavailable" },
+        "publicationRule": { "const": "publish connected land cells only and report pre/post cell counts; this is a screening control, not hydrodynamic modelling" },
+        "controls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "const": "src/pipeline/science/connectivity-controls.json" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
         "review": { "$ref": "#/$defs/review" }
       }
     },
@@ -152,9 +195,9 @@
         "status": { "const": "blocked" },
         "blockingDecisions": {
           "type": "array",
-          "minItems": 1,
-          "items": { "enum": ["supported-geography-approval", "canonical-coastal-source", "connectivity-review"] },
-          "uniqueItems": true
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["product-owner-geography-approval", "independent-connectivity-review"] }
         }
       }
     }
