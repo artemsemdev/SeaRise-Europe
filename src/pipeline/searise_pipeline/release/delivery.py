@@ -130,7 +130,7 @@ def create_delivery_report(
     ):
         raise ScienceContractError("Browser delivery harness differs from the contract")
     trace = load_json(trace_path)
-    binding = candidate_binding(candidate)
+    binding = candidate_binding(candidate, contract=contract)
     manifest = load_json(candidate / "manifest.json")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, list):

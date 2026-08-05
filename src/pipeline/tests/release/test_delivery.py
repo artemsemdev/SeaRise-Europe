@@ -13,6 +13,7 @@ import pytest
 import searise_pipeline.release.delivery as delivery
 from searise_pipeline.science import ScienceContractError
 
+from .test_evidence import _candidate, _seal
 from .test_source_fixture import contract
 
 COG_PATH = "analysis/ssp2-45/2050.tif"
@@ -81,7 +82,12 @@ def _sample(*, cold: bool, grid_bytes: int) -> dict[str, object]:
     }
 
 
-def _inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+def _inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    mock_binding: bool = True,
+):
     release = copy.deepcopy(contract())
     harness = tmp_path / "measure-ar6-release.mjs"
     harness.write_text("// measured browser harness\n", encoding="utf-8")
@@ -163,7 +169,12 @@ def _inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             "fullCleanBuildDurationSeconds": 10,
         },
     )
-    monkeypatch.setattr(delivery, "candidate_binding", lambda _: BINDING)
+    if mock_binding:
+        monkeypatch.setattr(
+            delivery,
+            "candidate_binding",
+            lambda _, *, contract: BINDING,
+        )
     return release, candidate, trace, trace_path, timing_path, harness
 
 
@@ -180,6 +191,80 @@ def test_observed_browser_trace_passes_declared_budgets(
     assert report["rangeRequestCount"] == 1
     assert report["coldTransferBytes"] == trace["coldLookupSamples"][0]["transferBytes"]
     assert report["browserHeapBytes"] == 300
+
+
+def test_delivery_report_uses_real_contract_aware_candidate_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    release, fixture, trace, trace_path, timing_path, harness = _inputs(
+        tmp_path,
+        monkeypatch,
+        mock_binding=False,
+    )
+    candidate = tmp_path / "real-candidate"
+    _candidate(candidate)
+    manifest_path = candidate / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    replacements = [
+        (manifest["artifacts"][0], COG_PATH),
+        (manifest["artifacts"][1], GRID_PATH),
+    ]
+    for record, relative in replacements:
+        previous = candidate / record["path"]
+        replacement = candidate / relative
+        replacement.parent.mkdir(parents=True, exist_ok=True)
+        previous.replace(replacement)
+        record["path"] = relative
+    (candidate / GRID_PATH).write_bytes((fixture / GRID_PATH).read_bytes())
+    for record, relative in replacements:
+        artifact = candidate / relative
+        record["byteSize"] = artifact.stat().st_size
+        record["sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    _write(manifest_path, manifest)
+    _write(
+        candidate / "build-evidence.json",
+        {
+            "lookupGoldenEvidence": {
+                "sha256": "1" * 64,
+                "browserBenchmarkTarget": TARGET,
+            }
+        },
+    )
+    _seal(candidate)
+
+    binding = delivery.candidate_binding(candidate, contract=release)
+    artifact_byte_sizes = {item["path"]: item["byteSize"] for item in manifest["artifacts"]}
+    trace["candidate"] = {
+        "releaseId": binding["releaseId"],
+        "manifestSha256": binding["manifestSha256"],
+        "artifactHashes": binding["artifactHashes"],
+        "artifactByteSizes": artifact_byte_sizes,
+    }
+    cog_bytes = artifact_byte_sizes[COG_PATH]
+    grid_bytes = artifact_byte_sizes[GRID_PATH]
+    for sample in trace["coldLookupSamples"]:
+        cog_request = next(item for item in sample["requests"] if item["kind"] == "cog")
+        cog_request["range"] = f"bytes=0-{cog_bytes - 1}"
+        cog_request["contentRange"] = f"bytes 0-{cog_bytes - 1}/{cog_bytes}"
+        cog_request["responseBytes"] = cog_bytes
+        grid_request = next(item for item in sample["requests"] if item["kind"] == "source-grid")
+        grid_request["responseBytes"] = grid_bytes
+        sample["transferBytes"] = cog_bytes + grid_bytes
+    _write(trace_path, trace)
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    timing["candidate"] = binding
+    _write(timing_path, timing)
+
+    report = delivery.create_delivery_report(
+        candidate,
+        trace_path,
+        harness,
+        timing_path,
+        contract=release,
+    )
+
+    assert report["status"] == "passed"
+    assert report["candidate"] == binding
 
 
 @pytest.mark.parametrize(
