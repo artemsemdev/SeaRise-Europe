@@ -356,6 +356,21 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             macos,
         )
         self.assertIn("test -s /tmp/delivery-report-macos-arm64.json", macos)
+        self.assertIn('.status == "passed"', macos)
+        self.assertIn(
+            '.candidate.releaseId == "phase-0r-ar6-v1"',
+            macos,
+        )
+        self.assertIn(
+            '.trace.path == "browser-trace-macos-arm64.json"',
+            macos,
+        )
+        self.assertIn(
+            '.buildTiming.path == "build-timing-macos-arm64.json"',
+            macos,
+        )
+        self.assertIn('.profiles.hardware.architecture == "arm64"', macos)
+        self.assertIn('.profiles.browser.engine == "Chromium"', macos)
         self.assertIn("            /tmp/browser-trace-macos-arm64.json", macos)
         self.assertLess(
             macos.index("test -s /tmp/browser-trace-macos-arm64.json"),

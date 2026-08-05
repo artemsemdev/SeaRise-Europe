@@ -656,6 +656,15 @@ jobs:
             --build-timing /tmp/build-timing-macos-arm64.json \
             --output /tmp/delivery-report-macos-arm64.json
           test -s /tmp/delivery-report-macos-arm64.json
+          jq -e '
+            .schemaVersion == 1 and
+            .status == "passed" and
+            .candidate.releaseId == "phase-0r-ar6-v1" and
+            .trace.path == "browser-trace-macos-arm64.json" and
+            .buildTiming.path == "build-timing-macos-arm64.json" and
+            .profiles.hardware.architecture == "arm64" and
+            .profiles.browser.engine == "Chromium"
+          ' /tmp/delivery-report-macos-arm64.json
 
       - name: Summarize candidate
         run: |
