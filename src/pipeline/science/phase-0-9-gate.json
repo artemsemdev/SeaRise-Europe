@@ -10,7 +10,7 @@
   "decisionReason": "All nine exact scenario/horizon attempts stop before array creation because mandatory numerical, control, reproducibility, golden-vector, and independent-review evidence is unavailable.",
   "attemptEvidence": {
     "path": "src/pipeline/science/evidence/phase-0-9-regional-attempt.json",
-    "sha256": "4e305b9190623cd17268361a8b735e2a7b5f2c1003397e5046f75b32f08db8b6",
+    "sha256": "9e158807a36cc5f445f0fecb955975dabb5119496d680063a724b18743524636",
     "status": "preflight-blocked"
   },
   "attemptSummary": {

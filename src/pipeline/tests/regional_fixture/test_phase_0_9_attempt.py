@@ -65,6 +65,13 @@ def test_every_combination_stops_before_arrays_classes_or_artifacts() -> None:
 
     assert evidence["syntheticScientificInputsUsed"] is False
     assert evidence["outputs"] == []
+    assert evidence["sourceAndLicence"]["review"] == (
+        "project-registry-evidence-independent-licence-review-pending"
+    )
+    assert all(
+        source["registryRedistributionStatus"] == "approved"
+        for source in evidence["sourceAndLicence"]["usedSources"]
+    )
     assert [item["id"] for item in evidence["blockers"]] == list(BLOCKER_IDS)
     for attempt in evidence["attempts"]:
         assert attempt["status"] == "blocked-before-array"
