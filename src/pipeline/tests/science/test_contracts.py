@@ -55,6 +55,16 @@ def test_vertical_methodology_binds_reference_epoch_and_uncertainty() -> None:
         "aggregation": "duration-weighted mean over complete source intervals",
         "missingIntervals": "nodata",
     }
+    assert methodology["baseline"]["sourceProductId"] == "SEALEVEL_EUR_PHY_L4_MY_008_068"
+    assert methodology["baseline"]["sourceVariable"] == "sla"
+    assert methodology["baseline"]["derivedVariable"] == "adt"
+    assert methodology["baseline"]["supportingMdtProductId"] == (
+        "SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070"
+    )
+    assert methodology["baseline"]["equation"] == (
+        "B_EGM2008 = mean_1995_2014(ADT_GOCO06S) + "
+        "N_GOCO06S_tide_free - N_EGM2008_tide_free"
+    )
     assert methodology["projection"]["quantiles"] == {
         "lower": 0.167,
         "central": 0.5,
