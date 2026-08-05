@@ -182,6 +182,11 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
     return result
 
 
+def release_only_outputs() -> dict[str, bool]:
+    """Route a manual full-source evidence run without fanning out runtime CI."""
+    return {name: name in {"release", "heavy"} for name in OUTPUTS}
+
+
 def parse_name_status(output: str) -> list[str]:
     """Include both sides of renames/copies so removed ownership is routed."""
     paths: list[str] = []
@@ -228,6 +233,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--all", action="store_true", help="Enable every route")
+    source.add_argument(
+        "--release-only",
+        action="store_true",
+        help="Enable only the pinned release-toolchain route",
+    )
     source.add_argument("--changed", nargs="+", help="Explicit repository paths")
     source.add_argument("--base", help="Git base revision for BASE...HEAD")
     parser.add_argument("--head", default="HEAD")
@@ -235,8 +245,17 @@ def main() -> int:
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
 
-    paths = [] if args.all else (args.changed or git_changed_paths(args.base, args.head, args.repo_root))
-    outputs = {name: True for name in OUTPUTS} if args.all else classify_paths(paths)
+    paths = (
+        []
+        if args.all or args.release_only
+        else (args.changed or git_changed_paths(args.base, args.head, args.repo_root))
+    )
+    if args.all:
+        outputs = {name: True for name in OUTPUTS}
+    elif args.release_only:
+        outputs = release_only_outputs()
+    else:
+        outputs = classify_paths(paths)
     if args.github_output:
         write_github_outputs(args.github_output, outputs)
     print(json.dumps({"changedPaths": sorted(paths), "outputs": outputs}, indent=2))

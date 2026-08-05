@@ -8,6 +8,7 @@ from scripts.ci.changed_components import (
     OUTPUTS,
     classify_paths,
     parse_name_status,
+    release_only_outputs,
     write_github_outputs,
 )
 
@@ -93,6 +94,19 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["scripts/ci/changed_components.py"])
 
         self.assertTrue(all(outputs[name] for name in OUTPUTS))
+
+    def test_release_evidence_dispatch_skips_unrelated_jobs(self) -> None:
+        outputs = release_only_outputs()
+
+        self.assertTrue(outputs["release"])
+        self.assertTrue(outputs["heavy"])
+        self.assertTrue(
+            all(
+                not outputs[name]
+                for name in OUTPUTS
+                if name not in {"release", "heavy"}
+            )
+        )
 
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])

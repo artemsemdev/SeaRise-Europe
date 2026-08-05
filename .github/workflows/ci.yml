@@ -15,6 +15,11 @@ on:
       - master
       - "integration/**"
   workflow_dispatch:
+    inputs:
+      release_source_revision:
+        description: Exact commit SHA to build for independent AR6 evidence
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -49,8 +54,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
         run: |
-          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" && -n "${RELEASE_SOURCE_REVISION}" ]]; then
+            python3 scripts/ci/changed_components.py --release-only --github-output "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             python3 scripts/ci/changed_components.py --all --github-output "${GITHUB_OUTPUT}"
           else
             python3 scripts/ci/changed_components.py --base "${BASE_SHA}" --head "${HEAD_SHA}" --github-output "${GITHUB_OUTPUT}"
@@ -243,6 +251,121 @@ jobs:
           SEARISE_PYTHON_LOCK: requirements-release.lock
         run: pytest tests/release -q
 
+  ar6-release-evidence:
+    name: Full-source Linux AR6 candidate
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4.3.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_source_revision || github.sha }}
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11.9"
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
+
+      - name: Install immutable Python release environment
+        working-directory: src/pipeline
+        run: |
+          pip install --only-binary=:all: --require-hashes -r requirements-release.lock
+          pip install -e . --no-deps
+
+      - name: Restore verified release tools
+        uses: actions/cache@v4.2.4
+        with:
+          path: ${{ runner.temp }}/ar6-tools
+          key: ar6-evidence-tools-linux-x86_64-${{ hashFiles('src/pipeline/science/ar6-regional-release.json', 'src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64', 'src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json') }}
+
+      - name: Build and verify pinned Tippecanoe
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          mkdir -p "${tool_cache}"
+          if [[ ! -f "${tool_cache}/tippecanoe-2.79.0.tar.gz" ]]; then
+            curl --fail --location --retry 4 --output "${tool_cache}/tippecanoe-2.79.0.tar.gz" https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz
+          fi
+          echo "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d  ${tool_cache}/tippecanoe-2.79.0.tar.gz" | sha256sum -c -
+          echo '8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5  src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64' | sha256sum -c -
+          if [[ ! -x "${tool_cache}/tippecanoe" || ! -x "${tool_cache}/tippecanoe-decode" ]]; then
+            docker build --platform linux/amd64 --tag searise-tippecanoe:2.79.0 \
+              --file src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64 \
+              "${tool_cache}"
+            docker run --platform linux/amd64 --rm \
+              --volume "${tool_cache}:/out" \
+              searise-tippecanoe:2.79.0
+          fi
+          echo "a70bb67594919b0eae357ec4678c77f5c3b9d4a277bd11046e4d9d03b1c6c426  ${tool_cache}/tippecanoe" | sha256sum -c -
+          echo "27d15c0f9394b2b29187312103a94579a9262a365d5b3eb71f1e5677751d2c36  ${tool_cache}/tippecanoe-decode" | sha256sum -c -
+
+      - name: Acquire and verify pinned go-pmtiles
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          if [[ ! -f "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" ]]; then
+            curl --fail --location --retry 4 --output "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles_1.31.2_Linux_x86_64.tar.gz
+          fi
+          echo "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f  ${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" | sha256sum -c -
+          if [[ ! -x "${tool_cache}/pmtiles" ]]; then
+            tar -xzf "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" \
+              -C "${tool_cache}" pmtiles
+          fi
+
+      - name: Acquire and verify locked AR6 archive
+        run: |
+          curl --fail --location --retry 8 --retry-all-errors \
+            --output /tmp/ar6-regional-confidence.zip \
+            https://zenodo.org/api/records/6382554/files/ar6-regional-confidence.zip/content
+          echo 'd3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91  /tmp/ar6-regional-confidence.zip' | sha256sum -c -
+
+      - name: Build full real-source candidate
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          python scripts/science/build_ar6_regional_release.py \
+            --archive /tmp/ar6-regional-confidence.zip \
+            --source-lock src/pipeline/sources/source-lock.json \
+            --source-semantics src/pipeline/science/source-semantics.json \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --lookup-goldens src/pipeline/science/evidence/ar6-lookup-goldens.json \
+            --tippecanoe "${tool_cache}/tippecanoe" \
+            --tippecanoe-decode "${tool_cache}/tippecanoe-decode" \
+            --pmtiles "${tool_cache}/pmtiles" \
+            --tippecanoe-source-archive "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+            --tippecanoe-build-receipt src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json \
+            --pmtiles-distribution-asset "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" \
+            --pmtiles-distribution-platform linux-x86_64 \
+            --python-lock src/pipeline/requirements-release.lock \
+            --build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64" \
+            --release-id phase-0r-ar6-v1 \
+            --output /tmp/phase-0r-ar6-v1 \
+            --failure-gate /tmp/ar6-release-failure.json \
+            --timing-evidence /tmp/build-timing-linux.json
+
+      - name: Summarize candidate
+        run: |
+          {
+            echo '## AR6 Linux release candidate'
+            echo
+            jq -r '"Source revision: `\(.sourceRevision)`"' /tmp/phase-0r-ar6-v1/build-receipt.json
+            echo
+            jq -r '"Core artifacts: \(.totals.coreArtifactBytes) bytes\n\nCOGs: \(.totals.cogBytes) bytes\n\nPMTiles: \(.totals.pmtilesBytes) bytes\n\nGeoParquet: \(.totals.geoparquetBytes) bytes"' /tmp/phase-0r-ar6-v1/manifest.json
+            echo
+            jq -r '"Full clean build: \(.fullCleanBuildDurationSeconds) seconds"' /tmp/build-timing-linux.json
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload independently built candidate and timing
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: ar6-linux-candidate-${{ inputs.release_source_revision || github.sha }}-${{ github.run_id }}
+          path: |
+            /tmp/phase-0r-ar6-v1
+            /tmp/build-timing-linux.json
+          if-no-files-found: error
+          retention-days: 14
+
   infrastructure:
     name: Infrastructure (compose config)
     needs: changes
@@ -310,6 +433,7 @@ jobs:
       - api
       - pipeline
       - release-toolchain
+      - ar6-release-evidence
       - infrastructure
       - docker-frontend
       - docker-api
