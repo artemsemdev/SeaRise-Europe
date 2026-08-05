@@ -17,12 +17,13 @@
 Adopt `absolute-mean-water-surface-egm2008-interval-v1` as the only vertical
 methodology allowed to proceed to source acquisition and validation.
 
-Construct a duration-weighted 1995–2014 baseline from Copernicus Marine
-European L4 absolute dynamic topography, transform its documented GOCO06S
-geoid reference to tide-free EGM2008, add AR6 relative change, and compare an
-uncertainty interval with EGM2008 Copernicus DSM elevation. Ambiguous or
-unsupported cells return `DataUnavailable`; they cannot become binary `0` or
-`1`.
+Construct a duration-weighted 1995–2014 baseline by deriving absolute dynamic
+topography as `adt = sla + mdt` from the locked Copernicus Marine European L4
+`008_068` monthly `sla` source and locked `008_070` static MDT. Transform the
+MDT's documented GOCO06S geoid reference to tide-free EGM2008, add AR6 relative
+change, and compare an uncertainty interval with EGM2008 Copernicus DSM
+elevation. Ambiguous or unsupported cells return `DataUnavailable`; they
+cannot become binary `0` or `1`.
 
 This decision supersedes the direct comparison in ADR-015 and the affected
 candidate-method language in ADR-021/ADR-022. It does not approve a source
@@ -32,6 +33,7 @@ connectivity algorithm, classified layer, release, or Phase 1.
 ## Binding model
 
 ```text
+ADT_GOCO06S(t) = SLA_monthly(t) + MDT_GOCO06S
 B_EGM2008 = mean_1995_2014(ADT_GOCO06S)
             + N_GOCO06S_tide_free - N_EGM2008_tide_free
 
@@ -146,5 +148,11 @@ and returned `BLOCKED` before array creation. It produced no scientific classes
 or release artifacts. The final gate additionally names missing reviewed golden
 vectors and product, connectivity, cross-environment, Baltic, and Black Sea
 evidence. ADR-023 remains the selected candidate methodology, but Phase 1 is
-not authorized. Only a future explicit approved Phase 0.9 decision with zero
-blockers and complete reviews may change that state.
+not authorized. Resolve
+[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94),
+[#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95),
+[#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96), and
+[#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) in order. The
+corrected Phase 0.9 evidence is immutable; only
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
+the final gate and possibly unlock Phase 1 after all blockers and reviews pass.

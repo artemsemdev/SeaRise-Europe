@@ -173,7 +173,17 @@ PYTHONPATH=src/pipeline python scripts/science/build_phase_0_8_evidence.py \
 - product-owner review of Europe, territory, and 25 km scope outcomes;
 - independently bounded systematic, edit/fill, DSM-representation, and
   resolution errors;
-- Phase 0.6 source-lock integration and Phase 0.7 reconciliation controls;
-- the Phase 0.9 real regional rebuild and final scientific gate decision.
+- Phase 0.6 source locks and Phase 0.7 reconciliation are integrated into the
+  Phase 0.9 attempt; their remaining scientific and review blockers continue
+  through [#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94) and
+  [#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95), with final
+  independent review enforced by
+  [#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98);
+- Phase 0.9 completed with a `BLOCKED` disposition. Resolve basin controls in
+  [#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96) and this
+  scope/connectivity review in
+  [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97); only
+  [#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may perform a
+  future final-gate re-evaluation and possibly unlock Phase 1.
 
 No public release or Phase 1 work is authorized by this evidence alone.
