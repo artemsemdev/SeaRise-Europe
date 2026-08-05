@@ -20,6 +20,7 @@ from searise_pipeline.science import (
     evaluate_connectivity_controls,
     load_scope_connectivity_review,
     ocean_connected_cells,
+    review_evidence_sha256,
     validate_scope_connectivity_review,
     verify_evidence_bindings,
     verify_independent_review_proofs,
@@ -221,8 +222,17 @@ def test_blocked_empirical_control_cannot_contain_metrics() -> None:
     review["empiricalControls"][0]["observation"]["metrics"][
         "preFilterPositiveCellCount"
     ] = 1
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
 
     with pytest.raises(ScienceContractError, match="invented metrics"):
+        validate_scope_connectivity_review(review)
+
+
+def test_observation_change_invalidates_review_evidence_hash() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["semanticControls"][0]["observedState"] = "DataUnavailable"
+
+    with pytest.raises(ScienceContractError, match="observations checksum mismatch"):
         validate_scope_connectivity_review(review)
 
 
@@ -253,7 +263,10 @@ def _signed_blocked_review(tmp_path: Path) -> dict:  # type: ignore[type-arg]
             "disposition": "blocked",
             "reviewedCommit": reviewed_commit,
             "decisionBindingSha256": decision_binding_sha256(
-                "blocked", review["evidenceBundleSha256"], reviewed_commit
+                "blocked",
+                review["evidenceBundleSha256"],
+                review["reviewEvidenceSha256"],
+                reviewed_commit,
             ),
         }
     )
@@ -269,6 +282,7 @@ def _signed_blocked_review(tmp_path: Path) -> dict:  # type: ignore[type-arg]
             {
                 "decision": record["decision"],
                 "evidenceBundleSha256": review["evidenceBundleSha256"],
+                "reviewEvidenceSha256": review["reviewEvidenceSha256"],
                 "independenceStatement": record["independenceStatement"],
                 "reviewedCommit": reviewed_commit,
                 "reviewer": record["reviewer"],
@@ -299,6 +313,22 @@ def test_independent_reviewer_proofs_are_cryptographically_verified(
         verify_independent_review_proofs(review, tmp_path)
 
 
+def test_decision_requires_both_named_signed_reviewers(tmp_path: Path) -> None:
+    review = _signed_blocked_review(tmp_path)
+    scientific = review["review"]["reviewers"]["scientific"]
+    scientific.update(
+        {
+            "decision": "pending",
+            "reviewer": None,
+            "independenceStatement": None,
+            "proof": None,
+        }
+    )
+
+    with pytest.raises(ScienceContractError, match="both named, signed"):
+        validate_scope_connectivity_review(review)
+
+
 def test_automation_cannot_self_approve_the_review() -> None:
     review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
     reviewed_commit = "a" * 40
@@ -308,7 +338,10 @@ def test_automation_cannot_self_approve_the_review() -> None:
             "disposition": "approved",
             "reviewedCommit": reviewed_commit,
             "decisionBindingSha256": decision_binding_sha256(
-                "approved", review["evidenceBundleSha256"], reviewed_commit
+                "approved",
+                review["evidenceBundleSha256"],
+                review["reviewEvidenceSha256"],
+                reviewed_commit,
             ),
         }
     )

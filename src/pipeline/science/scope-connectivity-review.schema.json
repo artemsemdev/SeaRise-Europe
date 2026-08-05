@@ -12,6 +12,7 @@
     "candidate",
     "evidenceBindings",
     "evidenceBundleSha256",
+    "reviewEvidenceSha256",
     "controlObservations",
     "semanticControls",
     "empiricalControls",
@@ -32,6 +33,7 @@
       "items": { "$ref": "#/$defs/binding" }
     },
     "evidenceBundleSha256": { "$ref": "#/$defs/sha256" },
+    "reviewEvidenceSha256": { "$ref": "#/$defs/sha256" },
     "controlObservations": {
       "type": "array",
       "minItems": 36,
