@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "phase-0.6-vertical-source-inspection",
+  "issue": 82,
+  "inspectedAt": "2026-08-05",
+  "status": "inputs-locked-publication-blocked",
+  "sourceReceipts": [
+    {
+      "sourceId": "ipcc-ar6-sea-level",
+      "assetId": "regional-confidence-archive",
+      "method": "complete stream plus remote ZIP central-directory and selected-member inspection",
+      "byteSize": 9243771601,
+      "sha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+      "upstreamChecksum": "md5:fec362a2385079fac32fa736d4a39944",
+      "result": "verified",
+      "details": {
+        "record": "https://zenodo.org/records/6382554",
+        "version": "20210809",
+        "doi": "10.5281/zenodo.6382554",
+        "selectedMemberCount": 3,
+        "memberChecks": ["uncompressed byte size", "compressed byte size", "CRC32", "SHA-256", "NetCDF metadata"]
+      }
+    },
+    {
+      "sourceId": "copernicus-marine-eur-sla-monthly",
+      "assetId": "monthly-sla-1995-2014",
+      "method": "complete anonymous S3 listing plus byte-size, ETag, and SHA-256 verification of every object",
+      "objectCount": 240,
+      "totalByteSize": 137971876,
+      "manifestSha256": "94364fcb281bc3e0e3ee7d74c769f2dee5ad630305e040e5940603f1cecee5a7",
+      "payloadSha256": "77c8294956444b78c0d5d9127692f77ec597f2ec93476e71c296700cebbdda18",
+      "result": "verified",
+      "details": {
+        "productId": "SEALEVEL_EUR_PHY_L4_MY_008_068",
+        "datasetId": "cmems_obs-sl_eur_phy-ssh_my_allsat-l4-duacs-0.0625deg_P1M-m",
+        "version": "202411",
+        "firstPeriod": "1995-01-01/1995-02-01",
+        "lastPeriod": "2014-12-01/2015-01-01",
+        "calendarDayWeight": 7305,
+        "missingMonths": 0
+      }
+    },
+    {
+      "sourceId": "copernicus-marine-eur-mdt",
+      "assetId": "europe-mdt",
+      "method": "complete file stream, S3 metadata, STAC, and HDF5 variable inspection",
+      "byteSize": 22840797,
+      "sha256": "397cdca04e899ceb9eb3182f87cab64498357881407b3ab769796ce756249682",
+      "upstreamChecksum": "etag:c5efac6b56b187b816c87722fc8da009-3",
+      "result": "verified",
+      "details": {
+        "productId": "SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070",
+        "datasetId": "cmems_obs-sl_eur_phy-mdt_my_l4-0.0625deg_P20Y",
+        "version": "202411",
+        "referencePeriod": "1993-01-01/2013-01-01",
+        "variables": ["mdt", "err_mdt", "land_water_mask"],
+        "shape": [1, 768, 1186]
+      }
+    },
+    {
+      "sourceId": "goco06s-gravity-model",
+      "assetId": "goco06s-coefficients",
+      "method": "complete archive/member SHA-256 and ICGEM GFC header inspection",
+      "byteSize": 3763873,
+      "sha256": "980e00abdb126994ff0a682fe7de4226acd77b35ed247bf1732783759fb600b6",
+      "result": "verified",
+      "details": {
+        "member": "GOCO06s.gfc",
+        "memberByteSize": 10451091,
+        "memberSha256": "351d9d20b84cd2c0f52ce77146b1e3b774f408200b579ffaf98593cf3d271819",
+        "maximumDegree": 300,
+        "normalization": "fully_normalized",
+        "earthGravityConstant": 398600441500000.0,
+        "referenceRadiusMetres": 6378136.3,
+        "nativeTideSystem": "zero_tide",
+        "referenceEpoch": "2010-01-01",
+        "coefficientErrors": "formal"
+      }
+    },
+    {
+      "sourceId": "egm2008-gravity-model",
+      "assetId": "spherical-harmonics",
+      "method": "complete archive and three required member SHA-256 checks plus embedded NGA documentation inspection",
+      "byteSize": 109351360,
+      "sha256": "65a9072f337f156e8cbd76ffd773f536e6fb0de18697ea6726ecdb790fac0fbd",
+      "result": "verified",
+      "details": {
+        "coefficientMember": "EGM2008_to2190_TideFree",
+        "maximumDegree": 2190,
+        "maximumOrder": 2159,
+        "nativeTideSystem": "tide_free",
+        "normalization": "fully_normalized",
+        "coefficientErrors": "calibrated_standard_deviations",
+        "heightAnomalyConversionMember": "Zeta-to-N_to2160_egm2008"
+      }
+    },
+    {
+      "sourceId": "copernicus-dem-glo30",
+      "assetId": "regional-control-set",
+      "method": "complete byte/SHA-256 checks of five mandatory layers in five representative tiles",
+      "objectCount": 25,
+      "totalByteSize": 165670216,
+      "manifestSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+      "result": "verified",
+      "details": {
+        "release": "2021_1",
+        "layers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
+        "tiles": ["N35_00_E014_00", "N38_00_W010_00", "N45_00_E012_00", "N52_00_E004_00", "N64_00_W022_00"]
+      }
+    },
+    {
+      "sourceId": "copernicus-dem-glo90",
+      "assetId": "regional-control-set",
+      "method": "complete byte/SHA-256 checks of five mandatory layers in five representative tiles",
+      "objectCount": 25,
+      "totalByteSize": 20555898,
+      "manifestSha256": "5c2d1848c5fefb81d9a280afbaaeb745490444ff7b5faded052f9eddc93d3e85",
+      "result": "verified",
+      "details": {
+        "release": "2021_1",
+        "layers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
+        "tiles": ["N35_00_E014_00", "N38_00_W010_00", "N45_00_E012_00", "N52_00_E004_00", "N64_00_W022_00"]
+      }
+    }
+  ],
+  "baselineSelection": {
+    "id": "monthly-sla-plus-static-mdt-v202411",
+    "result": "selected",
+    "reason": "The official monthly dataset contains SLA only. Its Product User Manual defines each monthly value as the simple temporal average of available daily L4 products. Since MDT is static and daily ADT equals SLA plus MDT, the 7305-calendar-day weighted mean of the complete 240-month SLA set plus the exact MDT grid is algebraically the selected daily-ADT mean.",
+    "equation": "mean_1995_2014(ADT_GOCO06S) = sum(monthly_SLA * calendar_days) / 7305 + MDT_GOCO06S",
+    "failClosedConditions": [
+      "any month from 1995-01 through 2014-12 is absent or duplicated",
+      "the month timestamp or calendar-day weight is inconsistent",
+      "SLA, MDT, or required neighbouring interpolation cells are nodata",
+      "the monthly SLA and MDT grids cannot be aligned without extrapolation"
+    ]
+  },
+  "variableSemantics": {
+    "projection": {
+      "variable": "sea_level_change",
+      "dimensions": ["quantiles", "years", "locations"],
+      "sizes": {"quantiles": 107, "years": 14, "locations": 66190},
+      "units": "mm",
+      "fillValue": -32768,
+      "selectedQuantileCoordinates": {"lower": 0.167, "central": 0.5, "upper": 0.833},
+      "note": "q17 and q83 are human labels. Code must match the exact source coordinates 0.167 and 0.833."
+    },
+    "monthlySla": {
+      "variable": "sla",
+      "standardName": "sea_surface_height_above_sea_level",
+      "units": "m",
+      "statistic": "simple temporal average of available daily L4 SLA",
+      "errorVariable": null,
+      "errorEvidence": "The monthly dataset does not carry daily err_sla. Phase 0.7 must derive a conservative mapping bound from the locked QUID validation evidence or return DataUnavailable."
+    },
+    "mdt": {
+      "variables": {
+        "mdt": "mean_dynamic_topography in m",
+        "err_mdt": "formal mean_dynamic_topography_error in m",
+        "land_water_mask": "0 water; 1 land"
+      },
+      "surface": "GOCO06S geoid",
+      "warning": "err_mdt is a formal mapping error and is not a complete ADT or datum-transformation uncertainty bound."
+    },
+    "terrain": {
+      "verticalCrs": "EGM2008 (EPSG:3855)",
+      "pixelInterpretation": "RasterPixelIsPoint",
+      "layers": {
+        "DEM": "digital surface model height",
+        "EDM": "editing source/control mask",
+        "FLM": "filling source/control mask",
+        "HEM": "height error mask",
+        "WBM": "water body mask"
+      }
+    }
+  },
+  "verticalReferences": {
+    "source": {
+      "model": "GOCO06S",
+      "nativeTideSystem": "zero_tide",
+      "evaluationEpoch": "2010-01-01",
+      "requiredOutputTideSystem": "tide_free"
+    },
+    "target": {
+      "model": "EGM2008",
+      "nativeTideSystem": "tide_free",
+      "verticalCrs": "EPSG:3855",
+      "staticModelEpoch": "not-applicable"
+    },
+    "mandatoryRule": "Evaluate both undulations on the same ellipsoid and tide-free convention before differencing. Native zero-tide GOCO06S coefficients must never be subtracted directly from tide-free EGM2008 values."
+  },
+  "coverageMatrix": [
+    {"region": "atlantic", "projection": "covered", "baselineSla": "covered", "mdt": "covered", "gravityModels": "global", "terrainControls": "lisbon-control"},
+    {"region": "north-sea", "projection": "covered", "baselineSla": "covered", "mdt": "covered", "gravityModels": "global", "terrainControls": "netherlands-control"},
+    {"region": "baltic-sea", "projection": "covered", "baselineSla": "covered", "mdt": "covered", "gravityModels": "global", "terrainControls": "not-sampled"},
+    {"region": "mediterranean", "projection": "covered", "baselineSla": "covered", "mdt": "covered", "gravityModels": "global", "terrainControls": "malta-control"},
+    {"region": "adriatic", "projection": "covered", "baselineSla": "covered", "mdt": "covered", "gravityModels": "global", "terrainControls": "venice-control"},
+    {"region": "black-sea", "projection": "covered", "baselineSla": "covered", "mdt": "covered", "gravityModels": "global", "terrainControls": "not-sampled"},
+    {"region": "islands", "projection": "covered", "baselineSla": "partial", "mdt": "partial", "gravityModels": "global", "terrainControls": "reykjavik-and-malta-controls"},
+    {"region": "ports-estuaries", "projection": "covered", "baselineSla": "partial", "mdt": "partial", "gravityModels": "global", "terrainControls": "partial"},
+    {"region": "north-of-66.03125n", "projection": "covered", "baselineSla": "not-covered", "mdt": "partial-to-66.96875n", "gravityModels": "global", "terrainControls": "reykjavik-control-only"}
+  ],
+  "licenceDisposition": [
+    {"source": "IPCC AR6 projections", "redistribution": "approved", "basis": "CC BY 4.0 canonical Zenodo record", "rawBytesInGit": false},
+    {"source": "Copernicus Marine SLA and MDT", "redistribution": "approved-with-attribution", "basis": "Copernicus Marine Service licence and required product DOI statements", "rawBytesInGit": false},
+    {"source": "GOCO06S", "redistribution": "approved", "basis": "CC BY 4.0 embedded in GFC file", "rawBytesInGit": false},
+    {"source": "NGA EGM2008", "redistribution": "approved", "basis": "official free public release of United States Government model; attribution retained", "rawBytesInGit": false},
+    {"source": "Copernicus DEM GLO-30/GLO-90", "redistribution": "approved-with-mandatory-notices", "basis": "instance licences recorded in source lock", "rawBytesInGit": false}
+  ],
+  "residualGates": [
+    "implement and independently validate zero-tide to tide-free conversion and geoid differencing",
+    "derive conservative non-projection error bounds from the locked error variables and documents",
+    "approve the DEM resolution, coastal scope, and connectivity controls",
+    "rebuild and independently review the regional real-source release"
+  ]
+}
