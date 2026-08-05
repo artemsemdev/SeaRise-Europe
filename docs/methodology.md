@@ -3,8 +3,8 @@
 > **Status:** Blocked; not approved for a real-data public release
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
-> **Blocking gate:** Fail-closed interval mechanics and Phase 0.8 terrain/scope/connectivity candidates are implemented; numerical geoid conventions, uncertainty bounds, regional rebuild, reproducibility, and independent review remain blocking
-> **Latest evidence:** [Phase 0.8 terrain, geography, and connectivity controls](science/phase-0-8-terrain-geography-controls.md) — candidates selected, publication `blocked`
+> **Blocking gate:** Phase 0.9 attempted all nine combinations and returned an explicit `BLOCKED` decision; numerical geoid conventions, uncertainty bounds, controls, reproducibility, golden vectors, and independent review remain incomplete
+> **Latest evidence:** [Phase 0.9 regional scientific gate](evidence/phase-0-9-regional-gate.md) — Phase 0 complete, Phase 1 `blocked`
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
@@ -184,6 +184,25 @@ geography controls and nine symbolic connectivity controls pass. External
 product/scientific review remains mandatory, and the connectivity screen is
 not a hydraulic model.
 
+## Phase 0.9 final gate result
+
+[Phase 0.9 evidence](evidence/phase-0-9-regional-gate.md) records the final
+Phase 0 decision as `BLOCKED`. The reproducible preflight covers all three
+scenarios and all three horizons with exact scenario-member hashes and complete
+shared lineage. All nine attempts stop before array creation on the same seven
+named evidence gaps.
+
+No scientific classes, statistics, connectivity comparison, reviewed parity
+vectors, COGs, PMTiles, or GeoParquet were generated. This is not an all-nodata
+release: it is the absence of a scientifically authorized release. Source-lock
+and automated tests pass, but automation is explicitly unable to authorize the
+methodology, product scope, connectivity control, or Phase 1.
+
+Phase 1 may unlock only if a future Phase 0.9 decision is explicitly
+`approved`, contains zero blockers, completes all nine combinations with hashed
+artifacts, and records every required independent review. Until then, the next
+work is the named scientific evidence—not an implementation workaround.
+
 ## Required preprocessing record
 
 Before approval, the pipeline must record and test:
@@ -324,3 +343,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-08-05 | Inputs locked; publication blocked | Phase 0.6 pinned the exact AR6, SLA/MDT, GOCO06S, EGM2008, and terrain-control evidence; implementation and review remain open |
 | `v1.0` | 2026-08-05 | Mechanics implemented; publication blocked | Phase 0.7 added the fail-closed interval implementation and receipt; numerical conventions, bounds, controls, reproducibility, and review remain open |
 | `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |
+| `v1.0` | 2026-08-05 | Phase 0 complete; Phase 1 blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates |

@@ -184,6 +184,13 @@ derivative on a loopback reference profile. It explicitly does not validate
 production-network latency, mobile performance, PMTiles, or nine-layer scale;
 the scientific gate blocked those measurements before class generation.
 
+The [Phase 0.9 attempt](../evidence/phase-0-9-regional-gate.md) again stops
+before scientific arrays, now across the exact nine-combination matrix. It
+therefore records COG/PMTiles/GeoParquet QA, build time, peak memory, range
+locality, request count, and browser latency as `not-generated` or `not-run`.
+Those target budgets remain unmeasured and cannot be inferred from source
+checks or unit-test duration.
+
 ## 9. Failure and degradation rules
 
 - If a required uncached range is unavailable, return a clear

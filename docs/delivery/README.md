@@ -60,14 +60,14 @@ Use Conventional Commits and the repository pull-request template.
 This workstream blocks a production data release and destructive removal of the
 legacy assessment path.
 
-- [ ] Pin and download the exact IPCC AR6 source release.
-- [ ] Record source URL, version/date, licence, size, and SHA-256.
-- [ ] Inspect its actual dimensions, coordinate model, quantiles, units, and
+- [x] Pin and inspect the exact IPCC AR6 source release and members.
+- [x] Record source URL, version/date, licence, size, and SHA-256.
+- [x] Inspect its actual dimensions, coordinate model, quantiles, units, and
   missing values.
-- [ ] Pin the Copernicus DEM product and document vertical datum and licence.
+- [x] Pin the Copernicus DEM product and document vertical datum and licence.
 - [x] Compare the current Natural Earth-derived 25 km coastal approximation
   with the canonical Copernicus coastal product.
-- [ ] Decide and version the Europe support geometry, including
+- [x] Select and version the Europe support geometry candidate, including
   transcontinental-state handling.
 - [ ] Build a representative regional slice end to end.
 - [ ] Validate coordinate-to-pixel parity between Python and TypeScript.
@@ -80,6 +80,14 @@ Phase 0.8 selected GLO-30, the explicit Natural Earth v2 Europe/25 km product
 scope, and eight-neighbour ocean connectivity for external review. The checks
 above remain open where product/scientific approval, terrain uncertainty
 bounds, or the real regional rebuild is still required.
+
+Phase 0.9 is complete with an explicit `BLOCKED` disposition. Its exact 3×3
+attempt matrix emitted no scientific classes or release artifacts because
+EGM2008 evaluator conventions, numerical uncertainty bounds, independent
+review, Baltic/Black Sea controls, product/connectivity approval,
+cross-environment reproducibility, and reviewed golden vectors are missing.
+Workstream 1 and Phase 1 are not actionable until a repeated Phase 0.9 gate is
+explicitly approved with zero blockers; green CI cannot authorize that change.
 
 Exit evidence:
 

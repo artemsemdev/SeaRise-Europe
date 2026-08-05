@@ -684,6 +684,13 @@ path is proven.
 - Measure COG and PMTiles sizes, R2 requests, and browser memory.
 - Validate exact client-side lookup against the pipeline array.
 
+**Current disposition (2026-08-05): `BLOCKED`.** The
+[Phase 0.9 gate](../../evidence/phase-0-9-regional-gate.md) attempted all nine
+scenario/horizon combinations with exact lineage but stopped before arrays.
+No scientific artifacts or performance/parity claims were produced. Phase 1
+is locked until a repeated final gate is explicitly approved with zero
+blockers and completed independent reviews; CI success cannot unlock it.
+
 ### Phase 1 — define public artifacts
 
 - Add schemas for manifest, config, settlements, and methodology.

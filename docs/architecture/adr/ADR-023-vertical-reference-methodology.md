@@ -10,7 +10,7 @@
 >
 > **Required reviewer:** Independent scientific/data reviewer (`pending`)
 >
-> **Evidence:** [Phase 0.5 methodology decision](../../science/phase-0-5-vertical-methodology-evidence.md), [Phase 0.7 implementation evidence](../../science/phase-0-7-vertical-reconciliation-evidence.md)
+> **Evidence:** [Phase 0.5 methodology decision](../../science/phase-0-5-vertical-methodology-evidence.md), [Phase 0.7 implementation evidence](../../science/phase-0-7-vertical-reconciliation-evidence.md), [Phase 0.9 final gate](../../evidence/phase-0-9-regional-gate.md)
 
 ## Decision
 
@@ -138,3 +138,13 @@ DSM-representation, and resolution terms. The systematic, edit/fill, DSM, and
 resolution terms remain unbounded, and neither the terrain nor connectivity
 selection has external approval. The original publication block therefore
 remains in force even though the implementation choices are now explicit.
+
+## Final Phase 0.9 disposition
+
+Phase 0.9 attempted all nine scenario/horizon combinations with exact lineage
+and returned `BLOCKED` before array creation. It produced no scientific classes
+or release artifacts. The final gate additionally names missing reviewed golden
+vectors and product, connectivity, cross-environment, Baltic, and Black Sea
+evidence. ADR-023 remains the selected candidate methodology, but Phase 1 is
+not authorized. Only a future explicit approved Phase 0.9 decision with zero
+blockers and complete reviews may change that state.
