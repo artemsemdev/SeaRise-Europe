@@ -458,18 +458,54 @@ def _validate_stac(
     links = [link for link in collection.get("links", []) if link.get("rel") == "item"]
     if len(links) != len(expected_matrix):
         raise ScienceContractError("STAC Collection does not link the exact 3 x 3 matrix")
+    expected_item_links = {
+        f"items/{scenario}-{horizon}.json": (scenario, horizon)
+        for scenario, horizon in expected_matrix
+    }
     by_path = {item["path"]: item for item in artifacts}
     observed: set[tuple[str, int]] = set()
     for link in links:
+        layer = expected_item_links.get(link.get("href"))
+        if link.get("type") != "application/geo+json" or layer is None:
+            raise ScienceContractError("STAC Collection Item links differ from the matrix")
+        scenario, horizon = layer
         item_path = (root / "stac" / link["href"]).resolve()
         if (root / "stac/items").resolve() not in item_path.parents:
             raise ScienceContractError("STAC item link escapes the candidate")
         item = json.loads(item_path.read_text(encoding="utf-8"))
-        scenario = item.get("properties", {}).get("scenario")
-        horizon = int(item.get("properties", {}).get("datetime", "0")[:4])
         observed.add((scenario, horizon))
         cog_record = by_path[f"analysis/{scenario}/{horizon}.tif"]
+        west, south, east, north = contract["grid"]["bounds"]
+        expected_geometry = {
+            "type": "Polygon",
+            "coordinates": [[
+                [west, south],
+                [east, south],
+                [east, north],
+                [west, north],
+                [west, south],
+            ]],
+        }
+        if (
+            item.get("stac_version") != "1.0.0"
+            or item.get("stac_extensions")
+            != [
+                "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+                "https://stac-extensions.github.io/checksum/v1.0.0/schema.json",
+            ]
+            or item.get("type") != "Feature"
+            or item.get("id") != f"{scenario}-{horizon}"
+            or item.get("collection") != release_id
+            or item.get("bbox") != contract["grid"]["bounds"]
+            or item.get("geometry") != expected_geometry
+        ):
+            raise ScienceContractError("STAC Item identity or geometry differs from the matrix")
         expected_properties = {
+            "datetime": f"{horizon}-01-01T00:00:00Z",
+            "scenario": scenario,
+            "baseline": contract["values"]["baseline"],
+            "confidence": contract["values"]["confidence"],
+            "scientific_disposition": contract["scientificDisposition"],
             "source_release": contract["source"]["version"],
             "source_archive_sha256": contract["source"]["archiveSha256"],
             "source_member_sha256": cog_record["source"]["memberSha256"],
@@ -480,15 +516,53 @@ def _validate_stac(
             "scale_to_metres": contract["values"]["scaleToMetres"],
             "attribution": contract["source"]["attribution"],
         }
-        if any(item["properties"].get(key) != value for key, value in expected_properties.items()):
+        if item.get("properties") != expected_properties:
             raise ScienceContractError("STAC Item lineage differs from its artifacts")
-        item_links = {link["rel"]: link["href"] for link in item.get("links", [])}
+        expected_links = {
+            "collection": {
+                "rel": "collection",
+                "href": "../collection.json",
+                "type": "application/json",
+            },
+            "license": {
+                "rel": "license",
+                "href": contract["source"]["licenceUrl"],
+            },
+            "cite-as": {
+                "rel": "cite-as",
+                "href": contract["source"]["canonicalRecord"],
+            },
+        }
+        actual_links = item.get("links")
         if (
-            item_links.get("license") != contract["source"]["licenceUrl"]
-            or item_links.get("cite-as") != contract["source"]["canonicalRecord"]
+            not isinstance(actual_links, list)
+            or len(actual_links) != len(expected_links)
+            or not all(isinstance(item_link, Mapping) for item_link in actual_links)
+            or {item_link.get("rel"): item_link for item_link in actual_links}
+            != expected_links
         ):
             raise ScienceContractError("STAC Item rights links differ from the contract")
-        for asset in item.get("assets", {}).values():
+        expected_asset_paths = {
+            "analysis": f"analysis/{scenario}/{horizon}.tif",
+            "visual": f"layers/{scenario}/{horizon}.pmtiles",
+            "table": "analysis/projections.parquet",
+            "source-grid": "analysis/source-grid.json.gz",
+        }
+        expected_assets = {}
+        for key, relative in expected_asset_paths.items():
+            record = by_path.get(relative)
+            if record is None:
+                raise ScienceContractError("STAC Item source artifacts are incomplete")
+            expected_assets[key] = {
+                "href": f"../../{relative}",
+                "type": record["mediaType"],
+                "roles": [record["role"]],
+                "file:size": record["byteSize"],
+                "checksum:multihash": f"1220{record['sha256']}",
+            }
+        if item.get("assets") != expected_assets:
+            raise ScienceContractError("STAC Item asset inventory differs from sealed artifacts")
+        for asset in expected_assets.values():
             target = (item_path.parent / asset["href"]).resolve()
             if root.resolve() not in target.parents or not target.is_file():
                 raise ScienceContractError("STAC asset target is missing or unsafe")

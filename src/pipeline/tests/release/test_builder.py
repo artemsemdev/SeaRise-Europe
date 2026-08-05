@@ -16,6 +16,7 @@ from searise_pipeline.release import (
     compare_release_candidates,
     load_source_fixture,
 )
+from searise_pipeline.release.builder import _validate_stac, _write_stac
 from searise_pipeline.science import ScienceContractError
 
 from .test_source_fixture import FIXTURE_DIR, GOLDENS_PATH, contract
@@ -78,6 +79,81 @@ def _missing_tool_paths() -> dict[str, Path | str]:
     }
 
 
+def _write_json(path: Path, document: object) -> None:
+    path.write_text(
+        json.dumps(document, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _stac_candidate(root: Path) -> list[dict[str, object]]:
+    artifacts: list[dict[str, object]] = []
+
+    def add_artifact(
+        relative: str,
+        *,
+        media_type: str,
+        role: str,
+        member_sha256: str | None = None,
+    ) -> None:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((relative + "\n").encode())
+        record: dict[str, object] = {
+            "path": relative,
+            "mediaType": media_type,
+            "role": role,
+            "byteSize": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+        if member_sha256 is not None:
+            record["source"] = {"memberSha256": member_sha256}
+        artifacts.append(record)
+
+    release = contract()
+    for scenario in release["matrix"]["scenarios"]:
+        member_sha256 = hashlib.sha256(scenario.encode()).hexdigest()
+        for horizon in release["matrix"]["horizons"]:
+            add_artifact(
+                f"analysis/{scenario}/{horizon}.tif",
+                media_type=(
+                    "image/tiff; application=geotiff; profile=cloud-optimized"
+                ),
+                role="exact-browser-lookup",
+                member_sha256=member_sha256,
+            )
+            add_artifact(
+                f"layers/{scenario}/{horizon}.pmtiles",
+                media_type="application/vnd.pmtiles",
+                role="visual-only",
+            )
+    add_artifact(
+        "analysis/projections.parquet",
+        media_type="application/vnd.apache.parquet",
+        role="analytical-parity",
+    )
+    add_artifact(
+        "analysis/source-grid.json.gz",
+        media_type="application/gzip",
+        role="source-grid-identity",
+    )
+    _write_stac(
+        root,
+        artifacts,
+        release_id="ar6-europe-fixture-v1",
+        contract=release,
+    )
+    return artifacts
+
+
+def _first_stac_item(root: Path) -> tuple[Path, dict[str, object]]:
+    release = contract()
+    scenario = release["matrix"]["scenarios"][0]
+    horizon = release["matrix"]["horizons"][0]
+    path = root / f"stac/items/{scenario}-{horizon}.json"
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
 EXTERNAL_TOOLS_AVAILABLE = all(
     os.environ.get(name)
     for name in (
@@ -91,6 +167,65 @@ EXTERNAL_TOOLS_AVAILABLE = all(
         "SEARISE_PYTHON_LOCK",
     )
 )
+
+
+@pytest.mark.parametrize("mutation", ["empty", "missing", "extra", "swapped"])
+def test_stac_validator_rejects_mutated_asset_inventory(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    artifacts = _stac_candidate(tmp_path)
+    item_path, item = _first_stac_item(tmp_path)
+    assets = item["assets"]
+    if mutation == "empty":
+        item["assets"] = {}
+    elif mutation == "missing":
+        assets.pop("visual")
+    elif mutation == "extra":
+        assets["unexpected"] = dict(assets["analysis"])
+    else:
+        assets["analysis"], assets["visual"] = assets["visual"], assets["analysis"]
+    _write_json(item_path, item)
+
+    with pytest.raises(ScienceContractError, match="asset inventory"):
+        _validate_stac(
+            tmp_path,
+            artifacts,
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("id", "identity or geometry"),
+        ("collection", "identity or geometry"),
+        ("bbox", "identity or geometry"),
+        ("geometry", "identity or geometry"),
+        ("properties", "lineage"),
+    ],
+)
+def test_stac_validator_rejects_mutated_item_contract(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    artifacts = _stac_candidate(tmp_path)
+    item_path, item = _first_stac_item(tmp_path)
+    if mutation == "properties":
+        item["properties"]["unexpected"] = True
+    else:
+        item[mutation] = {} if mutation in {"bbox", "geometry"} else "wrong"
+    _write_json(item_path, item)
+
+    with pytest.raises(ScienceContractError, match=message):
+        _validate_stac(
+            tmp_path,
+            artifacts,
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+        )
 
 
 @pytest.mark.skipif(
