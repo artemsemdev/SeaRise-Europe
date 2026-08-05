@@ -8,20 +8,22 @@
 >
 > **Last updated:** 2026-08-04
 >
-> **Architecture:** [ADR-021 — Static-First Offline Geospatial Architecture](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Architecture:** [ADR-021 — Static-First Offline Geospatial Architecture](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md),
+> amended by [ADR-024 — AR6 Regional Projection Contract](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
 
 ## 1. Product summary
 
 SeaRise Europe is a public, Europe-focused web explorer for scenario-based
-coastal sea-level exposure. A user searches a city, town, or village, selects
-one of three scenarios and one of three time horizons, and receives a cautious,
-traceable result on an interactive map.
+regional relative sea-level projections. A user searches a city, town, or
+village, selects one of three scenarios and one of three time horizons, and
+receives a cautious, traceable AR6 median and likely range on an interactive
+map.
 
 The product is also a portfolio case study. It demonstrates how a data-heavy
 geospatial experience can be fast, inexpensive, reproducible, and transparent
 without a production application server, database, tile server, or runtime
 geocoder. Scientific processing happens before publication; the browser reads
-versioned artifacts and performs bounded search and assessment work locally.
+versioned artifacts and performs bounded search and projection lookup locally.
 
 The target architecture is accepted but not yet implemented. The checked-in
 legacy runtime and synthetic raster are not evidence of a production-ready
@@ -45,8 +47,9 @@ rather than recomputing static facts for every request.
 
 ### Product goals
 
-1. Let a user find a European settlement and understand its modeled coastal
-   exposure under a selected scenario and horizon.
+1. Let a user find a European settlement and understand the IPCC AR6 projected
+   regional relative sea-level change near it under a selected scenario and
+   horizon.
 2. Return useful local search results quickly, including small coastal villages
    and inland places that should resolve to `OutOfScope`.
 3. Keep result language understandable, calm, and scientifically cautious.
@@ -71,15 +74,17 @@ rather than recomputing static facts for every request.
 - Scenarios are `ssp1-26`, `ssp2-45`, and `ssp5-85`.
 - Horizons are exactly `2030`, `2050`, and `2100`.
 - Defaults are `ssp2-45` and `2050`.
-- A completed assessment has exactly one domain state:
-  `ModeledExposureDetected`, `NoModeledExposureDetected`, `DataUnavailable`,
-  `OutOfScope`, or `UnsupportedGeography`.
+- A completed lookup has exactly one domain state: `ProjectionAvailable`,
+  `DataUnavailable`, `OutOfScope`, or `UnsupportedGeography`.
 - `OutOfScope` and `UnsupportedGeography` are valid outcomes, not errors.
 - No result is a property-level forecast, probability, safety guarantee,
   engineering assessment, legal determination, insurance evaluation, mortgage
   guidance, or financial advice.
-- Every displayed assessment identifies its scenario, horizon, methodology
-  version, and data release.
+- Every displayed projection identifies its scenario, horizon, baseline,
+  likely-range semantics, source grid location and distance, native resolution,
+  methodology version, and data release.
+- No result determines flooding, inundation, terrain exposure, property risk,
+  or an absolute water level.
 - The browser must not call `/assess`, `/geocode`, or `/config` in the target
   production flow.
 
@@ -110,7 +115,7 @@ Personas remain research hypotheses; see [PERSONAS.md](PERSONAS.md).
 - Search by canonical, ASCII, and alternate place names, with country and
   first-level administration shown for disambiguation.
 - Optional point refinement on the map after settlement selection.
-- Local support/coastal boundary checks and exact classified-pixel assessment.
+- Local support/coastal boundary checks and exact source-grid projection lookup.
 - Nine validated scenario/horizon combinations.
 - MapLibre map, PMTiles overlay, marker, and accessible textual result.
 - Data/methodology details, required attribution, static STAC catalog, and
@@ -161,10 +166,10 @@ make clear that a precise marker does not imply parcel-level model accuracy.
 **FR-008** Empty and unmatched queries shall produce inline guidance without
 removing the last valid result.
 
-### 7.2 Scope and assessment
+### 7.2 Scope and projection lookup
 
 **FR-009** The browser shall validate coordinates and the versioned Europe
-support geometry before reading exposure data.
+support geometry before reading projection data.
 
 **FR-010** A point outside the support geometry shall return
 `UnsupportedGeography`.
@@ -175,17 +180,18 @@ shall return `OutOfScope`.
 **FR-012** An in-scope point shall resolve the exact artifact for the active
 scenario and horizon from the pinned release manifest.
 
-**FR-013** Exact assessment shall use nearest-neighbour classified values. It
-shall map nodata to `DataUnavailable`, class `1` to
-`ModeledExposureDetected`, and class `0` to
-`NoModeledExposureDetected`.
+**FR-013** Exact lookup shall choose the nearest source-native 1° grid location
+using the ADR-024 haversine operator and shall return `ProjectionAvailable`
+only when q0.167, q0.5, and q0.833 all exist at that location. It shall not
+skip nodata, interpolate, or fall back to a tide-gauge location.
 
-**FR-014** The UI shall never derive a scientific value from rendered colour or
-interpolate a binary class.
+**FR-014** The UI shall never derive a scientific value from rendered colour.
+It reads exact published projection values and source identity from the
+analysis artifact.
 
 **FR-015** A missing network range is a delivery/connectivity condition, not
-evidence of no exposure. The UI shall not guess or silently substitute another
-artifact.
+evidence of zero sea-level change. The UI shall not guess or silently
+substitute another artifact, grid location, scenario, or horizon.
 
 ### 7.3 Scenarios and horizons
 
@@ -195,23 +201,27 @@ scenario after a data provider.
 
 **FR-017** The horizon control shall expose exactly `2030`, `2050`, and `2100`.
 
-**FR-018** The first eligible assessment shall default to `ssp2-45` and `2050`.
+**FR-018** The first eligible projection lookup shall default to `ssp2-45` and
+`2050`.
 
 **FR-019** Changing scenario or horizon shall update the summary, overlay,
 legend, URL, and source context as one consistent state without a new search.
 
 ### 7.4 Results and map
 
-**FR-020** Every completed result shall show the selected place/point, scenario,
-horizon, result state, methodology version, and data release.
+**FR-020** Every `ProjectionAvailable` result shall show the selected
+place/point, scenario, horizon, q0.167/q0.5/q0.833 in metres, 1995–2014
+baseline, medium-confidence likely-range meaning, source location and distance,
+native 1° resolution, methodology version, and data release.
 
 **FR-021** Every map-only meaning shall have an equivalent text representation.
 
-**FR-022** Exposure overlays shall remain visually distinct from the selected
-marker and basemap, and the legend shall match the active layer.
+**FR-022** Projection overlays shall remain visually distinct from the selected
+marker and basemap, and the legend shall match the active scenario, horizon,
+and displayed statistic.
 
 **FR-023** Basemap failure shall not prevent local search, scope validation, or
-assessment; the UI shall show a clear degraded-map state.
+projection lookup; the UI shall show a clear degraded-map state.
 
 **FR-024** Result copy shall follow
 [CONTENT_GUIDELINES.md](CONTENT_GUIDELINES.md) and shall never call a location
@@ -253,7 +263,7 @@ return to the initial state. It need not erase immutable application caches.
 2. Search initializes locally and returns ranked settlements.
 3. The user selects a place; the browser validates support and coastal scope.
 4. The browser reads only the ranges required for the default
-   `ssp2-45`/`2050` assessment.
+   `ssp2-45`/`2050` projection.
 5. The UI shows one result state, synchronized map context, sources, and
    limitations.
 6. Scenario/horizon changes reuse the selected point and update local state.
@@ -271,7 +281,7 @@ flow is most commonly reached through a shared URL or map refinement.
 
 ### Offline return visit
 
-The cached shell and loaded index remain usable. An assessment succeeds only
+The cached shell and loaded index remain usable. A lookup succeeds only
 when its required boundaries and artifact ranges are cached; otherwise the UI
 states the connectivity limitation and preserves the selection for retry.
 
@@ -281,10 +291,9 @@ states the connectivity limitation and preserves the selection for retry.
 |---|---|---|
 | Settlements | Pinned GeoNames snapshot and alternate names | Serialized local index; no geocoder request |
 | Sea-level inputs | Pinned IPCC AR6 release | Offline processing only |
-| Elevation | Pinned Copernicus DEM product | Offline processing only |
 | Support/coastal geometry | Versioned approved geometry | Local scope validation |
 | Basemap | OpenFreeMap with required OSM/OpenMapTiles attribution | Optional visual context; non-authoritative |
-| Exposure | Nine exact COGs plus visual PMTiles | Byte-range reads from immutable object storage |
+| Projection | Nine exact AR6 projection COGs plus visual PMTiles | Byte-range reads from immutable object storage |
 | Discovery/provenance | Manifest, static STAC, SLSA/Cosign bundle | Transparency and release verification |
 
 Raw sources remain in ignored local/CI storage unless redistribution is
@@ -300,7 +309,7 @@ explicitly permitted. Public artifacts are versioned and immutable.
   on the agreed mobile profile.
 - Search p95 after worker initialization: under 50 ms.
 - Search worker initialization on reference mobile hardware: under 1 second.
-- Local assessment p95 after required data is cached: under 100 ms.
+- Local projection lookup p95 after required data is cached: under 100 ms.
 - Large artifacts must support `HEAD` and byte-range `GET` with correct CORS,
   ETag, and immutable cache headers.
 - The normal production flow must make zero application API calls.
@@ -328,10 +337,10 @@ explicitly permitted. Public artifacts are versioned and immutable.
 
 1. At least 90% of first-time pilot users can find a test place, obtain a
    result, and correctly explain that it is scenario-based within two minutes.
-2. At least 80% can distinguish all five domain states in comprehension tests.
+2. At least 80% can distinguish all four domain states in comprehension tests.
 3. Every tested result shows its scenario, horizon, methodology, release, and
    required attribution.
-4. The defined search, assessment, Lighthouse, artifact, scientific, and
+4. The defined search, projection lookup, Lighthouse, artifact, scientific, and
    offline fitness functions pass before release.
 5. Scripted demos cover at least three coastal, three inland, one nodata, and
    one unsupported case without backend services or cloud credentials in the
@@ -346,11 +355,11 @@ Detailed measurement is in [METRICS_PLAN.md](METRICS_PLAN.md).
 | Risk | Mitigation |
 |---|---|
 | Users infer parcel-level certainty | Conservative copy, resolution disclosure, persistent methodology access, and comprehension testing |
-| Simplified binary method produces disconnected inland false positives | Phase 0 scientific review, connectivity tests, golden locations, and a superseding methodology decision if needed |
+| Users interpret a coarse regional projection as a local flood result | Show native 1° resolution, source-grid distance, likely-range meaning, and persistent no-flood/no-property-risk copy |
 | Upstream dimensions or vertical datums differ from pipeline assumptions | Inspect pinned real sources before Europe-wide processing; fail publication on unresolved semantics |
 | The settlement source is incomplete or ambiguous | Define coverage operationally, show administration/country, preserve aliases, and publish snapshot/QA statistics |
 | Large artifacts exceed device/network budgets | Measure regional spike, use range requests and lazy loading, set cache limits, and avoid mandatory full-Europe download |
-| Public basemap is unavailable | Treat it as optional context and retain textual/local assessment functionality |
+| Public basemap is unavailable | Treat it as optional context and retain textual/local projection functionality |
 | Source licence or attribution is incomplete | Block publication until every artifact maps to reviewed source metadata |
 | Portfolio claims get ahead of implementation | Generate evidence from manifests/CI and label migration/demo state honestly |
 
@@ -374,11 +383,11 @@ behaviour.
 
 ## 14. Release acceptance criteria
 
-- [ ] Real IPCC and Copernicus inputs have completed the scientific validation
-  gate; synthetic fixtures are clearly labelled.
+- [ ] The locked IPCC AR6 members have completed offline source and
+  implementation parity; synthetic fixtures are clearly labelled.
 - [ ] Search finds the approved multilingual, duplicate-name, coastal-village,
   inland, and boundary test fixtures with deterministic ranking.
-- [ ] Each of the five domain states is covered by an accessible end-to-end
+- [ ] Each of the four domain states is covered by an accessible end-to-end
   browser test.
 - [ ] Exactly nine scenario/horizon combinations pass manifest, schema,
   checksum, range, and golden-point tests.
