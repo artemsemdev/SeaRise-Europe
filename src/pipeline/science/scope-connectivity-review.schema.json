@@ -17,6 +17,7 @@
     "reviewEvidenceSha256",
     "controlObservations",
     "semanticControls",
+    "slaSourceControls",
     "empiricalControls",
     "blockingDependencies",
     "review"
@@ -59,9 +60,16 @@
     },
     "semanticControls": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 3,
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/semanticControl" }
+    },
+    "slaSourceControls": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/slaSourceControl" }
     },
     "empiricalControls": {
       "type": "array",
@@ -220,6 +228,46 @@
         "provenance": { "$ref": "#/$defs/text" },
         "expectedState": { "enum": ["DataUnavailable", "OutOfScope", "UnsupportedGeography"] },
         "observedState": { "enum": ["DataUnavailable", "OutOfScope", "UnsupportedGeography"] },
+        "reviewerStatus": { "$ref": "#/$defs/reviewerStatus" }
+      }
+    },
+    "slaSourceControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sourceId",
+        "longitude",
+        "latitude",
+        "northernLimitLatitude",
+        "sourceValueAvailable",
+        "expectedSourceSupported",
+        "observedSourceSupported",
+        "expectedState",
+        "observedState",
+        "expectedReasonCode",
+        "observedReasonCode",
+        "expectedReasonLabel",
+        "observedReasonLabel",
+        "provenance",
+        "reviewerStatus"
+      ],
+      "properties": {
+        "id": { "enum": ["sla-north-boundary-below", "sla-north-boundary-above"] },
+        "sourceId": { "const": "copernicus-marine-eur-sla-monthly" },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "northernLimitLatitude": { "const": 66.03125 },
+        "sourceValueAvailable": { "const": false },
+        "expectedSourceSupported": { "type": "boolean" },
+        "observedSourceSupported": { "type": "boolean" },
+        "expectedState": { "const": "DataUnavailable" },
+        "observedState": { "const": "DataUnavailable" },
+        "expectedReasonCode": { "enum": [3, 4] },
+        "observedReasonCode": { "enum": [3, 4] },
+        "expectedReasonLabel": { "enum": ["transform-out-of-coverage", "source-nodata"] },
+        "observedReasonLabel": { "enum": ["transform-out-of-coverage", "source-nodata"] },
+        "provenance": { "$ref": "#/$defs/text" },
         "reviewerStatus": { "$ref": "#/$defs/reviewerStatus" }
       }
     },
