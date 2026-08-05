@@ -36,6 +36,8 @@ def test_contracts_validate_and_geometry_bytes_match() -> None:
     )
     assert contracts.terrain_decision["decision"]["selectedInstance"] == "GLO-30"
     assert contracts.terrain_decision["review"]["status"] == "pending-external"
+    assert contracts.final_gate["decision"] == "blocked"
+    assert contracts.final_gate["phase1"]["unlocked"] is False
 
 
 def test_vertical_methodology_binds_reference_epoch_and_uncertainty() -> None:
@@ -186,4 +188,5 @@ def test_publication_gate_reports_every_visible_blocker() -> None:
     assert "product-owner-geography-approval" in message
     assert "independent-connectivity-review" in message
     assert "systematic-error-bound" in message
+    assert "egm2008-evaluator-conventions" in message
     assert "dsm-representation-bias-bound" in message
