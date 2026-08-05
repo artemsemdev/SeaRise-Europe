@@ -6,6 +6,7 @@
   "methodologyId": "absolute-mean-water-surface-egm2008-interval-v1",
   "decision": {
     "status": "complete",
+    "authority": "automated-methodology-analysis",
     "recommendedDisposition": "rejected",
     "reason": "The locked sources do not provide a finite coastal SLA representativeness bound or a finite GLO-30 DSM-to-bare-earth bound. Both apply to the intended land-exposure result, so no scientific binary cell is eligible under the fail-closed rule."
   },
@@ -447,11 +448,12 @@
   "maximumTotalUncertaintyMetres": null,
   "review": {
     "status": "pending-independent",
+    "authoritativeDisposition": "pending",
     "requiredRole": "independent scientific/data reviewer",
     "record": "No independent person has approved, rejected, or blocked this recommendation. Automation may prepare evidence but cannot self-approve it."
   },
   "publicationGate": {
-    "status": "rejected",
+    "status": "blocked",
     "blockingDecisions": [
       "independent-uncertainty-budget-review",
       "finite-coastal-sla-representativeness-bound-or-method-change",
