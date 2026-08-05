@@ -25,6 +25,7 @@ def test_current_contracts_end_in_explicit_blocked_state() -> None:
     assert "vertical-compatibility" in gate.blockers
     assert "projection-archive-sha256" in gate.blockers
     assert "canonical-coastal-source" in gate.blockers
+    assert "vertical-methodology-review" in gate.blockers
     assert gate.missing_evidence
 
 
@@ -38,6 +39,11 @@ def test_all_nine_layers_record_lineage_without_claiming_completion() -> None:
     assert all(item.status == "blocked" for item in gate.layers)
     assert all(item.source_lineage["variable"] == "sea_level_change" for item in gate.layers)
     assert all(item.source_lineage["quantile"] == 0.5 for item in gate.layers)
+    assert all(
+        item.source_lineage["verticalMethodology"]
+        == "absolute-mean-water-surface-egm2008-interval-v1"
+        for item in gate.layers
+    )
 
 
 def test_release_guard_prevents_scientific_artifacts_and_phase_1() -> None:
@@ -60,6 +66,7 @@ def test_no_go_is_not_implicitly_promoted_after_contract_edits() -> None:
     contracts = load_science_contracts()
     source = deepcopy(contracts.source_semantics)
     geography = deepcopy(contracts.geography_rules)
+    vertical_methodology = deepcopy(contracts.vertical_methodology)
     source["publicationGate"]["status"] = "approved"
     source["publicationGate"]["blockingDecisions"] = []
     geography["publicationGate"]["status"] = "approved"
@@ -73,8 +80,11 @@ def test_no_go_is_not_implicitly_promoted_after_contract_edits() -> None:
     ):
         review["status"] = "approved"
 
-    gate = evaluate_methodology_gate(ScienceContracts(source, geography))
+    gate = evaluate_methodology_gate(
+        ScienceContracts(source, geography, vertical_methodology)
+    )
 
-    assert gate.state == "approved"
+    assert gate.state == "blocked"
     assert gate.unlocks_phase_1 is False
-    assert all(item.status == "ready-for-regional-build" for item in gate.layers)
+    assert "vertical-methodology-review" in gate.blockers
+    assert all(item.status == "blocked" for item in gate.layers)
