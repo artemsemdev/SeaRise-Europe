@@ -78,7 +78,8 @@ artifact for the independent comparison.
 2. Download the native Ubuntu candidate and compare it with the measured macOS
    candidate using the repository reproducibility command.
 3. Record the resulting cross-environment evidence. Keep
-   `automatedValidation=pending` if the comparison is absent or fails.
+   `automatedValidation=pending` while the comparison is absent; set it to
+   `failed` when a supplied comparison fails.
 4. After integration reaches `master`, the project owner records
    `releaseDisposition=approved`, `rejected`, or `blocked`. CI cannot make that
    decision.
