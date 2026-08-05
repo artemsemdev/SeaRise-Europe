@@ -140,12 +140,15 @@ jobs:
 
       - uses: actions/setup-python@v5.6.0
         with:
-          python-version: "3.11"
+          python-version: "3.11.9"
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
-          pip install ruff mypy pytest
+          pip install --only-binary=:all: --require-hashes -r requirements-release.lock
+          pip install -e . --no-deps
+          pip install ruff mypy pytest==8.4.2
 
       - name: Validate test migration contracts
         run: |
@@ -165,6 +168,14 @@ jobs:
           python -m searise_pipeline.sources publication-check
           git -C ../.. check-ignore -q data/raw/sources/example.bin
           git -C ../.. check-ignore -q artifacts/acquisition-receipts/example.json
+
+      - name: Preflight exact AR6 release environment and fixture
+        run: |
+          pytest \
+            tests/release/test_source_fixture.py \
+            tests/release/test_toolchain.py \
+            tests/science/test_ar6_regional_release_contract.py \
+            -q
 
       - name: Unit tests
         run: pytest tests/ -v
