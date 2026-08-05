@@ -405,6 +405,60 @@ def _canonical_metadata(
     }
 
 
+def _expected_metadata(
+    source: RegionalReleaseSource,
+    layer: RegionalLayer,
+    contract: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Derive the validation oracle without using the metadata writer helper."""
+    specification = contract["artifacts"]["pmtiles"]
+    return {
+        "attribution": contract["source"]["attribution"],
+        "description": (
+            f"IPCC AR6 {layer.scenario} {layer.horizon} source-native 1 degree grid; visual only"
+        ),
+        "format": "pbf",
+        "generator": f"tippecanoe v{contract['toolchain']['tippecanoe']['version']}",
+        "name": f"SeaRise AR6 {layer.scenario} {layer.horizon}",
+        "searise": {
+            "baseline": contract["values"]["baseline"],
+            "confidence": contract["values"]["confidence"],
+            "horizon": int(layer.horizon),
+            "member_sha256": layer.member_sha256,
+            "method_version": "ar6-regional-projection-v1",
+            "native_resolution_degrees": contract["grid"]["nativeResolutionDegrees"],
+            "published_units": contract["values"]["publishedUnits"],
+            "quantiles": contract["matrix"]["quantiles"],
+            "release_contract_id": contract["releaseContractId"],
+            "scenario": layer.scenario,
+            "scientific_lookup": "prohibited",
+            "scale_to_metres": contract["values"]["scaleToMetres"],
+            "source_archive_sha256": source.archive_sha256,
+            "source_release": contract["source"]["version"],
+            "units": "mm",
+            "visual_only": True,
+        },
+        "type": "overlay",
+        "vector_layers": [
+            {
+                "description": "AR6 source-native cells; visual only",
+                "fields": {
+                    "horizon": "Number",
+                    "lower_mm": "Number",
+                    "median_mm": "Number",
+                    "scenario": "String",
+                    "source_location_id": "Number",
+                    "upper_mm": "Number",
+                },
+                "id": specification["layerId"],
+                "maxzoom": specification["maximumZoom"],
+                "minzoom": specification["minimumZoom"],
+            }
+        ],
+        "version": "1",
+    }
+
+
 def _decode_properties(
     decode_path: Path,
     archive_path: Path,
@@ -517,7 +571,7 @@ def write_visual_pmtiles(
         _run([str(pmtiles_path), "edit", str(archive_path), f"--metadata={metadata_path}"])
         _run([str(pmtiles_path), "verify", str(archive_path)])
         metadata = json.loads(_run([str(pmtiles_path), "show", str(archive_path), "--metadata"]))
-        expected_metadata = _canonical_metadata(source, layer, contract)
+        expected_metadata = _expected_metadata(source, layer, contract)
         prohibited = {"generator_options", "tilestats", "timestamp", "hostname", "host"}
         if metadata != expected_metadata or prohibited.intersection(metadata):
             raise ScienceContractError("PMTiles metadata differs from the canonical allow-list")
