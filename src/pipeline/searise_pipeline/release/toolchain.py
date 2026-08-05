@@ -75,7 +75,7 @@ def validate_python_toolchain(
         if match is None:
             raise ScienceContractError("Python release lock contains an unpinned entry")
         locked[match.group("name")] = match.group("version")
-    if any(locked.get(name) != version for name, version in pin["packageVersions"].items()):
+    if locked != pin["packageVersions"]:
         raise ScienceContractError("Python release lock differs from package-version pins")
     packages: dict[str, str] = {}
     for distribution, expected in locked.items():
