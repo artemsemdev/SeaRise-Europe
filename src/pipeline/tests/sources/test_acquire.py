@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from searise_pipeline.sources.acquire import Acquirer, AcquisitionError
-from searise_pipeline.sources.registry import Asset, Licence, Source
+from searise_pipeline.sources.registry import Asset, Licence, ObjectSet, Source
 
 LOCKED_BYTES = b"locked-source-bytes\n"
 HTML_BYTES = b"<!doctype html><html><form>login</form></html>"
@@ -248,6 +248,36 @@ def test_uncertain_rights_block_before_cache_or_network(tmp_path: Path, source_s
     _rejection(
         lambda: _acquirer(tmp_path).fetch(_source("review-required"), _asset(base_url)),
         "permission-blocked",
+    )
+
+    assert counts == {}
+
+
+def test_object_set_requires_manifest_driven_acquisition(tmp_path: Path, source_server):
+    base_url, counts = source_server
+    asset = replace(
+        _asset(base_url),
+        kind="object-set",
+        byte_size=None,
+        sha256=None,
+        object_set=ObjectSet(
+            contract="monthly-series-v1",
+            manifest_path="manifest.jsonl.gz",
+            manifest_media_type="application/gzip",
+            manifest_byte_size=1,
+            manifest_sha256="0" * 64,
+            payload_sha256="0" * 64,
+            object_count=1,
+            total_byte_size=1,
+            key_prefix="dataset",
+            reference_start="2020-01-01",
+            reference_end="2020-02-01",
+        ),
+    )
+
+    _rejection(
+        lambda: _acquirer(tmp_path).fetch(_source(), asset),
+        "manifest-driven-object-set-required",
     )
 
     assert counts == {}
