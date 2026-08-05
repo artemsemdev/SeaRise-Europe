@@ -302,6 +302,20 @@
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Checked-in real-source fixture, pinned PyArrow writer, exact readback, fixed row counts, and byte-identical rebuild assertion." }
     },
     {
+      "id": "pipeline-ar6-release-pmtiles",
+      "layer": "scientific",
+      "owner": "science",
+      "purpose": "Verify visual PMTiles fail closed without the pinned toolchain and preserve canonical bytes and exact integer properties when the tools are available.",
+      "sourcePaths": ["src/pipeline/tests/release/test_pmtiles.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/release/pmtiles.py", "src/pipeline/tests/release/test_pmtiles.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent visual-only artifact tool-pin, canonicalization, official-verifier, and exact-property gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_pmtiles.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 8, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Internal fail-closed test is unconditional; external determinism and property parity require the pinned Tippecanoe and go-pmtiles binaries." }
+    },
+    {
       "id": "pipeline-regional-fixture",
       "layer": "scientific",
       "owner": "science",
@@ -496,6 +510,7 @@
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_9_attempt.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_source_fixture.py", "suite": "pipeline-ar6-release-source-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
