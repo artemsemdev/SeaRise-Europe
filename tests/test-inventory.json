@@ -32,6 +32,12 @@
       "observedAt": "2026-08-05T00:10:00+02:00",
       "reference": ".github/workflows/ci.yml and .github/workflows/codeql.yml",
       "environment": "agent/issue-73-tdd-harness worktree"
+    },
+    "phase-0r-release-2026-08-05": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-05T21:27:52+02:00",
+      "reference": "docs/evidence/phase-0r-regional-release.md",
+      "environment": "macOS arm64; pinned macOS release profile; 82 release/science tests passed with three intentional environment skips"
     }
   },
   "suites": [
@@ -274,6 +280,20 @@
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Fixed checksums, COG metadata, receipts, and vectors passed in the successful combined Phase 0.2/0.3 run." }
     },
     {
+      "id": "pipeline-ar6-release",
+      "layer": "integration",
+      "owner": "science",
+      "purpose": "Protect the real-source AR6 candidate builder, exact artifact semantics, pinned toolchains, delivery evidence, reproducibility, and owner-separated recovery gate.",
+      "sourcePaths": ["src/pipeline/tests/release/test_*.py"],
+      "changedPaths": ["scripts/science/*ar6*release*.py", "scripts/science/validate_ar6_delivery_trace.py", "src/frontend/scripts/measure-ar6-release.mjs", "src/pipeline/fixtures/ar6-regional-release/**", "src/pipeline/requirements-release*.lock", "src/pipeline/science/ar6-regional-release*.json", "src/pipeline/science/evidence/ar6-regional-release/**", "src/pipeline/searise_pipeline/release/**", "src/pipeline/tests/release/**", "src/pipeline/toolchain/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent release-integrity, reproducibility, delivery-budget, and owner-approval separation gate." },
+      "commands": { "focused": "cd src/pipeline && pytest tests/release -q", "full": "cd src/pipeline && pytest tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "release-toolchain", "requiresDocker": true, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 7, "class": "fast", "evidenceRef": "phase-0r-release-2026-08-05", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic fixture and real-source evidence tests passed locally; external encoder tests require the pinned release profile and otherwise skip explicitly." }
+    },
+    {
       "id": "pipeline-legacy-transform",
       "layer": "unit",
       "owner": "data",
@@ -452,6 +472,18 @@
     { "path": "src/pipeline/tests/regional_fixture/test_lookup.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_14_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_9_attempt.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_builder.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_committed_evidence.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_delivery.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_recovery_gate.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_reproducibility.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_source_fixture.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_source_grid.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_toolchain.py", "suite": "pipeline-ar6-release", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup_goldens.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -488,8 +520,8 @@
     {
       "id": "real-source-regional-science",
       "owner": "science",
-      "targetIssue": 85,
-      "description": "Phase 0.9 attempted all nine combinations with exact lineage but stopped before arrays because the required numerical and reviewed scientific evidence is unavailable."
+      "targetIssue": 110,
+      "description": "The projection contract now has a complete measured macOS candidate; native Linux cross-environment evidence and the owner release disposition remain pending."
     },
     {
       "id": "pipeline-legacy-mypy",
@@ -507,13 +539,13 @@
       "id": "promotion-routing",
       "owner": "platform",
       "targetIssue": 61,
-      "description": "Current CI has fast legacy jobs but no regional/release promotion workflow consuming this classification yet."
+      "description": "Candidate validation and owner-separated promotion contracts exist; production protected-environment publication and rollback routing remain Phase 1 work."
     },
     {
       "id": "phase-0-final-gate-blockers",
       "owner": "science",
-      "targetIssue": 85,
-      "description": "Phase 1 remains explicitly blocked on EGM2008 evaluator conventions, numerical uncertainty bounds, independent review, Baltic/Black Sea controls, product/connectivity approval, cross-environment reproducibility, and reviewed golden vectors."
+      "targetIssue": 110,
+      "description": "Phase 1 remains explicitly blocked on native Linux reproducibility, final integration evidence, and the project-owner release disposition."
     }
   ]
 }
