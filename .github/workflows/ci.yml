@@ -22,7 +22,7 @@ on:
         default: false
         type: boolean
       release_source_revision:
-        description: Exact source commit for an AR6 evidence build
+        description: Exact master commit for an AR6 evidence build
         required: false
         type: string
 
@@ -55,6 +55,10 @@ jobs:
           RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
         run: |
           if [[ "${RELEASE_EVIDENCE}" == "true" ]]; then
+            if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+              echo "release evidence must be dispatched from master" >&2
+              exit 1
+            fi
             if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
               echo "release_source_revision must be one exact lowercase commit SHA" >&2
               exit 1
@@ -246,6 +250,7 @@ jobs:
     needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' &&
+      github.ref_name == 'master' &&
       inputs.release_evidence == true
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -254,6 +259,10 @@ jobs:
         env:
           RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
         run: |
+          if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "release evidence must be dispatched from master" >&2
+            exit 1
+          fi
           if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "release_source_revision must be one exact lowercase commit SHA" >&2
             exit 1
@@ -426,6 +435,7 @@ jobs:
     needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' &&
+      github.ref_name == 'master' &&
       inputs.release_evidence == true
     runs-on: macos-14
     timeout-minutes: 120
@@ -434,6 +444,10 @@ jobs:
         env:
           RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
         run: |
+          if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "release evidence must be dispatched from master" >&2
+            exit 1
+          fi
           if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "release_source_revision must be one exact lowercase commit SHA" >&2
             exit 1
