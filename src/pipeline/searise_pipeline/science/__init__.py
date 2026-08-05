@@ -2,10 +2,12 @@
 
 from .ar6 import (
     Ar6GridSlice,
+    Ar6MemberIdentity,
     Ar6ProjectionInterval,
     bilinear_sample,
     extract_projection_grid,
     extract_projection_interval,
+    projection_member_identity,
     validate_ar6_schema,
 )
 from .baseline import BaselineSurface, MonthlySlaField, reconstruct_baseline_surface
@@ -49,6 +51,7 @@ from .vertical import (
 
 __all__ = [
     "Ar6GridSlice",
+    "Ar6MemberIdentity",
     "Ar6ProjectionInterval",
     "BaselineSurface",
     "CandidateGeometries",
@@ -80,6 +83,7 @@ __all__ = [
     "inspect_dem_sample",
     "inspect_geometry_assets",
     "projection_mapping",
+    "projection_member_identity",
     "reconstruct_baseline_surface",
     "reconcile_baseline_to_egm2008",
     "reconcile_vertical_interval",
