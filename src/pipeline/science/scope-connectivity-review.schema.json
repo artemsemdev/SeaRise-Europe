@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/scope-connectivity-review-v1.json",
+  "title": "SeaRise Europe Phase 0.13 scope and connectivity review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "reviewId",
+    "issue",
+    "recordedAt",
+    "candidate",
+    "evidenceBindings",
+    "evidenceBundleSha256",
+    "controlObservations",
+    "semanticControls",
+    "empiricalControls",
+    "blockingDependencies",
+    "review"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "reviewId": { "const": "phase-0.13-scope-connectivity-review" },
+    "issue": { "const": 97 },
+    "recordedAt": { "type": "string", "format": "date" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "evidenceBindings": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/binding" }
+    },
+    "evidenceBundleSha256": { "$ref": "#/$defs/sha256" },
+    "controlObservations": {
+      "type": "array",
+      "minItems": 36,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/controlObservation" }
+    },
+    "semanticControls": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/semanticControl" }
+    },
+    "empiricalControls": {
+      "type": "array",
+      "minItems": 9,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/empiricalControl" }
+    },
+    "blockingDependencies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "integer", "minimum": 1 }
+    },
+    "review": { "$ref": "#/$defs/review" }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*\\.\\.).+$" },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "sha256"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terrain", "support", "coastalScope", "connectivity"],
+      "properties": {
+        "terrain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["instance", "release", "model", "status"],
+          "properties": {
+            "instance": { "const": "GLO-30" },
+            "release": { "const": "2021_1" },
+            "model": { "const": "digital-surface-model" },
+            "status": { "const": "selected-for-external-review" }
+          }
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "predicate", "status", "canonical"],
+          "properties": {
+            "version": { "const": "natural-earth-5.1.1-explicit-scope-v2" },
+            "predicate": { "const": "covers" },
+            "status": { "const": "selected-scope-approximation" },
+            "canonical": { "const": false }
+          }
+        },
+        "coastalScope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "distanceMetres", "role", "hazardExtentClaim", "canonical"],
+          "properties": {
+            "version": { "const": "natural-earth-5.1.1-25km-scope-v2" },
+            "distanceMetres": { "const": 25000 },
+            "role": { "const": "product-eligibility-only" },
+            "hazardExtentClaim": { "const": false },
+            "canonical": { "const": false }
+          }
+        },
+        "connectivity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "neighbourhood", "seedSource", "status", "hydrodynamicModel"],
+          "properties": {
+            "id": { "const": "ocean-seeded-eight-neighbour-v1" },
+            "neighbourhood": { "const": 8 },
+            "seedSource": { "const": "pinned GLO-30 WBM ocean cells" },
+            "status": { "const": "selected-for-external-review" },
+            "hydrodynamicModel": { "const": false }
+          }
+        }
+      }
+    },
+    "reviewerStatus": {
+      "enum": ["pending-independent-review", "approved", "rejected", "blocked"]
+    },
+    "controlObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "domain", "kind", "provenance", "expected", "observed", "automationStatus", "reviewerStatus"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "domain": { "enum": ["geography", "connectivity"] },
+        "kind": { "$ref": "#/$defs/text" },
+        "provenance": { "type": "object", "minProperties": 1 },
+        "expected": { "type": "object", "minProperties": 1 },
+        "observed": { "type": "object", "minProperties": 1 },
+        "automationStatus": { "enum": ["passed", "failed"] },
+        "reviewerStatus": { "$ref": "#/$defs/reviewerStatus" }
+      }
+    },
+    "semanticControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "longitude", "latitude", "provenance", "expectedState", "observedState", "reviewerStatus"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "name": { "$ref": "#/$defs/text" },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "provenance": { "$ref": "#/$defs/text" },
+        "expectedState": { "enum": ["DataUnavailable", "OutOfScope", "UnsupportedGeography"] },
+        "observedState": { "enum": ["DataUnavailable", "OutOfScope", "UnsupportedGeography"] },
+        "reviewerStatus": { "$ref": "#/$defs/reviewerStatus" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preFilterPositiveCellCount",
+        "postFilterPositiveCellCount",
+        "removedCellCount",
+        "removalFraction",
+        "referencePositiveCellCount",
+        "falsePositiveBeforeCount",
+        "falsePositiveAfterCount",
+        "falsePositiveBeforeRate",
+        "falsePositiveAfterRate",
+        "disputedCellCount",
+        "tileSeamMismatchCellCount"
+      ],
+      "properties": {
+        "preFilterPositiveCellCount": { "$ref": "#/$defs/countOrNull" },
+        "postFilterPositiveCellCount": { "$ref": "#/$defs/countOrNull" },
+        "removedCellCount": { "$ref": "#/$defs/countOrNull" },
+        "removalFraction": { "$ref": "#/$defs/rateOrNull" },
+        "referencePositiveCellCount": { "$ref": "#/$defs/countOrNull" },
+        "falsePositiveBeforeCount": { "$ref": "#/$defs/countOrNull" },
+        "falsePositiveAfterCount": { "$ref": "#/$defs/countOrNull" },
+        "falsePositiveBeforeRate": { "$ref": "#/$defs/rateOrNull" },
+        "falsePositiveAfterRate": { "$ref": "#/$defs/rateOrNull" },
+        "disputedCellCount": { "$ref": "#/$defs/countOrNull" },
+        "tileSeamMismatchCellCount": { "$ref": "#/$defs/countOrNull" }
+      }
+    },
+    "countOrNull": { "type": ["integer", "null"], "minimum": 0 },
+    "rateOrNull": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "empiricalControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "name", "longitude", "latitude", "provenance", "expected", "requiredChecks", "observation", "reviewerStatus"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "kind": { "enum": ["port", "estuary", "lagoon", "island", "disconnected-low-terrain", "steep-coast", "diagonal-leak", "wbm-barrier", "mosaic-tile-seam"] },
+        "name": { "$ref": "#/$defs/text" },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "provenance": { "$ref": "#/$defs/text" },
+        "expected": { "$ref": "#/$defs/text" },
+        "requiredChecks": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/text" }
+        },
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "metrics", "evidence", "blockingIssues"],
+          "properties": {
+            "status": { "enum": ["blocked-by-dependencies", "complete"] },
+            "metrics": { "$ref": "#/$defs/metrics" },
+            "evidence": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/$defs/binding" }
+              ]
+            },
+            "blockingIssues": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "reviewerStatus": { "$ref": "#/$defs/reviewerStatus" }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "publicKeyPath", "publicKeySha256", "signatureBase64"],
+      "properties": {
+        "kind": { "const": "ed25519-detached-signature" },
+        "publicKeyPath": { "$ref": "#/$defs/path" },
+        "publicKeySha256": { "$ref": "#/$defs/sha256" },
+        "signatureBase64": { "type": "string", "minLength": 80 }
+      }
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "decision", "reviewer", "independenceStatement", "proof"],
+      "properties": {
+        "role": { "enum": ["product reviewer", "scientific/data reviewer"] },
+        "decision": { "enum": ["pending", "approved", "rejected", "blocked"] },
+        "reviewer": { "type": ["string", "null"], "minLength": 1 },
+        "independenceStatement": { "type": ["string", "null"], "minLength": 1 },
+        "proof": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/proof" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "decision": { "const": "pending" } } },
+          "then": {
+            "properties": {
+              "reviewer": { "const": null },
+              "independenceStatement": { "const": null },
+              "proof": { "const": null }
+            }
+          },
+          "else": {
+            "properties": {
+              "reviewer": { "type": "string", "minLength": 1 },
+              "independenceStatement": { "type": "string", "minLength": 1 },
+              "proof": { "$ref": "#/$defs/proof" }
+            }
+          }
+        }
+      ]
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "disposition", "approvalReady", "reviewedCommit", "decisionBindingSha256", "reviewers", "nextDecision"],
+      "properties": {
+        "status": { "enum": ["pending-independent-review", "decided"] },
+        "disposition": { "enum": [null, "approved", "rejected", "blocked"] },
+        "approvalReady": { "type": "boolean" },
+        "reviewedCommit": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+          ]
+        },
+        "decisionBindingSha256": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/sha256" }
+          ]
+        },
+        "reviewers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["product", "scientific"],
+          "properties": {
+            "product": { "$ref": "#/$defs/reviewer" },
+            "scientific": { "$ref": "#/$defs/reviewer" }
+          }
+        },
+        "nextDecision": { "$ref": "#/$defs/text" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "pending-independent-review" } } },
+          "then": {
+            "properties": {
+              "disposition": { "const": null },
+              "approvalReady": { "const": false },
+              "reviewedCommit": { "const": null },
+              "decisionBindingSha256": { "const": null }
+            }
+          },
+          "else": {
+            "properties": {
+              "disposition": { "enum": ["approved", "rejected", "blocked"] },
+              "reviewedCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+              "decisionBindingSha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
