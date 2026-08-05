@@ -249,7 +249,7 @@
       "id": "pipeline-regional-fixture",
       "layer": "scientific",
       "owner": "science",
-      "purpose": "Validate real-source regional lineage, COG structure, lookup parity, and the fail-closed methodology gate.",
+      "purpose": "Validate historical real-source fixture mechanics, exact nine-combination lineage, reproducible blocked attempts, and the explicit final scientific gate.",
       "sourcePaths": ["src/pipeline/tests/regional_fixture/test_*.py"],
       "changedPaths": ["src/pipeline/fixtures/regional/**", "src/pipeline/searise_pipeline/regional_fixture/**", "src/pipeline/tests/regional_fixture/**"],
       "disposition": "keep-permanently",
@@ -431,8 +431,10 @@
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_evidence.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/regional_fixture/test_final_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_lookup.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/regional_fixture/test_phase_0_9_attempt.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_baseline.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_connectivity.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -463,8 +465,8 @@
     {
       "id": "real-source-regional-science",
       "owner": "science",
-      "targetIssue": 47,
-      "description": "No current suite transforms and validates a reviewed real-source regional candidate end to end."
+      "targetIssue": 85,
+      "description": "Phase 0.9 attempted all nine combinations with exact lineage but stopped before arrays because the required numerical and reviewed scientific evidence is unavailable."
     },
     {
       "id": "pipeline-legacy-mypy",
@@ -485,10 +487,10 @@
       "description": "Current CI has fast legacy jobs but no regional/release promotion workflow consuming this classification yet."
     },
     {
-      "id": "vertical-reconciliation-publication-evidence",
+      "id": "phase-0-final-gate-blockers",
       "owner": "science",
       "targetIssue": 85,
-      "description": "The fail-closed interval implementation is characterized, but EGM2008 evaluation conventions, QUID and terrain bounds, Baltic/Black Sea controls, cross-environment reproducibility, and independent review remain incomplete."
+      "description": "Phase 1 remains explicitly blocked on EGM2008 evaluator conventions, numerical uncertainty bounds, independent review, Baltic/Black Sea controls, product/connectivity approval, cross-environment reproducibility, and reviewed golden vectors."
     }
   ]
 }
