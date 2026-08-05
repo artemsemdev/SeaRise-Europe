@@ -23,6 +23,7 @@ class ScienceContracts:
     geography_rules: Mapping[str, Any]
     vertical_methodology: Mapping[str, Any]
     terrain_decision: Mapping[str, Any]
+    final_gate: Mapping[str, Any]
 
 
 def _default_contract_dir() -> Path:
@@ -48,6 +49,8 @@ def _load_document(name: str, contract_dir: Path) -> Mapping[str, Any]:
     if errors:
         details = "; ".join(_format_error(error) for error in errors)
         raise ScienceContractError(f"Invalid {name} contract: {details}")
+    if not isinstance(document, dict):
+        raise ScienceContractError(f"Invalid {name} contract: document must be an object")
     return document
 
 
@@ -59,6 +62,7 @@ def load_science_contracts(contract_dir: Path | None = None) -> ScienceContracts
         geography_rules=_load_document("geography-rules", root),
         vertical_methodology=_load_document("vertical-methodology", root),
         terrain_decision=_load_document("terrain-decision", root),
+        final_gate=_load_document("phase-0-9-gate", root),
     )
 
 
@@ -74,7 +78,10 @@ def projection_mapping(
             f"No projection mapping for {source_id}/{version}; "
             f"expected {projection['sourceId']}/{projection['version']}"
         )
-    return projection["mapping"]
+    mapping = projection["mapping"]
+    if not isinstance(mapping, dict):
+        raise ScienceContractError("Projection mapping must be an object")
+    return mapping
 
 
 def verify_geometry_assets(contracts: ScienceContracts, repo_root: Path) -> None:
@@ -139,5 +146,8 @@ def assert_publication_ready(contracts: ScienceContracts) -> None:
         gate = document["publicationGate"]
         if gate["status"] != "approved":
             blockers.extend(str(item) for item in gate["blockingDecisions"])
+    final_gate = contracts.final_gate
+    if final_gate["decision"] != "approved" or not final_gate["phase1"]["unlocked"]:
+        blockers.extend(str(item) for item in final_gate["blockerIds"])
     if blockers:
         raise ScienceContractError("Scientific publication gate is blocked: " + ", ".join(blockers))

@@ -90,7 +90,13 @@ def test_no_go_is_not_implicitly_promoted_after_contract_edits() -> None:
         review["status"] = "approved"
 
     gate = evaluate_methodology_gate(
-        ScienceContracts(source, geography, vertical_methodology, terrain_decision)
+        ScienceContracts(
+            source,
+            geography,
+            vertical_methodology,
+            terrain_decision,
+            contracts.final_gate,
+        )
     )
 
     assert gate.state == "blocked"
