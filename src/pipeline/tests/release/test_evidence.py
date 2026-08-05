@@ -21,22 +21,36 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _seal(root: Path) -> None:
+    checksum_path = root / "checksums.txt"
+    checksums = [
+        f"{_sha(path)}  {path.relative_to(root).as_posix()}"
+        for path in sorted(item for item in root.rglob("*") if item.is_file())
+        if path != checksum_path
+    ]
+    checksum_path.write_text("\n".join(checksums) + "\n", encoding="utf-8")
+
+
 def _candidate(root: Path) -> None:
-    data = root / "analysis/value.bin"
-    data.parent.mkdir(parents=True)
-    data.write_bytes(b"science")
+    artifacts = []
+    for index in range(31):
+        relative = "analysis/value.bin" if index == 0 else f"analysis/value-{index:02d}.bin"
+        data = root / relative
+        data.parent.mkdir(parents=True, exist_ok=True)
+        data.write_bytes(f"science-{index}\n".encode())
+        artifacts.append(
+            {
+                "path": relative,
+                "byteSize": data.stat().st_size,
+                "sha256": _sha(data),
+            }
+        )
     _write(
         root / "manifest.json",
         {
             "releaseId": "candidate-v1",
             "releaseContractId": "ar6-europe-regional-release-v1",
-            "artifacts": [
-                {
-                    "path": "analysis/value.bin",
-                    "byteSize": data.stat().st_size,
-                    "sha256": _sha(data),
-                }
-            ],
+            "artifacts": artifacts,
         },
     )
     _write(
@@ -51,11 +65,7 @@ def _candidate(root: Path) -> None:
     _write(root / "source-receipt.json", {"releaseContractSha256": "b" * 64})
     _write(root / "gate.json", {"automatedValidation": "pending"})
     _write(root / "statistics.json", {"layers": 9})
-    checksums = [
-        f"{_sha(path)}  {path.relative_to(root).as_posix()}"
-        for path in sorted(item for item in root.rglob("*") if item.is_file())
-    ]
-    (root / "checksums.txt").write_text("\n".join(checksums) + "\n", encoding="utf-8")
+    _seal(root)
 
 
 @pytest.mark.parametrize(
@@ -92,4 +102,67 @@ def test_candidate_seal_rejects_unsafe_artifact_path(tmp_path: Path) -> None:
     _write(tmp_path / "manifest.json", manifest)
 
     with pytest.raises(ScienceContractError, match="unsafe artifact path"):
+        candidate_binding(tmp_path)
+
+
+@pytest.mark.parametrize("relative", ["gate.json", "statistics.json"])
+def test_candidate_seal_rejects_deleted_authoritative_file_after_reseal(
+    tmp_path: Path,
+    relative: str,
+) -> None:
+    _candidate(tmp_path)
+    (tmp_path / relative).unlink()
+    _seal(tmp_path)
+
+    with pytest.raises(ScienceContractError, match="file inventory"):
+        candidate_binding(tmp_path)
+
+
+def test_candidate_seal_rejects_unexpected_file_after_reseal(tmp_path: Path) -> None:
+    _candidate(tmp_path)
+    _write(tmp_path / "unexpected.json", {"trusted": False})
+    _seal(tmp_path)
+
+    with pytest.raises(ScienceContractError, match="file inventory"):
+        candidate_binding(tmp_path)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra"])
+def test_candidate_seal_rejects_inexact_checksum_lines(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    _candidate(tmp_path)
+    checksum_path = tmp_path / "checksums.txt"
+    lines = checksum_path.read_text(encoding="utf-8").splitlines()
+    if mutation == "missing":
+        lines.pop()
+    else:
+        lines.append(f"{'0' * 64}  unexpected.json")
+    checksum_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    with pytest.raises(ScienceContractError, match="checksum inventory"):
+        candidate_binding(tmp_path)
+
+
+def test_candidate_seal_rejects_nested_checksum_inventory(tmp_path: Path) -> None:
+    _candidate(tmp_path)
+    nested = tmp_path / "nested/checksums.txt"
+    nested.parent.mkdir()
+    nested.write_text("not authoritative\n", encoding="utf-8")
+    _seal(tmp_path)
+
+    with pytest.raises(ScienceContractError, match="file inventory"):
+        candidate_binding(tmp_path)
+
+
+def test_candidate_seal_rejects_symlinked_files(tmp_path: Path) -> None:
+    _candidate(tmp_path)
+    gate = tmp_path / "gate.json"
+    target = tmp_path / "gate-target.json"
+    gate.replace(target)
+    gate.symlink_to(target.name)
+    _seal(tmp_path)
+
+    with pytest.raises(ScienceContractError, match="symlink"):
         candidate_binding(tmp_path)

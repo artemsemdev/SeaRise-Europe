@@ -36,10 +36,21 @@ def binding_sha256(binding: Mapping[str, Any]) -> str:
 
 def safe_candidate_path(root: Path, relative: str) -> Path:
     candidate = Path(relative)
-    if candidate.is_absolute() or not relative or ".." in candidate.parts:
+    if (
+        candidate.is_absolute()
+        or not relative
+        or candidate.as_posix() != relative
+        or any(part in {"", ".", ".."} for part in candidate.parts)
+    ):
         raise ScienceContractError("Release manifest contains an unsafe artifact path")
     resolved_root = root.resolve()
-    resolved = (root / candidate).resolve()
+    unresolved = root / candidate
+    if any(
+        (root / Path(*candidate.parts[:index])).is_symlink()
+        for index in range(1, len(candidate.parts) + 1)
+    ):
+        raise ScienceContractError("Release candidate contains a symlink")
+    resolved = unresolved.resolve()
     if resolved == resolved_root or resolved_root not in resolved.parents:
         raise ScienceContractError("Release artifact escapes its immutable candidate")
     return resolved
@@ -47,17 +58,23 @@ def safe_candidate_path(root: Path, relative: str) -> Path:
 
 def candidate_binding(root: Path) -> Mapping[str, Any]:
     """Hash every declared artifact and the receipts before accepting evidence."""
+    try:
+        candidate_entries = list(root.rglob("*"))
+    except OSError as exc:
+        raise ScienceContractError(f"Cannot inventory release candidate: {exc}") from exc
+    if root.is_symlink() or any(path.is_symlink() for path in candidate_entries):
+        raise ScienceContractError("Release candidate contains a symlink")
+
     manifest_path = root / "manifest.json"
     receipt_path = root / "build-receipt.json"
     build_evidence_path = root / "build-evidence.json"
     source_receipt_path = root / "source-receipt.json"
+    statistics_path = root / "statistics.json"
+    gate_path = root / "gate.json"
     manifest = load_json(manifest_path)
-    receipt = load_json(receipt_path)
-    load_json(build_evidence_path)
-    load_json(source_receipt_path)
     artifacts = manifest.get("artifacts")
-    if not isinstance(artifacts, list) or not artifacts:
-        raise ScienceContractError("Release manifest has no artifacts")
+    if not isinstance(artifacts, list) or len(artifacts) != 31:
+        raise ScienceContractError("Release manifest must contain exactly 31 artifacts")
     hashes: dict[str, str] = {}
     for record in artifacts:
         if not isinstance(record, dict):
@@ -73,9 +90,27 @@ def candidate_binding(root: Path) -> Mapping[str, Any]:
         ):
             raise ScienceContractError(f"Release artifact bytes differ from manifest: {relative}")
         hashes[relative] = record["sha256"]
-    if receipt.get("releaseId") != manifest.get("releaseId"):
-        raise ScienceContractError("Build receipt and manifest release IDs differ")
+
+    evidence_paths = {
+        "manifest.json",
+        "build-receipt.json",
+        "build-evidence.json",
+        "source-receipt.json",
+        "statistics.json",
+        "gate.json",
+    }
+    if set(hashes) & evidence_paths:
+        raise ScienceContractError("Manifest artifacts overlap candidate evidence files")
+    expected_files = set(hashes) | evidence_paths
     checksum_path = root / "checksums.txt"
+    actual_files = {
+        path.relative_to(root).as_posix(): sha256(path)
+        for path in sorted(candidate_entries)
+        if path.is_file() and path != checksum_path
+    }
+    if set(actual_files) != expected_files:
+        raise ScienceContractError("Candidate file inventory differs from the exact release set")
+
     try:
         checksum_lines = checksum_path.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
@@ -83,16 +118,27 @@ def candidate_binding(root: Path) -> Mapping[str, Any]:
     declared_checksums: dict[str, str] = {}
     for line in checksum_lines:
         parts = line.split("  ", 1)
-        if len(parts) != 2 or parts[1] in declared_checksums:
+        relative = Path(parts[1]) if len(parts) == 2 else None
+        if (
+            relative is None
+            or not parts[1]
+            or relative.is_absolute()
+            or relative.as_posix() != parts[1]
+            or any(part in {"", ".", ".."} for part in relative.parts)
+            or parts[1] in declared_checksums
+        ):
             raise ScienceContractError("Candidate checksum inventory is malformed")
         declared_checksums[parts[1]] = parts[0]
-    actual_files = {
-        path.relative_to(root).as_posix(): sha256(path)
-        for path in sorted(item for item in root.rglob("*") if item.is_file())
-        if path.name != "checksums.txt"
-    }
     if declared_checksums != actual_files:
         raise ScienceContractError("Candidate checksum inventory differs from actual files")
+
+    receipt = load_json(receipt_path)
+    load_json(build_evidence_path)
+    load_json(source_receipt_path)
+    load_json(statistics_path)
+    load_json(gate_path)
+    if receipt.get("releaseId") != manifest.get("releaseId"):
+        raise ScienceContractError("Build receipt and manifest release IDs differ")
     candidate_files = {
         **actual_files,
         "checksums.txt": sha256(checksum_path),
