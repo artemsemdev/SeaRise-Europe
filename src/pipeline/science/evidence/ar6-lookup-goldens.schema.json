@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.dev/schemas/ar6-lookup-goldens.schema.json",
+  "title": "Offline IPCC AR6 grid lookup golden evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "goldenSetId",
+    "validationContract",
+    "decisionContract",
+    "scopeGeometry",
+    "provenance",
+    "numericToleranceMetres",
+    "results"
+  ],
+  "properties": {
+    "$schema": { "const": "./ar6-lookup-goldens.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "goldenSetId": { "const": "ar6-regional-projection-goldens-v1" },
+    "validationContract": { "$ref": "#/$defs/fileBinding" },
+    "decisionContract": { "$ref": "#/$defs/fileBinding" },
+    "scopeGeometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["support", "coastal", "predicate"],
+      "properties": {
+        "support": { "$ref": "#/$defs/fileBinding" },
+        "coastal": { "$ref": "#/$defs/fileBinding" },
+        "predicate": { "const": "covers" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retrievedAt",
+        "sourceRecord",
+        "archiveSha256",
+        "memberSha256",
+        "readerName",
+        "readerVersion",
+        "generatorPath",
+        "generatorSha256",
+        "networkRequiredForValidation",
+        "onlineReferenceRole"
+      ],
+      "properties": {
+        "retrievedAt": { "type": "string", "format": "date" },
+        "sourceRecord": { "const": "https://zenodo.org/records/6382554" },
+        "archiveSha256": { "$ref": "#/$defs/sha256" },
+        "memberSha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ssp126", "ssp245", "ssp585"],
+          "properties": {
+            "ssp126": { "$ref": "#/$defs/sha256" },
+            "ssp245": { "$ref": "#/$defs/sha256" },
+            "ssp585": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "readerName": { "const": "netCDF4-python" },
+        "readerVersion": { "type": "string", "minLength": 1 },
+        "generatorPath": { "const": "scripts/science/build_ar6_lookup_goldens.py" },
+        "generatorSha256": { "$ref": "#/$defs/sha256" },
+        "networkRequiredForValidation": { "const": false },
+        "onlineReferenceRole": { "const": "supplementary-manual-cross-check-only" }
+      }
+    },
+    "numericToleranceMetres": { "const": 1e-6 },
+    "results": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": { "$ref": "#/$defs/result" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "coordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["locationId", "latitude", "longitude", "family", "distanceKilometres"],
+      "properties": {
+        "locationId": { "type": "integer", "minimum": 1000000000 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 179 },
+        "family": { "const": "grid" },
+        "distanceKilometres": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario",
+        "horizon",
+        "lowerMetres",
+        "centralMetres",
+        "upperMetres"
+      ],
+      "properties": {
+        "scenario": { "enum": ["ssp1-26", "ssp2-45", "ssp5-85"] },
+        "horizon": { "enum": [2030, 2050, 2100] },
+        "lowerMetres": { "type": "number" },
+        "centralMetres": { "type": "number" },
+        "upperMetres": { "type": "number" }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "coordinates", "state", "reasonCode"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "coordinates": { "$ref": "#/$defs/coordinates" },
+        "state": {
+          "enum": ["ProjectionAvailable", "OutOfScope", "UnsupportedGeography"]
+        },
+        "reasonCode": {
+          "enum": [
+            "projection-available",
+            "outside-coastal-scope",
+            "outside-europe-support"
+          ]
+        },
+        "source": { "$ref": "#/$defs/source" },
+        "projections": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": { "$ref": "#/$defs/projection" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "ProjectionAvailable" } } },
+          "then": { "required": ["source", "projections"] },
+          "else": {
+            "not": { "anyOf": [{ "required": ["source"] }, { "required": ["projections"] }] }
+          }
+        }
+      ]
+    }
+  }
+}
