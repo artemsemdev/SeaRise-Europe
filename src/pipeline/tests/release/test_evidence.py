@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from searise_pipeline.release.evidence import candidate_binding, write_new_json_record
+from searise_pipeline.release.evidence import (
+    candidate_binding,
+    ensure_outside_candidate,
+    load_json_snapshot,
+    write_new_json_record,
+)
 from searise_pipeline.science import ScienceContractError
 
 from .test_source_fixture import contract
@@ -267,3 +272,27 @@ def test_immutable_json_record_is_atomic_and_never_overwritten(tmp_path: Path) -
 
     assert json.loads(record.read_text(encoding="utf-8")) == {"status": "first"}
     assert not list(tmp_path.glob(".evidence.json.*"))
+
+
+def test_resolved_evidence_path_survives_symlink_parent_retarget(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    alias = tmp_path / "evidence"
+    alias.symlink_to(first, target_is_directory=True)
+
+    resolved = ensure_outside_candidate(
+        candidate,
+        alias / "record.json",
+        label="Evidence record",
+        require_new=True,
+    )
+    alias.unlink()
+    alias.symlink_to(second, target_is_directory=True)
+    write_new_json_record(resolved, {"status": "bound"})
+
+    assert load_json_snapshot(first / "record.json")[0] == {"status": "bound"}
+    assert not (second / "record.json").exists()
