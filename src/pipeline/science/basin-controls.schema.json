@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/basin-controls.schema.json",
+  "title": "Phase 0.12 basin control contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "issue",
+    "evidenceDate",
+    "status",
+    "sourcePolicy",
+    "sourceBindings",
+    "windows",
+    "combinedSuite",
+    "review",
+    "publicationGate"
+  ],
+  "properties": {
+    "$schema": { "const": "./basin-controls.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0.12-baltic-black-sea-controls-v1" },
+    "issue": { "const": 96 },
+    "evidenceDate": { "type": "string", "format": "date" },
+    "status": { "const": "source-pinning-complete-vertical-goldens-blocked" },
+    "sourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scientificInputs",
+        "baselineSampling",
+        "landAndNodata",
+        "unsupportedDomain",
+        "modelIndependence"
+      ],
+      "properties": {
+        "scientificInputs": { "const": "real-source-only" },
+        "baselineSampling": { "const": "source-native-cell-centres-no-extrapolation" },
+        "landAndNodata": { "const": "DataUnavailable:source-nodata" },
+        "unsupportedDomain": { "const": "blocked-or-UnsupportedGeography-never-extrapolated" },
+        "modelIndependence": { "const": "expectations-must-not-be-generated-by-vertical-classifier" }
+      }
+    },
+    "sourceBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projection", "baseline", "geoid", "terrain", "geography", "connectivity"],
+      "properties": {
+        "projection": { "$ref": "#/$defs/sourceBinding" },
+        "baseline": { "$ref": "#/$defs/baselineBinding" },
+        "geoid": { "$ref": "#/$defs/geoidBinding" },
+        "terrain": { "$ref": "#/$defs/terrainBinding" },
+        "geography": { "$ref": "#/$defs/geographyBinding" },
+        "connectivity": { "$ref": "#/$defs/fileBinding" }
+      }
+    },
+    "windows": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/window" }
+    },
+    "combinedSuite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existingWindows", "requiredContexts", "stateExpectations", "connectivityComparison"],
+      "properties": {
+        "existingWindows": {
+          "type": "array",
+          "minItems": 5,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "requiredContexts": {
+          "type": "array",
+          "minItems": 10,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "stateExpectations": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/stateExpectation" }
+        },
+        "connectivityComparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "unfilteredCount", "connectedCount", "removedCount", "disagreementCount", "blockedBy"],
+          "properties": {
+            "status": { "const": "not-run-fail-closed" },
+            "unfilteredCount": { "type": "null" },
+            "connectedCount": { "type": "null" },
+            "removedCount": { "type": "null" },
+            "disagreementCount": { "type": "null" },
+            "blockedBy": {
+              "type": "array",
+              "minItems": 3,
+              "items": { "type": "integer" },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "review": { "$ref": "#/$defs/review" },
+    "publicationGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "europeWideClaimAllowed", "blockingIssues"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "europeWideClaimAllowed": { "const": false },
+        "blockingIssues": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "integer" },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "version", "assetId", "sha256", "members"],
+      "properties": {
+        "sourceId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "assetId": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "members": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "sha256"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
+      }
+    },
+    "baselineBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sla", "mdt", "referencePeriod", "missingPeriodRule"],
+      "properties": {
+        "sla": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceId", "version", "assetId", "manifestPath", "manifestSha256", "payloadSha256", "objectCount", "totalByteSize"],
+          "properties": {
+            "sourceId": { "const": "copernicus-marine-eur-sla-monthly" },
+            "version": { "const": "202411" },
+            "assetId": { "const": "monthly-sla-1995-2014" },
+            "manifestPath": { "type": "string", "minLength": 1 },
+            "manifestSha256": { "$ref": "#/$defs/sha256" },
+            "payloadSha256": { "$ref": "#/$defs/sha256" },
+            "objectCount": { "const": 240 },
+            "totalByteSize": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "mdt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceId", "version", "assetId", "sha256", "byteSize"],
+          "properties": {
+            "sourceId": { "const": "copernicus-marine-eur-mdt" },
+            "version": { "const": "202411" },
+            "assetId": { "const": "europe-mdt" },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "byteSize": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "referencePeriod": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startInclusive", "endExclusive", "calendarDayWeight"],
+          "properties": {
+            "startInclusive": { "const": "1995-01-01" },
+            "endExclusive": { "const": "2015-01-01" },
+            "calendarDayWeight": { "const": 7305 }
+          }
+        },
+        "missingPeriodRule": { "const": "DataUnavailable:source-nodata" }
+      }
+    },
+    "geoidBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "target"],
+      "properties": {
+        "source": { "$ref": "#/$defs/geoidModel" },
+        "target": { "$ref": "#/$defs/geoidModel" }
+      }
+    },
+    "geoidModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "version", "assetId", "memberId", "memberSha256", "tideSystem"],
+      "properties": {
+        "sourceId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "assetId": { "type": "string", "minLength": 1 },
+        "memberId": { "type": "string", "minLength": 1 },
+        "memberSha256": { "$ref": "#/$defs/sha256" },
+        "tideSystem": { "enum": ["zero_tide", "tide_free"] }
+      }
+    },
+    "terrainBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId", "version", "assetId", "publisher", "canonicalRecord",
+        "resolvedUrl", "resolvedVersion", "nativeVersion", "manifestPath",
+        "manifestByteSize", "manifestSha256", "payloadSha256", "objectCount",
+        "totalByteSize", "keyPrefix", "requiredLayers", "licence"
+      ],
+      "properties": {
+        "sourceId": { "const": "copernicus-dem-glo30" },
+        "version": { "const": "2021_1" },
+        "assetId": { "const": "baltic-black-sea-control-set" },
+        "publisher": { "type": "string", "minLength": 1 },
+        "canonicalRecord": { "type": "string", "format": "uri" },
+        "resolvedUrl": { "type": "string", "format": "uri" },
+        "resolvedVersion": { "const": "2021_1" },
+        "nativeVersion": { "const": "COP-DEM-GLO30-F" },
+        "manifestPath": { "type": "string", "minLength": 1 },
+        "manifestByteSize": { "type": "integer", "minimum": 1 },
+        "manifestSha256": { "$ref": "#/$defs/sha256" },
+        "payloadSha256": { "$ref": "#/$defs/sha256" },
+        "objectCount": { "const": 20 },
+        "totalByteSize": { "type": "integer", "minimum": 1 },
+        "keyPrefix": { "const": "Copernicus_DSM_COG_10" },
+        "requiredLayers": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "DEM" }, { "const": "EDM" }, { "const": "FLM" }, { "const": "HEM" }, { "const": "WBM" }
+          ],
+          "items": false
+        },
+        "licence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "url", "spdx", "attribution", "redistributionStatus", "requiredAcknowledgements"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "url": { "type": "string", "format": "uri" },
+            "spdx": { "const": "LicenseRef-Copernicus-DEM-GLO30" },
+            "attribution": { "type": "string", "minLength": 1 },
+            "redistributionStatus": { "const": "approved" },
+            "requiredAcknowledgements": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "geographyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["support", "coastal", "predicate"],
+      "properties": {
+        "support": { "$ref": "#/$defs/fileBinding" },
+        "coastal": { "$ref": "#/$defs/fileBinding" },
+        "predicate": { "const": "covers" }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "basin", "tile", "boundsWgs84", "contexts", "selectionBasis", "marineAnchors"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "basin": { "enum": ["Baltic Sea", "Black Sea"] },
+        "tile": { "type": "string", "pattern": "^N[0-9]{2}_00_E[0-9]{3}_00$" },
+        "boundsWgs84": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number" }, { "type": "number" }, { "type": "number" }, { "type": "number" }
+          ],
+          "items": false
+        },
+        "contexts": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "selectionBasis": { "type": "string", "minLength": 1 },
+        "marineAnchors": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/marineAnchor" }
+        }
+      }
+    },
+    "marineAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "longitude", "latitude", "expectedSourceState", "basis"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "longitude": { "type": "number" },
+        "latitude": { "type": "number" },
+        "expectedSourceState": { "enum": ["baseline-ready", "source-nodata"] },
+        "basis": { "type": "string", "minLength": 1 }
+      }
+    },
+    "stateExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "longitude", "latitude", "expectedState", "reasonCode", "classificationReasonCode", "verificationStatus", "provenance"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "longitude": { "type": "number" },
+        "latitude": { "type": "number" },
+        "expectedState": {
+          "enum": ["ModeledExposureDetected", "NoModeledExposureDetected", "DataUnavailable", "OutOfScope", "UnsupportedGeography"]
+        },
+        "reasonCode": { "type": "string", "minLength": 1 },
+        "classificationReasonCode": { "type": ["integer", "null"], "minimum": 0, "maximum": 10 },
+        "verificationStatus": {
+          "enum": ["verified-source-native", "verified-geometry", "blocked-pending-independent-executable-golden"]
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["origin", "generatedByModelUnderTest", "reviewStatus"],
+          "properties": {
+            "origin": { "type": "string", "minLength": 1 },
+            "generatedByModelUnderTest": { "const": false },
+            "reviewStatus": { "enum": ["pending-external", "source-measurement", "geometry-contract"] }
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRoles", "executableGoldens"],
+      "properties": {
+        "status": { "const": "pending-external" },
+        "requiredRoles": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "executableGoldens": { "const": "blocked-by-issues-94-and-95" }
+      }
+    }
+  }
+}
