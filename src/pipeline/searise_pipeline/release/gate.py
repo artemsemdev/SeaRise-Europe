@@ -54,10 +54,11 @@ def evaluate_recovery_gate(
     budgets = contract["budgets"]
     checks["deliveryMeasurements"] = (
         _report_check(delivery_report, {"status": "passed"})
-        and delivery_report.get("buildDurationSeconds", float("inf"))
+        and delivery_report.get("fullCleanBuildDurationSeconds", float("inf"))
         <= budgets["buildDurationSeconds"]
         and delivery_report.get("browserHeapBytes", float("inf")) <= budgets["browserHeapBytes"]
         and delivery_report.get("rangeRequestCount", float("inf")) <= budgets["rangeRequestCount"]
+        and delivery_report.get("coldTransferBytes", float("inf")) <= budgets["coldTransferBytes"]
         and delivery_report.get("lookupP95Milliseconds", float("inf"))
         <= budgets["lookupP95Milliseconds"]
     )

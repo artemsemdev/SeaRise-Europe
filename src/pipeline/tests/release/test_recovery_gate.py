@@ -27,9 +27,10 @@ REPRODUCIBILITY = {
 }
 DELIVERY = {
     "status": "passed",
-    "buildDurationSeconds": 20,
+    "fullCleanBuildDurationSeconds": 20,
     "browserHeapBytes": 8 * 1024 * 1024,
     "rangeRequestCount": 4,
+    "coldTransferBytes": 32 * 1024,
     "lookupP95Milliseconds": 2,
 }
 
@@ -99,3 +100,21 @@ def test_project_owner_can_explicitly_reject_a_complete_candidate() -> None:
 
     assert gate["disposition"] == "rejected"
     assert gate["phase1Unlocked"] is False
+
+
+def test_delivery_transfer_budget_is_required() -> None:
+    release = contract()
+    over_budget = {
+        **DELIVERY,
+        "coldTransferBytes": release["budgets"]["coldTransferBytes"] + 1,
+    }
+
+    gate = evaluate_recovery_gate(
+        {"checks": BUILD_CHECKS},
+        contract=release,
+        reproducibility_report=REPRODUCIBILITY,
+        delivery_report=over_budget,
+    )
+
+    assert gate["checks"]["deliveryMeasurements"] is False
+    assert gate["blockingChecks"] == ["deliveryMeasurements"]
