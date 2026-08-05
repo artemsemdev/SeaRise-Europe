@@ -32,6 +32,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Regional release comparison now reports local byte and value parity as
+  pending until trusted external build provenance is bound to both candidate
+  digests; self-declared receipt profiles can no longer prove independence.
 - Replaced the blocked binary terrain-exposure contract with a source-native
   IPCC AR6 regional projection contract that reports the median and published
   likely range, uses one grid-only lookup rule, and keeps release approval
