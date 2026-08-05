@@ -58,6 +58,52 @@ Add screenshots or GIFs if UI changed.
 - [ ] No secrets or local-only files committed
 ```
 
+## Coordinate Multiple Issues with Integration Branches
+
+Use the simplest branch topology that preserves independent review and a green
+default branch.
+
+- For one issue, or several truly independent issues, create one issue branch
+  and one pull request per issue directly against `master`.
+- For a phase, epic, or ordered set of dependent issues, create one temporary
+  integration branch from the latest `origin/master`, for example
+  `integration/phase-1`.
+- Create every issue branch from the commit it actually depends on. Normally
+  this is the current integration branch, using a name such as
+  `agent/issue-123-short-description`.
+- Open each issue pull request against the integration branch, not `master`.
+  Keep the issue PR focused, independently reviewable, and linked to its issue.
+- Merge issue PRs into the integration branch one at a time in dependency
+  order, only after their required checks pass. Update the integration branch
+  before starting the next dependent issue.
+- After all issue PRs are integrated, run the complete phase-level validation
+  and open one final pull request from the integration branch to `master`.
+- Do not merge the final integration pull request into `master` unless the user
+  explicitly requests it. Delete temporary issue and integration branches only
+  after the final merge and verification.
+
+Parallel agents may work only on issues whose contracts and files do not depend
+on unfinished sibling work. Give every agent its own Git worktree and issue
+branch. Never let multiple agents commit to the same branch or worktree.
+
+Before integrating parallel work:
+
+1. Decide and record the dependency order.
+2. Refresh the issue branch from the latest integration branch.
+3. Resolve conflicts and rerun tests on the issue branch, not on `master`.
+4. Merge the issue pull request into the integration branch after CI passes.
+5. Refresh the remaining dependent branches before continuing.
+
+Prefer rebasing unpublished or agent-owned issue branches to keep their history
+linear. Do not rewrite a shared or reviewed branch without coordination; use a
+normal merge when preserving published history is safer. Never force-push
+without `--force-with-lease` and explicit confirmation that nobody else is
+using the branch.
+
+The integration branch is temporary coordination infrastructure, not a place
+for unrelated cleanup or direct implementation commits. If an integration fix
+is required, make it through its own focused branch and pull request.
+
 ## Create Atomic, Readable Commits
 
 Plan commit boundaries before staging changes. Each commit should represent one
