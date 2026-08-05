@@ -630,6 +630,180 @@ def _validate_stac(
         raise ScienceContractError("STAC Items differ from the exact 3 x 3 matrix")
 
 
+def _validate_manifest(
+    root: Path,
+    manifest: Mapping[str, Any],
+    *,
+    release_id: str,
+    source: RegionalReleaseSource,
+    contract: Mapping[str, Any],
+) -> None:
+    """Independently bind all manifest records to source semantics and real bytes."""
+    source_members: dict[str, str] = {}
+    for scenario in contract["matrix"]["scenarios"]:
+        member_hashes = {
+            layer.member_sha256
+            for layer in source.layers
+            if layer.scenario == scenario
+        }
+        if len(member_hashes) != 1:
+            raise ScienceContractError("Manifest source members are inconsistent by scenario")
+        source_members[scenario] = member_hashes.pop()
+
+    expected: dict[str, Mapping[str, Any]] = {}
+    for scenario in contract["matrix"]["scenarios"]:
+        for horizon in contract["matrix"]["horizons"]:
+            layer = {"scenario": scenario, "horizon": horizon}
+            expected[f"analysis/{scenario}/{horizon}.tif"] = {
+                **layer,
+                "mediaType": (
+                    "image/tiff; application=geotiff; profile=cloud-optimized"
+                ),
+                "role": contract["artifacts"]["cog"]["role"],
+            }
+            expected[f"layers/{scenario}/{horizon}.pmtiles"] = {
+                **layer,
+                "mediaType": "application/vnd.pmtiles",
+                "role": contract["artifacts"]["pmtiles"]["role"],
+            }
+            expected[f"stac/items/{scenario}-{horizon}.json"] = {
+                **layer,
+                "mediaType": "application/geo+json",
+                "role": "stac-item",
+            }
+    expected.update(
+        {
+            "analysis/projections.parquet": {
+                "mediaType": "application/vnd.apache.parquet",
+                "role": contract["artifacts"]["geoparquet"]["role"],
+            },
+            "analysis/source-grid.json.gz": {
+                "mediaType": "application/gzip",
+                "role": "source-grid-identity",
+            },
+            "NOTICE.md": {
+                "mediaType": "text/markdown",
+                "role": "licence-notice",
+            },
+            "stac/collection.json": {
+                "mediaType": "application/json",
+                "role": "stac-collection",
+            },
+        }
+    )
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list) or len(artifacts) != 31 or len(expected) != 31:
+        raise ScienceContractError("Manifest must contain the exact 31 artifact records")
+
+    expected_method = {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none",
+    }
+    expected_rights = {
+        "licence": contract["source"]["licence"],
+        "attribution": contract["source"]["attribution"],
+        "notice": "NOTICE.md",
+    }
+    expected_values = {
+        "baseline": contract["values"]["baseline"],
+        "confidence": contract["values"]["confidence"],
+        "quantiles": contract["matrix"]["quantiles"],
+        "storageUnits": contract["values"]["storageUnits"],
+        "publishedUnits": contract["values"]["publishedUnits"],
+        "scaleToMetres": contract["values"]["scaleToMetres"],
+        "scientificDisposition": contract["scientificDisposition"],
+    }
+    root_resolved = root.resolve()
+    records_by_path: dict[str, Mapping[str, Any]] = {}
+    resolved_paths: set[Path] = set()
+    for record in artifacts:
+        if type(record) is not dict:
+            raise ScienceContractError("Manifest artifact records must be exact objects")
+        relative = record.get("path")
+        candidate = Path(relative) if isinstance(relative, str) else None
+        if (
+            candidate is None
+            or not relative
+            or candidate.is_absolute()
+            or candidate.as_posix() != relative
+            or any(part in {"", ".", ".."} for part in candidate.parts)
+        ):
+            raise ScienceContractError("Manifest artifact path is unsafe or non-canonical")
+        unresolved_path = root / candidate
+        path = unresolved_path.resolve()
+        has_symlink_component = any(
+            (root / Path(*candidate.parts[:index])).is_symlink()
+            for index in range(1, len(candidate.parts) + 1)
+        )
+        if (
+            root_resolved not in path.parents
+            or relative in records_by_path
+            or path in resolved_paths
+            or has_symlink_component
+            or not path.is_file()
+        ):
+            raise ScienceContractError("Manifest artifact paths are not unique safe files")
+        records_by_path[relative] = record
+        resolved_paths.add(path)
+
+    if set(records_by_path) != set(expected):
+        raise ScienceContractError("Manifest artifact paths differ from the exact inventory")
+    for relative, specification in expected.items():
+        record = records_by_path[relative]
+        layer_specific = "scenario" in specification
+        expected_keys = {
+            "path",
+            "mediaType",
+            "role",
+            "byteSize",
+            "sha256",
+            "source",
+            "method",
+            "rights",
+            "valueSemantics",
+        }
+        if layer_specific:
+            expected_keys.update({"scenario", "horizon"})
+        if (
+            set(record) != expected_keys
+            or record.get("mediaType") != specification["mediaType"]
+            or record.get("role") != specification["role"]
+            or (layer_specific and record.get("scenario") != specification["scenario"])
+            or (layer_specific and record.get("horizon") != specification["horizon"])
+        ):
+            raise ScienceContractError("Manifest artifact identity differs from the contract")
+        scenario = specification.get("scenario")
+        expected_source = {
+            "sourceId": contract["source"]["sourceId"],
+            "release": contract["source"]["version"],
+            "archiveSha256": source.archive_sha256,
+            "memberSha256": (
+                source_members[scenario]
+                if isinstance(scenario, str)
+                else source_members
+            ),
+        }
+        if record.get("source") != expected_source:
+            raise ScienceContractError("Manifest artifact source lineage differs from source")
+        if record.get("method") != expected_method:
+            raise ScienceContractError("Manifest artifact method binding differs from contract")
+        if record.get("rights") != expected_rights:
+            raise ScienceContractError("Manifest artifact rights binding differs from contract")
+        if record.get("valueSemantics") != expected_values:
+            raise ScienceContractError("Manifest artifact value semantics differ from contract")
+        path = root / relative
+        if (
+            type(record.get("byteSize")) is not int
+            or record["byteSize"] != path.stat().st_size
+            or type(record.get("sha256")) is not str
+            or record["sha256"] != _sha256(path)
+        ):
+            raise ScienceContractError("Manifest artifact bytes differ from the sealed record")
+
+    if manifest.get("releaseId") != release_id:
+        raise ScienceContractError("Manifest release ID differs from the candidate")
+
+
 def build_regional_release(
     source: RegionalReleaseSource,
     output_directory: Path,
@@ -899,6 +1073,13 @@ def build_regional_release(
         _write_json(root / "source-receipt.json", source_receipt)
         _write_json(root / "build-receipt.json", build_receipt)
         _write_json(root / "build-evidence.json", build_evidence)
+        _validate_manifest(
+            root,
+            manifest,
+            release_id=release_id,
+            source=source,
+            contract=contract,
+        )
         _write_json(root / "manifest.json", manifest)
         from .gate import evaluate_recovery_gate
 

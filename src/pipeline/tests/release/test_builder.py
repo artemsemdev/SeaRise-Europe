@@ -8,6 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Mapping
 
 import pytest
 
@@ -90,7 +91,11 @@ def _write_json(path: Path, document: object) -> None:
 
 def _stac_candidate(
     root: Path,
-) -> tuple[list[dict[str, object]], RegionalReleaseSource]:
+) -> tuple[
+    list[dict[str, object]],
+    RegionalReleaseSource,
+    list[Mapping[str, object]],
+]:
     artifacts: list[dict[str, object]] = []
 
     def add_artifact(
@@ -156,14 +161,57 @@ def _stac_candidate(
         media_type="application/gzip",
         role="source-grid-identity",
     )
-    _write_stac(
+    stac_records = _write_stac(
         root,
         artifacts,
         release_id="ar6-europe-fixture-v1",
         source=source,
         contract=release,
     )
-    return artifacts, source
+    return artifacts, source, stac_records
+
+
+def _manifest_candidate(
+    root: Path,
+) -> tuple[dict[str, object], RegionalReleaseSource]:
+    artifacts, source, stac_records = _stac_candidate(root)
+    release = contract()
+    notice = release_builder._write_notice(root, release)
+    records = [
+        *[
+            release_builder._attach_lineage(
+                artifact,
+                source=source,
+                contract=release,
+            )
+            for artifact in artifacts
+        ],
+        release_builder._attach_lineage(
+            notice,
+            source=source,
+            contract=release,
+        ),
+        *[
+            release_builder._attach_lineage(
+                artifact,
+                source=source,
+                contract=release,
+            )
+            for artifact in stac_records
+        ],
+    ]
+    manifest: dict[str, object] = {
+        "releaseId": "ar6-europe-fixture-v1",
+        "artifacts": records,
+    }
+    release_builder._validate_manifest(
+        root,
+        manifest,
+        release_id="ar6-europe-fixture-v1",
+        source=source,
+        contract=release,
+    )
+    return manifest, source
 
 
 def _first_stac_item(root: Path) -> tuple[Path, dict[str, object]]:
@@ -232,7 +280,7 @@ def test_stac_validator_rejects_mutated_asset_inventory(
     tmp_path: Path,
     mutation: str,
 ) -> None:
-    artifacts, source = _stac_candidate(tmp_path)
+    artifacts, source, _ = _stac_candidate(tmp_path)
     item_path, item = _first_stac_item(tmp_path)
     assets = item["assets"]
     if mutation == "empty":
@@ -270,7 +318,7 @@ def test_stac_validator_rejects_mutated_item_contract(
     mutation: str,
     message: str,
 ) -> None:
-    artifacts, source = _stac_candidate(tmp_path)
+    artifacts, source, _ = _stac_candidate(tmp_path)
     item_path, item = _first_stac_item(tmp_path)
     if mutation == "properties":
         item["properties"]["unexpected"] = True
@@ -282,6 +330,59 @@ def test_stac_validator_rejects_mutated_item_contract(
         _validate_stac(
             tmp_path,
             artifacts,
+            release_id="ar6-europe-fixture-v1",
+            source=source,
+            contract=contract(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("duplicate", "unique safe files"),
+        ("unsafe", "unsafe or non-canonical"),
+        ("bytes", "bytes differ"),
+        ("identity", "identity differs"),
+        ("source", "source lineage differs"),
+        ("method", "method binding differs"),
+        ("rights", "rights binding differs"),
+        ("values", "value semantics differ"),
+    ],
+)
+def test_manifest_validator_rejects_mutated_artifact_records(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    manifest, source = _manifest_candidate(tmp_path)
+    records = manifest["artifacts"]
+    assert isinstance(records, list)
+    record = records[0]
+    assert isinstance(record, dict)
+    if mutation == "duplicate":
+        duplicate = records[-1]
+        assert isinstance(duplicate, dict)
+        duplicate["path"] = record["path"]
+    elif mutation == "unsafe":
+        record["path"] = "../escape"
+    elif mutation == "bytes":
+        path = tmp_path / str(record["path"])
+        path.write_bytes(path.read_bytes() + b"tamper")
+    elif mutation == "identity":
+        record["role"] = "wrong"
+    else:
+        field = {
+            "source": "source",
+            "method": "method",
+            "rights": "rights",
+            "values": "valueSemantics",
+        }[mutation]
+        record[field] = {}
+
+    with pytest.raises(ScienceContractError, match=message):
+        release_builder._validate_manifest(
+            tmp_path,
+            manifest,
             release_id="ar6-europe-fixture-v1",
             source=source,
             contract=contract(),
@@ -385,9 +486,10 @@ def test_builder_rejects_artifact_record_member_lineage_common_mode(
         "_artifact_record",
         corrupted_artifact_record,
     )
+    monkeypatch.setattr(release_builder, "_validate_stac", lambda *args, **kwargs: None)
     output = tmp_path / "candidate"
 
-    with pytest.raises(ScienceContractError, match="STAC Item lineage"):
+    with pytest.raises(ScienceContractError, match="Manifest artifact source lineage"):
         build_regional_release(
             _source(),
             output,
