@@ -1,6 +1,6 @@
 # 10 — Testing Strategy
 
-> **Status:** Accepted target strategy; migration in progress
+> **Status:** Accepted target strategy; Phase 1 locked after the Phase 0 no-go
 >
 > **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Quality rule:** no artifact is publishable merely because it builds. Scientific validity, contracts, browser parity, and delivery behaviour are release gates.
@@ -59,14 +59,29 @@ built.
 
 The [Phase 0.9 gate](../evidence/phase-0-9-regional-gate.md) completed with an
 explicit `BLOCKED` decision: all nine combinations have exact preflight lineage
-but no arrays or artifacts. Final-gate contract tests enforce that green CI is
-not approval. After [#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94)
-through [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) resolve
-their evidence, [#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98)
-is the sole final-gate re-evaluation. Phase 1 unlock requires its explicit
-approved record with zero blockers, nine completed combinations, hashed
-deliverables, and every named review approved; the corrected Phase 0.9 record
-remains immutable.
+but no arrays or artifacts. The later
+[Phase 0.14 gate](../evidence/phase-0-14-final-no-go.md) completed the
+investigation as `complete-with-no-go`. Issue #95's automated recommendation
+is `rejected`, while the authoritative scientific and release disposition
+remains `blocked` because independent review is pending.
+
+Recovery tests follow the dependency chain
+[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) →
+([#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107),
+[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108)) →
+[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) →
+[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Before an
+independently reviewed `approved` #110 with zero blockers:
+
+- v1 contract tests must continue rejecting release artifacts and direct
+  AR6-relative-versus-absolute-terrain comparison;
+- missing or unbounded MSS, DTM, transformation, mask, licence, or review
+  evidence must produce `DataUnavailable` or stop preflight;
+- blocked preflight must emit no all-nodata, synthetic, or placeholder release;
+- CI may validate hashes and invariants but may not populate or approve an
+  independent review;
+- [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48) and Phase 1
+  remain locked.
 
 ## 3. Test layers
 
@@ -238,14 +253,15 @@ current summary on `/about/architecture`.
 
 1. **Fast checks:** format, lint, type check, unit, property, schema, and small
    artifact tests.
-2. **Regional candidate:** Phase 0/reference-region transform, shared golden
-   tests, search build, browser integration, and performance budgets.
+2. **Regional candidate:** after #106–#109 provide approved inputs, #110 runs
+   the reference-region transform, shared golden tests, browser parity, and
+   performance budgets; a failed preflight emits no substitute artifacts.
 3. **Full release build:** all sources and nine layer combinations, full data
    QA, diff report, inventory, STAC, provenance, and signatures.
 4. **Staged delivery:** upload immutable prefix; verify hashes, range requests,
    headers, CORS, and browser smoke tests from the public origin.
-5. **Promotion:** approval after evidence review; retain the prior app/release
-   pair for rollback.
+5. **Promotion:** approval only after the required independent evidence review;
+   retain the prior app/release pair for rollback.
 
 A waiver must identify the failed budget, measured regression, rationale,
 owner, and expiry date. Scientific, integrity, licence, scenario completeness,

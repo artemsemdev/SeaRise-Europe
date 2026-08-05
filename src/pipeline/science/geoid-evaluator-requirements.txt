@@ -1,0 +1,6 @@
+# Evaluator binary lock for issue #94. Runtime dependencies are supplied by the
+# separately receipted execution environment; --no-deps is mandatory.
+pyshtools==4.13.1 \
+    --hash=sha256:8f6235c5616c17a5b214af2575571dee7eb15f58ec5b382081ace47960a10e14 \
+    --hash=sha256:c4059d67721c7ba033ae591cad8f32fa26149892e833e292d512824bbedce445 \
+    --hash=sha256:d7b566cfe7499f19e4d7db2eb336e1ad9a20faf609788e7b696bb3ad03312aa5

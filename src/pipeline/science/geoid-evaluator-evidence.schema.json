@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/geoid-evaluator-evidence-v1.json",
+  "title": "Independent geoid evaluator validation evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "evidenceId", "issue", "recordedAt",
+    "status", "policy", "sourceEvidence", "comparisons",
+    "evaluatorDisagreement", "crossEnvironment", "review", "blockers"
+  ],
+  "properties": {
+    "$schema": { "const": "../geoid-evaluator-evidence.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "evidenceId": { "const": "phase-0.10-geoid-evaluator-validation" },
+    "issue": { "const": 94 },
+    "recordedAt": { "type": "string", "format": "date" },
+    "status": { "enum": ["accepted", "rejected", "blocked"] },
+    "policy": { "$ref": "#/$defs/hashedPath" },
+    "sourceEvidence": {
+      "type": "array", "minItems": 4, "uniqueItems": true,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "comparisons": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": { "$ref": "#/$defs/comparison" }
+    },
+    "evaluatorDisagreement": { "$ref": "#/$defs/disagreement" },
+    "crossEnvironment": { "$ref": "#/$defs/crossEnvironment" },
+    "review": { "$ref": "#/$defs/review" },
+    "blockers": {
+      "type": "array", "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "accepted" } } },
+      "then": {
+        "properties": {
+          "comparisons": {
+            "items": { "properties": { "status": { "const": "passed" } } }
+          },
+          "evaluatorDisagreement": {
+            "properties": {
+              "status": { "const": "bounded" },
+              "boundMetres": { "type": "number" }
+            }
+          },
+          "crossEnvironment": { "properties": { "status": { "const": "passed" } } },
+          "review": {
+            "properties": {
+              "independent": { "const": true },
+              "disposition": { "const": "approved" },
+              "reviewer": { "type": "string", "minLength": 1 },
+              "reviewedAt": { "type": "string", "format": "date" }
+            }
+          },
+          "blockers": { "maxItems": 0 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "hashedPath": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "publisher", "url", "role", "sha256", "retrievedAt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "publisher": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "role": { "type": "string", "minLength": 1 },
+        "sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "retrievedAt": { "type": "string", "format": "date" }
+      }
+    },
+    "point": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "id", "latitude", "longitude", "coverage", "expectedMetres",
+        "actualMetres", "absoluteDisagreementMetres", "status"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -360, "maximum": 360 },
+        "coverage": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "expectedMetres": { "type": ["number", "null"] },
+        "actualMetres": { "type": "number" },
+        "absoluteDisagreementMetres": { "type": ["number", "null"], "minimum": 0 },
+        "status": { "enum": ["passed", "failed", "blocked-no-independent-value"] }
+      }
+    },
+    "comparison": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "model", "status", "independentSourceId", "toleranceMetres",
+        "maximumAbsoluteDisagreementMetres", "points", "resultReceipt"
+      ],
+      "properties": {
+        "model": { "enum": ["GOCO06S", "EGM2008"] },
+        "status": { "enum": ["passed", "failed", "blocked"] },
+        "independentSourceId": { "type": "string", "minLength": 1 },
+        "toleranceMetres": { "const": 0.01 },
+        "maximumAbsoluteDisagreementMetres": { "type": ["number", "null"], "minimum": 0 },
+        "points": { "type": "array", "minItems": 6, "items": { "$ref": "#/$defs/point" } },
+        "resultReceipt": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "jobId", "shareUrl", "resultUrl", "httpFailure"],
+          "properties": {
+            "status": { "enum": ["available", "upstream-result-unavailable"] },
+            "jobId": { "type": ["string", "null"] },
+            "shareUrl": { "type": ["string", "null"], "format": "uri" },
+            "resultUrl": { "type": ["string", "null"], "format": "uri" },
+            "httpFailure": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "disagreement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["termId", "status", "aggregation", "observedPartialMaximumMetres", "boundMetres", "reason"],
+      "properties": {
+        "termId": { "const": "geoid-evaluator-disagreement" },
+        "status": { "enum": ["bounded", "pending-bound", "rejected"] },
+        "aggregation": { "const": "sum-absolute-bounds" },
+        "observedPartialMaximumMetres": { "type": ["number", "null"], "minimum": 0 },
+        "boundMetres": { "type": ["number", "null"], "minimum": 0 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "crossEnvironment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "requiredEnvironmentIds", "completedEnvironmentIds", "toleranceMetres", "maximumDifferenceMetres"],
+      "properties": {
+        "status": { "enum": ["passed", "pending", "failed"] },
+        "requiredEnvironmentIds": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "type": "string" } },
+        "completedEnvironmentIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "toleranceMetres": { "const": 1e-9 },
+        "maximumDifferenceMetres": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["independent", "reviewer", "reviewedAt", "disposition", "reason"],
+      "properties": {
+        "independent": { "type": "boolean" },
+        "reviewer": { "type": ["string", "null"] },
+        "reviewedAt": { "type": ["string", "null"], "format": "date" },
+        "disposition": { "enum": ["approved", "rejected", "blocked", "pending"] },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

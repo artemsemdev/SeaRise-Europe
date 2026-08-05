@@ -16,6 +16,8 @@
 > **Phase 0.8 evidence:** [terrain, geography, and connectivity controls](../science/phase-0-8-terrain-geography-controls.md)
 >
 > **Phase 0.9 decision:** [regional scientific gate](../evidence/phase-0-9-regional-gate.md) — `BLOCKED`
+>
+> **Phase 0.14 decision:** [terminal no-go](../evidence/phase-0-14-final-no-go.md) — investigation `COMPLETE-WITH-NO-GO`; authoritative disposition `BLOCKED`
 
 ## Current risk register
 
@@ -33,12 +35,14 @@
 | R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
 | R-11 | Cloudflare pricing, limits, or custom-domain behaviour changes | Medium / Medium | Date the cost model, alert on usage, avoid proprietary runtime services, and retain a static host + byte-range object storage portability test. |
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
-| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claim and decommissioning until ADR-021 Phase 0–3 gates pass. |
+| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claims, Phase 1, and decommissioning until an independently reviewed `approved` #110 and the later ADR-021 gates pass. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
-| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Low / Critical | The legacy build path now always refuses this operation. Phase 0.7 implements the 1995–2014 baseline and interval contract, but publication remains blocked until the numerical transform and controls validate it. |
-| R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | The adapter now verifies locked model/member hashes and echoed harmonic metadata before differencing. It fails before engine execution while EGM2008 constants, common ellipsoid, engine version, permanent-tide rule, numeric bounds, basin controls, reproducibility, and review remain missing. |
-| R-17 | Copernicus DSM/HEM is treated as bare-earth terrain or as a complete per-pixel error bound | High / Critical | GLO-30 is selected, but HEM is used only for random error on valid unedited pixels. `U_systematic`, `U_edit`, `U_DSM`, and `U_resolution` never default to zero; publication stays blocked until each term is independently bounded and reviewed. |
-| R-18 | Green CI or source-integrity checks are mistaken for scientific approval | Medium / Critical | The Phase 0.9 schema sets `automation.canAuthorizeDecision=false`. Only the explicit #98 final-gate decision, with zero blockers, nine completed combinations, complete artifacts, and all named reviews, can unlock Phase 1. |
+| R-15 | Relative AR6 change is compared directly with absolute terrain height | Low / Critical | The legacy path always refuses this operation, and the v1 no-go may not be used to revive it. #106 must select a new datum-safe product contract before any regional build. |
+| R-16 | A geoid or vertical transform mixes model realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | Phase 0.10 pins the v1 evaluator but lacks independent GOCO06S vectors, cross-environment reproduction, and review. V1 is superseded for publication; #109 may reuse evaluator evidence only if the #106 contract requires it and every missing bound and review is closed. |
+| R-17 | A DSM, HEM, MAE, or product accuracy target is treated as bare-earth terrain or a complete per-cell upper bound | High / Critical | Phase 0.11 automatically recommends rejecting v1: GLO-30 has no finite DSM-to-bare-earth or shoreline-resolution bound. #108 must validate an eligible bare-earth source and common-90% bounds against independent truth; unsupported strata remain `DataUnavailable`. |
+| R-18 | Green CI or source-integrity checks are mistaken for scientific approval | Medium / Critical | Phase 0.14 separates the automated `REJECTED` recommendation from the authoritative `BLOCKED` state and records no artifacts. Only an independently reviewed `approved` #110 with zero blockers may unlock #48; CI cannot supply that review. |
+| R-19 | An offshore mean-sea-surface grid, land filler, or ordinary tide-gauge record is treated as a datum-safe shoreline water reference | High / Critical | #107 must pin datum, epoch, water mask, coastal transfer, vertical-land-motion treatment, licences, and independent GNSS/ellipsoid-linked holdouts. Land-filled or open-ended coastal values remain ineligible. |
+| R-20 | A global coastal DTM or multi-source mosaic is assumed to have finite European per-cell uncertainty from MAE/RMSE alone | High / Critical | #108 must validate signed bias, tail quantiles, interval coverage, datum, seams, masks, edited cells, licences, and terrain strata against independent airborne-lidar truth. Finite bounds apply only to demonstrated strata. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
 records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
@@ -58,10 +62,18 @@ Phase 0.9 attempted the exact nine-layer matrix and stopped before arrays. Its
 explicit blocked decision prevents R-13 and R-18 from being hidden by a green
 build, but R-02, R-04, R-07, R-08, R-16, and R-17 remain open because the
 required numerical, artifact, control, reproducibility, and review evidence
-does not exist. Resolve #94 geoid conventions, #95 uncertainty bounds, #96
-basin controls, and #97 scope/connectivity review in order. The corrected Phase
-0.9 evidence is immutable; #98 alone may re-evaluate the final gate and
-possibly unlock Phase 1.
+does not exist. The corrected Phase 0.9 evidence is immutable. Issues #94–#97
+recorded the follow-up evidence as blocked, and #98 performed the terminal v1
+re-evaluation without rewriting it.
+Phase 0.11 quantifies the finite source terms but confirms that coastal SLA
+representativeness and DSM-to-bare-earth error are not finitely bounded by the
+locked evidence. The automated recommendation is therefore `rejected`, not
+`approved`; the independent review remains pending, so the authoritative
+disposition and publication gate remain `blocked` and a superseding method is
+required.
+Phase 0.14 closes the investigation as `complete-with-no-go` without closing
+the scientific gate. Recovery follows #106 → (#107, #108) → #109 → #110; only
+an independently reviewed `approved` #110 may unlock #48.
 
 ## Assumptions that require evidence
 
@@ -84,7 +96,8 @@ be resolved by the named evidence before their implementation is fixed:
 | Question | Decision evidence | Resolution mechanism |
 |---|---|---|
 | What is the final Europe support polygon and how are transcontinental states treated? | The v2 candidate uses an explicit 50-feature allow-list, fixed clip/tolerance, 27 controls, and `covers`; Russia/Turkey and named territories have explicit outcomes | Product-owner approval; ADR if domain outcomes change |
-| Copernicus DEM GLO-30 or GLO-90? | GLO-30 is selected after five quality-aware windows measured HEM, mask/detail loss, threshold disagreement, and delivery bytes; independent vertical truth is still absent | Scientific review plus independent systematic, edit/fill, DSM, and resolution bounds |
+| Which bare-earth coastal terrain source is defensible? | The GLO-30 DSM route ended in a no-go. #108 evaluates DeltaDTM and independent national lidar controls without treating MAE/RMSE as a per-cell bound | Versioned source decision, stratum-specific validation, licence review, and independent scientific/data review |
+| Which coastal mean-water reference is datum-safe? | The v1 SLA/MDT route has no finite shoreline representativeness bound. #107 evaluates direct MSS candidates and GNSS/ellipsoid-linked holdouts without treating land filler as water | Versioned datum/epoch/mask decision, calibrated shoreline bounds, licence review, and independent scientific/data review |
 | What coastline-connectivity algorithm is scientifically acceptable? | Eight-neighbour ocean-seeded traversal is specified and passes nine mechanism controls, but corner connectivity and real barriers remain unreviewed | Regional comparisons and independent scientific review; superseding methodology ADR if v1.0 changes |
 | MiniSearch or another compact open-source search engine? | Index bytes, initialization, p95 query latency, multilingual relevance, licence | Implementation design note and pinned tests |
 | Can exact PMTiles lookup replace companion COGs? | Bit-exact parity over golden and edge cases plus range/size improvement | New ADR before COG removal |
@@ -115,6 +128,10 @@ validated production product until all of these are true:
 If the scientific spike invalidates the binary methodology, pause the
 Europe-wide build and write a superseding ADR. Simpler infrastructure never
 overrides scientific correctness.
+
+That stop condition has fired. Keep the Europe-wide build and Phase 1 paused
+through #106 → (#107, #108) → #109. Only an independently reviewed `approved`
+#110 recovery gate with zero blockers may unlock #48.
 
 ## Risk review cadence
 

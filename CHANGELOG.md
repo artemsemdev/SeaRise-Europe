@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
   receipts.
 - Added an explicit Phase 0.9 gate and reproducible nine-combination preflight
   record that cannot treat CI success as scientific approval.
+- Added a machine-readable 90% coastal uncertainty budget with source hashes,
+  eligibility masks, sensitivity controls, and mutation-resistant fail-closed
+  semantics.
 
 ### Changed
 
@@ -41,6 +44,17 @@ All notable changes to this project will be documented in this file.
 - Exposure generation now fails closed instead of comparing AR6 relative
   sea-level change directly with absolute EGM2008 terrain heights.
 - Phase 0.9 completed with a `BLOCKED` disposition and no classified release
-  artifacts; the Phase 0 scientific gate and Phase 1 stay blocked until the
-  named numerical, control, reproducibility, golden-vector, and review issues
-  are resolved and the final gate is re-evaluated.
+  artifacts; its corrected evidence remains an immutable historical record and
+  was not rewritten by the later no-go decision.
+- Automated methodology analysis now recommends rejecting the current coastal
+  binary method because the locked evidence provides no finite SLA shoreline
+  or GLO-30 DSM-to-bare-earth bound. Independent review remains pending, so
+  the authoritative scientific and release disposition is blocked.
+- Completed the Phase 0 investigation with a no-go: all nine release attempts
+  stop before arrays, the automated v1 recommendation is rejected, the
+  authoritative scientific disposition remains blocked pending independent
+  review, and Phase 1 stays locked.
+- Superseded ADR-023 as a publication path and defined the recovery order from
+  a new product-contract decision through independently validated coastal
+  water, bare-earth terrain, methodology v2, and a final reviewed regional
+  gate. Historical receipts remain unchanged.

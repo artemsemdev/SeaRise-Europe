@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/geoid-evaluator-v1.json",
+  "title": "Pinned geoid evaluator policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "policyId", "issue", "recordedAt", "status",
+    "evaluator", "referenceFrame", "harmonicConvention", "models",
+    "execution", "benchmarkPolicy", "review", "publicationGate"
+  ],
+  "properties": {
+    "$schema": { "const": "./geoid-evaluator.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "policyId": { "const": "pyshtools-point-harmonic-wgs84-tide-free-v1" },
+    "issue": { "const": 94 },
+    "recordedAt": { "type": "string", "format": "date" },
+    "status": { "enum": ["approved", "rejected", "blocked"] },
+    "evaluator": { "$ref": "#/$defs/evaluator" },
+    "referenceFrame": { "$ref": "#/$defs/referenceFrame" },
+    "harmonicConvention": { "$ref": "#/$defs/harmonicConvention" },
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/model" }
+    },
+    "execution": { "$ref": "#/$defs/execution" },
+    "benchmarkPolicy": { "$ref": "#/$defs/benchmarkPolicy" },
+    "review": { "$ref": "#/$defs/review" },
+    "publicationGate": { "$ref": "#/$defs/publicationGate" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "approved" } } },
+      "then": {
+        "properties": {
+          "execution": {
+            "properties": {
+              "environments": {
+                "contains": { "properties": { "status": { "const": "passed" } } },
+                "minContains": 2
+              }
+            }
+          },
+          "review": {
+            "properties": {
+              "independent": { "const": true },
+              "disposition": { "const": "approved" },
+              "reviewer": { "type": "string", "minLength": 1 },
+              "reviewedAt": { "type": "string", "format": "date" }
+            }
+          },
+          "publicationGate": {
+            "properties": {
+              "status": { "const": "unblocked-for-issue-98" },
+              "blockers": { "maxItems": 0 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name", "version", "tagCommit", "sourceUrl", "sourceArchive",
+        "licence", "backend", "supportedMaximumDegree", "dependencyPolicy"
+      ],
+      "properties": {
+        "name": { "const": "pyshtools" },
+        "version": { "const": "4.13.1" },
+        "tagCommit": { "const": "4c7fd73fd61f863351fdc067294c8538acc70d89" },
+        "sourceUrl": { "const": "https://github.com/SHTOOLS/SHTOOLS/tree/v4.13.1" },
+        "sourceArchive": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "byteSize", "sha256"],
+          "properties": {
+            "url": { "const": "https://files.pythonhosted.org/packages/f4/58/b75aa783852e3b5af74e5657163c5ddc2d3a906d3cf935b4f41a57defcbc/pyshtools-4.13.1.tar.gz" },
+            "byteSize": { "const": 41577254 },
+            "sha256": { "const": "cc4a323e9cbc905c04ae9e2e9fedeea6d76f3315a6863ede353a4dec87b8c018" }
+          }
+        },
+        "licence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spdx", "url", "redistribution"],
+          "properties": {
+            "spdx": { "const": "BSD-3-Clause" },
+            "url": { "const": "https://github.com/SHTOOLS/SHTOOLS/blob/v4.13.1/LICENSE.txt" },
+            "redistribution": { "const": "compatible" }
+          }
+        },
+        "backend": { "const": "native-shtools-fortran" },
+        "supportedMaximumDegree": { "type": "integer", "minimum": 2190 },
+        "dependencyPolicy": { "const": "hash-locked-wheel-and-transitive-environment" }
+      }
+    },
+    "referenceFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ellipsoid", "semiMajorAxisMetres", "inverseFlattening",
+        "earthGravityConstant", "angularVelocityRadiansPerSecond",
+        "normalPotentialSquareMetresPerSquareSecond", "geodeticInput",
+        "synthesisLatitude", "longitudeConvention"
+      ],
+      "properties": {
+        "ellipsoid": { "const": "WGS84" },
+        "semiMajorAxisMetres": { "const": 6378137.0 },
+        "inverseFlattening": { "const": 298.257223563 },
+        "earthGravityConstant": { "const": 398600441800000.0 },
+        "angularVelocityRadiansPerSecond": { "const": 0.00007292115 },
+        "normalPotentialSquareMetresPerSquareSecond": { "const": 62636851.7146 },
+        "geodeticInput": { "const": "EPSG:4326-latitude-longitude-decimal-degrees-height-zero" },
+        "synthesisLatitude": { "const": "geocentric-latitude-derived-from-wgs84-geodetic-latitude" },
+        "longitudeConvention": { "const": "east-positive-normalize-modulo-360" }
+      }
+    },
+    "harmonicConvention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalization", "condonShortleyPhase", "coefficientOrdering",
+        "missingCoefficientRule", "interpolation", "extrapolation", "nodata"
+      ],
+      "properties": {
+        "normalization": { "const": "fully-normalized-geodesy-4pi" },
+        "condonShortleyPhase": { "const": "excluded-csphase-plus-one" },
+        "coefficientOrdering": { "const": "degree-ascending-order-ascending-cosine-then-sine" },
+        "missingCoefficientRule": { "const": "explicit-zero-only-no-implicit-truncation" },
+        "interpolation": { "const": "point-synthesis-no-interpolation" },
+        "extrapolation": { "const": "none" },
+        "nodata": { "const": "reject-nonfinite-coordinate-or-coefficient-and-propagate-nodata" }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model", "version", "memberSha256", "maximumDegree", "maximumOrder",
+        "earthGravityConstant", "referenceRadiusMetres", "nativeTideSystem",
+        "outputTideSystem", "epoch", "heightFunctional"
+      ],
+      "properties": {
+        "model": { "enum": ["GOCO06S", "EGM2008"] },
+        "version": { "$ref": "#/$defs/nonEmpty" },
+        "memberSha256": { "$ref": "#/$defs/sha256" },
+        "maximumDegree": { "type": "integer", "minimum": 300 },
+        "maximumOrder": { "type": "integer", "minimum": 0 },
+        "earthGravityConstant": { "const": 398600441500000.0 },
+        "referenceRadiusMetres": { "const": 6378136.3 },
+        "nativeTideSystem": { "enum": ["zero_tide", "tide_free"] },
+        "outputTideSystem": { "const": "tide_free" },
+        "epoch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "value", "timeVariableTerms"],
+          "properties": {
+            "status": { "enum": ["applicable", "not-applicable-static-model"] },
+            "value": { "type": ["string", "null"], "format": "date" },
+            "timeVariableTerms": { "enum": ["evaluate-at-epoch", "not-applicable"] }
+          }
+        },
+        "permanentTideConversion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operation", "deltaFullyNormalizedC20", "source"],
+          "properties": {
+            "operation": { "const": "C20_tide_free=C20_zero_tide+delta" },
+            "deltaFullyNormalizedC20": { "const": 4.1736e-9 },
+            "source": { "const": "IERS-Conventions-2010-chapter-6-equations-6.13-6.14" }
+          }
+        },
+        "heightFunctional": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "zeroDegreeTermMetres", "correctionModel"],
+          "properties": {
+            "method": { "enum": ["marine-height-anomaly-on-wgs84", "nga-wgs84-height-anomaly-plus-zeta-to-n"] },
+            "zeroDegreeTermMetres": { "type": "number" },
+            "correctionModel": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "wheel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "byteSize", "sha256"],
+      "properties": {
+        "filename": { "$ref": "#/$defs/nonEmpty" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "platform", "python", "wheel", "buildFlags", "status", "receiptSha256"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmpty" },
+        "platform": { "$ref": "#/$defs/nonEmpty" },
+        "python": { "const": "CPython 3.10" },
+        "wheel": { "$ref": "#/$defs/wheel" },
+        "buildFlags": { "const": "not-applicable-prebuilt-wheel-exact-bytes" },
+        "status": { "enum": ["passed", "pending", "failed"] },
+        "receiptSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["install", "environments", "crossEnvironmentToleranceMetres"],
+      "properties": {
+        "install": { "const": "python -m pip install --no-deps --only-binary=:all: --require-hashes -r src/pipeline/science/geoid-evaluator-requirements.txt" },
+        "environments": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/environment" }
+        },
+        "crossEnvironmentToleranceMetres": { "const": 1e-9 }
+      }
+    },
+    "benchmarkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declaredBeforeComparison", "absoluteToleranceMetres", "requiredCoverage", "evidence"],
+      "properties": {
+        "declaredBeforeComparison": { "const": true },
+        "absoluteToleranceMetres": { "const": 0.01 },
+        "requiredCoverage": {
+          "type": "array", "uniqueItems": true, "minItems": 7,
+          "items": { "enum": ["positive-sign", "negative-sign", "northern-hemisphere", "southern-hemisphere", "longitude-wrap", "coast", "island", "harmonic-grid-boundary", "poles"] }
+        },
+        "evidence": { "const": "src/pipeline/science/evidence/geoid-evaluator-validation.json" }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["independent", "requiredRole", "reviewer", "reviewedAt", "disposition", "reason"],
+      "properties": {
+        "independent": { "type": "boolean" },
+        "requiredRole": { "const": "independent-scientific-or-geodetic-reviewer" },
+        "reviewer": { "type": ["string", "null"] },
+        "reviewedAt": { "type": ["string", "null"], "format": "date" },
+        "disposition": { "enum": ["approved", "rejected", "blocked", "pending"] },
+        "reason": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "publicationGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockers", "ciCanApprove"],
+      "properties": {
+        "status": { "enum": ["unblocked-for-issue-98", "blocked"] },
+        "blockers": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/nonEmpty" } },
+        "ciCanApprove": { "const": false }
+      }
+    }
+  }
+}

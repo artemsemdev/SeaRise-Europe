@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/coastal-uncertainty-budget.schema.json",
+  "title": "SeaRise coastal vertical uncertainty budget",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "contractId", "issue", "methodologyId", "decision",
+    "confidenceFramework", "terms", "eligibility", "sensitivity",
+    "maximumTotalUncertaintyMetres", "review", "publicationGate"
+  ],
+  "properties": {
+    "$schema": { "const": "./coastal-uncertainty-budget.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0.11-coastal-uncertainty-budget" },
+    "issue": { "const": 95 },
+    "methodologyId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
+    "decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "authority", "recommendedDisposition", "reason"],
+      "properties": {
+        "status": { "const": "complete" },
+        "authority": { "const": "automated-methodology-analysis" },
+        "recommendedDisposition": { "const": "rejected" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "confidenceFramework": {
+      "type": "object", "additionalProperties": false,
+      "required": ["level", "normalMultiplier", "projectionTreatment", "aggregation", "dependence"],
+      "properties": {
+        "level": { "const": 0.9 },
+        "normalMultiplier": { "const": 1.645 },
+        "projectionTreatment": { "const": "AR6 q0.167/q0.833 remains a separate projection interval" },
+        "aggregation": { "const": "sum-absolute-non-projection-bounds" },
+        "dependence": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "terms": {
+      "type": "array", "minItems": 15, "maxItems": 15, "uniqueItems": true,
+      "items": { "$ref": "#/$defs/term" }
+    },
+    "eligibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requiredBoundTermIds", "unboundedTermIds", "rules", "missingRule", "thresholdCrossingRule"],
+      "properties": {
+        "requiredBoundTermIds": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "unboundedTermIds": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rules": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "missingRule": { "const": "DataUnavailable" },
+        "thresholdCrossingRule": { "const": "DataUnavailable:uncertain-threshold" }
+      }
+    },
+    "sensitivity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidenceRef", "contexts", "conclusion"],
+      "properties": {
+        "evidenceRef": { "type": "string", "minLength": 1 },
+        "contexts": {
+          "type": "array", "minItems": 7, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/context" }
+        },
+        "conclusion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "maximumTotalUncertaintyMetres": { "type": "null" },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "authoritativeDisposition", "requiredRole", "record"],
+      "properties": {
+        "status": { "const": "pending-independent" },
+        "authoritativeDisposition": { "const": "pending" },
+        "requiredRole": { "const": "independent scientific/data reviewer" },
+        "record": { "type": "string", "minLength": 1 }
+      }
+    },
+    "publicationGate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "blockingDecisions"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "blockingDecisions": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "term": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "id", "component", "units", "scope", "source", "confidence",
+        "numeric", "licence", "provenance", "status", "unsupportedOutcome"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "component": { "enum": ["baseline", "geoid", "terrain", "masking"] },
+        "units": { "const": "m" },
+        "scope": { "type": "string", "minLength": 1 },
+        "source": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "version", "assetSha256", "location"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "minLength": 1 },
+            "assetSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+            "location": { "type": "string", "minLength": 1 }
+          }
+        },
+        "confidence": {
+          "type": "object", "additionalProperties": false,
+          "required": ["level", "interpretation"],
+          "properties": {
+            "level": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+            "interpretation": { "type": "string", "minLength": 1 }
+          }
+        },
+        "numeric": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "value", "equation"],
+          "properties": {
+            "kind": { "enum": ["constant", "per-cell", "exact-zero", "unbounded"] },
+            "value": { "type": ["number", "null"], "minimum": 0 },
+            "equation": { "type": "string", "minLength": 1 }
+          }
+        },
+        "licence": { "type": "string", "minLength": 1 },
+        "provenance": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["bounded", "bounded-conditionally", "inapplicable", "unbounded"] },
+        "unsupportedOutcome": { "enum": ["not-applicable", "DataUnavailable"] }
+      }
+    },
+    "rule": {
+      "type": "object", "additionalProperties": false,
+      "required": ["condition", "outcome"],
+      "properties": {
+        "condition": { "type": "string", "minLength": 1 },
+        "outcome": { "type": "string", "minLength": 1 }
+      }
+    },
+    "context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "observed", "result"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "observed": { "type": "string", "minLength": 1 },
+        "result": { "enum": ["defensible-only-with-complete-bounds", "DataUnavailable"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "$schema": "../geoid-evaluator-evidence.schema.json",
+  "schemaVersion": 1,
+  "evidenceId": "phase-0.10-geoid-evaluator-validation",
+  "issue": 94,
+  "recordedAt": "2026-08-05",
+  "status": "blocked",
+  "policy": {
+    "path": "src/pipeline/science/geoid-evaluator.json",
+    "sha256": "02129aef36db0edd1a09dcfd8784f4a085877d8455b80505932f624867fb7d6c"
+  },
+  "sourceEvidence": [
+    {
+      "id": "nga-egm2008-release-archive",
+      "publisher": "United States National Geospatial-Intelligence Agency",
+      "url": "https://earth-info.nga.mil/php/download.php?file=egm-08spherical",
+      "role": "authoritative coefficients, evaluator source, constants, and six expected values",
+      "sha256": "65a9072f337f156e8cbd76ffd773f536e6fb0de18697ea6726ecdb790fac0fbd",
+      "retrievedAt": "2026-08-05"
+    },
+    {
+      "id": "nga-egm2008-output1",
+      "publisher": "United States National Geospatial-Intelligence Agency",
+      "url": "https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84",
+      "role": "independent expected geoid undulations embedded as OUTPUT1.DAT",
+      "sha256": "21b2f034a1214d2cb5586aa2985f93e89a215be6d5f1e439e73f0bce55c09c6c",
+      "retrievedAt": "2026-08-05"
+    },
+    {
+      "id": "iers-conventions-2010-chapter-6",
+      "publisher": "International Earth Rotation and Reference Systems Service",
+      "url": "https://www.iers.org/SharedDocs/Publikationen/EN/IERS/Publications/tn/TechnNote36/tn36_079.pdf",
+      "role": "authoritative zero-tide to tide-free C20 conversion",
+      "sha256": null,
+      "retrievedAt": "2026-08-05"
+    },
+    {
+      "id": "icgem-goco06s-calculation-job",
+      "publisher": "International Centre for Global Earth Models, GFZ",
+      "url": "https://icgem.gfz.de/calc_stat/7de41c2ce7745dbf10bb6ce6fc1e66a558e57c19f3093a3a641dc0e631fd9efa",
+      "role": "independent GOCO06S WGS84 tide-free degree-300 point comparison",
+      "sha256": null,
+      "retrievedAt": "2026-08-05"
+    },
+    {
+      "id": "icgem-faq",
+      "publisher": "International Centre for Global Earth Models, GFZ",
+      "url": "https://icgem.gfz.de/docs/icgem_faq.pdf",
+      "role": "authoritative tide-system and point-functional semantics",
+      "sha256": "a349aaa90540d183498014eab7c905f0b3eb557ee1cc2eade65f47c00343e5de",
+      "retrievedAt": "2026-08-05"
+    }
+  ],
+  "comparisons": [
+    {
+      "model": "EGM2008",
+      "status": "passed",
+      "independentSourceId": "nga-egm2008-output1",
+      "toleranceMetres": 0.01,
+      "maximumAbsoluteDisagreementMetres": 0.005301211346,
+      "points": [
+        {
+          "id": "nga-wrap-positive",
+          "latitude": 37.0,
+          "longitude": 241.0,
+          "coverage": ["northern-hemisphere", "longitude-wrap", "negative-sign"],
+          "expectedMetres": -26.151,
+          "actualMetres": -26.155690095906,
+          "absoluteDisagreementMetres": 0.004690095906,
+          "status": "passed"
+        },
+        {
+          "id": "nga-wrap-negative",
+          "latitude": 37.0,
+          "longitude": -119.0,
+          "coverage": ["northern-hemisphere", "longitude-wrap", "negative-sign"],
+          "expectedMetres": -26.151,
+          "actualMetres": -26.155690095905,
+          "absoluteDisagreementMetres": 0.004690095905,
+          "status": "passed"
+        },
+        {
+          "id": "nga-grid-boundary",
+          "latitude": 36.0,
+          "longitude": 242.983333,
+          "coverage": ["northern-hemisphere", "harmonic-grid-boundary", "negative-sign"],
+          "expectedMetres": -29.17,
+          "actualMetres": -29.17502200636,
+          "absoluteDisagreementMetres": 0.00502200636,
+          "status": "passed"
+        },
+        {
+          "id": "north-pole",
+          "latitude": 90.0,
+          "longitude": 0.0,
+          "coverage": ["northern-hemisphere", "poles", "positive-sign"],
+          "expectedMetres": 14.899,
+          "actualMetres": 14.893698788654,
+          "absoluteDisagreementMetres": 0.005301211346,
+          "status": "passed"
+        },
+        {
+          "id": "south-pole-wrap",
+          "latitude": -90.0,
+          "longitude": 359.983333,
+          "coverage": ["southern-hemisphere", "longitude-wrap", "poles", "negative-sign"],
+          "expectedMetres": -30.15,
+          "actualMetres": -30.15477257175,
+          "absoluteDisagreementMetres": 0.00477257175,
+          "status": "passed"
+        },
+        {
+          "id": "south-pole-zero",
+          "latitude": -90.0,
+          "longitude": 0.0,
+          "coverage": ["southern-hemisphere", "poles", "negative-sign"],
+          "expectedMetres": -30.15,
+          "actualMetres": -30.15477257175,
+          "absoluteDisagreementMetres": 0.00477257175,
+          "status": "passed"
+        }
+      ],
+      "resultReceipt": {
+        "status": "available",
+        "jobId": null,
+        "shareUrl": "https://earth-info.nga.mil/index.php?dir=wgs84&action=wgs84",
+        "resultUrl": "https://earth-info.nga.mil/php/download.php?file=egm-08spherical",
+        "httpFailure": null
+      }
+    },
+    {
+      "model": "GOCO06S",
+      "status": "blocked",
+      "independentSourceId": "icgem-goco06s-calculation-job",
+      "toleranceMetres": 0.01,
+      "maximumAbsoluteDisagreementMetres": null,
+      "points": [
+        {
+          "id": "rotterdam-coast",
+          "latitude": 51.95,
+          "longitude": 4.14,
+          "coverage": ["northern-hemisphere", "coast", "positive-sign"],
+          "expectedMetres": null,
+          "actualMetres": 44.146712934318,
+          "absoluteDisagreementMetres": null,
+          "status": "blocked-no-independent-value"
+        },
+        {
+          "id": "venice-island",
+          "latitude": 45.44,
+          "longitude": 12.33,
+          "coverage": ["northern-hemisphere", "coast", "island", "positive-sign"],
+          "expectedMetres": null,
+          "actualMetres": 44.555569258333,
+          "absoluteDisagreementMetres": null,
+          "status": "blocked-no-independent-value"
+        },
+        {
+          "id": "azores-island",
+          "latitude": 37.74,
+          "longitude": -25.67,
+          "coverage": ["northern-hemisphere", "longitude-wrap", "island", "positive-sign"],
+          "expectedMetres": null,
+          "actualMetres": 55.964632495981,
+          "absoluteDisagreementMetres": null,
+          "status": "blocked-no-independent-value"
+        },
+        {
+          "id": "helsinki-baltic",
+          "latitude": 60.17,
+          "longitude": 24.94,
+          "coverage": ["northern-hemisphere", "coast", "positive-sign"],
+          "expectedMetres": null,
+          "actualMetres": 18.318027226395,
+          "absoluteDisagreementMetres": null,
+          "status": "blocked-no-independent-value"
+        },
+        {
+          "id": "constanta-black-sea",
+          "latitude": 44.17,
+          "longitude": 28.65,
+          "coverage": ["northern-hemisphere", "coast", "positive-sign"],
+          "expectedMetres": null,
+          "actualMetres": 34.146680426275,
+          "absoluteDisagreementMetres": null,
+          "status": "blocked-no-independent-value"
+        },
+        {
+          "id": "las-palmas-south-island",
+          "latitude": 28.1,
+          "longitude": -15.42,
+          "coverage": ["northern-hemisphere", "longitude-wrap", "coast", "island", "positive-sign"],
+          "expectedMetres": null,
+          "actualMetres": 42.51617765043,
+          "absoluteDisagreementMetres": null,
+          "status": "blocked-no-independent-value"
+        }
+      ],
+      "resultReceipt": {
+        "status": "upstream-result-unavailable",
+        "jobId": "7de41c2ce7745dbf10bb6ce6fc1e66a558e57c19f3093a3a641dc0e631fd9efa",
+        "shareUrl": "https://icgem.gfz.de/calc_stat/7de41c2ce7745dbf10bb6ce6fc1e66a558e57c19f3093a3a641dc0e631fd9efa",
+        "resultUrl": "https://icgem.gfz.de/calc_res_points/7de41c2ce7745dbf10bb6ce6fc1e66a558e57c19f3093a3a641dc0e631fd9efa",
+        "httpFailure": "Job reached Done, but repeated result downloads returned HTTP 502 on 2026-08-05."
+      }
+    }
+  ],
+  "evaluatorDisagreement": {
+    "termId": "geoid-evaluator-disagreement",
+    "status": "pending-bound",
+    "aggregation": "sum-absolute-bounds",
+    "observedPartialMaximumMetres": 0.005301211346,
+    "boundMetres": null,
+    "reason": "The EGM2008 comparison passes 0.01 m, but a complete bound cannot be claimed until independent GOCO06S values and review are available."
+  },
+  "crossEnvironment": {
+    "status": "pending",
+    "requiredEnvironmentIds": [
+      "darwin-x86_64-rosetta-cpython310",
+      "linux-x86_64-cpython310"
+    ],
+    "completedEnvironmentIds": ["darwin-x86_64-rosetta-cpython310"],
+    "toleranceMetres": 1e-9,
+    "maximumDifferenceMetres": null
+  },
+  "review": {
+    "independent": false,
+    "reviewer": null,
+    "reviewedAt": null,
+    "disposition": "pending",
+    "reason": "Automated and authoritative-source evidence cannot substitute for an independent scientific or geodetic reviewer."
+  },
+  "blockers": [
+    "independent-goco06s-numerical-benchmark",
+    "second-environment-reproduction",
+    "independent-scientific-or-geodetic-review"
+  ]
+}

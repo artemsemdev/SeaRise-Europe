@@ -1,0 +1,155 @@
+{
+  "$schema": "./geoid-evaluator.schema.json",
+  "schemaVersion": 1,
+  "policyId": "pyshtools-point-harmonic-wgs84-tide-free-v1",
+  "issue": 94,
+  "recordedAt": "2026-08-05",
+  "status": "blocked",
+  "evaluator": {
+    "name": "pyshtools",
+    "version": "4.13.1",
+    "tagCommit": "4c7fd73fd61f863351fdc067294c8538acc70d89",
+    "sourceUrl": "https://github.com/SHTOOLS/SHTOOLS/tree/v4.13.1",
+    "sourceArchive": {
+      "url": "https://files.pythonhosted.org/packages/f4/58/b75aa783852e3b5af74e5657163c5ddc2d3a906d3cf935b4f41a57defcbc/pyshtools-4.13.1.tar.gz",
+      "byteSize": 41577254,
+      "sha256": "cc4a323e9cbc905c04ae9e2e9fedeea6d76f3315a6863ede353a4dec87b8c018"
+    },
+    "licence": {
+      "spdx": "BSD-3-Clause",
+      "url": "https://github.com/SHTOOLS/SHTOOLS/blob/v4.13.1/LICENSE.txt",
+      "redistribution": "compatible"
+    },
+    "backend": "native-shtools-fortran",
+    "supportedMaximumDegree": 2800,
+    "dependencyPolicy": "hash-locked-wheel-and-transitive-environment"
+  },
+  "referenceFrame": {
+    "ellipsoid": "WGS84",
+    "semiMajorAxisMetres": 6378137.0,
+    "inverseFlattening": 298.257223563,
+    "earthGravityConstant": 398600441800000.0,
+    "angularVelocityRadiansPerSecond": 0.00007292115,
+    "normalPotentialSquareMetresPerSquareSecond": 62636851.7146,
+    "geodeticInput": "EPSG:4326-latitude-longitude-decimal-degrees-height-zero",
+    "synthesisLatitude": "geocentric-latitude-derived-from-wgs84-geodetic-latitude",
+    "longitudeConvention": "east-positive-normalize-modulo-360"
+  },
+  "harmonicConvention": {
+    "normalization": "fully-normalized-geodesy-4pi",
+    "condonShortleyPhase": "excluded-csphase-plus-one",
+    "coefficientOrdering": "degree-ascending-order-ascending-cosine-then-sine",
+    "missingCoefficientRule": "explicit-zero-only-no-implicit-truncation",
+    "interpolation": "point-synthesis-no-interpolation",
+    "extrapolation": "none",
+    "nodata": "reject-nonfinite-coordinate-or-coefficient-and-propagate-nodata"
+  },
+  "models": [
+    {
+      "model": "GOCO06S",
+      "version": "GOCO06S-2019-12-13",
+      "memberSha256": "351d9d20b84cd2c0f52ce77146b1e3b774f408200b579ffaf98593cf3d271819",
+      "maximumDegree": 300,
+      "maximumOrder": 300,
+      "earthGravityConstant": 398600441500000.0,
+      "referenceRadiusMetres": 6378136.3,
+      "nativeTideSystem": "zero_tide",
+      "outputTideSystem": "tide_free",
+      "epoch": {
+        "status": "applicable",
+        "value": "2010-01-01",
+        "timeVariableTerms": "evaluate-at-epoch"
+      },
+      "permanentTideConversion": {
+        "operation": "C20_tide_free=C20_zero_tide+delta",
+        "deltaFullyNormalizedC20": 4.1736e-9,
+        "source": "IERS-Conventions-2010-chapter-6-equations-6.13-6.14"
+      },
+      "heightFunctional": {
+        "method": "marine-height-anomaly-on-wgs84",
+        "zeroDegreeTermMetres": 0.0,
+        "correctionModel": null
+      }
+    },
+    {
+      "model": "EGM2008",
+      "version": "EGM2008-2008-07",
+      "memberSha256": "7e448aac4e1b8e63955890cbca08286018ecc6d203e074a64ba5bde21851438a",
+      "maximumDegree": 2190,
+      "maximumOrder": 2159,
+      "earthGravityConstant": 398600441500000.0,
+      "referenceRadiusMetres": 6378136.3,
+      "nativeTideSystem": "tide_free",
+      "outputTideSystem": "tide_free",
+      "epoch": {
+        "status": "not-applicable-static-model",
+        "value": null,
+        "timeVariableTerms": "not-applicable"
+      },
+      "heightFunctional": {
+        "method": "nga-wgs84-height-anomaly-plus-zeta-to-n",
+        "zeroDegreeTermMetres": -0.41,
+        "correctionModel": "Zeta-to-N_to2160_egm2008"
+      }
+    }
+  ],
+  "execution": {
+    "install": "python -m pip install --no-deps --only-binary=:all: --require-hashes -r src/pipeline/science/geoid-evaluator-requirements.txt",
+    "environments": [
+      {
+        "id": "darwin-x86_64-rosetta-cpython310",
+        "platform": "macOS-26-arm64-kernel-x86_64-interpreter",
+        "python": "CPython 3.10",
+        "wheel": {
+          "filename": "pyshtools-4.13.1-cp310-cp310-macosx_10_9_x86_64.whl",
+          "byteSize": 3521146,
+          "sha256": "8f6235c5616c17a5b214af2575571dee7eb15f58ec5b382081ace47960a10e14"
+        },
+        "buildFlags": "not-applicable-prebuilt-wheel-exact-bytes",
+        "status": "passed",
+        "receiptSha256": null
+      },
+      {
+        "id": "linux-x86_64-cpython310",
+        "platform": "manylinux_2_28_x86_64",
+        "python": "CPython 3.10",
+        "wheel": {
+          "filename": "pyshtools-4.13.1-cp310-cp310-manylinux_2_28_x86_64.whl",
+          "byteSize": 13971617,
+          "sha256": "d7b566cfe7499f19e4d7db2eb336e1ad9a20faf609788e7b696bb3ad03312aa5"
+        },
+        "buildFlags": "not-applicable-prebuilt-wheel-exact-bytes",
+        "status": "pending",
+        "receiptSha256": null
+      }
+    ],
+    "crossEnvironmentToleranceMetres": 1e-9
+  },
+  "benchmarkPolicy": {
+    "declaredBeforeComparison": true,
+    "absoluteToleranceMetres": 0.01,
+    "requiredCoverage": [
+      "positive-sign", "negative-sign", "northern-hemisphere",
+      "southern-hemisphere", "longitude-wrap", "coast", "island",
+      "harmonic-grid-boundary", "poles"
+    ],
+    "evidence": "src/pipeline/science/evidence/geoid-evaluator-validation.json"
+  },
+  "review": {
+    "independent": false,
+    "requiredRole": "independent-scientific-or-geodetic-reviewer",
+    "reviewer": null,
+    "reviewedAt": null,
+    "disposition": "pending",
+    "reason": "The evidence packet is ready for review, but no independent reviewer has recorded a disposition."
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "blockers": [
+      "independent-goco06s-numerical-benchmark",
+      "second-environment-reproduction",
+      "independent-scientific-or-geodetic-review"
+    ],
+    "ciCanApprove": false
+  }
+}

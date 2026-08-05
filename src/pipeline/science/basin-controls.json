@@ -1,0 +1,334 @@
+{
+  "$schema": "./basin-controls.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.12-baltic-black-sea-controls-v1",
+  "issue": 96,
+  "evidenceDate": "2026-08-05",
+  "status": "source-pinning-complete-vertical-goldens-blocked",
+  "sourcePolicy": {
+    "scientificInputs": "real-source-only",
+    "baselineSampling": "source-native-cell-centres-no-extrapolation",
+    "landAndNodata": "DataUnavailable:source-nodata",
+    "unsupportedDomain": "blocked-or-UnsupportedGeography-never-extrapolated",
+    "modelIndependence": "expectations-must-not-be-generated-by-vertical-classifier"
+  },
+  "sourceBindings": {
+    "projection": {
+      "sourceId": "ipcc-ar6-sea-level",
+      "version": "20210809",
+      "assetId": "regional-confidence-archive",
+      "sha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+      "members": [
+        {
+          "id": "ssp126-medium-total",
+          "sha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716"
+        },
+        {
+          "id": "ssp245-medium-total",
+          "sha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8"
+        },
+        {
+          "id": "ssp585-medium-total",
+          "sha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+        }
+      ]
+    },
+    "baseline": {
+      "sla": {
+        "sourceId": "copernicus-marine-eur-sla-monthly",
+        "version": "202411",
+        "assetId": "monthly-sla-1995-2014",
+        "manifestPath": "src/pipeline/sources/manifests/cmems-eur-monthly-sla-1995-2014-v202411.jsonl.gz",
+        "manifestSha256": "94364fcb281bc3e0e3ee7d74c769f2dee5ad630305e040e5940603f1cecee5a7",
+        "payloadSha256": "77c8294956444b78c0d5d9127692f77ec597f2ec93476e71c296700cebbdda18",
+        "objectCount": 240,
+        "totalByteSize": 137971876
+      },
+      "mdt": {
+        "sourceId": "copernicus-marine-eur-mdt",
+        "version": "202411",
+        "assetId": "europe-mdt",
+        "sha256": "397cdca04e899ceb9eb3182f87cab64498357881407b3ab769796ce756249682",
+        "byteSize": 22840797
+      },
+      "referencePeriod": {
+        "startInclusive": "1995-01-01",
+        "endExclusive": "2015-01-01",
+        "calendarDayWeight": 7305
+      },
+      "missingPeriodRule": "DataUnavailable:source-nodata"
+    },
+    "geoid": {
+      "source": {
+        "sourceId": "goco06s-gravity-model",
+        "version": "GOCO06S-2019-12-13",
+        "assetId": "goco06s-coefficients",
+        "memberId": "goco06s-gfc",
+        "memberSha256": "351d9d20b84cd2c0f52ce77146b1e3b774f408200b579ffaf98593cf3d271819",
+        "tideSystem": "zero_tide"
+      },
+      "target": {
+        "sourceId": "egm2008-gravity-model",
+        "version": "EGM2008-2008-07",
+        "assetId": "spherical-harmonics",
+        "memberId": "egm2008-coefficients",
+        "memberSha256": "7e448aac4e1b8e63955890cbca08286018ecc6d203e074a64ba5bde21851438a",
+        "tideSystem": "tide_free"
+      }
+    },
+    "terrain": {
+      "sourceId": "copernicus-dem-glo30",
+      "version": "2021_1",
+      "assetId": "baltic-black-sea-control-set",
+      "publisher": "European Union and ESA; DLR/Airbus source data",
+      "canonicalRecord": "https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM",
+      "resolvedUrl": "https://copernicus-dem-30m.s3.amazonaws.com",
+      "resolvedVersion": "2021_1",
+      "nativeVersion": "COP-DEM-GLO30-F",
+      "manifestPath": "src/pipeline/sources/manifests/cop-dem-glo-30-baltic-black-sea-controls-v2021_1.jsonl.gz",
+      "manifestByteSize": 1641,
+      "manifestSha256": "22bd56ebdd644ecd62162ccb2155664b0b45436ea1bfc68f3a28589ae3bbac36",
+      "payloadSha256": "6a273b93bf690e4886666899213a080417ce21e849202ad7fbf9adafcae73d47",
+      "objectCount": 20,
+      "totalByteSize": 224337149,
+      "keyPrefix": "Copernicus_DSM_COG_10",
+      "requiredLayers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
+      "licence": {
+        "name": "Licence for Copernicus DEM instance COP-DEM-GLO-30-F",
+        "url": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+        "spdx": "LicenseRef-Copernicus-DEM-GLO30",
+        "attribution": "Produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+        "redistributionStatus": "approved",
+        "requiredAcknowledgements": [
+          "Use the mandatory modified-derivative notice for outputs produced from GLO-30.",
+          "Cite https://doi.org/10.5270/ESA-c5d3d65 where applicable."
+        ]
+      }
+    },
+    "geography": {
+      "support": {
+        "path": "data/geometry/europe.geojson",
+        "sha256": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385"
+      },
+      "coastal": {
+        "path": "data/geometry/coastal_analysis_zone.geojson",
+        "sha256": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9"
+      },
+      "predicate": "covers"
+    },
+    "connectivity": {
+      "path": "src/pipeline/science/connectivity-controls.json",
+      "sha256": "f77b99e64c61485bbc9c32f079004472756b820349eeaf327632bd437b169cb4"
+    }
+  },
+  "windows": [
+    {
+      "id": "gdansk-vistula",
+      "basin": "Baltic Sea",
+      "tile": "N54_00_E018_00",
+      "boundsWgs84": [18, 54, 19, 55],
+      "contexts": ["low-terrain", "estuary-port", "disconnected-inland", "shoreline-edit"],
+      "selectionBasis": "Vistula delta and Gdansk Bay were selected before source measurement as a Baltic low-coast, estuary, port, and inland-disconnection control.",
+      "marineAnchors": [
+        {
+          "id": "gdansk-bay-native-water",
+          "longitude": 18.78125,
+          "latitude": 54.53125,
+          "expectedSourceState": "baseline-ready",
+          "basis": "Exact 0.0625-degree CMEMS SLA/MDT source-cell centre in Gdansk Bay."
+        },
+        {
+          "id": "gdansk-inland-native-nodata",
+          "longitude": 18.15625,
+          "latitude": 54.15625,
+          "expectedSourceState": "source-nodata",
+          "basis": "Exact inland CMEMS source-cell centre used to prove that missing water support is not extrapolated across land."
+        }
+      ]
+    },
+    {
+      "id": "stockholm-archipelago",
+      "basin": "Baltic Sea",
+      "tile": "N59_00_E018_00",
+      "boundsWgs84": [18, 59, 19, 60],
+      "contexts": ["islands", "narrow-coastal-water", "source-mask-disagreement", "nodata"],
+      "selectionBasis": "The Stockholm archipelago was selected before source measurement to test islands, narrow passages, and near-shore source masks.",
+      "marineAnchors": [
+        {
+          "id": "stockholm-archipelago-native-water",
+          "longitude": 18.71875,
+          "latitude": 59.53125,
+          "expectedSourceState": "baseline-ready",
+          "basis": "Exact CMEMS source-cell centre where the complete SLA series and static MDT both have native support."
+        },
+        {
+          "id": "stockholm-mdt-mask-gap",
+          "longitude": 18.09375,
+          "latitude": 59.34375,
+          "expectedSourceState": "source-nodata",
+          "basis": "Exact CMEMS source-cell centre with complete SLA coverage but no MDT value; the baseline must remain unavailable."
+        }
+      ]
+    },
+    {
+      "id": "constanta-black-sea",
+      "basin": "Black Sea",
+      "tile": "N44_00_E028_00",
+      "boundsWgs84": [28, 44, 29, 45],
+      "contexts": ["low-terrain", "port", "lagoon-lakes", "disconnected-inland", "shoreline-edit"],
+      "selectionBasis": "The Constanta coast was selected before source measurement as a supported Black Sea low coast with port, lakes, and inland controls.",
+      "marineAnchors": [
+        {
+          "id": "constanta-native-water",
+          "longitude": 28.78125,
+          "latitude": 44.15625,
+          "expectedSourceState": "baseline-ready",
+          "basis": "Exact CMEMS source-cell centre where every monthly SLA input and the static MDT are present."
+        },
+        {
+          "id": "constanta-inland-native-nodata",
+          "longitude": 28.28125,
+          "latitude": 44.53125,
+          "expectedSourceState": "source-nodata",
+          "basis": "Exact inland CMEMS source-cell centre proving no marine baseline is inferred across land."
+        }
+      ]
+    },
+    {
+      "id": "batumi-black-sea-boundary",
+      "basin": "Black Sea",
+      "tile": "N41_00_E041_00",
+      "boundsWgs84": [41, 41, 42, 42],
+      "contexts": ["steep-coast", "port", "source-eastern-boundary", "unsupported-geography"],
+      "selectionBasis": "The Batumi area was selected before source measurement as a steep Black Sea coast at the eastern CMEMS/product-support boundary.",
+      "marineAnchors": [
+        {
+          "id": "batumi-native-water",
+          "longitude": 41.46875,
+          "latitude": 41.59375,
+          "expectedSourceState": "baseline-ready",
+          "basis": "Exact CMEMS source-cell centre inside the eastern Black Sea source domain with complete baseline inputs."
+        },
+        {
+          "id": "batumi-eastern-native-nodata",
+          "longitude": 41.78125,
+          "latitude": 41.59375,
+          "expectedSourceState": "source-nodata",
+          "basis": "Exact source-cell centre with no SLA or MDT support near the eastern land/domain boundary; extrapolation is prohibited."
+        }
+      ]
+    }
+  ],
+  "combinedSuite": {
+    "existingWindows": [
+      "malta-mediterranean",
+      "lisbon-atlantic",
+      "venice-adriatic",
+      "netherlands-north-sea",
+      "reykjavik-island"
+    ],
+    "requiredContexts": [
+      "atlantic-north-sea",
+      "mediterranean-adriatic",
+      "baltic-sea",
+      "black-sea",
+      "low-terrain",
+      "steep-coast",
+      "estuary-port",
+      "islands",
+      "nodata",
+      "disconnected-inland",
+      "source-domain-boundary"
+    ],
+    "stateExpectations": [
+      {
+        "id": "baltic-modeled-exposure-target",
+        "longitude": 18.65625,
+        "latitude": 54.40625,
+        "expectedState": "ModeledExposureDetected",
+        "reasonCode": "classified-connected-exposure",
+        "classificationReasonCode": 0,
+        "verificationStatus": "blocked-pending-independent-executable-golden",
+        "provenance": {
+          "origin": "Hand-authored target-state slot selected independently of the vertical classifier; a reviewed numeric expectation is deliberately absent until issues 94 and 95 pass.",
+          "generatedByModelUnderTest": false,
+          "reviewStatus": "pending-external"
+        }
+      },
+      {
+        "id": "baltic-no-modeled-exposure-target",
+        "longitude": 18.21875,
+        "latitude": 59.40625,
+        "expectedState": "NoModeledExposureDetected",
+        "reasonCode": "connectivity-rejected",
+        "classificationReasonCode": 10,
+        "verificationStatus": "blocked-pending-independent-executable-golden",
+        "provenance": {
+          "origin": "Hand-authored target-state slot selected independently of the vertical classifier; the expected connectivity outcome requires issue 97 review.",
+          "generatedByModelUnderTest": false,
+          "reviewStatus": "pending-external"
+        }
+      },
+      {
+        "id": "baltic-source-data-unavailable",
+        "longitude": 18.09375,
+        "latitude": 59.34375,
+        "expectedState": "DataUnavailable",
+        "reasonCode": "source-nodata",
+        "classificationReasonCode": 4,
+        "verificationStatus": "verified-source-native",
+        "provenance": {
+          "origin": "Direct source-cell inspection: all 240 SLA values exist and the independently produced CMEMS MDT is nodata.",
+          "generatedByModelUnderTest": false,
+          "reviewStatus": "source-measurement"
+        }
+      },
+      {
+        "id": "baltic-outside-coastal-scope",
+        "longitude": 18.125,
+        "latitude": 54.125,
+        "expectedState": "OutOfScope",
+        "reasonCode": "outside-coastal-scope",
+        "classificationReasonCode": 1,
+        "verificationStatus": "verified-geometry",
+        "provenance": {
+          "origin": "Pinned support and coastal geometries evaluated with the declared boundary-inclusive covers predicate.",
+          "generatedByModelUnderTest": false,
+          "reviewStatus": "geometry-contract"
+        }
+      },
+      {
+        "id": "black-sea-unsupported-geography",
+        "longitude": 41.65625,
+        "latitude": 41.65625,
+        "expectedState": "UnsupportedGeography",
+        "reasonCode": "outside-supported-geography",
+        "classificationReasonCode": null,
+        "verificationStatus": "verified-geometry",
+        "provenance": {
+          "origin": "Pinned Europe support geometry excludes Georgia; product-state precedence stops before vertical classification.",
+          "generatedByModelUnderTest": false,
+          "reviewStatus": "geometry-contract"
+        }
+      }
+    ],
+    "connectivityComparison": {
+      "status": "not-run-fail-closed",
+      "unfilteredCount": null,
+      "connectedCount": null,
+      "removedCount": null,
+      "disagreementCount": null,
+      "blockedBy": [94, 95, 97]
+    }
+  },
+  "review": {
+    "status": "pending-external",
+    "requiredRoles": ["independent scientific/data reviewer", "product owner"],
+    "executableGoldens": "blocked-by-issues-94-and-95"
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "europeWideClaimAllowed": false,
+    "blockingIssues": [94, 95, 97]
+  }
+}
