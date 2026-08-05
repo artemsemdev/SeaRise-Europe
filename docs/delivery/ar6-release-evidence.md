@@ -58,7 +58,18 @@ conclusions, and artifact IDs and digests. The expected artifacts are:
 - `ar6-linux-candidate-<sourceRevision>-<runId>` containing
   `phase-0r-ar6-v1/...` and `build-timing-linux.json`;
 - `ar6-macos-arm64-candidate-<sourceRevision>-<runId>` containing
-  `phase-0r-ar6-v1/...` and `build-timing-macos-arm64.json`.
+  `phase-0r-ar6-v1/...`, `build-timing-macos-arm64.json`, and
+  `browser-trace-macos-arm64.json`.
+
+The browser trace is generated only from the macOS ARM64 candidate. It uses
+Node 20, the exact frontend package lock, and that Playwright release's pinned
+Chromium revision to exercise the candidate through the real HTTP Range lookup
+harness. The trace binds its manifest digest, artifact hashes and sizes,
+golden evidence, package-lock digest, browser version, hardware profile, and
+cold and warm lookup samples. Before upload, the producer validates the trace
+against the candidate manifest, delivery harness, release contract, and macOS
+build timing. A missing or invalid trace fails the producer job; the owner
+validator independently recomputes the same bindings after download.
 
 Artifacts are retained for 14 days and cannot overwrite an artifact from the
 same run. A successful build remains a candidate with a pending scientific
