@@ -11,6 +11,8 @@
     "recordedAt",
     "candidate",
     "evidenceBindings",
+    "dependencyBindings",
+    "dependencyStatus",
     "evidenceBundleSha256",
     "reviewEvidenceSha256",
     "controlObservations",
@@ -31,6 +33,21 @@
       "minItems": 8,
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/binding" }
+    },
+    "dependencyBindings": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/dependencyBinding" }
+    },
+    "dependencyStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["95", "96"],
+      "properties": {
+        "95": { "$ref": "#/$defs/dependencyStatus" },
+        "96": { "$ref": "#/$defs/dependencyStatus" }
+      }
     },
     "evidenceBundleSha256": { "$ref": "#/$defs/sha256" },
     "reviewEvidenceSha256": { "$ref": "#/$defs/sha256" },
@@ -71,6 +88,53 @@
         "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
         "path": { "$ref": "#/$defs/path" },
         "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "dependencyBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "issue",
+        "artifactRole",
+        "path",
+        "identityField",
+        "expectedIdentity",
+        "sha256",
+        "verificationStatus"
+      ],
+      "properties": {
+        "id": { "enum": ["issue-95-uncertainty-budget", "issue-96-basin-contract", "issue-96-basin-evidence"] },
+        "issue": { "enum": [95, 96] },
+        "artifactRole": { "enum": ["uncertainty-budget-and-review", "basin-control-contract", "basin-control-evidence"] },
+        "path": { "$ref": "#/$defs/path" },
+        "identityField": { "enum": ["contractId", "evidenceId"] },
+        "expectedIdentity": { "$ref": "#/$defs/text" },
+        "sha256": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/sha256" }
+          ]
+        },
+        "verificationStatus": { "enum": ["missing-until-integration", "verified"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "verificationStatus": { "const": "missing-until-integration" } } },
+          "then": { "properties": { "sha256": { "const": null } } },
+          "else": { "properties": { "sha256": { "$ref": "#/$defs/sha256" } } }
+        }
+      ]
+    },
+    "dependencyStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactsVerified", "publicationGateStatus", "reviewStatus", "approvalReady"],
+      "properties": {
+        "artifactsVerified": { "type": "boolean" },
+        "publicationGateStatus": { "enum": ["missing", "approved", "blocked", "rejected"] },
+        "reviewStatus": { "enum": ["missing", "approved", "pending-independent", "pending-external", "blocked", "rejected"] },
+        "approvalReady": { "type": "boolean" }
       }
     },
     "candidate": {

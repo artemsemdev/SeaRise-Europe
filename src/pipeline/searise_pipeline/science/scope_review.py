@@ -37,6 +37,32 @@ REQUIRED_EMPIRICAL_KINDS = frozenset(
 REQUIRED_PUBLIC_STATES = frozenset(
     {"OutOfScope", "UnsupportedGeography", "DataUnavailable"}
 )
+REQUIRED_DEPENDENCY_BINDINGS: tuple[dict[str, Any], ...] = (
+    {
+        "id": "issue-95-uncertainty-budget",
+        "issue": 95,
+        "artifactRole": "uncertainty-budget-and-review",
+        "path": "src/pipeline/science/coastal-uncertainty-budget.json",
+        "identityField": "contractId",
+        "expectedIdentity": "phase-0.11-coastal-uncertainty-budget",
+    },
+    {
+        "id": "issue-96-basin-contract",
+        "issue": 96,
+        "artifactRole": "basin-control-contract",
+        "path": "src/pipeline/science/basin-controls.json",
+        "identityField": "contractId",
+        "expectedIdentity": "phase-0.12-baltic-black-sea-controls-v1",
+    },
+    {
+        "id": "issue-96-basin-evidence",
+        "issue": 96,
+        "artifactRole": "basin-control-evidence",
+        "path": "src/pipeline/science/evidence/phase-0-12-basin-controls.json",
+        "identityField": "evidenceId",
+        "expectedIdentity": "phase-0.12-baltic-black-sea-controls-v1",
+    },
+)
 
 
 def _schema_path() -> Path:
@@ -106,6 +132,8 @@ def review_evidence_sha256(document: Mapping[str, Any]) -> str:
         for key in (
             "candidate",
             "evidenceBindings",
+            "dependencyBindings",
+            "dependencyStatus",
             "evidenceBundleSha256",
             "controlObservations",
             "semanticControls",
@@ -114,6 +142,148 @@ def review_evidence_sha256(document: Mapping[str, Any]) -> str:
         )
     }
     return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
+
+
+def _read_json_object(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Cannot read {label} {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ScienceContractError(f"{label} must be a JSON object: {path}")
+    return value
+
+
+def _dependency_artifacts(
+    repo_root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    bindings: list[dict[str, Any]] = []
+    artifacts: dict[str, dict[str, Any]] = {}
+    for specification in REQUIRED_DEPENDENCY_BINDINGS:
+        binding = dict(specification)
+        path = repo_root / str(specification["path"])
+        if not path.is_file():
+            binding.update(
+                {"sha256": None, "verificationStatus": "missing-until-integration"}
+            )
+        else:
+            artifact = _read_json_object(path, str(specification["id"]))
+            identity_field = str(specification["identityField"])
+            if artifact.get(identity_field) != specification["expectedIdentity"]:
+                raise ScienceContractError(
+                    f"{specification['id']} has an unexpected {identity_field}"
+                )
+            artifacts[str(specification["id"])] = artifact
+            binding.update({"sha256": _sha256(path), "verificationStatus": "verified"})
+        bindings.append(binding)
+    return bindings, artifacts
+
+
+def _dependency_status(
+    bindings: Sequence[Mapping[str, Any]], artifacts: Mapping[str, Mapping[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    verified_by_issue = {
+        issue: all(
+            item["verificationStatus"] == "verified"
+            for item in bindings
+            if item["issue"] == issue
+        )
+        for issue in (95, 96)
+    }
+    if not verified_by_issue[95]:
+        issue_95 = {
+            "artifactsVerified": False,
+            "publicationGateStatus": "missing",
+            "reviewStatus": "missing",
+            "approvalReady": False,
+        }
+    else:
+        budget = artifacts["issue-95-uncertainty-budget"]
+        gate_status = budget.get("publicationGate", {}).get("status")
+        review_status = budget.get("review", {}).get("status")
+        recommendation = budget.get("decision", {}).get("recommendedDisposition")
+        issue_95 = {
+            "artifactsVerified": True,
+            "publicationGateStatus": gate_status,
+            "reviewStatus": review_status,
+            "approvalReady": (
+                gate_status == "approved"
+                and review_status == "approved"
+                and recommendation == "approved"
+            ),
+        }
+
+    if not verified_by_issue[96]:
+        issue_96 = {
+            "artifactsVerified": False,
+            "publicationGateStatus": "missing",
+            "reviewStatus": "missing",
+            "approvalReady": False,
+        }
+    else:
+        contract = artifacts["issue-96-basin-contract"]
+        evidence = artifacts["issue-96-basin-evidence"]
+        gate_statuses = {
+            contract.get("publicationGate", {}).get("status"),
+            evidence.get("publicationGate", {}).get("status"),
+        }
+        review_statuses = {
+            contract.get("review", {}).get("status"),
+            evidence.get("review", {}).get("status"),
+        }
+        if len(gate_statuses) != 1 or len(review_statuses) != 1:
+            raise ScienceContractError("Issue 96 contract and evidence statuses disagree")
+        gate_status = gate_statuses.pop()
+        review_status = review_statuses.pop()
+        issue_96 = {
+            "artifactsVerified": True,
+            "publicationGateStatus": gate_status,
+            "reviewStatus": review_status,
+            "approvalReady": gate_status == "approved" and review_status == "approved",
+        }
+    return {"95": issue_95, "96": issue_96}
+
+
+def _validate_dependency_records(document: Mapping[str, Any]) -> None:
+    bindings = document["dependencyBindings"]
+    actual = {item["id"]: item for item in bindings}
+    expected = {item["id"]: item for item in REQUIRED_DEPENDENCY_BINDINGS}
+    if set(actual) != set(expected) or len(actual) != len(bindings):
+        raise ScienceContractError("Phase 0.13 dependency bindings are incomplete")
+    for identifier, specification in expected.items():
+        record = actual[identifier]
+        for key, value in specification.items():
+            if record.get(key) != value:
+                raise ScienceContractError(
+                    f"Phase 0.13 dependency binding changed: {identifier}.{key}"
+                )
+
+    statuses = document["dependencyStatus"]
+    for issue in (95, 96):
+        records = [item for item in bindings if item["issue"] == issue]
+        artifacts_verified = all(
+            item["verificationStatus"] == "verified" for item in records
+        )
+        status = statuses[str(issue)]
+        if status["artifactsVerified"] != artifacts_verified:
+            raise ScienceContractError(
+                f"Phase 0.13 issue {issue} artifact verification status is inconsistent"
+            )
+        if status["approvalReady"] and (
+            not artifacts_verified
+            or status["publicationGateStatus"] != "approved"
+            or status["reviewStatus"] != "approved"
+        ):
+            raise ScienceContractError(
+                f"Phase 0.13 issue {issue} is marked ready without approved evidence"
+            )
+    expected_blockers = sorted(
+        int(issue)
+        for issue, status in statuses.items()
+        if not status["approvalReady"]
+    )
+    if document["blockingDependencies"] != expected_blockers:
+        raise ScienceContractError("Phase 0.13 blockers differ from dependency evidence")
 
 
 def _validate_metric_observation(control: Mapping[str, Any]) -> bool:
@@ -184,7 +354,10 @@ def validate_scope_connectivity_review(
     bindings = list(document["evidenceBindings"])
     if len({item["id"] for item in bindings}) != len(bindings):
         raise ScienceContractError("Phase 0.13 evidence binding IDs must be unique")
-    expected_bundle = evidence_bundle_sha256(bindings)
+    _validate_dependency_records(document)
+    expected_bundle = evidence_bundle_sha256(
+        [*bindings, *document["dependencyBindings"]]
+    )
     if document["evidenceBundleSha256"] != expected_bundle:
         raise ScienceContractError("Phase 0.13 evidence bundle checksum mismatch")
     if document["reviewEvidenceSha256"] != review_evidence_sha256(document):
@@ -281,6 +454,20 @@ def verify_evidence_bindings(document: Mapping[str, Any], repo_root: Path) -> No
             raise ScienceContractError(
                 f"Phase 0.13 evidence changed after binding: {binding['id']}"
             )
+    actual_bindings, artifacts = _dependency_artifacts(repo_root)
+    missing = [
+        item["id"]
+        for item in actual_bindings
+        if item["verificationStatus"] != "verified"
+    ]
+    if missing:
+        raise ScienceContractError(
+            "Phase 0.13 dependency evidence is unavailable: " + ", ".join(missing)
+        )
+    if actual_bindings != document["dependencyBindings"]:
+        raise ScienceContractError("Phase 0.13 dependency evidence changed after binding")
+    if _dependency_status(actual_bindings, artifacts) != document["dependencyStatus"]:
+        raise ScienceContractError("Phase 0.13 dependency status changed after binding")
 
 
 def _reviewer_payload(record: Mapping[str, Any], document: Mapping[str, Any]) -> bytes:
@@ -569,6 +756,15 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
         {"id": identifier, "path": path, "sha256": _sha256(repo_root / path)}
         for identifier, path in bound_paths.items()
     ]
+    dependency_bindings, dependency_artifacts = _dependency_artifacts(repo_root)
+    dependency_status = _dependency_status(
+        dependency_bindings, dependency_artifacts
+    )
+    blocking_dependencies = sorted(
+        int(issue)
+        for issue, status in dependency_status.items()
+        if not status["approvalReady"]
+    )
     support = gpd.read_file(repo_root / bound_paths["europe-support"]).geometry.union_all()
     coastal = gpd.read_file(repo_root / bound_paths["coastal-scope"]).geometry.union_all()
     geography = json.loads(
@@ -710,10 +906,12 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
             },
         },
         "evidenceBindings": bindings,
+        "dependencyBindings": dependency_bindings,
+        "dependencyStatus": dependency_status,
         "controlObservations": control_observations,
         "semanticControls": semantic_controls,
         "empiricalControls": _empirical_controls(),
-        "blockingDependencies": [95, 96],
+        "blockingDependencies": blocking_dependencies,
         "review": {
             "status": "pending-independent-review",
             "disposition": None,
@@ -743,7 +941,9 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
             ),
         },
     }
-    document["evidenceBundleSha256"] = evidence_bundle_sha256(bindings)
+    document["evidenceBundleSha256"] = evidence_bundle_sha256(
+        [*bindings, *dependency_bindings]
+    )
     document["reviewEvidenceSha256"] = review_evidence_sha256(document)
     validate_scope_connectivity_review(document)
     return document

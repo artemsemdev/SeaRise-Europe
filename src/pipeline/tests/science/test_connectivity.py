@@ -159,7 +159,54 @@ def test_scope_review_preflight_is_reproducible_and_bound() -> None:
         },
         "status": "pending-independent-review",
     }
+    dependency_bindings = checked_in["dependencyBindings"]
+    assert [item["id"] for item in dependency_bindings] == [
+        "issue-95-uncertainty-budget",
+        "issue-96-basin-contract",
+        "issue-96-basin-evidence",
+    ]
+    for binding in dependency_bindings:
+        path = REPO_ROOT / binding["path"]
+        assert binding["verificationStatus"] == "verified"
+        assert binding["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert checked_in["dependencyStatus"] == {
+        "95": {
+            "approvalReady": False,
+            "artifactsVerified": True,
+            "publicationGateStatus": "blocked",
+            "reviewStatus": "pending-independent",
+        },
+        "96": {
+            "approvalReady": False,
+            "artifactsVerified": True,
+            "publicationGateStatus": "blocked",
+            "reviewStatus": "pending-external",
+        },
+    }
     verify_evidence_bindings(checked_in, REPO_ROOT)
+
+
+def test_dependency_blockers_are_derived_from_exact_bound_artifacts() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["blockingDependencies"] = [95]
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="blockers differ"):
+        validate_scope_connectivity_review(review)
+
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["dependencyStatus"]["95"].update(
+        {
+            "approvalReady": True,
+            "publicationGateStatus": "approved",
+            "reviewStatus": "approved",
+        }
+    )
+    review["blockingDependencies"] = [96]
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="dependency status changed after binding"):
+        verify_evidence_bindings(review, REPO_ROOT)
 
 
 def test_every_existing_control_has_expected_observed_and_review_status() -> None:
