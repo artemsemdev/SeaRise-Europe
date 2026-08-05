@@ -7,12 +7,35 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 import numpy as np
 
 from searise_pipeline.science.contracts import ScienceContractError
 
 from .evidence import candidate_binding, load_json, sha256
+
+_TRACE_KEYS = {
+    "schemaVersion",
+    "harness",
+    "candidate",
+    "profiles",
+    "target",
+    "toolchain",
+    "coldLookupSamples",
+    "warmLookupSamples",
+}
+_REQUEST_KEYS = {
+    "kind",
+    "path",
+    "artifactPath",
+    "status",
+    "responseBytes",
+    "range",
+    "contentRange",
+}
+_MIN_TOTAL_MEMORY_BYTES = 512 * 1024 * 1024
+_MAX_TOTAL_MEMORY_BYTES = 16 * 1024**4
 
 
 def _non_negative_integer(value: object, field: str) -> int:
@@ -21,10 +44,74 @@ def _non_negative_integer(value: object, field: str) -> int:
     return value
 
 
-def _finite_non_negative_number(value: object, field: str) -> float:
-    if type(value) not in (int, float) or not np.isfinite(value) or value < 0:
-        raise ScienceContractError(f"{field} must be finite and non-negative")
+def _positive_integer(value: object, field: str) -> int:
+    if type(value) is not int or value <= 0:
+        raise ScienceContractError(f"{field} must be a positive integer")
+    return value
+
+
+def _finite_positive_number(value: object, field: str) -> float:
+    if type(value) not in (int, float) or not np.isfinite(value) or value <= 0:
+        raise ScienceContractError(f"{field} must be finite and positive")
     return float(value)
+
+
+def _validate_profiles(value: object) -> tuple[Mapping[str, Any], int]:
+    if not isinstance(value, dict) or set(value) != {"hardware", "browser", "network"}:
+        raise ScienceContractError("Browser delivery trace lacks exact environment profiles")
+    hardware = value["hardware"]
+    browser = value["browser"]
+    network = value["network"]
+    if (
+        not isinstance(hardware, dict)
+        or set(hardware) != {"operatingSystem", "architecture", "cpu", "totalMemoryBytes"}
+        or not isinstance(hardware.get("operatingSystem"), str)
+        or re.fullmatch(r"(?:darwin|linux) \S+", hardware["operatingSystem"]) is None
+        or hardware.get("architecture") not in {"arm64", "x64"}
+        or not isinstance(hardware.get("cpu"), str)
+        or not hardware["cpu"].strip()
+        or hardware["cpu"] == "unknown"
+    ):
+        raise ScienceContractError("Browser delivery trace has an invalid hardware profile")
+    total_memory = _positive_integer(
+        hardware.get("totalMemoryBytes"), "Hardware total-memory byte count"
+    )
+    if not _MIN_TOTAL_MEMORY_BYTES <= total_memory <= _MAX_TOTAL_MEMORY_BYTES:
+        raise ScienceContractError("Hardware total-memory byte count is not realistic")
+    if (
+        not isinstance(browser, dict)
+        or set(browser) != {"engine", "version"}
+        or browser.get("engine") != "Chromium"
+        or not isinstance(browser.get("version"), str)
+        or re.fullmatch(r"\d+(?:\.\d+){1,3}", browser["version"]) is None
+    ):
+        raise ScienceContractError("Browser delivery trace has an invalid browser profile")
+    if (
+        not isinstance(network, dict)
+        or set(network) != {"transport", "cacheControl", "origin"}
+        or network.get("transport") != "loopback-http-1.1"
+        or network.get("cacheControl") != "immutable"
+        or not isinstance(network.get("origin"), str)
+    ):
+        raise ScienceContractError("Browser delivery trace has an invalid network profile")
+    try:
+        origin = urlsplit(network["origin"])
+        port = origin.port
+    except ValueError as exc:
+        raise ScienceContractError("Browser delivery origin is not valid") from exc
+    if (
+        origin.scheme != "http"
+        or origin.hostname != "127.0.0.1"
+        or port is None
+        or not 1 <= port <= 65535
+        or origin.username is not None
+        or origin.password is not None
+        or origin.path
+        or origin.query
+        or origin.fragment
+    ):
+        raise ScienceContractError("Browser delivery origin is not loopback HTTP")
+    return value, total_memory
 
 
 def create_delivery_report(
@@ -44,6 +131,22 @@ def create_delivery_report(
         raise ScienceContractError("Browser delivery harness differs from the contract")
     trace = load_json(trace_path)
     binding = candidate_binding(candidate)
+    manifest = load_json(candidate / "manifest.json")
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise ScienceContractError("Release manifest has no delivery artifact inventory")
+    try:
+        artifact_byte_sizes = {
+            item["path"]: _positive_integer(
+                item.get("byteSize"), f"Release artifact byte size: {item['path']}"
+            )
+            for item in artifacts
+            if isinstance(item, dict)
+        }
+    except (KeyError, TypeError) as exc:
+        raise ScienceContractError("Release manifest has invalid delivery artifact sizes") from exc
+    if len(artifact_byte_sizes) != len(artifacts):
+        raise ScienceContractError("Release manifest has invalid delivery artifact sizes")
     build_timing = load_json(build_timing_path)
     if (
         build_timing.get("candidate") != binding
@@ -56,29 +159,17 @@ def create_delivery_report(
         "releaseId": binding["releaseId"],
         "manifestSha256": binding["manifestSha256"],
         "artifactHashes": binding["artifactHashes"],
+        "artifactByteSizes": artifact_byte_sizes,
     }
     if (
-        type(trace.get("schemaVersion")) is not int
+        set(trace) != _TRACE_KEYS
+        or type(trace.get("schemaVersion")) is not int
         or trace["schemaVersion"] != 1
         or trace.get("harness") != specification["harnessPath"]
         or trace.get("candidate") != expected_trace_binding
     ):
         raise ScienceContractError("Browser delivery trace is detached from the candidate")
-    profiles = trace.get("profiles", {})
-    hardware_profile = profiles.get("hardware", {}) if isinstance(profiles, dict) else {}
-    network_profile = profiles.get("network", {}) if isinstance(profiles, dict) else {}
-    browser_profile = profiles.get("browser", {}) if isinstance(profiles, dict) else {}
-    if (
-        not isinstance(hardware_profile, dict)
-        or not hardware_profile
-        or not isinstance(network_profile, dict)
-        or not network_profile
-        or not isinstance(browser_profile, dict)
-        or browser_profile.get("engine") != "Chromium"
-        or not isinstance(browser_profile.get("version"), str)
-        or not browser_profile["version"]
-    ):
-        raise ScienceContractError("Browser delivery trace lacks exact environment profiles")
+    profiles, total_memory_bytes = _validate_profiles(trace.get("profiles"))
     if trace.get("toolchain") != {
         "playwrightVersion": specification["playwrightVersion"],
         "geotiffVersion": specification["geotiffVersion"],
@@ -97,6 +188,13 @@ def create_delivery_report(
         raise ScienceContractError("Sealed browser target has invalid projection values")
     expected_cog_path = f"analysis/{sealed_target['scenario']}/{sealed_target['horizon']}.tif"
     expected_grid_path = "analysis/source-grid.json.gz"
+    try:
+        expected_cog_bytes = artifact_byte_sizes[expected_cog_path]
+        expected_grid_bytes = artifact_byte_sizes[expected_grid_path]
+    except KeyError as exc:
+        raise ScienceContractError(
+            "Browser target artifacts are absent from the sealed manifest"
+        ) from exc
     try:
         with gzip.open(candidate / expected_grid_path, "rt", encoding="utf-8") as stream:
             source_grid = json.load(stream)
@@ -141,7 +239,9 @@ def create_delivery_report(
         sample: Mapping[str, Any], *, cold_sample: bool
     ) -> tuple[float, int, int, int]:
         requests = sample.get("requests")
-        if not isinstance(requests, list) or any(not isinstance(item, dict) for item in requests):
+        if not isinstance(requests, list) or any(
+            not isinstance(item, dict) or set(item) != _REQUEST_KEYS for item in requests
+        ):
             raise ScienceContractError("Browser delivery sample lacks observed HTTP requests")
         expected_request_paths = {
             "cog": ("/projection.tif", expected_cog_path),
@@ -157,29 +257,50 @@ def create_delivery_report(
             )
         range_requests = [item for item in requests if item.get("kind") == "cog"]
         grid_requests = [item for item in requests if item.get("kind") == "source-grid"]
-        if any(
-            type(item.get("status")) is not int
-            or item["status"] != 206
-            or not isinstance(item.get("range"), str)
-            or re.fullmatch(r"bytes=\d+-\d*", item["range"]) is None
-            for item in range_requests
+        if (cold_sample and (len(grid_requests) != 1 or not range_requests)) or (
+            not cold_sample and requests
         ):
-            raise ScienceContractError("COG lookup did not use successful HTTP Range responses")
-        if (
-            cold_sample
-            and (
-                len(grid_requests) != 1
-                or type(grid_requests[0].get("status")) is not int
-                or grid_requests[0]["status"] != 200
-                or grid_requests[0].get("range") is not None
-            )
-        ) or (not cold_sample and requests):
             raise ScienceContractError(
                 "Browser lookup requests differ from the cold/warm cache contract"
             )
+        if cold_sample:
+            grid_request = grid_requests[0]
+            if (
+                type(grid_request.get("status")) is not int
+                or grid_request["status"] != 200
+                or grid_request.get("range") is not None
+                or grid_request.get("contentRange") is not None
+                or grid_request.get("responseBytes") != expected_grid_bytes
+            ):
+                raise ScienceContractError(
+                    "Source-grid response differs from its sealed artifact bytes"
+                )
+        for item in range_requests:
+            range_value = item.get("range")
+            match = (
+                re.fullmatch(r"bytes=(\d+)-(\d*)", range_value)
+                if isinstance(range_value, str)
+                else None
+            )
+            if type(item.get("status")) is not int or item.get("status") != 206 or match is None:
+                raise ScienceContractError("COG lookup did not use successful HTTP Range responses")
+            start = int(match.group(1))
+            requested_end = int(match.group(2)) if match.group(2) else expected_cog_bytes - 1
+            if start >= expected_cog_bytes or requested_end < start:
+                raise ScienceContractError("COG request Range is outside the sealed artifact")
+            response_end = min(requested_end, expected_cog_bytes - 1)
+            expected_content_range = f"bytes {start}-{response_end}/{expected_cog_bytes}"
+            expected_response_bytes = response_end - start + 1
+            if (
+                item.get("contentRange") != expected_content_range
+                or item.get("responseBytes") != expected_response_bytes
+            ):
+                raise ScienceContractError(
+                    "COG Content-Range differs from its sealed artifact bytes"
+                )
         observed_count = len(range_requests)
         response_bytes = [
-            _non_negative_integer(item.get("responseBytes"), "Browser response byte count")
+            _positive_integer(item.get("responseBytes"), "Browser response byte count")
             for item in requests
         ]
         observed_bytes = sum(response_bytes)
@@ -195,15 +316,13 @@ def create_delivery_report(
             or (cold_sample and observed_count == 0)
         ):
             raise ScienceContractError("Browser delivery sample aggregates differ from its trace")
-        before = _non_negative_integer(
-            sample.get("heapBeforeBytes"), "Browser heap-before byte count"
-        )
-        after = _non_negative_integer(sample.get("heapAfterBytes"), "Browser heap-after byte count")
-        peak = _non_negative_integer(sample.get("peakHeapBytes"), "Browser peak-heap byte count")
-        duration = _finite_non_negative_number(
+        before = _positive_integer(sample.get("heapBeforeBytes"), "Browser heap-before byte count")
+        after = _positive_integer(sample.get("heapAfterBytes"), "Browser heap-after byte count")
+        peak = _positive_integer(sample.get("peakHeapBytes"), "Browser peak-heap byte count")
+        duration = _finite_positive_number(
             sample.get("durationMilliseconds"), "Browser lookup duration"
         )
-        if peak < before:
+        if peak < before or max(before, after, peak) > total_memory_bytes:
             raise ScienceContractError(
                 "Browser delivery sample contains invalid timing or heap data"
             )
@@ -217,12 +336,12 @@ def create_delivery_report(
             or sample.get("locationId") != target.get("sourceLocationId")
         ):
             raise ScienceContractError("Browser lookup did not return an ID and three quantiles")
-        return duration, observed_count, observed_bytes, max(0, max(peak, after) - before)
+        return duration, observed_count, observed_bytes, max(peak, after) - before
 
     cold_metrics = [validate_sample(sample, cold_sample=True) for sample in cold]
     warm_metrics = [validate_sample(sample, cold_sample=False) for sample in warm]
     budgets = contract["budgets"]
-    full_duration = _finite_non_negative_number(
+    full_duration = _finite_positive_number(
         build_timing.get("fullCleanBuildDurationSeconds"),
         "Full clean build duration",
     )
@@ -235,6 +354,8 @@ def create_delivery_report(
             float(np.percentile([item[0] for item in warm_metrics], 95)), 6
         ),
     }
+    if metrics["browserHeapBytes"] <= 0:
+        raise ScienceContractError("Browser delivery trace records no measurable heap growth")
     passed = (
         metrics["fullCleanBuildDurationSeconds"] <= budgets["buildDurationSeconds"]
         and metrics["browserHeapBytes"] <= budgets["browserHeapBytes"]
