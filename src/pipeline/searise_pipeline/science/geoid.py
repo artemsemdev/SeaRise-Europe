@@ -87,7 +87,10 @@ def _source(document: Mapping[str, Any], source_id: str) -> Mapping[str, Any]:
     matches = [item for item in document["sources"] if item["id"] == source_id]
     if len(matches) != 1:
         raise ScienceContractError(f"Missing or duplicate geoid source: {source_id}")
-    return matches[0]
+    result = matches[0]
+    if not isinstance(result, dict):
+        raise ScienceContractError(f"Invalid geoid source: {source_id}")
+    return result
 
 
 def _member(source: Mapping[str, Any], member_id: str) -> Mapping[str, Any]:
@@ -99,14 +102,20 @@ def _member(source: Mapping[str, Any], member_id: str) -> Mapping[str, Any]:
     ]
     if len(matches) != 1:
         raise ScienceContractError(f"Missing or duplicate geoid member: {member_id}")
-    return matches[0]
+    result = matches[0]
+    if not isinstance(result, dict):
+        raise ScienceContractError(f"Invalid geoid member: {member_id}")
+    return result
 
 
 def _asset(source: Mapping[str, Any], asset_id: str) -> Mapping[str, Any]:
     matches = [asset for asset in source["assets"] if asset["id"] == asset_id]
     if len(matches) != 1:
         raise ScienceContractError(f"Missing or duplicate geoid asset: {asset_id}")
-    return matches[0]
+    result = matches[0]
+    if not isinstance(result, dict):
+        raise ScienceContractError(f"Invalid geoid asset: {asset_id}")
+    return result
 
 
 def build_geoid_requests(
