@@ -240,6 +240,8 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             linux,
         )
         self.assertIn("/tmp/build-timing-linux.json", linux)
+        self.assertNotIn("/tmp/build-timing-macos-arm64.json", linux)
+        self.assertNotIn("-macos-arm64", linux)
 
         self.assertIn("name: Full-source macOS ARM64 AR6 candidate", macos)
         self.assertIn("runs-on: macos-14", macos)
@@ -257,6 +259,8 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             macos,
         )
         self.assertIn("/tmp/build-timing-macos-arm64.json", macos)
+        self.assertNotIn("/tmp/build-timing-linux.json", macos)
+        self.assertNotIn("-linux-x86_64", macos)
         self.assertEqual(linux.count("/tmp/phase-0r-ar6-v1"), 4)
         self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 4)
 
