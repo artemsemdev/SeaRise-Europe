@@ -21,6 +21,15 @@ class Ar6GridSlice:
     values_m: NDArray[np.float64]
 
 
+@dataclass(frozen=True)
+class Ar6ProjectionInterval:
+    """Exact lower, central, and upper AR6 projection grids."""
+
+    lower: Ar6GridSlice
+    central: Ar6GridSlice
+    upper: Ar6GridSlice
+
+
 def _require_equal(actual: Any, expected: Any, label: str) -> None:
     if actual != expected:
         raise ScienceContractError(f"Unexpected AR6 {label}: {actual!r} != {expected!r}")
@@ -72,6 +81,8 @@ def extract_projection_grid(
     projection: Mapping[str, Any],
     scenario: str,
     year: int,
+    *,
+    quantile: float | None = None,
 ) -> Ar6GridSlice:
     """Select the exact approved statistic and reshape explicit grid locations."""
     validate_ar6_schema(dataset, projection)
@@ -84,11 +95,17 @@ def extract_projection_grid(
     coordinates = mapping["coordinates"]
     year_values = np.asarray(dataset[coordinates["years"]].values)
     quantile_values = np.asarray(dataset[coordinates["quantiles"]].values)
-    quantile = mapping["statistic"]["quantile"]
+    selected_quantile = (
+        mapping["statistic"]["quantile"] if quantile is None else quantile
+    )
     if year not in year_values:
         raise ScienceContractError(f"AR6 horizon is absent from source: {year}")
-    if not np.any(quantile_values == quantile):
-        raise ScienceContractError(f"AR6 quantile is absent from source: {quantile}")
+    if np.count_nonzero(year_values == year) != 1:
+        raise ScienceContractError(f"AR6 horizon is not uniquely present: {year}")
+    if np.count_nonzero(quantile_values == selected_quantile) != 1:
+        raise ScienceContractError(
+            f"AR6 quantile is not uniquely present in source: {selected_quantile}"
+        )
 
     location_ids = np.asarray(dataset[coordinates["locations"]].values)
     grid_rule = projection["nativeCoordinates"]
@@ -122,7 +139,7 @@ def extract_projection_grid(
         .sel(
             {
                 coordinates["years"]: year,
-                coordinates["quantiles"]: quantile,
+                coordinates["quantiles"]: selected_quantile,
             }
         )
         .values[selected]
@@ -136,6 +153,59 @@ def extract_projection_grid(
     grid = np.full((latitudes.size, longitudes.size), np.nan, dtype=np.float64)
     grid[lat_index, lon_index] = values
     return Ar6GridSlice(latitudes=latitudes, longitudes=longitudes, values_m=grid)
+
+
+def extract_projection_interval(
+    dataset: xr.Dataset,
+    projection: Mapping[str, Any],
+    scenario: str,
+    year: int,
+) -> Ar6ProjectionInterval:
+    """Select the exact 0.167/0.5/0.833 likely interval without fallback."""
+    statistics = projection["mapping"]["intervalStatistics"]
+    interval = Ar6ProjectionInterval(
+        lower=extract_projection_grid(
+            dataset,
+            projection,
+            scenario,
+            year,
+            quantile=statistics["lowerQuantile"],
+        ),
+        central=extract_projection_grid(
+            dataset,
+            projection,
+            scenario,
+            year,
+            quantile=statistics["centralQuantile"],
+        ),
+        upper=extract_projection_grid(
+            dataset,
+            projection,
+            scenario,
+            year,
+            quantile=statistics["upperQuantile"],
+        ),
+    )
+    for candidate in (interval.central, interval.upper):
+        if not (
+            np.array_equal(candidate.latitudes, interval.lower.latitudes)
+            and np.array_equal(candidate.longitudes, interval.lower.longitudes)
+        ):
+            raise ScienceContractError("AR6 interval grids do not share coordinates")
+    complete = (
+        np.isfinite(interval.lower.values_m)
+        & np.isfinite(interval.central.values_m)
+        & np.isfinite(interval.upper.values_m)
+    )
+    if np.any(
+        complete
+        & (
+            (interval.lower.values_m > interval.central.values_m)
+            | (interval.central.values_m > interval.upper.values_m)
+        )
+    ):
+        raise ScienceContractError("AR6 interval quantiles are not monotonic")
+    return interval
 
 
 def bilinear_sample(
