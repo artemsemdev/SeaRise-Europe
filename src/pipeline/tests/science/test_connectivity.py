@@ -297,6 +297,57 @@ def test_blocked_empirical_control_cannot_contain_metrics() -> None:
     with pytest.raises(ScienceContractError, match="invented metrics"):
         validate_scope_connectivity_review(review)
 
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["empiricalControls"][-1]["observation"]["blockingIssues"] = [95]
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="blockers differ"):
+        validate_scope_connectivity_review(review)
+
+
+def _complete_first_empirical_control(review: dict) -> None:  # type: ignore[type-arg]
+    review["empiricalControls"][0]["observation"] = {
+        "status": "complete",
+        "metrics": {
+            "preFilterPositiveCellCount": 10,
+            "postFilterPositiveCellCount": 8,
+            "removedCellCount": 2,
+            "removalFraction": 0.2,
+            "referencePositiveCellCount": 8,
+            "falsePositiveBeforeCount": 2,
+            "falsePositiveAfterCount": 0,
+            "falsePositiveBeforeRate": 0.2,
+            "falsePositiveAfterRate": 0.0,
+            "disputedCellCount": 0,
+            "tileSeamMismatchCellCount": 0,
+        },
+        "evidence": {
+            "id": "rotterdam-port-evidence",
+            "path": "data/geometry/europe.geojson",
+            "sha256": "0" * 64,
+        },
+        "blockingIssues": [],
+    }
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+
+def test_complete_empirical_control_requires_checksum_bound_evidence() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    _complete_first_empirical_control(review)
+    review["empiricalControls"][0]["observation"]["evidence"] = None
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="Invalid Phase 0.13 review"):
+        validate_scope_connectivity_review(review)
+
+
+def test_completed_empirical_evidence_checksum_is_verified() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    _complete_first_empirical_control(review)
+
+    with pytest.raises(ScienceContractError, match="empirical evidence changed"):
+        verify_evidence_bindings(review, REPO_ROOT)
+
 
 def test_observation_change_invalidates_review_evidence_hash() -> None:
     review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
@@ -319,13 +370,6 @@ def test_evidence_change_invalidates_review_binding(tmp_path: Path) -> None:
 
 def _signed_blocked_review(tmp_path: Path) -> dict:  # type: ignore[type-arg]
     review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
-    private_key = Ed25519PrivateKey.generate()
-    public_bytes = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-    key_path = tmp_path / "reviewer.pem"
-    key_path.write_bytes(public_bytes)
     reviewed_commit = "a" * 40
     review["review"].update(
         {
@@ -341,6 +385,13 @@ def _signed_blocked_review(tmp_path: Path) -> dict:  # type: ignore[type-arg]
         }
     )
     for key, record in review["review"]["reviewers"].items():
+        private_key = Ed25519PrivateKey.generate()
+        public_bytes = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        key_path = tmp_path / f"reviewer-{key}.pem"
+        key_path.write_bytes(public_bytes)
         record.update(
             {
                 "decision": "blocked",
@@ -361,7 +412,7 @@ def _signed_blocked_review(tmp_path: Path) -> dict:  # type: ignore[type-arg]
         )
         record["proof"] = {
             "kind": "ed25519-detached-signature",
-            "publicKeyPath": "reviewer.pem",
+            "publicKeyPath": key_path.name,
             "publicKeySha256": hashlib.sha256(public_bytes).hexdigest(),
             "signatureBase64": base64.b64encode(private_key.sign(payload)).decode("ascii"),
         }
@@ -396,6 +447,25 @@ def test_decision_requires_both_named_signed_reviewers(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ScienceContractError, match="both named, signed"):
+        validate_scope_connectivity_review(review)
+
+
+def test_review_roles_require_distinct_identities_and_keys(tmp_path: Path) -> None:
+    review = _signed_blocked_review(tmp_path)
+    product = review["review"]["reviewers"]["product"]
+    scientific = review["review"]["reviewers"]["scientific"]
+    scientific["reviewer"] = f"  {product['reviewer'].upper()}  "
+
+    with pytest.raises(ScienceContractError, match="identities must be distinct"):
+        validate_scope_connectivity_review(review)
+
+    review = _signed_blocked_review(tmp_path)
+    product = review["review"]["reviewers"]["product"]
+    scientific = review["review"]["reviewers"]["scientific"]
+    scientific["proof"]["publicKeyPath"] = product["proof"]["publicKeyPath"]
+    scientific["proof"]["publicKeySha256"] = product["proof"]["publicKeySha256"]
+
+    with pytest.raises(ScienceContractError, match="fingerprints must be distinct"):
         validate_scope_connectivity_review(review)
 
 
