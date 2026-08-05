@@ -260,6 +260,20 @@
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic checked-in contracts and evidence passed in the successful combined Phase 0.2/0.3 run." }
     },
     {
+      "id": "pipeline-ar6-release-source-fixture",
+      "layer": "scientific",
+      "owner": "science",
+      "purpose": "Verify the checked-in AR6 regional release fixture is deterministic, hash-bound, tamper-evident, and consistent with the independent lookup goldens.",
+      "sourcePaths": ["src/pipeline/tests/release/test_source_fixture.py"],
+      "changedPaths": ["scripts/science/build_ar6_release_fixture.py", "src/pipeline/fixtures/ar6-regional-release/**", "src/pipeline/searise_pipeline/release/**", "src/pipeline/tests/release/test_source_fixture.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent real-source fixture integrity, determinism, and independent-golden parity gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_source_fixture.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic checked-in gzip bytes, SHA-256 receipts, synthetic tamper control, and independent AR6 golden values." }
+    },
+    {
       "id": "pipeline-regional-fixture",
       "layer": "scientific",
       "owner": "science",
@@ -452,6 +466,7 @@
     { "path": "src/pipeline/tests/regional_fixture/test_lookup.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_14_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_9_attempt.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_source_fixture.py", "suite": "pipeline-ar6-release-source-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup_goldens.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
