@@ -6,7 +6,9 @@ import hashlib
 import json
 import os
 import subprocess
+import tarfile
 import tempfile
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -40,10 +42,13 @@ class VectorToolchainEvidence:
     """Observed local binaries bound to the official source/asset pins."""
 
     tippecanoe_version: str
+    tippecanoe_source_sha256: str
     tippecanoe_binary_sha256: str
     pmtiles_version: str
     pmtiles_commit: str
     pmtiles_binary_sha256: str
+    pmtiles_distribution_platform: str
+    pmtiles_distribution_sha256: str
     decode_binary_sha256: str
 
 
@@ -57,6 +62,7 @@ class PmtilesEvidence:
     source_feature_count: int
     decoded_fragment_count: int
     header: Mapping[str, Any]
+    metadata: Mapping[str, Any]
 
 
 def validate_vector_toolchain(
@@ -64,6 +70,10 @@ def validate_vector_toolchain(
     tippecanoe_path: Path,
     decode_path: Path,
     pmtiles_path: Path,
+    tippecanoe_source_archive_path: Path,
+    tippecanoe_build_receipt_path: Path,
+    pmtiles_distribution_asset_path: Path,
+    pmtiles_distribution_platform: str,
     contract: Mapping[str, Any],
 ) -> VectorToolchainEvidence:
     """Reject absent or version-drifted external tools before generation."""
@@ -75,10 +85,70 @@ def validate_vector_toolchain(
         if not path.is_file() or not os.access(path, os.X_OK):
             raise ScienceContractError(f"Pinned {name} executable is absent: {path}")
     tippecanoe_pin = contract["toolchain"]["tippecanoe"]
+    reference_build = tippecanoe_pin["referenceBuilds"].get(pmtiles_distribution_platform)
+    if reference_build is None:
+        raise ScienceContractError("Unsupported Tippecanoe reference-build platform")
+    if (
+        not tippecanoe_source_archive_path.is_file()
+        or tippecanoe_source_archive_path.stat().st_size != tippecanoe_pin["sourceByteSize"]
+        or _sha256(tippecanoe_source_archive_path) != tippecanoe_pin["sourceSha256"]
+    ):
+        raise ScienceContractError("Tippecanoe source archive differs from the release contract")
+    try:
+        tippecanoe_receipt = json.loads(
+            tippecanoe_build_receipt_path.read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Cannot read Tippecanoe build receipt: {exc}") from exc
+    expected_receipt = {
+        "schemaVersion": 1,
+        "version": tippecanoe_pin["version"],
+        "commit": tippecanoe_pin["commit"],
+        "sourceSha256": tippecanoe_pin["sourceSha256"],
+        "buildCommand": tippecanoe_pin["buildCommand"],
+        "platform": pmtiles_distribution_platform,
+        "tippecanoeBinarySha256": reference_build["tippecanoeBinarySha256"],
+        "decodeBinarySha256": reference_build["decodeBinarySha256"],
+    }
+    if "buildEnvironment" in reference_build:
+        expected_receipt["buildEnvironment"] = reference_build["buildEnvironment"]
+    if tippecanoe_receipt != expected_receipt:
+        raise ScienceContractError("Tippecanoe binaries differ from their pinned build receipt")
+    if (
+        _sha256(tippecanoe_path) != reference_build["tippecanoeBinarySha256"]
+        or _sha256(decode_path) != reference_build["decodeBinarySha256"]
+    ):
+        raise ScienceContractError("Tippecanoe binaries differ from the contract hashes")
     tippecanoe_version = _run([str(tippecanoe_path), "--version"]).strip()
     if tippecanoe_version != f"tippecanoe v{tippecanoe_pin['version']}":
         raise ScienceContractError("Tippecanoe version differs from the release contract")
     pmtiles_pin = contract["toolchain"]["pmtiles"]
+    asset = pmtiles_pin["assets"].get(pmtiles_distribution_platform)
+    if asset is None:
+        raise ScienceContractError("Unsupported go-pmtiles distribution platform")
+    if (
+        not pmtiles_distribution_asset_path.is_file()
+        or pmtiles_distribution_asset_path.name != asset["fileName"]
+        or pmtiles_distribution_asset_path.stat().st_size != asset["byteSize"]
+        or _sha256(pmtiles_distribution_asset_path) != asset["sha256"]
+    ):
+        raise ScienceContractError("go-pmtiles distribution asset differs from the official pin")
+    if zipfile.is_zipfile(pmtiles_distribution_asset_path):
+        with zipfile.ZipFile(pmtiles_distribution_asset_path) as archive:
+            embedded_binary = archive.read("pmtiles")
+    elif tarfile.is_tarfile(pmtiles_distribution_asset_path):
+        with tarfile.open(pmtiles_distribution_asset_path, "r:gz") as archive:
+            members = [item for item in archive.getmembers() if Path(item.name).name == "pmtiles"]
+            if len(members) != 1:
+                raise ScienceContractError("go-pmtiles asset does not contain one pmtiles binary")
+            stream = archive.extractfile(members[0])
+            if stream is None:
+                raise ScienceContractError("Cannot read pmtiles binary from official asset")
+            embedded_binary = stream.read()
+    else:
+        raise ScienceContractError("Unsupported go-pmtiles distribution archive")
+    if hashlib.sha256(embedded_binary).hexdigest() != _sha256(pmtiles_path):
+        raise ScienceContractError("go-pmtiles binary differs from the official distribution")
     pmtiles_version = _run([str(pmtiles_path), "version"]).strip()
     expected_pmtiles = (
         f"pmtiles {pmtiles_pin['version']}, commit {pmtiles_pin['commit']}, built at "
@@ -87,10 +157,13 @@ def validate_vector_toolchain(
         raise ScienceContractError("go-pmtiles version or commit differs from the release contract")
     return VectorToolchainEvidence(
         tippecanoe_version=tippecanoe_pin["version"],
+        tippecanoe_source_sha256=tippecanoe_pin["sourceSha256"],
         tippecanoe_binary_sha256=_sha256(tippecanoe_path),
         pmtiles_version=pmtiles_pin["version"],
         pmtiles_commit=pmtiles_pin["commit"],
         pmtiles_binary_sha256=_sha256(pmtiles_path),
+        pmtiles_distribution_platform=pmtiles_distribution_platform,
+        pmtiles_distribution_sha256=asset["sha256"],
         decode_binary_sha256=_sha256(decode_path),
     )
 
@@ -169,13 +242,19 @@ def _canonical_metadata(
         "name": f"SeaRise AR6 {layer.scenario} {layer.horizon}",
         "searise": {
             "baseline": contract["values"]["baseline"],
+            "confidence": contract["values"]["confidence"],
             "horizon": layer.horizon,
             "member_sha256": layer.member_sha256,
+            "method_version": "ar6-regional-projection-v1",
             "native_resolution_degrees": contract["grid"]["nativeResolutionDegrees"],
+            "published_units": contract["values"]["publishedUnits"],
+            "quantiles": contract["matrix"]["quantiles"],
             "release_contract_id": contract["releaseContractId"],
             "scenario": layer.scenario,
             "scientific_lookup": "prohibited",
+            "scale_to_metres": contract["values"]["scaleToMetres"],
             "source_archive_sha256": source.archive_sha256,
+            "source_release": contract["source"]["version"],
             "units": "mm",
             "visual_only": True,
         },
@@ -240,12 +319,20 @@ def write_visual_pmtiles(
     tippecanoe_path: Path,
     decode_path: Path,
     pmtiles_path: Path,
+    tippecanoe_source_archive_path: Path,
+    tippecanoe_build_receipt_path: Path,
+    pmtiles_distribution_asset_path: Path,
+    pmtiles_distribution_platform: str,
 ) -> PmtilesEvidence:
     """Write, canonicalize, verify, and decode one visual-only PMTiles archive."""
     validate_vector_toolchain(
         tippecanoe_path=tippecanoe_path,
         decode_path=decode_path,
         pmtiles_path=pmtiles_path,
+        tippecanoe_source_archive_path=tippecanoe_source_archive_path,
+        tippecanoe_build_receipt_path=tippecanoe_build_receipt_path,
+        pmtiles_distribution_asset_path=pmtiles_distribution_asset_path,
+        pmtiles_distribution_platform=pmtiles_distribution_platform,
         contract=contract,
     )
     specification = contract["artifacts"]["pmtiles"]
@@ -284,6 +371,13 @@ def write_visual_pmtiles(
         )
         _run([str(pmtiles_path), "edit", str(archive_path), f"--metadata={metadata_path}"])
         _run([str(pmtiles_path), "verify", str(archive_path)])
+        metadata = json.loads(
+            _run([str(pmtiles_path), "show", str(archive_path), "--metadata"])
+        )
+        expected_metadata = _canonical_metadata(source, layer, contract)
+        prohibited = {"generator_options", "tilestats", "timestamp", "hostname", "host"}
+        if metadata != expected_metadata or prohibited.intersection(metadata):
+            raise ScienceContractError("PMTiles metadata differs from the canonical allow-list")
         header = json.loads(_run([str(pmtiles_path), "show", str(archive_path), "--header-json"]))
         expected_header = {
             "tile_compression": specification["tileCompression"],
@@ -310,4 +404,5 @@ def write_visual_pmtiles(
         source_feature_count=len(expected_properties),
         decoded_fragment_count=fragments,
         header=header,
+        metadata=metadata,
     )

@@ -1,6 +1,6 @@
 {
   "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
-  "byteSize": 119696,
+  "byteSize": 119703,
   "derivation": "verified-archive-native-grid-subset-no-resampling",
   "fixtureId": "ar6-europe-regional-source-v1",
   "memberSha256": {
@@ -8,8 +8,8 @@
     "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
     "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
   },
-  "releaseContractSha256": "82c29dd1f6060823f9cf0c643050031e288975f5266400ffe643475f81df6432",
+  "releaseContractSha256": "cbffc50f91bff545775ee1597b8dcc5c08678d0fc277d61f8c0bb304d2bc20e4",
   "scientificReleaseEligible": false,
-  "sha256": "a772081bfe5299c4d39f9f4e224c280e1339d4bc51b791d42e33d459deb3e5cb",
+  "sha256": "7386a1be17c74880e395afe3538893fa69ecaa1f4d32c3e11f4a262d7aa56c64",
   "sourceArchiveVerifiedForThisWrite": true
 }
