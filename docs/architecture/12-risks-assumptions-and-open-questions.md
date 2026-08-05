@@ -14,6 +14,8 @@
 > **Phase 0.7 evidence:** [fail-closed vertical reconciliation implementation](../science/phase-0-7-vertical-reconciliation-evidence.md)
 >
 > **Phase 0.8 evidence:** [terrain, geography, and connectivity controls](../science/phase-0-8-terrain-geography-controls.md)
+>
+> **Phase 0.9 decision:** [regional scientific gate](../evidence/phase-0-9-regional-gate.md) — `BLOCKED`
 
 ## Current risk register
 
@@ -36,6 +38,7 @@
 | R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Low / Critical | The legacy build path now always refuses this operation. Phase 0.7 implements the 1995–2014 baseline and interval contract, but publication remains blocked until the numerical transform and controls validate it. |
 | R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | The adapter now verifies locked model/member hashes and echoed harmonic metadata before differencing. It fails before engine execution while EGM2008 constants, common ellipsoid, engine version, permanent-tide rule, numeric bounds, basin controls, reproducibility, and review remain missing. |
 | R-17 | Copernicus DSM/HEM is treated as bare-earth terrain or as a complete per-pixel error bound | High / Critical | GLO-30 is selected, but HEM is used only for random error on valid unedited pixels. `U_systematic`, `U_edit`, `U_DSM`, and `U_resolution` never default to zero; publication stays blocked until each term is independently bounded and reviewed. |
+| R-18 | Green CI or source-integrity checks are mistaken for scientific approval | Medium / Critical | The Phase 0.9 schema sets `automation.canAuthorizeDecision=false`. Only an explicit approved decision with zero blockers, nine completed combinations, complete artifacts, and all named reviews can unlock Phase 1. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
 records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
@@ -51,6 +54,11 @@ lower R-16 until numerical controls and independent review pass.
 Phase 0.8 selects terrain, product-scope, and connectivity candidates and adds
 executable controls. It reduces implementation ambiguity but does not close
 R-02, R-07, or R-17 without the named external reviews and regional evidence.
+Phase 0.9 attempted the exact nine-layer matrix and stopped before arrays. Its
+explicit blocked decision prevents R-13 and R-18 from being hidden by a green
+build, but R-02, R-04, R-07, R-08, R-16, and R-17 remain open because the
+required numerical, artifact, control, reproducibility, and review evidence
+does not exist.
 
 ## Assumptions that require evidence
 

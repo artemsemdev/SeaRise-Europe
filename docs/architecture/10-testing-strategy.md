@@ -45,8 +45,8 @@ pipeline cannot answer:
    treatment.
 4. Compare the checked-in coastal approximation with the intended canonical
    coastal product.
-5. Test coastline connectivity and disconnected inland false positives in the
-   binary `sea-level projection >= terrain elevation` model.
+5. Test coastline connectivity and disconnected inland false positives only
+   after the approved uncertainty interval produces vertically eligible cells.
 6. Compare independently reviewed control locations with the derived array
    and browser lookup.
 7. Measure COG/PMTiles size, byte-range count, lookup latency, map quality, and
@@ -56,6 +56,13 @@ pipeline cannot answer:
 A failed or ambiguous result stops publication. If it invalidates methodology
 v1.0, the methodology and ADR must be superseded before Europe-wide output is
 built.
+
+The [Phase 0.9 gate](../evidence/phase-0-9-regional-gate.md) completed with an
+explicit `BLOCKED` decision: all nine combinations have exact preflight lineage
+but no arrays or artifacts. Final-gate contract tests enforce that green CI is
+not approval. Phase 1 unlock requires an explicit approved record with zero
+blockers, nine completed combinations, hashed deliverables, and every named
+review approved.
 
 ## 3. Test layers
 

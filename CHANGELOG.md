@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
   likely intervals, a complete calendar-weighted water baseline, explicit
   uncertainty provenance, stable nodata reasons, and deterministic evidence
   receipts.
+- Added an explicit Phase 0.9 gate and reproducible nine-combination preflight
+  record that cannot treat CI success as scientific approval.
 
 ### Changed
 
@@ -38,6 +40,6 @@ All notable changes to this project will be documented in this file.
   frontend, API, pipeline, Docker, or full-stack tests.
 - Exposure generation now fails closed instead of comparing AR6 relative
   sea-level change directly with absolute EGM2008 terrain heights.
-- Phase 0 now records an explicit blocked scientific decision and keeps Phase 1
-  locked until vertical-reference, uncertainty, terrain, coastal-scope, and
-  independent-review gates pass.
+- Phase 0 completed with a `BLOCKED` scientific decision and no classified
+  release artifacts; Phase 1 stays locked until all numerical, control,
+  reproducibility, golden-vector, and independent-review evidence passes.
