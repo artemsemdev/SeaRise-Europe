@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -90,6 +91,34 @@ def test_release_contract_pins_native_grid_and_zero_scientific_tolerance() -> No
         "coldTransferBytes": 262144,
         "lookupP95Milliseconds": 50,
     }
+
+
+def test_release_path_cannot_consume_historical_v1_transformation() -> None:
+    semantics_path = CONTRACT_DIR / "source-semantics.json"
+    semantics = _load(semantics_path.name)
+    evidence = _load("evidence/ar6-regional-release-evidence.json")
+    binding = evidence["sourceSemanticsUse"]
+
+    assert hashlib.sha256(semantics_path.read_bytes()).hexdigest() == binding[
+        "sourceSemanticsSha256"
+    ]
+    assert semantics["projection"]["transformation"]["method"] == "bilinear"
+    assert binding["historicalNonOperativeFields"] == [
+        "projection.transformation",
+        "projection.review",
+        "terrain",
+        "verticalInputs",
+    ]
+    assert binding["scientificResampling"] == "none"
+
+    release_paths = list(
+        (CONTRACT_DIR.parent / "searise_pipeline/release").glob("*.py")
+    )
+    release_paths.append(CONTRACT_DIR.parents[2] / "scripts/science/build_ar6_regional_release.py")
+    assert all(
+        "transformation" not in path.read_text(encoding="utf-8")
+        for path in release_paths
+    )
 
 
 @pytest.mark.parametrize(

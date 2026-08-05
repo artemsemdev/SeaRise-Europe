@@ -5,6 +5,7 @@
   "releaseContractId": "ar6-europe-regional-release-v1",
   "scientificDisposition": "projection-only",
   "automatedValidation": "pending",
+  "ownerDecision": "pending-owner",
   "releaseDisposition": "pending-owner",
   "phase1Unlocked": false,
   "measuredCandidate": {
@@ -56,6 +57,23 @@
     "sourceArchiveAndMembersVerified": true,
     "sourceContentSeal": true,
     "sourceGridIdentity": true
+  },
+  "sourceSemanticsUse": {
+    "sourceSemanticsSha256": "63fbc8d805318d63f32cc28d5991a78e2cbe67cc130871da735cbf89e811911c",
+    "activeProjectionFields": [
+      "projection.archive",
+      "projection.mapping",
+      "projection.nativeCoordinates",
+      "projection.sourceId",
+      "projection.version"
+    ],
+    "historicalNonOperativeFields": [
+      "projection.transformation",
+      "projection.review",
+      "terrain",
+      "verticalInputs"
+    ],
+    "scientificResampling": "none"
   },
   "committedEvidenceBundle": {
     "path": "src/pipeline/science/evidence/ar6-regional-release/mac-e41",
