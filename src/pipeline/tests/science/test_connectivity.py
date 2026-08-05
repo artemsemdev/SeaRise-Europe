@@ -159,7 +159,77 @@ def test_scope_review_preflight_is_reproducible_and_bound() -> None:
         },
         "status": "pending-independent-review",
     }
-    verify_evidence_bindings(checked_in, REPO_ROOT)
+    assert checked_in["dependencyBindings"] == [
+        {
+            "artifactRole": "uncertainty-budget-and-review",
+            "expectedIdentity": "phase-0.11-coastal-uncertainty-budget",
+            "id": "issue-95-uncertainty-budget",
+            "identityField": "contractId",
+            "issue": 95,
+            "path": "src/pipeline/science/coastal-uncertainty-budget.json",
+            "sha256": None,
+            "verificationStatus": "missing-until-integration",
+        },
+        {
+            "artifactRole": "basin-control-contract",
+            "expectedIdentity": "phase-0.12-baltic-black-sea-controls-v1",
+            "id": "issue-96-basin-contract",
+            "identityField": "contractId",
+            "issue": 96,
+            "path": "src/pipeline/science/basin-controls.json",
+            "sha256": None,
+            "verificationStatus": "missing-until-integration",
+        },
+        {
+            "artifactRole": "basin-control-evidence",
+            "expectedIdentity": "phase-0.12-baltic-black-sea-controls-v1",
+            "id": "issue-96-basin-evidence",
+            "identityField": "evidenceId",
+            "issue": 96,
+            "path": "src/pipeline/science/evidence/phase-0-12-basin-controls.json",
+            "sha256": None,
+            "verificationStatus": "missing-until-integration",
+        },
+    ]
+    assert checked_in["dependencyStatus"] == {
+        "95": {
+            "approvalReady": False,
+            "artifactsVerified": False,
+            "publicationGateStatus": "missing",
+            "reviewStatus": "missing",
+        },
+        "96": {
+            "approvalReady": False,
+            "artifactsVerified": False,
+            "publicationGateStatus": "missing",
+            "reviewStatus": "missing",
+        },
+    }
+    with pytest.raises(ScienceContractError, match="dependency evidence is unavailable"):
+        verify_evidence_bindings(checked_in, REPO_ROOT)
+
+
+def test_dependency_blockers_are_derived_from_exact_bound_artifacts() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["blockingDependencies"] = [95]
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="blockers differ"):
+        validate_scope_connectivity_review(review)
+
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["dependencyStatus"]["95"].update(
+        {
+            "approvalReady": True,
+            "publicationGateStatus": "approved",
+            "reviewStatus": "approved",
+        }
+    )
+    review["blockingDependencies"] = [96]
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="ready without approved evidence"):
+        validate_scope_connectivity_review(review)
 
 
 def test_every_existing_control_has_expected_observed_and_review_status() -> None:
