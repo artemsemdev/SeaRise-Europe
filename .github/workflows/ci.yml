@@ -184,7 +184,9 @@ jobs:
   release-toolchain:
     name: AR6 release toolchain (pinned Linux)
     needs: changes
-    if: needs.changes.outputs.release == 'true'
+    if: >-
+      needs.changes.outputs.release == 'true' &&
+      github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-24.04
     defaults:
       run:

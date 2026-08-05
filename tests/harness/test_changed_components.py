@@ -108,6 +108,16 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             )
         )
 
+    def test_release_evidence_dispatch_skips_fixture_toolchain_job(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "github.event_name != 'workflow_dispatch'",
+            workflow,
+        )
+
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])
 
