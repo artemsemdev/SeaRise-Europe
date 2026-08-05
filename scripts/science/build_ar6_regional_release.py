@@ -42,6 +42,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tippecanoe", type=Path, required=True)
     parser.add_argument("--tippecanoe-decode", type=Path, required=True)
     parser.add_argument("--pmtiles", type=Path, required=True)
+    parser.add_argument("--python-lock", type=Path, required=True)
     parser.add_argument("--release-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--reproducibility-report", type=Path)
@@ -83,6 +84,7 @@ def main() -> None:
             tippecanoe_path=args.tippecanoe,
             decode_path=args.tippecanoe_decode,
             pmtiles_path=args.pmtiles,
+            python_lock_path=args.python_lock,
             lookup_goldens_path=args.lookup_goldens,
             reproducibility_report=(
                 _load(args.reproducibility_report)

@@ -28,7 +28,7 @@ DELIVERY = {
     "status": "passed",
     "buildDurationSeconds": 20,
     "browserHeapBytes": 8 * 1024 * 1024,
-    "rangeRequestCount": 5,
+    "rangeRequestCount": 4,
     "lookupP95Milliseconds": 2,
 }
 

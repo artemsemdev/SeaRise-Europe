@@ -344,6 +344,20 @@
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Deterministic synthetic writer adapters and fixed artifact receipts; no network, clock, or external binary dependency." }
     },
     {
+      "id": "pipeline-ar6-release-toolchain",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Verify the active release interpreter, runtime distributions, native geospatial libraries, and platform lock match the hash-bound release contract.",
+      "sourcePaths": ["src/pipeline/tests/release/test_toolchain.py"],
+      "changedPaths": ["src/pipeline/requirements-release*.lock", "src/pipeline/searise_pipeline/release/toolchain.py", "src/pipeline/tests/release/test_toolchain.py", "src/pipeline/toolchain/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent interpreter, package-lock, GDAL, PROJ, and platform-profile trust-boundary gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_toolchain.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Passes only inside an explicitly supported hash-locked release profile; mismatched developer environments fail closed by design." }
+    },
+    {
       "id": "pipeline-regional-fixture",
       "layer": "scientific",
       "owner": "science",
@@ -542,6 +556,7 @@
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_recovery_gate.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_source_fixture.py", "suite": "pipeline-ar6-release-source-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_toolchain.py", "suite": "pipeline-ar6-release-toolchain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup_goldens.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

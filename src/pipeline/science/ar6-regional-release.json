@@ -7,8 +7,14 @@
     "sourceId": "ipcc-ar6-sea-level",
     "version": "20210809",
     "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+    "canonicalRecord": "https://zenodo.org/records/6382554",
     "licence": "CC-BY-4.0",
-    "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709."
+    "licenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+    "requiredAcknowledgements": [
+      "Cite IPCC AR6 Working Group I Chapter 9, the FACTS model description, and dataset version 20210809.",
+      "Thank the projection authors, supporting funding agencies, and NASA Sea Level Change Team as required by the canonical record."
+    ]
   },
   "matrix": {
     "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
@@ -42,6 +48,8 @@
       "blockSize": 256,
       "compression": "DEFLATE",
       "predictor": 2,
+      "overviewCount": 5,
+      "overviewFactors": [2, 4, 8, 19, 38],
       "overviewResampling": "NEAREST"
     },
     "geoparquet": {
@@ -75,23 +83,72 @@
       "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
       "sourceUrl": "https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz",
       "sourceByteSize": 25910834,
-      "sourceSha256": "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d"
+      "sourceSha256": "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d",
+      "buildCommand": ["make", "-j4", "tippecanoe", "tippecanoe-decode"],
+      "referenceBuilds": {
+        "darwin-arm64": {
+          "tippecanoeBinarySha256": "12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92",
+          "decodeBinarySha256": "d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076"
+        },
+        "linux-x86_64": {
+          "tippecanoeBinarySha256": "a70bb67594919b0eae357ec4678c77f5c3b9d4a277bd11046e4d9d03b1c6c426",
+          "decodeBinarySha256": "27d15c0f9394b2b29187312103a94579a9262a365d5b3eb71f1e5677751d2c36"
+        }
+      }
     },
     "pmtiles": {
       "version": "1.31.2",
       "commit": "a3e4951ea6a0477b784c27c1dcbfd9c130878c5a",
       "assets": {
-        "darwin-arm64": "40528f7f616fcbf91207cd48c8fc023d213f6d86c0cbf1f748732803d1880f3d",
-        "linux-arm64": "f8bd47e7ea866863489cad588fbaf2f31f42e5821f7a03f009b3769f05801cb1",
-        "linux-x86_64": "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f"
+        "darwin-arm64": {
+          "fileName": "go-pmtiles-1.31.2_Darwin_arm64.zip",
+          "byteSize": 15963714,
+          "sha256": "40528f7f616fcbf91207cd48c8fc023d213f6d86c0cbf1f748732803d1880f3d"
+        },
+        "linux-arm64": {
+          "fileName": "go-pmtiles_1.31.2_Linux_arm64.tar.gz",
+          "byteSize": 15779781,
+          "sha256": "f8bd47e7ea866863489cad588fbaf2f31f42e5821f7a03f009b3769f05801cb1"
+        },
+        "linux-x86_64": {
+          "fileName": "go-pmtiles_1.31.2_Linux_x86_64.tar.gz",
+          "byteSize": 17444324,
+          "sha256": "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f"
+        }
       }
     },
     "python": {
-      "numpy": "1.26.4",
-      "rasterio": "1.4.3",
-      "rioCogeo": "5.4.2",
-      "geopandas": "1.0.1",
-      "pyarrow": "16.1.0"
+      "packageVersions": {
+        "affine": "2.4.0", "annotated-types": "0.7.0", "attrs": "26.1.0",
+        "certifi": "2026.7.22", "cffi": "2.0.0", "cftime": "1.6.4.post1",
+        "click": "8.1.8", "click-plugins": "1.1.1.2", "cligj": "0.7.2",
+        "cryptography": "50.0.0", "geopandas": "1.0.1", "importlib-metadata": "8.7.1",
+        "jsonschema": "4.25.1",
+        "jsonschema-specifications": "2025.9.1", "morecantile": "6.2.0",
+        "netCDF4": "1.7.2", "numpy": "1.26.4", "packaging": "26.3",
+        "pandas": "2.3.2", "pyarrow": "16.1.0", "pycparser": "2.23",
+        "pydantic": "2.13.4", "pydantic-core": "2.46.4", "pyogrio": "0.11.1",
+        "pyparsing": "3.3.2", "pyproj": "3.6.1",
+        "python-dateutil": "2.9.0.post0", "pytz": "2026.3.post1",
+        "rasterio": "1.4.3", "referencing": "0.36.2", "rio-cogeo": "5.4.2",
+        "rpds-py": "0.27.1", "shapely": "2.0.7", "six": "1.17.0",
+        "typing-extensions": "4.16.0", "typing-inspection": "0.4.2",
+        "tzdata": "2026.3", "xarray": "2024.7.0", "zipp": "3.23.1"
+      },
+      "profiles": {
+        "linux-x86_64-cp311": {
+          "pythonVersion": "3.11.9",
+          "lockPath": "src/pipeline/requirements-release.lock",
+          "lockSha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f",
+          "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
+        },
+        "macos-arm64-cp39": {
+          "pythonVersion": "3.9.6",
+          "lockPath": "src/pipeline/requirements-release-macos-arm64.lock",
+          "lockSha256": "3f8160b8aee8d9fae73da298703fb00c1869a02def181316b75b1d6a917e7bed",
+          "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
+        }
+      }
     }
   },
   "reproducibility": {
@@ -100,14 +157,25 @@
     "byteIdentityWithinPinnedToolchain": true,
     "minimumIndependentEnvironments": 2
   },
+  "deliveryMeasurement": {
+    "harnessPath": "src/frontend/scripts/measure-ar6-release.mjs",
+    "harnessSha256": "37fb32e04937f85cce31e18089d71c4231881c0542b3e302955413e772bffe45",
+    "packageLockPath": "src/frontend/package-lock.json",
+    "packageLockSha256": "0cf125d429ffb54cd52342bbcfac73f5fee1eebf53a7111a2329dd64d099b979",
+    "playwrightVersion": "1.62.1",
+    "geotiffVersion": "3.0.5",
+    "minimumColdLookups": 10,
+    "minimumWarmLookups": 100
+  },
   "budgets": {
     "cogTotalBytes": 262144,
     "pmtilesTotalBytes": 6291456,
     "geoparquetBytes": 1048576,
     "coreArtifactsTotalBytes": 8388608,
-    "buildDurationSeconds": 120,
+    "buildDurationSeconds": 60,
     "browserHeapBytes": 67108864,
-    "rangeRequestCount": 12,
+    "rangeRequestCount": 4,
+    "coldTransferBytes": 262144,
     "lookupP95Milliseconds": 50
   },
   "scientificDisposition": "projection-only"

@@ -70,6 +70,20 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(all(outputs[name] for name in OUTPUTS))
 
+    def test_release_environment_preflight_is_isolated_from_general_tests(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        start = workflow.index("  release-toolchain:")
+        end = workflow.index("  infrastructure:", start)
+        preflight = workflow[start:end]
+        self.assertIn("--require-hashes -r requirements-release.lock", preflight)
+        self.assertIn("tests/release/test_toolchain.py", preflight)
+        self.assertNotIn("ar6-regional-confidence.zip/content", preflight)
+        gate = workflow[workflow.index("  ci-gate:") :]
+        self.assertIn("      - release-toolchain", gate)
+
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])
 

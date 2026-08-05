@@ -169,6 +169,36 @@ jobs:
       - name: Unit tests
         run: pytest tests/ -v
 
+  release-toolchain:
+    name: AR6 release toolchain (pinned Linux)
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/pipeline
+    steps:
+      - uses: actions/checkout@v4.3.1
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11.9"
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
+
+      - name: Install immutable release environment
+        run: |
+          pip install --only-binary=:all: --require-hashes -r requirements-release.lock
+          pip install pytest==8.4.2
+
+      - name: Preflight exact AR6 release environment and fixture
+        run: |
+          pytest \
+            tests/release/test_source_fixture.py \
+            tests/release/test_toolchain.py \
+            tests/science/test_ar6_regional_release_contract.py \
+            -q
+
   infrastructure:
     name: Infrastructure (compose config)
     needs: changes
@@ -235,6 +265,7 @@ jobs:
       - frontend
       - api
       - pipeline
+      - release-toolchain
       - infrastructure
       - docker-frontend
       - docker-api

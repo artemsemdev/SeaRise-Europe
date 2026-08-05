@@ -18,12 +18,13 @@ from searise_pipeline.science.contracts import ScienceContractError
 from .cog import CogEvidence, write_analysis_cog
 from .gate import evaluate_recovery_gate
 from .geoparquet import GeoParquetEvidence, write_geoparquet
-from .model import RegionalLayer, RegionalReleaseSource
+from .model import RegionalLayer, RegionalReleaseSource, assert_source_integrity
 from .pmtiles import (
     PmtilesEvidence,
     validate_vector_toolchain,
     write_visual_pmtiles,
 )
+from .toolchain import validate_python_toolchain
 
 
 def _sha256(path: Path) -> str:
@@ -181,6 +182,7 @@ def build_regional_release(
     tippecanoe_path: Path,
     decode_path: Path,
     pmtiles_path: Path,
+    python_lock_path: Path,
     lookup_goldens_path: Path,
     reproducibility_report: Mapping[str, Any] | None = None,
     delivery_report: Mapping[str, Any] | None = None,
@@ -189,7 +191,9 @@ def build_regional_release(
     """Build into a private directory and publish atomically only after validation."""
     if output_directory.exists():
         raise ScienceContractError(f"Immutable release path already exists: {output_directory}")
+    assert_source_integrity(source, contract, require_verified_archive=False)
     output_directory.parent.mkdir(parents=True, exist_ok=True)
+    python_toolchain = validate_python_toolchain(python_lock_path, contract=contract)
     toolchain = validate_vector_toolchain(
         tippecanoe_path=tippecanoe_path,
         decode_path=decode_path,
@@ -285,7 +289,9 @@ def build_regional_release(
             "schemaVersion": 1,
             "releaseId": release_id,
             "checks": {
-                "sourceArchiveAndMembersVerified": source.source_mode == "verified-archive",
+                "sourceArchiveAndMembersVerified": (
+                    source.archive_and_members_verified_this_build
+                ),
                 "completeScenarioHorizonMatrix": len(source.layers) == 9,
                 "cogStructureAndValues": len(cogs) == 9,
                 "geoparquetSchemaAndValues": geoparquet.row_count
@@ -313,7 +319,9 @@ def build_regional_release(
             "schemaVersion": 1,
             "sourceMode": source.source_mode,
             "archiveSha256": source.archive_sha256,
-            "archiveAndMembersVerifiedThisBuild": source.source_mode == "verified-archive",
+            "archiveAndMembersVerifiedThisBuild": (
+                source.archive_and_members_verified_this_build
+            ),
             "memberSha256": {
                 layer.scenario: layer.member_sha256
                 for layer in source.layers
@@ -327,6 +335,7 @@ def build_regional_release(
             "schemaVersion": 1,
             "releaseId": release_id,
             "toolchainPins": contract["toolchain"],
+            "observedPython": asdict(python_toolchain),
             "observedBinaries": asdict(toolchain),
             "normalizedParameters": {
                 "nativeResolutionDegrees": 1,
