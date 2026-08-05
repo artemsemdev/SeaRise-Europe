@@ -54,6 +54,7 @@ from .receipt import (
     vertical_receipt_sha256,
 )
 from .scope_review import (
+    build_pending_scope_connectivity_review,
     canonical_json_bytes,
     decision_binding_sha256,
     evidence_bundle_sha256,
@@ -101,6 +102,7 @@ __all__ = [
     "aggregate_absolute_bounds",
     "bilinear_sample",
     "build_geoid_requests",
+    "build_pending_scope_connectivity_review",
     "compare_dem_samples",
     "compare_dem_windows",
     "canonical_json_bytes",

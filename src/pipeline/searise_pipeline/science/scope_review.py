@@ -7,7 +7,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import geopandas as gpd  # type: ignore[import-untyped]
 import numpy as np
@@ -70,7 +70,7 @@ def _sha256(path: Path) -> str:
         raise ScienceContractError(f"Cannot read review evidence {path}: {exc}") from exc
 
 
-def evidence_bundle_sha256(bindings: list[Mapping[str, Any]]) -> str:
+def evidence_bundle_sha256(bindings: Sequence[Mapping[str, Any]]) -> str:
     """Hash sorted evidence identities so decisions cannot float across inputs."""
     identities = [
         {"id": item["id"], "path": item["path"], "sha256": item["sha256"]}
@@ -321,3 +321,355 @@ def load_review_geometries(repo_root: Path, document: Mapping[str, Any]) -> tupl
     support = gpd.read_file(repo_root / bindings["europe-support"]["path"]).geometry.union_all()
     coastal = gpd.read_file(repo_root / bindings["coastal-scope"]["path"]).geometry.union_all()
     return support, coastal
+
+
+def _empty_metrics() -> dict[str, None]:
+    return {
+        "preFilterPositiveCellCount": None,
+        "postFilterPositiveCellCount": None,
+        "removedCellCount": None,
+        "removalFraction": None,
+        "referencePositiveCellCount": None,
+        "falsePositiveBeforeCount": None,
+        "falsePositiveAfterCount": None,
+        "falsePositiveBeforeRate": None,
+        "falsePositiveAfterRate": None,
+        "disputedCellCount": None,
+        "tileSeamMismatchCellCount": None,
+    }
+
+
+def _empirical_control(
+    identifier: str,
+    kind: str,
+    name: str,
+    longitude: float,
+    latitude: float,
+    provenance: str,
+    expected: str,
+    required_checks: list[str],
+) -> dict[str, Any]:
+    return {
+        "id": identifier,
+        "kind": kind,
+        "name": name,
+        "longitude": longitude,
+        "latitude": latitude,
+        "provenance": provenance,
+        "expected": expected,
+        "requiredChecks": required_checks,
+        "observation": {
+            "status": "blocked-by-dependencies",
+            "metrics": _empty_metrics(),
+            "evidence": None,
+            "blockingIssues": [95, 96],
+        },
+        "reviewerStatus": "pending-independent-review",
+    }
+
+
+def _empirical_controls() -> list[dict[str, Any]]:
+    common = [
+        "Quantify pre-filter, connected, removed, and independently labelled cells.",
+        "Quantify false positives before and after filtering; disputed cells fail closed.",
+    ]
+    return [
+        _empirical_control(
+            "rotterdam-port",
+            "port",
+            "Rotterdam",
+            4.47917,
+            51.9225,
+            "GeoNames 2759794 and the pinned Netherlands GLO-30 five-layer window.",
+            "Retain genuinely ocean-connected eligible port cells without bridging WBM barriers.",
+            common + ["Inspect port infrastructure and edited DSM categories separately."],
+        ),
+        _empirical_control(
+            "lisbon-estuary",
+            "estuary",
+            "Lisbon",
+            -9.1498,
+            38.72509,
+            "GeoNames 2267057 and the pinned Lisbon GLO-30 five-layer window.",
+            "Retain reviewed Tagus-connected cells and remove terrain isolated from the estuary.",
+            common + ["Compare narrow estuary traversal with WBM ocean seed provenance."],
+        ),
+        _empirical_control(
+            "venice-lagoon",
+            "lagoon",
+            "Venice",
+            12.33265,
+            45.43713,
+            "GeoNames 3164603 and the pinned Venice GLO-30 five-layer window.",
+            "Preserve reviewed lagoon connections while disputed diagonal crossings fail closed.",
+            common + ["Review lagoon barriers and diagonal adjacency cell by cell."],
+        ),
+        _empirical_control(
+            "valletta-island",
+            "island",
+            "Valletta",
+            14.5148,
+            35.89968,
+            "GeoNames 2562305 and the pinned Malta GLO-30 five-layer window.",
+            "Retain ocean-adjacent small-island land without treating array edges as ocean seeds.",
+            common + ["Measure island removals and edge-derived false positives."],
+        ),
+        _empirical_control(
+            "utrecht-disconnected-low-terrain",
+            "disconnected-low-terrain",
+            "Utrecht",
+            5.12222,
+            52.09083,
+            "GeoNames 2745912 and the pinned Netherlands GLO-30 five-layer window.",
+            "Remain OutOfScope under the 25 km eligibility rule; do not infer hazard reach inland.",
+            common + ["Separate eligibility-scope removal from connectivity removal."],
+        ),
+        _empirical_control(
+            "bergen-steep-coast",
+            "steep-coast",
+            "Bergen",
+            5.3221,
+            60.39299,
+            (
+                "GeoNames named-place coordinate and exact GLO-30 "
+                "DEM/HEM/EDM/FLM/WBM assets required by the regional review."
+            ),
+            "Block low terrain behind confidently non-exposed steep coastal cells.",
+            common + ["Demonstrate that steep barriers are not crossed at corners."],
+        ),
+        _empirical_control(
+            "venice-diagonal-leak",
+            "diagonal-leak",
+            "Venice diagonal adjacency audit",
+            12.33265,
+            45.43713,
+            "Pinned Venice GLO-30 window with independent reference labels required by issue 96.",
+            (
+                "Quantify eight-neighbour additions relative to four-neighbour "
+                "traversal; disputed corner connections fail closed."
+            ),
+            common + ["Report the exact cells added only by diagonal traversal."],
+        ),
+        _empirical_control(
+            "netherlands-wbm-barrier",
+            "wbm-barrier",
+            "Netherlands WBM barrier audit",
+            4.47917,
+            51.9225,
+            "Pinned Netherlands GLO-30 WBM asset and matching DEM/EDM/FLM/HEM layers.",
+            "Never traverse water, nodata, rejected quality, or unexpected WBM codes.",
+            common + ["Report removals by WBM, nodata, and quality-barrier reason."],
+        ),
+        _empirical_control(
+            "regional-mosaic-tile-seam",
+            "mosaic-tile-seam",
+            "Regional GLO-30 mosaic seam audit",
+            10.0,
+            54.0,
+            (
+                "Adjacent checksum-locked GLO-30 tiles selected by issue 96 "
+                "across an internal mosaic seam."
+            ),
+            (
+                "Match a seam-free reference traversal; missing neighbours "
+                "produce DataUnavailable, never seeds."
+            ),
+            common + ["Require zero tile-seam mismatches before approval."],
+        ),
+    ]
+
+
+def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
+    """Rebuild the dependency-independent Phase 0.13 review preflight."""
+    contract_dir = repo_root / "src" / "pipeline" / "science"
+    bound_paths = {
+        "terrain-decision": "src/pipeline/science/terrain-decision.json",
+        "terrain-measurements": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json",
+        "geography-rules": "src/pipeline/science/geography-rules.json",
+        "geography-controls": "src/pipeline/science/geography-controls.json",
+        "connectivity-controls": "src/pipeline/science/connectivity-controls.json",
+        "europe-support": "data/geometry/europe.geojson",
+        "coastal-scope": "data/geometry/coastal_analysis_zone.geojson",
+        "source-lock": "src/pipeline/sources/source-lock.json",
+    }
+    bindings = [
+        {"id": identifier, "path": path, "sha256": _sha256(repo_root / path)}
+        for identifier, path in bound_paths.items()
+    ]
+    support = gpd.read_file(repo_root / bound_paths["europe-support"]).geometry.union_all()
+    coastal = gpd.read_file(repo_root / bound_paths["coastal-scope"]).geometry.union_all()
+    geography = json.loads(
+        (contract_dir / "geography-controls.json").read_text(encoding="utf-8")
+    )
+    connectivity = json.loads(
+        (contract_dir / "connectivity-controls.json").read_text(encoding="utf-8")
+    )
+
+    control_observations: list[dict[str, Any]] = []
+    for control in geography["controls"]:
+        point = Point(control["longitude"], control["latitude"])
+        observed = {
+            "support": bool(support.covers(point)),
+            "coastal": bool(coastal.covers(point)),
+        }
+        expected = {"support": control["support"], "coastal": control["coastal"]}
+        control_observations.append(
+            {
+                "id": f"geography-{control['recordId']}",
+                "domain": "geography",
+                "kind": control["kind"],
+                "provenance": {
+                    "sourceId": geography["source"]["sourceId"],
+                    "sourceVersion": geography["source"]["version"],
+                    "recordId": control["recordId"],
+                    "name": control["name"],
+                },
+                "expected": expected,
+                "observed": observed,
+                "automationStatus": "passed" if observed == expected else "failed",
+                "reviewerStatus": "pending-independent-review",
+            }
+        )
+    for control in connectivity["controls"]:
+        outcome = observe_connectivity_control(control, int(connectivity["neighbourhood"]))
+        control_observations.append(
+            {
+                "id": f"connectivity-{control['id']}",
+                "domain": "connectivity",
+                "kind": control["kind"],
+                "provenance": {
+                    "contractId": connectivity["contractId"],
+                    "basis": control["provenance"]["basis"],
+                },
+                "expected": {"connectedRows": outcome["expectedConnected"]},
+                "observed": {"connectedRows": outcome["observedConnected"]},
+                "automationStatus": "passed" if outcome["passed"] else "failed",
+                "reviewerStatus": "pending-independent-review",
+            }
+        )
+
+    boundary = support.boundary.representative_point()
+    semantic_inputs = [
+        {
+            "id": "outside-coastal-scope",
+            "name": "Prague",
+            "longitude": 14.42076,
+            "latitude": 50.08804,
+            "provenance": (
+                "GeoNames 3067696; inside support and outside the 25 km eligibility scope."
+            ),
+            "expectedState": "OutOfScope",
+        },
+        {
+            "id": "outside-europe-support",
+            "name": "Saint Petersburg",
+            "longitude": 30.31413,
+            "latitude": 59.93863,
+            "provenance": "GeoNames 498817; excluded Russia control.",
+            "expectedState": "UnsupportedGeography",
+        },
+        {
+            "id": "north-of-sla-limit",
+            "name": "Bodo",
+            "longitude": 14.405,
+            "latitude": 67.28,
+            "provenance": (
+                "Named-place coordinate inside support/coastal scope but north of "
+                "the SLA 66.03125 degree limit."
+            ),
+            "expectedState": "DataUnavailable",
+        },
+        {
+            "id": "support-boundary-covers",
+            "name": "Exact support boundary point",
+            "longitude": boundary.x,
+            "latitude": boundary.y,
+            "provenance": (
+                "Deterministic representative point of the checksum-bound support "
+                "boundary; covers, not contains, is authoritative."
+            ),
+            "expectedState": "OutOfScope",
+        },
+    ]
+    semantic_controls = []
+    for control in semantic_inputs:
+        observed = observe_semantic_control(control, support, coastal)
+        semantic_controls.append(
+            {
+                **control,
+                "observedState": observed["observedState"],
+                "reviewerStatus": "pending-independent-review",
+            }
+        )
+
+    document: dict[str, Any] = {
+        "$schema": "./scope-connectivity-review.schema.json",
+        "schemaVersion": 1,
+        "reviewId": "phase-0.13-scope-connectivity-review",
+        "issue": 97,
+        "recordedAt": "2026-08-05",
+        "candidate": {
+            "terrain": {
+                "instance": "GLO-30",
+                "release": "2021_1",
+                "model": "digital-surface-model",
+                "status": "selected-for-external-review",
+            },
+            "support": {
+                "version": "natural-earth-5.1.1-explicit-scope-v2",
+                "predicate": "covers",
+                "status": "selected-scope-approximation",
+                "canonical": False,
+            },
+            "coastalScope": {
+                "version": "natural-earth-5.1.1-25km-scope-v2",
+                "distanceMetres": 25000,
+                "role": "product-eligibility-only",
+                "hazardExtentClaim": False,
+                "canonical": False,
+            },
+            "connectivity": {
+                "id": "ocean-seeded-eight-neighbour-v1",
+                "neighbourhood": 8,
+                "seedSource": "pinned GLO-30 WBM ocean cells",
+                "status": "selected-for-external-review",
+                "hydrodynamicModel": False,
+            },
+        },
+        "evidenceBindings": bindings,
+        "evidenceBundleSha256": evidence_bundle_sha256(bindings),
+        "controlObservations": control_observations,
+        "semanticControls": semantic_controls,
+        "empiricalControls": _empirical_controls(),
+        "blockingDependencies": [95, 96],
+        "review": {
+            "status": "pending-independent-review",
+            "disposition": None,
+            "approvalReady": False,
+            "reviewedCommit": None,
+            "decisionBindingSha256": None,
+            "reviewers": {
+                "product": {
+                    "role": "product reviewer",
+                    "decision": "pending",
+                    "reviewer": None,
+                    "independenceStatement": None,
+                    "proof": None,
+                },
+                "scientific": {
+                    "role": "scientific/data reviewer",
+                    "decision": "pending",
+                    "reviewer": None,
+                    "independenceStatement": None,
+                    "proof": None,
+                },
+            },
+            "nextDecision": (
+                "Integrate approved issue 95 bounds and issue 96 basin evidence, "
+                "record both independent signed reviews, and fail closed on every "
+                "disputed empirical cell before issue 98 re-evaluates Phase 0."
+            ),
+        },
+    }
+    validate_scope_connectivity_review(document)
+    return document
