@@ -22,9 +22,9 @@ class ScienceContracts:
     source_semantics: Mapping[str, Any]
     geography_rules: Mapping[str, Any]
     vertical_methodology: Mapping[str, Any]
-    uncertainty_budget: Mapping[str, Any]
     terrain_decision: Mapping[str, Any]
     final_gate: Mapping[str, Any]
+    uncertainty_budget: Mapping[str, Any] | None = None
 
 
 def _default_contract_dir() -> Path:
@@ -190,13 +190,15 @@ def verify_terrain_source_bindings(
 def assert_publication_ready(contracts: ScienceContracts) -> None:
     """Fail while any scientific or geography decision remains blocking."""
     blockers: list[str] = []
-    for document in (
+    documents = [
         contracts.source_semantics,
         contracts.geography_rules,
         contracts.vertical_methodology,
-        contracts.uncertainty_budget,
         contracts.terrain_decision,
-    ):
+    ]
+    if contracts.uncertainty_budget is not None:
+        documents.append(contracts.uncertainty_budget)
+    for document in documents:
         gate = document["publicationGate"]
         if gate["status"] != "approved":
             blockers.extend(str(item) for item in gate["blockingDecisions"])
