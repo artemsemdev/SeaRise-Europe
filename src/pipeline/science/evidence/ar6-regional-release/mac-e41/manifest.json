@@ -1,0 +1,1247 @@
+{
+  "artifacts": [
+    {
+      "byteSize": 18623,
+      "horizon": 2030,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp1-26/2030.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp1-26",
+      "sha256": "03cc14d33cc75535ce8fdd83e3e2636e4203c8d828a723e254dfa4cb90b0e6d6",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 20137,
+      "horizon": 2050,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp1-26/2050.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp1-26",
+      "sha256": "87030c7e7d0c3481353a06507dab4acc93d0b2fc3a3482b34b607ce6bc891831",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 22143,
+      "horizon": 2100,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp1-26/2100.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp1-26",
+      "sha256": "554799b56ef3abbff2c5c42f9033860f06d2fa8f025d6c4f6518b8e2d14a90c4",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 18778,
+      "horizon": 2030,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp2-45/2030.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp2-45",
+      "sha256": "b087b052c77fddfbb7add3634a1c6a3f6ac384d5652e18c67e2e3105c292d12c",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 20320,
+      "horizon": 2050,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp2-45/2050.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp2-45",
+      "sha256": "d7998337ead737320cba98772284c7e7ee9372573f65e72f100071f38b90391f",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 22333,
+      "horizon": 2100,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp2-45/2100.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp2-45",
+      "sha256": "423570ce5d8d862e65b050e901c3f206bc5dad67b7477290e717afde09116adf",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 19045,
+      "horizon": 2030,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp5-85/2030.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp5-85",
+      "sha256": "a5b5f6eb410e989016b946bc89bbe22fde5ea220add5a5430bf96ea1d5182a52",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 20568,
+      "horizon": 2050,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp5-85/2050.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp5-85",
+      "sha256": "cc91888b39f42b0e23827d50e0d99c94cb56553d6f318fc374838513fd546310",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 22452,
+      "horizon": 2100,
+      "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/ssp5-85/2100.tif",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "exact-browser-lookup",
+      "scenario": "ssp5-85",
+      "sha256": "4695e3d482a14c4e7e4e8c02631e9909547d714adb2ba7813a45454182239d80",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 251231,
+      "mediaType": "application/vnd.apache.parquet",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/projections.parquet",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "analytical-parity",
+      "sha256": "aab3139c33773fd9883f17a6ebf928f6dca6474bca5f1c46636f0e23375e46ea",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": {
+          "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+          "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+          "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+        },
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 586933,
+      "horizon": 2030,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp1-26/2030.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp1-26",
+      "sha256": "fdf249683240259e46ba76a80e25b43d41bd7a5e14d6c00456856030d52db540",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 621823,
+      "horizon": 2050,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp1-26/2050.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp1-26",
+      "sha256": "5c59e2428c7dfa161c8e86ad88e11ee4d5881e5d8ca53b6c1ef8f0be5b362d20",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 665538,
+      "horizon": 2100,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp1-26/2100.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp1-26",
+      "sha256": "dd7ea11bb10431104a9c4c7bb75f1f2fae4a08971d40bf91843fc441b52c996d",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 587387,
+      "horizon": 2030,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp2-45/2030.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp2-45",
+      "sha256": "1d734067de66e679a4d1904872027bb253f529788a3f5e64ef99b272716d9cdf",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 624674,
+      "horizon": 2050,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp2-45/2050.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp2-45",
+      "sha256": "e249f9d53adfbc4877d3c1babd82445d4bb0eac3c208cc64d6828e7a0b5458eb",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 670481,
+      "horizon": 2100,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp2-45/2100.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp2-45",
+      "sha256": "ce1d83b2067a4d99febfc73e5582333003d732ff3b1f685615555f93cf1a86ea",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 590810,
+      "horizon": 2030,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp5-85/2030.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp5-85",
+      "sha256": "e9d891ec2556b52c513c1e6d6b05f33a7ba6c25a097753fc69f3ebb9400c7c42",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 627003,
+      "horizon": 2050,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp5-85/2050.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp5-85",
+      "sha256": "a302dd8a9bd6ff017088dab4bc512c1846ffb569647fa64927a6f893932e024c",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 681871,
+      "horizon": 2100,
+      "mediaType": "application/vnd.pmtiles",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "layers/ssp5-85/2100.pmtiles",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "visual-only",
+      "scenario": "ssp5-85",
+      "sha256": "36e9c1059768e2ab3d71ab892768d6475be250ac2ecef0181301d21542610e1d",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 7848,
+      "mediaType": "application/gzip",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "analysis/source-grid.json.gz",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "source-grid-identity",
+      "sha256": "771b77e3240a25f37d115a563f1b7115c2aaf0bd6f1a9eac5afc04395d28af71",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": {
+          "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+          "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+          "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+        },
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 502,
+      "mediaType": "text/markdown",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "NOTICE.md",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "licence-notice",
+      "sha256": "b95d08385471774b6e095c7b75a1822ba6550358169e6fa1712a7f1555657ef6",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": {
+          "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+          "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+          "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+        },
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 2230,
+      "mediaType": "application/json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/collection.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-collection",
+      "sha256": "1937ebb753c37643750924ae2c6f96923119890d14d7e322ea743a3444f816fc",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": {
+          "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+          "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+          "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+        },
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2030,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp1-26-2030.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp1-26",
+      "sha256": "3d7faa30aa528945544401d57dacb50e9614543c4f139be7781ef305f65f842d",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2050,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp1-26-2050.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp1-26",
+      "sha256": "e079d485115841c66ced773ef4a549e716144099924db65dc0c3e6bcd1d1d03a",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2100,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp1-26-2100.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp1-26",
+      "sha256": "9ca9177ba5e817e364cddce3e9eb55c7b2267a9ff703c16a4b7cd2856bc8cefc",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2030,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp2-45-2030.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp2-45",
+      "sha256": "48171a74969d2af5cc4bf8fbcd38263fd00b2e69af63d0d029c08ffd787850e7",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2050,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp2-45-2050.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp2-45",
+      "sha256": "3e37880fd6bbc77bd276432ee5378f079ff52d0112b1740f1ee30ba9e68cd7ef",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2100,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp2-45-2100.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp2-45",
+      "sha256": "6e392dc5bd6e59a40839bfd3f25017908f900bb320856af9bfaa6079cb782ac2",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2030,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp5-85-2030.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp5-85",
+      "sha256": "6673aec3079f2d8ca54f40427a21a43f3fb3359098a2f114390524dd237e6a7a",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2050,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp5-85-2050.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp5-85",
+      "sha256": "5c03eb65da93bb45b5a20784d4faa832032b12f4bfdfa2785df4ccb8208d7438",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    },
+    {
+      "byteSize": 3000,
+      "horizon": 2100,
+      "mediaType": "application/geo+json",
+      "method": {
+        "methodVersion": "ar6-regional-projection-v1",
+        "scientificResampling": "none"
+      },
+      "path": "stac/items/ssp5-85-2100.json",
+      "rights": {
+        "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+        "licence": "CC-BY-4.0",
+        "notice": "NOTICE.md"
+      },
+      "role": "stac-item",
+      "scenario": "ssp5-85",
+      "sha256": "d43723bc05bb7fedd4c704db62a7ad8c7f8e16019c4c27c5dcc4069419580d96",
+      "source": {
+        "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+        "memberSha256": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0",
+        "release": "20210809",
+        "sourceId": "ipcc-ar6-sea-level"
+      },
+      "valueSemantics": {
+        "baseline": "1995-2014 mean",
+        "confidence": "medium",
+        "publishedUnits": "m",
+        "quantiles": {
+          "central": 0.5,
+          "lower": 0.167,
+          "upper": 0.833
+        },
+        "scaleToMetres": 0.001,
+        "scientificDisposition": "projection-only",
+        "storageUnits": "mm"
+      }
+    }
+  ],
+  "baseline": "1995-2014 mean",
+  "confidence": "medium",
+  "grid": {
+    "bounds": [
+      -30.5,
+      29.5,
+      45.5,
+      75.5
+    ],
+    "crs": "EPSG:4326",
+    "height": 46,
+    "latitudeCentres": [
+      30,
+      75
+    ],
+    "longitudeCentres": [
+      -30,
+      45
+    ],
+    "nativeResolutionDegrees": 1,
+    "scientificResampling": "none",
+    "width": 76
+  },
+  "limitations": [
+    "projection-only-not-flood-inundation-terrain-or-property-risk",
+    "pmtiles-visual-only",
+    "geoparquet-nearest-selection-prohibited",
+    "cog-is-the-only-exact-browser-lookup-artifact"
+  ],
+  "matrix": {
+    "horizons": [
+      2030,
+      2050,
+      2100
+    ],
+    "quantiles": {
+      "central": 0.5,
+      "lower": 0.167,
+      "upper": 0.833
+    },
+    "scenarios": [
+      "ssp1-26",
+      "ssp2-45",
+      "ssp5-85"
+    ]
+  },
+  "modeledQuantity": "regional-relative-sea-level-change",
+  "nativeResolutionDegrees": 1,
+  "publicationStatus": "pending-owner",
+  "releaseContractId": "ar6-europe-regional-release-v1",
+  "releaseId": "phase-0r-ar6-v1",
+  "scaleToMetres": 0.001,
+  "schemaVersion": 1,
+  "scientificDisposition": "projection-only",
+  "source": {
+    "archiveAndMembersVerifiedThisBuild": true,
+    "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+    "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+    "canonicalRecord": "https://zenodo.org/records/6382554",
+    "licence": "CC-BY-4.0",
+    "memberSha256": {
+      "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+      "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+      "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+    },
+    "notice": {
+      "byteSize": 502,
+      "mediaType": "text/markdown",
+      "path": "NOTICE.md",
+      "role": "licence-notice",
+      "sha256": "b95d08385471774b6e095c7b75a1822ba6550358169e6fa1712a7f1555657ef6"
+    },
+    "releaseContractSha256": "6b7ebe3bd184d62b9f8764069602b6530169e4425aa696d9a0b60e1c5dddebb8",
+    "requiredAcknowledgements": [
+      "Cite IPCC AR6 Working Group I Chapter 9, the FACTS model description, and dataset version 20210809.",
+      "Thank the projection authors, supporting funding agencies, and NASA Sea Level Change Team as required by the canonical record."
+    ],
+    "schemaVersion": 1,
+    "sourceContentSha256": "46cfa137ecb124bd8595eb454eff8b67cb821bb24133eb50efefa04e3faa8439",
+    "sourceMode": "verified-archive"
+  },
+  "storageUnits": "mm",
+  "totals": {
+    "cogBytes": 184399,
+    "coreArtifactBytes": 6092150,
+    "geoparquetBytes": 251231,
+    "pmtilesBytes": 5656520
+  }
+}

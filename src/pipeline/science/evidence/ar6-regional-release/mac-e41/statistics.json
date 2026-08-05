@@ -1,0 +1,215 @@
+{
+  "layers": [
+    {
+      "horizon": 2030,
+      "nodataCellCount": 441,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 200,
+          "meanMillimetres": 92.963666,
+          "minimumMillimetres": -122
+        },
+        "lower": {
+          "maximumMillimetres": 136,
+          "meanMillimetres": 23.174795,
+          "minimumMillimetres": -196
+        },
+        "upper": {
+          "maximumMillimetres": 502,
+          "meanMillimetres": 167.514894,
+          "minimumMillimetres": -60
+        }
+      },
+      "scenario": "ssp1-26",
+      "validCellCount": 3055
+    },
+    {
+      "horizon": 2050,
+      "nodataCellCount": 441,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 368,
+          "meanMillimetres": 174.241571,
+          "minimumMillimetres": -200
+        },
+        "lower": {
+          "maximumMillimetres": 266,
+          "meanMillimetres": 61.926023,
+          "minimumMillimetres": -361
+        },
+        "upper": {
+          "maximumMillimetres": 969,
+          "meanMillimetres": 299.576432,
+          "minimumMillimetres": -99
+        }
+      },
+      "scenario": "ssp1-26",
+      "validCellCount": 3055
+    },
+    {
+      "horizon": 2100,
+      "nodataCellCount": 441,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 720,
+          "meanMillimetres": 347.664484,
+          "minimumMillimetres": -464
+        },
+        "lower": {
+          "maximumMillimetres": 498,
+          "meanMillimetres": 119.510311,
+          "minimumMillimetres": -927
+        },
+        "upper": {
+          "maximumMillimetres": 1688,
+          "meanMillimetres": 614.325041,
+          "minimumMillimetres": -215
+        }
+      },
+      "scenario": "ssp1-26",
+      "validCellCount": 3055
+    },
+    {
+      "horizon": 2030,
+      "nodataCellCount": 442,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 201,
+          "meanMillimetres": 92.997053,
+          "minimumMillimetres": -116
+        },
+        "lower": {
+          "maximumMillimetres": 136,
+          "meanMillimetres": 24.627701,
+          "minimumMillimetres": -228
+        },
+        "upper": {
+          "maximumMillimetres": 311,
+          "meanMillimetres": 165.66372,
+          "minimumMillimetres": -30
+        }
+      },
+      "scenario": "ssp2-45",
+      "validCellCount": 3054
+    },
+    {
+      "horizon": 2050,
+      "nodataCellCount": 442,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 388,
+          "meanMillimetres": 186.211526,
+          "minimumMillimetres": -182
+        },
+        "lower": {
+          "maximumMillimetres": 280,
+          "meanMillimetres": 75.74296,
+          "minimumMillimetres": -368
+        },
+        "upper": {
+          "maximumMillimetres": 583,
+          "meanMillimetres": 309.483628,
+          "minimumMillimetres": -94
+        }
+      },
+      "scenario": "ssp2-45",
+      "validCellCount": 3054
+    },
+    {
+      "horizon": 2100,
+      "nodataCellCount": 442,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 864,
+          "meanMillimetres": 447.80812,
+          "minimumMillimetres": -541
+        },
+        "lower": {
+          "maximumMillimetres": 639,
+          "meanMillimetres": 212.955141,
+          "minimumMillimetres": -1170
+        },
+        "upper": {
+          "maximumMillimetres": 1219,
+          "meanMillimetres": 739.778651,
+          "minimumMillimetres": -98
+        }
+      },
+      "scenario": "ssp2-45",
+      "validCellCount": 3054
+    },
+    {
+      "horizon": 2030,
+      "nodataCellCount": 442,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 207,
+          "meanMillimetres": 95.425344,
+          "minimumMillimetres": -110
+        },
+        "lower": {
+          "maximumMillimetres": 145,
+          "meanMillimetres": 25.481009,
+          "minimumMillimetres": -321
+        },
+        "upper": {
+          "maximumMillimetres": 742,
+          "meanMillimetres": 169.668631,
+          "minimumMillimetres": -54
+        }
+      },
+      "scenario": "ssp5-85",
+      "validCellCount": 3054
+    },
+    {
+      "horizon": 2050,
+      "nodataCellCount": 442,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 408,
+          "meanMillimetres": 204.912246,
+          "minimumMillimetres": -168
+        },
+        "lower": {
+          "maximumMillimetres": 303,
+          "meanMillimetres": 90.456451,
+          "minimumMillimetres": -358
+        },
+        "upper": {
+          "maximumMillimetres": 1051,
+          "meanMillimetres": 333.248199,
+          "minimumMillimetres": -74
+        }
+      },
+      "scenario": "ssp5-85",
+      "validCellCount": 3054
+    },
+    {
+      "horizon": 2100,
+      "nodataCellCount": 442,
+      "quantiles": {
+        "central": {
+          "maximumMillimetres": 1084,
+          "meanMillimetres": 617.59332,
+          "minimumMillimetres": -949
+        },
+        "lower": {
+          "maximumMillimetres": 838,
+          "meanMillimetres": 348.921415,
+          "minimumMillimetres": -1687
+        },
+        "upper": {
+          "maximumMillimetres": 1752,
+          "meanMillimetres": 963.20334,
+          "minimumMillimetres": -258
+        }
+      },
+      "scenario": "ssp5-85",
+      "validCellCount": 3054
+    }
+  ],
+  "nodata": -32768,
+  "releaseId": "phase-0r-ar6-v1",
+  "schemaVersion": 1,
+  "storageUnits": "mm"
+}

@@ -1,0 +1,43 @@
+{
+  "automatedValidation": "pending",
+  "blockers": [
+    "crossEnvironmentReproducibility",
+    "deliveryMeasurements",
+    "projectOwnerReleaseDecision",
+    "finalIntegrationMergedToMaster"
+  ],
+  "checks": {
+    "artifactBudgets": true,
+    "cogStructureAndValues": true,
+    "completeScenarioHorizonMatrix": true,
+    "crossArtifactSemanticParity": true,
+    "crossEnvironmentReproducibility": false,
+    "deliveryMeasurements": false,
+    "geoparquetSchemaAndValues": true,
+    "licenceNoticeAndAttribution": true,
+    "lookupGoldenParity": true,
+    "nonAllNodataLayers": true,
+    "pmtilesStructureAndProperties": true,
+    "sourceArchiveAndMembersVerified": true,
+    "sourceContentSeal": true,
+    "sourceGridIdentity": true
+  },
+  "evidencePaths": {
+    "build": "build-evidence.json",
+    "delivery": "external:delivery-measurements.json",
+    "integration": "external:integration-merge.json",
+    "ownerDecision": "external:owner-decision.json",
+    "reproducibility": "external:reproducibility.json",
+    "source": "source-receipt.json"
+  },
+  "fallback": "do-not-publish-or-unlock-phase-1",
+  "finalIntegrationMergedToMaster": false,
+  "gateId": "phase-0r-ar6-regional-release-v1",
+  "issue": 110,
+  "ownerDecision": "pending-owner",
+  "phase1Unlocked": false,
+  "releaseDisposition": "pending-owner",
+  "releaseId": "phase-0r-ar6-v1",
+  "schemaVersion": 1,
+  "scientificDisposition": "projection-only"
+}

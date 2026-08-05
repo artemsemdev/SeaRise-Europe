@@ -1,0 +1,27 @@
+{
+  "archiveAndMembersVerifiedThisBuild": true,
+  "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+  "attribution": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709.",
+  "canonicalRecord": "https://zenodo.org/records/6382554",
+  "licence": "CC-BY-4.0",
+  "memberSha256": {
+    "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+    "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+    "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+  },
+  "notice": {
+    "byteSize": 502,
+    "mediaType": "text/markdown",
+    "path": "NOTICE.md",
+    "role": "licence-notice",
+    "sha256": "b95d08385471774b6e095c7b75a1822ba6550358169e6fa1712a7f1555657ef6"
+  },
+  "releaseContractSha256": "6b7ebe3bd184d62b9f8764069602b6530169e4425aa696d9a0b60e1c5dddebb8",
+  "requiredAcknowledgements": [
+    "Cite IPCC AR6 Working Group I Chapter 9, the FACTS model description, and dataset version 20210809.",
+    "Thank the projection authors, supporting funding agencies, and NASA Sea Level Change Team as required by the canonical record."
+  ],
+  "schemaVersion": 1,
+  "sourceContentSha256": "46cfa137ecb124bd8595eb454eff8b67cb821bb24133eb50efefa04e3faa8439",
+  "sourceMode": "verified-archive"
+}

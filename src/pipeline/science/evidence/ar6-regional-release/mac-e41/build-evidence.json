@@ -1,0 +1,46 @@
+{
+  "checks": {
+    "artifactBudgets": true,
+    "cogStructureAndValues": true,
+    "completeScenarioHorizonMatrix": true,
+    "crossArtifactSemanticParity": true,
+    "geoparquetSchemaAndValues": true,
+    "licenceNoticeAndAttribution": true,
+    "lookupGoldenParity": true,
+    "nonAllNodataLayers": true,
+    "pmtilesStructureAndProperties": true,
+    "sourceArchiveAndMembersVerified": true,
+    "sourceContentSeal": true,
+    "sourceGridIdentity": true
+  },
+  "lookupGoldenEvidence": {
+    "availableControlCount": 7,
+    "browserBenchmarkTarget": {
+      "expectedValuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "horizon": 2050,
+      "scenario": "ssp2-45",
+      "sourceLocationId": 1003800040
+    },
+    "coveredStates": [
+      "DataUnavailable",
+      "OutOfScope",
+      "ProjectionAvailable",
+      "UnsupportedGeography"
+    ],
+    "numericToleranceMillimetres": 0,
+    "path": "src/pipeline/science/evidence/ar6-lookup-goldens.json",
+    "sha256": "0d1187bacc6162585c3b48e3361b3fe3ab208847920d37ed54b10a331d58595c"
+  },
+  "releaseId": "phase-0r-ar6-v1",
+  "schemaVersion": 1,
+  "totals": {
+    "cogBytes": 184399,
+    "coreArtifactBytes": 6092150,
+    "geoparquetBytes": 251231,
+    "pmtilesBytes": 5656520
+  }
+}
