@@ -28,6 +28,8 @@ def test_current_contracts_end_in_explicit_blocked_state() -> None:
     assert "product-owner-geography-approval" in gate.blockers
     assert "independent-connectivity-review" in gate.blockers
     assert "vertical-methodology-review" in gate.blockers
+    assert "terrain-scientific-review" in gate.blockers
+    assert "systematic-error-bound" in gate.blockers
     assert gate.missing_evidence
 
 
@@ -69,21 +71,25 @@ def test_no_go_is_not_implicitly_promoted_after_contract_edits() -> None:
     source = deepcopy(contracts.source_semantics)
     geography = deepcopy(contracts.geography_rules)
     vertical_methodology = deepcopy(contracts.vertical_methodology)
+    terrain_decision = deepcopy(contracts.terrain_decision)
     source["publicationGate"]["status"] = "approved"
     source["publicationGate"]["blockingDecisions"] = []
     geography["publicationGate"]["status"] = "approved"
     geography["publicationGate"]["blockingDecisions"] = []
+    terrain_decision["publicationGate"]["status"] = "approved"
+    terrain_decision["publicationGate"]["blockingDecisions"] = []
     source["verticalCompatibility"]["status"] = "approved"
     for review in (
         source["projection"]["review"],
         geography["support"]["review"],
         geography["coastal"]["review"],
         geography["connectivity"]["review"],
+        terrain_decision["review"],
     ):
         review["status"] = "approved"
 
     gate = evaluate_methodology_gate(
-        ScienceContracts(source, geography, vertical_methodology)
+        ScienceContracts(source, geography, vertical_methodology, terrain_decision)
     )
 
     assert gate.state == "blocked"

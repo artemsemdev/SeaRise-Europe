@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/terrain-decision-v1.json",
+  "title": "SeaRise Europe Phase 0.8 terrain decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "methodologyId", "decision", "uncertainty", "delivery", "review", "publicationGate"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0.8-terrain-decision" },
+    "methodologyId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
+    "decision": { "$ref": "#/$defs/decision" },
+    "uncertainty": { "$ref": "#/$defs/uncertainty" },
+    "delivery": { "$ref": "#/$defs/delivery" },
+    "review": { "$ref": "#/$defs/review" },
+    "publicationGate": { "$ref": "#/$defs/gate" }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "selectedInstance", "sourceId", "release", "terrainVariable", "horizontalCrs", "verticalCrs", "evidence", "reasons", "rejectedAlternatives"],
+      "properties": {
+        "status": { "const": "selected-for-external-review" },
+        "selectedInstance": { "const": "GLO-30" },
+        "sourceId": { "const": "copernicus-dem-glo30" },
+        "release": { "const": "2021_1" },
+        "terrainVariable": { "const": "Z_DSM_EGM2008" },
+        "horizontalCrs": { "const": "WGS84-G1150 (EPSG:4326)" },
+        "verticalCrs": { "const": "EGM2008 (EPSG:3855)" },
+        "evidence": { "const": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json" },
+        "reasons": { "type": "array", "minItems": 3, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } },
+        "rejectedAlternatives": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["instance", "reason"],
+            "properties": {
+              "instance": { "enum": ["GLO-90", "terrain-not-applicable"] },
+              "reason": { "$ref": "#/$defs/text" }
+            }
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredLayers", "heightError", "systematicError", "qualityPolicy", "dsmRepresentationBias", "resolutionRepresentation", "composition", "failClosedOutcome"],
+      "properties": {
+        "requiredLayers": {
+          "type": "array",
+          "prefixItems": [{ "const": "DEM" }, { "const": "EDM" }, { "const": "FLM" }, { "const": "HEM" }, { "const": "WBM" }],
+          "items": false
+        },
+        "heightError": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hemSemantics", "hemSentinel", "confidence", "normalMultiplier", "publishedAbsoluteLe90Target", "uneditedRule", "editedRule"],
+          "properties": {
+            "hemSemantics": { "const": "per-pixel one-sigma random error; excludes systematic, phase-unwrapping, editing, filling, and DSM representation errors" },
+            "hemSentinel": { "const": -32767 },
+            "confidence": { "const": 0.9 },
+            "normalMultiplier": { "const": 1.645 },
+            "publishedAbsoluteLe90Target": { "const": "less than 4 m; product-level performance, not a per-pixel uncertainty bound" },
+            "uneditedRule": { "const": "U_random=1.645*HEM where HEM is valid" },
+            "editedRule": { "const": "HEM sentinel requires a reviewed category/source-specific U_edit; no numeric substitution is permitted" }
+          }
+        },
+        "systematicError": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "state", "reason", "rule"],
+          "properties": {
+            "required": { "const": true },
+            "state": { "const": "not-bounded" },
+            "reason": { "$ref": "#/$defs/text" },
+            "rule": { "const": "without independently justified U_systematic, classification is uncertain-threshold" }
+          }
+        },
+        "qualityPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["void", "uneditedUnfilledLand", "editedOrFilledLand", "water", "unexpectedCode"],
+          "properties": {
+            "void": { "const": "DataUnavailable" },
+            "uneditedUnfilledLand": { "const": "use U_random plus required representation terms" },
+            "editedOrFilledLand": { "const": "uncertain-threshold until U_edit is independently bounded for the EDM/FLM category" },
+            "water": { "const": "WBM ocean identifies adjacency for land seeds; water pixels are never published as exposed land" },
+            "unexpectedCode": { "const": "DataUnavailable and fail the source contract" }
+          }
+        },
+        "dsmRepresentationBias": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "state", "reason", "rule"],
+          "properties": {
+            "required": { "const": true },
+            "state": { "const": "not-bounded" },
+            "reason": { "$ref": "#/$defs/text" },
+            "rule": { "const": "without an independently justified U_DSM for the surface context, classification is uncertain-threshold" }
+          }
+        },
+        "resolutionRepresentation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["required", "rule"],
+          "properties": {
+            "required": { "const": true },
+            "rule": { "const": "U_resolution must bound within-cell and resampling representation error using GLO-30 controls; it is never assumed zero" }
+          }
+        },
+        "composition": { "const": "U_Z=U_random+U_systematic+U_edit+U_DSM+U_resolution; absent terms do not default to zero" },
+        "failClosedOutcome": { "const": "uncertain-threshold (DataUnavailable), never NoModeledExposureDetected" }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["buildCost", "browserRule", "mitigations"],
+      "properties": {
+        "buildCost": { "const": "GLO-30 has nine times the pixels of GLO-90 per matched window; evidence records source and lossless-class bytes" },
+        "browserRule": { "const": "the browser range-reads classified coastal COG blocks and never downloads or evaluates raw DEM/quality layers" },
+        "mitigations": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/text" } }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRole", "issue"],
+      "properties": {
+        "status": { "const": "pending-external" },
+        "requiredRole": { "const": "scientific/data reviewer" },
+        "issue": { "const": "https://github.com/artemsemdev/SeaRise-Europe/issues/84" }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockingDecisions"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "blockingDecisions": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": { "enum": ["independent-terrain-review", "systematic-error-bound", "dsm-representation-bias-bound", "edited-pixel-uncertainty-bound"] }
+        }
+      }
+    }
+  }
+}

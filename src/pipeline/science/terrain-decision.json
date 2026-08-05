@@ -1,0 +1,91 @@
+{
+  "$schema": "./terrain-decision.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.8-terrain-decision",
+  "methodologyId": "absolute-mean-water-surface-egm2008-interval-v1",
+  "decision": {
+    "status": "selected-for-external-review",
+    "selectedInstance": "GLO-30",
+    "sourceId": "copernicus-dem-glo30",
+    "release": "2021_1",
+    "terrainVariable": "Z_DSM_EGM2008",
+    "horizontalCrs": "WGS84-G1150 (EPSG:4326)",
+    "verticalCrs": "EGM2008 (EPSG:3855)",
+    "evidence": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json",
+    "reasons": [
+      "Five coastal windows show lower p95 HEM sigma for GLO-30 than GLO-90.",
+      "GLO-90 changes near-threshold classifications and removes coarse water-mask cells that contain GLO-30 land, which is material for islands and narrow coasts.",
+      "Range-served classified COGs isolate the browser from raw DEM size while coastal masking and immutable blocks control delivery cost."
+    ],
+    "rejectedAlternatives": [
+      {
+        "instance": "GLO-90",
+        "reason": "Lower build and storage cost does not offset measured loss of coastal detail, higher HEM percentiles, and threshold disagreement in the reviewed windows."
+      },
+      {
+        "instance": "terrain-not-applicable",
+        "reason": "The accepted absolute-water-surface interval methodology still requires EGM2008 DSM terrain as Z_DSM_EGM2008."
+      }
+    ]
+  },
+  "uncertainty": {
+    "requiredLayers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
+    "heightError": {
+      "hemSemantics": "per-pixel one-sigma random error; excludes systematic, phase-unwrapping, editing, filling, and DSM representation errors",
+      "hemSentinel": -32767,
+      "confidence": 0.9,
+      "normalMultiplier": 1.645,
+      "publishedAbsoluteLe90Target": "less than 4 m; product-level performance, not a per-pixel uncertainty bound",
+      "uneditedRule": "U_random=1.645*HEM where HEM is valid",
+      "editedRule": "HEM sentinel requires a reviewed category/source-specific U_edit; no numeric substitution is permitted"
+    },
+    "systematicError": {
+      "required": true,
+      "state": "not-bounded",
+      "reason": "HEM explicitly excludes systematic elevation offsets and phase-unwrapping errors; the published product-level LE90 target is not a per-pixel bound.",
+      "rule": "without independently justified U_systematic, classification is uncertain-threshold"
+    },
+    "qualityPolicy": {
+      "void": "DataUnavailable",
+      "uneditedUnfilledLand": "use U_random plus required representation terms",
+      "editedOrFilledLand": "uncertain-threshold until U_edit is independently bounded for the EDM/FLM category",
+      "water": "WBM ocean identifies adjacency for land seeds; water pixels are never published as exposed land",
+      "unexpectedCode": "DataUnavailable and fail the source contract"
+    },
+    "dsmRepresentationBias": {
+      "required": true,
+      "state": "not-bounded",
+      "reason": "Copernicus DEM is a surface model; vegetation, buildings, infrastructure, and hydro-editing can raise or alter the represented surface relative to bare-earth terrain.",
+      "rule": "without an independently justified U_DSM for the surface context, classification is uncertain-threshold"
+    },
+    "resolutionRepresentation": {
+      "required": true,
+      "rule": "U_resolution must bound within-cell and resampling representation error using GLO-30 controls; it is never assumed zero"
+    },
+    "composition": "U_Z=U_random+U_systematic+U_edit+U_DSM+U_resolution; absent terms do not default to zero",
+    "failClosedOutcome": "uncertain-threshold (DataUnavailable), never NoModeledExposureDetected"
+  },
+  "delivery": {
+    "buildCost": "GLO-30 has nine times the pixels of GLO-90 per matched window; evidence records source and lossless-class bytes",
+    "browserRule": "the browser range-reads classified coastal COG blocks and never downloads or evaluates raw DEM/quality layers",
+    "mitigations": [
+      "mask processing and publication to the selected Europe/coastal scope",
+      "publish lossless tiled COGs with overviews and immutable range caching",
+      "retain raw DEM and quality layers only in the offline build cache"
+    ]
+  },
+  "review": {
+    "status": "pending-external",
+    "requiredRole": "scientific/data reviewer",
+    "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/84"
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "blockingDecisions": [
+      "independent-terrain-review",
+      "systematic-error-bound",
+      "dsm-representation-bias-bound",
+      "edited-pixel-uncertainty-bound"
+    ]
+  }
+}

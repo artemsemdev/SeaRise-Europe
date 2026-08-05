@@ -17,11 +17,12 @@ class ScienceContractError(ValueError):
 
 @dataclass(frozen=True)
 class ScienceContracts:
-    """The source and geography decision documents used by a build."""
+    """The complete scientific decision documents used by a build."""
 
     source_semantics: Mapping[str, Any]
     geography_rules: Mapping[str, Any]
     vertical_methodology: Mapping[str, Any]
+    terrain_decision: Mapping[str, Any]
 
 
 def _default_contract_dir() -> Path:
@@ -51,12 +52,13 @@ def _load_document(name: str, contract_dir: Path) -> Mapping[str, Any]:
 
 
 def load_science_contracts(contract_dir: Path | None = None) -> ScienceContracts:
-    """Load both versioned contracts after validating their complete schemas."""
+    """Load every versioned contract after validating its complete schema."""
     root = contract_dir or _default_contract_dir()
     return ScienceContracts(
         source_semantics=_load_document("source-semantics", root),
         geography_rules=_load_document("geography-rules", root),
         vertical_methodology=_load_document("vertical-methodology", root),
+        terrain_decision=_load_document("terrain-decision", root),
     )
 
 
@@ -97,11 +99,10 @@ def assert_publication_ready(contracts: ScienceContracts) -> None:
         contracts.source_semantics,
         contracts.geography_rules,
         contracts.vertical_methodology,
+        contracts.terrain_decision,
     ):
         gate = document["publicationGate"]
         if gate["status"] != "approved":
             blockers.extend(str(item) for item in gate["blockingDecisions"])
     if blockers:
-        raise ScienceContractError(
-            "Scientific publication gate is blocked: " + ", ".join(blockers)
-        )
+        raise ScienceContractError("Scientific publication gate is blocked: " + ", ".join(blockers))
