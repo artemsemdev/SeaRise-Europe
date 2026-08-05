@@ -29,6 +29,13 @@ All notable changes to this project will be documented in this file.
 - Added a checksum-first AR6 projection reader, source-native grid lookup, and
   offline real-source goldens with independent Python-reader and browser parity
   across all nine scenario/horizon combinations.
+- Added a fail-closed AR6 regional release builder for the complete 3 × 3
+  matrix: nine exact browser-lookup COGs, one analytical GeoParquet export,
+  nine visual PMTiles archives, STAC metadata, checksums, attribution, and
+  source/build receipts.
+- Added pinned macOS and Linux release profiles, strict cross-environment
+  comparison, and a manual native Linux evidence job that can rebuild an exact
+  source revision without running unrelated CI components.
 
 ### Changed
 
@@ -61,7 +68,8 @@ All notable changes to this project will be documented in this file.
   stop before arrays, the automated v1 recommendation is rejected, the
   authoritative scientific disposition remains blocked pending independent
   review, and Phase 1 stays locked.
-- Superseded ADR-023 as a publication path and defined the recovery order from
-  a new product-contract decision through independently validated coastal
-  water, bare-earth terrain, methodology v2, and a final reviewed regional
-  gate. Historical receipts remain unchanged.
+- Superseded ADR-023 as a publication path and replaced its coastal-water and
+  terrain recovery chain with #106 contract adoption, #135 source/lookup
+  parity, and the #110 regional projection release gate. The first measured
+  candidate passes local artifact and browser delivery budgets; native Linux
+  reproducibility and owner approval remain pending.
