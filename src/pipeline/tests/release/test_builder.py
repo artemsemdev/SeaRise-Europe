@@ -136,7 +136,10 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     assert len(list(first.glob("layers/*/*.pmtiles"))) == 9
     assert (first / "analysis/projections.parquet").is_file()
     assert (first / "analysis/source-grid.json.gz").is_file()
-    assert len(first_result.manifest["artifacts"]) == 20
+    assert (first / "NOTICE.md").is_file()
+    assert (first / "stac/collection.json").is_file()
+    assert len(list(first.glob("stac/items/*.json"))) == 9
+    assert len(first_result.manifest["artifacts"]) == 31
     source_grid = next(
         artifact
         for artifact in first_result.manifest["artifacts"]
@@ -145,7 +148,7 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     assert source_grid["path"] == "analysis/source-grid.json.gz"
     assert first_result.manifest == second_result.manifest
     assert comparison["status"] == "passed"
-    assert comparison["comparedArtifactCount"] == 20
+    assert comparison["comparedArtifactCount"] == 31
     assert first_result.gate["disposition"] == "blocked"
     assert first_result.gate["blockingChecks"] == [
         "sourceArchiveAndMembersVerified",
