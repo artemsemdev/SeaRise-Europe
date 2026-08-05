@@ -288,6 +288,20 @@
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic synthetic release layer, exact Rasterio readback, and fixed COG structure assertions." }
     },
     {
+      "id": "pipeline-ar6-release-geoparquet",
+      "layer": "scientific",
+      "owner": "science",
+      "purpose": "Verify the analytical GeoParquet table preserves exact AR6 integer-millimetre values, source identities, deterministic bytes, and the declared valid-row set.",
+      "sourcePaths": ["src/pipeline/tests/release/test_geoparquet.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/release/geoparquet.py", "src/pipeline/tests/release/test_geoparquet.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent analytical-artifact schema, exact-value, valid-row, and determinism gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_geoparquet.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Checked-in real-source fixture, pinned PyArrow writer, exact readback, fixed row counts, and byte-identical rebuild assertion." }
+    },
+    {
       "id": "pipeline-regional-fixture",
       "layer": "scientific",
       "owner": "science",
@@ -481,6 +495,7 @@
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_14_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_9_attempt.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_source_fixture.py", "suite": "pipeline-ar6-release-source-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
