@@ -119,7 +119,6 @@
     "status": "blocked",
     "blockingDecisions": [
       "vertical-methodology-review",
-      "pinned-vertical-inputs",
       "validated-vertical-transform",
       "terrain-and-connectivity-controls"
     ]

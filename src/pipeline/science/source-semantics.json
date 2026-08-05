@@ -155,15 +155,16 @@
       "requiredLayers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
       "regionalControlCountPerResolution": 25
     },
-    "evidence": "src/pipeline/science/evidence/vertical-source-inspection.json"
+    "evidence": "src/pipeline/science/evidence/vertical-source-inspection.json",
+    "implementationEvidence": "src/pipeline/science/evidence/vertical-transformation-implementation.json"
   },
   "verticalCompatibility": {
     "status": "blocked",
-    "reason": "The exact AR6, SLA, MDT, GOCO06S, EGM2008, and DEM control inputs are locked, but the uncertainty-aware vertical transform has not yet been implemented and independently validated.",
+    "reason": "The fail-closed interval transform is implemented, but numerical geoid evaluation conventions, conservative uncertainty bounds, regional controls, cross-environment reproducibility, and independent review are incomplete.",
     "missingEvidence": [
-      "a validated zero-tide to tide-free GOCO06S-to-EGM2008 implementation",
-      "conservative combined baseline, datum, interpolation, DEM, and DSM uncertainty bounds",
-      "independent scientific/data review of the implemented transform"
+      "locked EGM2008 evaluation constants plus a version-pinned evaluator and permanent-tide rule",
+      "QUID-derived mapping bounds and approved DEM, DSM, interpolation, and total-uncertainty limits",
+      "Baltic and Black Sea controls, cross-environment reproducibility, and independent scientific/data review"
     ],
     "prohibitedOperation": "publish classification from sea_level_change >= DEM elevation"
   },
