@@ -100,10 +100,11 @@ def test_terrain_decision_fails_closed_on_unbounded_error_terms() -> None:
     assert "systematic-error-bound" in terrain["publicationGate"]["blockingDecisions"]
 
 
-def test_coastal_uncertainty_budget_rejects_binary_publication() -> None:
+def test_coastal_uncertainty_budget_recommends_rejecting_binary_publication() -> None:
     budget = load_science_contracts(CONTRACT_DIR).uncertainty_budget
     terms = {term["id"]: term for term in budget["terms"]}
 
+    assert budget["decision"]["authority"] == "automated-methodology-analysis"
     assert budget["decision"]["recommendedDisposition"] == "rejected"
     assert budget["confidenceFramework"]["projectionTreatment"] == (
         "AR6 q0.167/q0.833 remains a separate projection interval"
@@ -117,6 +118,8 @@ def test_coastal_uncertainty_budget_rejects_binary_publication() -> None:
     assert terms["dsm-to-bare-earth-representation"]["status"] == "unbounded"
     assert budget["maximumTotalUncertaintyMetres"] is None
     assert budget["review"]["status"] == "pending-independent"
+    assert budget["review"]["authoritativeDisposition"] == "pending"
+    assert budget["publicationGate"]["status"] == "blocked"
     assert all(
         context["result"] in {
             "DataUnavailable",
@@ -126,44 +129,141 @@ def test_coastal_uncertainty_budget_rejects_binary_publication() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    "mutation",
-    [
-        lambda budget: budget["terms"].pop(
-            next(
-                index
-                for index, term in enumerate(budget["terms"])
-                if term["id"] == "dsm-to-bare-earth-representation"
-            )
-        ),
-        lambda budget: next(
-            term
-            for term in budget["terms"]
-            if term["id"] == "dsm-to-bare-earth-representation"
-        ).update(
-            {
-                "status": "bounded",
-                "numeric": {
-                    "kind": "constant",
-                    "value": 0.0,
-                    "equation": "assume no DSM bias",
-                },
-            }
-        ),
-    ],
-)
-def test_removing_or_zeroing_required_uncertainty_fails_contract(
-    tmp_path: Path,
-    mutation,
-) -> None:  # type: ignore[no-untyped-def]
+CANONICAL_UNCERTAINTY_TERM_IDS = [
+    "sla-l4-mapping",
+    "mdt-formal-mapping",
+    "temporal-weighting",
+    "reference-period-completeness",
+    "horizontal-interpolation",
+    "coastal-sla-representativeness",
+    "geoid-evaluator-disagreement",
+    "dem-random-error",
+    "dem-absolute-systematic-envelope",
+    "dem-edit-fill",
+    "dsm-to-bare-earth-representation",
+    "water-mask",
+    "terrain-void",
+    "coastline-representation",
+    "effective-resolution",
+]
+
+
+def _mutated_contract_dir(tmp_path: Path) -> tuple[Path, dict]:
     for path in CONTRACT_DIR.glob("*.json"):
         shutil.copy2(path, tmp_path / path.name)
     budget_path = tmp_path / "coastal-uncertainty-budget.json"
-    budget = json.loads(budget_path.read_text(encoding="utf-8"))
-    mutation(budget)
-    budget_path.write_text(json.dumps(budget), encoding="utf-8")
+    return budget_path, json.loads(budget_path.read_text(encoding="utf-8"))
+
+
+def _write_budget(path: Path, budget: dict) -> None:
+    path.write_text(json.dumps(budget), encoding="utf-8")
+
+
+@pytest.mark.parametrize("claim", ["reviewed-rejection", "publication-rejection"])
+def test_pending_review_cannot_claim_authoritative_rejection(
+    tmp_path: Path,
+    claim: str,
+) -> None:
+    budget_path, budget = _mutated_contract_dir(tmp_path)
+    if claim == "reviewed-rejection":
+        budget["review"]["authoritativeDisposition"] = "rejected"
+    else:
+        budget["publicationGate"]["status"] = "rejected"
+    _write_budget(budget_path, budget)
+
+    with pytest.raises(ScienceContractError, match="coastal-uncertainty"):
+        load_science_contracts(tmp_path)
+
+
+@pytest.mark.parametrize("term_id", CANONICAL_UNCERTAINTY_TERM_IDS)
+def test_removing_any_canonical_uncertainty_term_fails_contract(
+    tmp_path: Path,
+    term_id: str,
+) -> None:
+    budget_path, budget = _mutated_contract_dir(tmp_path)
+    budget["terms"] = [term for term in budget["terms"] if term["id"] != term_id]
+    _write_budget(budget_path, budget)
 
     with pytest.raises(ScienceContractError, match="uncertainty budget|coastal-uncertainty"):
+        load_science_contracts(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("term_id", "status", "kind", "value"),
+    [
+        ("sla-l4-mapping", "bounded-conditionally", "constant", 0.0),
+        ("dem-absolute-systematic-envelope", "bounded-conditionally", "constant", float("inf")),
+        ("mdt-formal-mapping", "inapplicable", "exact-zero", 0.0),
+        ("dem-random-error", "bounded-conditionally", "constant", 1.0),
+        ("temporal-weighting", "bounded", "constant", 1.0),
+        ("water-mask", "unbounded", "unbounded", None),
+        ("coastal-sla-representativeness", "inapplicable", "exact-zero", 0.0),
+        ("dsm-to-bare-earth-representation", "bounded", "constant", 1.0),
+    ],
+)
+def test_zeroing_or_weakening_canonical_uncertainty_semantics_fails_contract(
+    tmp_path: Path,
+    term_id: str,
+    status: str,
+    kind: str,
+    value: float | None,
+) -> None:
+    budget_path, budget = _mutated_contract_dir(tmp_path)
+    term = next(term for term in budget["terms"] if term["id"] == term_id)
+    term["status"] = status
+    term["numeric"] = {
+        "kind": kind,
+        "value": value,
+        "equation": "mutated uncertainty semantics",
+    }
+    _write_budget(budget_path, budget)
+
+    with pytest.raises(ScienceContractError, match="uncertainty budget|coastal-uncertainty"):
+        load_science_contracts(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "term_id",
+    ["sla-l4-mapping", "temporal-weighting", "dsm-to-bare-earth-representation"],
+)
+def test_unsupported_terms_cannot_be_weakened_across_classes(
+    tmp_path: Path,
+    term_id: str,
+) -> None:
+    budget_path, budget = _mutated_contract_dir(tmp_path)
+    term = next(term for term in budget["terms"] if term["id"] == term_id)
+    term["unsupportedOutcome"] = "not-applicable"
+    _write_budget(budget_path, budget)
+
+    with pytest.raises(ScienceContractError, match="must fail closed"):
+        load_science_contracts(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("field", "mutation"),
+    [
+        ("requiredBoundTermIds", "remove"),
+        ("requiredBoundTermIds", "add-inapplicable"),
+        ("unboundedTermIds", "remove"),
+        ("unboundedTermIds", "add-bounded"),
+    ],
+)
+def test_eligibility_term_sets_are_canonical(
+    tmp_path: Path,
+    field: str,
+    mutation: str,
+) -> None:
+    budget_path, budget = _mutated_contract_dir(tmp_path)
+    term_ids = budget["eligibility"][field]
+    if mutation == "remove":
+        term_ids.pop()
+    elif field == "requiredBoundTermIds":
+        term_ids.append("water-mask")
+    else:
+        term_ids.append("sla-l4-mapping")
+    _write_budget(budget_path, budget)
+
+    with pytest.raises(ScienceContractError, match="uncertainty budget"):
         load_science_contracts(tmp_path)
 
 

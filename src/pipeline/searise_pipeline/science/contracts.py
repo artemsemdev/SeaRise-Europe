@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -13,6 +14,25 @@ from jsonschema import Draft202012Validator, FormatChecker  # type: ignore[impor
 
 class ScienceContractError(ValueError):
     """A scientific contract is absent, invalid, or not approved for use."""
+
+
+_CANONICAL_UNCERTAINTY_TERMS = {
+    "sla-l4-mapping": ("constant", "bounded-conditionally"),
+    "mdt-formal-mapping": ("per-cell", "bounded-conditionally"),
+    "temporal-weighting": ("exact-zero", "inapplicable"),
+    "reference-period-completeness": ("exact-zero", "inapplicable"),
+    "horizontal-interpolation": ("exact-zero", "inapplicable"),
+    "coastal-sla-representativeness": ("unbounded", "unbounded"),
+    "geoid-evaluator-disagreement": ("unbounded", "unbounded"),
+    "dem-random-error": ("per-cell", "bounded-conditionally"),
+    "dem-absolute-systematic-envelope": ("constant", "bounded-conditionally"),
+    "dem-edit-fill": ("unbounded", "unbounded"),
+    "dsm-to-bare-earth-representation": ("unbounded", "unbounded"),
+    "water-mask": ("exact-zero", "inapplicable"),
+    "terrain-void": ("unbounded", "unbounded"),
+    "coastline-representation": ("unbounded", "unbounded"),
+    "effective-resolution": ("unbounded", "unbounded"),
+}
 
 
 @dataclass(frozen=True)
@@ -77,45 +97,82 @@ def _validate_uncertainty_budget(budget: Mapping[str, Any]) -> None:
     if len(by_id) != len(terms):
         raise ScienceContractError("Invalid uncertainty budget: duplicate term id")
 
-    required = set(budget["eligibility"]["requiredBoundTermIds"])
-    missing = required - set(by_id)
-    if missing:
+    canonical_ids = set(_CANONICAL_UNCERTAINTY_TERMS)
+    actual_ids = set(by_id)
+    if actual_ids != canonical_ids:
         raise ScienceContractError(
-            f"Invalid uncertainty budget: missing required terms {sorted(missing)}"
+            "Invalid uncertainty budget: canonical terms differ; "
+            f"missing={sorted(canonical_ids - actual_ids)}, "
+            f"unexpected={sorted(actual_ids - canonical_ids)}"
+        )
+
+    required = set(budget["eligibility"]["requiredBoundTermIds"])
+    expected_required = {
+        term_id
+        for term_id, (_, status) in _CANONICAL_UNCERTAINTY_TERMS.items()
+        if status != "inapplicable"
+    }
+    if required != expected_required:
+        raise ScienceContractError(
+            "Invalid uncertainty budget: required bound terms differ from canonical set"
         )
 
     declared_unbounded = set(budget["eligibility"]["unboundedTermIds"])
-    if not declared_unbounded <= required:
+    expected_unbounded = {
+        term_id
+        for term_id, (_, status) in _CANONICAL_UNCERTAINTY_TERMS.items()
+        if status == "unbounded"
+    }
+    if declared_unbounded != expected_unbounded:
         raise ScienceContractError(
-            "Invalid uncertainty budget: unbounded terms must be required terms"
+            "Invalid uncertainty budget: declared unbounded terms differ from canonical set"
         )
-    unbounded = {term_id for term_id in required if by_id[term_id]["status"] == "unbounded"}
-    if unbounded != declared_unbounded:
-        raise ScienceContractError(
-            "Invalid uncertainty budget: declared unbounded terms were weakened or changed"
-        )
-    for term in terms:
+
+    for term_id, term in by_id.items():
         numeric = term["numeric"]
-        if term["status"] == "unbounded":
-            if numeric != {
-                "kind": "unbounded",
-                "value": None,
-                "equation": numeric["equation"],
-            } or term["unsupportedOutcome"] != "DataUnavailable":
-                raise ScienceContractError(
-                    f"Invalid uncertainty budget: unbounded term {term['id']} was weakened"
-                )
-        if numeric["kind"] == "exact-zero" and term["status"] != "inapplicable":
+        expected_kind, expected_status = _CANONICAL_UNCERTAINTY_TERMS[term_id]
+        if (numeric["kind"], term["status"]) != (expected_kind, expected_status):
             raise ScienceContractError(
-                f"Invalid uncertainty budget: zero bound for applicable term {term['id']}"
+                f"Invalid uncertainty budget: {term_id} kind/status differs "
+                "from canonical semantics"
+            )
+        if term["unsupportedOutcome"] != "DataUnavailable":
+            raise ScienceContractError(
+                f"Invalid uncertainty budget: {term_id} must fail closed when unsupported"
+            )
+        value = numeric["value"]
+        if expected_kind == "constant":
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise ScienceContractError(
+                    f"Invalid uncertainty budget: bounded constant {term_id} "
+                    "must be positive and finite"
+                )
+        elif expected_kind == "exact-zero":
+            if value != 0:
+                raise ScienceContractError(
+                    f"Invalid uncertainty budget: inapplicable term {term_id} must be exact zero"
+                )
+        elif value is not None:
+            raise ScienceContractError(
+                f"Invalid uncertainty budget: {expected_kind} term {term_id} "
+                "must not declare a constant"
             )
 
-    if unbounded and (
-        budget["decision"]["recommendedDisposition"] != "rejected"
-        or budget["publicationGate"]["status"] != "rejected"
+    if expected_unbounded and budget["decision"]["recommendedDisposition"] != "rejected":
+        raise ScienceContractError(
+            "Invalid uncertainty budget: required unbounded terms must recommend rejection"
+        )
+    if budget["review"]["status"] == "pending-independent" and (
+        budget["review"]["authoritativeDisposition"] != "pending"
+        or budget["publicationGate"]["status"] != "blocked"
     ):
         raise ScienceContractError(
-            "Invalid uncertainty budget: required unbounded terms must reject publication"
+            "Invalid uncertainty budget: pending review must keep authoritative publication blocked"
         )
 
 
