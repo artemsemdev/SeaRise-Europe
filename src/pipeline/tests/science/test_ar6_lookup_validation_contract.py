@@ -10,6 +10,8 @@ import geopandas as gpd  # type: ignore[import-untyped]
 from jsonschema import Draft202012Validator
 from shapely.geometry import Point  # type: ignore[import-untyped]
 
+from searise_pipeline.science import load_science_contracts
+
 SCIENCE_DIR = Path(__file__).parents[2] / "science"
 
 
@@ -22,6 +24,7 @@ def test_lookup_validation_contract_matches_schema() -> None:
     schema = _document("ar6-lookup-validation.schema.json")
 
     Draft202012Validator(schema).validate(contract)
+    assert load_science_contracts(SCIENCE_DIR).lookup_validation == contract
 
 
 def test_member_hashes_are_bound_to_source_lock() -> None:
@@ -114,6 +117,12 @@ def test_lookup_is_grid_only_and_never_skips_nodata() -> None:
         "interpolation": "forbidden",
         "extrapolation": "forbidden",
     }
+    assert _document("ar6-lookup-validation.json")["publicationMetadata"] == {
+        "confidence": "medium",
+        "nativeResolutionDegrees": 1,
+        "methodVersion": "ar6-regional-projection-v1",
+        "sourceRelease": "20210809",
+    }
 
 
 def test_file_bindings_match_exact_decision_and_source_contracts() -> None:
@@ -145,6 +154,13 @@ def test_lookup_parameters_match_the_accepted_projection_decision() -> None:
         == accepted["reportedDistanceDecimalPlaces"]
     )
     assert lookup["tieBreak"] == accepted["tieBreak"]
+    metadata = validation["publicationMetadata"]
+    assert metadata["confidence"] == decision["sourceBinding"]["confidence"]
+    assert metadata["nativeResolutionDegrees"] == decision["spatialLookup"]["map"][
+        "nativeResolutionDegrees"
+    ]
+    assert metadata["methodVersion"] == decision["contractId"]
+    assert metadata["sourceRelease"] == "20210809"
     assert accepted["interpolation"] == "none"
     assert accepted["tideGaugeFallback"] == "prohibited"
     assert accepted["nodataSubstitution"] == "prohibited"

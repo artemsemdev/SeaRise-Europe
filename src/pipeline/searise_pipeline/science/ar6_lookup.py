@@ -52,6 +52,11 @@ class Ar6ProjectionLookupResult:
     scenario: str
     horizon: int
     baseline: str
+    confidence: str
+    native_resolution_degrees: float
+    method_version: str
+    source_release: str
+    member_sha256: str
     lower_m: float | None = None
     central_m: float | None = None
     upper_m: float | None = None
@@ -146,6 +151,56 @@ def _validate_interval_grid(interval: Ar6ProjectionInterval) -> None:
             raise ScienceContractError("AR6 lookup interval grids do not share one source grid")
 
 
+def _validate_lookup_contract(contract: Mapping[str, Any]) -> None:
+    lookup = contract.get("lookup", {})
+    distance = lookup.get("distance", {})
+    if lookup.get("sourceFamily") != "native-one-degree-grid":
+        raise ScienceContractError("AR6 point lookup must use only the source-native grid")
+    if lookup.get("locationSelection") != "nearest-source-grid-location":
+        raise ScienceContractError("AR6 point lookup location operator changed")
+    if lookup.get("tieBreak") != "lowest-source-location-id":
+        raise ScienceContractError("AR6 point lookup tie-break changed")
+    if lookup.get("nodataRule") != (
+        "resolve-nearest-location-first-then-fail-if-any-required-quantile-is-fill"
+    ):
+        raise ScienceContractError("AR6 point lookup nodata rule changed")
+    if lookup.get("interpolation") != "forbidden" or lookup.get("extrapolation") != ("forbidden"):
+        raise ScienceContractError("AR6 point lookup cannot interpolate or extrapolate")
+    if distance.get("algorithm") != "haversine" or distance.get("boundary") != "inclusive":
+        raise ScienceContractError("AR6 point lookup distance contract changed")
+    if lookup.get("maximumDistanceKm") != 100:
+        raise ScienceContractError("AR6 point lookup maximum distance changed")
+    if distance.get("earthMeanRadiusKm") != 6371.0088:
+        raise ScienceContractError("AR6 point lookup Earth radius changed")
+    if distance.get("reportedDistanceDecimalPlaces") != 6:
+        raise ScienceContractError("AR6 point lookup distance precision changed")
+    if lookup.get("requiredQuantiles") != [0.167, 0.5, 0.833]:
+        raise ScienceContractError("AR6 point lookup quantiles changed")
+    if contract.get("publicationMetadata") != {
+        "confidence": "medium",
+        "nativeResolutionDegrees": 1,
+        "methodVersion": "ar6-regional-projection-v1",
+        "sourceRelease": "20210809",
+    }:
+        raise ScienceContractError("AR6 point lookup publication metadata changed")
+
+
+def _result_identity(
+    interval: Ar6ProjectionInterval, contract: Mapping[str, Any]
+) -> dict[str, Any]:
+    metadata = contract["publicationMetadata"]
+    return {
+        "scenario": interval.scenario,
+        "horizon": interval.horizon,
+        "baseline": interval.baseline,
+        "confidence": metadata["confidence"],
+        "native_resolution_degrees": float(metadata["nativeResolutionDegrees"]),
+        "method_version": metadata["methodVersion"],
+        "source_release": interval.source_release,
+        "member_sha256": interval.member_sha256,
+    }
+
+
 def _nearest_grid_location(
     interval: Ar6ProjectionInterval,
     latitude: float,
@@ -177,9 +232,6 @@ def lookup_ar6_projection(
     *,
     latitude: float,
     longitude: float,
-    scenario: str,
-    horizon: int,
-    baseline: str,
     support: BaseGeometry,
     coastal_scope: BaseGeometry,
     lookup_contract: Mapping[str, Any],
@@ -189,27 +241,24 @@ def lookup_ar6_projection(
         raise ValueError("Latitude must be finite and between -90 and 90")
     if not math.isfinite(longitude) or not -180 <= longitude <= 180:
         raise ValueError("Longitude must be finite and between -180 and 180")
-    _validate_interval_grid(interval)
-
+    _validate_lookup_contract(lookup_contract)
+    result_identity = _result_identity(interval, lookup_contract)
     reasons = lookup_contract["resultContract"]["stableReasonCodes"]
     point = Point(longitude, latitude)
     if not support.covers(point):
         return Ar6ProjectionLookupResult(
-            "UnsupportedGeography",
-            reasons["outsideEuropeSupport"],
-            scenario,
-            horizon,
-            baseline,
+            state="UnsupportedGeography",
+            reason_code=reasons["outsideEuropeSupport"],
+            **result_identity,
         )
     if not coastal_scope.covers(point):
         return Ar6ProjectionLookupResult(
-            "OutOfScope",
-            reasons["outsideCoastalScope"],
-            scenario,
-            horizon,
-            baseline,
+            state="OutOfScope",
+            reason_code=reasons["outsideCoastalScope"],
+            **result_identity,
         )
 
+    _validate_interval_grid(interval)
     lookup = lookup_contract["lookup"]
     row, column, distance_km = _nearest_grid_location(
         interval,
@@ -229,11 +278,9 @@ def lookup_ar6_projection(
     )
     if distance_km > float(lookup["maximumDistanceKm"]):
         return Ar6ProjectionLookupResult(
-            "DataUnavailable",
-            reasons["sourceGridBeyondMaximumDistance"],
-            scenario,
-            horizon,
-            baseline,
+            state="DataUnavailable",
+            reason_code=reasons["sourceGridBeyondMaximumDistance"],
+            **result_identity,
             source=source,
         )
 
@@ -244,19 +291,15 @@ def lookup_ar6_projection(
     )
     if not all(math.isfinite(value) for value in values):
         return Ar6ProjectionLookupResult(
-            "DataUnavailable",
-            reasons["sourceValueNodata"],
-            scenario,
-            horizon,
-            baseline,
+            state="DataUnavailable",
+            reason_code=reasons["sourceValueNodata"],
+            **result_identity,
             source=source,
         )
     return Ar6ProjectionLookupResult(
-        "ProjectionAvailable",
-        "projection-available",
-        scenario,
-        horizon,
-        baseline,
+        state="ProjectionAvailable",
+        reason_code="projection-available",
+        **result_identity,
         lower_m=values[0],
         central_m=values[1],
         upper_m=values[2],

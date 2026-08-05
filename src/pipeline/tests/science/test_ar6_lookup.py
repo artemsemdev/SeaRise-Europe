@@ -127,9 +127,14 @@ def _interval(
     **kwargs: Any,
 ) -> Ar6ProjectionInterval:
     return Ar6ProjectionInterval(
-        _slice(lower, **kwargs),
-        _slice(central, **kwargs),
-        _slice(upper, **kwargs),
+        scenario="ssp2-45",
+        horizon=2050,
+        baseline="1995-2014 mean",
+        source_release="20210809",
+        member_sha256="b" * 64,
+        lower=_slice(lower, **kwargs),
+        central=_slice(central, **kwargs),
+        upper=_slice(upper, **kwargs),
     )
 
 
@@ -138,9 +143,6 @@ def _lookup(interval: Ar6ProjectionInterval, latitude: float, longitude: float):
         interval,
         latitude=latitude,
         longitude=longitude,
-        scenario="ssp2-45",
-        horizon=2050,
-        baseline="1995-2014 mean",
         support=box(-180, -90, 180, 90),
         coastal_scope=box(-180, -90, 180, 90),
         lookup_contract=_contract(),
@@ -187,6 +189,18 @@ def test_lookup_uses_lowest_location_id_for_an_exact_distance_tie() -> None:
     assert result.source is not None
     assert result.source.location_id == 10
     assert result.source.family == "grid"
+    assert (result.scenario, result.horizon, result.baseline) == (
+        "ssp2-45",
+        2050,
+        "1995-2014 mean",
+    )
+    assert result.source_release == "20210809"
+    assert result.member_sha256 == "b" * 64
+    assert (result.confidence, result.native_resolution_degrees, result.method_version) == (
+        "medium",
+        1,
+        "ar6-regional-projection-v1",
+    )
 
 
 def test_lookup_does_not_skip_a_nearest_nodata_location() -> None:
@@ -230,9 +244,6 @@ def test_geography_states_are_resolved_before_source_lookup() -> None:
         interval,
         latitude=5,
         longitude=5,
-        scenario="ssp2-45",
-        horizon=2050,
-        baseline="1995-2014 mean",
         support=box(-2, -2, 2, 2),
         coastal_scope=box(-1, -1, 1, 1),
         lookup_contract=contract,
@@ -241,9 +252,6 @@ def test_geography_states_are_resolved_before_source_lookup() -> None:
         interval,
         latitude=1.5,
         longitude=0,
-        scenario="ssp2-45",
-        horizon=2050,
-        baseline="1995-2014 mean",
         support=box(-2, -2, 2, 2),
         coastal_scope=box(-1, -1, 1, 1),
         lookup_contract=contract,
@@ -259,3 +267,57 @@ def test_geography_states_are_resolved_before_source_lookup() -> None:
         "outside-coastal-scope",
         None,
     )
+
+
+def test_scope_precedence_does_not_read_a_malformed_grid() -> None:
+    malformed = _interval([[0.1]], [[0.2]], [[0.3]])
+
+    result = lookup_ar6_projection(
+        malformed,
+        latitude=5,
+        longitude=5,
+        support=box(-2, -2, 2, 2),
+        coastal_scope=box(-1, -1, 1, 1),
+        lookup_contract=_contract(),
+    )
+
+    assert result.state == "UnsupportedGeography"
+    assert result.source is None
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda contract: contract["lookup"].update(maximumDistanceKm=101), "maximum"),
+        (
+            lambda contract: contract["lookup"]["distance"].update(earthMeanRadiusKm=6371),
+            "Earth radius",
+        ),
+        (
+            lambda contract: contract["lookup"]["distance"].update(reportedDistanceDecimalPlaces=3),
+            "distance precision",
+        ),
+        (
+            lambda contract: contract["lookup"].update(requiredQuantiles=[0.17, 0.5, 0.83]),
+            "quantiles",
+        ),
+        (lambda contract: contract["lookup"].update(interpolation="bilinear"), "interpolate"),
+        (
+            lambda contract: contract["publicationMetadata"].update(confidence="low"),
+            "publication metadata",
+        ),
+    ],
+)
+def test_changed_lookup_semantics_fail_closed(mutation: Any, message: str) -> None:
+    contract = _contract()
+    mutation(contract)
+
+    with pytest.raises(ScienceContractError, match=message):
+        lookup_ar6_projection(
+            _interval([[0.1, 0.2]], [[0.3, 0.4]], [[0.5, 0.6]]),
+            latitude=0,
+            longitude=0,
+            support=box(-2, -2, 2, 2),
+            coastal_scope=box(-1, -1, 1, 1),
+            lookup_contract=contract,
+        )
