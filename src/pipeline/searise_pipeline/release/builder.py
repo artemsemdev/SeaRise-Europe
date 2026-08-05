@@ -225,6 +225,7 @@ def _validate_lookup_goldens(
     layers = {(layer.scenario, layer.horizon): layer for layer in source.layers}
     available_count = 0
     declared_states = set()
+    benchmark_target: Mapping[str, Any] | None = None
     for result in goldens["results"]:
         declared_states.add(result["state"])
         if result["state"] != "ProjectionAvailable":
@@ -248,6 +249,17 @@ def _validate_lookup_goldens(
             )
             if actual != expected:
                 raise ScienceContractError("Regional values differ from independent goldens")
+            if (
+                benchmark_target is None
+                and projection["scenario"] == "ssp2-45"
+                and projection["horizon"] == 2050
+            ):
+                benchmark_target = {
+                    "scenario": "ssp2-45",
+                    "horizon": 2050,
+                    "sourceLocationId": result["source"]["locationId"],
+                    "expectedValuesMillimetres": list(expected),
+                }
     validation_binding = goldens["validationContract"]
     validation_path = goldens_path.parents[4] / validation_binding["path"]
     if _sha256(validation_path) != validation_binding["sha256"]:
@@ -262,12 +274,15 @@ def _validate_lookup_goldens(
     }
     if declared_states | controls != required_states:
         raise ScienceContractError("Lookup goldens do not cover all four product states")
+    if benchmark_target is None:
+        raise ScienceContractError("Lookup goldens lack the browser benchmark target")
     return {
         "path": f"src/pipeline/science/evidence/{goldens_path.name}",
         "sha256": _sha256(goldens_path),
         "availableControlCount": available_count,
         "coveredStates": sorted(required_states),
         "numericToleranceMillimetres": 0,
+        "browserBenchmarkTarget": benchmark_target,
     }
 
 
