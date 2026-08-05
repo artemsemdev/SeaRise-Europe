@@ -24,20 +24,16 @@ def test_contracts_validate_and_geometry_bytes_match() -> None:
 
     verify_geometry_assets(contracts, REPO_ROOT)
     assert contracts.source_semantics["verticalCompatibility"]["status"] == "blocked"
-    assert (
-        contracts.geography_rules["support"]["status"]
-        == "selected-scope-approximation"
-    )
-    assert (
-        contracts.geography_rules["coastal"]["status"]
-        == "selected-scope-approximation"
-    )
+    assert contracts.geography_rules["support"]["status"] == "selected-scope-approximation"
+    assert contracts.geography_rules["coastal"]["status"] == "selected-scope-approximation"
     assert contracts.geography_rules["predicate"] == "covers"
     assert contracts.vertical_methodology["decision"] == "accepted"
     assert (
         contracts.vertical_methodology["methodId"]
         == "absolute-mean-water-surface-egm2008-interval-v1"
     )
+    assert contracts.terrain_decision["decision"]["selectedInstance"] == "GLO-30"
+    assert contracts.terrain_decision["review"]["status"] == "pending-external"
 
 
 def test_vertical_methodology_binds_reference_epoch_and_uncertainty() -> None:
@@ -70,6 +66,18 @@ def test_vertical_methodology_binds_reference_epoch_and_uncertainty() -> None:
         "missingConnectivityState": "DataUnavailable",
     }
     assert methodology["review"]["status"] == "pending"
+
+
+def test_terrain_decision_fails_closed_on_unbounded_error_terms() -> None:
+    terrain = load_science_contracts(CONTRACT_DIR).terrain_decision
+
+    assert terrain["uncertainty"]["systematicError"]["state"] == "not-bounded"
+    assert terrain["uncertainty"]["dsmRepresentationBias"]["state"] == "not-bounded"
+    assert terrain["uncertainty"]["composition"] == (
+        "U_Z=U_random+U_systematic+U_edit+U_DSM+U_resolution; absent terms do not default to zero"
+    )
+    assert terrain["publicationGate"]["status"] == "blocked"
+    assert "systematic-error-bound" in terrain["publicationGate"]["blockingDecisions"]
 
 
 def test_projection_mapping_is_keyed_by_exact_source_version() -> None:
@@ -152,3 +160,5 @@ def test_publication_gate_reports_every_visible_blocker() -> None:
     assert "vertical-methodology-review" in message
     assert "product-owner-geography-approval" in message
     assert "independent-connectivity-review" in message
+    assert "systematic-error-bound" in message
+    assert "dsm-representation-bias-bound" in message

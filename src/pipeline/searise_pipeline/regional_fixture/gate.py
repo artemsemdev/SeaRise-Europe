@@ -60,16 +60,23 @@ def evaluate_methodology_gate(contracts: ScienceContracts) -> MethodologyGate:
     source = contracts.source_semantics
     geography = contracts.geography_rules
     vertical_methodology = contracts.vertical_methodology
+    terrain_decision = contracts.terrain_decision
     blockers = (
         _blocking_decisions(source)
         + _blocking_decisions(geography)
         + _blocking_decisions(vertical_methodology)
+        + _blocking_decisions(terrain_decision)
     )
     vertical = source["verticalCompatibility"]
     if vertical["status"] != "approved":
         blockers.append("vertical-compatibility")
 
-    pending_reviews = _pending_reviews(source, geography, vertical_methodology)
+    pending_reviews = _pending_reviews(
+        source,
+        geography,
+        vertical_methodology,
+        terrain_decision,
+    )
     blockers.extend(pending_reviews)
     blockers = list(dict.fromkeys(blockers))
     state = "blocked" if blockers else "approved"
@@ -128,6 +135,7 @@ def _pending_reviews(
     source: Mapping[str, Any],
     geography: Mapping[str, Any],
     vertical_methodology: Mapping[str, Any],
+    terrain_decision: Mapping[str, Any],
 ) -> list[str]:
     reviews = {
         "projection-scientific-review": source["projection"]["review"]["status"],
@@ -135,5 +143,6 @@ def _pending_reviews(
         "coastal-geography-review": geography["coastal"]["review"]["status"],
         "connectivity-scientific-review": geography["connectivity"]["review"]["status"],
         "vertical-methodology-review": vertical_methodology["review"]["status"],
+        "terrain-scientific-review": terrain_decision["review"]["status"],
     }
     return [name for name, status in reviews.items() if status != "approved"]
