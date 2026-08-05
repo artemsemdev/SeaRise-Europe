@@ -53,6 +53,6 @@
   "phase1": {
     "status": "blocked",
     "unlocked": false,
-    "nextDecision": "Resolve every named scientific and review evidence gap, then repeat Phase 0.9; do not begin Phase 1 or substitute an implementation workaround."
+    "nextDecision": "Resolve #94 geoid conventions, #95 uncertainty bounds, #96 basin controls, and #97 scope/connectivity review; then #98 alone may re-evaluate the final gate."
   }
 }
