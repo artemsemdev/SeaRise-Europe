@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 import numpy as np
 import rasterio
+from rasterio.io import MemoryFile
 from rasterio.transform import from_origin
 from rio_cogeo.cogeo import cog_validate
 
@@ -34,6 +35,31 @@ class CogEvidence:
     sha256: str
     valid_cells: int
     nodata_cells: int
+
+
+def _nearest_overviews(values: np.ndarray, *, count: int, nodata: int) -> list[np.ndarray]:
+    """Build canonical overviews independently from the stored COG overviews."""
+    with MemoryFile() as memory:
+        with memory.open(
+            driver="COG",
+            width=values.shape[2],
+            height=values.shape[1],
+            count=values.shape[0],
+            dtype=values.dtype,
+            transform=from_origin(0, values.shape[1], 1, 1),
+            nodata=nodata,
+            blocksize=256,
+            compress="DEFLATE",
+            predictor=2,
+            overview_count=count,
+            overview_resampling="NEAREST",
+        ) as base:
+            base.write(values)
+        overviews: list[np.ndarray] = []
+        for overview_index in range(count):
+            with memory.open(OVERVIEW_LEVEL=overview_index) as overview:
+                overviews.append(overview.read())
+        return overviews
 
 
 def write_analysis_cog(
@@ -172,3 +198,15 @@ def validate_analysis_cog(
         )
         if not np.array_equal(dataset.read(), expected):
             raise ScienceContractError("AR6 analysis COG values differ from source millimetres")
+        nearest_overviews = _nearest_overviews(
+            expected,
+            count=len(contract["artifacts"]["cog"]["overviewFactors"]),
+            nodata=values["nodata"],
+        )
+        for overview_index, nearest in enumerate(nearest_overviews):
+            with rasterio.open(path, OVERVIEW_LEVEL=overview_index) as overview:
+                observed = overview.read()
+            if not np.array_equal(observed, nearest):
+                raise ScienceContractError(
+                    "AR6 analysis COG overview values differ from nearest-neighbour decimation"
+                )

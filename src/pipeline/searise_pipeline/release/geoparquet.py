@@ -160,24 +160,26 @@ def validate_geoparquet(
     required_metadata = {
         b"searise:release_contract_id": contract["releaseContractId"].encode(),
         b"searise:source_archive_sha256": source.archive_sha256.encode(),
+        b"searise:scientific_disposition": contract["scientificDisposition"].encode(),
         b"searise:semantic_role": b"analytical-parity",
         b"searise:nearest_selection": b"prohibited",
     }
     if any(metadata.get(key) != value for key, value in required_metadata.items()):
         raise ScienceContractError("GeoParquet release metadata differs from the contract")
-    expected_types = {
-        "scenario": pa.string(),
-        "horizon": pa.int16(),
-        "source_location_id": pa.int64(),
-        "lower_mm": pa.int16(),
-        "median_mm": pa.int16(),
-        "upper_mm": pa.int16(),
-        "geometry": pa.binary(),
-    }
-    if {
-        field.name: field.type for field in parquet.schema_arrow
-    } != expected_types:
-        raise ScienceContractError("GeoParquet Arrow field types differ from the contract")
+    expected_fields = [
+        ("scenario", pa.string()),
+        ("horizon", pa.int16()),
+        ("source_location_id", pa.int64()),
+        ("lower_mm", pa.int16()),
+        ("median_mm", pa.int16()),
+        ("upper_mm", pa.int16()),
+        ("geometry", pa.binary()),
+    ]
+    actual_fields = [(field.name, field.type) for field in parquet.schema_arrow]
+    if actual_fields != expected_fields:
+        raise ScienceContractError(
+            "GeoParquet Arrow field types or column order differ from the contract"
+        )
     try:
         geo_metadata = json.loads(metadata[b"geo"])
         pandas_metadata = json.loads(metadata[b"pandas"])
@@ -185,12 +187,27 @@ def validate_geoparquet(
         raise ScienceContractError("GeoParquet metadata is absent or malformed") from exc
     geometry_metadata = geo_metadata.get("columns", {}).get("geometry", {})
     crs_id = geometry_metadata.get("crs", {}).get("id", {})
+    valid = np.logical_or.reduce([layer.valid for layer in source.layers])
+    rows, columns = np.nonzero(valid)
+    expected_bbox = [
+        float(source.longitudes[columns].min()),
+        float(source.latitudes[rows].min()),
+        float(source.longitudes[columns].max()),
+        float(source.latitudes[rows].max()),
+    ]
+    bbox = geometry_metadata.get("bbox")
     if (
         geo_metadata.get("version") != specification["schemaVersion"]
         or geo_metadata.get("primary_column") != "geometry"
+        or set(geo_metadata.get("columns", {})) != {"geometry"}
+        or set(geometry_metadata) != {"encoding", "geometry_types", "crs", "bbox"}
         or geometry_metadata.get("encoding") != specification["geometryEncoding"]
         or geometry_metadata.get("geometry_types") != [specification["geometryType"]]
         or crs_id != {"authority": "OGC", "code": "CRS84"}
+        or not isinstance(bbox, list)
+        or len(bbox) != 4
+        or any(type(value) not in (int, float) for value in bbox)
+        or [float(value) for value in bbox] != expected_bbox
         or pandas_metadata.get("index_columns") != []
     ):
         raise ScienceContractError("GeoParquet 1.1 geometry or index metadata differs")
