@@ -4,16 +4,43 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import importlib.util
 import json
+import sys
+from copy import deepcopy
 from pathlib import Path
+from types import ModuleType
 
+import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 
 REPO_ROOT = Path(__file__).parents[4]
+BUILDER_PATH = REPO_ROOT / "scripts/science/build_basin_control_evidence.py"
 SCIENCE_DIR = REPO_ROOT / "src/pipeline/science"
 CONTRACT_PATH = SCIENCE_DIR / "basin-controls.json"
 SCHEMA_PATH = SCIENCE_DIR / "basin-controls.schema.json"
 EVIDENCE_PATH = SCIENCE_DIR / "evidence/phase-0-12-basin-controls.json"
+EVIDENCE_SCHEMA_PATH = (
+    SCIENCE_DIR / "evidence/phase-0-12-basin-controls.schema.json"
+)
+
+
+def _load_evidence_builder() -> ModuleType:
+    spec = importlib.util.spec_from_file_location(
+        "build_basin_control_evidence", BUILDER_PATH
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load evidence builder: {BUILDER_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+evidence_builder = _load_evidence_builder()
+EvidenceBuildError = evidence_builder.EvidenceBuildError
+_canonical_bytes = evidence_builder._canonical_bytes
+validate_checked_in_evidence = evidence_builder.validate_checked_in_evidence
 
 
 def _load(path: Path) -> dict:
@@ -208,3 +235,119 @@ def test_evidence_is_compact_canonical_and_licence_complete() -> None:
     }
     assert all(item["redistributionStatus"] == "approved" for item in licences)
     assert all(item["name"] and item["url"] and item["attribution"] for item in licences)
+
+
+def test_evidence_schema_and_validator_enforce_the_checked_in_receipt() -> None:
+    evidence = _load(EVIDENCE_PATH)
+    schema = _load(EVIDENCE_SCHEMA_PATH)
+
+    Draft202012Validator(schema, format_checker=FormatChecker()).validate(evidence)
+    assert validate_checked_in_evidence(REPO_ROOT) == evidence
+    assert _canonical_bytes(evidence) == EVIDENCE_PATH.read_bytes()
+    assert set(evidence["lineage"]) == {
+        "recipe",
+        "contract",
+        "contractSchema",
+        "evidenceSchema",
+        "sourceLock",
+        "sourceLockSchema",
+        "supportGeometry",
+        "coastalGeometry",
+        "connectivityControls",
+        "slaManifest",
+        "terrainManifest",
+        "existingTerrainManifest",
+    }
+
+
+def test_builder_regenerates_receipt_bytes_from_recorded_measurements(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    evidence = _load(EVIDENCE_PATH)
+    contract = _load(CONTRACT_PATH)
+    sla_manifest = REPO_ROOT / evidence["lineage"]["slaManifest"]["path"]
+    monthly_header, monthly_rows, _ = evidence_builder._manifest_records(sla_manifest)
+
+    monkeypatch.setattr(
+        evidence_builder,
+        "_verify_monthly_inputs",
+        lambda *_: (monthly_rows, monthly_header),
+    )
+    monkeypatch.setattr(
+        evidence_builder,
+        "_inspect_baseline",
+        lambda *_: (evidence["baseline"], evidence["marineAnchors"]),
+    )
+    monkeypatch.setattr(
+        evidence_builder,
+        "_inspect_dem_controls",
+        lambda *_: evidence["terrain"]["windows"],
+    )
+    monkeypatch.setattr(
+        evidence_builder,
+        "_inspect_state_expectations",
+        lambda *_: evidence["combinedSuite"]["stateExpectations"],
+    )
+
+    rebuilt = evidence_builder.build_evidence(
+        REPO_ROOT,
+        contract,
+        tmp_path / "dem",
+        tmp_path / "monthly-sla",
+        tmp_path / "mdt.nc",
+    )
+
+    assert _canonical_bytes(rebuilt) == EVIDENCE_PATH.read_bytes()
+
+
+@pytest.mark.parametrize(
+    "lineage_key",
+    [
+        "recipe",
+        "contract",
+        "contractSchema",
+        "evidenceSchema",
+        "sourceLock",
+        "sourceLockSchema",
+        "supportGeometry",
+        "coastalGeometry",
+        "connectivityControls",
+        "slaManifest",
+        "terrainManifest",
+        "existingTerrainManifest",
+    ],
+)
+def test_validator_recomputes_every_committed_lineage_binding(
+    tmp_path: Path, lineage_key: str
+) -> None:
+    evidence = deepcopy(_load(EVIDENCE_PATH))
+    evidence["lineage"][lineage_key]["sha256"] = "0" * 64
+    receipt = tmp_path / "mutated-receipt.json"
+    receipt.write_bytes(_canonical_bytes(evidence))
+
+    with pytest.raises(EvidenceBuildError, match="identity mismatch"):
+        validate_checked_in_evidence(REPO_ROOT, receipt)
+
+
+def test_validator_recomputes_manifest_payload_and_summary(tmp_path: Path) -> None:
+    evidence = deepcopy(_load(EVIDENCE_PATH))
+    evidence["lineage"]["terrainManifest"]["payloadSha256"] = "0" * 64
+    receipt = tmp_path / "mutated-manifest-lineage.json"
+    receipt.write_bytes(_canonical_bytes(evidence))
+
+    with pytest.raises(EvidenceBuildError, match="payload identity mismatch"):
+        validate_checked_in_evidence(REPO_ROOT, receipt)
+
+
+def test_validator_rejects_noncanonical_or_extended_receipts(tmp_path: Path) -> None:
+    evidence = deepcopy(_load(EVIDENCE_PATH))
+    evidence["unexpectedClaim"] = True
+    receipt = tmp_path / "extended-receipt.json"
+    receipt.write_bytes(_canonical_bytes(evidence))
+    with pytest.raises(EvidenceBuildError, match="Additional properties"):
+        validate_checked_in_evidence(REPO_ROOT, receipt)
+
+    noncanonical = tmp_path / "noncanonical-receipt.json"
+    noncanonical.write_text(json.dumps(_load(EVIDENCE_PATH), indent=2) + "\n")
+    with pytest.raises(EvidenceBuildError, match="byte-identical canonical JSON"):
+        validate_checked_in_evidence(REPO_ROOT, noncanonical)
