@@ -243,7 +243,7 @@
         "sourceGeoid": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["sourceId", "model", "version", "nativeTideSystem", "evaluationEpoch", "maximumDegree", "coefficientErrors"],
+          "required": ["sourceId", "model", "version", "nativeTideSystem", "evaluationEpoch", "maximumDegree", "maximumOrder", "normalization", "earthGravityConstant", "referenceRadiusMetres", "evaluationConstantsStatus", "coefficientErrors"],
           "properties": {
             "sourceId": { "const": "goco06s-gravity-model" },
             "model": { "const": "GOCO06S" },
@@ -251,13 +251,18 @@
             "nativeTideSystem": { "const": "zero_tide" },
             "evaluationEpoch": { "const": "2010-01-01" },
             "maximumDegree": { "const": 300 },
+            "maximumOrder": { "const": 300 },
+            "normalization": { "const": "fully_normalized" },
+            "earthGravityConstant": { "const": 398600441500000.0 },
+            "referenceRadiusMetres": { "const": 6378136.3 },
+            "evaluationConstantsStatus": { "const": "locked" },
             "coefficientErrors": { "const": "formal" }
           }
         },
         "targetGeoid": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["sourceId", "model", "version", "nativeTideSystem", "maximumDegree", "maximumOrder", "coefficientErrors"],
+          "required": ["sourceId", "model", "version", "nativeTideSystem", "maximumDegree", "maximumOrder", "normalization", "earthGravityConstant", "referenceRadiusMetres", "evaluationConstantsStatus", "coefficientErrors"],
           "properties": {
             "sourceId": { "const": "egm2008-gravity-model" },
             "model": { "const": "EGM2008" },
@@ -265,6 +270,10 @@
             "nativeTideSystem": { "const": "tide_free" },
             "maximumDegree": { "const": 2190 },
             "maximumOrder": { "const": 2159 },
+            "normalization": { "const": "fully_normalized" },
+            "earthGravityConstant": { "const": null },
+            "referenceRadiusMetres": { "const": null },
+            "evaluationConstantsStatus": { "const": "pending-locked-readme-inspection" },
             "coefficientErrors": { "const": "calibrated-standard-deviations" }
           }
         },

@@ -32,6 +32,16 @@ class FakeEvaluator:
             engine_version=request.policy.version,
             ellipsoid=request.policy.ellipsoid,
             output_tide_system=request.output_tide_system,
+            maximum_degree=request.maximum_degree,
+            maximum_order=request.maximum_order,
+            normalization=request.normalization,
+            earth_gravity_constant=request.earth_gravity_constant,
+            reference_radius_m=request.reference_radius_m,
+            permanent_tide_rule=(
+                request.policy.permanent_tide_rule
+                if request.requires_permanent_tide_conversion
+                else None
+            ),
             permanent_tide_conversion_applied=request.requires_permanent_tide_conversion,
             height_anomaly_to_geoid_applied=request.requires_height_anomaly_to_geoid,
         )
@@ -51,6 +61,19 @@ def _requests():  # type: ignore[no-untyped-def]
     return build_geoid_requests(contracts.source_semantics, source_lock, policy)
 
 
+def _complete_requests():  # type: ignore[no-untyped-def]
+    source, target = _requests()
+    # Synthetic adapter control only. The project contract deliberately keeps
+    # these EGM2008 values pending until locked README evidence is inspected.
+    target = replace(
+        target,
+        earth_gravity_constant=398600441500000.0,
+        reference_radius_m=6378136.3,
+        evaluation_constants_status="locked",
+    )
+    return source, target
+
+
 def test_requests_bind_exact_coefficients_and_required_conversions() -> None:
     source, target = _requests()
 
@@ -60,6 +83,10 @@ def test_requests_bind_exact_coefficients_and_required_conversions() -> None:
     assert source.native_tide_system == "zero_tide"
     assert source.output_tide_system == "tide_free"
     assert source.requires_permanent_tide_conversion
+    assert source.maximum_order == 300
+    assert source.normalization == "fully_normalized"
+    assert source.earth_gravity_constant == 398600441500000.0
+    assert source.reference_radius_m == 6378136.3
     assert target.member_sha256 == (
         "7e448aac4e1b8e63955890cbca08286018ecc6d203e074a64ba5bde21851438a"
     )
@@ -67,10 +94,22 @@ def test_requests_bind_exact_coefficients_and_required_conversions() -> None:
         "464ca875a86a5eba8e7dbb8f3cd18196c02375a318b77bc3a0294abf073b07b8"
     )
     assert target.requires_height_anomaly_to_geoid
+    assert target.evaluation_constants_status == "pending-locked-readme-inspection"
+    assert target.earth_gravity_constant is None
+    assert target.reference_radius_m is None
+
+
+def test_missing_egm2008_evaluation_constants_fail_before_engine_call() -> None:
+    source, target = _requests()
+
+    with pytest.raises(ScienceContractError, match="EGM2008 evaluation constants"):
+        evaluate_geoid_correction(
+            FakeEvaluator(), source, target, np.array([50.0]), np.array([4.0])
+        )
 
 
 def test_reconciliation_uses_goco_minus_egm_sign() -> None:
-    source, target = _requests()
+    source, target = _complete_requests()
     coordinates = np.array([50.0, 51.0])
 
     correction = evaluate_geoid_correction(
@@ -90,12 +129,15 @@ def test_reconciliation_uses_goco_minus_egm_sign() -> None:
         ("ellipsoid", "GRS80", "ellipsoid"),
         ("permanent_tide_conversion_applied", False, "permanent-tide"),
         ("height_anomaly_to_geoid_applied", False, "height-anomaly"),
+        ("normalization", "unnormalized", "harmonic constants"),
+        ("maximum_order", 1, "harmonic constants"),
+        ("earth_gravity_constant", 1.0, "harmonic constants"),
     ],
 )
 def test_unreviewed_reference_operation_fails_closed(
     field: str, value: object, message: str
 ) -> None:
-    source, target = _requests()
+    source, target = _complete_requests()
 
     class InvalidEvaluator(FakeEvaluator):
         def evaluate(self, request, latitudes, longitudes):  # type: ignore[no-untyped-def]
