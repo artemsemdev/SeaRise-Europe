@@ -8,6 +8,7 @@ from .ar6 import (
     extract_projection_interval,
     validate_ar6_schema,
 )
+from .baseline import BaselineSurface, MonthlySlaField, reconstruct_baseline_surface
 from .connectivity import connectivity_comparison, ocean_connected_cells
 from .contracts import (
     ScienceContractError,
@@ -28,9 +29,11 @@ from .geography import (
 __all__ = [
     "Ar6GridSlice",
     "Ar6ProjectionInterval",
+    "BaselineSurface",
     "CandidateGeometries",
     "ScienceContractError",
     "ScienceContracts",
+    "MonthlySlaField",
     "assert_publication_ready",
     "bilinear_sample",
     "compare_dem_samples",
@@ -43,6 +46,7 @@ __all__ = [
     "inspect_dem_sample",
     "inspect_geometry_assets",
     "projection_mapping",
+    "reconstruct_baseline_surface",
     "rebuild_approximation",
     "verify_geometry_assets",
     "validate_ar6_schema",
