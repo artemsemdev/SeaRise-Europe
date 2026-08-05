@@ -1,29 +1,33 @@
-# Blocked Uncertainty-Aware Exposure Methodology — v1.0 Candidate
+# Historical Exposure Methodology — v1.0 (Not Publishable)
 
-> **Status:** Blocked; not approved for a real-data public release
+> **Status:** Phase 0 investigation `complete-with-no-go`; v1 superseded for publication
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
-> **Blocking gate:** Phase 0.9 attempted all nine combinations and returned an explicit `BLOCKED` decision; numerical geoid conventions, uncertainty bounds, controls, reproducibility, golden vectors, and independent review remain incomplete
-> **Latest evidence:** [Phase 0.9 regional scientific gate](evidence/phase-0-9-regional-gate.md) — Phase 0.9 completed with a `BLOCKED` disposition; the Phase 0 scientific gate and Phase 1 remain blocked
+> **Blocking gate:** [Phase 0.14](evidence/phase-0-14-final-no-go.md) completed the investigation without a publishable result; the authoritative scientific and release disposition is `BLOCKED` because independent review is pending
+> **Automated recommendation:** `REJECTED` for `absolute-mean-water-surface-egm2008-interval-v1`; automation is not an independent reviewer
+> **Phase 1:** `LOCKED`; only an independently reviewed `approved` [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) may unlock [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48)
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
 
-This document specifies the selected candidate methodology and the evidence
-needed before it can become a published methodology version. The strategy is
-binding for acquisition and validation. The repository implements its
-fail-closed computational contracts, but cannot execute a publishable numerical
-transform until the explicitly missing conventions, bounds, controls, and
-review evidence are supplied.
+This document preserves the v1 methodology investigated by Phase 0 and explains
+why it is not publishable. The repository implements its fail-closed
+computational contracts, but the locked evidence cannot supply finite coastal
+water and bare-earth terrain uncertainty bounds for the intended binary
+classification. Phase 0 therefore ended with an honest no-go rather than a
+scientific artifact.
 
-No UI, README, or portfolio page may describe methodology `v1.0` as validated
-until every approval condition in this document passes.
+No UI, README, portfolio page, fixture, or release may describe methodology
+`v1.0` as validated. Future validation must use the recovery product contract
+selected by [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106),
+not silently revive this candidate.
 
-## Selected classification
+## Historical candidate classification
 
-The method is `absolute-mean-water-surface-egm2008-interval-v1`. It constructs
+The investigated method is `absolute-mean-water-surface-egm2008-interval-v1`.
+It constructs
 the 1995–2014 mean water surface in EGM2008 metres, adds AR6 relative change,
 and compares a complete likely/error interval with the Copernicus DSM:
 
@@ -202,16 +206,12 @@ release: it is the absence of a scientifically authorized release. Source-lock
 and automated tests pass, but automation is explicitly unable to authorize the
 methodology, product scope, connectivity control, or Phase 1.
 
-The corrected Phase 0.9 record is immutable historical evidence. Resolve
-[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94) geoid
-conventions, [#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95)
-uncertainty bounds, [#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96)
-basin controls, and [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97)
-scope/connectivity review in that order. Then
-[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) is the sole
-future final-gate re-evaluation and the only issue that may unlock Phase 1. It
-may approve only with zero blockers, all nine combinations and hashed artifacts
-complete, and every required independent review recorded.
+The corrected Phase 0.9 record is immutable historical evidence. Issues
+[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94) through
+[#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) subsequently
+recorded their evidence without manufacturing approval. Issue
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) then performed
+the terminal v1 re-evaluation recorded in Phase 0.14.
 
 ## Phase 0.11 uncertainty-budget result
 
@@ -235,9 +235,35 @@ The resulting automated recommendation is `rejected`, as required by #95 when
 the selected binary method is indefensible. This is not an authoritative
 reviewed rejection: the human disposition remains `pending` and the
 publication gate remains `blocked` until an independent scientific/data
-reviewer records it. Until the method is superseded with a finite coastal water
-reference and defensible bare-earth terrain source, #98 cannot authorize a
-regional binary release.
+reviewer records it. The v1 method is superseded for publication; its evidence
+remains historical input to the recovery decision.
+
+## Phase 0.14 terminal no-go
+
+[Phase 0.14 evidence](evidence/phase-0-14-final-no-go.md) records three distinct
+states that must not be collapsed:
+
+- the Phase 0 investigation is `complete-with-no-go`;
+- the #95 automated methodology recommendation is `rejected`;
+- the authoritative scientific and release disposition is `blocked` because
+  no independent reviewer has approved or rejected the method.
+
+All nine scenario/horizon attempts stopped before arrays. No classes, COGs,
+PMTiles, GeoParquet, statistics, release receipt, or synthetic substitute were
+created. Phase 1 remains locked.
+
+Recovery is a new, ordered scientific program rather than completion work on
+v1: [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) selects a
+post-no-go product contract; then
+[#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107) validates a
+datum-safe coastal mean-water reference and
+[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108) validates
+bare-earth coastal terrain in parallel; their approved evidence feeds
+[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109), which
+implements and independently reviews methodology v2; finally
+[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) rebuilds the
+regional proof. Only an independently reviewed `approved` #110 with zero
+blockers may unlock [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
 
 ## Required preprocessing record
 
@@ -345,9 +371,11 @@ The approval suite contains:
 Every release records the test-set version and result summary in
 `manifest.json`. A failed golden point blocks publication.
 
-## Approval conditions
+## Historical v1 approval conditions
 
-Methodology `v1.0` may change from `provisional` to `approved` only when:
+These conditions explain why v1 did not pass. They are retained for audit, not
+as a route to revive ADR-023. The recovery issues must define and approve a new
+versioned contract. Methodology `v1.0` would have required all of the following:
 
 - exact real source snapshots and licences are recorded;
 - the IPCC dimensional/coordinate assumption is confirmed or replaced;
@@ -364,8 +392,8 @@ Methodology `v1.0` may change from `provisional` to `approved` only when:
   connectivity have explicit approvals;
 - the signed release manifest links this exact methodology revision.
 
-If any condition changes the classification rule, create methodology `v1.1` or
-a superseding ADR rather than editing a released version in place.
+Any future classification rule belongs to methodology v2 and a superseding
+ADR. Do not edit the v1 evidence or interpretation in place.
 
 ## Version history
 
@@ -380,3 +408,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-08-05 | Mechanics implemented; publication blocked | Phase 0.7 added the fail-closed interval implementation and receipt; numerical conventions, bounds, controls, reproducibility, and review remain open |
 | `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |
 | `v1.0` | 2026-08-05 | Phase 0.9 completed; scientific gate blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates; Phase 0 and Phase 1 remain blocked |
+| `v1.0` | 2026-08-05 | Phase 0 complete with no-go; publication superseded | Phase 0.14 preserved the authoritative `BLOCKED` state, recorded the automated `REJECTED` recommendation, emitted no release artifacts, and routed future work through #106–#110 |
