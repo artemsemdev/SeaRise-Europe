@@ -597,7 +597,8 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
             for binding in forged_comparison["requiredExternalBindings"]
         }
     ) == 2
-    assert first_result.gate["disposition"] == "blocked"
+    assert first_result.gate["automatedValidation"] == "failed"
+    assert first_result.gate["releaseDisposition"] == "pending-owner"
     assert first_result.gate["blockingChecks"] == [
         "sourceArchiveAndMembersVerified",
         "crossEnvironmentReproducibility",
