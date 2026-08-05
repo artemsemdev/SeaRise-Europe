@@ -114,6 +114,18 @@ def validate_vector_toolchain(
         expected_receipt["buildEnvironment"] = reference_build["buildEnvironment"]
     if tippecanoe_receipt != expected_receipt:
         raise ScienceContractError("Tippecanoe binaries differ from their pinned build receipt")
+    build_environment = reference_build.get("buildEnvironment")
+    if build_environment is not None:
+        build_recipe_path = tippecanoe_build_receipt_path.parent / Path(
+            build_environment["buildRecipePath"]
+        ).name
+        if (
+            not build_recipe_path.is_file()
+            or _sha256(build_recipe_path) != build_environment["buildRecipeSha256"]
+        ):
+            raise ScienceContractError(
+                "Tippecanoe build recipe differs from the release contract"
+            )
     if (
         _sha256(tippecanoe_path) != reference_build["tippecanoeBinarySha256"]
         or _sha256(decode_path) != reference_build["decodeBinarySha256"]

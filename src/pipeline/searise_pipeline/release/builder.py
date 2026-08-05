@@ -182,6 +182,10 @@ def build_regional_release(
     tippecanoe_path: Path,
     decode_path: Path,
     pmtiles_path: Path,
+    tippecanoe_source_archive_path: Path,
+    tippecanoe_build_receipt_path: Path,
+    pmtiles_distribution_asset_path: Path,
+    pmtiles_distribution_platform: str,
     python_lock_path: Path,
     lookup_goldens_path: Path,
     reproducibility_report: Mapping[str, Any] | None = None,
@@ -198,6 +202,10 @@ def build_regional_release(
         tippecanoe_path=tippecanoe_path,
         decode_path=decode_path,
         pmtiles_path=pmtiles_path,
+        tippecanoe_source_archive_path=tippecanoe_source_archive_path,
+        tippecanoe_build_receipt_path=tippecanoe_build_receipt_path,
+        pmtiles_distribution_asset_path=pmtiles_distribution_asset_path,
+        pmtiles_distribution_platform=pmtiles_distribution_platform,
         contract=contract,
     )
     lookup_evidence = _validate_lookup_goldens(source, lookup_goldens_path)
@@ -228,6 +236,10 @@ def build_regional_release(
                     tippecanoe_path=tippecanoe_path,
                     decode_path=decode_path,
                     pmtiles_path=pmtiles_path,
+                    tippecanoe_source_archive_path=tippecanoe_source_archive_path,
+                    tippecanoe_build_receipt_path=tippecanoe_build_receipt_path,
+                    pmtiles_distribution_asset_path=pmtiles_distribution_asset_path,
+                    pmtiles_distribution_platform=pmtiles_distribution_platform,
                 )
             )
         duration = round(time.perf_counter() - started, 6)
