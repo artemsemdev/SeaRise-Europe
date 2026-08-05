@@ -30,6 +30,17 @@ class Ar6ProjectionInterval:
     upper: Ar6GridSlice
 
 
+@dataclass(frozen=True)
+class Ar6MemberIdentity:
+    """Scenario-specific member locked inside the exact AR6 archive."""
+
+    scenario: str
+    archive_sha256: str
+    path: str
+    byte_size: int
+    sha256: str
+
+
 def _require_equal(actual: Any, expected: Any, label: str) -> None:
     if actual != expected:
         raise ScienceContractError(f"Unexpected AR6 {label}: {actual!r} != {expected!r}")
@@ -160,8 +171,17 @@ def extract_projection_interval(
     projection: Mapping[str, Any],
     scenario: str,
     year: int,
+    *,
+    member_identity: Ar6MemberIdentity,
+    verified_member_sha256: str,
 ) -> Ar6ProjectionInterval:
     """Select the exact 0.167/0.5/0.833 likely interval without fallback."""
+    if member_identity.scenario != scenario:
+        raise ScienceContractError("AR6 member identity does not match requested scenario")
+    if member_identity.archive_sha256 != projection["archive"]["sha256"]:
+        raise ScienceContractError("AR6 member identity belongs to another archive")
+    if verified_member_sha256 != member_identity.sha256:
+        raise ScienceContractError("AR6 member SHA-256 differs from the source lock")
     statistics = projection["mapping"]["intervalStatistics"]
     interval = Ar6ProjectionInterval(
         lower=extract_projection_grid(
@@ -206,6 +226,45 @@ def extract_projection_interval(
     ):
         raise ScienceContractError("AR6 interval quantiles are not monotonic")
     return interval
+
+
+def projection_member_identity(
+    source_lock: Mapping[str, Any], projection: Mapping[str, Any], scenario: str
+) -> Ar6MemberIdentity:
+    """Resolve one scenario member from the audited source lock."""
+    mapping = projection["mapping"]
+    if scenario not in mapping["scenarios"]:
+        raise ScienceContractError(f"Unsupported AR6 scenario: {scenario}")
+    sources = [
+        item
+        for item in source_lock["sources"]
+        if item["id"] == projection["sourceId"] and item["version"] == projection["version"]
+    ]
+    if len(sources) != 1:
+        raise ScienceContractError("AR6 source lock entry is missing or duplicated")
+    assets = [
+        asset
+        for asset in sources[0]["assets"]
+        if asset.get("sha256") == projection["archive"]["sha256"]
+    ]
+    if len(assets) != 1:
+        raise ScienceContractError("AR6 archive identity differs from the source lock")
+    upstream_scenario = mapping["scenarios"][scenario]
+    members = [
+        member
+        for member in assets[0].get("members", [])
+        if member.get("scenario") == upstream_scenario
+    ]
+    if len(members) != 1:
+        raise ScienceContractError("AR6 scenario member is missing or duplicated")
+    member = members[0]
+    return Ar6MemberIdentity(
+        scenario=scenario,
+        archive_sha256=assets[0]["sha256"],
+        path=member["path"],
+        byte_size=member["byteSize"],
+        sha256=member["sha256"],
+    )
 
 
 def bilinear_sample(

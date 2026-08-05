@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -11,11 +12,13 @@ import pytest
 import xarray as xr
 
 from searise_pipeline.science import (
+    Ar6MemberIdentity,
     ScienceContractError,
     bilinear_sample,
     extract_projection_grid,
     extract_projection_interval,
     load_science_contracts,
+    projection_member_identity,
     validate_ar6_schema,
 )
 
@@ -69,6 +72,24 @@ def _dataset() -> xr.Dataset:
     )
 
 
+def _member(scenario: str = "ssp2-45") -> Ar6MemberIdentity:
+    return Ar6MemberIdentity(scenario, "a" * 64, "member.nc", 123, "b" * 64)
+
+
+def _interval(dataset: xr.Dataset, scenario: str = "ssp2-45"):
+    projection = _projection()
+    projection["archive"]["sha256"] = "a" * 64
+    member = _member(scenario)
+    return extract_projection_interval(
+        dataset,
+        projection,
+        scenario,
+        2050,
+        member_identity=member,
+        verified_member_sha256=member.sha256,
+    )
+
+
 def test_exact_mapping_reconstructs_complete_grid_in_metres() -> None:
     grid = extract_projection_grid(_dataset(), _projection(), "ssp2-45", 2050)
 
@@ -101,7 +122,7 @@ def test_bilinear_sampling_does_not_bridge_nodata() -> None:
 
 
 def test_exact_likely_interval_uses_source_quantiles_without_rounding() -> None:
-    interval = extract_projection_interval(_dataset(), _projection(), "ssp2-45", 2050)
+    interval = _interval(_dataset())
 
     np.testing.assert_allclose(interval.lower.values_m[0], [0.5, 1.5, 2.5])
     np.testing.assert_allclose(interval.central.values_m[0], [1.0, 2.0, 3.0])
@@ -112,7 +133,7 @@ def test_human_quantile_label_is_not_accepted_as_source_coordinate() -> None:
     dataset = _dataset().assign_coords(quantiles=[0.17, 0.5, 0.833])
 
     with pytest.raises(ScienceContractError, match="0.167"):
-        extract_projection_interval(dataset, _projection(), "ssp2-45", 2050)
+        _interval(dataset)
 
 
 def test_non_monotonic_projection_interval_fails_closed() -> None:
@@ -120,7 +141,40 @@ def test_non_monotonic_projection_interval_fails_closed() -> None:
     dataset["sea_level_change"].values[0, 1, 1] = 2000
 
     with pytest.raises(ScienceContractError, match="not monotonic"):
-        extract_projection_interval(dataset, _projection(), "ssp2-45", 2050)
+        _interval(dataset)
+
+
+def test_member_identity_binds_scenario_archive_and_verified_bytes() -> None:
+    contracts = load_science_contracts(CONTRACT_DIR)
+    source_lock = json.loads(
+        (CONTRACT_DIR.parent / "sources/source-lock.json").read_text(encoding="utf-8")
+    )
+    identity = projection_member_identity(
+        source_lock, contracts.source_semantics["projection"], "ssp2-45"
+    )
+
+    assert identity.path.endswith("total_ssp245_medium_confidence_values.nc")
+    assert identity.sha256 == "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8"
+
+    with pytest.raises(ScienceContractError, match="SHA-256"):
+        extract_projection_interval(
+            _dataset(),
+            {**_projection(), "archive": {"sha256": identity.archive_sha256}},
+            "ssp2-45",
+            2050,
+            member_identity=identity,
+            verified_member_sha256="0" * 64,
+        )
+
+    with pytest.raises(ScienceContractError, match="requested scenario"):
+        extract_projection_interval(
+            _dataset(),
+            {**_projection(), "archive": {"sha256": "a" * 64}},
+            "ssp5-85",
+            2050,
+            member_identity=_member("ssp2-45"),
+            verified_member_sha256="b" * 64,
+        )
 
 
 @pytest.mark.parametrize(
