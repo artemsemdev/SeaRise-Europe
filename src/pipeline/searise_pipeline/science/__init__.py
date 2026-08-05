@@ -11,7 +11,11 @@ from .ar6 import (
     validate_ar6_schema,
 )
 from .baseline import BaselineSurface, MonthlySlaField, reconstruct_baseline_surface
-from .connectivity import connectivity_comparison, ocean_connected_cells
+from .connectivity import (
+    connectivity_comparison,
+    evaluate_connectivity_controls,
+    ocean_connected_cells,
+)
 from .contracts import (
     ScienceContractError,
     ScienceContracts,
@@ -82,6 +86,7 @@ __all__ = [
     "compare_dem_samples",
     "canonical_geojson_bytes",
     "connectivity_comparison",
+    "evaluate_connectivity_controls",
     "extract_projection_grid",
     "extract_projection_interval",
     "evaluate_geoid_correction",

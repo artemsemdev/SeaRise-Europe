@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.example/schemas/connectivity-controls-v1.json",
+  "title": "SeaRise Europe connectivity golden controls",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractId", "neighbourhood", "symbols", "controls", "review"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0.8-connectivity-controls" },
+    "neighbourhood": { "const": 8 },
+    "symbols": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["O", "L", "H", "N", "B", "C", "."],
+      "properties": {
+        "O": { "const": "eligible ocean-adjacent land seed" },
+        "L": { "const": "eligible land" },
+        "H": { "const": "not-exposed land" },
+        "N": { "const": "nodata or uncertain-threshold" },
+        "B": { "const": "eligible-height cell rejected by an explicit barrier or quality mask" },
+        "C": { "const": "expected connected cell" },
+        ".": { "const": "expected disconnected or ineligible cell" }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "grid", "expectedConnected", "provenance"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+          "kind": { "enum": ["open-coast", "diagonal-channel", "nodata", "barrier", "disconnected-low-terrain", "steep-coast", "island", "estuary-lagoon", "tile-edge"] },
+          "grid": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "pattern": "^[OLHNB]+$" }
+          },
+          "expectedConnected": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "pattern": "^[C.]+$" }
+          },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["basis", "independentOfImplementation"],
+            "properties": {
+              "basis": { "type": "string", "minLength": 1 },
+              "independentOfImplementation": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRole", "issue"],
+      "properties": {
+        "status": { "const": "pending-external" },
+        "requiredRole": { "const": "scientific/data reviewer" },
+        "issue": { "const": "https://github.com/artemsemdev/SeaRise-Europe/issues/84" }
+      }
+    }
+  }
+}
