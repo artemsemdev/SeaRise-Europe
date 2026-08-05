@@ -18,7 +18,6 @@ from searise_pipeline.release import (
 )
 from searise_pipeline.science import ScienceContractError
 
-from .test_recovery_gate import DELIVERY, REPRODUCIBILITY
 from .test_source_fixture import FIXTURE_DIR, GOLDENS_PATH, contract
 
 REPO_ROOT = Path(__file__).parents[4]
@@ -111,9 +110,8 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
         release_id="ar6-europe-fixture-v1",
         contract=contract(),
         lookup_goldens_path=GOLDENS_PATH,
-        reproducibility_report=REPRODUCIBILITY,
-        delivery_report=DELIVERY,
-        owner_decision="approved",
+        build_environment_id="isolated-build-a",
+        source_revision="a" * 40,
         **_tool_paths(),
     )
     second_result = build_regional_release(
@@ -122,9 +120,8 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
         release_id="ar6-europe-fixture-v1",
         contract=contract(),
         lookup_goldens_path=GOLDENS_PATH,
-        reproducibility_report=REPRODUCIBILITY,
-        delivery_report=DELIVERY,
-        owner_decision="approved",
+        build_environment_id="isolated-build-b",
+        source_revision="a" * 40,
         **_tool_paths(),
     )
     comparison = compare_release_candidates(
@@ -139,7 +136,10 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     assert len(list(first.glob("layers/*/*.pmtiles"))) == 9
     assert (first / "analysis/projections.parquet").is_file()
     assert (first / "analysis/source-grid.json.gz").is_file()
-    assert len(first_result.manifest["artifacts"]) == 20
+    assert (first / "NOTICE.md").is_file()
+    assert (first / "stac/collection.json").is_file()
+    assert len(list(first.glob("stac/items/*.json"))) == 9
+    assert len(first_result.manifest["artifacts"]) == 31
     source_grid = next(
         artifact
         for artifact in first_result.manifest["artifacts"]
@@ -148,9 +148,13 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     assert source_grid["path"] == "analysis/source-grid.json.gz"
     assert first_result.manifest == second_result.manifest
     assert comparison["status"] == "passed"
-    assert comparison["comparedArtifactCount"] == 20
+    assert comparison["comparedArtifactCount"] == 31
     assert first_result.gate["disposition"] == "blocked"
-    assert first_result.gate["blockingChecks"] == ["sourceArchiveAndMembersVerified"]
+    assert first_result.gate["blockingChecks"] == [
+        "sourceArchiveAndMembersVerified",
+        "crossEnvironmentReproducibility",
+        "deliveryMeasurements",
+    ]
     assert first_result.gate["phase1Unlocked"] is False
 
     for line in (first / "checksums.txt").read_text(encoding="utf-8").splitlines():
@@ -170,6 +174,55 @@ def test_builder_refuses_to_overwrite_immutable_release(tmp_path: Path) -> None:
             release_id="ar6-europe-fixture-v1",
             contract=contract(),
             lookup_goldens_path=GOLDENS_PATH,
+            build_environment_id="test-existing-path",
+            source_revision="a" * 40,
+            **_missing_tool_paths(),
+        )
+
+
+@pytest.mark.parametrize("release_id", ["../escape", "a/b", "UPPER", "absolute"])
+def test_builder_rejects_unsafe_release_ids(tmp_path: Path, release_id: str) -> None:
+    unsafe_id = str(tmp_path / "absolute") if release_id == "absolute" else release_id
+    output = tmp_path / "candidate"
+
+    with pytest.raises(ScienceContractError, match="Release ID"):
+        build_regional_release(
+            _source(),
+            output,
+            release_id=unsafe_id,
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            build_environment_id="test-unsafe-id",
+            source_revision="a" * 40,
+            **_missing_tool_paths(),
+        )
+
+    assert not output.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    ("build_environment_id", "source_revision", "message"),
+    [
+        ("", "a" * 40, "build environment"),
+        ("test-build", "branch-name", "Source revision"),
+    ],
+)
+def test_builder_rejects_unbound_build_identity(
+    tmp_path: Path,
+    build_environment_id: str,
+    source_revision: str,
+    message: str,
+) -> None:
+    with pytest.raises(ScienceContractError, match=message):
+        build_regional_release(
+            _source(),
+            tmp_path / "candidate",
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            build_environment_id=build_environment_id,
+            source_revision=source_revision,
             **_missing_tool_paths(),
         )
 
@@ -189,6 +242,8 @@ def test_builder_rejects_source_mutation_before_artifact_generation(
             release_id="ar6-europe-fixture-v1",
             contract=contract(),
             lookup_goldens_path=GOLDENS_PATH,
+            build_environment_id="test-mutated-source",
+            source_revision="a" * 40,
             **_missing_tool_paths(),
         )
 
@@ -207,6 +262,8 @@ def test_builder_rejects_unbound_python_environment_before_vector_tools(
             release_id="ar6-europe-fixture-v1",
             contract=contract(),
             lookup_goldens_path=GOLDENS_PATH,
+            build_environment_id="test-unbound-python",
+            source_revision="a" * 40,
             **_missing_tool_paths(),
         )
 
@@ -252,6 +309,8 @@ def test_cli_wires_required_vector_trust_inputs(
             "darwin-arm64",
             "--python-lock",
             str(REPO_ROOT / "src/pipeline/requirements-release-macos-arm64.lock"),
+            "--build-environment-id",
+            "test-cli",
             "--release-id",
             "ar6-europe-fixture-v1",
             "--output",
@@ -260,10 +319,36 @@ def test_cli_wires_required_vector_trust_inputs(
             str(failure),
         ],
     )
+    captured: dict[str, object] = {}
+
+    def fake_git(repository: Path, *arguments: str) -> str:
+        assert repository == REPO_ROOT
+        if arguments == ("status", "--porcelain"):
+            return ""
+        assert arguments == ("rev-parse", "HEAD")
+        return "a" * 40
+
+    def fake_build_regional_release(*args, **kwargs):
+        captured.update(kwargs)
+        raise ScienceContractError("stop after CLI wiring")
+
+    monkeypatch.setattr(release_cli, "_git", fake_git)
+    monkeypatch.setattr(
+        release_cli,
+        "build_regional_release",
+        fake_build_regional_release,
+    )
 
     with pytest.raises(SystemExit):
         release_cli.main()
 
     blocked = json.loads(failure.read_text(encoding="utf-8"))
     assert blocked["failure"]["type"] == "ScienceContractError"
+    assert captured["build_environment_id"] == "test-cli"
+    assert captured["source_revision"] == "a" * 40
+    assert isinstance(captured["workflow_started_monotonic"], float)
+    assert captured["tippecanoe_source_archive_path"] == missing
+    assert captured["tippecanoe_build_receipt_path"] == missing
+    assert captured["pmtiles_distribution_asset_path"] == missing
+    assert captured["pmtiles_distribution_platform"] == "darwin-arm64"
     assert not output.exists()

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,22 @@ def _write_json(path: Path, document: Mapping[str, Any]) -> None:
     )
 
 
+def _git(repository: Path, *arguments: str) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=repository,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ScienceContractError(
+            f"Cannot establish the exact release source revision: {exc}"
+        ) from exc
+    return completed.stdout.strip()
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     source = parser.add_mutually_exclusive_group(required=True)
@@ -47,22 +65,23 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--pmtiles-distribution-asset", type=Path, required=True)
     parser.add_argument("--pmtiles-distribution-platform", required=True)
     parser.add_argument("--python-lock", type=Path, required=True)
+    parser.add_argument("--build-environment-id", required=True)
     parser.add_argument("--release-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--reproducibility-report", type=Path)
-    parser.add_argument("--delivery-report", type=Path)
-    parser.add_argument(
-        "--owner-decision",
-        choices=("pending-owner", "approved", "rejected"),
-        default="pending-owner",
-    )
     parser.add_argument("--failure-gate", type=Path, required=True)
     return parser
 
 
 def main() -> None:
     args = _parser().parse_args()
+    workflow_started = time.perf_counter()
     try:
+        repository = Path(__file__).resolve().parents[2]
+        if _git(repository, "status", "--porcelain"):
+            raise ScienceContractError(
+                "Release candidates require a clean Git worktree"
+            )
+        source_revision = _git(repository, "rev-parse", "HEAD")
         contract = load_release_contract(args.release_contract)
         if args.archive:
             regional_source = build_source_from_verified_archive(
@@ -94,15 +113,9 @@ def main() -> None:
             pmtiles_distribution_platform=args.pmtiles_distribution_platform,
             python_lock_path=args.python_lock,
             lookup_goldens_path=args.lookup_goldens,
-            reproducibility_report=(
-                _load(args.reproducibility_report)
-                if args.reproducibility_report
-                else None
-            ),
-            delivery_report=_load(args.delivery_report)
-            if args.delivery_report
-            else None,
-            owner_decision=args.owner_decision,
+            build_environment_id=args.build_environment_id,
+            source_revision=source_revision,
+            workflow_started_monotonic=workflow_started,
         )
     except (OSError, KeyError, ValueError, ScienceContractError) as exc:
         blocked = {
