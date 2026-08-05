@@ -3,8 +3,10 @@
 > **Status:** Blocked; not approved for a real-data public release
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
-> **Blocking gate:** Fail-closed interval mechanics are implemented; numerical geoid conventions, uncertainty bounds, terrain/connectivity controls, reproducibility, and independent review remain blocking
-> **Latest evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
+> **Blocking gate:** Fail-closed interval mechanics and Phase 0.8 terrain/scope/connectivity candidates are implemented; numerical geoid conventions, uncertainty bounds, regional rebuild, reproducibility, and independent review remain blocking
+> **Latest evidence:** [Phase 0.8 terrain, geography, and connectivity controls](science/phase-0-8-terrain-geography-controls.md) — candidates selected, publication `blocked`
+> **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
+> **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
@@ -65,9 +67,9 @@ of their implemented use remains required.
 | Baseline water surface | Copernicus Marine `008_068` monthly `sla` plus static European `008_070` `mdt`, calendar-day weighted over 1995–2014 | Exact dataset/version/files, complete interval, `err_mdt` and QUID error evidence, coverage, licence, attribution, SHA-256 |
 | Source geoid | GOCO06S used by European MDT `008_070` | Exact coefficients, zero-tide metadata, reference epoch, normalization, evaluation software, error bound, licence, SHA-256 |
 | Target geoid | NGA EGM2008 / EPSG:3855 | Exact coefficients or grid, tide-free convention, ellipsoid, interpolation, propagated error, terms, SHA-256 |
-| Terrain | Copernicus DEM GLO-30 or GLO-90 | Product edition, resolution choice, horizontal/vertical reference, nodata, licence, modified-product attribution, SHA-256 |
-| Coastal scope | Current Natural Earth-derived 25 km approximation, to be compared with Copernicus Coastal Zones | Geometry version, source, processing recipe, distance rule, topology QA, comparison decision |
-| Europe support | Natural Earth-derived support geometry | Explicit country/territory rule, clipping, source version, topology QA |
+| Terrain | Copernicus DEM GLO-30 release `2021_1`, selected for external review | Exact DEM/EDM/FLM/HEM/WBM assets, reference semantics, licence, attribution, SHA-256, and independently bounded error terms |
+| Coastal scope | Natural Earth 5.1.1 ocean-derived 25 km product scope, selected for external review after Copernicus Coastal Zones comparison | Geometry version, processing recipe, topology QA, controls, and product-owner approval |
+| Europe support | Explicit 50-feature Natural Earth 5.1.1 `ADM0_A3` allow-list | Country/territory rule, fixed clip/tolerance, topology QA, controls, and product-owner approval |
 
 Raw inputs are acquired once per release into a local or CI cache. They are not
 served to normal site visitors. The release manifest records all inputs and
@@ -147,12 +149,40 @@ implements and tests the deterministic parts of the selected method:
   grid/reference semantics, equations, uncertainty provenance, outputs, and
   residual blockers.
 
-The checked-in receipt intentionally records no classified artifacts. EGM2008
-evaluation constants and a versioned evaluator/tide rule are not yet locked;
-QUID-derived and terrain bounds are not approved; the Phase 0.8 target grid,
-affine, terrain and connectivity controls are pending; and Baltic/Black Sea,
-cross-environment, and independent-review evidence is absent. Those conditions
-produce `DataUnavailable` or stop the build rather than guessed values.
+At the Phase 0.7 boundary, the checked-in receipt intentionally recorded no
+classified artifacts. EGM2008 evaluation constants and a versioned
+evaluator/tide rule are not yet locked;
+QUID-derived and terrain bounds are not approved; the target grid, affine,
+terrain, and connectivity controls were still pending; and Baltic/Black Sea,
+cross-environment, and independent-review evidence was absent. Those conditions
+produced `DataUnavailable` or stopped the build rather than guessed values.
+
+## Phase 0.8 terrain and scope result
+
+[Phase 0.8 evidence](science/phase-0-8-terrain-geography-controls.md) selects
+GLO-30 after comparing five GLO-30/GLO-90 coastal windows with their EDM, FLM,
+HEM, and WBM layers. GLO-30 retains materially more narrow-coast and island
+detail, reports a lower p95 HEM sigma in every window, and has near-threshold
+differences in every window. This is resolution-selection evidence, not
+independent elevation truth.
+
+Terrain now fails closed through explicit terms:
+
+```text
+U_Z = U_random + U_systematic + U_edit + U_DSM + U_resolution
+```
+
+Only `U_random = 1.645 × HEM` is defined for a valid, unedited pixel. The
+systematic, edit/fill, DSM-representation, and resolution terms require
+independent bounds and never default to zero. The Copernicus product-level
+“less than 4 m LE90” target is not treated as a per-pixel bound.
+
+The same phase versions an explicit 50-feature Europe allow-list, the 25 km
+Natural Earth-derived product scope, the `covers` boundary predicate, and an
+eight-neighbour ocean-seeded connectivity screen. Twenty-seven named-place
+geography controls and nine symbolic connectivity controls pass. External
+product/scientific review remains mandatory, and the connectivity screen is
+not a hydraulic model.
 
 ## Required preprocessing record
 
@@ -181,17 +211,17 @@ review of the implemented interval transform remains a publication gate.
 
 ## Coastal analysis scope
 
-The checked-in geometry is a 25 km inland band derived from Natural Earth. It
-is an engineering approximation that includes ports/estuaries omitted by the
-coarse source shoreline. It defines product eligibility only; it does not mean
-that sea-level effects extend 25 km inland.
+The checked-in v2 geometry is a deterministic 25 km inland band derived from
+pinned Natural Earth 5.1.1 inputs. It includes a fixed EPSG:3035 recipe,
+explicit Europe/territory allow-list, declared coastline tolerance, topology
+invariants, and independent named-place controls. It defines product
+eligibility only; it does not mean that sea-level effects extend 25 km inland.
 
-Before release, compare it with the canonical Copernicus coastal product and
-record one of these decisions:
-
-1. replace the approximation;
-2. retain it with quantitative evidence and an explicit methodology version;
-3. build a new connectivity-aware scope geometry.
+Copernicus Coastal Zones V1-2018 was compared and not selected as flood-reach
+or connectivity geometry. Its published 10 km inland extent is a
+land-cover/land-use mapping scope derived from EU-Hydro and is officially
+marked “not yet validated.” The 25 km approximation is therefore retained for
+external product-owner review, not promoted as a canonical hazard boundary.
 
 `OutOfScope` means the selected location is inside supported Europe but outside
 this versioned product boundary. `UnsupportedGeography` means it is outside the
@@ -293,3 +323,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-08-05 | Selected; publication blocked | ADR-023 selected the 1995–2014 ADT/GOCO06S-to-EGM2008 interval method; exact inputs, validation, controls, and independent review remain open |
 | `v1.0` | 2026-08-05 | Inputs locked; publication blocked | Phase 0.6 pinned the exact AR6, SLA/MDT, GOCO06S, EGM2008, and terrain-control evidence; implementation and review remain open |
 | `v1.0` | 2026-08-05 | Mechanics implemented; publication blocked | Phase 0.7 added the fail-closed interval implementation and receipt; numerical conventions, bounds, controls, reproducibility, and review remain open |
+| `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |

@@ -27,7 +27,7 @@ not as active guidance in this document.
 
 | ID | Decision | Status | Current interpretation |
 |---|---|---|---|
-| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed; gate enforced, amended by ADR-023 | A vertical strategy is selected, but its inputs, transform, uncertainty, terrain/connectivity controls, and named approvals remain blocking. |
+| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed; gate enforced, amended by ADR-023 and Phase 0.8 evidence | Vertical, GLO-30, Europe/25 km scope, and connectivity candidates are selected; exact reconciliation, terrain uncertainty, regional evidence, and named approvals remain blocking. |
 
 ## Decisions superseded by ADR-021
 

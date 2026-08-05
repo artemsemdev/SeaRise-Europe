@@ -24,6 +24,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Selected fail-closed GLO-30 terrain, explicit Europe and 25 km coastal
+  product-scope rules, and an ocean-seeded connectivity screen backed by
+  measured controls; scientific publication remains blocked pending complete
+  terrain uncertainty bounds and external approvals.
 - Selected an uncertainty-aware vertical methodology that constructs a
   1995–2014 mean water surface on EGM2008 and returns ambiguous cells as data
   unavailable; exact inputs and computational contracts are now locked, while
