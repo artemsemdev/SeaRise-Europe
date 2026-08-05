@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -151,9 +152,11 @@ def validate_geoparquet(
 ) -> None:
     """Require exact values, IDs, points, CRS, schema, and GeoParquet metadata."""
     gpd, _, pq = _dependencies()
+    import pyarrow as pa
+
     specification = contract["artifacts"]["geoparquet"]
     parquet = pq.ParquetFile(path)
-    metadata = parquet.metadata.metadata
+    metadata = parquet.metadata.metadata or {}
     required_metadata = {
         b"searise:release_contract_id": contract["releaseContractId"].encode(),
         b"searise:source_archive_sha256": source.archive_sha256.encode(),
@@ -162,6 +165,54 @@ def validate_geoparquet(
     }
     if any(metadata.get(key) != value for key, value in required_metadata.items()):
         raise ScienceContractError("GeoParquet release metadata differs from the contract")
+    expected_types = {
+        "scenario": pa.string(),
+        "horizon": pa.int16(),
+        "source_location_id": pa.int64(),
+        "lower_mm": pa.int16(),
+        "median_mm": pa.int16(),
+        "upper_mm": pa.int16(),
+        "geometry": pa.binary(),
+    }
+    if {
+        field.name: field.type for field in parquet.schema_arrow
+    } != expected_types:
+        raise ScienceContractError("GeoParquet Arrow field types differ from the contract")
+    try:
+        geo_metadata = json.loads(metadata[b"geo"])
+        pandas_metadata = json.loads(metadata[b"pandas"])
+    except (KeyError, json.JSONDecodeError) as exc:
+        raise ScienceContractError("GeoParquet metadata is absent or malformed") from exc
+    geometry_metadata = geo_metadata.get("columns", {}).get("geometry", {})
+    crs_id = geometry_metadata.get("crs", {}).get("id", {})
+    if (
+        geo_metadata.get("version") != specification["schemaVersion"]
+        or geo_metadata.get("primary_column") != "geometry"
+        or geometry_metadata.get("encoding") != specification["geometryEncoding"]
+        or geometry_metadata.get("geometry_types") != [specification["geometryType"]]
+        or crs_id != {"authority": "OGC", "code": "CRS84"}
+        or pandas_metadata.get("index_columns") != []
+    ):
+        raise ScienceContractError("GeoParquet 1.1 geometry or index metadata differs")
+    expected_row_groups = [specification["rowGroupSize"]] * (
+        parquet.metadata.num_rows // specification["rowGroupSize"]
+    )
+    remainder = parquet.metadata.num_rows % specification["rowGroupSize"]
+    if remainder:
+        expected_row_groups.append(remainder)
+    actual_row_groups = [
+        parquet.metadata.row_group(index).num_rows
+        for index in range(parquet.metadata.num_row_groups)
+    ]
+    if actual_row_groups != expected_row_groups:
+        raise ScienceContractError("GeoParquet row-group sizes differ from the contract")
+    for row_group_index in range(parquet.metadata.num_row_groups):
+        row_group = parquet.metadata.row_group(row_group_index)
+        if any(
+            row_group.column(column).compression != "ZSTD"
+            for column in range(row_group.num_columns)
+        ):
+            raise ScienceContractError("GeoParquet columns must all use ZSTD compression")
     actual = gpd.read_parquet(path)
     expected_columns, _ = _records(source)
     expected = gpd.GeoDataFrame(
@@ -185,6 +236,10 @@ def validate_geoparquet(
     expected = expected.reset_index(drop=True)
     if list(actual.columns) != list(expected.columns) or len(actual) != len(expected):
         raise ScienceContractError("GeoParquet schema or row count differs from source")
+    key_columns = ["scenario", "horizon", "source_location_id"]
+    actual_keys = list(actual[key_columns].itertuples(index=False, name=None))
+    if actual_keys != sorted(actual_keys) or len(actual_keys) != len(set(actual_keys)):
+        raise ScienceContractError("GeoParquet keys must be sorted and unique")
     for column in (
         "scenario",
         "horizon",

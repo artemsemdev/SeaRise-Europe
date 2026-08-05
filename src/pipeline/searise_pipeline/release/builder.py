@@ -24,6 +24,7 @@ from .pmtiles import (
     validate_vector_toolchain,
     write_visual_pmtiles,
 )
+from .source_grid import SourceGridEvidence, write_source_grid
 from .toolchain import validate_python_toolchain
 
 
@@ -75,7 +76,7 @@ def _layer_statistics(layer: RegionalLayer) -> Mapping[str, Any]:
 
 
 def _artifact_record(
-    evidence: CogEvidence | GeoParquetEvidence | PmtilesEvidence,
+    evidence: CogEvidence | GeoParquetEvidence | PmtilesEvidence | SourceGridEvidence,
     *,
     media_type: str,
     role: str,
@@ -225,6 +226,11 @@ def build_regional_release(
             root / "analysis/projections.parquet",
             contract=contract,
         )
+        source_grid = write_source_grid(
+            source,
+            root / "analysis/source-grid.json.gz",
+            contract=contract,
+        )
         for layer in source.layers:
             archive_path = root / f"layers/{layer.scenario}/{layer.horizon}.pmtiles"
             pmtiles.append(
@@ -272,6 +278,13 @@ def build_regional_release(
                 role="analytical-parity",
             )
         )
+        artifacts.append(
+            _artifact_record(
+                source_grid,
+                media_type="application/gzip",
+                role="source-grid-identity",
+            )
+        )
         for evidence in pmtiles:
             parts = Path(evidence.path).parts
             layer = by_layer[(parts[1], int(Path(parts[2]).stem))]
@@ -305,6 +318,8 @@ def build_regional_release(
                     source.archive_and_members_verified_this_build
                 ),
                 "completeScenarioHorizonMatrix": len(source.layers) == 9,
+                "sourceGridIdentity": source_grid.cell_count
+                == contract["grid"]["width"] * contract["grid"]["height"],
                 "cogStructureAndValues": len(cogs) == 9,
                 "geoparquetSchemaAndValues": geoparquet.row_count
                 == sum(item.source_feature_count for item in pmtiles),

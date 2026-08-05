@@ -295,6 +295,7 @@ def _decode_properties(
     decode_path: Path,
     archive_path: Path,
     maximum_zoom: int,
+    expected_layer_id: str,
 ) -> tuple[dict[int, Mapping[str, Any]], int]:
     decoded = json.loads(
         _run(
@@ -308,8 +309,13 @@ def _decode_properties(
     )
     properties: dict[int, Mapping[str, Any]] = {}
     fragments = 0
+    observed_layer_ids: set[str] = set()
     for tile in decoded["features"]:
         for layer in tile["features"]:
+            layer_id = layer.get("properties", {}).get("layer")
+            if not isinstance(layer_id, str):
+                raise ScienceContractError("Decoded PMTiles layer lacks an exact layer ID")
+            observed_layer_ids.add(layer_id)
             for feature in layer["features"]:
                 fragments += 1
                 location_id = int(feature["id"])
@@ -319,6 +325,8 @@ def _decode_properties(
                     raise ScienceContractError(
                         "PMTiles fragments disagree on one source location's properties"
                     )
+    if observed_layer_ids != {expected_layer_id}:
+        raise ScienceContractError("Decoded PMTiles layer ID differs from the contract")
     return properties, fragments
 
 
@@ -404,6 +412,7 @@ def write_visual_pmtiles(
             decode_path,
             archive_path,
             specification["maximumZoom"],
+            specification["layerId"],
         )
         expected_properties = _expected_properties(source, layer)
         if actual_properties != expected_properties:

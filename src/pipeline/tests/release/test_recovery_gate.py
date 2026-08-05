@@ -9,6 +9,7 @@ from .test_source_fixture import contract
 BUILD_CHECKS = {
     "sourceArchiveAndMembersVerified": True,
     "completeScenarioHorizonMatrix": True,
+    "sourceGridIdentity": True,
     "cogStructureAndValues": True,
     "geoparquetSchemaAndValues": True,
     "pmtilesStructureAndProperties": True,

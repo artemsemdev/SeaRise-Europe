@@ -138,10 +138,17 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     assert len(list(first.glob("analysis/*/*.tif"))) == 9
     assert len(list(first.glob("layers/*/*.pmtiles"))) == 9
     assert (first / "analysis/projections.parquet").is_file()
-    assert len(first_result.manifest["artifacts"]) == 19
+    assert (first / "analysis/source-grid.json.gz").is_file()
+    assert len(first_result.manifest["artifacts"]) == 20
+    source_grid = next(
+        artifact
+        for artifact in first_result.manifest["artifacts"]
+        if artifact["role"] == "source-grid-identity"
+    )
+    assert source_grid["path"] == "analysis/source-grid.json.gz"
     assert first_result.manifest == second_result.manifest
     assert comparison["status"] == "passed"
-    assert comparison["comparedArtifactCount"] == 19
+    assert comparison["comparedArtifactCount"] == 20
     assert first_result.gate["disposition"] == "blocked"
     assert first_result.gate["blockingChecks"] == ["sourceArchiveAndMembersVerified"]
     assert first_result.gate["phase1Unlocked"] is False
