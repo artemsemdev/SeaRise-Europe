@@ -40,6 +40,7 @@ All notable changes to this project will be documented in this file.
   frontend, API, pipeline, Docker, or full-stack tests.
 - Exposure generation now fails closed instead of comparing AR6 relative
   sea-level change directly with absolute EGM2008 terrain heights.
-- Phase 0 completed with a `BLOCKED` scientific decision and no classified
-  release artifacts; Phase 1 stays locked until all numerical, control,
-  reproducibility, golden-vector, and independent-review evidence passes.
+- Phase 0.9 completed with a `BLOCKED` disposition and no classified release
+  artifacts; the Phase 0 scientific gate and Phase 1 stay blocked until the
+  named numerical, control, reproducibility, golden-vector, and review issues
+  are resolved and the final gate is re-evaluated.

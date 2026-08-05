@@ -688,8 +688,13 @@ path is proven.
 [Phase 0.9 gate](../../evidence/phase-0-9-regional-gate.md) attempted all nine
 scenario/horizon combinations with exact lineage but stopped before arrays.
 No scientific artifacts or performance/parity claims were produced. Phase 1
-is locked until a repeated final gate is explicitly approved with zero
-blockers and completed independent reviews; CI success cannot unlock it.
+is locked. Resolve [#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94)
+through [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) in the
+documented order; only
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
+the final gate and possibly unlock Phase 1 with zero blockers and completed
+independent reviews. The corrected Phase 0.9 evidence remains immutable, and
+CI success cannot unlock it.
 
 ### Phase 1 — define public artifacts
 

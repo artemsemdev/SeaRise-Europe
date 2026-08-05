@@ -38,7 +38,7 @@
 | R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Low / Critical | The legacy build path now always refuses this operation. Phase 0.7 implements the 1995–2014 baseline and interval contract, but publication remains blocked until the numerical transform and controls validate it. |
 | R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | The adapter now verifies locked model/member hashes and echoed harmonic metadata before differencing. It fails before engine execution while EGM2008 constants, common ellipsoid, engine version, permanent-tide rule, numeric bounds, basin controls, reproducibility, and review remain missing. |
 | R-17 | Copernicus DSM/HEM is treated as bare-earth terrain or as a complete per-pixel error bound | High / Critical | GLO-30 is selected, but HEM is used only for random error on valid unedited pixels. `U_systematic`, `U_edit`, `U_DSM`, and `U_resolution` never default to zero; publication stays blocked until each term is independently bounded and reviewed. |
-| R-18 | Green CI or source-integrity checks are mistaken for scientific approval | Medium / Critical | The Phase 0.9 schema sets `automation.canAuthorizeDecision=false`. Only an explicit approved decision with zero blockers, nine completed combinations, complete artifacts, and all named reviews can unlock Phase 1. |
+| R-18 | Green CI or source-integrity checks are mistaken for scientific approval | Medium / Critical | The Phase 0.9 schema sets `automation.canAuthorizeDecision=false`. Only the explicit #98 final-gate decision, with zero blockers, nine completed combinations, complete artifacts, and all named reviews, can unlock Phase 1. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
 records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
@@ -58,7 +58,10 @@ Phase 0.9 attempted the exact nine-layer matrix and stopped before arrays. Its
 explicit blocked decision prevents R-13 and R-18 from being hidden by a green
 build, but R-02, R-04, R-07, R-08, R-16, and R-17 remain open because the
 required numerical, artifact, control, reproducibility, and review evidence
-does not exist.
+does not exist. Resolve #94 geoid conventions, #95 uncertainty bounds, #96
+basin controls, and #97 scope/connectivity review in order. The corrected Phase
+0.9 evidence is immutable; #98 alone may re-evaluate the final gate and
+possibly unlock Phase 1.
 
 ## Assumptions that require evidence
 

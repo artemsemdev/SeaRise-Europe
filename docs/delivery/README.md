@@ -81,13 +81,20 @@ scope, and eight-neighbour ocean connectivity for external review. The checks
 above remain open where product/scientific approval, terrain uncertainty
 bounds, or the real regional rebuild is still required.
 
-Phase 0.9 is complete with an explicit `BLOCKED` disposition. Its exact 3×3
-attempt matrix emitted no scientific classes or release artifacts because
-EGM2008 evaluator conventions, numerical uncertainty bounds, independent
-review, Baltic/Black Sea controls, product/connectivity approval,
-cross-environment reproducibility, and reviewed golden vectors are missing.
-Workstream 1 and Phase 1 are not actionable until a repeated Phase 0.9 gate is
-explicitly approved with zero blockers; green CI cannot authorize that change.
+Phase 0.9 completed with an explicit `BLOCKED` disposition; the Phase 0
+scientific gate remains blocked. Its exact 3×3 attempt matrix emitted no
+scientific classes or release artifacts because EGM2008 evaluator conventions,
+numerical uncertainty bounds, independent review, Baltic/Black Sea controls,
+product/connectivity approval, cross-environment reproducibility, and reviewed
+golden vectors are missing. Resolve
+[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94),
+[#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95),
+[#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96), and
+[#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) in order. The
+corrected Phase 0.9 evidence remains immutable; only
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
+the final gate and possibly unlock Workstream 1 and Phase 1. Green CI cannot
+authorize that change.
 
 Exit evidence:
 

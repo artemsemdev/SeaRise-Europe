@@ -60,9 +60,13 @@ built.
 The [Phase 0.9 gate](../evidence/phase-0-9-regional-gate.md) completed with an
 explicit `BLOCKED` decision: all nine combinations have exact preflight lineage
 but no arrays or artifacts. Final-gate contract tests enforce that green CI is
-not approval. Phase 1 unlock requires an explicit approved record with zero
-blockers, nine completed combinations, hashed deliverables, and every named
-review approved.
+not approval. After [#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94)
+through [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) resolve
+their evidence, [#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98)
+is the sole final-gate re-evaluation. Phase 1 unlock requires its explicit
+approved record with zero blockers, nine completed combinations, hashed
+deliverables, and every named review approved; the corrected Phase 0.9 record
+remains immutable.
 
 ## 3. Test layers
 

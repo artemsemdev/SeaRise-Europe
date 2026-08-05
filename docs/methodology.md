@@ -4,7 +4,7 @@
 > **Last reviewed:** 2026-08-05
 > **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
 > **Blocking gate:** Phase 0.9 attempted all nine combinations and returned an explicit `BLOCKED` decision; numerical geoid conventions, uncertainty bounds, controls, reproducibility, golden vectors, and independent review remain incomplete
-> **Latest evidence:** [Phase 0.9 regional scientific gate](evidence/phase-0-9-regional-gate.md) — Phase 0 complete, Phase 1 `blocked`
+> **Latest evidence:** [Phase 0.9 regional scientific gate](evidence/phase-0-9-regional-gate.md) — Phase 0.9 completed with a `BLOCKED` disposition; the Phase 0 scientific gate and Phase 1 remain blocked
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
@@ -28,6 +28,7 @@ the 1995–2014 mean water surface in EGM2008 metres, adds AR6 relative change,
 and compares a complete likely/error interval with the Copernicus DSM:
 
 ```text
+ADT_GOCO06S(t) = SLA_monthly(t) + MDT_GOCO06S
 B_E = mean_1995_2014(ADT_GOCO06S) + N_GOCO06S_tide_free - N_EGM2008_tide_free
 
 C_low  = (B_E - U_B) + 0.001 * AR6_q17 - (Z_E + U_Z)
@@ -103,7 +104,9 @@ migration callers.
 [Phase 0.5 evidence](science/phase-0-5-vertical-methodology-evidence.md)
 selected a reproducible route through the mismatch:
 
-1. build an exact 1995–2014 mean from European Copernicus Marine `adt`;
+1. lock European Copernicus Marine monthly `sla`, derive `adt = sla + mdt`
+   with the locked static MDT, and calendar-day weight the exact 1995–2014
+   interval;
 2. transform the documented GOCO06S geoid reference to EGM2008 only after
    reconciling zero-tide and tide-free conventions;
 3. add AR6 relative change on its matching 1995–2014 baseline;
@@ -186,8 +189,9 @@ not a hydraulic model.
 
 ## Phase 0.9 final gate result
 
-[Phase 0.9 evidence](evidence/phase-0-9-regional-gate.md) records the final
-Phase 0 decision as `BLOCKED`. The reproducible preflight covers all three
+[Phase 0.9 evidence](evidence/phase-0-9-regional-gate.md) records the Phase 0.9
+disposition as `BLOCKED`; the Phase 0 scientific gate remains blocked. The
+reproducible preflight covers all three
 scenarios and all three horizons with exact scenario-member hashes and complete
 shared lineage. All nine attempts stop before array creation on the same seven
 named evidence gaps.
@@ -198,10 +202,16 @@ release: it is the absence of a scientifically authorized release. Source-lock
 and automated tests pass, but automation is explicitly unable to authorize the
 methodology, product scope, connectivity control, or Phase 1.
 
-Phase 1 may unlock only if a future Phase 0.9 decision is explicitly
-`approved`, contains zero blockers, completes all nine combinations with hashed
-artifacts, and records every required independent review. Until then, the next
-work is the named scientific evidence—not an implementation workaround.
+The corrected Phase 0.9 record is immutable historical evidence. Resolve
+[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94) geoid
+conventions, [#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95)
+uncertainty bounds, [#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96)
+basin controls, and [#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97)
+scope/connectivity review in that order. Then
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) is the sole
+future final-gate re-evaluation and the only issue that may unlock Phase 1. It
+may approve only with zero blockers, all nine combinations and hashed artifacts
+complete, and every required independent review recorded.
 
 ## Required preprocessing record
 
@@ -343,4 +353,4 @@ a superseding ADR rather than editing a released version in place.
 | `v1.0` | 2026-08-05 | Inputs locked; publication blocked | Phase 0.6 pinned the exact AR6, SLA/MDT, GOCO06S, EGM2008, and terrain-control evidence; implementation and review remain open |
 | `v1.0` | 2026-08-05 | Mechanics implemented; publication blocked | Phase 0.7 added the fail-closed interval implementation and receipt; numerical conventions, bounds, controls, reproducibility, and review remain open |
 | `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |
-| `v1.0` | 2026-08-05 | Phase 0 complete; Phase 1 blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates |
+| `v1.0` | 2026-08-05 | Phase 0.9 completed; scientific gate blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates; Phase 0 and Phase 1 remain blocked |

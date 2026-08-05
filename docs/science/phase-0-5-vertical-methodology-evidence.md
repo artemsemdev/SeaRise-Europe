@@ -17,9 +17,11 @@ sea-level change. The method identifier is
 `absolute-mean-water-surface-egm2008-interval-v1`.
 
 The selected baseline candidate is the duration-weighted 1995–2014 mean of
-Copernicus Marine European Seas Level-4 absolute dynamic topography (`adt`).
-It must be transformed from its source geoid realization to tide-free EGM2008
-before comparison with the DEM. This is a selected transformation design, not
+absolute dynamic topography derived as `adt = sla + mdt`. The locked monthly
+source variable is Copernicus Marine European Seas Level-4 `sla`; `mdt` comes
+from the locked static European MDT product. The derived field must be
+transformed from its source geoid realization to tide-free EGM2008 before
+comparison with the DEM. This is a selected transformation design, not
 evidence that the exact assets already pass it.
 
 Independent project review has **not** occurred. Exact source locking,
@@ -33,8 +35,8 @@ Phase 1.
 | Evidence | Verified fact | Consequence |
 |---|---|---|
 | [IPCC AR6 regional record](https://zenodo.org/records/6382554) and [NASA PO.DAAC description](https://podaac.jpl.nasa.gov/announcements/2021-08-09-Sea-level-projections-from-the-IPCC-6th-Assessment-Report) | Regional values are change relative to the 1995–2014 mean; the repository mapping uses `sea_level_change` in millimetres. | AR6 cannot itself provide the absolute baseline water elevation. |
-| [European L4 MY sea-level product](https://data.marine.copernicus.eu/product/SEALEVEL_EUR_PHY_L4_MY_008_068/description) | Product `008_068` supplies daily/monthly sea-surface fields from 1993, at 0.0625°, across European seas, including `adt`. | Its exact 1995–2014 interval can construct the AR6-matched baseline without estimating a trend between unlike periods. |
-| [Sea-level L4 Product User Manual](https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-046-047-060-068.pdf) | `adt` is in metres, is sea-surface height above geoid, and is defined as `sla + mdt`; `err_sla` is a formal mapping error. | ADT is the water-height quantity; error variables must be inspected and cannot be treated as guaranteed coverage bounds by name. |
+| [European L4 MY sea-level product](https://data.marine.copernicus.eu/product/SEALEVEL_EUR_PHY_L4_MY_008_068/description) | Product `008_068` supplies daily/monthly sea-surface fields from 1993 at 0.0625° across European seas. The locked monthly snapshot exposes `sla`; it does not expose `adt`. | Its exact monthly `sla` interval plus the locked static MDT can derive the AR6-matched ADT baseline without estimating a trend between unlike periods. |
+| [Sea-level L4 Product User Manual](https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-046-047-060-068.pdf) | Product-family semantics define `adt` in metres as sea-surface height above geoid and `adt = sla + mdt`; `err_sla` is a formal mapping error. | ADT is a derived water-height quantity for the locked monthly inputs; error variables must be inspected and cannot be treated as guaranteed coverage bounds by name. |
 | [European MDT product](https://data.marine.copernicus.eu/product/SEALEVEL_EUR_PHY_MDT_L4_STATIC_008_070/description) and [MDT manual](https://documentation.marine.copernicus.eu/PUM/CMEMS-SL-PUM-008-063-066-067-70.pdf) | MDT is a 1993–2012 mean sea-surface height above geoid; `mdt` and `err_mdt` are in metres. | MDT alone has the wrong epoch and does not prove EGM2008 compatibility. |
 | [MDT Quality Information Document](https://documentation.marine.copernicus.eu/QUID/CMEMS-SL-QUID-008-063-066-067-70.pdf) | European MDT uses CNES-CLS22 MSS and the GOCO06S geoid in its first guess and adds European coastal observations. | Treating “above geoid” as “above EGM2008” is prohibited; a GOCO06S-to-EGM2008 relation is required. |
 | [Official GOCO06S ICGEM record](https://icgem.gfz.de/tom_longtime) | The coefficient header declares `zero_tide`, degree/order 300, reference epoch 2010-01-01, and formal errors; data are CC BY 4.0. | The permanent-tide convention must be reconciled before geoid differencing. |
@@ -48,10 +50,11 @@ Phase 1.
 - **Verified:** Copernicus Marine documents `adt = sla + mdt`; the European
   MDT reference is 1993–2012 and its documented gravity model is GOCO06S;
   GOCO06S is zero-tide; EGM2008 delivery is conventional tide-free.
-- **Methodological inference selected for testing:** European `adt` can be
-  expressed on EGM2008 by a pointwise, convention-matched geoid-model
-  difference. The equation follows the documented reference surfaces, but its
-  numerical accuracy is not yet validated.
+- **Methodological inference selected for testing:** `adt` derived from the
+  locked monthly `sla` plus locked static `mdt` can be expressed on EGM2008 by
+  a pointwise, convention-matched geoid-model difference. The equation follows
+  the documented reference surfaces, but its numerical accuracy is not yet
+  validated.
 - **Open evidence:** the exact `008_068` dataset/version and files used, the
   exact MDT linked by those files, AR6 0.17/0.50/0.83 coordinates, all
   checksums, licences, coverage masks, error-variable semantics, and geoid
@@ -61,7 +64,7 @@ Phase 1.
 
 | Strategy | Datum/geoid and epoch | Coverage, resolution, near shore | Uncertainty | Licence and reproducibility | Decision |
 |---|---|---|---|---|---|
-| **1A. European ADT mean, transformed to EGM2008, plus AR6** | `adt` uses MDT/SLA geoid semantics; build an exact 1995–2014 mean; evaluate GOCO06S and EGM2008 in tide-free convention and add their undulation difference. | `008_068` reports European seas, 0.0625°, daily/monthly. Regional processing is fitted to European seas, but cell-level coastal gaps remain a required inspection. | `err_sla`, `err_mdt`, geoid/tide conversion, epoch aggregation, interpolation, AR6 quantiles, DEM error, and DSM bias remain separate. | Official products and gravity models are obtainable and attributable; exact assets, checksums, access continuity, and derivative wording remain Phase 0.6 evidence. | **Selected.** Only family that retains the required scenarios/horizons while supplying an explicit absolute baseline and uncertainty path. |
+| **1A. European ADT mean, transformed to EGM2008, plus AR6** | Derive `adt = sla + mdt` from locked monthly SLA and static MDT; calendar-day weight the exact 1995–2014 mean; evaluate GOCO06S and EGM2008 in tide-free convention and add their undulation difference. | `008_068` reports European seas at 0.0625° with daily/monthly product-family support; the locked monthly snapshot supplies `sla`. Regional processing is fitted to European seas, but cell-level coastal gaps remain a required inspection. | `err_sla`, `err_mdt`, geoid/tide conversion, epoch aggregation, interpolation, AR6 quantiles, DEM error, and DSM bias remain separate. | Official products and gravity models are obtainable and attributable; exact assets, checksums, access continuity, and derivative wording remain Phase 0.6 evidence. | **Selected.** Only family that retains the required scenarios/horizons while supplying an explicit absolute baseline and uncertainty path. |
 | 1B. Use European MDT directly as EGM2008 baseline | MDT is 1993–2012 above the documented GOCO06S geoid, not EGM2008. | 0.0625° European coastal field with `err_mdt`. | Omits epoch and geoid differences. | Reproducible product, scientifically incomplete transform. | **Rejected.** “Height above geoid” is not datum equivalence. |
 | 1C. Ellipsoidal MSS minus EGM2008 | Could be an algebraically direct baseline, but still needs an exact 1995–2014 epoch adjustment and tide/ellipsoid conventions. | Global MSS is available, but the reviewed candidate lacks the European regional coastal refinement and matched error chain of `008_068`/`008_070`. | MSS, epoch, coastal, and EGM2008 errors still required. | Potentially reproducible after a separate source review. | Not selected; retain as fallback if 1A fails controls. |
 | **2. Normalize projection and terrain to local MSL/tidal datums** | Would require country/port-specific national and tidal transformations, reference epochs, tide systems, and land-motion handling. EVRF2019 does not by itself create a continuous coastal water datum. | Potentially strong locally; no demonstrated homogeneous support for the whole product extent, islands, and all European basins. | Station datum transfer, spatial representativeness, epoch, and network discontinuities dominate between gauges. | Many authorities, licences, versions, and transformation services; difficult to reproduce as one immutable release. | **Rejected for Europe-wide v1.** Suitable for independent local controls, not the canonical surface. |
@@ -71,8 +74,11 @@ Phase 1.
 
 At location `x`, let:
 
-- `ADT_G(x,t)` be Copernicus Marine absolute dynamic topography in metres
-  above the source GOCO06S geoid;
+- `SLA(x,t)` be the locked Copernicus Marine monthly source variable;
+- `MDT_G(x)` be the locked static MDT in metres above the source GOCO06S
+  geoid;
+- `ADT_G(x,t) = SLA(x,t) + MDT_G(x)` be the derived absolute dynamic
+  topography;
 - `N_G^TF(x)` and `N_E^TF(x)` be GOCO06S and EGM2008 geoid undulations,
   evaluated on the same ellipsoid in conventional tide-free form;
 - `B_E(x)` be the 1995–2014 mean water surface in EGM2008 metres;
@@ -83,6 +89,8 @@ At location `x`, let:
 The baseline and future water surface are:
 
 ```text
+ADT_G(x,t) = SLA(x,t) + MDT_G(x)
+
 B_E(x) = mean_duration[1995-01-01,2015-01-01)(ADT_G(x,t))
          + N_G^TF(x) - N_E^TF(x)
 
@@ -96,7 +104,7 @@ coverage.
 
 ```mermaid
 flowchart LR
-    SLA[Copernicus SLA\n1993–2012 anomaly] --> ADT[ADT = SLA + MDT]
+    SLA[Locked monthly SLA\n1995–2014] --> ADT[Derived ADT = SLA + MDT]
     MDT[European MDT\n1993–2012 / GOCO06S] --> ADT
     ADT --> MEAN[Duration-weighted\n1995–2014 mean]
     G[GOCO06S\nzero-tide source] --> TIDE[Common tide-free\nconvention]
@@ -165,8 +173,8 @@ reportable as context but never overrides the interval class.
 
 Phase 0.6 must lock and inspect:
 
-1. exact `008_068` ADT/SLA/error dataset files for 1995–2014;
-2. exact `008_070` MDT/error product used by those ADT files;
+1. exact `008_068` monthly SLA/error dataset files for 1995–2014;
+2. exact `008_070` MDT/error product used to derive ADT;
 3. GOCO06S coefficients/metadata and the selected tide conversion;
 4. NGA EGM2008 coefficients or grid and computation software;
 5. AR6 archive and 0.17/0.50/0.83 coordinates;
@@ -174,11 +182,13 @@ Phase 0.6 must lock and inspect:
 7. licences, attribution, redistribution, checksums, coverage, and access
    continuity for every input and derivative.
 
-Phase 0.7 must prove the equations, interval terms, deterministic numerics,
-and independent controls across Atlantic/North Sea, Baltic,
-Mediterranean/Adriatic, and Black Sea contexts. Phase 0.8 must approve terrain,
-scope, and connectivity. Phase 0.9 alone may change the scientific gate after
-all evidence and reviews pass.
+Phase 0.6 and Phase 0.7 are now integrated into the Phase 0.9 attempt lineage.
+The remaining scientific and review work is tracked by
+[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94) through
+[#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97). The corrected
+Phase 0.9 evidence is immutable; only
+[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
+the final gate and possibly unlock Phase 1 after that work passes.
 
 ## Reviewer record
 
