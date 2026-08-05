@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/ar6-projection-contract.schema.json",
+  "title": "AR6 regional projection product decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "decision",
+    "sourceBinding",
+    "modeledQuantity",
+    "resultContract",
+    "spatialLookup",
+    "userFacingDisclosure",
+    "validation",
+    "excludedInputs",
+    "publicationGate"
+  ],
+  "properties": {
+    "$schema": { "const": "./ar6-projection-contract.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "ar6-regional-projection-v1" },
+    "decision": {
+      "const": {
+        "status": "accepted",
+        "adr": "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+        "supersedesPublicationPath": "ADR-023",
+        "implementationIssues": [135, 110]
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "semanticsPath",
+        "sourceKey",
+        "archiveSha256",
+        "memberBasenameTemplate",
+        "variable",
+        "sourceUnits",
+        "publishedUnits",
+        "unitToMetres",
+        "fillValue",
+        "confidence",
+        "baseline",
+        "scenarios",
+        "horizons",
+        "quantiles"
+      ],
+      "properties": {
+        "semanticsPath": { "const": "src/pipeline/science/source-semantics.json" },
+        "sourceKey": { "const": "ipcc-ar6-sea-level/20210809" },
+        "archiveSha256": {
+          "const": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91"
+        },
+        "memberBasenameTemplate": {
+          "const": "total_{scenario}_medium_confidence_values.nc"
+        },
+        "variable": { "const": "sea_level_change" },
+        "sourceUnits": { "const": "mm" },
+        "publishedUnits": { "const": "m" },
+        "unitToMetres": { "const": 0.001 },
+        "fillValue": { "const": -32768 },
+        "confidence": { "const": "medium" },
+        "baseline": { "const": "1995-2014 mean" },
+        "scenarios": { "const": ["ssp1-26", "ssp2-45", "ssp5-85"] },
+        "horizons": { "const": [2030, 2050, 2100] },
+        "quantiles": {
+          "const": { "lower": 0.167, "central": 0.5, "upper": 0.833 }
+        }
+      }
+    },
+    "modeledQuantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "summary", "reportedStatistics", "rangeName", "notClaims"],
+      "properties": {
+        "id": { "const": "regional-relative-sea-level-change" },
+        "summary": { "type": "string", "minLength": 40 },
+        "reportedStatistics": { "const": ["lower", "central", "upper"] },
+        "rangeName": { "const": "AR6 medium-confidence likely range" },
+        "notClaims": {
+          "const": [
+            "absolute-water-level",
+            "flooding",
+            "inundation",
+            "terrain-exposure",
+            "property-risk",
+            "flood-probability"
+          ]
+        }
+      }
+    },
+    "resultContract": {
+      "const": {
+        "states": [
+          "ProjectionAvailable",
+          "DataUnavailable",
+          "OutOfScope",
+          "UnsupportedGeography"
+        ],
+        "projectionAvailableRequires": ["lower", "central", "upper"],
+        "dataUnavailableReasons": [
+          "source-location-too-distant",
+          "source-value-nodata"
+        ],
+        "legacyExposureStatesProhibited": [
+          "ModeledExposureDetected",
+          "NoModeledExposureDetected"
+        ]
+      }
+    },
+    "spatialLookup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scopeOrder", "map", "point", "gridIdentity"],
+      "properties": {
+        "scopeOrder": {
+          "const": [
+            "validate-coordinate",
+            "validate-europe-support",
+            "validate-coastal-product-zone",
+            "select-source-grid-location",
+            "read-source-values"
+          ]
+        },
+        "map": {
+          "const": {
+            "sourceLocationFamily": "grid",
+            "nativeResolutionDegrees": 1,
+            "scientificResampling": "none"
+          }
+        },
+        "point": {
+          "const": {
+            "sourceLocationFamily": "grid",
+            "operator": "nearest-source-grid-location",
+            "distanceMetric": "haversine",
+            "earthRadiusKilometres": 6371.0088,
+            "maximumDistanceKilometres": 100,
+            "tieBreak": "lowest-source-location-id",
+            "selectionDistanceRounding": "none",
+            "reportedDistanceDecimalPlaces": 6,
+            "interpolation": "none",
+            "extrapolation": "none",
+            "tideGaugeFallback": "prohibited",
+            "nodataSubstitution": "prohibited"
+          }
+        },
+        "gridIdentity": {
+          "const": {
+            "locationIdMinimum": 1000000000,
+            "locationCount": 65160,
+            "latitudeCount": 181,
+            "longitudeCount": 360,
+            "longitudeRange": [-180, 179]
+          }
+        }
+      }
+    },
+    "userFacingDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredFields", "requiredMeaning", "distanceAndResolutionRequired"],
+      "properties": {
+        "requiredFields": {
+          "const": [
+            "scenario",
+            "horizon",
+            "lowerMetres",
+            "centralMetres",
+            "upperMetres",
+            "baseline",
+            "confidence",
+            "sourceLocationId",
+            "sourceLatitude",
+            "sourceLongitude",
+            "sourceDistanceKilometres",
+            "nativeResolutionDegrees",
+            "sourceRelease",
+            "methodVersion"
+          ]
+        },
+        "requiredMeaning": { "type": "string", "minLength": 80 },
+        "distanceAndResolutionRequired": { "const": true }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "goldenSetId",
+        "goldenSetOwnerIssue",
+        "requiredContexts",
+        "minimumIndependentReaders",
+        "absoluteToleranceMetres",
+        "relativeTolerance",
+        "onlineReference",
+        "automatedValidationMeaning",
+        "releaseDecisionAuthority"
+      ],
+      "properties": {
+        "strategy": { "const": "offline-pinned-source-golden-parity" },
+        "goldenSetId": { "const": "ar6-regional-projection-goldens-v1" },
+        "goldenSetOwnerIssue": { "const": 135 },
+        "requiredContexts": {
+          "const": [
+            "atlantic-north-sea",
+            "baltic",
+            "mediterranean-adriatic",
+            "black-sea",
+            "source-nodata",
+            "out-of-scope",
+            "unsupported-geography"
+          ]
+        },
+        "minimumIndependentReaders": { "const": 2 },
+        "absoluteToleranceMetres": { "const": 0.000001 },
+        "relativeTolerance": { "const": 0 },
+        "onlineReference": {
+          "const": {
+            "name": "NASA/Rutgers IPCC AR6 Sea Level Projection Tool",
+            "role": "supplementary-manual-cross-check",
+            "requiredForCi": false
+          }
+        },
+        "automatedValidationMeaning": {
+          "const": "source-and-implementation-parity-only"
+        },
+        "releaseDecisionAuthority": { "const": "project-owner" }
+      }
+    },
+    "excludedInputs": {
+      "const": [
+        "tide-gauge-locations",
+        "low-confidence-ar6-projections",
+        "altimetry",
+        "mean-dynamic-topography",
+        "geoid-transformation",
+        "terrain",
+        "connectivity-classification"
+      ]
+    },
+    "publicationGate": {
+      "const": {
+        "status": "blocked",
+        "automatedValidation": "pending",
+        "releaseDecision": "pending-owner",
+        "blockingIssues": [135, 110],
+        "phase1Unlocked": false
+      }
+    }
+  }
+}

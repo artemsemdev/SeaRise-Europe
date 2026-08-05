@@ -40,6 +40,7 @@ class ScienceContracts:
     """The complete scientific decision documents used by a build."""
 
     source_semantics: Mapping[str, Any]
+    projection_contract: Mapping[str, Any]
     geography_rules: Mapping[str, Any]
     vertical_methodology: Mapping[str, Any]
     terrain_decision: Mapping[str, Any]
@@ -82,6 +83,7 @@ def load_science_contracts(contract_dir: Path | None = None) -> ScienceContracts
     _validate_uncertainty_budget(uncertainty_budget)
     return ScienceContracts(
         source_semantics=_load_document("source-semantics", root),
+        projection_contract=_load_document("ar6-projection-contract", root),
         geography_rules=_load_document("geography-rules", root),
         vertical_methodology=_load_document("vertical-methodology", root),
         uncertainty_budget=uncertainty_budget,

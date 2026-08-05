@@ -1,0 +1,157 @@
+{
+  "$schema": "./ar6-projection-contract.schema.json",
+  "schemaVersion": 1,
+  "contractId": "ar6-regional-projection-v1",
+  "decision": {
+    "status": "accepted",
+    "adr": "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+    "supersedesPublicationPath": "ADR-023",
+    "implementationIssues": [135, 110]
+  },
+  "sourceBinding": {
+    "semanticsPath": "src/pipeline/science/source-semantics.json",
+    "sourceKey": "ipcc-ar6-sea-level/20210809",
+    "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+    "memberBasenameTemplate": "total_{scenario}_medium_confidence_values.nc",
+    "variable": "sea_level_change",
+    "sourceUnits": "mm",
+    "publishedUnits": "m",
+    "unitToMetres": 0.001,
+    "fillValue": -32768,
+    "confidence": "medium",
+    "baseline": "1995-2014 mean",
+    "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
+    "horizons": [2030, 2050, 2100],
+    "quantiles": {
+      "lower": 0.167,
+      "central": 0.5,
+      "upper": 0.833
+    }
+  },
+  "modeledQuantity": {
+    "id": "regional-relative-sea-level-change",
+    "summary": "IPCC AR6 projected regional relative sea-level change at the selected source-grid location, relative to the 1995-2014 mean",
+    "reportedStatistics": ["lower", "central", "upper"],
+    "rangeName": "AR6 medium-confidence likely range",
+    "notClaims": [
+      "absolute-water-level",
+      "flooding",
+      "inundation",
+      "terrain-exposure",
+      "property-risk",
+      "flood-probability"
+    ]
+  },
+  "resultContract": {
+    "states": [
+      "ProjectionAvailable",
+      "DataUnavailable",
+      "OutOfScope",
+      "UnsupportedGeography"
+    ],
+    "projectionAvailableRequires": ["lower", "central", "upper"],
+    "dataUnavailableReasons": [
+      "source-location-too-distant",
+      "source-value-nodata"
+    ],
+    "legacyExposureStatesProhibited": [
+      "ModeledExposureDetected",
+      "NoModeledExposureDetected"
+    ]
+  },
+  "spatialLookup": {
+    "scopeOrder": [
+      "validate-coordinate",
+      "validate-europe-support",
+      "validate-coastal-product-zone",
+      "select-source-grid-location",
+      "read-source-values"
+    ],
+    "map": {
+      "sourceLocationFamily": "grid",
+      "nativeResolutionDegrees": 1,
+      "scientificResampling": "none"
+    },
+    "point": {
+      "sourceLocationFamily": "grid",
+      "operator": "nearest-source-grid-location",
+      "distanceMetric": "haversine",
+      "earthRadiusKilometres": 6371.0088,
+      "maximumDistanceKilometres": 100,
+      "tieBreak": "lowest-source-location-id",
+      "selectionDistanceRounding": "none",
+      "reportedDistanceDecimalPlaces": 6,
+      "interpolation": "none",
+      "extrapolation": "none",
+      "tideGaugeFallback": "prohibited",
+      "nodataSubstitution": "prohibited"
+    },
+    "gridIdentity": {
+      "locationIdMinimum": 1000000000,
+      "locationCount": 65160,
+      "latitudeCount": 181,
+      "longitudeCount": 360,
+      "longitudeRange": [-180, 179]
+    }
+  },
+  "userFacingDisclosure": {
+    "requiredFields": [
+      "scenario",
+      "horizon",
+      "lowerMetres",
+      "centralMetres",
+      "upperMetres",
+      "baseline",
+      "confidence",
+      "sourceLocationId",
+      "sourceLatitude",
+      "sourceLongitude",
+      "sourceDistanceKilometres",
+      "nativeResolutionDegrees",
+      "sourceRelease",
+      "methodVersion"
+    ],
+    "requiredMeaning": "Projected regional relative sea-level change near this location; not a flood, inundation, terrain-exposure, or property-risk assessment",
+    "distanceAndResolutionRequired": true
+  },
+  "validation": {
+    "strategy": "offline-pinned-source-golden-parity",
+    "goldenSetId": "ar6-regional-projection-goldens-v1",
+    "goldenSetOwnerIssue": 135,
+    "requiredContexts": [
+      "atlantic-north-sea",
+      "baltic",
+      "mediterranean-adriatic",
+      "black-sea",
+      "source-nodata",
+      "out-of-scope",
+      "unsupported-geography"
+    ],
+    "minimumIndependentReaders": 2,
+    "absoluteToleranceMetres": 0.000001,
+    "relativeTolerance": 0,
+    "onlineReference": {
+      "name": "NASA/Rutgers IPCC AR6 Sea Level Projection Tool",
+      "role": "supplementary-manual-cross-check",
+      "requiredForCi": false
+    },
+    "automatedValidationMeaning": "source-and-implementation-parity-only",
+    "releaseDecisionAuthority": "project-owner"
+  },
+  "excludedInputs": [
+    "tide-gauge-locations",
+    "low-confidence-ar6-projections",
+    "altimetry",
+    "mean-dynamic-topography",
+    "geoid-transformation",
+    "terrain",
+    "connectivity-classification"
+  ],
+  "publicationGate": {
+    "status": "blocked",
+    "automatedValidation": "pending",
+    "releaseDecision": "pending-owner",
+    "blockingIssues": [135, 110],
+    "phase1Unlocked": false
+  }
+}
