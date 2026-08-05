@@ -206,10 +206,10 @@ jobs:
       - name: Build and verify pinned Tippecanoe
         run: |
           mkdir -p ../../.ci-cache/ar6-tools
-          if [[ ! -f ../../.ci-cache/ar6-tools/tippecanoe.tar.gz ]]; then
-            curl --fail --location --output ../../.ci-cache/ar6-tools/tippecanoe.tar.gz https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz
+          if [[ ! -f ../../.ci-cache/ar6-tools/tippecanoe-2.79.0.tar.gz ]]; then
+            curl --fail --location --output ../../.ci-cache/ar6-tools/tippecanoe-2.79.0.tar.gz https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz
           fi
-          echo 'b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d  ../../.ci-cache/ar6-tools/tippecanoe.tar.gz' | sha256sum -c -
+          echo 'b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d  ../../.ci-cache/ar6-tools/tippecanoe-2.79.0.tar.gz' | sha256sum -c -
           echo '8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5  toolchain/Dockerfile.tippecanoe-linux-x86_64' | sha256sum -c -
           if [[ ! -x ../../.ci-cache/ar6-tools/tippecanoe || ! -x ../../.ci-cache/ar6-tools/tippecanoe-decode ]]; then
             docker build --platform linux/amd64 --tag searise-tippecanoe:2.79.0 \
@@ -236,7 +236,7 @@ jobs:
           SEARISE_TIPPECANOE: ${{ github.workspace }}/.ci-cache/ar6-tools/tippecanoe
           SEARISE_TIPPECANOE_DECODE: ${{ github.workspace }}/.ci-cache/ar6-tools/tippecanoe-decode
           SEARISE_PMTILES: ${{ github.workspace }}/.ci-cache/ar6-tools/pmtiles
-          SEARISE_TIPPECANOE_SOURCE: ${{ github.workspace }}/.ci-cache/ar6-tools/tippecanoe.tar.gz
+          SEARISE_TIPPECANOE_SOURCE: ${{ github.workspace }}/.ci-cache/ar6-tools/tippecanoe-2.79.0.tar.gz
           SEARISE_TIPPECANOE_BUILD_RECEIPT: toolchain/tippecanoe-linux-x86_64-build-receipt.json
           SEARISE_PMTILES_ASSET: ${{ github.workspace }}/.ci-cache/ar6-tools/go-pmtiles.tar.gz
           SEARISE_VECTOR_PLATFORM: linux-x86_64
