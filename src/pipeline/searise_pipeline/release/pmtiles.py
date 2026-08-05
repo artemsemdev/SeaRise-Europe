@@ -95,9 +95,7 @@ def validate_vector_toolchain(
     ):
         raise ScienceContractError("Tippecanoe source archive differs from the release contract")
     try:
-        tippecanoe_receipt = json.loads(
-            tippecanoe_build_receipt_path.read_text(encoding="utf-8")
-        )
+        tippecanoe_receipt = json.loads(tippecanoe_build_receipt_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ScienceContractError(f"Cannot read Tippecanoe build receipt: {exc}") from exc
     expected_receipt = {
@@ -116,16 +114,14 @@ def validate_vector_toolchain(
         raise ScienceContractError("Tippecanoe binaries differ from their pinned build receipt")
     build_environment = reference_build.get("buildEnvironment")
     if build_environment is not None:
-        build_recipe_path = tippecanoe_build_receipt_path.parent / Path(
-            build_environment["buildRecipePath"]
-        ).name
+        build_recipe_path = (
+            tippecanoe_build_receipt_path.parent / Path(build_environment["buildRecipePath"]).name
+        )
         if (
             not build_recipe_path.is_file()
             or _sha256(build_recipe_path) != build_environment["buildRecipeSha256"]
         ):
-            raise ScienceContractError(
-                "Tippecanoe build recipe differs from the release contract"
-            )
+            raise ScienceContractError("Tippecanoe build recipe differs from the release contract")
     if (
         _sha256(tippecanoe_path) != reference_build["tippecanoeBinarySha256"]
         or _sha256(decode_path) != reference_build["decodeBinarySha256"]
@@ -220,10 +216,127 @@ def _expected_properties(
     layer: RegionalLayer,
 ) -> dict[int, Mapping[str, Any]]:
     rows, columns = np.nonzero(layer.valid)
+    expected: dict[int, Mapping[str, Any]] = {}
+    for row, column in zip(rows.tolist(), columns.tolist()):
+        location_id = int(source.location_ids[row, column])
+        expected[location_id] = {
+            "horizon": int(layer.horizon),
+            "lower_mm": int(layer.lower_mm[row, column]),
+            "median_mm": int(layer.central_mm[row, column]),
+            "scenario": str(layer.scenario),
+            "source_location_id": location_id,
+            "upper_mm": int(layer.upper_mm[row, column]),
+        }
+    return expected
+
+
+def _expected_geometry(
+    source: RegionalReleaseSource,
+    row: int,
+    column: int,
+) -> Mapping[str, Any]:
+    longitude = float(source.longitudes[column])
+    latitude = float(source.latitudes[row])
     return {
-        int(source.location_ids[row, column]): _feature(source, layer, row, column)["properties"]
-        for row, column in zip(rows.tolist(), columns.tolist())
+        "type": "Polygon",
+        "coordinates": [
+            [
+                [longitude - 0.5, latitude - 0.5],
+                [longitude + 0.5, latitude - 0.5],
+                [longitude + 0.5, latitude + 0.5],
+                [longitude - 0.5, latitude + 0.5],
+                [longitude - 0.5, latitude - 0.5],
+            ]
+        ],
     }
+
+
+_PROPERTY_TYPES = {
+    "horizon": int,
+    "lower_mm": int,
+    "median_mm": int,
+    "scenario": str,
+    "source_location_id": int,
+    "upper_mm": int,
+}
+
+
+def _assert_exact_properties(properties: object, *, location_id: int, context: str) -> None:
+    if (
+        type(properties) is not dict
+        or set(properties) != set(_PROPERTY_TYPES)
+        or any(type(properties[key]) is not expected for key, expected in _PROPERTY_TYPES.items())
+        or properties["source_location_id"] != location_id
+    ):
+        raise ScienceContractError(f"{context} feature properties or types differ from source")
+
+
+def _assert_exact_geometry(geometry: object, expected: Mapping[str, Any]) -> None:
+    if type(geometry) is not dict or set(geometry) != {"type", "coordinates"}:
+        raise ScienceContractError("PMTiles NDJSON geometry differs from source cells")
+    coordinates = geometry.get("coordinates")
+    if (
+        geometry.get("type") != "Polygon"
+        or type(geometry.get("type")) is not str
+        or type(coordinates) is not list
+        or len(coordinates) != 1
+        or type(coordinates[0]) is not list
+        or len(coordinates[0]) != 5
+        or any(
+            type(point) is not list
+            or len(point) != 2
+            or any(type(value) is not float for value in point)
+            for point in coordinates[0]
+        )
+        or geometry != expected
+    ):
+        raise ScienceContractError("PMTiles NDJSON geometry differs from source cells")
+
+
+def _validate_ndjson(
+    path: Path,
+    source: RegionalReleaseSource,
+    layer: RegionalLayer,
+) -> None:
+    """Independently prove every source feature before Tippecanoe transforms it."""
+    expected_properties = _expected_properties(source, layer)
+    positions = {
+        int(source.location_ids[row, column]): (row, column)
+        for row, column in zip(*np.nonzero(layer.valid))
+    }
+    observed: set[int] = set()
+    try:
+        with path.open(encoding="utf-8") as stream:
+            documents = [json.loads(line) for line in stream if line.strip()]
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Cannot validate PMTiles NDJSON: {exc}") from exc
+    for feature in documents:
+        if (
+            type(feature) is not dict
+            or set(feature) != {"type", "id", "properties", "geometry"}
+            or type(feature.get("type")) is not str
+            or feature.get("type") != "Feature"
+            or type(feature.get("id")) is not int
+        ):
+            raise ScienceContractError("PMTiles NDJSON feature identity differs from source")
+        location_id = feature["id"]
+        if location_id not in expected_properties or location_id in observed:
+            raise ScienceContractError("PMTiles NDJSON feature identity differs from source")
+        _assert_exact_properties(
+            feature.get("properties"),
+            location_id=location_id,
+            context="PMTiles NDJSON",
+        )
+        if feature["properties"] != expected_properties[location_id]:
+            raise ScienceContractError("PMTiles NDJSON feature properties differ from source")
+        row, column = positions[location_id]
+        _assert_exact_geometry(
+            feature.get("geometry"),
+            _expected_geometry(source, row, column),
+        )
+        observed.add(location_id)
+    if observed != set(expected_properties):
+        raise ScienceContractError("PMTiles NDJSON source feature set is incomplete")
 
 
 def _write_ndjson(path: Path, source: RegionalReleaseSource, layer: RegionalLayer) -> None:
@@ -236,6 +349,7 @@ def _write_ndjson(path: Path, source: RegionalReleaseSource, layer: RegionalLaye
                 separators=(",", ":"),
             )
             stream.write(encoded + "\n")
+    _validate_ndjson(path, source, layer)
 
 
 def _canonical_metadata(
@@ -315,11 +429,22 @@ def _decode_properties(
             layer_id = layer.get("properties", {}).get("layer")
             if not isinstance(layer_id, str):
                 raise ScienceContractError("Decoded PMTiles layer lacks an exact layer ID")
+            if layer_id != expected_layer_id:
+                raise ScienceContractError("Decoded PMTiles layer ID differs from the contract")
             observed_layer_ids.add(layer_id)
             for feature in layer["features"]:
                 fragments += 1
-                location_id = int(feature["id"])
-                candidate = feature["properties"]
+                if type(feature) is not dict or type(feature.get("id")) is not int:
+                    raise ScienceContractError(
+                        "Decoded PMTiles feature ID must be an exact integer"
+                    )
+                location_id = feature["id"]
+                candidate = feature.get("properties")
+                _assert_exact_properties(
+                    candidate,
+                    location_id=location_id,
+                    context="Decoded PMTiles",
+                )
                 previous = properties.setdefault(location_id, candidate)
                 if previous != candidate:
                     raise ScienceContractError(
@@ -391,9 +516,7 @@ def write_visual_pmtiles(
         )
         _run([str(pmtiles_path), "edit", str(archive_path), f"--metadata={metadata_path}"])
         _run([str(pmtiles_path), "verify", str(archive_path)])
-        metadata = json.loads(
-            _run([str(pmtiles_path), "show", str(archive_path), "--metadata"])
-        )
+        metadata = json.loads(_run([str(pmtiles_path), "show", str(archive_path), "--metadata"]))
         expected_metadata = _canonical_metadata(source, layer, contract)
         prohibited = {"generator_options", "tilestats", "timestamp", "hostname", "host"}
         if metadata != expected_metadata or prohibited.intersection(metadata):
