@@ -7,39 +7,105 @@
   "required": [
     "$schema", "schemaVersion", "releaseContractId", "issue", "source",
     "matrix", "grid", "values", "artifacts", "toolchain",
-    "reproducibility", "budgets", "scientificDisposition"
+    "reproducibility", "deliveryMeasurement", "budgets", "scientificDisposition"
   ],
   "properties": {
-    "$schema": {"type": "string"},
+    "$schema": {"const": "./ar6-regional-release.schema.json"},
     "schemaVersion": {"const": 1},
     "releaseContractId": {"const": "ar6-europe-regional-release-v1"},
     "issue": {"const": 110},
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceId", "version", "archiveSha256", "licence", "attribution"],
+      "required": ["sourceId", "version", "archiveSha256", "canonicalRecord", "licence", "licenceUrl", "attribution", "requiredAcknowledgements"],
       "properties": {
         "sourceId": {"const": "ipcc-ar6-sea-level"},
         "version": {"const": "20210809"},
-        "archiveSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "archiveSha256": {"const": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91"},
+        "canonicalRecord": {"const": "https://zenodo.org/records/6382554"},
         "licence": {"const": "CC-BY-4.0"},
-        "attribution": {"type": "string", "minLength": 20}
+        "licenceUrl": {"const": "https://creativecommons.org/licenses/by/4.0/"},
+        "attribution": {"const": "Garner et al. (2021), IPCC AR6 Sea Level Projections, version 20210809, doi:10.5281/zenodo.5914709."},
+        "requiredAcknowledgements": {"const": [
+          "Cite IPCC AR6 Working Group I Chapter 9, the FACTS model description, and dataset version 20210809.",
+          "Thank the projection authors, supporting funding agencies, and NASA Sea Level Change Team as required by the canonical record."
+        ]}
       }
     },
     "matrix": {"$ref": "#/$defs/matrix"},
     "grid": {"$ref": "#/$defs/grid"},
     "values": {"$ref": "#/$defs/values"},
     "artifacts": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["cog", "geoparquet", "pmtiles"],
-      "properties": {
-        "cog": {"type": "object"},
-        "geoparquet": {"type": "object"},
-        "pmtiles": {"type": "object"}
+      "const": {
+        "cog": {
+          "role": "exact-browser-lookup", "count": 9,
+          "bands": ["q0.167", "q0.5", "q0.833"], "blockSize": 256,
+          "compression": "DEFLATE", "predictor": 2, "overviewCount": 5,
+          "overviewFactors": [2, 4, 8, 19, 38], "overviewResampling": "NEAREST"
+        },
+        "geoparquet": {
+          "role": "analytical-parity", "count": 1, "schemaVersion": "1.1.0",
+          "geometryEncoding": "WKB", "geometryType": "Point", "crs": "OGC:CRS84",
+          "compression": "zstd", "rowGroupSize": 1024,
+          "rows": "valid-source-locations-only", "nearestSelection": "prohibited"
+        },
+        "pmtiles": {
+          "role": "visual-only", "count": 9, "layerId": "projection",
+          "tileType": "mvt", "tileCompression": "gzip", "minimumZoom": 0,
+          "maximumZoom": 6, "rows": "valid-source-locations-only",
+          "scientificLookup": "prohibited", "canonicalMetadataRequired": true
+        }
       }
     },
-    "toolchain": {"type": "object"},
+    "toolchain": {
+      "const": {
+        "tippecanoe": {
+          "version": "2.79.0", "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
+          "sourceUrl": "https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz",
+          "sourceByteSize": 25910834,
+          "sourceSha256": "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d",
+          "buildCommand": ["make", "-j4", "tippecanoe", "tippecanoe-decode"],
+          "referenceBuilds": {
+            "darwin-arm64": {
+              "tippecanoeBinarySha256": "12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92",
+              "decodeBinarySha256": "d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076"
+            },
+            "linux-x86_64": {
+              "tippecanoeBinarySha256": "a70bb67594919b0eae357ec4678c77f5c3b9d4a277bd11046e4d9d03b1c6c426",
+              "decodeBinarySha256": "27d15c0f9394b2b29187312103a94579a9262a365d5b3eb71f1e5677751d2c36"
+            }
+          }
+        },
+        "pmtiles": {
+          "version": "1.31.2", "commit": "a3e4951ea6a0477b784c27c1dcbfd9c130878c5a",
+          "assets": {
+            "darwin-arm64": {"fileName": "go-pmtiles-1.31.2_Darwin_arm64.zip", "byteSize": 15963714, "sha256": "40528f7f616fcbf91207cd48c8fc023d213f6d86c0cbf1f748732803d1880f3d"},
+            "linux-arm64": {"fileName": "go-pmtiles_1.31.2_Linux_arm64.tar.gz", "byteSize": 15779781, "sha256": "f8bd47e7ea866863489cad588fbaf2f31f42e5821f7a03f009b3769f05801cb1"},
+            "linux-x86_64": {"fileName": "go-pmtiles_1.31.2_Linux_x86_64.tar.gz", "byteSize": 17444324, "sha256": "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f"}
+          }
+        },
+        "python": {
+          "packageVersions": {
+            "xarray": "2024.7.0", "netCDF4": "1.7.2", "cftime": "1.6.4.post1",
+            "numpy": "1.26.4", "pandas": "2.3.2", "rasterio": "1.4.3",
+            "rio-cogeo": "5.4.2", "geopandas": "1.0.1", "pyarrow": "16.1.0",
+            "shapely": "2.0.7", "pyproj": "3.6.1", "pyogrio": "0.11.1"
+          },
+          "profiles": {
+            "linux-x86_64-cp311": {
+              "pythonVersion": "3.11.9", "lockPath": "src/pipeline/requirements-release.lock",
+              "lockSha256": "bac71aaa7aef03fda483c6345446361c53ec2ce2821c845b921bca1a856838be",
+              "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
+            },
+            "macos-arm64-cp39": {
+              "pythonVersion": "3.9.6", "lockPath": "src/pipeline/requirements-release-macos-arm64.lock",
+              "lockSha256": "52134b618da0193ab99e7a52f6c741d2b36011da0ca742c899c58885e11ec2c9",
+              "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
+            }
+          }
+        }
+      }
+    },
     "reproducibility": {
       "type": "object",
       "additionalProperties": false,
@@ -54,7 +120,25 @@
         "minimumIndependentEnvironments": {"minimum": 2, "type": "integer"}
       }
     },
-    "budgets": {"type": "object"},
+    "deliveryMeasurement": {
+      "const": {
+        "harnessPath": "src/frontend/scripts/measure-ar6-release.mjs",
+        "harnessSha256": "37fb32e04937f85cce31e18089d71c4231881c0542b3e302955413e772bffe45",
+        "packageLockPath": "src/frontend/package-lock.json",
+        "packageLockSha256": "0cf125d429ffb54cd52342bbcfac73f5fee1eebf53a7111a2329dd64d099b979",
+        "playwrightVersion": "1.62.1", "geotiffVersion": "3.0.5",
+        "minimumColdLookups": 10, "minimumWarmLookups": 100
+      }
+    },
+    "budgets": {
+      "const": {
+        "cogTotalBytes": 262144, "pmtilesTotalBytes": 6291456,
+        "geoparquetBytes": 1048576, "coreArtifactsTotalBytes": 8388608,
+        "buildDurationSeconds": 60, "browserHeapBytes": 67108864,
+        "rangeRequestCount": 4, "coldTransferBytes": 262144,
+        "lookupP95Milliseconds": 50
+      }
+    },
     "scientificDisposition": {"const": "projection-only"}
   },
   "$defs": {

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import numpy as np
+from jsonschema import Draft202012Validator
 from numpy.typing import NDArray
 
 from searise_pipeline.science.ar6 import extract_projection_interval
@@ -22,6 +23,8 @@ from searise_pipeline.science.ar6_lookup import (
 from searise_pipeline.science.contracts import ScienceContractError
 
 _CHUNK_BYTES = 1024 * 1024
+_VERIFIED_ARCHIVE_CAPABILITY = object()
+_OFFLINE_FIXTURE_CAPABILITY = object()
 
 
 def _sha256(path: Path) -> str:
@@ -43,15 +46,16 @@ def _canonical_json(document: Mapping[str, Any]) -> bytes:
 
 
 def load_release_contract(path: Path) -> Mapping[str, Any]:
-    """Load the fixed issue #110 contract without accepting implicit defaults."""
+    """Load and fully schema-validate the fixed issue #110 contract."""
     try:
         document = json.loads(path.read_text(encoding="utf-8"))
+        schema = json.loads(path.with_suffix(".schema.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ScienceContractError(f"Cannot read AR6 release contract: {exc}") from exc
-    if not isinstance(document, dict) or document.get("releaseContractId") != (
-        "ar6-europe-regional-release-v1"
-    ):
-        raise ScienceContractError("Unexpected AR6 regional release contract")
+    errors = sorted(Draft202012Validator(schema).iter_errors(document), key=lambda e: list(e.path))
+    if errors:
+        details = "; ".join(error.message for error in errors)
+        raise ScienceContractError(f"Invalid AR6 regional release contract: {details}")
     return document
 
 
@@ -75,13 +79,30 @@ class RegionalLayer:
 class RegionalReleaseSource:
     """Complete rectangular Europe subset bound to exact source identities."""
 
-    source_mode: str
+    _verification_capability: object
     archive_sha256: str
     contract_sha256: str
     latitudes: NDArray[np.float64]
     longitudes: NDArray[np.float64]
     location_ids: NDArray[np.int64]
     layers: tuple[RegionalLayer, ...]
+    _content_sha256: str
+
+    @property
+    def source_mode(self) -> str:
+        if self._verification_capability is _VERIFIED_ARCHIVE_CAPABILITY:
+            return "verified-archive"
+        if self._verification_capability is _OFFLINE_FIXTURE_CAPABILITY:
+            return "offline-real-source-fixture"
+        return "unverified"
+
+    @property
+    def archive_and_members_verified_this_build(self) -> bool:
+        return self._verification_capability is _VERIFIED_ARCHIVE_CAPABILITY
+
+    @property
+    def content_sha256(self) -> str:
+        return self._content_sha256
 
 
 def _to_millimetres(values_m: NDArray[np.float64], nodata: int) -> NDArray[np.int16]:
@@ -131,6 +152,74 @@ def _validate_source(source: RegionalReleaseSource, contract: Mapping[str, Any])
             raise ScienceContractError("AR6 regional quantiles are not monotonic")
 
 
+def _source_content_sha256(
+    latitudes: NDArray[np.float64],
+    longitudes: NDArray[np.float64],
+    location_ids: NDArray[np.int64],
+    layers: tuple[RegionalLayer, ...],
+) -> str:
+    digest = hashlib.sha256()
+    for array in (latitudes, longitudes, location_ids):
+        digest.update(array.dtype.str.encode())
+        digest.update(str(array.shape).encode())
+        digest.update(np.ascontiguousarray(array).tobytes())
+    for layer in layers:
+        digest.update(f"{layer.scenario}/{layer.horizon}/{layer.member_sha256}".encode())
+        for array in (layer.lower_mm, layer.central_mm, layer.upper_mm):
+            digest.update(array.dtype.str.encode())
+            digest.update(str(array.shape).encode())
+            digest.update(np.ascontiguousarray(array).tobytes())
+    return digest.hexdigest()
+
+
+def _freeze_array(array: NDArray[Any]) -> NDArray[Any]:
+    frozen = np.ascontiguousarray(array).copy()
+    frozen.flags.writeable = False
+    return frozen
+
+
+def _freeze_source_arrays(
+    latitudes: NDArray[np.float64],
+    longitudes: NDArray[np.float64],
+    location_ids: NDArray[np.int64],
+    layers: tuple[RegionalLayer, ...],
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.int64], tuple[RegionalLayer, ...]]:
+    frozen_layers = tuple(
+        RegionalLayer(
+            scenario=layer.scenario,
+            horizon=layer.horizon,
+            member_sha256=layer.member_sha256,
+            lower_mm=_freeze_array(layer.lower_mm),
+            central_mm=_freeze_array(layer.central_mm),
+            upper_mm=_freeze_array(layer.upper_mm),
+        )
+        for layer in layers
+    )
+    return (
+        _freeze_array(latitudes),
+        _freeze_array(longitudes),
+        _freeze_array(location_ids),
+        frozen_layers,
+    )
+
+
+def assert_source_integrity(
+    source: RegionalReleaseSource,
+    contract: Mapping[str, Any],
+    *,
+    require_verified_archive: bool,
+) -> None:
+    """Revalidate semantics and the post-verification content seal before building."""
+    if require_verified_archive and not source.archive_and_members_verified_this_build:
+        raise ScienceContractError("Scientific release requires freshly verified archive bytes")
+    _validate_source(source, contract)
+    observed = _source_content_sha256(
+        source.latitudes, source.longitudes, source.location_ids, source.layers
+    )
+    if observed != source._content_sha256:
+        raise ScienceContractError("AR6 regional source changed after verification")
+
+
 def build_source_from_verified_archive(
     archive_path: Path,
     *,
@@ -140,6 +229,12 @@ def build_source_from_verified_archive(
     release_contract_path: Path,
 ) -> RegionalReleaseSource:
     """Verify the 9.24 GB archive and members before extracting the Europe grid."""
+    try:
+        contract_bytes = json.loads(release_contract_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Cannot re-read release contract bytes: {exc}") from exc
+    if contract_bytes != release_contract:
+        raise ScienceContractError("Release contract mapping differs from its versioned file")
     projection = source_semantics["projection"]
     if release_contract["source"]["archiveSha256"] != projection["archive"]["sha256"]:
         raise ScienceContractError("Release and source-semantics archive identities differ")
@@ -193,14 +288,18 @@ def build_source_from_verified_archive(
                 )
     if regional_latitudes is None or regional_longitudes is None or regional_location_ids is None:
         raise ScienceContractError("AR6 regional source extraction produced no grid")
+    frozen = _freeze_source_arrays(
+        regional_latitudes, regional_longitudes, regional_location_ids, tuple(layers)
+    )
     source = RegionalReleaseSource(
-        source_mode="verified-archive",
+        _verification_capability=_VERIFIED_ARCHIVE_CAPABILITY,
         archive_sha256=verified.sha256,
-        contract_sha256=_sha256(release_contract_path),
-        latitudes=regional_latitudes,
-        longitudes=regional_longitudes,
-        location_ids=regional_location_ids,
-        layers=tuple(layers),
+        contract_sha256=hashlib.sha256(_canonical_json(release_contract)).hexdigest(),
+        latitudes=frozen[0],
+        longitudes=frozen[1],
+        location_ids=frozen[2],
+        layers=frozen[3],
+        _content_sha256=_source_content_sha256(*frozen),
     )
     _validate_source(source, release_contract)
     return source
@@ -248,7 +347,8 @@ def write_source_fixture(source: RegionalReleaseSource, path: Path) -> Mapping[s
             layer.scenario: layer.member_sha256 for layer in source.layers if layer.horizon == 2030
         },
         "releaseContractSha256": source.contract_sha256,
-        "derivation": "verified-archive-native-grid-subset-no-resampling",
+        "derivation": f"{source.source_mode}-native-grid-subset-no-resampling",
+        "sourceArchiveVerifiedForThisWrite": source.archive_and_members_verified_this_build,
         "scientificReleaseEligible": False,
     }
 
@@ -281,16 +381,27 @@ def load_source_fixture(
         )
         for item in document["layers"]
     )
+    raw_latitudes = np.asarray(document["latitudes"], dtype=np.float64)
+    raw_longitudes = np.asarray(document["longitudes"], dtype=np.float64)
+    raw_location_ids = np.asarray(document["locationIds"], dtype=np.int64).reshape(shape)
+    frozen = _freeze_source_arrays(raw_latitudes, raw_longitudes, raw_location_ids, layers)
     source = RegionalReleaseSource(
-        source_mode="offline-real-source-fixture",
+        _verification_capability=_OFFLINE_FIXTURE_CAPABILITY,
         archive_sha256=document["archiveSha256"],
         contract_sha256=document["releaseContractSha256"],
-        latitudes=np.asarray(document["latitudes"], dtype=np.float64),
-        longitudes=np.asarray(document["longitudes"], dtype=np.float64),
-        location_ids=np.asarray(document["locationIds"], dtype=np.int64).reshape(shape),
-        layers=layers,
+        latitudes=frozen[0],
+        longitudes=frozen[1],
+        location_ids=frozen[2],
+        layers=frozen[3],
+        _content_sha256=_source_content_sha256(*frozen),
     )
     if source.archive_sha256 != release_contract["source"]["archiveSha256"]:
         raise ScienceContractError("Fixture archive identity differs from the release contract")
+    expected_contract_sha256 = hashlib.sha256(_canonical_json(release_contract)).hexdigest()
+    if (
+        source.contract_sha256 != expected_contract_sha256
+        or receipt.get("releaseContractSha256") != expected_contract_sha256
+    ):
+        raise ScienceContractError("Fixture release-contract binding differs")
     _validate_source(source, release_contract)
     return source
