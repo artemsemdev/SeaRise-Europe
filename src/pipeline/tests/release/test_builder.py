@@ -137,6 +137,37 @@ def test_builder_refuses_to_overwrite_immutable_release(tmp_path: Path) -> None:
         )
 
 
+def test_builder_rejects_post_verification_array_mutation_before_tools(
+    tmp_path: Path,
+) -> None:
+    source = _source()
+    layer = source.layers[0]
+    layer.central_mm.flags.writeable = True
+    layer.central_mm[0, 0] = layer.central_mm[0, 0] + 1
+    output = tmp_path / "candidate"
+
+    with pytest.raises(ScienceContractError, match="changed after verification"):
+        build_regional_release(
+            source,
+            output,
+            release_id="ar6-europe-fixture-v1",
+            contract=contract(),
+            lookup_goldens_path=GOLDENS_PATH,
+            tippecanoe_path=Path("missing"),
+            decode_path=Path("missing"),
+            pmtiles_path=Path("missing"),
+            tippecanoe_source_archive_path=Path("missing"),
+            tippecanoe_build_receipt_path=Path("missing"),
+            pmtiles_distribution_asset_path=Path("missing"),
+            pmtiles_distribution_platform="darwin-arm64",
+            python_lock_path=Path("missing"),
+            build_environment_id="test-mutated-source",
+            source_revision="a" * 40,
+        )
+
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("release_id", ["../escape", "/absolute", "UPPER", "name/child"])
 def test_builder_rejects_unsafe_release_ids(tmp_path: Path, release_id: str) -> None:
     with pytest.raises(ScienceContractError, match="Release ID"):
