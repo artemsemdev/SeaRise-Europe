@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "issue": 110,
+  "releaseId": "phase-0r-ar6-v1",
+  "releaseContractId": "ar6-europe-regional-release-v1",
+  "scientificDisposition": "projection-only",
+  "automatedValidation": "pending",
+  "releaseDisposition": "pending-owner",
+  "phase1Unlocked": false,
+  "measuredCandidate": {
+    "sourceRevision": "e41be39b4304e4a9835319f8b4935c8a4e68558a",
+    "platform": "macos-arm64-cp39",
+    "buildRunId": "macos-arm64-e41be39",
+    "manifestSha256": "dc8fcec21edab6b615d025bdc01095a10237f62b025e789cbec231c1143dacff",
+    "buildReceiptSha256": "246d9058406352dbb6357f6ac6ff187407d631e61eb3953d18758944e1f3aabf",
+    "sourceReceiptSha256": "f24f2f0bd8a9877ef32c33f9e58ddf3c150f6fb48a79a2195e73d5ad739ec037",
+    "artifactCount": 31,
+    "matrix": {
+      "scenarioCount": 3,
+      "horizonCount": 3,
+      "cogCount": 9,
+      "pmtilesCount": 9,
+      "geoparquetCount": 1
+    },
+    "totals": {
+      "cogBytes": 184399,
+      "pmtilesBytes": 5656520,
+      "geoparquetBytes": 251231,
+      "coreArtifactBytes": 6092150
+    },
+    "fullCleanBuildDurationSeconds": 13.384166
+  },
+  "deliveryMeasurement": {
+    "status": "passed",
+    "browser": "Chromium 151.0.7922.34",
+    "coldLookupSampleCount": 10,
+    "warmLookupSampleCount": 100,
+    "lookupP95Milliseconds": 1.7,
+    "rangeRequestCount": 1,
+    "coldTransferBytes": 28168,
+    "browserHeapBytes": 1328476,
+    "reportSha256": "7b8a1454bf704c97d1764f97cc3dd0282cca8723096aa506492eecd95429b82e",
+    "traceSha256": "dd2a57fb513c9f7342eb4a9577087ccb443c52d15fcd4e7be5d0ff8885ce15d6",
+    "timingSha256": "8a04444126efd88057768c6e09bfe4266eacee7d929895fba09578831a2dfae6"
+  },
+  "candidateChecks": {
+    "artifactBudgets": true,
+    "cogStructureAndValues": true,
+    "completeScenarioHorizonMatrix": true,
+    "crossArtifactSemanticParity": true,
+    "geoparquetSchemaAndValues": true,
+    "licenceNoticeAndAttribution": true,
+    "lookupGoldenParity": true,
+    "nonAllNodataLayers": true,
+    "pmtilesStructureAndProperties": true,
+    "sourceArchiveAndMembersVerified": true,
+    "sourceContentSeal": true,
+    "sourceGridIdentity": true
+  },
+  "pending": [
+    "native-linux-cross-environment-reproducibility",
+    "project-owner-release-disposition",
+    "final-integration-merged-to-master"
+  ],
+  "linuxEvidenceWorkflow": ".github/workflows/ci.yml#ar6-release-evidence"
+}

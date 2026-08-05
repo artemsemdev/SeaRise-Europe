@@ -19,7 +19,7 @@
 >
 > **Phase 0.14 decision:** [terminal no-go](../evidence/phase-0-14-final-no-go.md) — investigation `COMPLETE-WITH-NO-GO`; authoritative disposition `BLOCKED`
 >
-> **Recovery decision:** [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md) — projection contract and #135 source/lookup parity accepted; release remains blocked on #110
+> **Recovery evidence:** [Phase 0R regional release](../evidence/phase-0r-regional-release.md) — #135 complete; #110 macOS candidate and delivery budgets passed; native Linux comparison and owner disposition pending
 
 ## Current risk register
 
@@ -32,17 +32,17 @@
 | R-05 | Search indexes are too large or slow on mobile | Medium / High | Core/coastal shards, Brotli, lazy Web Worker load, representative mobile benchmarks, size/count report, deterministic ranking tests. |
 | R-06 | GeoNames misses, duplicates, or misclassifies settlements implied by “all coastal cities and villages” | High / High | Publish the operational definition, snapshot/date, feature-code rules, exclusions, corpus counts, duplicate/transcontinental QA, and limitations. |
 | R-07 | The approximate 25 km coastal zone is mistaken for flood reach | Medium / High | The deterministic v2 recipe, 27 named-place controls, topology invariant, and Copernicus Coastal Zones comparison are recorded. Keep product-scope language explicit; product-owner approval and release wording remain blocking. |
-| R-08 | PMTiles plus analysis COGs exceed free storage or cause excessive R2 range operations | Medium / Medium | Regional size/request spike, range-locality measurement, cache tuning, release cost model, usage alerts; consolidate only after exact-lookup proof. |
+| R-08 | PMTiles plus analysis COGs exceed free storage or cause excessive R2 range operations | Low / Medium | The complete candidate is 6,092,150 core bytes and exact cold lookup used one COG range request / 28,168 bytes. Keep public-origin range/CORS tests, the release cost model, cache tuning, and usage alerts as Phase 1 gates. |
 | R-09 | Service Worker mixes application and data releases | Medium / High | Namespace caches by app version and `dataReleaseId`; atomic activation; offline/mid-update tests; fail closed on mismatch. |
 | R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
 | R-11 | Cloudflare pricing, limits, or custom-domain behaviour changes | Medium / Medium | Date the cost model, alert on usage, avoid proprietary runtime services, and retain a static host + byte-range object storage portability test. |
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
-| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | #135 supplies real-source lookup evidence, but production claims, Phase 1, and decommissioning remain blocked until the owner approves a zero-blocker #110 release gate with measured artifacts. |
+| R-13 | Static architecture is presented as complete before real-data validation | Low / Critical | #135 and the measured #110 macOS candidate supply real-source evidence. Production claims, Phase 1, and decommissioning remain blocked until native Linux reproducibility passes and the owner approves the zero-blocker release gate. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
 | R-15 | Relative AR6 change is compared directly with absolute terrain height | Inapplicable to ADR-024 / Historical Critical | ADR-024 prohibits terrain comparison and reports relative change directly. Tests must continue to reject any reintroduction of the legacy operation. |
 | R-16 | A geoid or vertical transform mixes model realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Inapplicable to ADR-024 / Historical Critical | The active path performs no geoid or vertical transform. Phase 0.10 remains immutable evidence for the superseded v1 path. |
 | R-17 | A DSM, HEM, MAE, or product accuracy target is treated as bare-earth terrain or a complete per-cell upper bound | Inapplicable to ADR-024 / Historical Critical | The active path consumes no terrain. Phase 0.11 remains immutable evidence and terrain cannot return without a new ADR. |
-| R-18 | Green CI or source-integrity checks are mistaken for scientific or release approval | Medium / Critical | The projection contract separates `automatedValidation` from the owner-controlled `releaseDecision`. Only the project owner may approve a zero-blocker #110 gate and unlock #48. |
+| R-18 | Green CI or source-integrity checks are mistaken for scientific or release approval | Medium / Critical | The projection contract separates `automatedValidation` from the owner-controlled `releaseDisposition`. Only the project owner may approve a zero-blocker #110 gate and unlock #48. |
 | R-19 | An offshore mean-sea-surface grid, land filler, or ordinary tide-gauge record is treated as a datum-safe shoreline water reference | Inapplicable to ADR-024 / Historical Critical | ADR-024 does not construct an absolute water reference and prohibits tide-gauge fallback. Retain the v1 finding as historical evidence. |
 | R-20 | A global coastal DTM or multi-source mosaic is assumed to have finite European per-cell uncertainty from MAE/RMSE alone | Inapplicable to ADR-024 / Historical Critical | ADR-024 consumes no DTM or terrain uncertainty. Retain the v1 finding as historical evidence. |
 
@@ -74,17 +74,18 @@ locked evidence. The automated recommendation is therefore `rejected`, not
 disposition and publication gate remain `blocked` and a superseding method is
 required.
 Phase 0.14 remains the immutable binary-path no-go. ADR-024 completes #106's
-contract decision without reinterpreting that evidence. #135 has now passed
-offline source/implementation parity and lowers R-01 and R-04 to permanent
-regression risks. Recovery proceeds through #110; only its measured artifacts
-and an explicit project-owner release decision may unlock #48.
+contract decision without reinterpreting that evidence. #135 passed offline
+source/implementation parity and lowers R-01 and R-04 to permanent regression
+risks. #110 produced the complete macOS candidate and passed candidate-local
+and delivery budgets, lowering R-08 and A-02. Native Linux reproducibility and
+an explicit project-owner `releaseDisposition` still block #48.
 
 ## Assumptions that require evidence
 
 | ID | Assumption | Required validation |
 |---|---|---|
 | A-01 | A static browser path can preserve all four projection domain states | Golden tests across Europe support, inland coast scope, source nodata, and projection-available locations |
-| A-02 | Nine Europe-wide visual PMTiles and exact lookup artifacts are practical to publish and query | Regional spike extrapolation plus full-build size, range-count, memory, and latency measurements |
+| A-02 | Nine Europe-wide visual PMTiles and exact lookup artifacts are practical to publish and query | Supported on the measured macOS candidate: 6,092,150 core bytes, 1.7 ms warm p95, one cold COG range request, 28,168 transferred bytes, and 1,328,476 incremental heap bytes. Native Linux reproducibility and public-origin delivery remain pending gates. |
 | A-03 | GeoNames CC BY 4.0 data and selected alternate names can be redistributed in derived indexes | Recorded licence review and complete attribution in manifest/product |
 | A-04 | Cloudflare Workers Static Assets + R2 can remain at or near EUR 0/month for portfolio traffic | Current provider allowance/pricing snapshot and measured release/traffic model |
 | A-05 | R2 custom-domain delivery returns correct `HEAD`, `206`, CORS, ETag, and immutable cache behaviour | Staging probes from public origins and representative browsers |
@@ -116,9 +117,10 @@ new ADR.
 Do not remove the old runtime implementation or present the static path as the
 validated production product until all of these are true:
 
-- real IPCC, Copernicus DEM, and coastal source snapshots pass licence and
+- the exact IPCC AR6 archive and members pass licence, checksum, and
   source-shape review;
-- a representative regional pipeline passes independent scientific controls;
+- the complete projection matrix passes source-bound goldens and independent
+  environment reproduction;
 - Python and TypeScript exact lookup are bit-exact for approved fixtures;
 - browser, artifact, offline, performance, and accessibility gates pass;
 - staging proves public byte-range/CORS/cache behaviour;
@@ -130,9 +132,11 @@ If the scientific spike invalidates the binary methodology, pause the
 Europe-wide build and write a superseding ADR. Simpler infrastructure never
 overrides scientific correctness.
 
-That stop condition fired for binary exposure. Keep Phase 1 paused through
-#135 and #110. Passing CI records automated validation only; the project owner
-must separately approve the zero-blocker release decision before #48 unlocks.
+That stop condition fired for binary exposure. #135 is complete and #110 has a
+measured macOS candidate, but Phase 1 remains paused through native Linux
+comparison and final integration. Passing CI records automated validation
+only; the project owner must separately approve the zero-blocker
+`releaseDisposition` before #48 unlocks.
 
 ## Risk review cadence
 

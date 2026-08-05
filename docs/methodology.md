@@ -1,11 +1,11 @@
 # AR6 Regional Projection Methodology
 
-> **Status:** Projection lookup and source parity validated; regional release gate pending
+> **Status:** Projection release candidate measured; native Linux and owner gates pending
 > **Last reviewed:** 2026-08-05
 > **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Machine contract:** [`ar6-projection-contract.json`](../src/pipeline/science/ar6-projection-contract.json)
-> **Blocking gate:** #110 must produce the measured regional release gate and owner decision
-> **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's release decision
+> **Blocking gate:** #110 requires native Linux reproducibility, final integration, and owner disposition
+> **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's release disposition
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
@@ -49,8 +49,12 @@ synthetic mutation control rather than a manufactured real-source golden.
 
 The NASA/Rutgers IPCC AR6 Sea Level Projection Tool is a supplementary manual
 cross-check only, not the CI oracle. Automated source/implementation parity for
-#135 has passed without authorizing publication; #110 and an explicit
-project-owner release decision remain required.
+#135 has passed without authorizing publication. #110 built the complete 3 × 3
+real-source release and passed candidate-local and macOS Chromium delivery
+budgets. Native Linux comparison, final integration, and an explicit
+project-owner release disposition remain required. The measured results and
+hashes are recorded in the
+[Phase 0R regional release evidence](evidence/phase-0r-regional-release.md).
 
 The hash-bound `ar6-projection-contract.json` is the accepted pre-run decision
 snapshot. Its `publicationGate` therefore still records `automatedValidation`
@@ -291,10 +295,11 @@ PMTiles, GeoParquet, statistics, release receipt, or synthetic substitute were
 created. Phase 1 remains locked.
 
 The original recovery plan through #107–#109 was superseded when ADR-024
-removed the absolute-water and terrain comparison. Current recovery is #135
-source/implementation parity followed by the #110 regional release gate. CI
-may record automated validation, but only the project owner may set the release
-decision that unlocks [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
+removed the absolute-water and terrain comparison. #135 source/implementation
+parity is complete. #110 has a complete measured macOS candidate; native Linux
+comparison and final integration remain. CI may record automated validation,
+but only the project owner may set the `releaseDisposition` that unlocks
+[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
 
 ## Historical v1 required preprocessing record
 
@@ -440,4 +445,4 @@ ADR. Do not edit the v1 evidence or interpretation in place.
 | `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |
 | `v1.0` | 2026-08-05 | Phase 0.9 completed; scientific gate blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates; Phase 0 and Phase 1 remain blocked |
 | `v1.0` | 2026-08-05 | Phase 0 complete with no-go; publication superseded | Phase 0.14 preserved the authoritative `BLOCKED` state, recorded the automated `REJECTED` recommendation, emitted no release artifacts, and routed future work through #106–#110 |
-| `v2.0` | 2026-08-05 | Contract accepted; implementation blocked | ADR-024 replaced binary exposure with source-native AR6 q0.167/q0.5/q0.833 reporting; #135 and #110 remain required before release or Phase 1. |
+| `v2.0` | 2026-08-05 | Candidate measured; release pending | ADR-024 replaced binary exposure with source-native AR6 q0.167/q0.5/q0.833 reporting; #135 passed and #110 built/measured all nine layers, while native Linux reproducibility, integration, and owner disposition remain required. |

@@ -1,6 +1,6 @@
 # Static-First Migration Plan
 
-> **Status:** AR6 projection contract accepted; implementation and Phase 1 locked
+> **Status:** AR6 regional candidate measured; final recovery gate and Phase 1 locked
 > **Last updated:** 2026-08-05
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
 
@@ -18,8 +18,9 @@ The repository is currently in a transition state:
   browser-ready artifacts;
 - production migration has not started;
 - the binary Phase 0 investigation ended without a publishable release;
-- ADR-024 accepts a source-native AR6 projection contract, while #135 parity
-  evidence and the #110 regional release gate remain incomplete;
+- ADR-024 accepts a source-native AR6 projection contract; #135 parity is
+  complete and #110 has a measured macOS candidate, while native Linux
+  reproducibility and the owner release disposition remain pending;
 - the current checked-in raster is demonstration data and must not be
   represented as a production scientific release.
 
@@ -72,11 +73,11 @@ deliberately not rewritten as completed deliverables.
   with the canonical Copernicus coastal product.
 - [x] Select and version the Europe support geometry candidate, including
   transcontinental-state handling.
-- [ ] Build a representative regional slice end to end.
-- [ ] Validate coordinate-to-pixel parity between Python and TypeScript.
+- [x] Build a representative regional release end to end.
+- [x] Validate coordinate-to-pixel parity between Python and TypeScript.
 - [ ] Review connectivity-related false positives and decide whether
   methodology `v1.0` remains valid.
-- [ ] Record artifact size, build duration, browser memory, range-request count,
+- [x] Record artifact size, build duration, browser memory, range-request count,
   and lookup latency.
 
 Phase 0.14 records the historical v1 terminal no-go. Issue #95's automated
@@ -98,8 +99,15 @@ Recovery follows this dependency order:
 3. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) builds the
    nine regional projection layers and records the recovery gate.
 
+The first #110 macOS candidate contains nine exact COGs, one analytical
+GeoParquet, nine visual PMTiles archives, STAC metadata, and complete receipts.
+Its measured delivery budgets passed. Native Linux comparison is still
+pending, so `automatedValidation` remains `pending` and the candidate remains
+unpublished. See the
+[regional release evidence](../evidence/phase-0r-regional-release.md).
+
 Only a zero-blocker #110 with passing automated evidence and a separate
-project-owner `releaseDecision=approved` may unlock
+project-owner `releaseDisposition=approved` may unlock
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48), Workstream 1,
 and Phase 1. Green CI cannot authorize that decision.
 
@@ -119,17 +127,17 @@ response are documented in the
 
 - [ ] Add JSON Schemas for release manifest, scenarios, methodology, source
   attribution, and search records.
-- [ ] Add a deterministic release-directory builder.
+- [x] Add a deterministic release-directory builder.
 - [ ] Use DuckDB Spatial for GeoNames normalization, support/coastal joins,
   duplicate checks, and GeoParquet output.
 - [ ] Produce `europe-core` and `europe-coastal` search shards from a pinned
   GeoNames snapshot.
-- [ ] Produce nine exact analysis COGs with q0.167/q0.5/q0.833 projection
+- [x] Produce nine exact analysis COGs with q0.167/q0.5/q0.833 projection
   bands and source-grid identity.
-- [ ] Produce nine visual PMTiles archives from the same projection arrays.
+- [x] Produce nine visual PMTiles archives from the same projection arrays.
 - [ ] Produce PMTiles support/coastal geometry.
-- [ ] Generate and validate a static STAC catalog.
-- [ ] Generate an artifact inventory, SHA-256 checksums, and data-quality
+- [x] Generate and validate a static STAC catalog.
+- [x] Generate an artifact inventory, SHA-256 checksums, and data-quality
   summary.
 - [ ] Generate SLSA-compatible provenance and sign the manifest with Cosign.
 - [ ] Provide a small committed fixture release; keep large/raw data ignored.
@@ -214,9 +222,9 @@ Exit evidence:
 
 | Order | Focused change | Depends on |
 |---:|---|---|
-| 1 | #106 adopt the AR6 regional projection contract | Phase 0.14 no-go |
-| 2 | #135 implement grid-only projection lookup and offline parity | Approved #106 |
-| 3 | #110 build nine projection layers and record the recovery gate | Approved #135 |
+| 1 | #106 adopt the AR6 regional projection contract (complete) | Phase 0.14 no-go |
+| 2 | #135 implement grid-only projection lookup and offline parity (complete) | Approved #106 |
+| 3 | #110 build nine projection layers and record the recovery gate (native Linux evidence pending) | Approved #135 |
 | 4 | Define manifest/config/search JSON Schemas | Owner-approved zero-blocker #110 |
 | 5 | Build GeoNames core/coastal GeoParquet datasets | 4 |
 | 6 | Serialize and benchmark the Web Worker search index | 5 |

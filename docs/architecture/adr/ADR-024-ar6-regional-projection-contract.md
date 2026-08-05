@@ -6,7 +6,7 @@
 >
 > **Decision owner:** Project owner
 >
-> **Implementation state:** Contract accepted; publication remains blocked on #135 and #110
+> **Implementation state:** #135 complete; #110 candidate and macOS delivery evidence complete; native Linux comparison and owner disposition pending
 >
 > **Machine contract:** [`ar6-projection-contract.json`](../../../src/pipeline/science/ar6-projection-contract.json)
 >
@@ -100,7 +100,7 @@ and native resolution.
 
 Validation is offline and source-bound:
 
-- #135 records a predeclared golden set for all nine scenario/horizon
+- #135 recorded a predeclared golden set for all nine scenario/horizon
   combinations, the four named European basin contexts, nodata, scope, and
   boundary cases;
 - expected values are extracted from the SHA-256-locked NetCDF members with an
@@ -114,7 +114,8 @@ Validation is offline and source-bound:
 The NASA/Rutgers tool and published reader may support a documented manual
 cross-check, but a mutable or unavailable web interface is not a CI oracle.
 CI may report `automatedValidation=passed`; it cannot set the owner-controlled
-`releaseDecision=approved` or describe the product as scientifically approved.
+`releaseDisposition=approved` or describe the product as scientifically
+approved.
 
 ## Superseded decisions
 
@@ -157,11 +158,12 @@ Limitations:
 
 Implementation proceeds in dependency order:
 
-1. #135 implements and independently reproduces the grid-only lookup.
-2. #110 builds and measures the nine regional projection layers and records the
-   recovery gate.
+1. #135 implemented and independently reproduced the grid-only lookup.
+2. #110 built the nine regional projection layers and measured the macOS
+   candidate; its native Linux comparison and final automated gate remain
+   pending.
 3. #48 may unlock Phase 1 only after the owner records an approved release
-   decision with all required automated evidence passing.
+   disposition with all required automated evidence passing.
 
 Rollback means keeping the projection release unpublished. It never means
 reviving the direct AR6-versus-terrain comparison or rewriting historical
@@ -175,5 +177,6 @@ evidence.
   documents point to this ADR and the four-state contract.
 - Tests reject tide-gauge fallback, interpolation, nodata substitution, changed
   source identity, weakened disclosure, or CI-as-approver semantics.
-- #135 and #110 remain blocking until their evidence exists; this decision
-  alone does not unlock Phase 1 or authorize publication.
+- #110 remains blocking until native Linux reproducibility evidence passes and
+  the owner records the release disposition; this decision alone does not
+  unlock Phase 1 or authorize publication.

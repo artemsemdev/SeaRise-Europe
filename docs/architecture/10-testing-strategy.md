@@ -1,6 +1,6 @@
 # 10 — Testing Strategy
 
-> **Status:** Accepted target strategy; Phase 1 locked after the Phase 0 no-go
+> **Status:** AR6 regional candidate measured; native Linux recovery evidence pending
 >
 > **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Quality rule:** no artifact is publishable merely because it builds. Scientific validity, contracts, browser parity, and delivery behaviour are release gates.
@@ -33,29 +33,23 @@ the smaller gates pass and still cannot publish without the full release gate.
 
 ## 2. Phase 0 scientific gate
 
-Phase 0 precedes the static migration and uses real, licensed inputs for a
-small representative region. It must answer questions the existing synthetic
-pipeline cannot answer:
+Phase 0 precedes the static migration and uses real, licensed inputs. The v1
+binary investigation tested datum, terrain, coastal, and connectivity
+requirements and ended with a no-go. ADR-024 superseded that publication path.
+The active projection recovery gate must now:
 
-1. Inspect the actual IPCC AR6 dimensions, coordinate model, quantiles, units,
-   and missing values.
-2. Document how location-based projections become an analysis grid; do not
-   assume a regular latitude/longitude raster.
-3. Confirm DEM product/resolution, CRS, vertical datum, resampling, and nodata
-   treatment.
-4. Compare the checked-in coastal approximation with the intended canonical
-   coastal product.
-5. Test coastline connectivity and disconnected inland false positives only
-   after the approved uncertainty interval produces vertically eligible cells.
-6. Compare independently reviewed control locations with the derived array
-   and browser lookup.
-7. Measure COG/PMTiles size, byte-range count, lookup latency, map quality, and
-   browser memory.
-8. Complete redistribution and attribution review.
-
-A failed or ambiguous result stops publication. If it invalidates methodology
-v1.0, the methodology and ADR must be superseded before Europe-wide output is
-built.
+1. verify the locked AR6 archive and all three exact scenario members before
+   decoding values;
+2. preserve source-native location IDs, q0.167/q0.5/q0.833 integer
+   millimetres, nodata, and the complete 3 × 3 matrix;
+3. prove Python/TypeScript lookup parity and exact browser COG lookup against
+   predeclared real-source goldens;
+4. validate COG, analytical GeoParquet, and visual PMTiles semantics from the
+   same source values;
+5. measure artifact size, clean-build duration, range requests, lookup
+   latency, and browser heap;
+6. compare candidates from two independent pinned environment profiles; and
+7. keep automated validation separate from the owner release disposition.
 
 The [Phase 0.9 gate](../evidence/phase-0-9-regional-gate.md) completed with an
 explicit `BLOCKED` decision: all nine combinations have exact preflight lineage
@@ -65,21 +59,16 @@ investigation as `complete-with-no-go`. Issue #95's automated recommendation
 is `rejected`, while the authoritative scientific and release disposition
 remains `blocked` because independent review is pending.
 
-Recovery tests follow the dependency chain
-[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) →
-([#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107),
-[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108)) →
-[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) →
-[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Before an
-independently reviewed `approved` #110 with zero blockers:
+Recovery tests follow #106 → #135 → #110. #106 and #135 are complete. The #110
+macOS candidate and browser measurements pass their local checks; native Linux
+reproducibility, final integration evidence, and the owner disposition remain
+pending. Before `automatedValidation=passed` and owner-controlled
+`releaseDisposition=approved`:
 
-- v1 contract tests must continue rejecting release artifacts and direct
+- v1 contract tests continue rejecting direct
   AR6-relative-versus-absolute-terrain comparison;
-- missing or unbounded MSS, DTM, transformation, mask, licence, or review
-  evidence must produce `DataUnavailable` or stop preflight;
-- blocked preflight must emit no all-nodata, synthetic, or placeholder release;
-- CI may validate hashes and invariants but may not populate or approve an
-  independent review;
+- blocked preflight emits no all-nodata, synthetic, or placeholder release;
+- CI may validate hashes and invariants but may not approve a release;
 - [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48) and Phase 1
   remain locked.
 
@@ -91,8 +80,8 @@ Pure functions and small fixture files cover:
 
 - source metadata parsing, URL pinning, and SHA-256 verification;
 - CRS and coordinate normalization;
-- grid alignment, nearest-neighbour class resampling, and nodata propagation;
-- binary result classification;
+- source-grid identity, nearest-location selection, and nodata propagation;
+- four-state projection result classification;
 - shoreline distance and spatial predicates;
 - GeoNames feature-code filters, normalization, aliases, and deduplication;
 - deterministic search ranking;
@@ -114,8 +103,9 @@ Generated inputs exercise:
 - deterministic tie-breaking for equal search scores;
 - cache/release namespace isolation.
 
-Binary class lookup always uses nearest-neighbour semantics. Tests fail if an
-interpolation path invents a fractional class.
+Projection lookup always uses the selected source-grid location. Tests fail if
+an interpolation, tide-gauge fallback, or farther non-nodata substitution path
+changes the published source values.
 
 ### 3.3 Data-contract tests
 
@@ -137,14 +127,13 @@ must reconcile with the pinned source snapshot.
 
 Required checks include:
 
-- approved exposed, non-exposed, nodata, inland, and unsupported control
+- approved projection-available, nodata, out-of-scope, and unsupported control
   locations;
 - known coastal cities, small villages, islands, ports, estuaries, and low
   terrain;
 - source-unit and plausible-range checks before calculation;
 - raster bounds, dimensions, transform, CRS, class domain, nodata, and coverage;
 - topology validity for support/coastal geometry;
-- connectivity checks designed to reveal isolated inland exposure;
 - scenario/horizon monotonicity checks only where scientifically justified;
 - summary-statistic and spatial-difference reports against the prior release.
 
@@ -157,7 +146,8 @@ For every published candidate:
 
 - validate analysis GeoTIFFs as Cloud-Optimized GeoTIFFs;
 - run PMTiles structural verification and sample tiles at multiple zooms;
-- prove visual PMTiles classes agree with the corresponding COG samples;
+- prove decoded visual PMTiles projection properties agree with corresponding
+  COG samples;
 - compare local and uploaded sizes and SHA-256 values;
 - issue `HEAD` and partial `GET` requests and verify `Accept-Ranges`,
   `Content-Range`, `ETag`, cache headers, and allowed CORS origin;
@@ -253,15 +243,19 @@ current summary on `/about/architecture`.
 
 1. **Fast checks:** format, lint, type check, unit, property, schema, and small
    artifact tests.
-2. **Regional candidate:** after #106–#109 provide approved inputs, #110 runs
-   the reference-region transform, shared golden tests, browser parity, and
-   performance budgets; a failed preflight emits no substitute artifacts.
-3. **Full release build:** all sources and nine layer combinations, full data
-   QA, diff report, inventory, STAC, provenance, and signatures.
+2. **Regional candidate:** #110 verifies the locked real source and builds all
+   nine source-native projection combinations, shared golden tests, browser
+   parity, and performance budgets; a failed preflight emits no substitute
+   artifacts.
+3. **Independent release build:** the manual `ci.yml` evidence job rebuilds
+   the same source revision with the pinned native Linux profile; the
+   comparator requires matching scientific values, valid IDs, and artifact
+   bytes according to the release contract.
 4. **Staged delivery:** upload immutable prefix; verify hashes, range requests,
    headers, CORS, and browser smoke tests from the public origin.
-5. **Promotion:** approval only after the required independent evidence review;
-   retain the prior app/release pair for rollback.
+5. **Promotion:** automation may pass validation, but only the project owner
+   records `releaseDisposition=approved`; retain the prior app/release pair for
+   rollback.
 
 A waiver must identify the failed budget, measured regression, rationale,
 owner, and expiry date. Scientific, integrity, licence, scenario completeness,

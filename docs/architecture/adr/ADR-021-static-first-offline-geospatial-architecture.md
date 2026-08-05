@@ -4,7 +4,7 @@
 > **Decision date:** 2026-08-04
 > **Decision owner:** Project owner
 > **Scope:** Production architecture, data distribution, search, hosting, delivery pipeline, and portfolio presentation
-> **Implementation state:** Static-first target retained; projection implementation and recovery gate remain blocked on #135 and #110
+> **Implementation state:** Static-first target retained; #135 complete and #110 native Linux/owner gate pending
 
 > **Amendment:** ADR-024 supersedes this record's five-state, binary exposure,
 > terrain-comparison, connectivity, and classified-pixel requirements. The
@@ -599,9 +599,12 @@ finitely bounded from the locked evidence. Independent review is pending, so
 the authoritative scientific and release disposition remains `blocked`. No
 scientific arrays or release artifacts were generated.
 
-Recovery is #106 → (#107, #108) → #109 → #110. Only an independently reviewed
-`approved` #110 with zero blockers may unlock #48 and Phase 1. CI, a synthetic
-fixture, or an all-nodata artifact cannot satisfy this gate.
+ADR-024 superseded that binary recovery path. The active order is #106 → #135
+→ #110. #106 and #135 are complete; #110 has produced and measured a complete
+macOS candidate, while native Linux reproducibility and the project-owner
+release disposition remain pending. Only `automatedValidation=passed` plus
+`releaseDisposition=approved` may unlock #48 and Phase 1. CI cannot set the
+owner disposition.
 
 ## 15. Performance budgets and architecture fitness functions
 
@@ -701,22 +704,20 @@ path is proven.
 - Measure COG and PMTiles sizes, R2 requests, and browser memory.
 - Validate exact client-side lookup against the pipeline array.
 
-**Current project disposition (2026-08-05): `COMPLETE-WITH-NO-GO`.** The
+**Historical binary-path disposition (2026-08-05):
+`COMPLETE-WITH-NO-GO`.** The
 [Phase 0.14 gate](../../evidence/phase-0-14-final-no-go.md) preserves the
 earlier [Phase 0.9 `BLOCKED` evidence](../../evidence/phase-0-9-regional-gate.md)
 and stops all nine combinations before arrays. The automated v1 recommendation
 is `REJECTED`; the authoritative scientific and release disposition is
 `BLOCKED` because independent review is pending. No scientific artifacts or
-performance/parity claims were produced, and Phase 1 remains locked.
+performance/parity claims were produced for v1.
 
-The recovery dependency order is
-[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) →
-([#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107),
-[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108)) →
-[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) →
-[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Only an
-independently reviewed `approved` #110 with zero blockers may unlock
-[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48) and Phase 1.
+ADR-024's replacement path is #106 → #135 → #110. The first two are complete.
+The [#110 regional projection evidence](../../evidence/phase-0r-regional-release.md)
+records a complete, measured macOS candidate; native Linux comparison and the
+owner `releaseDisposition` remain pending. Phase 1 stays locked until both are
+complete and the automated gate has no blockers.
 
 ### Phase 1 — define public artifacts
 
