@@ -59,12 +59,17 @@ def evaluate_methodology_gate(contracts: ScienceContracts) -> MethodologyGate:
     """Return the explicit stop/go state without inferring missing approvals."""
     source = contracts.source_semantics
     geography = contracts.geography_rules
-    blockers = _blocking_decisions(source) + _blocking_decisions(geography)
+    vertical_methodology = contracts.vertical_methodology
+    blockers = (
+        _blocking_decisions(source)
+        + _blocking_decisions(geography)
+        + _blocking_decisions(vertical_methodology)
+    )
     vertical = source["verticalCompatibility"]
     if vertical["status"] != "approved":
         blockers.append("vertical-compatibility")
 
-    pending_reviews = _pending_reviews(source, geography)
+    pending_reviews = _pending_reviews(source, geography, vertical_methodology)
     blockers.extend(pending_reviews)
     blockers = list(dict.fromkeys(blockers))
     state = "blocked" if blockers else "approved"
@@ -77,6 +82,7 @@ def evaluate_methodology_gate(contracts: ScienceContracts) -> MethodologyGate:
         "quantile": mapping["statistic"]["quantile"],
         "projectionUnits": mapping["units"],
         "terrainUnits": source["terrain"]["verticalUnits"],
+        "verticalMethodology": vertical_methodology["methodId"],
     }
     layers = tuple(
         LayerDecision(
@@ -119,12 +125,15 @@ def _blocking_decisions(document: Mapping[str, Any]) -> list[str]:
 
 
 def _pending_reviews(
-    source: Mapping[str, Any], geography: Mapping[str, Any]
+    source: Mapping[str, Any],
+    geography: Mapping[str, Any],
+    vertical_methodology: Mapping[str, Any],
 ) -> list[str]:
     reviews = {
         "projection-scientific-review": source["projection"]["review"]["status"],
         "support-geography-review": geography["support"]["review"]["status"],
         "coastal-geography-review": geography["coastal"]["review"]["status"],
         "connectivity-scientific-review": geography["connectivity"]["review"]["status"],
+        "vertical-methodology-review": vertical_methodology["review"]["status"],
     }
     return [name for name, status in reviews.items() if status != "approved"]
