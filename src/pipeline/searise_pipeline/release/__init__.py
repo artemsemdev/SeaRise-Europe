@@ -1,6 +1,7 @@
 """Deterministic AR6 regional release construction."""
 
 from .cog import CogEvidence, validate_analysis_cog, write_analysis_cog
+from .gate import evaluate_recovery_gate
 from .geoparquet import GeoParquetEvidence, validate_geoparquet, write_geoparquet
 from .model import (
     RegionalLayer,
@@ -25,6 +26,7 @@ __all__ = [
     "PmtilesEvidence",
     "VectorToolchainEvidence",
     "build_source_from_verified_archive",
+    "evaluate_recovery_gate",
     "load_release_contract",
     "load_source_fixture",
     "validate_analysis_cog",
