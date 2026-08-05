@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 import searise_pipeline.release.delivery as delivery
+from searise_pipeline.release import evaluate_recovery_gate
 from searise_pipeline.science import ScienceContractError
 
 from .test_evidence import _candidate, _seal
@@ -262,9 +263,16 @@ def test_delivery_report_uses_real_contract_aware_candidate_binding(
         timing_path,
         contract=release,
     )
+    gate = evaluate_recovery_gate(
+        {"checks": {}},
+        contract=release,
+        reproducibility_report=None,
+        delivery_report=report,
+    )
 
     assert report["status"] == "passed"
     assert report["candidate"] == binding
+    assert gate["checks"]["deliveryMeasurements"] is True
 
 
 @pytest.mark.parametrize(
