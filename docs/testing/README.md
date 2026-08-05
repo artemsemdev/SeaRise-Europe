@@ -86,6 +86,30 @@ The tiers have different purposes:
 A fast pass cannot waive regional or release evidence. Promotion workflows in
 #61 must consume the same suite IDs rather than maintain an unrelated path map.
 
+## Path-aware pull request CI
+
+`scripts/ci/changed_components.py` is the shared path router for CI and CodeQL.
+Its mapping is versioned and covered by `tests/harness/test_changed_components.py`.
+Each workflow always runs a lightweight detection job and an aggregate gate;
+component jobs between them are conditional:
+
+- frontend paths run frontend checks and JavaScript/TypeScript CodeQL;
+- API paths run .NET checks and C# CodeQL;
+- pipeline, scientific data, and test-contract paths run pipeline checks;
+- infrastructure/compose paths run infrastructure validation and the relevant
+  full-stack smoke test;
+- image builds run only for production/container inputs, not test-only edits;
+- Markdown and other documentation-only changes skip all heavyweight jobs;
+- router or workflow changes run every route so filtering cannot weaken itself.
+
+Manual CI and scheduled/manual CodeQL runs enable every route. Renames evaluate
+both the old and new path so moving code into documentation cannot bypass its
+former owner.
+
+Branch protection should require the stable `CI Gate` and `CodeQL Gate`
+checks, not each conditional implementation job. A skipped component is valid
+only when its aggregate gate succeeds.
+
 ## Review ownership
 
 Changes to this contract need the relevant owners below. The PR records actual
