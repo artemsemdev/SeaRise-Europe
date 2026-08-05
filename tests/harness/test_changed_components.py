@@ -8,6 +8,7 @@ from scripts.ci.changed_components import (
     OUTPUTS,
     classify_paths,
     parse_name_status,
+    release_only_outputs,
     write_github_outputs,
 )
 
@@ -41,10 +42,34 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["src/pipeline/searise_pipeline/science/ar6.py"])
 
         self.assertTrue(outputs["pipeline"])
+        self.assertTrue(outputs["release"])
         self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["infrastructure"])
         self.assertFalse(outputs["compose"])
+
+    def test_ordinary_pipeline_change_skips_release_toolchain(self) -> None:
+        outputs = classify_paths(["src/pipeline/searise_pipeline/config.py"])
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
+    def test_release_contract_routes_release_toolchain(self) -> None:
+        outputs = classify_paths(["src/pipeline/science/ar6-regional-release.json"])
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertTrue(outputs["release"])
+
+    def test_release_source_evidence_routes_release_toolchain(self) -> None:
+        paths = [
+            "src/pipeline/science/evidence/ar6-lookup-goldens.json",
+            "src/pipeline/science/source-semantics.json",
+            "src/pipeline/sources/source-lock.json",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertTrue(classify_paths([path])["release"])
 
     def test_infrastructure_schema_change_routes_api_and_compose(self) -> None:
         outputs = classify_paths(["infra/db/init.sql"])
@@ -69,6 +94,19 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["scripts/ci/changed_components.py"])
 
         self.assertTrue(all(outputs[name] for name in OUTPUTS))
+
+    def test_release_evidence_dispatch_skips_unrelated_jobs(self) -> None:
+        outputs = release_only_outputs()
+
+        self.assertTrue(outputs["release"])
+        self.assertTrue(outputs["heavy"])
+        self.assertTrue(
+            all(
+                not outputs[name]
+                for name in OUTPUTS
+                if name not in {"release", "heavy"}
+            )
+        )
 
     def test_release_environment_preflight_is_isolated_from_general_tests(self) -> None:
         workflow = (
