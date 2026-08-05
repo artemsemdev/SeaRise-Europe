@@ -44,6 +44,23 @@ def _write_json(path: Path, document: Mapping[str, Any]) -> None:
     path.write_text(encoded, encoding="utf-8")
 
 
+def _same_json_value(observed: Any, expected: Any) -> bool:
+    """Compare JSON-shaped values without Python's bool/int equivalence."""
+    if type(observed) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return set(observed) == set(expected) and all(
+            _same_json_value(observed[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return len(observed) == len(expected) and all(
+            _same_json_value(left, right)
+            for left, right in zip(observed, expected)
+        )
+    return observed == expected
+
+
 @dataclass(frozen=True)
 class ReleaseBuildResult:
     """Completed candidate location and its machine disposition."""
@@ -639,6 +656,28 @@ def _validate_manifest(
     contract: Mapping[str, Any],
 ) -> None:
     """Independently bind all manifest records to source semantics and real bytes."""
+    expected_top_level_keys = {
+        "schemaVersion",
+        "releaseId",
+        "releaseContractId",
+        "scientificDisposition",
+        "publicationStatus",
+        "modeledQuantity",
+        "baseline",
+        "confidence",
+        "storageUnits",
+        "scaleToMetres",
+        "nativeResolutionDegrees",
+        "grid",
+        "matrix",
+        "source",
+        "artifacts",
+        "totals",
+        "limitations",
+    }
+    if type(manifest) is not dict or set(manifest) != expected_top_level_keys:
+        raise ScienceContractError("Manifest top-level fields differ from the exact envelope")
+
     source_members: dict[str, str] = {}
     for scenario in contract["matrix"]["scenarios"]:
         member_hashes = {
@@ -800,8 +839,81 @@ def _validate_manifest(
         ):
             raise ScienceContractError("Manifest artifact bytes differ from the sealed record")
 
-    if manifest.get("releaseId") != release_id:
-        raise ScienceContractError("Manifest release ID differs from the candidate")
+    expected_contract_envelope = {
+        "schemaVersion": 1,
+        "releaseId": release_id,
+        "releaseContractId": contract["releaseContractId"],
+        "scientificDisposition": contract["scientificDisposition"],
+        "publicationStatus": "pending-owner",
+        "modeledQuantity": "regional-relative-sea-level-change",
+        "baseline": contract["values"]["baseline"],
+        "confidence": contract["values"]["confidence"],
+        "storageUnits": contract["values"]["storageUnits"],
+        "scaleToMetres": contract["values"]["scaleToMetres"],
+        "nativeResolutionDegrees": contract["grid"]["nativeResolutionDegrees"],
+        "grid": contract["grid"],
+        "matrix": contract["matrix"],
+    }
+    if any(
+        not _same_json_value(manifest[key], value)
+        for key, value in expected_contract_envelope.items()
+    ):
+        raise ScienceContractError("Manifest envelope differs from the release contract")
+
+    notice_path = root / "NOTICE.md"
+    expected_source_receipt = {
+        "schemaVersion": 1,
+        "sourceMode": source.source_mode,
+        "archiveSha256": source.archive_sha256,
+        "archiveAndMembersVerifiedThisBuild": (
+            source.archive_and_members_verified_this_build
+        ),
+        "memberSha256": source_members,
+        "releaseContractSha256": source.contract_sha256,
+        "licence": contract["source"]["licence"],
+        "attribution": contract["source"]["attribution"],
+        "canonicalRecord": contract["source"]["canonicalRecord"],
+        "requiredAcknowledgements": contract["source"]["requiredAcknowledgements"],
+        "notice": {
+            "path": "NOTICE.md",
+            "mediaType": "text/markdown",
+            "role": "licence-notice",
+            "byteSize": notice_path.stat().st_size,
+            "sha256": _sha256(notice_path),
+        },
+        "sourceContentSha256": source.content_sha256,
+    }
+    if not _same_json_value(manifest["source"], expected_source_receipt):
+        raise ScienceContractError("Manifest source receipt differs from verified source")
+
+    cog_bytes = sum(
+        (root / f"analysis/{scenario}/{horizon}.tif").stat().st_size
+        for scenario in contract["matrix"]["scenarios"]
+        for horizon in contract["matrix"]["horizons"]
+    )
+    pmtiles_bytes = sum(
+        (root / f"layers/{scenario}/{horizon}.pmtiles").stat().st_size
+        for scenario in contract["matrix"]["scenarios"]
+        for horizon in contract["matrix"]["horizons"]
+    )
+    geoparquet_bytes = (root / "analysis/projections.parquet").stat().st_size
+    expected_totals = {
+        "cogBytes": cog_bytes,
+        "pmtilesBytes": pmtiles_bytes,
+        "geoparquetBytes": geoparquet_bytes,
+        "coreArtifactBytes": cog_bytes + pmtiles_bytes + geoparquet_bytes,
+    }
+    if not _same_json_value(manifest["totals"], expected_totals):
+        raise ScienceContractError("Manifest totals differ from actual core artifact bytes")
+
+    expected_limitations = [
+        "projection-only-not-flood-inundation-terrain-or-property-risk",
+        "pmtiles-visual-only",
+        "geoparquet-nearest-selection-prohibited",
+        "cog-is-the-only-exact-browser-lookup-artifact",
+    ]
+    if not _same_json_value(manifest["limitations"], expected_limitations):
+        raise ScienceContractError("Manifest limitations differ from the product contract")
 
 
 def build_regional_release(

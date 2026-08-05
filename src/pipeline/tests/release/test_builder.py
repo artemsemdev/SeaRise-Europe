@@ -200,9 +200,66 @@ def _manifest_candidate(
             for artifact in stac_records
         ],
     ]
+    source_members = {
+        layer.scenario: layer.member_sha256
+        for layer in source.layers
+        if layer.horizon == release["matrix"]["horizons"][0]
+    }
+    source_receipt = {
+        "schemaVersion": 1,
+        "sourceMode": source.source_mode,
+        "archiveSha256": source.archive_sha256,
+        "archiveAndMembersVerifiedThisBuild": (
+            source.archive_and_members_verified_this_build
+        ),
+        "memberSha256": source_members,
+        "releaseContractSha256": source.contract_sha256,
+        "licence": release["source"]["licence"],
+        "attribution": release["source"]["attribution"],
+        "canonicalRecord": release["source"]["canonicalRecord"],
+        "requiredAcknowledgements": release["source"]["requiredAcknowledgements"],
+        "notice": notice,
+        "sourceContentSha256": source.content_sha256,
+    }
+    cog_bytes = sum(
+        (root / f"analysis/{scenario}/{horizon}.tif").stat().st_size
+        for scenario in release["matrix"]["scenarios"]
+        for horizon in release["matrix"]["horizons"]
+    )
+    pmtiles_bytes = sum(
+        (root / f"layers/{scenario}/{horizon}.pmtiles").stat().st_size
+        for scenario in release["matrix"]["scenarios"]
+        for horizon in release["matrix"]["horizons"]
+    )
+    geoparquet_bytes = (root / "analysis/projections.parquet").stat().st_size
     manifest: dict[str, object] = {
+        "schemaVersion": 1,
         "releaseId": "ar6-europe-fixture-v1",
+        "releaseContractId": release["releaseContractId"],
+        "scientificDisposition": release["scientificDisposition"],
+        "publicationStatus": "pending-owner",
+        "modeledQuantity": "regional-relative-sea-level-change",
+        "baseline": release["values"]["baseline"],
+        "confidence": release["values"]["confidence"],
+        "storageUnits": release["values"]["storageUnits"],
+        "scaleToMetres": release["values"]["scaleToMetres"],
+        "nativeResolutionDegrees": release["grid"]["nativeResolutionDegrees"],
+        "grid": release["grid"],
+        "matrix": release["matrix"],
+        "source": source_receipt,
         "artifacts": records,
+        "totals": {
+            "cogBytes": cog_bytes,
+            "pmtilesBytes": pmtiles_bytes,
+            "geoparquetBytes": geoparquet_bytes,
+            "coreArtifactBytes": cog_bytes + pmtiles_bytes + geoparquet_bytes,
+        },
+        "limitations": [
+            "projection-only-not-flood-inundation-terrain-or-property-risk",
+            "pmtiles-visual-only",
+            "geoparquet-nearest-selection-prohibited",
+            "cog-is-the-only-exact-browser-lookup-artifact",
+        ],
     }
     release_builder._validate_manifest(
         root,
@@ -378,6 +435,52 @@ def test_manifest_validator_rejects_mutated_artifact_records(
             "values": "valueSemantics",
         }[mutation]
         record[field] = {}
+
+    with pytest.raises(ScienceContractError, match=message):
+        release_builder._validate_manifest(
+            tmp_path,
+            manifest,
+            release_id="ar6-europe-fixture-v1",
+            source=source,
+            contract=contract(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("missing", "top-level fields"),
+        ("extra", "top-level fields"),
+        ("contract", "release contract"),
+        ("source", "source receipt"),
+        ("totals", "actual core artifact bytes"),
+        ("limitations", "product contract"),
+    ],
+)
+def test_manifest_validator_rejects_mutated_envelope(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    manifest, source = _manifest_candidate(tmp_path)
+    if mutation == "missing":
+        manifest.pop("releaseContractId")
+    elif mutation == "extra":
+        manifest["unexpected"] = True
+    elif mutation == "contract":
+        manifest["modeledQuantity"] = "flood-inundation"
+    elif mutation == "source":
+        source_receipt = manifest["source"]
+        assert isinstance(source_receipt, dict)
+        source_receipt["archiveSha256"] = "0" * 64
+    elif mutation == "totals":
+        totals = manifest["totals"]
+        assert isinstance(totals, dict)
+        totals["cogBytes"] = int(totals["cogBytes"]) + 1
+    else:
+        limitations = manifest["limitations"]
+        assert isinstance(limitations, list)
+        limitations.pop()
 
     with pytest.raises(ScienceContractError, match=message):
         release_builder._validate_manifest(
