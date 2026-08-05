@@ -57,6 +57,22 @@
     "sourceContentSeal": true,
     "sourceGridIdentity": true
   },
+  "committedEvidenceBundle": {
+    "path": "src/pipeline/science/evidence/ar6-regional-release/mac-e41",
+    "files": {
+      "NOTICE.md": "b95d08385471774b6e095c7b75a1822ba6550358169e6fa1712a7f1555657ef6",
+      "build-evidence.json": "7b50318da2129a2b57098c1dab4f13fad4556ec20764ed81807976c90fc38f2f",
+      "build-receipt.json": "246d9058406352dbb6357f6ac6ff187407d631e61eb3953d18758944e1f3aabf",
+      "build-timing.json": "8a04444126efd88057768c6e09bfe4266eacee7d929895fba09578831a2dfae6",
+      "checksums.txt": "6f803dfe0ca25cf3c003662e13205e6ceeebc4a88983fc60e5c6e500ca24916c",
+      "delivery-measurements.json": "7b8a1454bf704c97d1764f97cc3dd0282cca8723096aa506492eecd95429b82e",
+      "delivery-trace.json": "dd2a57fb513c9f7342eb4a9577087ccb443c52d15fcd4e7be5d0ff8885ce15d6",
+      "gate.json": "febed46a0a0394970992c2730b4029127908f02503e68c1fe5740f5630a8202c",
+      "manifest.json": "dc8fcec21edab6b615d025bdc01095a10237f62b025e789cbec231c1143dacff",
+      "source-receipt.json": "f24f2f0bd8a9877ef32c33f9e58ddf3c150f6fb48a79a2195e73d5ad739ec037",
+      "statistics.json": "53cc547432130c4a06cf368e3882fd28f375d12e2a6a36c1ba6f60fd8142f0f5"
+    }
+  },
   "pending": [
     "native-linux-cross-environment-reproducibility",
     "project-owner-release-disposition",

@@ -62,9 +62,14 @@ not the browser nearest-location oracle.
 
 The machine-readable summary is
 [`ar6-regional-release-evidence.json`](../../src/pipeline/science/evidence/ar6-regional-release-evidence.json).
-The full candidate directory is intentionally not committed; its hashes and
-receipts are the durable identity, and the manual CI job uploads the native
-Linux candidate as a temporary GitHub Actions artifact.
+The compact
+[`mac-e41` evidence bundle](../../src/pipeline/science/evidence/ar6-regional-release/mac-e41/manifest.json)
+commits the manifest, source/build receipts, inventory, statistics, candidate
+gate snapshot, delivery report, trace, and timing. Large COG, PMTiles, and
+GeoParquet payloads stay uncommitted; their complete path/size/SHA-256
+inventory is retained in the committed manifest and checksums. The manual CI
+job also uploads the native Linux candidate as a temporary GitHub Actions
+artifact for the independent comparison.
 
 ## Remaining gate sequence
 
