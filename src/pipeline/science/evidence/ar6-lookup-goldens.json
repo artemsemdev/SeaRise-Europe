@@ -1,0 +1,831 @@
+{
+  "$schema": "./ar6-lookup-goldens.schema.json",
+  "decisionContract": {
+    "path": "src/pipeline/science/ar6-projection-contract.json",
+    "sha256": "2ad74bf75376effff355114fcc8a24bd6b5da796b4e093ba4f869ec274a8c8ba"
+  },
+  "goldenSetId": "ar6-regional-projection-goldens-v1",
+  "nodataSearchEvidence": {
+    "conclusion": "no-real-in-scope-source-nodata-location-exists",
+    "inScopeGridLocationCount": 154,
+    "scenarioLocationChecks": 462,
+    "searchRule": "all native grid locations covered by the versioned Europe support and coastal scope across all required scenarios, horizons, and quantiles",
+    "sourceNodataLocationCount": 0,
+    "syntheticControlId": "nearest-location-is-nodata"
+  },
+  "numericToleranceMetres": 1e-06,
+  "provenance": {
+    "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+    "generatorPath": "scripts/science/build_ar6_lookup_goldens.py",
+    "generatorSha256": "ec9b10ae822bc084e11809034b8e58416095c2b6fd429f839f58b3bd341c0d5e",
+    "memberSha256": {
+      "ssp126": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+      "ssp245": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+      "ssp585": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+    },
+    "networkRequiredForValidation": false,
+    "onlineReferenceRole": "supplementary-manual-cross-check-only",
+    "readerName": "netCDF4-python",
+    "readerVersion": "1.7.2",
+    "retrievedAt": "2026-08-05",
+    "sourceRecord": "https://zenodo.org/records/6382554"
+  },
+  "publicationMetadata": {
+    "confidence": "medium",
+    "methodVersion": "ar6-regional-projection-v1",
+    "nativeResolutionDegrees": 1,
+    "sourceRelease": "20210809"
+  },
+  "results": [
+    {
+      "coordinates": {
+        "latitude": 51.9244,
+        "longitude": 4.4777
+      },
+      "id": "rotterdam-north-sea-port",
+      "projections": [
+        {
+          "centralMetres": 0.12,
+          "centralMillimetres": 120,
+          "horizon": 2030,
+          "lowerMetres": 0.066,
+          "lowerMillimetres": 66,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.18,
+          "upperMillimetres": 180
+        },
+        {
+          "centralMetres": 0.229,
+          "centralMillimetres": 229,
+          "horizon": 2050,
+          "lowerMetres": 0.135,
+          "lowerMillimetres": 135,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.337,
+          "upperMillimetres": 337
+        },
+        {
+          "centralMetres": 0.478,
+          "centralMillimetres": 478,
+          "horizon": 2100,
+          "lowerMetres": 0.277,
+          "lowerMillimetres": 277,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.719,
+          "upperMillimetres": 719
+        },
+        {
+          "centralMetres": 0.122,
+          "centralMillimetres": 122,
+          "horizon": 2030,
+          "lowerMetres": 0.064,
+          "lowerMillimetres": 64,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.184,
+          "upperMillimetres": 184
+        },
+        {
+          "centralMetres": 0.247,
+          "centralMillimetres": 247,
+          "horizon": 2050,
+          "lowerMetres": 0.156,
+          "lowerMillimetres": 156,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.351,
+          "upperMillimetres": 351
+        },
+        {
+          "centralMetres": 0.6,
+          "centralMillimetres": 600,
+          "horizon": 2100,
+          "lowerMetres": 0.408,
+          "lowerMillimetres": 408,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.851,
+          "upperMillimetres": 851
+        },
+        {
+          "centralMetres": 0.122,
+          "centralMillimetres": 122,
+          "horizon": 2030,
+          "lowerMetres": 0.068,
+          "lowerMillimetres": 68,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.179,
+          "upperMillimetres": 179
+        },
+        {
+          "centralMetres": 0.269,
+          "centralMillimetres": 269,
+          "horizon": 2050,
+          "lowerMetres": 0.17,
+          "lowerMillimetres": 170,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.382,
+          "upperMillimetres": 382
+        },
+        {
+          "centralMetres": 0.808,
+          "centralMillimetres": 808,
+          "horizon": 2100,
+          "lowerMetres": 0.57,
+          "lowerMillimetres": 570,
+          "scenario": "ssp5-85",
+          "upperMetres": 1.123,
+          "upperMillimetres": 1123
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 33.792469,
+        "family": "grid",
+        "latitude": 52.0,
+        "locationId": 1003800040,
+        "longitude": 4.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 56.9496,
+        "longitude": 24.1052
+      },
+      "id": "riga-baltic-estuary",
+      "projections": [
+        {
+          "centralMetres": 0.108,
+          "centralMillimetres": 108,
+          "horizon": 2030,
+          "lowerMetres": 0.055,
+          "lowerMillimetres": 55,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.165,
+          "upperMillimetres": 165
+        },
+        {
+          "centralMetres": 0.214,
+          "centralMillimetres": 214,
+          "horizon": 2050,
+          "lowerMetres": 0.128,
+          "lowerMillimetres": 128,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.314,
+          "upperMillimetres": 314
+        },
+        {
+          "centralMetres": 0.401,
+          "centralMillimetres": 401,
+          "horizon": 2100,
+          "lowerMetres": 0.211,
+          "lowerMillimetres": 211,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.63,
+          "upperMillimetres": 630
+        },
+        {
+          "centralMetres": 0.116,
+          "centralMillimetres": 116,
+          "horizon": 2030,
+          "lowerMetres": 0.04,
+          "lowerMillimetres": 40,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.194,
+          "upperMillimetres": 194
+        },
+        {
+          "centralMetres": 0.234,
+          "centralMillimetres": 234,
+          "horizon": 2050,
+          "lowerMetres": 0.149,
+          "lowerMillimetres": 149,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.332,
+          "upperMillimetres": 332
+        },
+        {
+          "centralMetres": 0.548,
+          "centralMillimetres": 548,
+          "horizon": 2100,
+          "lowerMetres": 0.365,
+          "lowerMillimetres": 365,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.789,
+          "upperMillimetres": 789
+        },
+        {
+          "centralMetres": 0.116,
+          "centralMillimetres": 116,
+          "horizon": 2030,
+          "lowerMetres": 0.06,
+          "lowerMillimetres": 60,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.176,
+          "upperMillimetres": 176
+        },
+        {
+          "centralMetres": 0.25,
+          "centralMillimetres": 250,
+          "horizon": 2050,
+          "lowerMetres": 0.156,
+          "lowerMillimetres": 156,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.356,
+          "upperMillimetres": 356
+        },
+        {
+          "centralMetres": 0.764,
+          "centralMillimetres": 764,
+          "horizon": 2100,
+          "lowerMetres": 0.519,
+          "lowerMillimetres": 519,
+          "scenario": "ssp5-85",
+          "upperMetres": 1.077,
+          "upperMillimetres": 1077
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 8.488373,
+        "family": "grid",
+        "latitude": 57.0,
+        "locationId": 1003300240,
+        "longitude": 24.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 45.4408,
+        "longitude": 12.3155
+      },
+      "id": "venice-adriatic-port",
+      "projections": [
+        {
+          "centralMetres": 0.1,
+          "centralMillimetres": 100,
+          "horizon": 2030,
+          "lowerMetres": 0.036,
+          "lowerMillimetres": 36,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.17,
+          "upperMillimetres": 170
+        },
+        {
+          "centralMetres": 0.186,
+          "centralMillimetres": 186,
+          "horizon": 2050,
+          "lowerMetres": 0.091,
+          "lowerMillimetres": 91,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.293,
+          "upperMillimetres": 293
+        },
+        {
+          "centralMetres": 0.418,
+          "centralMillimetres": 418,
+          "horizon": 2100,
+          "lowerMetres": 0.209,
+          "lowerMillimetres": 209,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.663,
+          "upperMillimetres": 663
+        },
+        {
+          "centralMetres": 0.104,
+          "centralMillimetres": 104,
+          "horizon": 2030,
+          "lowerMetres": 0.055,
+          "lowerMillimetres": 55,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.158,
+          "upperMillimetres": 158
+        },
+        {
+          "centralMetres": 0.198,
+          "centralMillimetres": 198,
+          "horizon": 2050,
+          "lowerMetres": 0.106,
+          "lowerMillimetres": 106,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.304,
+          "upperMillimetres": 304
+        },
+        {
+          "centralMetres": 0.52,
+          "centralMillimetres": 520,
+          "horizon": 2100,
+          "lowerMetres": 0.316,
+          "lowerMillimetres": 316,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.787,
+          "upperMillimetres": 787
+        },
+        {
+          "centralMetres": 0.103,
+          "centralMillimetres": 103,
+          "horizon": 2030,
+          "lowerMetres": 0.05,
+          "lowerMillimetres": 50,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.161,
+          "upperMillimetres": 161
+        },
+        {
+          "centralMetres": 0.222,
+          "centralMillimetres": 222,
+          "horizon": 2050,
+          "lowerMetres": 0.131,
+          "lowerMillimetres": 131,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.329,
+          "upperMillimetres": 329
+        },
+        {
+          "centralMetres": 0.706,
+          "centralMillimetres": 706,
+          "horizon": 2100,
+          "lowerMetres": 0.473,
+          "lowerMillimetres": 473,
+          "scenario": "ssp5-85",
+          "upperMetres": 1.019,
+          "upperMillimetres": 1019
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 54.891507,
+        "family": "grid",
+        "latitude": 45.0,
+        "locationId": 1004500120,
+        "longitude": 12.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 44.1598,
+        "longitude": 28.6348
+      },
+      "id": "constanta-black-sea-port",
+      "projections": [
+        {
+          "centralMetres": 0.093,
+          "centralMillimetres": 93,
+          "horizon": 2030,
+          "lowerMetres": 0.029,
+          "lowerMillimetres": 29,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.162,
+          "upperMillimetres": 162
+        },
+        {
+          "centralMetres": 0.172,
+          "centralMillimetres": 172,
+          "horizon": 2050,
+          "lowerMetres": 0.064,
+          "lowerMillimetres": 64,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.293,
+          "upperMillimetres": 293
+        },
+        {
+          "centralMetres": 0.39,
+          "centralMillimetres": 390,
+          "horizon": 2100,
+          "lowerMetres": 0.14,
+          "lowerMillimetres": 140,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.673,
+          "upperMillimetres": 673
+        },
+        {
+          "centralMetres": 0.086,
+          "centralMillimetres": 86,
+          "horizon": 2030,
+          "lowerMetres": 0.024,
+          "lowerMillimetres": 24,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.153,
+          "upperMillimetres": 153
+        },
+        {
+          "centralMetres": 0.179,
+          "centralMillimetres": 179,
+          "horizon": 2050,
+          "lowerMetres": 0.084,
+          "lowerMillimetres": 84,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.287,
+          "upperMillimetres": 287
+        },
+        {
+          "centralMetres": 0.455,
+          "centralMillimetres": 455,
+          "horizon": 2100,
+          "lowerMetres": 0.164,
+          "lowerMillimetres": 164,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.79,
+          "upperMillimetres": 790
+        },
+        {
+          "centralMetres": 0.09,
+          "centralMillimetres": 90,
+          "horizon": 2030,
+          "lowerMetres": 0.041,
+          "lowerMillimetres": 41,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.145,
+          "upperMillimetres": 145
+        },
+        {
+          "centralMetres": 0.211,
+          "centralMillimetres": 211,
+          "horizon": 2050,
+          "lowerMetres": 0.118,
+          "lowerMillimetres": 118,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.319,
+          "upperMillimetres": 319
+        },
+        {
+          "centralMetres": 0.655,
+          "centralMillimetres": 655,
+          "horizon": 2100,
+          "lowerMetres": 0.444,
+          "lowerMillimetres": 444,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.951,
+          "upperMillimetres": 951
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 34.157472,
+        "family": "grid",
+        "latitude": 44.0,
+        "locationId": 1004600290,
+        "longitude": 29.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 39.5696,
+        "longitude": 2.6502
+      },
+      "id": "palma-mallorca-island-port",
+      "projections": [
+        {
+          "centralMetres": 0.119,
+          "centralMillimetres": 119,
+          "horizon": 2030,
+          "lowerMetres": 0.061,
+          "lowerMillimetres": 61,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.182,
+          "upperMillimetres": 182
+        },
+        {
+          "centralMetres": 0.218,
+          "centralMillimetres": 218,
+          "horizon": 2050,
+          "lowerMetres": 0.123,
+          "lowerMillimetres": 123,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.329,
+          "upperMillimetres": 329
+        },
+        {
+          "centralMetres": 0.468,
+          "centralMillimetres": 468,
+          "horizon": 2100,
+          "lowerMetres": 0.264,
+          "lowerMillimetres": 264,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.71,
+          "upperMillimetres": 710
+        },
+        {
+          "centralMetres": 0.123,
+          "centralMillimetres": 123,
+          "horizon": 2030,
+          "lowerMetres": 0.069,
+          "lowerMillimetres": 69,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.182,
+          "upperMillimetres": 182
+        },
+        {
+          "centralMetres": 0.234,
+          "centralMillimetres": 234,
+          "horizon": 2050,
+          "lowerMetres": 0.139,
+          "lowerMillimetres": 139,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.34,
+          "upperMillimetres": 340
+        },
+        {
+          "centralMetres": 0.582,
+          "centralMillimetres": 582,
+          "horizon": 2100,
+          "lowerMetres": 0.373,
+          "lowerMillimetres": 373,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.856,
+          "upperMillimetres": 856
+        },
+        {
+          "centralMetres": 0.122,
+          "centralMillimetres": 122,
+          "horizon": 2030,
+          "lowerMetres": 0.07,
+          "lowerMillimetres": 70,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.179,
+          "upperMillimetres": 179
+        },
+        {
+          "centralMetres": 0.254,
+          "centralMillimetres": 254,
+          "horizon": 2050,
+          "lowerMetres": 0.164,
+          "lowerMillimetres": 164,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.362,
+          "upperMillimetres": 362
+        },
+        {
+          "centralMetres": 0.798,
+          "centralMillimetres": 798,
+          "horizon": 2100,
+          "lowerMetres": 0.566,
+          "lowerMillimetres": 566,
+          "scenario": "ssp5-85",
+          "upperMetres": 1.114,
+          "upperMillimetres": 1114
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 56.425246,
+        "family": "grid",
+        "latitude": 40.0,
+        "locationId": 1005000030,
+        "longitude": 3.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 38.7223,
+        "longitude": -9.1393
+      },
+      "id": "lisbon-tagus-estuary",
+      "projections": [
+        {
+          "centralMetres": 0.109,
+          "centralMillimetres": 109,
+          "horizon": 2030,
+          "lowerMetres": 0.053,
+          "lowerMillimetres": 53,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.17,
+          "upperMillimetres": 170
+        },
+        {
+          "centralMetres": 0.211,
+          "centralMillimetres": 211,
+          "horizon": 2050,
+          "lowerMetres": 0.116,
+          "lowerMillimetres": 116,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.32,
+          "upperMillimetres": 320
+        },
+        {
+          "centralMetres": 0.458,
+          "centralMillimetres": 458,
+          "horizon": 2100,
+          "lowerMetres": 0.258,
+          "lowerMillimetres": 258,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.699,
+          "upperMillimetres": 699
+        },
+        {
+          "centralMetres": 0.111,
+          "centralMillimetres": 111,
+          "horizon": 2030,
+          "lowerMetres": 0.06,
+          "lowerMillimetres": 60,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.167,
+          "upperMillimetres": 167
+        },
+        {
+          "centralMetres": 0.225,
+          "centralMillimetres": 225,
+          "horizon": 2050,
+          "lowerMetres": 0.133,
+          "lowerMillimetres": 133,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.331,
+          "upperMillimetres": 331
+        },
+        {
+          "centralMetres": 0.574,
+          "centralMillimetres": 574,
+          "horizon": 2100,
+          "lowerMetres": 0.367,
+          "lowerMillimetres": 367,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.847,
+          "upperMillimetres": 847
+        },
+        {
+          "centralMetres": 0.112,
+          "centralMillimetres": 112,
+          "horizon": 2030,
+          "lowerMetres": 0.062,
+          "lowerMillimetres": 62,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.166,
+          "upperMillimetres": 166
+        },
+        {
+          "centralMetres": 0.247,
+          "centralMillimetres": 247,
+          "horizon": 2050,
+          "lowerMetres": 0.154,
+          "lowerMillimetres": 154,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.356,
+          "upperMillimetres": 356
+        },
+        {
+          "centralMetres": 0.776,
+          "centralMillimetres": 776,
+          "horizon": 2100,
+          "lowerMetres": 0.549,
+          "lowerMillimetres": 549,
+          "scenario": "ssp5-85",
+          "upperMetres": 1.093,
+          "upperMillimetres": 1093
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 33.150804,
+        "family": "grid",
+        "latitude": 39.0,
+        "locationId": 1005103510,
+        "longitude": -9.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 67.2804,
+        "longitude": 14.4049
+      },
+      "id": "bodo-high-latitude-port",
+      "projections": [
+        {
+          "centralMetres": 0.02,
+          "centralMillimetres": 20,
+          "horizon": 2030,
+          "lowerMetres": -0.043,
+          "lowerMillimetres": -43,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.089,
+          "upperMillimetres": 89
+        },
+        {
+          "centralMetres": 0.042,
+          "centralMillimetres": 42,
+          "horizon": 2050,
+          "lowerMetres": -0.071,
+          "lowerMillimetres": -71,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.166,
+          "upperMillimetres": 166
+        },
+        {
+          "centralMetres": 0.048,
+          "centralMillimetres": 48,
+          "horizon": 2100,
+          "lowerMetres": -0.161,
+          "lowerMillimetres": -161,
+          "scenario": "ssp1-26",
+          "upperMetres": 0.299,
+          "upperMillimetres": 299
+        },
+        {
+          "centralMetres": 0.022,
+          "centralMillimetres": 22,
+          "horizon": 2030,
+          "lowerMetres": -0.047,
+          "lowerMillimetres": -47,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.093,
+          "upperMillimetres": 93
+        },
+        {
+          "centralMetres": 0.06,
+          "centralMillimetres": 60,
+          "horizon": 2050,
+          "lowerMetres": -0.05,
+          "lowerMillimetres": -50,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.181,
+          "upperMillimetres": 181
+        },
+        {
+          "centralMetres": 0.16,
+          "centralMillimetres": 160,
+          "horizon": 2100,
+          "lowerMetres": -0.042,
+          "lowerMillimetres": -42,
+          "scenario": "ssp2-45",
+          "upperMetres": 0.421,
+          "upperMillimetres": 421
+        },
+        {
+          "centralMetres": 0.024,
+          "centralMillimetres": 24,
+          "horizon": 2030,
+          "lowerMetres": -0.04,
+          "lowerMillimetres": -40,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.092,
+          "upperMillimetres": 92
+        },
+        {
+          "centralMetres": 0.076,
+          "centralMillimetres": 76,
+          "horizon": 2050,
+          "lowerMetres": -0.037,
+          "lowerMillimetres": -37,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.2,
+          "upperMillimetres": 200
+        },
+        {
+          "centralMetres": 0.337,
+          "centralMillimetres": 337,
+          "horizon": 2100,
+          "lowerMetres": 0.098,
+          "lowerMillimetres": 98,
+          "scenario": "ssp5-85",
+          "upperMetres": 0.654,
+          "upperMillimetres": 654
+        }
+      ],
+      "reasonCode": "projection-available",
+      "source": {
+        "distanceKilometres": 35.749653,
+        "family": "grid",
+        "latitude": 67.0,
+        "locationId": 1002300140,
+        "longitude": 14.0
+      },
+      "state": "ProjectionAvailable"
+    },
+    {
+      "coordinates": {
+        "latitude": 52.52,
+        "longitude": 13.405
+      },
+      "id": "berlin-out-of-scope",
+      "reasonCode": "outside-coastal-scope",
+      "state": "OutOfScope"
+    },
+    {
+      "coordinates": {
+        "latitude": 40.7128,
+        "longitude": -74.006
+      },
+      "id": "new-york-unsupported-geography",
+      "reasonCode": "outside-europe-support",
+      "state": "UnsupportedGeography"
+    }
+  ],
+  "schemaVersion": 1,
+  "scopeGeometry": {
+    "coastal": {
+      "path": "data/geometry/coastal_analysis_zone.geojson",
+      "sha256": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9"
+    },
+    "predicate": "covers",
+    "support": {
+      "path": "data/geometry/europe.geojson",
+      "sha256": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385"
+    }
+  },
+  "validationContract": {
+    "path": "src/pipeline/science/ar6-lookup-validation.json",
+    "sha256": "df1d6c9b14e980a1569d09254e4027f9b7afc72bf636a314904100ab0c69ff2c"
+  }
+}
