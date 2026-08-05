@@ -1,0 +1,112 @@
+{
+  "$schema": "./connectivity-controls.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.8-connectivity-controls",
+  "neighbourhood": 8,
+  "symbols": {
+    "O": "eligible ocean-adjacent land seed",
+    "L": "eligible land",
+    "H": "not-exposed land",
+    "N": "nodata or uncertain-threshold",
+    "B": "eligible-height cell rejected by an explicit barrier or quality mask",
+    "C": "expected connected cell",
+    ".": "expected disconnected or ineligible cell"
+  },
+  "controls": [
+    {
+      "id": "open-coast-corridor",
+      "kind": "open-coast",
+      "grid": ["OLLL"],
+      "expectedConnected": ["CCCC"],
+      "provenance": {
+        "basis": "Mechanism control for an unobstructed low-elevation corridor from a WBM ocean-adjacent seed.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "diagonal-channel",
+      "kind": "diagonal-channel",
+      "grid": ["OHH", "HLH", "HHL"],
+      "expectedConnected": ["C..", ".C.", "..C"],
+      "provenance": {
+        "basis": "Rotational-connectivity control that distinguishes the selected eight-neighbour rule from four-neighbour traversal.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "nodata-barrier",
+      "kind": "nodata",
+      "grid": ["OLL", "NNN", "LLL"],
+      "expectedConnected": ["CCC", "...", "..."],
+      "provenance": {
+        "basis": "Fail-closed control requiring nodata and uncertain-threshold cells to stop traversal.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "quality-barrier",
+      "kind": "barrier",
+      "grid": ["OLB", "HHB", "LLL"],
+      "expectedConnected": ["CC.", "...", "..."],
+      "provenance": {
+        "basis": "Quality-mask control ensuring an otherwise low cell rejected by EDM/FLM/HEM policy cannot be bridged.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "disconnected-inland-depression",
+      "kind": "disconnected-low-terrain",
+      "grid": ["OLLHH", "LLHHH", "HHHHH", "HHLLL"],
+      "expectedConnected": ["CCC..", "CC...", ".....", "....."],
+      "provenance": {
+        "basis": "Principal false-positive control: low inland terrain behind a continuous high-elevation divide stays disconnected.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "steep-coast-blocks-inland-low",
+      "kind": "steep-coast",
+      "grid": ["OHLL"],
+      "expectedConnected": ["C..."],
+      "provenance": {
+        "basis": "Steep-coast control requiring a non-exposed coastal rise to isolate lower terrain behind it.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "small-island-seed",
+      "kind": "island",
+      "grid": ["HHHHH", "HOLHH", "HHHHH"],
+      "expectedConnected": [".....", ".CC..", "....."],
+      "provenance": {
+        "basis": "Small-island control preserving an ocean-adjacent seed and its connected low land without relying on an outer-array edge.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "estuary-lagoon-corridor",
+      "kind": "estuary-lagoon",
+      "grid": ["OHHHH", "LLLLH", "HHHLL"],
+      "expectedConnected": ["C....", "CCCC.", "...CC"],
+      "provenance": {
+        "basis": "Port/estuary/lagoon mechanism control retaining a narrow, bending connected corridor.",
+        "independentOfImplementation": true
+      }
+    },
+    {
+      "id": "internal-tile-edge-after-mosaic",
+      "kind": "tile-edge",
+      "grid": ["OLLLL"],
+      "expectedConnected": ["CCCCC"],
+      "provenance": {
+        "basis": "The conceptual seam lies between columns 2 and 3; traversal must occur after mosaicking and cannot treat that internal tile edge as a barrier or seed.",
+        "independentOfImplementation": true
+      }
+    }
+  ],
+  "review": {
+    "status": "pending-external",
+    "requiredRole": "scientific/data reviewer",
+    "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/84"
+  }
+}
