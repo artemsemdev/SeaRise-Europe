@@ -99,8 +99,29 @@ def validate_source_grid(
             "sourceColumn": "cogColumn",
         },
     }
-    if any(document.get(key) != value for key, value in expected_header.items()):
+    expected_keys = {*expected_header, "locationIds"}
+    mapping = document.get("cogCellMapping") if isinstance(document, dict) else None
+    if (
+        type(document) is not dict
+        or set(document) != expected_keys
+        or any(type(document.get(key)) is not int for key in ("schemaVersion", "width", "height"))
+        or type(mapping) is not dict
+        or set(mapping) != {"sourceRow", "sourceColumn"}
+        or any(document.get(key) != value for key, value in expected_header.items())
+    ):
         raise ScienceContractError("Source-grid identity metadata differs from the contract")
-    ids = np.asarray(document.get("locationIds"), dtype=np.int64)
+    raw_ids = document.get("locationIds")
+    if (
+        not isinstance(raw_ids, list)
+        or len(raw_ids) != source.location_ids.size
+        or any(type(item) is not int for item in raw_ids)
+    ):
+        raise ScienceContractError("Source-grid location IDs must be an exact integer list")
+    try:
+        ids = np.asarray(raw_ids, dtype=np.int64)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ScienceContractError(
+            "Source-grid location IDs must fit the signed 64-bit contract"
+        ) from exc
     if not np.array_equal(ids, source.location_ids.ravel()):
         raise ScienceContractError("Source-grid identity mapping differs from all source cells")
