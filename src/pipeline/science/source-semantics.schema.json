@@ -4,13 +4,14 @@
   "title": "SeaRise Europe source semantics contract",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "contractId", "projection", "terrain", "verticalCompatibility", "publicationGate"],
+  "required": ["schemaVersion", "contractId", "projection", "terrain", "verticalInputs", "verticalCompatibility", "publicationGate"],
   "properties": {
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
     "contractId": { "const": "phase-0.2-source-semantics" },
     "projection": { "$ref": "#/$defs/projection" },
     "terrain": { "$ref": "#/$defs/terrain" },
+    "verticalInputs": { "$ref": "#/$defs/verticalInputs" },
     "verticalCompatibility": { "$ref": "#/$defs/blockingDecision" },
     "publicationGate": { "$ref": "#/$defs/gate" }
   },
@@ -34,20 +35,21 @@
     "archive": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["record", "asset", "byteSize", "upstreamChecksum", "sha256LockStatus", "memberBasenameTemplate"],
+      "required": ["record", "asset", "byteSize", "upstreamChecksum", "sha256", "sha256LockStatus", "memberBasenameTemplate"],
       "properties": {
         "record": { "type": "string", "format": "uri" },
         "asset": { "const": "ar6-regional-confidence.zip" },
         "byteSize": { "const": 9243771601 },
         "upstreamChecksum": { "const": "md5:fec362a2385079fac32fa736d4a39944" },
-        "sha256LockStatus": { "const": "blocking" },
+        "sha256": { "const": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91" },
+        "sha256LockStatus": { "const": "locked" },
         "memberBasenameTemplate": { "const": "total_{scenario}_medium_confidence_values.nc" }
       }
     },
     "mapping": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scenarios", "variable", "dimensions", "expectedSizes", "coordinates", "coordinateUnits", "units", "unitToMetres", "fillValue", "statistic", "years", "baseline"],
+      "required": ["scenarios", "variable", "dimensions", "expectedSizes", "coordinates", "coordinateUnits", "units", "unitToMetres", "fillValue", "statistic", "intervalStatistics", "years", "baseline"],
       "properties": {
         "scenarios": {
           "type": "object",
@@ -108,6 +110,17 @@
           "properties": {
             "confidence": { "const": "medium" },
             "quantile": { "const": 0.5 }
+          }
+        },
+        "intervalStatistics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["confidence", "lowerQuantile", "centralQuantile", "upperQuantile"],
+          "properties": {
+            "confidence": { "const": "medium" },
+            "lowerQuantile": { "const": 0.167 },
+            "centralQuantile": { "const": 0.5 },
+            "upperQuantile": { "const": 0.833 }
           }
         },
         "years": {
@@ -195,6 +208,92 @@
         "sampleSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
       }
     },
+    "verticalInputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline", "sourceGeoid", "targetGeoid", "terrainControls", "evidence"],
+      "properties": {
+        "baseline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reconstructionId", "slaSourceId", "mdtSourceId", "sourceVersion", "referencePeriod", "monthlyObjectCount", "calendarDayWeight", "slaVariable", "mdtVariable", "mdtErrorVariable", "equation", "missingPeriodRule"],
+          "properties": {
+            "reconstructionId": { "const": "monthly-sla-plus-static-mdt-v202411" },
+            "slaSourceId": { "const": "copernicus-marine-eur-sla-monthly" },
+            "mdtSourceId": { "const": "copernicus-marine-eur-mdt" },
+            "sourceVersion": { "const": "202411" },
+            "referencePeriod": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["startInclusive", "endExclusive"],
+              "properties": {
+                "startInclusive": { "const": "1995-01-01" },
+                "endExclusive": { "const": "2015-01-01" }
+              }
+            },
+            "monthlyObjectCount": { "const": 240 },
+            "calendarDayWeight": { "const": 7305 },
+            "slaVariable": { "const": "sla" },
+            "mdtVariable": { "const": "mdt" },
+            "mdtErrorVariable": { "const": "err_mdt" },
+            "equation": { "const": "mean_1995_2014(ADT_GOCO06S) = day_weighted_mean(monthly_SLA) + MDT_GOCO06S" },
+            "missingPeriodRule": { "const": "nodata" }
+          }
+        },
+        "sourceGeoid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceId", "model", "version", "nativeTideSystem", "evaluationEpoch", "maximumDegree", "coefficientErrors"],
+          "properties": {
+            "sourceId": { "const": "goco06s-gravity-model" },
+            "model": { "const": "GOCO06S" },
+            "version": { "const": "GOCO06S-2019-12-13" },
+            "nativeTideSystem": { "const": "zero_tide" },
+            "evaluationEpoch": { "const": "2010-01-01" },
+            "maximumDegree": { "const": 300 },
+            "coefficientErrors": { "const": "formal" }
+          }
+        },
+        "targetGeoid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceId", "model", "version", "nativeTideSystem", "maximumDegree", "maximumOrder", "coefficientErrors"],
+          "properties": {
+            "sourceId": { "const": "egm2008-gravity-model" },
+            "model": { "const": "EGM2008" },
+            "version": { "const": "EGM2008-2008-07" },
+            "nativeTideSystem": { "const": "tide_free" },
+            "maximumDegree": { "const": 2190 },
+            "maximumOrder": { "const": 2159 },
+            "coefficientErrors": { "const": "calibrated-standard-deviations" }
+          }
+        },
+        "terrainControls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["release", "candidateSourceIds", "requiredLayers", "regionalControlCountPerResolution"],
+          "properties": {
+            "release": { "const": "2021_1" },
+            "candidateSourceIds": {
+              "type": "array",
+              "prefixItems": [{ "const": "copernicus-dem-glo30" }, { "const": "copernicus-dem-glo90" }],
+              "items": false,
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "requiredLayers": {
+              "type": "array",
+              "prefixItems": [{ "const": "DEM" }, { "const": "EDM" }, { "const": "FLM" }, { "const": "HEM" }, { "const": "WBM" }],
+              "items": false,
+              "minItems": 5,
+              "maxItems": 5
+            },
+            "regionalControlCountPerResolution": { "const": 25 }
+          }
+        },
+        "evidence": { "const": "src/pipeline/science/evidence/vertical-source-inspection.json" }
+      }
+    },
     "blockingDecision": {
       "type": "object",
       "additionalProperties": false,
@@ -224,7 +323,7 @@
         "blockingDecisions": {
           "type": "array",
           "minItems": 1,
-          "items": { "enum": ["projection-archive-sha256", "vertical-datum-reconciliation", "dem-resolution-review"] },
+          "items": { "enum": ["vertical-datum-reconciliation", "uncertainty-bound-validation", "dem-resolution-review"] },
           "uniqueItems": true
         }
       }

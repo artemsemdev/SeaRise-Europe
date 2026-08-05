@@ -41,9 +41,9 @@
     "sourceUnits": "mm",
     "unitToMetres": 0.001,
     "quantiles": {
-      "lower": 0.17,
+      "lower": 0.167,
       "central": 0.5,
-      "upper": 0.83
+      "upper": 0.833
     },
     "equation": "W_q = B_EGM2008 + 0.001 * AR6_q"
   },

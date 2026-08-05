@@ -23,7 +23,8 @@ def test_current_contracts_end_in_explicit_blocked_state() -> None:
     assert gate.unlocks_phase_1 is False
     assert gate.generated_scientific_artifacts == ()
     assert "vertical-compatibility" in gate.blockers
-    assert "projection-archive-sha256" in gate.blockers
+    assert "projection-archive-sha256" not in gate.blockers
+    assert "uncertainty-bound-validation" in gate.blockers
     assert "canonical-coastal-source" in gate.blockers
     assert "vertical-methodology-review" in gate.blockers
     assert gate.missing_evidence

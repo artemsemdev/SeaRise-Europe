@@ -50,9 +50,9 @@ def test_vertical_methodology_binds_reference_epoch_and_uncertainty() -> None:
         "missingIntervals": "nodata",
     }
     assert methodology["projection"]["quantiles"] == {
-        "lower": 0.17,
+        "lower": 0.167,
         "central": 0.5,
-        "upper": 0.83,
+        "upper": 0.833,
     }
     assert methodology["uncertainty"]["classification"] == {
         "verticalEligible": "C_low >= 0",
@@ -76,6 +76,37 @@ def test_projection_mapping_is_keyed_by_exact_source_version() -> None:
     assert mapping["units"] == "mm"
     assert mapping["unitToMetres"] == 0.001
     assert mapping["statistic"] == {"confidence": "medium", "quantile": 0.5}
+    assert mapping["intervalStatistics"] == {
+        "confidence": "medium",
+        "lowerQuantile": 0.167,
+        "centralQuantile": 0.5,
+        "upperQuantile": 0.833,
+    }
+
+
+def test_vertical_input_identities_are_locked_without_open_ended_fallbacks() -> None:
+    source = load_science_contracts(CONTRACT_DIR).source_semantics
+
+    assert source["projection"]["archive"]["sha256LockStatus"] == "locked"
+    assert source["verticalInputs"]["baseline"] == {
+        "reconstructionId": "monthly-sla-plus-static-mdt-v202411",
+        "slaSourceId": "copernicus-marine-eur-sla-monthly",
+        "mdtSourceId": "copernicus-marine-eur-mdt",
+        "sourceVersion": "202411",
+        "referencePeriod": {
+            "startInclusive": "1995-01-01",
+            "endExclusive": "2015-01-01",
+        },
+        "monthlyObjectCount": 240,
+        "calendarDayWeight": 7305,
+        "slaVariable": "sla",
+        "mdtVariable": "mdt",
+        "mdtErrorVariable": "err_mdt",
+        "equation": ("mean_1995_2014(ADT_GOCO06S) = day_weighted_mean(monthly_SLA) + MDT_GOCO06S"),
+        "missingPeriodRule": "nodata",
+    }
+    assert source["verticalInputs"]["sourceGeoid"]["nativeTideSystem"] == "zero_tide"
+    assert source["verticalInputs"]["targetGeoid"]["nativeTideSystem"] == "tide_free"
 
 
 @pytest.mark.parametrize(
