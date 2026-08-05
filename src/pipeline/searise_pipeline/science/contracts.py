@@ -22,6 +22,7 @@ class ScienceContracts:
     source_semantics: Mapping[str, Any]
     geography_rules: Mapping[str, Any]
     vertical_methodology: Mapping[str, Any]
+    uncertainty_budget: Mapping[str, Any]
     terrain_decision: Mapping[str, Any]
     final_gate: Mapping[str, Any]
 
@@ -57,13 +58,65 @@ def _load_document(name: str, contract_dir: Path) -> Mapping[str, Any]:
 def load_science_contracts(contract_dir: Path | None = None) -> ScienceContracts:
     """Load every versioned contract after validating its complete schema."""
     root = contract_dir or _default_contract_dir()
+    uncertainty_budget = _load_document("coastal-uncertainty-budget", root)
+    _validate_uncertainty_budget(uncertainty_budget)
     return ScienceContracts(
         source_semantics=_load_document("source-semantics", root),
         geography_rules=_load_document("geography-rules", root),
         vertical_methodology=_load_document("vertical-methodology", root),
+        uncertainty_budget=uncertainty_budget,
         terrain_decision=_load_document("terrain-decision", root),
         final_gate=_load_document("phase-0-9-gate", root),
     )
+
+
+def _validate_uncertainty_budget(budget: Mapping[str, Any]) -> None:
+    """Reject semantic weakening that JSON Schema cannot express concisely."""
+    terms = budget["terms"]
+    by_id = {term["id"]: term for term in terms}
+    if len(by_id) != len(terms):
+        raise ScienceContractError("Invalid uncertainty budget: duplicate term id")
+
+    required = set(budget["eligibility"]["requiredBoundTermIds"])
+    missing = required - set(by_id)
+    if missing:
+        raise ScienceContractError(
+            f"Invalid uncertainty budget: missing required terms {sorted(missing)}"
+        )
+
+    declared_unbounded = set(budget["eligibility"]["unboundedTermIds"])
+    if not declared_unbounded <= required:
+        raise ScienceContractError(
+            "Invalid uncertainty budget: unbounded terms must be required terms"
+        )
+    unbounded = {term_id for term_id in required if by_id[term_id]["status"] == "unbounded"}
+    if unbounded != declared_unbounded:
+        raise ScienceContractError(
+            "Invalid uncertainty budget: declared unbounded terms were weakened or changed"
+        )
+    for term in terms:
+        numeric = term["numeric"]
+        if term["status"] == "unbounded":
+            if numeric != {
+                "kind": "unbounded",
+                "value": None,
+                "equation": numeric["equation"],
+            } or term["unsupportedOutcome"] != "DataUnavailable":
+                raise ScienceContractError(
+                    f"Invalid uncertainty budget: unbounded term {term['id']} was weakened"
+                )
+        if numeric["kind"] == "exact-zero" and term["status"] != "inapplicable":
+            raise ScienceContractError(
+                f"Invalid uncertainty budget: zero bound for applicable term {term['id']}"
+            )
+
+    if unbounded and (
+        budget["decision"]["recommendedDisposition"] != "rejected"
+        or budget["publicationGate"]["status"] != "rejected"
+    ):
+        raise ScienceContractError(
+            "Invalid uncertainty budget: required unbounded terms must reject publication"
+        )
 
 
 def projection_mapping(
@@ -141,6 +194,7 @@ def assert_publication_ready(contracts: ScienceContracts) -> None:
         contracts.source_semantics,
         contracts.geography_rules,
         contracts.vertical_methodology,
+        contracts.uncertainty_budget,
         contracts.terrain_decision,
     ):
         gate = document["publicationGate"]

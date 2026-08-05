@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -97,6 +98,73 @@ def test_terrain_decision_fails_closed_on_unbounded_error_terms() -> None:
     )
     assert terrain["publicationGate"]["status"] == "blocked"
     assert "systematic-error-bound" in terrain["publicationGate"]["blockingDecisions"]
+
+
+def test_coastal_uncertainty_budget_rejects_binary_publication() -> None:
+    budget = load_science_contracts(CONTRACT_DIR).uncertainty_budget
+    terms = {term["id"]: term for term in budget["terms"]}
+
+    assert budget["decision"]["recommendedDisposition"] == "rejected"
+    assert budget["confidenceFramework"]["projectionTreatment"] == (
+        "AR6 q0.167/q0.833 remains a separate projection interval"
+    )
+    assert terms["sla-l4-mapping"]["numeric"]["value"] == pytest.approx(0.0981413)
+    assert terms["mdt-formal-mapping"]["numeric"]["equation"].startswith(
+        "U_mdt = 1.645 * err_mdt"
+    )
+    assert terms["dem-absolute-systematic-envelope"]["numeric"]["value"] == 4.0
+    assert terms["coastal-sla-representativeness"]["status"] == "unbounded"
+    assert terms["dsm-to-bare-earth-representation"]["status"] == "unbounded"
+    assert budget["maximumTotalUncertaintyMetres"] is None
+    assert budget["review"]["status"] == "pending-independent"
+    assert all(
+        context["result"] in {
+            "DataUnavailable",
+            "defensible-only-with-complete-bounds",
+        }
+        for context in budget["sensitivity"]["contexts"]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda budget: budget["terms"].pop(
+            next(
+                index
+                for index, term in enumerate(budget["terms"])
+                if term["id"] == "dsm-to-bare-earth-representation"
+            )
+        ),
+        lambda budget: next(
+            term
+            for term in budget["terms"]
+            if term["id"] == "dsm-to-bare-earth-representation"
+        ).update(
+            {
+                "status": "bounded",
+                "numeric": {
+                    "kind": "constant",
+                    "value": 0.0,
+                    "equation": "assume no DSM bias",
+                },
+            }
+        ),
+    ],
+)
+def test_removing_or_zeroing_required_uncertainty_fails_contract(
+    tmp_path: Path,
+    mutation,
+) -> None:  # type: ignore[no-untyped-def]
+    for path in CONTRACT_DIR.glob("*.json"):
+        shutil.copy2(path, tmp_path / path.name)
+    budget_path = tmp_path / "coastal-uncertainty-budget.json"
+    budget = json.loads(budget_path.read_text(encoding="utf-8"))
+    mutation(budget)
+    budget_path.write_text(json.dumps(budget), encoding="utf-8")
+
+    with pytest.raises(ScienceContractError, match="uncertainty budget|coastal-uncertainty"):
+        load_science_contracts(tmp_path)
 
 
 def test_terrain_decision_binds_exact_locked_control_manifests(
