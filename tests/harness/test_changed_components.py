@@ -108,6 +108,30 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             )
         )
 
+    def test_release_evidence_dispatch_requires_exact_source_revision(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        dispatch = workflow.split("permissions:", maxsplit=1)[0]
+        router = workflow.split("- id: route", maxsplit=1)[1].split(
+            "\n  frontend:", maxsplit=1
+        )[0]
+        self.assertIn("release_source_revision:\n", dispatch)
+        self.assertIn("required: true", dispatch)
+        self.assertIn("--release-only", router)
+        self.assertNotIn("--all", router)
+        self.assertIn("^[0-9a-f]{40}$", router)
+        self.assertNotIn("inputs.release_source_revision || github.sha", workflow)
+        self.assertNotIn("pip install -e . --no-deps", workflow)
+
+        evidence_job = workflow.index("ar6-release-evidence:")
+        evidence_header = workflow[evidence_job : workflow.index("steps:", evidence_job)]
+        self.assertIn("needs: changes", evidence_header)
+        guard = workflow.index("Validate exact release source revision", evidence_job)
+        checkout = workflow.index("- uses: actions/checkout@v4.3.1", evidence_job)
+        self.assertLess(guard, checkout)
+
     def test_release_evidence_dispatch_skips_fixture_toolchain_job(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"

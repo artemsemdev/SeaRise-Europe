@@ -18,7 +18,7 @@ on:
     inputs:
       release_source_revision:
         description: Exact commit SHA to build for independent AR6 evidence
-        required: false
+        required: true
         type: string
 
 permissions:
@@ -56,10 +56,12 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
         run: |
-          if [[ "${EVENT_NAME}" == "workflow_dispatch" && -n "${RELEASE_SOURCE_REVISION}" ]]; then
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "release_source_revision must be one exact lowercase commit SHA" >&2
+              exit 1
+            fi
             python3 scripts/ci/changed_components.py --release-only --github-output "${GITHUB_OUTPUT}"
-          elif [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
-            python3 scripts/ci/changed_components.py --all --github-output "${GITHUB_OUTPUT}"
           else
             python3 scripts/ci/changed_components.py --base "${BASE_SHA}" --head "${HEAD_SHA}" --github-output "${GITHUB_OUTPUT}"
           fi
@@ -210,7 +212,6 @@ jobs:
       - name: Install immutable Python release environment
         run: |
           pip install --only-binary=:all: --require-hashes -r requirements-release.lock
-          pip install -e . --no-deps
           pip install pytest==8.4.2
 
       - name: Build and verify pinned Tippecanoe
@@ -255,14 +256,24 @@ jobs:
 
   ar6-release-evidence:
     name: Full-source Linux AR6 candidate
+    needs: changes
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
+      - name: Validate exact release source revision
+        env:
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
+        run: |
+          if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "release_source_revision must be one exact lowercase commit SHA" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@v4.3.1
         with:
           fetch-depth: 0
-          ref: ${{ inputs.release_source_revision || github.sha }}
+          ref: ${{ inputs.release_source_revision }}
 
       - uses: actions/setup-python@v5.6.0
         with:
@@ -274,7 +285,6 @@ jobs:
         working-directory: src/pipeline
         run: |
           pip install --only-binary=:all: --require-hashes -r requirements-release.lock
-          pip install -e . --no-deps
 
       - name: Restore verified release tools
         uses: actions/cache@v4.2.4
@@ -388,7 +398,7 @@ jobs:
       - name: Upload independently built candidate and timing
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: ar6-linux-candidate-${{ inputs.release_source_revision || github.sha }}-${{ github.run_id }}
+          name: ar6-linux-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}
           path: |
             /tmp/phase-0r-ar6-v1
             /tmp/build-timing-linux.json
