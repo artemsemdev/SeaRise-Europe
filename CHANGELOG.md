@@ -26,6 +26,9 @@ All notable changes to this project will be documented in this file.
 - Added a machine-readable 90% coastal uncertainty budget with source hashes,
   eligibility masks, sensitivity controls, and mutation-resistant fail-closed
   semantics.
+- Added a checksum-first AR6 projection reader, source-native grid lookup, and
+  offline real-source goldens with independent Python-reader and browser parity
+  across all nine scenario/horizon combinations.
 
 ### Changed
 

@@ -19,16 +19,16 @@
 >
 > **Phase 0.14 decision:** [terminal no-go](../evidence/phase-0-14-final-no-go.md) — investigation `COMPLETE-WITH-NO-GO`; authoritative disposition `BLOCKED`
 >
-> **Recovery decision:** [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md) — projection contract accepted; implementation and release remain blocked on #135 and #110
+> **Recovery decision:** [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md) — projection contract and #135 source/lookup parity accepted; release remains blocked on #110
 
 ## Current risk register
 
 | ID | Risk | Likelihood / impact | Mitigation and exit evidence |
 |---|---|---|---|
-| R-01 | The exact IPCC AR6 archive member differs from the documented binding schema | Low / Critical | The full `20210809` archive and three exact scenario members now have byte, CRC/MD5 where available, SHA-256, and NetCDF inspection evidence. The contract fails closed on changed identity; #135 must reproduce the values with an independent reader. |
+| R-01 | The exact IPCC AR6 archive member differs from the documented binding schema | Low / Critical | The full `20210809` archive and three exact scenario members have byte, CRC/MD5 where available, SHA-256, and NetCDF inspection evidence. #135 now verifies archive and member hashes before opening NetCDF and reproduced every golden with an independent reader. Re-run this permanent gate for each release. |
 | R-02 | The binary elevation comparison creates disconnected inland false positives or misrepresents coastal pathways | Inapplicable to ADR-024 / Historical Critical | ADR-024 performs no terrain or connectivity classification. Preserve the v1 controls as historical evidence; any future hazard layer requires a new ADR and validation. |
 | R-03 | Source or derivative redistribution terms are incomplete | Medium / Critical | Licence review for each source and derivative; manifest attribution; block publication until all rights and required wording are documented. |
-| R-04 | Browser exact lookup disagrees with the source-bound build values because of coordinate, location-ID, unit, quantile, or nodata differences | Medium / Critical | #135 uses offline real-source goldens, two independent readers, a fixed grid-only operator, and Python/TypeScript parity for state, source identity, and q0.167/q0.5/q0.833 values. |
+| R-04 | Browser exact lookup disagrees with the source-bound build values because of coordinate, location-ID, unit, quantile, or nodata differences | Low / Critical | #135 passed offline parity for seven real regional points, 189 q0.167/q0.5/q0.833 values, two scope controls, and synthetic nodata/distance/tie controls. Python and TypeScript agree bit-exactly on integer millimetres and source identity; metre output uses the fixed 1e-6 tolerance. Keep this as a permanent release regression gate. |
 | R-05 | Search indexes are too large or slow on mobile | Medium / High | Core/coastal shards, Brotli, lazy Web Worker load, representative mobile benchmarks, size/count report, deterministic ranking tests. |
 | R-06 | GeoNames misses, duplicates, or misclassifies settlements implied by “all coastal cities and villages” | High / High | Publish the operational definition, snapshot/date, feature-code rules, exclusions, corpus counts, duplicate/transcontinental QA, and limitations. |
 | R-07 | The approximate 25 km coastal zone is mistaken for flood reach | Medium / High | The deterministic v2 recipe, 27 named-place controls, topology invariant, and Copernicus Coastal Zones comparison are recorded. Keep product-scope language explicit; product-owner approval and release wording remain blocking. |
@@ -37,7 +37,7 @@
 | R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
 | R-11 | Cloudflare pricing, limits, or custom-domain behaviour changes | Medium / Medium | Date the cost model, alert on usage, avoid proprietary runtime services, and retain a static host + byte-range object storage portability test. |
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
-| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claims, Phase 1, and decommissioning until #135 evidence passes and the owner approves a zero-blocker #110 release gate. |
+| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | #135 supplies real-source lookup evidence, but production claims, Phase 1, and decommissioning remain blocked until the owner approves a zero-blocker #110 release gate with measured artifacts. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
 | R-15 | Relative AR6 change is compared directly with absolute terrain height | Inapplicable to ADR-024 / Historical Critical | ADR-024 prohibits terrain comparison and reports relative change directly. Tests must continue to reject any reintroduction of the legacy operation. |
 | R-16 | A geoid or vertical transform mixes model realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Inapplicable to ADR-024 / Historical Critical | The active path performs no geoid or vertical transform. Phase 0.10 remains immutable evidence for the superseded v1 path. |
@@ -74,9 +74,10 @@ locked evidence. The automated recommendation is therefore `rejected`, not
 disposition and publication gate remain `blocked` and a superseding method is
 required.
 Phase 0.14 remains the immutable binary-path no-go. ADR-024 completes #106's
-contract decision without reinterpreting that evidence. Recovery now follows
-#135 → #110; only passing offline source/implementation evidence plus an
-explicit project-owner release decision may unlock #48.
+contract decision without reinterpreting that evidence. #135 has now passed
+offline source/implementation parity and lowers R-01 and R-04 to permanent
+regression risks. Recovery proceeds through #110; only its measured artifacts
+and an explicit project-owner release decision may unlock #48.
 
 ## Assumptions that require evidence
 
