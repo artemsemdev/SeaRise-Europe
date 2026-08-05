@@ -40,8 +40,8 @@
       "layer": "contract",
       "owner": "platform",
       "purpose": "Prove every current test file is owned, routed, costed, and protected by an explicit migration gate.",
-      "sourcePaths": ["scripts/tests/*.py", "tests/harness/*.py", "tests/test-inventory.json", "tests/contracts/test-inventory.schema.json"],
-      "changedPaths": ["scripts/tests/**", "tests/test-inventory.json", "tests/contracts/**"],
+      "sourcePaths": ["scripts/ci/*.py", "scripts/tests/*.py", "tests/harness/*.py", "tests/test-inventory.json", "tests/contracts/test-inventory.schema.json"],
+      "changedPaths": ["scripts/ci/**", "scripts/tests/**", "tests/test-inventory.json", "tests/contracts/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent migration safety contract." },
       "commands": { "focused": "python scripts/tests/validate_test_inventory.py && python -m unittest discover -s tests/harness -p 'test_*.py'", "full": "python scripts/tests/validate_test_inventory.py && python -m unittest discover -s tests/harness -p 'test_*.py'" },
@@ -449,7 +449,8 @@
     { "path": "src/pipeline/tests/test_register.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_upload.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_validate.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
-    { "path": "tests/harness/test_changed_suites.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
+    { "path": "tests/harness/test_changed_suites.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
   ],
   "knownGaps": [
     {

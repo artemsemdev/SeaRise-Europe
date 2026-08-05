@@ -17,6 +17,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Pull requests now route CI and CodeQL by changed component, so
+  documentation-only changes resolve lightweight gates without running
+  frontend, API, pipeline, Docker, or full-stack tests.
 - Exposure generation now fails closed instead of comparing AR6 relative
   sea-level change directly with absolute EGM2008 terrain heights.
 - Phase 0 now records an explicit blocked scientific decision and keeps Phase 1

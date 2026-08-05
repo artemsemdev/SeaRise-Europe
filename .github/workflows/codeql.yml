@@ -1,8 +1,5 @@
 # =============================================================================
-# SeaRise Europe — CodeQL Analysis
-# =============================================================================
-# Runs GitHub CodeQL security analysis on push/PR to master and weekly.
-# Languages: JavaScript/TypeScript (frontend), C# (API)
+# SeaRise Europe — path-aware CodeQL analysis
 # =============================================================================
 
 name: CodeQL
@@ -13,24 +10,49 @@ on:
   pull_request:
     branches: [master]
   schedule:
-    - cron: '0 6 * * 1'  # Weekly on Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
-  analyze:
-    name: Analyze (${{ matrix.language }})
+  changes:
+    name: Detect CodeQL languages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      javascript: ${{ steps.route.outputs.codeql_javascript }}
+      csharp: ${{ steps.route.outputs.codeql_csharp }}
+    steps:
+      - uses: actions/checkout@v4.3.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - id: route
+        name: Route changed languages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "${EVENT_NAME}" == "schedule" || "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            python3 scripts/ci/changed_components.py --all --github-output "${GITHUB_OUTPUT}"
+          else
+            python3 scripts/ci/changed_components.py --base "${BASE_SHA}" --head "${HEAD_SHA}" --github-output "${GITHUB_OUTPUT}"
+          fi
+
+  analyze-javascript:
+    name: Analyze (javascript-typescript)
+    needs: changes
+    if: needs.changes.outputs.javascript == 'true'
     runs-on: ubuntu-latest
     permissions:
       security-events: write
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [javascript-typescript, csharp]
-        include:
-          - language: javascript-typescript
-            build-mode: none
-          - language: csharp
-            build-mode: manual
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.3.1
@@ -38,14 +60,55 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3.28.16
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.build-mode }}
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3.28.16
+        with:
+          category: /language:javascript-typescript
+
+  analyze-csharp:
+    name: Analyze (csharp)
+    needs: changes
+    if: needs.changes.outputs.csharp == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.3.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3.28.16
+        with:
+          languages: csharp
+          build-mode: manual
 
       - name: Build C#
-        if: matrix.language == 'csharp'
         run: dotnet build src/api/SeaRise.sln
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3.28.16
         with:
-          category: "/language:${{ matrix.language }}"
+          category: /language:csharp
+
+  codeql-gate:
+    name: CodeQL Gate
+    needs:
+      - changes
+      - analyze-javascript
+      - analyze-csharp
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify selected analyses
+        env:
+          JOBS: ${{ toJSON(needs) }}
+        run: |
+          if jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' <<<"${JOBS}" >/dev/null; then
+            echo "A selected CodeQL analysis failed or was cancelled."
+            exit 1
+          fi
+          echo "All selected CodeQL analyses passed; unchanged languages were skipped."
