@@ -2,6 +2,7 @@
 
 from .builder import ReleaseBuildResult, build_regional_release
 from .cog import CogEvidence, validate_analysis_cog, write_analysis_cog
+from .delivery import create_delivery_report
 from .gate import evaluate_recovery_gate
 from .geoparquet import GeoParquetEvidence, validate_geoparquet, write_geoparquet
 from .model import (
@@ -30,6 +31,7 @@ __all__ = [
     "VectorToolchainEvidence",
     "build_source_from_verified_archive",
     "compare_release_candidates",
+    "create_delivery_report",
     "build_regional_release",
     "evaluate_recovery_gate",
     "load_release_contract",
