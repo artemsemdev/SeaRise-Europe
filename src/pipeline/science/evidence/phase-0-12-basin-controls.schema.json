@@ -1,0 +1,507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/schemas/phase-0-12-basin-controls.schema.json",
+  "title": "Phase 0.12 Baltic and Black Sea source evidence receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "evidenceId", "issue", "evidenceDate",
+    "builderVersion", "status", "realSourceOnly", "lineage",
+    "sourceAndLicence", "baseline", "marineAnchors", "terrain",
+    "combinedSuite", "connectivityComparison", "review", "publicationGate"
+  ],
+  "properties": {
+    "$schema": { "const": "./phase-0-12-basin-controls.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "evidenceId": { "const": "phase-0.12-baltic-black-sea-controls-v1" },
+    "issue": { "const": 96 },
+    "evidenceDate": { "type": "string", "format": "date" },
+    "builderVersion": { "const": "1.0.0" },
+    "status": { "const": "source-pinning-complete-vertical-goldens-blocked" },
+    "realSourceOnly": { "const": true },
+    "lineage": { "$ref": "#/$defs/lineage" },
+    "sourceAndLicence": { "$ref": "#/$defs/sourceAndLicence" },
+    "baseline": { "$ref": "#/$defs/baseline" },
+    "marineAnchors": { "$ref": "#/$defs/marineAnchors" },
+    "terrain": { "$ref": "#/$defs/terrain" },
+    "combinedSuite": { "$ref": "#/$defs/combinedSuite" },
+    "connectivityComparison": { "$ref": "#/$defs/connectivityComparison" },
+    "review": { "$ref": "#/$defs/review" },
+    "publicationGate": { "$ref": "#/$defs/publicationGate" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "manifestBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path", "sha256", "payloadSha256", "objectCount", "totalByteSize"
+      ],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "payloadSha256": { "$ref": "#/$defs/sha256" },
+        "objectCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "totalByteSize": { "$ref": "#/$defs/nonNegativeInteger" }
+      }
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recipe", "contract", "contractSchema", "evidenceSchema",
+        "sourceLock", "sourceLockSchema", "supportGeometry",
+        "coastalGeometry", "connectivityControls", "slaManifest",
+        "terrainManifest", "existingTerrainManifest"
+      ],
+      "properties": {
+        "recipe": { "$ref": "#/$defs/fileBinding" },
+        "contract": { "$ref": "#/$defs/fileBinding" },
+        "contractSchema": { "$ref": "#/$defs/fileBinding" },
+        "evidenceSchema": { "$ref": "#/$defs/fileBinding" },
+        "sourceLock": { "$ref": "#/$defs/fileBinding" },
+        "sourceLockSchema": { "$ref": "#/$defs/fileBinding" },
+        "supportGeometry": { "$ref": "#/$defs/fileBinding" },
+        "coastalGeometry": { "$ref": "#/$defs/fileBinding" },
+        "connectivityControls": { "$ref": "#/$defs/fileBinding" },
+        "slaManifest": { "$ref": "#/$defs/manifestBinding" },
+        "terrainManifest": { "$ref": "#/$defs/manifestBinding" },
+        "existingTerrainManifest": { "$ref": "#/$defs/manifestBinding" }
+      }
+    },
+    "licence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId", "version", "name", "spdx", "url", "attribution",
+        "redistributionStatus", "requiredAcknowledgements"
+      ],
+      "properties": {
+        "sourceId": {
+          "enum": [
+            "ipcc-ar6-sea-level", "copernicus-marine-eur-sla-monthly",
+            "copernicus-marine-eur-mdt", "goco06s-gravity-model",
+            "egm2008-gravity-model", "natural-earth-10m",
+            "copernicus-dem-glo30"
+          ]
+        },
+        "version": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "spdx": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "attribution": { "type": "string", "minLength": 1 },
+        "redistributionStatus": { "const": "approved" },
+        "requiredAcknowledgements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sourceAndLicence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rawAssetsCommitted", "licences"],
+      "properties": {
+        "rawAssetsCommitted": { "const": false },
+        "licences": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": { "$ref": "#/$defs/licence" }
+        }
+      }
+    },
+    "axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum", "spacingDegrees"],
+      "properties": {
+        "minimum": { "type": "number" },
+        "maximum": { "type": "number" },
+        "spacingDegrees": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "sourceGrid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["shape", "longitude", "latitude"],
+      "properties": {
+        "shape": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 1 },
+            { "type": "integer", "minimum": 1 }
+          ],
+          "items": false
+        },
+        "longitude": { "$ref": "#/$defs/axis" },
+        "latitude": { "$ref": "#/$defs/axis" }
+      }
+    },
+    "baselineWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceCellShape", "sourceCellCount", "slaValidAllMonths",
+        "slaValidNoMonths", "slaPartiallyValidMonths", "mdtValid",
+        "baselineReady", "baselineUnavailable", "slaReadyMdtNodata",
+        "slaNodataMdtValid", "extrapolatedCellCount", "missingRule"
+      ],
+      "properties": {
+        "sourceCellShape": {
+          "type": "array",
+          "prefixItems": [{ "const": 16 }, { "const": 16 }],
+          "items": false
+        },
+        "sourceCellCount": { "const": 256 },
+        "slaValidAllMonths": { "$ref": "#/$defs/nonNegativeInteger" },
+        "slaValidNoMonths": { "$ref": "#/$defs/nonNegativeInteger" },
+        "slaPartiallyValidMonths": { "$ref": "#/$defs/nonNegativeInteger" },
+        "mdtValid": { "$ref": "#/$defs/nonNegativeInteger" },
+        "baselineReady": { "$ref": "#/$defs/nonNegativeInteger" },
+        "baselineUnavailable": { "$ref": "#/$defs/nonNegativeInteger" },
+        "slaReadyMdtNodata": { "$ref": "#/$defs/nonNegativeInteger" },
+        "slaNodataMdtValid": { "$ref": "#/$defs/nonNegativeInteger" },
+        "extrapolatedCellCount": { "const": 0 },
+        "missingRule": { "const": "DataUnavailable:source-nodata" }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sla", "mdt", "windows"],
+      "properties": {
+        "sla": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["assetCount", "allAssetsVerified", "sourceGrid"],
+          "properties": {
+            "assetCount": { "const": 240 },
+            "allAssetsVerified": { "const": true },
+            "sourceGrid": { "$ref": "#/$defs/sourceGrid" }
+          }
+        },
+        "mdt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sha256", "sourceGrid"],
+          "properties": {
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "sourceGrid": { "$ref": "#/$defs/sourceGrid" }
+          }
+        },
+        "windows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gdansk-vistula", "stockholm-archipelago",
+            "constanta-black-sea", "batumi-black-sea-boundary"
+          ],
+          "properties": {
+            "gdansk-vistula": { "$ref": "#/$defs/baselineWindow" },
+            "stockholm-archipelago": { "$ref": "#/$defs/baselineWindow" },
+            "constanta-black-sea": { "$ref": "#/$defs/baselineWindow" },
+            "batumi-black-sea-boundary": { "$ref": "#/$defs/baselineWindow" }
+          }
+        }
+      }
+    },
+    "anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actualSourceState", "slaValidMonthCount", "mdtValid", "passed"],
+      "properties": {
+        "actualSourceState": { "enum": ["baseline-ready", "source-nodata"] },
+        "slaValidMonthCount": { "type": "integer", "minimum": 0, "maximum": 240 },
+        "mdtValid": { "type": "boolean" },
+        "passed": { "const": true }
+      }
+    },
+    "marineAnchors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gdansk-bay-native-water", "gdansk-inland-native-nodata",
+        "stockholm-archipelago-native-water", "stockholm-mdt-mask-gap",
+        "constanta-native-water", "constanta-inland-native-nodata",
+        "batumi-native-water", "batumi-eastern-native-nodata"
+      ],
+      "properties": {
+        "gdansk-bay-native-water": { "$ref": "#/$defs/anchor" },
+        "gdansk-inland-native-nodata": { "$ref": "#/$defs/anchor" },
+        "stockholm-archipelago-native-water": { "$ref": "#/$defs/anchor" },
+        "stockholm-mdt-mask-gap": { "$ref": "#/$defs/anchor" },
+        "constanta-native-water": { "$ref": "#/$defs/anchor" },
+        "constanta-inland-native-nodata": { "$ref": "#/$defs/anchor" },
+        "batumi-native-water": { "$ref": "#/$defs/anchor" },
+        "batumi-eastern-native-nodata": { "$ref": "#/$defs/anchor" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset", "byteSize", "sha256"],
+      "properties": {
+        "asset": { "type": "string", "minLength": 1 },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "countMap": {
+      "type": "object",
+      "patternProperties": {
+        "^[0-9]+$": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "terrainWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assets", "delivery", "elevation", "grid", "quality"],
+      "properties": {
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["DEM", "EDM", "FLM", "HEM", "WBM"],
+          "properties": {
+            "DEM": { "$ref": "#/$defs/asset" },
+            "EDM": { "$ref": "#/$defs/asset" },
+            "FLM": { "$ref": "#/$defs/asset" },
+            "HEM": { "$ref": "#/$defs/asset" },
+            "WBM": { "$ref": "#/$defs/asset" }
+          }
+        },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["losslessLandElevationClass2mGeoTiffBytes"],
+          "properties": {
+            "losslessLandElevationClass2mGeoTiffBytes": {
+              "type": "integer", "minimum": 1
+            }
+          }
+        },
+        "elevation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimumMetres", "maximumMetres", "negativePixelCount"],
+          "properties": {
+            "minimumMetres": { "type": "number" },
+            "maximumMetres": { "type": "number" },
+            "negativePixelCount": { "$ref": "#/$defs/nonNegativeInteger" }
+          }
+        },
+        "grid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "horizontalCrs", "pixelInterpretation", "shape", "pixelCount",
+            "longitudeSpacingArcSeconds", "latitudeSpacingArcSeconds"
+          ],
+          "properties": {
+            "horizontalCrs": { "const": "EPSG:4326" },
+            "pixelInterpretation": { "const": "Point" },
+            "shape": {
+              "type": "array",
+              "prefixItems": [
+                { "type": "integer", "minimum": 1 },
+                { "type": "integer", "minimum": 1 }
+              ],
+              "items": false
+            },
+            "pixelCount": { "type": "integer", "minimum": 1 },
+            "longitudeSpacingArcSeconds": { "type": "number", "exclusiveMinimum": 0 },
+            "latitudeSpacingArcSeconds": { "const": 1.0 }
+          }
+        },
+        "quality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "editedOrFilledLandPixelCount", "editingMaskCounts",
+            "fillingMaskCounts", "heightError", "shorelineEditedPixelCount",
+            "uneditedUnfilledLandPixelCount", "voidPixelCount", "waterBodyMaskCounts"
+          ],
+          "properties": {
+            "editedOrFilledLandPixelCount": { "$ref": "#/$defs/nonNegativeInteger" },
+            "editingMaskCounts": { "$ref": "#/$defs/countMap" },
+            "fillingMaskCounts": { "$ref": "#/$defs/countMap" },
+            "shorelineEditedPixelCount": { "$ref": "#/$defs/nonNegativeInteger" },
+            "uneditedUnfilledLandPixelCount": { "$ref": "#/$defs/nonNegativeInteger" },
+            "voidPixelCount": { "$ref": "#/$defs/nonNegativeInteger" },
+            "waterBodyMaskCounts": { "$ref": "#/$defs/countMap" },
+            "heightError": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "maximumSigmaMetres", "meanSigmaMetres", "p50SigmaMetres",
+                "p90SigmaMetres", "p95SigmaMetres",
+                "p99SigmaMetres", "sentinelPixelCount", "validLandPixelCount"
+              ],
+              "properties": {
+                "maximumSigmaMetres": { "type": "number", "minimum": 0 },
+                "meanSigmaMetres": { "type": "number", "minimum": 0 },
+                "p50SigmaMetres": { "type": "number", "minimum": 0 },
+                "p90SigmaMetres": { "type": "number", "minimum": 0 },
+                "p95SigmaMetres": { "type": "number", "minimum": 0 },
+                "p99SigmaMetres": { "type": "number", "minimum": 0 },
+                "sentinelPixelCount": { "$ref": "#/$defs/nonNegativeInteger" },
+                "validLandPixelCount": { "$ref": "#/$defs/nonNegativeInteger" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "terrain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestAssetsVerified", "windows"],
+      "properties": {
+        "manifestAssetsVerified": { "const": 20 },
+        "windows": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gdansk-vistula", "stockholm-archipelago",
+            "constanta-black-sea", "batumi-black-sea-boundary"
+          ],
+          "properties": {
+            "gdansk-vistula": { "$ref": "#/$defs/terrainWindow" },
+            "stockholm-archipelago": { "$ref": "#/$defs/terrainWindow" },
+            "constanta-black-sea": { "$ref": "#/$defs/terrainWindow" },
+            "batumi-black-sea-boundary": { "$ref": "#/$defs/terrainWindow" }
+          }
+        }
+      }
+    },
+    "stateExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "expectedState", "reasonCode", "classificationReasonCode",
+        "verificationStatus", "inSupportedGeography", "inCoastalScope",
+        "actualState", "passed"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "baltic-modeled-exposure-target", "baltic-no-modeled-exposure-target",
+            "baltic-source-data-unavailable", "baltic-outside-coastal-scope",
+            "black-sea-unsupported-geography"
+          ]
+        },
+        "expectedState": {
+          "enum": [
+            "ModeledExposureDetected", "NoModeledExposureDetected",
+            "DataUnavailable", "OutOfScope", "UnsupportedGeography"
+          ]
+        },
+        "reasonCode": { "type": "string", "minLength": 1 },
+        "classificationReasonCode": {
+          "type": ["integer", "null"], "minimum": 0
+        },
+        "verificationStatus": {
+          "enum": [
+            "blocked-pending-independent-executable-golden",
+            "verified-source-native", "verified-geometry"
+          ]
+        },
+        "inSupportedGeography": { "type": "boolean" },
+        "inCoastalScope": { "type": "boolean" },
+        "actualState": {
+          "type": ["string", "null"],
+          "enum": [null, "DataUnavailable", "OutOfScope", "UnsupportedGeography"]
+        },
+        "passed": { "type": ["boolean", "null"] }
+      }
+    },
+    "combinedSuite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "existingWindowCount", "newWindowCount", "totalWindowCount", "basins",
+        "requiredContexts", "stateExpectations"
+      ],
+      "properties": {
+        "existingWindowCount": { "const": 5 },
+        "newWindowCount": { "const": 4 },
+        "totalWindowCount": { "const": 9 },
+        "basins": {
+          "const": [
+            "Atlantic/North Sea", "Mediterranean/Adriatic",
+            "Baltic Sea", "Black Sea"
+          ]
+        },
+        "requiredContexts": {
+          "type": "array",
+          "minItems": 11,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "stateExpectations": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/stateExpectation" }
+        }
+      }
+    },
+    "connectivityComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status", "unfilteredCount", "connectedCount", "removedCount",
+        "disagreementCount", "blockedBy"
+      ],
+      "properties": {
+        "status": { "const": "not-run-fail-closed" },
+        "unfilteredCount": { "type": "null" },
+        "connectedCount": { "type": "null" },
+        "removedCount": { "type": "null" },
+        "disagreementCount": { "type": "null" },
+        "blockedBy": { "const": [94, 95, 97] }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "requiredRoles", "executableGoldens"],
+      "properties": {
+        "status": { "const": "pending-external" },
+        "requiredRoles": {
+          "const": ["independent scientific/data reviewer", "product owner"]
+        },
+        "executableGoldens": { "const": "blocked-by-issues-94-and-95" }
+      }
+    },
+    "publicationGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "europeWideClaimAllowed", "blockingIssues"],
+      "properties": {
+        "status": { "const": "blocked" },
+        "europeWideClaimAllowed": { "const": false },
+        "blockingIssues": { "const": [94, 95, 97] }
+      }
+    }
+  }
+}
