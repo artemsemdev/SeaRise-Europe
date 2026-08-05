@@ -1,0 +1,170 @@
+{
+  "$schema": "./ar6-lookup-validation.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0r.2-ar6-grid-lookup-validation",
+  "issue": "https://github.com/artemsemdev/SeaRise-Europe/issues/135",
+  "registrationStatus": "registered-before-reference-extraction",
+  "source": {
+    "sourceId": "ipcc-ar6-sea-level",
+    "version": "20210809",
+    "record": "https://zenodo.org/records/6382554",
+    "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+    "memberSha256ByScenario": {
+      "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
+      "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
+      "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
+    },
+    "sourceSemanticsBinding": {
+      "path": "src/pipeline/science/source-semantics.json",
+      "sha256": "63fbc8d805318d63f32cc28d5991a78e2cbe67cc130871da735cbf89e811911c"
+    },
+    "sourceLockBinding": {
+      "path": "src/pipeline/sources/source-lock.json",
+      "sha256": "d1f819b7338f90abac0b76dda06cb6779d3231ebedcac54ef9ab78dc7f821066"
+    },
+    "decisionContract": {
+      "contractId": "ar6-regional-projection-v1",
+      "path": "src/pipeline/science/ar6-projection-contract.json"
+    }
+  },
+  "lookup": {
+    "sourceFamily": "native-one-degree-grid",
+    "locationSelection": "nearest-source-grid-location",
+    "maximumDistanceKm": 100,
+    "distance": {
+      "algorithm": "haversine",
+      "earthMeanRadiusKm": 6371.0088,
+      "boundary": "inclusive"
+    },
+    "tieBreak": "lowest-source-location-id",
+    "requiredQuantiles": [0.167, 0.5, 0.833],
+    "nodataRule": "resolve-nearest-location-first-then-fail-if-any-required-quantile-is-fill",
+    "interpolation": "forbidden",
+    "extrapolation": "forbidden"
+  },
+  "resultContract": {
+    "availableState": "ProjectionAvailable",
+    "stableReasonCodes": {
+      "sourceValueNodata": "source-value-nodata",
+      "sourceGridBeyondMaximumDistance": "source-grid-beyond-maximum-distance",
+      "outsideCoastalScope": "outside-coastal-scope",
+      "outsideEuropeSupport": "outside-europe-support"
+    },
+    "sourceIdentityFields": [
+      "locationId",
+      "latitude",
+      "longitude",
+      "family",
+      "distanceKm"
+    ]
+  },
+  "validation": {
+    "referenceStrategy": "offline-independent-netcdf4-read-of-sha256-locked-source-members",
+    "numericToleranceMetres": 1e-12,
+    "scenarioHorizonMatrix": {
+      "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
+      "horizons": [2030, 2050, 2100]
+    },
+    "goldenPoints": [
+      {
+        "id": "rotterdam-north-sea-port",
+        "kind": "port",
+        "coverage": "Atlantic and North Sea",
+        "coordinates": { "latitude": 51.9244, "longitude": 4.4777 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "riga-baltic-estuary",
+        "kind": "estuary",
+        "coverage": "Baltic Sea",
+        "coordinates": { "latitude": 56.9496, "longitude": 24.1052 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "venice-adriatic-port",
+        "kind": "port",
+        "coverage": "Mediterranean and Adriatic Sea",
+        "coordinates": { "latitude": 45.4408, "longitude": 12.3155 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "constanta-black-sea-port",
+        "kind": "port",
+        "coverage": "Black Sea",
+        "coordinates": { "latitude": 44.1598, "longitude": 28.6348 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "palma-mallorca-island-port",
+        "kind": "island",
+        "coverage": "Mediterranean island",
+        "coordinates": { "latitude": 39.5696, "longitude": 2.6502 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "lisbon-tagus-estuary",
+        "kind": "estuary",
+        "coverage": "Atlantic estuary",
+        "coordinates": { "latitude": 38.7223, "longitude": -9.1393 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "bodo-high-latitude-port",
+        "kind": "high-latitude",
+        "coverage": "High-latitude Norwegian Sea",
+        "coordinates": { "latitude": 67.2804, "longitude": 14.4049 },
+        "expectedState": "ProjectionAvailable"
+      },
+      {
+        "id": "berlin-out-of-scope",
+        "kind": "scope-control",
+        "coverage": "Supported Europe outside coastal scope",
+        "coordinates": { "latitude": 52.52, "longitude": 13.405 },
+        "expectedState": "OutOfScope"
+      },
+      {
+        "id": "new-york-unsupported-geography",
+        "kind": "scope-control",
+        "coverage": "Outside Europe support",
+        "coordinates": { "latitude": 40.7128, "longitude": -74.006 },
+        "expectedState": "UnsupportedGeography"
+      }
+    ],
+    "algorithmicControls": [
+      {
+        "id": "nearest-location-is-nodata",
+        "purpose": "nodata",
+        "expectedState": "DataUnavailable",
+        "expectedReasonCode": "source-value-nodata"
+      },
+      {
+        "id": "exactly-at-maximum-distance",
+        "purpose": "distance-boundary",
+        "expectedState": "ProjectionAvailable",
+        "expectedReasonCode": "projection-available"
+      },
+      {
+        "id": "beyond-maximum-distance",
+        "purpose": "beyond-maximum-distance",
+        "expectedState": "DataUnavailable",
+        "expectedReasonCode": "source-grid-beyond-maximum-distance"
+      },
+      {
+        "id": "equidistant-lowest-location-id",
+        "purpose": "tie-break",
+        "expectedState": "ProjectionAvailable",
+        "expectedReasonCode": "projection-available"
+      }
+    ],
+    "requiredProvenance": [
+      "retrievedAt",
+      "sourceRecord",
+      "archiveSha256",
+      "memberSha256",
+      "readerName",
+      "readerVersion",
+      "generatorPath",
+      "generatorSha256"
+    ]
+  }
+}
