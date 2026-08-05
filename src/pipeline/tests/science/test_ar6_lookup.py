@@ -217,9 +217,9 @@ def test_maximum_distance_is_inclusive_and_then_fails_closed() -> None:
 
     assert at_boundary.state == "ProjectionAvailable"
     assert at_boundary.source is not None
-    assert at_boundary.source.distance_km == pytest.approx(100)
+    assert at_boundary.source.distance_km == 100
     assert beyond_boundary.state == "DataUnavailable"
-    assert beyond_boundary.reason_code == "source-grid-beyond-maximum-distance"
+    assert beyond_boundary.reason_code == "source-location-too-distant"
 
 
 def test_geography_states_are_resolved_before_source_lookup() -> None:

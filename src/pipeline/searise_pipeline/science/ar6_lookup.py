@@ -222,7 +222,10 @@ def lookup_ar6_projection(
         latitude=float(interval.lower.latitudes[row]),
         longitude=float(interval.lower.longitudes[column]),
         family="grid",
-        distance_km=distance_km,
+        distance_km=round(
+            distance_km,
+            int(lookup["distance"]["reportedDistanceDecimalPlaces"]),
+        ),
     )
     if distance_km > float(lookup["maximumDistanceKm"]):
         return Ar6ProjectionLookupResult(
