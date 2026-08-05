@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,7 @@ from typing import Any
 from searise_pipeline.release import (
     build_regional_release,
     build_source_from_verified_archive,
+    candidate_binding,
     load_release_contract,
     load_source_fixture,
 )
@@ -42,22 +45,37 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--tippecanoe", type=Path, required=True)
     parser.add_argument("--tippecanoe-decode", type=Path, required=True)
     parser.add_argument("--pmtiles", type=Path, required=True)
+    parser.add_argument("--tippecanoe-source-archive", type=Path, required=True)
+    parser.add_argument("--tippecanoe-build-receipt", type=Path, required=True)
+    parser.add_argument("--pmtiles-distribution-asset", type=Path, required=True)
+    parser.add_argument("--pmtiles-distribution-platform", required=True)
+    parser.add_argument("--python-lock", type=Path, required=True)
+    parser.add_argument("--build-environment-id", required=True)
     parser.add_argument("--release-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--reproducibility-report", type=Path)
-    parser.add_argument("--delivery-report", type=Path)
-    parser.add_argument(
-        "--owner-decision",
-        choices=("pending-owner", "approved", "rejected"),
-        default="pending-owner",
-    )
     parser.add_argument("--failure-gate", type=Path, required=True)
+    parser.add_argument("--timing-evidence", type=Path, required=True)
     return parser
 
 
 def main() -> None:
     args = _parser().parse_args()
+    workflow_started = time.perf_counter()
     try:
+        repository_root = Path(__file__).resolve().parents[2]
+        if subprocess.run(
+            ["git", "-C", str(repository_root), "status", "--porcelain"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout:
+            raise ScienceContractError("Production release builds require a clean Git worktree")
+        source_revision = subprocess.run(
+            ["git", "-C", str(repository_root), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
         contract = load_release_contract(args.release_contract)
         if args.archive:
             regional_source = build_source_from_verified_archive(
@@ -83,26 +101,50 @@ def main() -> None:
             tippecanoe_path=args.tippecanoe,
             decode_path=args.tippecanoe_decode,
             pmtiles_path=args.pmtiles,
+            tippecanoe_source_archive_path=args.tippecanoe_source_archive,
+            tippecanoe_build_receipt_path=args.tippecanoe_build_receipt,
+            pmtiles_distribution_asset_path=args.pmtiles_distribution_asset,
+            pmtiles_distribution_platform=args.pmtiles_distribution_platform,
+            python_lock_path=args.python_lock,
             lookup_goldens_path=args.lookup_goldens,
-            reproducibility_report=(
-                _load(args.reproducibility_report)
-                if args.reproducibility_report
-                else None
-            ),
-            delivery_report=_load(args.delivery_report)
-            if args.delivery_report
-            else None,
-            owner_decision=args.owner_decision,
+            build_environment_id=args.build_environment_id,
+            source_revision=source_revision,
+            workflow_started_monotonic=workflow_started,
+        )
+        _write_json(
+            args.timing_evidence,
+            {
+                "schemaVersion": 1,
+                "candidate": candidate_binding(result.output_directory),
+                "timer": "python-time-perf-counter",
+                "startedBeforeSourceVerification": True,
+                "endedAfterAtomicCandidatePublish": True,
+                "fullCleanBuildDurationSeconds": result.build_duration_seconds,
+            },
         )
     except (OSError, KeyError, ValueError, ScienceContractError) as exc:
         blocked = {
             "schemaVersion": 1,
             "gateId": "phase-0r-ar6-regional-release-v1",
             "issue": 110,
-            "disposition": "blocked",
-            "releaseDecision": "pending-owner",
+            "releaseId": args.release_id,
+            "scientificDisposition": "projection-only",
+            "automatedValidation": "failed",
+            "releaseDisposition": "blocked",
+            "ownerDecision": "pending-owner",
+            "finalIntegrationMergedToMaster": False,
             "phase1Unlocked": False,
-            "blockingChecks": ["preflight"],
+            "checks": {"preflight": False},
+            "blockers": ["preflight", "projectOwnerReleaseDecision", "finalIntegrationMergedToMaster"],
+            "evidencePaths": {
+                "build": "unavailable",
+                "delivery": "unavailable",
+                "reproducibility": "unavailable",
+                "source": "unavailable",
+                "ownerDecision": "external:owner-decision.json",
+                "integration": "external:integration-merge.json"
+            },
+            "fallback": "do-not-publish-or-unlock-phase-1",
             "failure": {"type": type(exc).__name__, "message": str(exc)},
             "emittedScientificArtifacts": [],
         }

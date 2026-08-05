@@ -14,8 +14,6 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--first", type=Path, required=True)
     parser.add_argument("--second", type=Path, required=True)
-    parser.add_argument("--first-environment", required=True)
-    parser.add_argument("--second-environment", required=True)
     parser.add_argument("--release-contract", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -23,8 +21,6 @@ def main() -> None:
     report = compare_release_candidates(
         args.first,
         args.second,
-        first_environment=args.first_environment,
-        second_environment=args.second_environment,
         contract=load_release_contract(args.release_contract),
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
