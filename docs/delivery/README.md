@@ -1,6 +1,6 @@
 # Static-First Migration Plan
 
-> **Status:** Active
+> **Status:** Phase 0 investigation complete with no-go; Phase 1 locked
 > **Last updated:** 2026-08-05
 > **Decision source:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
@@ -17,8 +17,8 @@ The repository is currently in a transition state:
 - the accepted target is a React/Vite static application backed by immutable
   browser-ready artifacts;
 - production migration has not started;
-- the real IPCC/Copernicus pipeline has not passed its required end-to-end
-  scientific validation;
+- the real-source Phase 0 investigation ended without a publishable method or
+  regional release; the authoritative scientific disposition remains blocked;
 - the current checked-in raster is demonstration data and must not be
   represented as a production scientific release.
 
@@ -55,10 +55,12 @@ Use Conventional Commits and the repository pull-request template.
 | Infrastructure | Terraform for Azure | OpenTofu for static host/object delivery |
 | Provenance | Source notes and tests | Checksums + STAC + SLSA + Cosign |
 
-## Workstream 0 — scientific proof
+## Workstream 0 — scientific proof (`complete-with-no-go`)
 
 This workstream blocks a production data release and destructive removal of the
-legacy assessment path.
+legacy assessment path. The investigation is terminal, but its positive exit
+criteria were not met; unchecked items below are deliberately not rewritten as
+completed deliverables.
 
 - [x] Pin and inspect the exact IPCC AR6 source release and members.
 - [x] Record source URL, version/date, licence, size, and SHA-256.
@@ -76,27 +78,32 @@ legacy assessment path.
 - [ ] Record artifact size, build duration, browser memory, range-request count,
   and lookup latency.
 
-Phase 0.8 selected GLO-30, the explicit Natural Earth v2 Europe/25 km product
-scope, and eight-neighbour ocean connectivity for external review. The checks
-above remain open where product/scientific approval, terrain uncertainty
-bounds, or the real regional rebuild is still required.
+Phase 0.14 records an honest terminal no-go. Issue #95's automated analysis
+recommends `REJECTED` because the locked evidence has no finite shoreline SLA
+representativeness or GLO-30 DSM-to-bare-earth bound. The authoritative
+scientific and release disposition remains `BLOCKED` because independent
+review is pending. All nine combinations stopped before arrays; no scientific
+class, COG, PMTiles, GeoParquet, statistics, or synthetic substitute was
+created.
 
-Phase 0.9 completed with an explicit `BLOCKED` disposition; the Phase 0
-scientific gate remains blocked. Its exact 3×3 attempt matrix emitted no
-scientific classes or release artifacts because EGM2008 evaluator conventions,
-numerical uncertainty bounds, independent review, Baltic/Black Sea controls,
-product/connectivity approval, cross-environment reproducibility, and reviewed
-golden vectors are missing. Resolve
-[#94](https://github.com/artemsemdev/SeaRise-Europe/issues/94),
-[#95](https://github.com/artemsemdev/SeaRise-Europe/issues/95),
-[#96](https://github.com/artemsemdev/SeaRise-Europe/issues/96), and
-[#97](https://github.com/artemsemdev/SeaRise-Europe/issues/97) in order. The
-corrected Phase 0.9 evidence remains immutable; only
-[#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) may re-evaluate
-the final gate and possibly unlock Workstream 1 and Phase 1. Green CI cannot
-authorize that change.
+Recovery follows this dependency order:
 
-Exit evidence:
+1. [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) selects a
+   post-no-go product contract and superseding ADR.
+2. [#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107) validates a
+   datum-safe coastal mean-water reference and
+   [#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108) validates a
+   bare-earth terrain source; these may run in parallel after #106.
+3. [#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) implements
+   and independently reviews methodology v2 from approved inputs.
+4. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) rebuilds
+   the regional proof and records the recovery gate.
+
+Only an independently reviewed `approved` #110 with zero blockers may unlock
+[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48), Workstream 1,
+and Phase 1. Green CI cannot authorize that change.
+
+Recovery exit evidence:
 
 - a source manifest with valid hashes and licences;
 - a regional fixture release using the public artifact layout;
@@ -108,7 +115,7 @@ Source-lock operation, rights status, cache handling, and upstream incident
 response are documented in the
 [source acquisition operator guide](source-acquisition.md).
 
-## Workstream 1 — artifact contracts and pipeline
+## Workstream 1 — artifact contracts and pipeline (`locked`)
 
 - [ ] Add JSON Schemas for release manifest, scenarios, methodology, source
   attribution, and search records.
@@ -206,20 +213,23 @@ Exit evidence:
 
 | Order | Focused change | Depends on |
 |---:|---|---|
-| 1 | Inspect and pin one real IPCC source snapshot | None |
-| 2 | Build one-region scientific fixture and methodology evidence | 1 |
-| 3 | Define manifest/config/search JSON Schemas | 2 |
-| 4 | Build GeoNames core/coastal GeoParquet datasets | 3 |
-| 5 | Serialize and benchmark the Web Worker search index | 4 |
-| 6 | Produce/verify regional COG and PMTiles artifacts | 2–3 |
-| 7 | Add STAC, checksums, provenance, and signing | 3, 6 |
-| 8 | Introduce the Vite static shell beside the legacy frontend | 3 |
-| 9 | Add local search and boundary validation | 4–5, 8 |
-| 10 | Add exact exposure lookup and map overlay | 6, 8 |
-| 11 | Add offline caching and architecture evidence page | 7, 9–10 |
-| 12 | Provision preview static hosting and R2 via OpenTofu | 7–8 |
-| 13 | Run parity, performance, accessibility, and cost gates | 9–12 |
-| 14 | Switch production and delete the legacy runtime | 13 |
+| 1 | #106 select the post-no-go scientific product contract | Phase 0.14 no-go |
+| 2 | #107 validate a datum-safe coastal mean-water reference | Approved #106 |
+| 3 | #108 validate bare-earth coastal terrain; may run with order 2 | Approved #106 |
+| 4 | #109 implement and independently review methodology v2 | Approved #107 and #108 |
+| 5 | #110 rebuild the regional proof and record the recovery gate | Approved #109 |
+| 6 | Define manifest/config/search JSON Schemas | Independently reviewed `approved` #110 |
+| 7 | Build GeoNames core/coastal GeoParquet datasets | 6 |
+| 8 | Serialize and benchmark the Web Worker search index | 7 |
+| 9 | Produce/verify regional COG and PMTiles artifacts | 5–6 |
+| 10 | Add STAC, checksums, provenance, and signing | 6, 9 |
+| 11 | Introduce the Vite static shell beside the legacy frontend | 6 |
+| 12 | Add local search and boundary validation | 7–8, 11 |
+| 13 | Add exact exposure lookup and map overlay | 9, 11 |
+| 14 | Add offline caching and architecture evidence page | 10, 12–13 |
+| 15 | Provision preview static hosting and R2 via OpenTofu | 10–11 |
+| 16 | Run parity, performance, accessibility, and cost gates | 12–15 |
+| 17 | Switch production and delete the legacy runtime | 16 |
 
 ## Required pull-request evidence
 
@@ -234,8 +244,8 @@ Use the repository PR template. In addition:
 
 ## Active reference artifacts
 
-- [Methodology specification](../methodology.md) — provisional
-  until Workstream 0 passes.
+- [Methodology specification](../methodology.md) — historical v1 no-go;
+  superseded for publication while #106–#110 define and validate recovery.
 - Accessibility and content evidence for the legacy frontend is local build
   output, not an authoritative target-architecture artifact; both audits must
   be regenerated for the static frontend.
