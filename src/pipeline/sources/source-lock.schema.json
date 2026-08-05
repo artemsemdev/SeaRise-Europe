@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://searise-europe.example/schemas/source-lock-v1.json",
+  "$id": "https://searise-europe.example/schemas/source-lock-v2.json",
   "title": "SeaRise Europe source lock",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "sources"],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "sources": {
       "type": "array",
       "minItems": 1,
@@ -19,10 +19,16 @@
       "type": "string",
       "pattern": "^[a-z0-9]+(?:[a-z0-9._-]*[a-z0-9])?$"
     },
+    "nonEmpty": { "type": "string", "minLength": 1 },
     "httpsUrl": {
       "type": "string",
       "format": "uri",
       "pattern": "^https://"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
     },
     "sha256": {
       "type": "string",
@@ -42,10 +48,10 @@
         "requiredAcknowledgements"
       ],
       "properties": {
-        "name": { "type": "string", "minLength": 1 },
+        "name": { "$ref": "#/$defs/nonEmpty" },
         "url": { "$ref": "#/$defs/httpsUrl" },
-        "spdx": { "type": "string", "minLength": 1 },
-        "attribution": { "type": "string", "minLength": 1 },
+        "spdx": { "$ref": "#/$defs/nonEmpty" },
+        "attribution": { "$ref": "#/$defs/nonEmpty" },
         "redistributionStatus": {
           "enum": ["approved", "review-required", "restricted", "unknown"]
         },
@@ -58,7 +64,7 @@
         },
         "requiredAcknowledgements": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
+          "items": { "$ref": "#/$defs/nonEmpty" },
           "uniqueItems": true
         },
         "notes": { "type": "string" }
@@ -71,10 +77,79 @@
           },
           "then": {
             "properties": {
-              "reviewer": { "type": "string", "minLength": 1 },
+              "reviewer": { "$ref": "#/$defs/nonEmpty" },
               "reviewedAt": { "type": "string", "format": "date" }
             }
           }
+        }
+      ]
+    },
+    "archiveMember": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "role", "byteSize", "sha256"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "role": { "$ref": "#/$defs/nonEmpty" },
+        "nativeVersion": { "$ref": "#/$defs/nonEmpty" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "compressedByteSize": { "type": "integer", "minimum": 1 },
+        "crc32": { "type": "string", "pattern": "^[a-f0-9]{8}$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "scenario": { "$ref": "#/$defs/nonEmpty" },
+        "variables": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmpty" },
+          "uniqueItems": true
+        },
+        "quantiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "number", "minimum": 0, "maximum": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "objectSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "manifestPath",
+        "manifestMediaType",
+        "manifestByteSize",
+        "manifestSha256",
+        "payloadSha256",
+        "objectCount",
+        "totalByteSize",
+        "keyPrefix"
+      ],
+      "properties": {
+        "contract": { "enum": ["monthly-series-v1", "dem-control-set-v1"] },
+        "manifestPath": { "$ref": "#/$defs/relativePath" },
+        "manifestMediaType": { "const": "application/gzip" },
+        "manifestByteSize": { "type": "integer", "minimum": 1 },
+        "manifestSha256": { "$ref": "#/$defs/sha256" },
+        "payloadSha256": { "$ref": "#/$defs/sha256" },
+        "objectCount": { "type": "integer", "minimum": 1 },
+        "totalByteSize": { "type": "integer", "minimum": 1 },
+        "keyPrefix": { "$ref": "#/$defs/relativePath" },
+        "referencePeriod": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["startInclusive", "endExclusive"],
+          "properties": {
+            "startInclusive": { "type": "string", "format": "date" },
+            "endExclusive": { "type": "string", "format": "date" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "contract": { "const": "monthly-series-v1" } } },
+          "then": { "required": ["referencePeriod"] }
         }
       ]
     },
@@ -83,6 +158,7 @@
       "additionalProperties": false,
       "required": [
         "id",
+        "kind",
         "url",
         "resolvedUrl",
         "resolvedVersion",
@@ -92,37 +168,91 @@
       ],
       "properties": {
         "id": { "$ref": "#/$defs/id" },
+        "kind": { "enum": ["file", "object-set"] },
         "url": { "$ref": "#/$defs/httpsUrl" },
         "resolvedUrl": { "$ref": "#/$defs/httpsUrl" },
-        "resolvedVersion": { "type": "string", "minLength": 1 },
+        "resolvedVersion": { "$ref": "#/$defs/nonEmpty" },
+        "nativeVersion": { "$ref": "#/$defs/nonEmpty" },
         "mediaType": { "type": "string", "pattern": "^[^/]+/[^/]+$" },
-        "cachePath": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
-        },
+        "cachePath": { "$ref": "#/$defs/relativePath" },
         "availability": { "enum": ["locked", "expected-absent"] },
         "byteSize": { "type": "integer", "minimum": 1 },
         "sha256": { "$ref": "#/$defs/sha256" },
-        "upstreamChecksum": { "type": "string", "minLength": 1 }
+        "upstreamChecksum": { "$ref": "#/$defs/nonEmpty" },
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nonEmpty" },
+          "uniqueItems": true
+        },
+        "members": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/archiveMember" }
+        },
+        "objectSet": { "$ref": "#/$defs/objectSet" }
       },
       "allOf": [
         {
-          "if": {
-            "properties": { "availability": { "const": "locked" } },
-            "required": ["availability"]
+          "if": { "properties": { "kind": { "const": "file" } }, "required": ["kind"] },
+          "then": {
+            "not": { "required": ["objectSet"] },
+            "allOf": [
+              {
+                "if": { "properties": { "availability": { "const": "locked" } } },
+                "then": { "required": ["byteSize", "sha256"] },
+                "else": {
+                  "not": {
+                    "anyOf": [
+                      { "required": ["byteSize"] },
+                      { "required": ["sha256"] },
+                      { "required": ["members"] }
+                    ]
+                  }
+                }
+              }
+            ]
           },
-          "then": { "required": ["byteSize", "sha256"] },
           "else": {
+            "required": ["objectSet"],
+            "properties": { "availability": { "const": "locked" } },
             "not": {
               "anyOf": [
                 { "required": ["byteSize"] },
-                { "required": ["sha256"] }
+                { "required": ["sha256"] },
+                { "required": ["upstreamChecksum"] },
+                { "required": ["members"] }
               ]
             }
           }
         }
       ]
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region", "status", "roles", "reason"],
+      "properties": {
+        "region": { "$ref": "#/$defs/id" },
+        "status": { "enum": ["covered", "partial", "not-covered", "global"] },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonEmpty" },
+          "uniqueItems": true
+        },
+        "reason": { "$ref": "#/$defs/nonEmpty" }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inspectedAt", "method", "evidenceRef", "result"],
+      "properties": {
+        "inspectedAt": { "type": "string", "format": "date" },
+        "method": { "$ref": "#/$defs/nonEmpty" },
+        "evidenceRef": { "$ref": "#/$defs/relativePath" },
+        "result": { "enum": ["verified", "blocked"] }
+      }
     },
     "source": {
       "type": "object",
@@ -140,15 +270,21 @@
       "properties": {
         "id": { "$ref": "#/$defs/id" },
         "selectionStatus": { "enum": ["selected", "candidate"] },
-        "publisher": { "type": "string", "minLength": 1 },
+        "publisher": { "$ref": "#/$defs/nonEmpty" },
         "canonicalRecord": { "$ref": "#/$defs/httpsUrl" },
-        "version": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "#/$defs/nonEmpty" },
         "snapshotDate": { "type": "string", "format": "date" },
         "licence": { "$ref": "#/$defs/licence" },
         "assets": {
           "type": "array",
           "items": { "$ref": "#/$defs/asset" }
-        }
+        },
+        "coverage": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/coverage" }
+        },
+        "inspection": { "$ref": "#/$defs/inspection" }
       },
       "allOf": [
         {

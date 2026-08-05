@@ -91,12 +91,14 @@ def _source(status: str = "approved") -> Source:
             required_acknowledgements=(),
         ),
         assets=(),
+        coverage=(),
     )
 
 
 def _asset(base_url: str, route: str = "/file", *, resolved_route: str | None = None) -> Asset:
     return Asset(
         id=urlsplit(route).path.strip("/") or "file",
+        kind="file",
         url=f"{base_url}{route}",
         resolved_url=f"{base_url}{resolved_route or route}",
         resolved_version="v1",
@@ -105,6 +107,9 @@ def _asset(base_url: str, route: str = "/file", *, resolved_route: str | None = 
         availability="locked",
         byte_size=len(LOCKED_BYTES),
         sha256=hashlib.sha256(LOCKED_BYTES).hexdigest(),
+        roles=(),
+        members=(),
+        object_set=None,
     )
 
 
