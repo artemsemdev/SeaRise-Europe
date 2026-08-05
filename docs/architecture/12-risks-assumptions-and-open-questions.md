@@ -37,7 +37,7 @@
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
 | R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Low / Critical | The legacy build path now always refuses this operation. Phase 0.7 implements the 1995–2014 baseline and interval contract, but publication remains blocked until the numerical transform and controls validate it. |
 | R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | The adapter now verifies locked model/member hashes and echoed harmonic metadata before differencing. It fails before engine execution while EGM2008 constants, common ellipsoid, engine version, permanent-tide rule, numeric bounds, basin controls, reproducibility, and review remain missing. |
-| R-17 | Copernicus DSM/HEM is treated as bare-earth terrain or as a complete per-pixel error bound | High / Critical | GLO-30 is selected, but HEM is used only for random error on valid unedited pixels. `U_systematic`, `U_edit`, `U_DSM`, and `U_resolution` never default to zero; publication stays blocked until each term is independently bounded and reviewed. |
+| R-17 | Copernicus DSM/HEM is treated as bare-earth terrain or as a complete per-pixel error bound | High / Critical | Phase 0.11 rejects the current binary publication method: HEM bounds only random error on valid unedited pixels, the 4 m LE90 is a product envelope, and no finite DSM-to-bare-earth or shoreline-resolution bound exists. Supersede the terrain method/source rather than defaulting those terms to zero. |
 | R-18 | Green CI or source-integrity checks are mistaken for scientific approval | Medium / Critical | The Phase 0.9 schema sets `automation.canAuthorizeDecision=false`. Only the explicit #98 final-gate decision, with zero blockers, nine completed combinations, complete artifacts, and all named reviews, can unlock Phase 1. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
@@ -62,6 +62,11 @@ does not exist. Resolve #94 geoid conventions, #95 uncertainty bounds, #96
 basin controls, and #97 scope/connectivity review in order. The corrected Phase
 0.9 evidence is immutable; #98 alone may re-evaluate the final gate and
 possibly unlock Phase 1.
+Phase 0.11 quantifies the finite source terms but confirms that coastal SLA
+representativeness and DSM-to-bare-earth error are not finitely bounded by the
+locked evidence. The automated recommendation is therefore `rejected`, not
+`approved`; the authoritative disposition remains pending independent review,
+publication stays blocked, and a superseding method remains required.
 
 ## Assumptions that require evidence
 

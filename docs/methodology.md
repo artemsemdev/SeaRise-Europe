@@ -213,6 +213,32 @@ future final-gate re-evaluation and the only issue that may unlock Phase 1. It
 may approve only with zero blockers, all nine combinations and hashed artifacts
 complete, and every required independent review recorded.
 
+## Phase 0.11 uncertainty-budget result
+
+The [machine-readable Phase 0.11 budget](../src/pipeline/science/coastal-uncertainty-budget.json)
+calibrates every selected non-projection term at a common 90% interpretation
+and keeps the AR6 `0.167`/`0.833` interval separate. It derives a conservative
+`0.0981413 m` SLA mapping term from the worst European QUID variance plus the
+documented two-altimeter degradation, uses `1.645 × err_mdt` per valid MDT
+cell, and retains the GLO-30 `4 m` product LE90 as an envelope rather than
+double-counting it with `1.645 × HEM`.
+
+That calibration does not make the binary method publishable. The SLA QUID
+gives an open-ended coastal error range without a cell mapping, while GLO-30
+is a DSM and supplies neither a bare-earth correction nor a finite maximum
+building/vegetation bias. Edited/fill, shoreline, and effective-resolution
+terms also lack independent truth bounds. Since those terms apply to the
+intended coastal land result, they become `DataUnavailable`; a maximum-total
+threshold is deliberately absent because it cannot repair missing evidence.
+
+The resulting automated recommendation is `rejected`, as required by #95 when
+the selected binary method is indefensible. This is not an authoritative
+reviewed rejection: the human disposition remains `pending` and the
+publication gate remains `blocked` until an independent scientific/data
+reviewer records it. Until the method is superseded with a finite coastal water
+reference and defensible bare-earth terrain source, #98 cannot authorize a
+regional binary release.
+
 ## Required preprocessing record
 
 Before approval, the pipeline must record and test:

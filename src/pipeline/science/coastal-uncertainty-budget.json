@@ -1,0 +1,464 @@
+{
+  "$schema": "./coastal-uncertainty-budget.schema.json",
+  "schemaVersion": 1,
+  "contractId": "phase-0.11-coastal-uncertainty-budget",
+  "issue": 95,
+  "methodologyId": "absolute-mean-water-surface-egm2008-interval-v1",
+  "decision": {
+    "status": "complete",
+    "authority": "automated-methodology-analysis",
+    "recommendedDisposition": "rejected",
+    "reason": "The locked sources do not provide a finite coastal SLA representativeness bound or a finite GLO-30 DSM-to-bare-earth bound. Both apply to the intended land-exposure result, so no scientific binary cell is eligible under the fail-closed rule."
+  },
+  "confidenceFramework": {
+    "level": 0.9,
+    "normalMultiplier": 1.645,
+    "projectionTreatment": "AR6 q0.167/q0.833 remains a separate projection interval",
+    "aggregation": "sum-absolute-non-projection-bounds",
+    "dependence": [
+      "No independence is claimed between SLA, MDT, geoid, DEM, coastline, or representation errors.",
+      "Finite non-projection bounds are added by absolute magnitude; covariance cancellation is prohibited.",
+      "The Copernicus DEM 4 m LE90 product envelope contains random and systematic error, so HEM is reported separately but is not added a second time when it is below that envelope.",
+      "AR6 projection quantiles are not combined probabilistically with measurement or transformation terms."
+    ]
+  },
+  "terms": [
+    {
+      "id": "sla-l4-mapping",
+      "component": "baseline",
+      "units": "m",
+      "scope": "Source-native valid European L4 SLA water cells for which all four bilinear neighbours exist",
+      "source": {
+        "id": "copernicus-marine-eur-sla-monthly",
+        "version": "202411 / QUID issue 15.0",
+        "assetSha256": "0be07a469ea5aeb6c03579df5c2ab80a2a83635e94204fa8c90cd1ba59bcd48e",
+        "location": "QUID Table 14 and the documented 40 percent two-altimeter degradation"
+      },
+      "confidence": {
+        "level": 0.9,
+        "interpretation": "Normal-equivalent absolute bound derived from the largest European regional independent-track error variance; it is conditional on the QUID RMS distribution and deliberately receives no temporal averaging reduction"
+      },
+      "numeric": {
+        "kind": "constant",
+        "value": 0.0981413,
+        "equation": "1.645 * 1.40 * sqrt(max(18.05,14.76,18.16) cm^2) / 100"
+      },
+      "licence": "Copernicus Marine Service products licence",
+      "provenance": "CMEMS-SL-QUID-008-033-068.pdf SHA-256 0be07a469ea5aeb6c03579df5c2ab80a2a83635e94204fa8c90cd1ba59bcd48e",
+      "status": "bounded-conditionally",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "mdt-formal-mapping",
+      "component": "baseline",
+      "units": "m",
+      "scope": "Valid water cells in mdt_cmems_2024_europe.nc with finite non-negative err_mdt and four-neighbour interpolation support",
+      "source": {
+        "id": "copernicus-marine-eur-mdt",
+        "version": "202411",
+        "assetSha256": "397cdca04e899ceb9eb3182f87cab64498357881407b3ab769796ce756249682",
+        "location": "err_mdt variable and PUM section II.3"
+      },
+      "confidence": {
+        "level": 0.9,
+        "interpretation": "1.645 times the per-cell formal standard error; this is a mapping term, not a complete MDT truth bound"
+      },
+      "numeric": {
+        "kind": "per-cell",
+        "value": null,
+        "equation": "U_mdt = 1.645 * err_mdt; observed valid source range is 0.0002 to 0.3000 m"
+      },
+      "licence": "Copernicus Marine Service products licence",
+      "provenance": "NetCDF SHA-256 397cdca04e899ceb9eb3182f87cab64498357881407b3ab769796ce756249682; PUM SHA-256 640736fc0927ab2bb5d2e7574596f4c3c27c1894621fddcc66e6bbc8fc846425",
+      "status": "bounded-conditionally",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "temporal-weighting",
+      "component": "baseline",
+      "units": "m",
+      "scope": "The exact locked 240-month 1995-01 through 2014-12 SLA sequence",
+      "source": {
+        "id": "copernicus-marine-eur-sla-monthly",
+        "version": "202411",
+        "assetSha256": "94364fcb281bc3e0e3ee7d74c769f2dee5ad630305e040e5940603f1cecee5a7",
+        "location": "locked object manifest and PUM monthly simple-average semantics"
+      },
+      "confidence": {
+        "level": 1.0,
+        "interpretation": "Exact deterministic calendar-day weights; a missing or duplicate month is nodata, not uncertainty"
+      },
+      "numeric": {
+        "kind": "exact-zero",
+        "value": 0.0,
+        "equation": "U_weighting = 0 only when objectCount=240 and calendarDayWeight=7305"
+      },
+      "licence": "Copernicus Marine Service products licence",
+      "provenance": "Manifest SHA-256 94364fcb281bc3e0e3ee7d74c769f2dee5ad630305e040e5940603f1cecee5a7",
+      "status": "inapplicable",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "reference-period-completeness",
+      "component": "baseline",
+      "units": "m",
+      "scope": "1995-01-01 inclusive through 2015-01-01 exclusive",
+      "source": {
+        "id": "copernicus-marine-eur-sla-monthly",
+        "version": "202411",
+        "assetSha256": "77c8294956444b78c0d5d9127692f77ec597f2ec93476e71c296700cebbdda18",
+        "location": "complete payload receipt"
+      },
+      "confidence": {
+        "level": 1.0,
+        "interpretation": "Exact interval identity; incomplete coverage is rejected before computation"
+      },
+      "numeric": {
+        "kind": "exact-zero",
+        "value": 0.0,
+        "equation": "U_period = 0 only for the complete locked interval; otherwise DataUnavailable"
+      },
+      "licence": "Copernicus Marine Service products licence",
+      "provenance": "Payload SHA-256 77c8294956444b78c0d5d9127692f77ec597f2ec93476e71c296700cebbdda18",
+      "status": "inapplicable",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "horizontal-interpolation",
+      "component": "baseline",
+      "units": "m",
+      "scope": "Bilinear evaluation of the modelled source field strictly inside four valid source neighbours",
+      "source": {
+        "id": "phase-0.7-transform",
+        "version": "v1",
+        "assetSha256": null,
+        "location": "searise_pipeline.science.baseline.bilinear_inside_support"
+      },
+      "confidence": {
+        "level": 1.0,
+        "interpretation": "The interpolation is the definition of the reconstructed model field; it is not asserted to recover unresolved physical coastal variation"
+      },
+      "numeric": {
+        "kind": "exact-zero",
+        "value": 0.0,
+        "equation": "U_numeric_interpolation = 0 for finite four-neighbour convex interpolation; extrapolation is forbidden"
+      },
+      "licence": "SeaRise Europe MIT licence",
+      "provenance": "Repository implementation and fail-closed interpolation tests",
+      "status": "inapplicable",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "coastal-sla-representativeness",
+      "component": "baseline",
+      "units": "m",
+      "scope": "Immediate shoreline, ports, estuaries, lagoons, narrow channels, and land cells whose water reference is inferred from the offshore 0.0625 degree SLA field",
+      "source": {
+        "id": "copernicus-marine-eur-sla-monthly",
+        "version": "202411 / QUID issue 15.0",
+        "assetSha256": "0be07a469ea5aeb6c03579df5c2ab80a2a83635e94204fa8c90cd1ba59bcd48e",
+        "location": "QUID coastal tide-gauge validation and effective-resolution discussion"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "The QUID reports coastal RMS differences from about 0.01 m to more than 0.10 m and no finite cell-level upper bound or mapping from those statistics to this shoreline grid"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "No defensible finite U_coast can be derived from an open-ended RMS range"
+      },
+      "licence": "Copernicus Marine Service products licence",
+      "provenance": "CMEMS-SL-QUID-008-033-068.pdf SHA-256 0be07a469ea5aeb6c03579df5c2ab80a2a83635e94204fa8c90cd1ba59bcd48e",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "geoid-evaluator-disagreement",
+      "component": "geoid",
+      "units": "m",
+      "scope": "GOCO06S-to-EGM2008 tide-free undulation difference at every supported evaluation point",
+      "source": {
+        "id": "phase-0.10-geoid-evaluator",
+        "version": "issue-94",
+        "assetSha256": null,
+        "location": "Issue #94 evaluator comparison receipt"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "Required per-cell evaluator disagreement; this budget must bind the #94 receipt after integration"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "U_geoid = abs(delta_evaluator_A - delta_evaluator_B)"
+      },
+      "licence": "GOCO06S CC BY 4.0; official NGA EGM2008 public release; evaluator licence bound by #94",
+      "provenance": "GOCO06S archive SHA-256 980e00abdb126994ff0a682fe7de4226acd77b35ed247bf1732783759fb600b6; EGM2008 archive SHA-256 65a9072f337f156e8cbd76ffd773f536e6fb0de18697ea6726ecdb790fac0fbd",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "dem-random-error",
+      "component": "terrain",
+      "units": "m",
+      "scope": "Unedited and unfilled GLO-30 land pixels with finite non-negative HEM sigma",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1 / Product Handbook 5.0",
+        "assetSha256": "b5a0b027bddef7122e39de368dba9cf10adce8631a2e3026d246b4be98c3f0c4",
+        "location": "Product Handbook section 1.2.5.3"
+      },
+      "confidence": {
+        "level": 0.9,
+        "interpretation": "Normal-equivalent per-pixel random interferometric phase bound; HEM excludes systematic, phase-unwrapping, edit, fill, and representation effects"
+      },
+      "numeric": {
+        "kind": "per-cell",
+        "value": null,
+        "equation": "U_random = 1.645 * HEM"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "Product Handbook issue 5.0 SHA-256 b5a0b027bddef7122e39de368dba9cf10adce8631a2e3026d246b4be98c3f0c4 and locked five-layer control manifest",
+      "status": "bounded-conditionally",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "dem-absolute-systematic-envelope",
+      "component": "terrain",
+      "units": "m",
+      "scope": "Unedited TanDEM-X/WorldDEM terrain represented by GLO-30, excluding edited/fill and local deviations not covered by the global specification",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1 / Product Handbook 5.0",
+        "assetSha256": "b5a0b027bddef7122e39de368dba9cf10adce8631a2e3026d246b4be98c3f0c4",
+        "location": "Product Handbook section 2.1 and Table 12"
+      },
+      "confidence": {
+        "level": 0.9,
+        "interpretation": "Published product-level absolute vertical LE90 envelope includes random and systematic errors; local geotiles can exceed it"
+      },
+      "numeric": {
+        "kind": "constant",
+        "value": 4.0,
+        "equation": "U_dem_instrument = max(4.0, 1.645 * HEM); do not add both envelopes"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "Product Handbook issue 5.0 SHA-256 b5a0b027bddef7122e39de368dba9cf10adce8631a2e3026d246b4be98c3f0c4",
+      "status": "bounded-conditionally",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "dem-edit-fill",
+      "component": "terrain",
+      "units": "m",
+      "scope": "Any GLO-30 pixel marked edited or filled by EDM/FLM or carrying the HEM sentinel -32767",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1 / Product Handbook 5.0",
+        "assetSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+        "location": "locked EDM/FLM/HEM layers and Product Handbook sections 1.2.5.1-1.2.5.3"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "The handbook supplies source categories but no category-specific finite elevation accuracy"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "No substitution is permitted for edited or filled pixels"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "Five-layer manifest SHA-256 4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "dsm-to-bare-earth-representation",
+      "component": "terrain",
+      "units": "m",
+      "scope": "Every GLO-30 land pixel used to make a claim about land terrain or inundation",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1 / Product Handbook 5.0",
+        "assetSha256": "b5a0b027bddef7122e39de368dba9cf10adce8631a2e3026d246b4be98c3f0c4",
+        "location": "Product Handbook definition of Copernicus DEM as a DSM including buildings, infrastructure, and vegetation"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "No bare-earth reference, land-cover correction, or finite maximum vegetation/building bias is locked"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "U_DSM is unbounded for a bare-earth land-exposure claim"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "Product Handbook issue 5.0 SHA-256 b5a0b027bddef7122e39de368dba9cf10adce8631a2e3026d246b4be98c3f0c4",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "water-mask",
+      "component": "masking",
+      "units": "m",
+      "scope": "GLO-30 WBM pixels classified as ocean, lake, or river",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1",
+        "assetSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+        "location": "locked WBM layers"
+      },
+      "confidence": {
+        "level": 1.0,
+        "interpretation": "Categorical eligibility rule, not a vertical error; water pixels cannot become exposed land"
+      },
+      "numeric": {
+        "kind": "exact-zero",
+        "value": 0.0,
+        "equation": "U_WBM is not applicable because WBM!=0 is excluded before vertical classification"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "Five-layer manifest SHA-256 4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+      "status": "inapplicable",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "terrain-void",
+      "component": "masking",
+      "units": "m",
+      "scope": "Missing DEM, invalid HEM, unexpected EDM/FLM/WBM codes, or missing mosaic neighbours",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1",
+        "assetSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+        "location": "locked five-layer controls"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "A missing elevation has no numerical substitute"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "void -> DataUnavailable"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "Five-layer manifest SHA-256 4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "coastline-representation",
+      "component": "terrain",
+      "units": "m",
+      "scope": "GLO-30 posts whose approximately 30 m support intersects the physical shoreline or narrow coastal structures",
+      "source": {
+        "id": "copernicus-dem-glo30",
+        "version": "2021_1",
+        "assetSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+        "location": "one-arc-second RasterPixelIsPoint grid and five real-source resolution controls"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "The selected controls measure GLO-30/GLO-90 disagreement but have no independent sub-pixel elevation truth"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "No finite U_coastline follows from grid spacing alone"
+      },
+      "licence": "Copernicus DEM GLO-30 free licence with mandatory derivative notice",
+      "provenance": "phase-0-8-terrain-geography.json real-source controls",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    },
+    {
+      "id": "effective-resolution",
+      "component": "terrain",
+      "units": "m",
+      "scope": "Within-cell relief and resampling representation at steep coasts, low-relief deltas, ports, estuaries, and islands",
+      "source": {
+        "id": "phase-0.8-terrain-controls",
+        "version": "2021_1 control set",
+        "assetSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+        "location": "five GLO-30/GLO-90 coastal comparisons"
+      },
+      "confidence": {
+        "level": null,
+        "interpretation": "Resolution disagreement is sensitivity evidence, not an accuracy bound, because neither raster is independent vertical truth"
+      },
+      "numeric": {
+        "kind": "unbounded",
+        "value": null,
+        "equation": "Observed p95 absolute GLO-30/GLO-90 differences range 0.6333-1.4552 m but cannot bound terrain truth"
+      },
+      "licence": "Copernicus DEM GLO-30/GLO-90 free licences with mandatory derivative notices",
+      "provenance": "GLO-30 manifest SHA-256 4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6 and GLO-90 manifest SHA-256 5c2d1848c5fefb81d9a280afbaaeb745490444ff7b5faded052f9eddc93d3e85",
+      "status": "unbounded",
+      "unsupportedOutcome": "DataUnavailable"
+    }
+  ],
+  "eligibility": {
+    "requiredBoundTermIds": [
+      "sla-l4-mapping",
+      "mdt-formal-mapping",
+      "coastal-sla-representativeness",
+      "geoid-evaluator-disagreement",
+      "dem-random-error",
+      "dem-absolute-systematic-envelope",
+      "dem-edit-fill",
+      "dsm-to-bare-earth-representation",
+      "terrain-void",
+      "coastline-representation",
+      "effective-resolution"
+    ],
+    "unboundedTermIds": [
+      "coastal-sla-representativeness",
+      "geoid-evaluator-disagreement",
+      "dem-edit-fill",
+      "dsm-to-bare-earth-representation",
+      "terrain-void",
+      "coastline-representation",
+      "effective-resolution"
+    ],
+    "rules": [
+      { "condition": "any required term is unbounded, missing, non-finite, or outside scope", "outcome": "DataUnavailable" },
+      { "condition": "SLA or MDT lacks four valid source neighbours", "outcome": "DataUnavailable:transform-out-of-coverage" },
+      { "condition": "EDM/FLM marks edited or filled, HEM is sentinel, or DEM/WBM code is unexpected", "outcome": "DataUnavailable:missing-uncertainty-bound" },
+      { "condition": "WBM is ocean, lake, or river", "outcome": "exclude from exposed-land publication" },
+      { "condition": "all bounds are finite but the clearance interval crosses zero", "outcome": "DataUnavailable:uncertain-threshold" }
+    ],
+    "missingRule": "DataUnavailable",
+    "thresholdCrossingRule": "DataUnavailable:uncertain-threshold"
+  },
+  "sensitivity": {
+    "evidenceRef": "src/pipeline/science/evidence/phase-0-8-terrain-geography.json",
+    "contexts": [
+      { "id": "lisbon-steep-estuary", "kind": "steep coast and estuary", "observed": "GLO-30 p95 HEM sigma 1.7963 m; p95 resolution disagreement 1.4552 m; 47,889 edited/filled land pixels", "result": "DataUnavailable" },
+      { "id": "netherlands-low-coast", "kind": "low-relief delta", "observed": "GLO-30 p95 HEM sigma 1.5569 m; 105,893 edited/filled land pixels; no DSM-to-terrain bound", "result": "DataUnavailable" },
+      { "id": "venice-lagoon", "kind": "port and lagoon", "observed": "21.8538 m maximum resolution disagreement and 54,181 edited/filled land pixels", "result": "DataUnavailable" },
+      { "id": "malta-small-islands", "kind": "small islands", "observed": "16.2168 m maximum resolution disagreement and 896 coarse water cells containing GLO-30 land", "result": "DataUnavailable" },
+      { "id": "reykjavik-steep-island", "kind": "steep island", "observed": "11.5694 m maximum resolution disagreement and SLA support north of 66.03125 degrees is unavailable", "result": "DataUnavailable" },
+      { "id": "synthetic-void-mutation", "kind": "void", "observed": "Removing a required terrain bound invalidates the entire target cell", "result": "DataUnavailable" },
+      { "id": "synthetic-threshold-mutation", "kind": "near-threshold", "observed": "Widening a complete interval can demote a binary class but cannot flip it", "result": "defensible-only-with-complete-bounds" }
+    ],
+    "conclusion": "The interval classifier is logically fail-closed, but the selected real sources cannot supply every required finite bound. Choosing a maximum-total threshold cannot repair missing evidence and would only manufacture apparent binary coverage."
+  },
+  "maximumTotalUncertaintyMetres": null,
+  "review": {
+    "status": "pending-independent",
+    "authoritativeDisposition": "pending",
+    "requiredRole": "independent scientific/data reviewer",
+    "record": "No independent person has approved, rejected, or blocked this recommendation. Automation may prepare evidence but cannot self-approve it."
+  },
+  "publicationGate": {
+    "status": "blocked",
+    "blockingDecisions": [
+      "independent-uncertainty-budget-review",
+      "finite-coastal-sla-representativeness-bound-or-method-change",
+      "finite-bare-earth-and-coastline-bound-or-terrain-source-change",
+      "approved-geoid-evaluator-disagreement-from-issue-94"
+    ]
+  }
+}
