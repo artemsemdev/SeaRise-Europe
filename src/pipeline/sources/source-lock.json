@@ -1,6 +1,6 @@
 {
   "$schema": "./source-lock.schema.json",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sources": [
     {
       "id": "ipcc-ar6-sea-level",
@@ -25,6 +25,7 @@
       "assets": [
         {
           "id": "location-list",
+          "kind": "file",
           "url": "https://zenodo.org/api/records/6382554/files/location_list.lst/content",
           "resolvedUrl": "https://zenodo.org/api/records/6382554/files/location_list.lst/content",
           "resolvedVersion": "20210809",
@@ -60,6 +61,7 @@
       "assets": [
         {
           "id": "cities15000",
+          "kind": "file",
           "url": "https://download.geonames.org/export/dump/cities15000.zip",
           "resolvedUrl": "https://download.geonames.org/export/dump/cities15000.zip",
           "resolvedVersion": "2026-08-04",
@@ -92,6 +94,7 @@
       "assets": [
         {
           "id": "admin-0-countries",
+          "kind": "file",
           "url": "https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip",
           "resolvedUrl": "https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_countries.zip",
           "resolvedVersion": "5.1.1",
@@ -104,6 +107,7 @@
         },
         {
           "id": "ocean",
+          "kind": "file",
           "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_ocean.zip",
           "resolvedUrl": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_ocean.zip",
           "resolvedVersion": "5.1.1",
@@ -140,6 +144,7 @@
       "assets": [
         {
           "id": "netherlands-n52-e004-sample",
+          "kind": "file",
           "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_E004_00_DEM/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
           "resolvedUrl": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_E004_00_DEM/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
           "resolvedVersion": "2021_1",
@@ -176,6 +181,7 @@
       "assets": [
         {
           "id": "netherlands-n52-e004-sample",
+          "kind": "file",
           "url": "https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N52_00_E004_00_DEM/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
           "resolvedUrl": "https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N52_00_E004_00_DEM/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
           "resolvedVersion": "2021_1",
