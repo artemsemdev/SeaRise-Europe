@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import tempfile
 import time
 from dataclasses import asdict, dataclass
@@ -16,7 +17,6 @@ import numpy as np
 from searise_pipeline.science.contracts import ScienceContractError
 
 from .cog import CogEvidence, write_analysis_cog
-from .gate import evaluate_recovery_gate
 from .geoparquet import GeoParquetEvidence, write_geoparquet
 from .model import RegionalLayer, RegionalReleaseSource, assert_source_integrity
 from .pmtiles import (
@@ -26,6 +26,8 @@ from .pmtiles import (
 )
 from .source_grid import SourceGridEvidence, write_source_grid
 from .toolchain import validate_python_toolchain
+
+_RELEASE_ID = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
 
 
 def _sha256(path: Path) -> str:
@@ -157,7 +159,7 @@ def _validate_lookup_goldens(
     if declared_states | controls != required_states:
         raise ScienceContractError("Lookup goldens do not cover all four product states")
     return {
-        "path": str(goldens_path),
+        "path": f"src/pipeline/science/evidence/{goldens_path.name}",
         "sha256": _sha256(goldens_path),
         "availableControlCount": available_count,
         "coveredStates": sorted(required_states),
@@ -189,14 +191,27 @@ def build_regional_release(
     pmtiles_distribution_platform: str,
     python_lock_path: Path,
     lookup_goldens_path: Path,
-    reproducibility_report: Mapping[str, Any] | None = None,
-    delivery_report: Mapping[str, Any] | None = None,
-    owner_decision: str = "pending-owner",
+    build_environment_id: str,
+    source_revision: str,
+    workflow_started_monotonic: float | None = None,
 ) -> ReleaseBuildResult:
-    """Build into a private directory and publish atomically only after validation."""
+    """Build an immutable candidate; external evidence is finalized separately."""
+    started = workflow_started_monotonic or time.perf_counter()
+    if started > time.perf_counter():
+        raise ScienceContractError("Workflow start timestamp cannot be in the future")
+    if not _RELEASE_ID.fullmatch(release_id):
+        raise ScienceContractError("Release ID contains unsafe or non-canonical characters")
+    if not build_environment_id.strip():
+        raise ScienceContractError("A non-empty clean build environment ID is required")
+    if not re.fullmatch(r"[0-9a-f]{40}", source_revision):
+        raise ScienceContractError("Source revision must be one exact Git commit SHA")
     if output_directory.exists():
         raise ScienceContractError(f"Immutable release path already exists: {output_directory}")
     assert_source_integrity(source, contract, require_verified_archive=False)
+    if source.archive_and_members_verified_this_build and workflow_started_monotonic is None:
+        raise ScienceContractError(
+            "Verified-archive builds must time the workflow from before source verification"
+        )
     output_directory.parent.mkdir(parents=True, exist_ok=True)
     python_toolchain = validate_python_toolchain(python_lock_path, contract=contract)
     toolchain = validate_vector_toolchain(
@@ -210,11 +225,13 @@ def build_regional_release(
         contract=contract,
     )
     lookup_evidence = _validate_lookup_goldens(source, lookup_goldens_path)
-    started = time.perf_counter()
     with tempfile.TemporaryDirectory(
         prefix="searise-release-", dir=output_directory.parent
     ) as temporary:
-        root = Path(temporary) / release_id
+        temporary_root = Path(temporary).resolve()
+        root = temporary_root / release_id
+        if root.resolve().parent != temporary_root:
+            raise ScienceContractError("Release ID escapes the private staging directory")
         root.mkdir()
         cogs: list[CogEvidence] = []
         pmtiles: list[PmtilesEvidence] = []
@@ -248,7 +265,6 @@ def build_regional_release(
                     pmtiles_distribution_platform=pmtiles_distribution_platform,
                 )
             )
-        duration = round(time.perf_counter() - started, 6)
         statistics = {
             "schemaVersion": 1,
             "releaseId": release_id,
@@ -318,9 +334,12 @@ def build_regional_release(
                     source.archive_and_members_verified_this_build
                 ),
                 "completeScenarioHorizonMatrix": len(source.layers) == 9,
+                "sourceContentSeal": True,
+                "nonAllNodataLayers": len(cogs) == 9
+                and all(item.valid_cells > 0 for item in cogs),
+                "cogStructureAndValues": len(cogs) == 9,
                 "sourceGridIdentity": source_grid.cell_count
                 == contract["grid"]["width"] * contract["grid"]["height"],
-                "cogStructureAndValues": len(cogs) == 9,
                 "geoparquetSchemaAndValues": geoparquet.row_count
                 == sum(item.source_feature_count for item in pmtiles),
                 "pmtilesStructureAndProperties": len(pmtiles) == 9,
@@ -335,13 +354,6 @@ def build_regional_release(
             "lookupGoldenEvidence": lookup_evidence,
             "totals": totals,
         }
-        gate = evaluate_recovery_gate(
-            build_evidence,
-            contract=contract,
-            reproducibility_report=reproducibility_report,
-            delivery_report=delivery_report,
-            owner_decision=owner_decision,
-        )
         source_receipt = {
             "schemaVersion": 1,
             "sourceMode": source.source_mode,
@@ -361,9 +373,13 @@ def build_regional_release(
         build_receipt = {
             "schemaVersion": 1,
             "releaseId": release_id,
+            "sourceRevision": source_revision,
             "toolchainPins": contract["toolchain"],
-            "observedPython": asdict(python_toolchain),
-            "observedBinaries": asdict(toolchain),
+            "environmentIdentity": {
+                "buildRunId": build_environment_id,
+                "python": asdict(python_toolchain),
+                "vector": asdict(toolchain),
+            },
             "normalizedParameters": {
                 "nativeResolutionDegrees": 1,
                 "pmtilesMaximumZoom": contract["artifacts"]["pmtiles"]["maximumZoom"],
@@ -376,7 +392,7 @@ def build_regional_release(
             "releaseId": release_id,
             "releaseContractId": contract["releaseContractId"],
             "scientificDisposition": contract["scientificDisposition"],
-            "publicationStatus": "approved" if gate["phase1Unlocked"] else "not-approved",
+            "publicationStatus": "pending-owner",
             "modeledQuantity": "regional-relative-sea-level-change",
             "baseline": contract["values"]["baseline"],
             "confidence": contract["values"]["confidence"],
@@ -398,26 +414,19 @@ def build_regional_release(
         _write_json(root / "source-receipt.json", source_receipt)
         _write_json(root / "build-receipt.json", build_receipt)
         _write_json(root / "build-evidence.json", build_evidence)
-        _write_json(root / "gate.json", gate)
-        _write_json(
-            root / "reproducibility.json",
-            reproducibility_report
-            or {"schemaVersion": 1, "status": "pending", "reason": "second-environment-required"},
-        )
-        _write_json(
-            root / "delivery-measurements.json",
-            delivery_report
-            or {
-                "schemaVersion": 1,
-                "status": "pending",
-                "buildDurationSeconds": duration,
-                "artifactBytes": totals,
-                "reason": "browser-profile-measurements-required",
-            },
-        )
         _write_json(root / "manifest.json", manifest)
+        from .gate import evaluate_recovery_gate
+
+        gate = evaluate_recovery_gate(
+            build_evidence,
+            contract=contract,
+            reproducibility_report=None,
+            delivery_report=None,
+        )
+        _write_json(root / "gate.json", gate)
         _checksums(root)
         os.replace(root, output_directory)
+    duration = round(time.perf_counter() - started, 6)
     return ReleaseBuildResult(
         output_directory=output_directory,
         manifest=manifest,
