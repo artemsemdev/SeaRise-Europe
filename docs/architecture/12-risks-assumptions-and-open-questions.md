@@ -6,6 +6,8 @@
 > assumption into a fact.
 >
 > **Phase 0.2 evidence:** [source semantics, datum, DEM, and geometry QA](../science/phase-0-2-source-and-geography-evidence.md)
+>
+> **Phase 0.5 evidence:** [selected vertical methodology](../science/phase-0-5-vertical-methodology-evidence.md)
 
 ## Current risk register
 
@@ -25,13 +27,16 @@
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
 | R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | Clearly label synthetic fixtures; block production claim and decommissioning until ADR-021 Phase 0–3 gates pass. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
-| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Certain / Critical | The build now refuses this operation by default. Exit requires a pinned baseline water/tidal surface, reviewed transformation to EGM2008, combined uncertainty controls, and scientific/data approval. |
+| R-15 | Relative AR6 change is compared directly with absolute EGM2008 DSM height | Certain / Critical | The build refuses this operation. ADR-023 replaces it with a 1995–2014 ADT baseline transformed to EGM2008 and an interval rule; exit still requires pinned inputs, validated implementation, controls, and independent approval. |
+| R-16 | The GOCO06S-to-EGM2008 transform mixes geoid realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Medium / Critical | Evaluate both pinned models on the same ellipsoid and tide-free convention, record the full transformation receipt and uncertainty, compare independent controls across European basins, and fail closed on any unsupported cell or missing bound. |
 
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
 records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
 and R-13. It proves a small real COG and lookup/range mechanics, but closes none
 of those risks: datum compatibility, scientific controls, connectivity,
 canonical coastal scope, PMTiles, public hosting, and human review remain open.
+Phase 0.5 selects the vertical strategy but closes none of these measured or
+human-review risks by documentation alone.
 
 ## Assumptions that require evidence
 

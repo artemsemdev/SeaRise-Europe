@@ -17,6 +17,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Selected an uncertainty-aware vertical methodology that constructs a
+  1995–2014 mean water surface on EGM2008 and returns ambiguous cells as data
+  unavailable; publication remains blocked pending exact inputs and review.
 - Pull requests now route CI and CodeQL by changed component, so
   documentation-only changes resolve lightweight gates without running
   frontend, API, pipeline, Docker, or full-stack tests.
