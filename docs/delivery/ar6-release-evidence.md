@@ -56,9 +56,9 @@ Both jobs must pass. Record the workflow run ID, source SHA, job IDs, job
 conclusions, and artifact IDs and digests. The expected artifacts are:
 
 - `ar6-linux-candidate-<sourceRevision>-<runId>` containing
-  `/tmp/phase-0r-ar6-v1` and `/tmp/build-timing-linux.json`;
+  `phase-0r-ar6-v1/...` and `build-timing-linux.json`;
 - `ar6-macos-arm64-candidate-<sourceRevision>-<runId>` containing
-  `/tmp/phase-0r-ar6-v1` and `/tmp/build-timing-macos-arm64.json`.
+  `phase-0r-ar6-v1/...` and `build-timing-macos-arm64.json`.
 
 Artifacts are retained for 14 days and cannot overwrite an artifact from the
 same run. A successful build remains a candidate with a pending scientific
