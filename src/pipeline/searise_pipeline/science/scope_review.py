@@ -286,7 +286,9 @@ def _validate_dependency_records(document: Mapping[str, Any]) -> None:
         raise ScienceContractError("Phase 0.13 blockers differ from dependency evidence")
 
 
-def _validate_metric_observation(control: Mapping[str, Any]) -> bool:
+def _validate_metric_observation(
+    control: Mapping[str, Any], blocking_dependencies: Sequence[int]
+) -> bool:
     observation = control["observation"]
     metrics = observation["metrics"]
     if observation["status"] != "complete":
@@ -294,8 +296,24 @@ def _validate_metric_observation(control: Mapping[str, Any]) -> bool:
             raise ScienceContractError(
                 f"Incomplete empirical control {control['id']} contains invented metrics"
             )
+        if observation["evidence"] is not None:
+            raise ScienceContractError(
+                f"Incomplete empirical control {control['id']} contains evidence"
+            )
+        if observation["blockingIssues"] != list(blocking_dependencies):
+            raise ScienceContractError(
+                f"Empirical blockers differ from dependencies for {control['id']}"
+            )
         return False
 
+    if observation["evidence"] is None:
+        raise ScienceContractError(
+            f"Complete empirical control {control['id']} lacks checksum-bound evidence"
+        )
+    if observation["blockingIssues"]:
+        raise ScienceContractError(
+            f"Complete empirical control {control['id']} retains blockers"
+        )
     required = (
         "preFilterPositiveCellCount",
         "postFilterPositiveCellCount",
@@ -368,7 +386,11 @@ def validate_scope_connectivity_review(
     if not REQUIRED_EMPIRICAL_KINDS.issubset(kinds):
         missing = ", ".join(sorted(REQUIRED_EMPIRICAL_KINDS - kinds))
         raise ScienceContractError(f"Phase 0.13 empirical coverage is incomplete: {missing}")
-    empirical_complete = all(_validate_metric_observation(item) for item in empirical)
+    empirical_results = [
+        _validate_metric_observation(item, document["blockingDependencies"])
+        for item in empirical
+    ]
+    empirical_complete = all(empirical_results)
     empirical_undisputed = empirical_complete and all(
         item["observation"]["metrics"]["disputedCellCount"] == 0
         and item["observation"]["metrics"]["tileSeamMismatchCellCount"] == 0
@@ -394,6 +416,20 @@ def validate_scope_connectivity_review(
     reviewer_records = list(review["reviewers"].values())
     proofs_present = all(record["proof"] is not None for record in reviewer_records)
     reviewers_decided = all(record["decision"] != "pending" for record in reviewer_records)
+    reviewer_identities = [
+        " ".join(str(record["reviewer"]).split()).casefold()
+        for record in reviewer_records
+        if record["reviewer"] is not None
+    ]
+    if len(reviewer_identities) == 2 and len(set(reviewer_identities)) != 2:
+        raise ScienceContractError("Phase 0.13 reviewer identities must be distinct")
+    reviewer_fingerprints = [
+        record["proof"]["publicKeySha256"]
+        for record in reviewer_records
+        if record["proof"] is not None
+    ]
+    if len(reviewer_fingerprints) == 2 and len(set(reviewer_fingerprints)) != 2:
+        raise ScienceContractError("Phase 0.13 reviewer key fingerprints must be distinct")
     all_controls_approved = all(
         item["reviewerStatus"] == "approved"
         and item["automationStatus"] == "passed"
@@ -453,6 +489,14 @@ def verify_evidence_bindings(document: Mapping[str, Any], repo_root: Path) -> No
         if _sha256(repo_root / binding["path"]) != binding["sha256"]:
             raise ScienceContractError(
                 f"Phase 0.13 evidence changed after binding: {binding['id']}"
+            )
+    for control in document["empiricalControls"]:
+        if control["observation"]["status"] != "complete":
+            continue
+        binding = control["observation"]["evidence"]
+        if _sha256(repo_root / binding["path"]) != binding["sha256"]:
+            raise ScienceContractError(
+                f"Phase 0.13 empirical evidence changed after binding: {control['id']}"
             )
     actual_bindings, artifacts = _dependency_artifacts(repo_root)
     missing = [
@@ -608,6 +652,7 @@ def _empirical_control(
     provenance: str,
     expected: str,
     required_checks: list[str],
+    blocking_issues: Sequence[int],
 ) -> dict[str, Any]:
     return {
         "id": identifier,
@@ -622,13 +667,13 @@ def _empirical_control(
             "status": "blocked-by-dependencies",
             "metrics": _empty_metrics(),
             "evidence": None,
-            "blockingIssues": [95, 96],
+            "blockingIssues": list(blocking_issues),
         },
         "reviewerStatus": "pending-independent-review",
     }
 
 
-def _empirical_controls() -> list[dict[str, Any]]:
+def _empirical_controls(blocking_issues: Sequence[int]) -> list[dict[str, Any]]:
     common = [
         "Quantify pre-filter, connected, removed, and independently labelled cells.",
         "Quantify false positives before and after filtering; disputed cells fail closed.",
@@ -643,6 +688,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             "GeoNames 2759794 and the pinned Netherlands GLO-30 five-layer window.",
             "Retain genuinely ocean-connected eligible port cells without bridging WBM barriers.",
             common + ["Inspect port infrastructure and edited DSM categories separately."],
+            blocking_issues,
         ),
         _empirical_control(
             "lisbon-estuary",
@@ -653,6 +699,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             "GeoNames 2267057 and the pinned Lisbon GLO-30 five-layer window.",
             "Retain reviewed Tagus-connected cells and remove terrain isolated from the estuary.",
             common + ["Compare narrow estuary traversal with WBM ocean seed provenance."],
+            blocking_issues,
         ),
         _empirical_control(
             "venice-lagoon",
@@ -663,6 +710,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             "GeoNames 3164603 and the pinned Venice GLO-30 five-layer window.",
             "Preserve reviewed lagoon connections while disputed diagonal crossings fail closed.",
             common + ["Review lagoon barriers and diagonal adjacency cell by cell."],
+            blocking_issues,
         ),
         _empirical_control(
             "valletta-island",
@@ -673,6 +721,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             "GeoNames 2562305 and the pinned Malta GLO-30 five-layer window.",
             "Retain ocean-adjacent small-island land without treating array edges as ocean seeds.",
             common + ["Measure island removals and edge-derived false positives."],
+            blocking_issues,
         ),
         _empirical_control(
             "utrecht-disconnected-low-terrain",
@@ -683,6 +732,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             "GeoNames 2745912 and the pinned Netherlands GLO-30 five-layer window.",
             "Remain OutOfScope under the 25 km eligibility rule; do not infer hazard reach inland.",
             common + ["Separate eligibility-scope removal from connectivity removal."],
+            blocking_issues,
         ),
         _empirical_control(
             "bergen-steep-coast",
@@ -696,6 +746,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             ),
             "Block low terrain behind confidently non-exposed steep coastal cells.",
             common + ["Demonstrate that steep barriers are not crossed at corners."],
+            blocking_issues,
         ),
         _empirical_control(
             "venice-diagonal-leak",
@@ -709,6 +760,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
                 "traversal; disputed corner connections fail closed."
             ),
             common + ["Report the exact cells added only by diagonal traversal."],
+            blocking_issues,
         ),
         _empirical_control(
             "netherlands-wbm-barrier",
@@ -719,6 +771,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
             "Pinned Netherlands GLO-30 WBM asset and matching DEM/EDM/FLM/HEM layers.",
             "Never traverse water, nodata, rejected quality, or unexpected WBM codes.",
             common + ["Report removals by WBM, nodata, and quality-barrier reason."],
+            blocking_issues,
         ),
         _empirical_control(
             "regional-mosaic-tile-seam",
@@ -735,6 +788,7 @@ def _empirical_controls() -> list[dict[str, Any]]:
                 "produce DataUnavailable, never seeds."
             ),
             common + ["Require zero tile-seam mismatches before approval."],
+            blocking_issues,
         ),
     ]
 
@@ -910,7 +964,7 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
         "dependencyStatus": dependency_status,
         "controlObservations": control_observations,
         "semanticControls": semantic_controls,
-        "empiricalControls": _empirical_controls(),
+        "empiricalControls": _empirical_controls(blocking_dependencies),
         "blockingDependencies": blocking_dependencies,
         "review": {
             "status": "pending-independent-review",

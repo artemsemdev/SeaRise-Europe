@@ -291,7 +291,24 @@
               "uniqueItems": true,
               "items": { "type": "integer", "minimum": 1 }
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "status": { "const": "complete" } } },
+              "then": {
+                "properties": {
+                  "evidence": { "$ref": "#/$defs/binding" },
+                  "blockingIssues": { "maxItems": 0 }
+                }
+              },
+              "else": {
+                "properties": {
+                  "evidence": { "const": null },
+                  "blockingIssues": { "minItems": 1 }
+                }
+              }
+            }
+          ]
         },
         "reviewerStatus": { "$ref": "#/$defs/reviewerStatus" }
       }
