@@ -163,7 +163,7 @@ def create_delivery_report(
         if (
             before < 0
             or after < 0
-            or peak < max(before, after)
+            or peak < before
             or not np.isfinite(duration)
             or duration < 0
         ):
@@ -176,7 +176,7 @@ def create_delivery_report(
             or sample.get("locationId") != target.get("sourceLocationId")
         ):
             raise ScienceContractError("Browser lookup did not return an ID and three quantiles")
-        return duration, observed_count, observed_bytes, max(0, peak - before)
+        return duration, observed_count, observed_bytes, max(0, max(peak, after) - before)
 
     cold_metrics = [validate_sample(sample, cold_sample=True) for sample in cold]
     warm_metrics = [validate_sample(sample, cold_sample=False) for sample in warm]
