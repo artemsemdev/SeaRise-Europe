@@ -20,6 +20,7 @@ from shapely.geometry import Point  # type: ignore[import-untyped]
 from ..domain.result_state import AssessmentSample, determine_result_state
 from .connectivity import ocean_connected_cells
 from .contracts import ScienceContractError
+from .vertical import REASON_LABELS, ClassificationReason
 
 REQUIRED_EMPIRICAL_KINDS = frozenset(
     {
@@ -62,6 +63,15 @@ REQUIRED_DEPENDENCY_BINDINGS: tuple[dict[str, Any], ...] = (
         "identityField": "evidenceId",
         "expectedIdentity": "phase-0.12-baltic-black-sea-controls-v1",
     },
+)
+SLA_SOURCE_BOUNDS = {
+    "west": -30.03125,
+    "east": 42.03125,
+    "south": 19.96875,
+    "north": 66.03125,
+}
+SLA_NORTHERN_COVERAGE_REASON = (
+    "The locked product grid ends at 66.03125 degrees north."
 )
 
 
@@ -137,6 +147,7 @@ def review_evidence_sha256(document: Mapping[str, Any]) -> str:
             "evidenceBundleSha256",
             "controlObservations",
             "semanticControls",
+            "slaSourceControls",
             "empiricalControls",
             "blockingDependencies",
         )
@@ -286,6 +297,84 @@ def _validate_dependency_records(document: Mapping[str, Any]) -> None:
         raise ScienceContractError("Phase 0.13 blockers differ from dependency evidence")
 
 
+def _validate_sla_source_contract(source_lock: Mapping[str, Any]) -> None:
+    sources = [
+        source
+        for source in source_lock.get("sources", [])
+        if source.get("id") == "copernicus-marine-eur-sla-monthly"
+    ]
+    if len(sources) != 1:
+        raise ScienceContractError("Locked monthly SLA source is not unique")
+    northern = [
+        item
+        for item in sources[0].get("coverage", [])
+        if item.get("region") == "northern-europe-above-66n"
+    ]
+    if len(northern) != 1 or northern[0] != {
+        "region": "northern-europe-above-66n",
+        "status": "not-covered",
+        "roles": ["baseline-water-sla"],
+        "reason": SLA_NORTHERN_COVERAGE_REASON,
+    }:
+        raise ScienceContractError("Locked SLA northern coverage semantics changed")
+
+
+def observe_sla_source_control(control: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply the locked SLA domain boundary and stable vertical reason precedence."""
+    longitude = float(control["longitude"])
+    latitude = float(control["latitude"])
+    supported = (
+        SLA_SOURCE_BOUNDS["west"] <= longitude <= SLA_SOURCE_BOUNDS["east"]
+        and SLA_SOURCE_BOUNDS["south"] <= latitude <= SLA_SOURCE_BOUNDS["north"]
+    )
+    reason = (
+        ClassificationReason.SOURCE_NODATA
+        if supported
+        else ClassificationReason.TRANSFORM_OUT_OF_COVERAGE
+    )
+    return {
+        "observedSourceSupported": supported,
+        "observedState": "DataUnavailable",
+        "observedReasonCode": int(reason),
+        "observedReasonLabel": REASON_LABELS[int(reason)],
+    }
+
+
+def _validate_sla_source_controls(controls: Sequence[Mapping[str, Any]]) -> None:
+    expected = {
+        "sla-north-boundary-below": {
+            "longitude": 14.03125,
+            "latitude": 65.96875,
+            "expectedSourceSupported": True,
+            "expectedReasonCode": int(ClassificationReason.SOURCE_NODATA),
+            "expectedReasonLabel": "source-nodata",
+        },
+        "sla-north-boundary-above": {
+            "longitude": 14.03125,
+            "latitude": 66.09375,
+            "expectedSourceSupported": False,
+            "expectedReasonCode": int(ClassificationReason.TRANSFORM_OUT_OF_COVERAGE),
+            "expectedReasonLabel": "transform-out-of-coverage",
+        },
+    }
+    actual = {item["id"]: item for item in controls}
+    if set(actual) != set(expected) or len(actual) != len(controls):
+        raise ScienceContractError("Phase 0.13 SLA boundary controls are incomplete")
+    for identifier, requirements in expected.items():
+        control = actual[identifier]
+        for key, value in requirements.items():
+            if control[key] != value:
+                raise ScienceContractError(
+                    f"Phase 0.13 SLA boundary semantics changed: {identifier}.{key}"
+                )
+        observed = observe_sla_source_control(control)
+        for key, value in observed.items():
+            if control[key] != value:
+                raise ScienceContractError(
+                    f"Phase 0.13 SLA boundary observation failed: {identifier}.{key}"
+                )
+
+
 def _validate_metric_observation(
     control: Mapping[str, Any], blocking_dependencies: Sequence[int]
 ) -> bool:
@@ -397,18 +486,14 @@ def validate_scope_connectivity_review(
         for item in empirical
     )
 
-    states = {item["expectedState"] for item in document["semanticControls"]}
+    sla_source_controls = document["slaSourceControls"]
+    _validate_sla_source_controls(sla_source_controls)
+    states = {
+        item["expectedState"]
+        for item in [*document["semanticControls"], *sla_source_controls]
+    }
     if not REQUIRED_PUBLIC_STATES.issubset(states):
         raise ScienceContractError("Phase 0.13 public-state coverage is incomplete")
-    sla_controls = [
-        item for item in document["semanticControls"] if item["id"] == "north-of-sla-limit"
-    ]
-    if (
-        len(sla_controls) != 1
-        or sla_controls[0]["latitude"] <= 66.03125
-        or sla_controls[0]["expectedState"] != "DataUnavailable"
-    ):
-        raise ScienceContractError("Phase 0.13 SLA latitude control is not fail closed")
 
     review = document["review"]
     disposition = review["disposition"]
@@ -437,11 +522,11 @@ def validate_scope_connectivity_review(
         for item in document["controlObservations"]
     ) and all(
         item["reviewerStatus"] == "approved"
-        for item in document["semanticControls"] + empirical
+        for item in document["semanticControls"] + sla_source_controls + empirical
     )
     semantic_controls_pass = all(
         item["expectedState"] == item["observedState"]
-        for item in document["semanticControls"]
+        for item in [*document["semanticControls"], *sla_source_controls]
     )
     approval_complete = (
         disposition == "approved"
@@ -827,6 +912,10 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
     connectivity = json.loads(
         (contract_dir / "connectivity-controls.json").read_text(encoding="utf-8")
     )
+    source_lock = _read_json_object(
+        repo_root / bound_paths["source-lock"], "source lock"
+    )
+    _validate_sla_source_contract(source_lock)
 
     control_observations: list[dict[str, Any]] = []
     for control in geography["controls"]:
@@ -892,17 +981,6 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
             "expectedState": "UnsupportedGeography",
         },
         {
-            "id": "north-of-sla-limit",
-            "name": "Bodo",
-            "longitude": 14.405,
-            "latitude": 67.28,
-            "provenance": (
-                "Named-place coordinate inside support/coastal scope but north of "
-                "the SLA 66.03125 degree limit."
-            ),
-            "expectedState": "DataUnavailable",
-        },
-        {
             "id": "support-boundary-covers",
             "name": "Exact support boundary point",
             "longitude": boundary.x,
@@ -924,6 +1002,47 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
                 "reviewerStatus": "pending-independent-review",
             }
         )
+
+    sla_source_inputs = [
+        {
+            "id": "sla-north-boundary-below",
+            "sourceId": "copernicus-marine-eur-sla-monthly",
+            "longitude": 14.03125,
+            "latitude": 65.96875,
+            "northernLimitLatitude": 66.03125,
+            "sourceValueAvailable": False,
+            "expectedSourceSupported": True,
+            "expectedState": "DataUnavailable",
+            "expectedReasonCode": int(ClassificationReason.SOURCE_NODATA),
+            "expectedReasonLabel": "source-nodata",
+            "provenance": (
+                "One native 0.0625-degree row below the locked SLA northern limit; "
+                "a deliberately missing value must use source-nodata, not coverage loss."
+            ),
+            "reviewerStatus": "pending-independent-review",
+        },
+        {
+            "id": "sla-north-boundary-above",
+            "sourceId": "copernicus-marine-eur-sla-monthly",
+            "longitude": 14.03125,
+            "latitude": 66.09375,
+            "northernLimitLatitude": 66.03125,
+            "sourceValueAvailable": False,
+            "expectedSourceSupported": False,
+            "expectedState": "DataUnavailable",
+            "expectedReasonCode": int(ClassificationReason.TRANSFORM_OUT_OF_COVERAGE),
+            "expectedReasonLabel": "transform-out-of-coverage",
+            "provenance": (
+                "One native 0.0625-degree row above the locked SLA northern limit; "
+                "coverage loss must precede source-nodata in vertical reason semantics."
+            ),
+            "reviewerStatus": "pending-independent-review",
+        },
+    ]
+    sla_source_controls = [
+        {**control, **observe_sla_source_control(control)}
+        for control in sla_source_inputs
+    ]
 
     document: dict[str, Any] = {
         "$schema": "./scope-connectivity-review.schema.json",
@@ -964,6 +1083,7 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
         "dependencyStatus": dependency_status,
         "controlObservations": control_observations,
         "semanticControls": semantic_controls,
+        "slaSourceControls": sla_source_controls,
         "empiricalControls": _empirical_controls(blocking_dependencies),
         "blockingDependencies": blocking_dependencies,
         "review": {

@@ -228,12 +228,52 @@ def test_every_existing_control_has_expected_observed_and_review_status() -> Non
 def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:
     review = load_scope_connectivity_review(REVIEW_PATH)
     controls = {item["id"]: item for item in review["semanticControls"]}
+    sla_controls = {item["id"]: item for item in review["slaSourceControls"]}
 
     assert controls["outside-coastal-scope"]["observedState"] == "OutOfScope"
     assert controls["outside-europe-support"]["observedState"] == "UnsupportedGeography"
-    assert controls["north-of-sla-limit"]["latitude"] > 66.03125
-    assert controls["north-of-sla-limit"]["observedState"] == "DataUnavailable"
     assert controls["support-boundary-covers"]["observedState"] == "OutOfScope"
+    assert sla_controls["sla-north-boundary-below"] == {
+        "expectedReasonCode": 4,
+        "expectedReasonLabel": "source-nodata",
+        "expectedSourceSupported": True,
+        "expectedState": "DataUnavailable",
+        "id": "sla-north-boundary-below",
+        "latitude": 65.96875,
+        "longitude": 14.03125,
+        "northernLimitLatitude": 66.03125,
+        "observedReasonCode": 4,
+        "observedReasonLabel": "source-nodata",
+        "observedSourceSupported": True,
+        "observedState": "DataUnavailable",
+        "provenance": (
+            "One native 0.0625-degree row below the locked SLA northern limit; a "
+            "deliberately missing value must use source-nodata, not coverage loss."
+        ),
+        "reviewerStatus": "pending-independent-review",
+        "sourceId": "copernicus-marine-eur-sla-monthly",
+        "sourceValueAvailable": False,
+    }
+    assert sla_controls["sla-north-boundary-above"]["latitude"] == 66.09375
+    assert sla_controls["sla-north-boundary-above"]["observedSourceSupported"] is False
+    assert sla_controls["sla-north-boundary-above"]["observedReasonCode"] == 3
+    assert (
+        sla_controls["sla-north-boundary-above"]["observedReasonLabel"]
+        == "transform-out-of-coverage"
+    )
+    assert sla_controls["sla-north-boundary-above"]["observedState"] == "DataUnavailable"
+
+
+def test_sla_northern_boundary_reason_cannot_be_relabelled() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    below = review["slaSourceControls"][0]
+    below["observedReasonCode"] = 3
+    below["observedReasonLabel"] = "transform-out-of-coverage"
+    below["observedSourceSupported"] = False
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="SLA boundary observation failed"):
+        validate_scope_connectivity_review(review)
 
 
 def test_empirical_review_plan_covers_required_regional_failure_modes() -> None:
