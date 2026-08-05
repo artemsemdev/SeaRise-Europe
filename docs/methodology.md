@@ -1,10 +1,10 @@
 # AR6 Regional Projection Methodology
 
-> **Status:** Projection contract accepted; implementation and release gate pending
+> **Status:** Projection lookup and source parity validated; regional release gate pending
 > **Last reviewed:** 2026-08-05
 > **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Machine contract:** [`ar6-projection-contract.json`](../src/pipeline/science/ar6-projection-contract.json)
-> **Blocking gate:** #135 must prove source/implementation parity and #110 must produce the measured regional release gate
+> **Blocking gate:** #110 must produce the measured regional release gate and owner decision
 > **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's release decision
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
@@ -30,12 +30,33 @@ baseline, source location and distance, native resolution, method, and source
 release. The product says explicitly that this is regional relative sea-level
 change, not flooding, inundation, terrain exposure, or property risk.
 
-Offline goldens owned by #135 validate exact source identity and independent
-value extraction across the nine scenario/horizon combinations and four basin
-contexts. Python and TypeScript parity uses `0.000001 m` absolute and zero
-relative tolerance. A live web UI is not a required oracle. Automated evidence
-may pass without authorizing publication; #110 and an explicit project-owner
-release decision remain required.
+The [offline #135 goldens](../src/pipeline/science/evidence/ar6-lookup-goldens.json)
+bind the full archive, all three members, the lookup and decision contracts,
+both scope geometries, and the independent generator. Seven regional points
+cover the four required basins, an island, two estuaries, and a high-latitude
+port. Each has all nine scenario/horizon combinations and all three source
+quantiles: 189 source values in total. Two further points prove `OutOfScope`
+and `UnsupportedGeography` precedence.
+
+The independent `netCDF4` reader preserves exact integer source millimetres;
+the production `xarray` reader reproduced every value within the predeclared
+`0.000001 m` tolerance. TypeScript reproduces the integer millimetres, source
+location identity, six-decimal distance, states, nodata, maximum-distance, and
+tie-break semantics bit-exactly. An exhaustive search across 154 source-grid
+locations covered by the versioned coastal scope in all three members found no
+real in-scope nodata location, so the required nodata path remains a declared
+synthetic mutation control rather than a manufactured real-source golden.
+
+The NASA/Rutgers IPCC AR6 Sea Level Projection Tool is a supplementary manual
+cross-check only, not the CI oracle. Automated source/implementation parity for
+#135 has passed without authorizing publication; #110 and an explicit
+project-owner release decision remain required.
+
+The hash-bound `ar6-projection-contract.json` is the accepted pre-run decision
+snapshot. Its `publicationGate` therefore still records `automatedValidation`
+as `pending` and lists #135 with #110; those fields are not the final release
+gate or the current #135 evidence status. Issue #110 owns the measured final
+gate and records the separate owner-controlled release disposition.
 
 The remainder of this document preserves the v1 binary investigation and why
 it was not publishable. It is historical evidence, not an alternative active
