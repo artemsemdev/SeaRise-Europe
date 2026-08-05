@@ -81,7 +81,10 @@ def evidence_bundle_sha256(bindings: Sequence[Mapping[str, Any]]) -> str:
 
 
 def decision_binding_sha256(
-    disposition: str, evidence_bundle: str, reviewed_commit: str
+    disposition: str,
+    evidence_bundle: str,
+    review_evidence: str,
+    reviewed_commit: str,
 ) -> str:
     """Bind an external disposition to exact evidence and reviewed source."""
     return hashlib.sha256(
@@ -89,10 +92,28 @@ def decision_binding_sha256(
             {
                 "disposition": disposition,
                 "evidenceBundleSha256": evidence_bundle,
+                "reviewEvidenceSha256": review_evidence,
                 "reviewedCommit": reviewed_commit,
             }
         )
     ).hexdigest()
+
+
+def review_evidence_sha256(document: Mapping[str, Any]) -> str:
+    """Hash every candidate, observation, metric, and dependency under review."""
+    payload = {
+        key: document[key]
+        for key in (
+            "candidate",
+            "evidenceBindings",
+            "evidenceBundleSha256",
+            "controlObservations",
+            "semanticControls",
+            "empiricalControls",
+            "blockingDependencies",
+        )
+    }
+    return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
 
 
 def _validate_metric_observation(control: Mapping[str, Any]) -> bool:
@@ -128,6 +149,10 @@ def _validate_metric_observation(control: Mapping[str, Any]) -> bool:
     after_false = int(metrics["falsePositiveAfterCount"])
     if pre != post + removed:
         raise ScienceContractError(f"Empirical removal count is inconsistent for {control['id']}")
+    if before_false > pre or after_false > post or after_false > before_false:
+        raise ScienceContractError(
+            f"Empirical false-positive count is inconsistent for {control['id']}"
+        )
 
     expected_rates = {
         "removalFraction": removed / pre if pre else 0.0,
@@ -162,6 +187,8 @@ def validate_scope_connectivity_review(
     expected_bundle = evidence_bundle_sha256(bindings)
     if document["evidenceBundleSha256"] != expected_bundle:
         raise ScienceContractError("Phase 0.13 evidence bundle checksum mismatch")
+    if document["reviewEvidenceSha256"] != review_evidence_sha256(document):
+        raise ScienceContractError("Phase 0.13 review observations checksum mismatch")
 
     empirical = document["empiricalControls"]
     kinds = {item["kind"] for item in empirical}
@@ -169,6 +196,11 @@ def validate_scope_connectivity_review(
         missing = ", ".join(sorted(REQUIRED_EMPIRICAL_KINDS - kinds))
         raise ScienceContractError(f"Phase 0.13 empirical coverage is incomplete: {missing}")
     empirical_complete = all(_validate_metric_observation(item) for item in empirical)
+    empirical_undisputed = empirical_complete and all(
+        item["observation"]["metrics"]["disputedCellCount"] == 0
+        and item["observation"]["metrics"]["tileSeamMismatchCellCount"] == 0
+        for item in empirical
+    )
 
     states = {item["expectedState"] for item in document["semanticControls"]}
     if not REQUIRED_PUBLIC_STATES.issubset(states):
@@ -191,22 +223,49 @@ def validate_scope_connectivity_review(
     reviewers_decided = all(record["decision"] != "pending" for record in reviewer_records)
     all_controls_approved = all(
         item["reviewerStatus"] == "approved"
+        and item["automationStatus"] == "passed"
+        and item["expected"] == item["observed"]
         for item in document["controlObservations"]
-    ) and all(item["reviewerStatus"] == "approved" for item in empirical)
+    ) and all(
+        item["reviewerStatus"] == "approved"
+        for item in document["semanticControls"] + empirical
+    )
+    semantic_controls_pass = all(
+        item["expectedState"] == item["observedState"]
+        for item in document["semanticControls"]
+    )
     approval_complete = (
         disposition == "approved"
         and not document["blockingDependencies"]
-        and empirical_complete
+        and empirical_undisputed
         and all_controls_approved
+        and semantic_controls_pass
         and reviewers_decided
         and proofs_present
         and all(record["decision"] == "approved" for record in reviewer_records)
     )
     if bool(review["approvalReady"]) != approval_complete:
         raise ScienceContractError("Phase 0.13 approvalReady differs from review evidence")
+    if disposition == "approved" and not approval_complete:
+        raise ScienceContractError("Phase 0.13 approved disposition lacks approval evidence")
+    if disposition == "rejected" and not any(
+        record["decision"] == "rejected" for record in reviewer_records
+    ):
+        raise ScienceContractError("Phase 0.13 rejected disposition lacks a rejection")
+    if disposition == "blocked" and not any(
+        record["decision"] == "blocked" for record in reviewer_records
+    ):
+        raise ScienceContractError("Phase 0.13 blocked disposition lacks a blocked review")
+    if decided and (not reviewers_decided or not proofs_present):
+        raise ScienceContractError(
+            "Phase 0.13 disposition requires both named, signed reviewer decisions"
+        )
     if decided:
         expected_decision_binding = decision_binding_sha256(
-            str(disposition), document["evidenceBundleSha256"], review["reviewedCommit"]
+            str(disposition),
+            document["evidenceBundleSha256"],
+            document["reviewEvidenceSha256"],
+            review["reviewedCommit"],
         )
         if review["decisionBindingSha256"] != expected_decision_binding:
             raise ScienceContractError("Phase 0.13 disposition is not bound to exact evidence")
@@ -229,6 +288,7 @@ def _reviewer_payload(record: Mapping[str, Any], document: Mapping[str, Any]) ->
         {
             "decision": record["decision"],
             "evidenceBundleSha256": document["evidenceBundleSha256"],
+            "reviewEvidenceSha256": document["reviewEvidenceSha256"],
             "independenceStatement": record["independenceStatement"],
             "reviewedCommit": document["review"]["reviewedCommit"],
             "reviewer": record["reviewer"],
@@ -264,6 +324,19 @@ def verify_independent_review_proofs(
             raise ScienceContractError(
                 f"Independent {key} reviewer signature is invalid"
             ) from exc
+
+
+def assert_scope_connectivity_approved(
+    document: Mapping[str, Any], repo_root: Path
+) -> None:
+    """Require a complete, byte-bound, independently signed approval."""
+    validate_scope_connectivity_review(document)
+    if document["review"]["disposition"] != "approved" or not document["review"][
+        "approvalReady"
+    ]:
+        raise ScienceContractError("Phase 0.13 scope/connectivity review is not approved")
+    verify_evidence_bindings(document, repo_root)
+    verify_independent_review_proofs(document, repo_root)
 
 
 def load_scope_connectivity_review(path: Path) -> Mapping[str, Any]:
@@ -637,7 +710,6 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
             },
         },
         "evidenceBindings": bindings,
-        "evidenceBundleSha256": evidence_bundle_sha256(bindings),
         "controlObservations": control_observations,
         "semanticControls": semantic_controls,
         "empiricalControls": _empirical_controls(),
@@ -671,5 +743,7 @@ def build_pending_scope_connectivity_review(repo_root: Path) -> dict[str, Any]:
             ),
         },
     }
+    document["evidenceBundleSha256"] = evidence_bundle_sha256(bindings)
+    document["reviewEvidenceSha256"] = review_evidence_sha256(document)
     validate_scope_connectivity_review(document)
     return document

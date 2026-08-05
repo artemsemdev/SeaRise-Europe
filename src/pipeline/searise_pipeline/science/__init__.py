@@ -61,6 +61,7 @@ from .receipt import (
     vertical_receipt_sha256,
 )
 from .scope_review import (
+    assert_scope_connectivity_approved,
     build_pending_scope_connectivity_review,
     canonical_json_bytes,
     decision_binding_sha256,
@@ -69,6 +70,7 @@ from .scope_review import (
     load_scope_connectivity_review,
     observe_connectivity_control,
     observe_semantic_control,
+    review_evidence_sha256,
     validate_scope_connectivity_review,
     verify_evidence_bindings,
     verify_independent_review_proofs,
@@ -106,6 +108,7 @@ __all__ = [
     "VerticalResult",
     "MonthlySlaField",
     "assert_publication_ready",
+    "assert_scope_connectivity_approved",
     "aggregate_absolute_bounds",
     "bilinear_sample",
     "build_geoid_requests",
@@ -132,6 +135,7 @@ __all__ = [
     "ocean_connected_cells",
     "observe_connectivity_control",
     "observe_semantic_control",
+    "review_evidence_sha256",
     "inspect_dem_sample",
     "inspect_dem_window",
     "inspect_geometry_assets",

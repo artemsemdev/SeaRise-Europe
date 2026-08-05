@@ -1,18 +1,35 @@
 """Tests for the explicit eight-neighbour connectivity candidate."""
 
+import base64
+import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from searise_pipeline.science import (
+    assert_scope_connectivity_approved,
+    build_pending_scope_connectivity_review,
+    canonical_json_bytes,
     connectivity_comparison,
+    decision_binding_sha256,
     evaluate_connectivity_controls,
+    load_scope_connectivity_review,
     ocean_connected_cells,
+    review_evidence_sha256,
+    validate_scope_connectivity_review,
+    verify_evidence_bindings,
+    verify_independent_review_proofs,
 )
+from searise_pipeline.science.contracts import ScienceContractError
 
 CONTRACT_DIR = Path(__file__).parents[2] / "science"
+REPO_ROOT = Path(__file__).parents[4]
+REVIEW_PATH = CONTRACT_DIR / "scope-connectivity-review.json"
 
 
 def test_diagonal_cells_connect_under_eight_neighbour_rule() -> None:
@@ -107,3 +124,239 @@ def test_independent_control_corpus_passes() -> None:
     report = evaluate_connectivity_controls(document)
 
     assert report["passed"] == report["count"] == 9
+
+
+def test_scope_review_preflight_is_reproducible_and_bound() -> None:
+    checked_in = load_scope_connectivity_review(REVIEW_PATH)
+    rebuilt = build_pending_scope_connectivity_review(REPO_ROOT)
+
+    assert canonical_json_bytes(rebuilt) == REVIEW_PATH.read_bytes()
+    assert checked_in["review"] == {
+        "approvalReady": False,
+        "decisionBindingSha256": None,
+        "disposition": None,
+        "nextDecision": (
+            "Integrate approved issue 95 bounds and issue 96 basin evidence, record both "
+            "independent signed reviews, and fail closed on every disputed empirical cell "
+            "before issue 98 re-evaluates Phase 0."
+        ),
+        "reviewedCommit": None,
+        "reviewers": {
+            "product": {
+                "decision": "pending",
+                "independenceStatement": None,
+                "proof": None,
+                "reviewer": None,
+                "role": "product reviewer",
+            },
+            "scientific": {
+                "decision": "pending",
+                "independenceStatement": None,
+                "proof": None,
+                "reviewer": None,
+                "role": "scientific/data reviewer",
+            },
+        },
+        "status": "pending-independent-review",
+    }
+    verify_evidence_bindings(checked_in, REPO_ROOT)
+
+
+def test_every_existing_control_has_expected_observed_and_review_status() -> None:
+    review = load_scope_connectivity_review(REVIEW_PATH)
+    observations = review["controlObservations"]
+
+    assert len(observations) == 36
+    assert sum(item["domain"] == "geography" for item in observations) == 27
+    assert sum(item["domain"] == "connectivity" for item in observations) == 9
+    for item in observations:
+        assert item["provenance"]
+        assert item["expected"] == item["observed"]
+        assert item["automationStatus"] == "passed"
+        assert item["reviewerStatus"] == "pending-independent-review"
+
+
+def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:
+    review = load_scope_connectivity_review(REVIEW_PATH)
+    controls = {item["id"]: item for item in review["semanticControls"]}
+
+    assert controls["outside-coastal-scope"]["observedState"] == "OutOfScope"
+    assert controls["outside-europe-support"]["observedState"] == "UnsupportedGeography"
+    assert controls["north-of-sla-limit"]["latitude"] > 66.03125
+    assert controls["north-of-sla-limit"]["observedState"] == "DataUnavailable"
+    assert controls["support-boundary-covers"]["observedState"] == "OutOfScope"
+
+
+def test_empirical_review_plan_covers_required_regional_failure_modes() -> None:
+    review = load_scope_connectivity_review(REVIEW_PATH)
+    controls = review["empiricalControls"]
+
+    assert {item["kind"] for item in controls} == {
+        "port",
+        "estuary",
+        "lagoon",
+        "island",
+        "disconnected-low-terrain",
+        "steep-coast",
+        "diagonal-leak",
+        "wbm-barrier",
+        "mosaic-tile-seam",
+    }
+    for item in controls:
+        assert item["observation"]["status"] == "blocked-by-dependencies"
+        assert item["observation"]["blockingIssues"] == [95, 96]
+        assert set(item["observation"]["metrics"].values()) == {None}
+        assert item["reviewerStatus"] == "pending-independent-review"
+    assert review["candidate"]["support"]["canonical"] is False
+    assert review["candidate"]["coastalScope"] == {
+        "canonical": False,
+        "distanceMetres": 25000,
+        "hazardExtentClaim": False,
+        "role": "product-eligibility-only",
+        "version": "natural-earth-5.1.1-25km-scope-v2",
+    }
+
+
+def test_blocked_empirical_control_cannot_contain_metrics() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["empiricalControls"][0]["observation"]["metrics"][
+        "preFilterPositiveCellCount"
+    ] = 1
+    review["reviewEvidenceSha256"] = review_evidence_sha256(review)
+
+    with pytest.raises(ScienceContractError, match="invented metrics"):
+        validate_scope_connectivity_review(review)
+
+
+def test_observation_change_invalidates_review_evidence_hash() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    review["semanticControls"][0]["observedState"] = "DataUnavailable"
+
+    with pytest.raises(ScienceContractError, match="observations checksum mismatch"):
+        validate_scope_connectivity_review(review)
+
+
+def test_evidence_change_invalidates_review_binding(tmp_path: Path) -> None:
+    review = load_scope_connectivity_review(REVIEW_PATH)
+    bound = review["evidenceBindings"][0]
+    target = tmp_path / bound["path"]
+    target.parent.mkdir(parents=True)
+    target.write_text("changed", encoding="utf-8")
+
+    with pytest.raises(ScienceContractError, match="evidence changed after binding"):
+        verify_evidence_bindings(review, tmp_path)
+
+
+def _signed_blocked_review(tmp_path: Path) -> dict:  # type: ignore[type-arg]
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    private_key = Ed25519PrivateKey.generate()
+    public_bytes = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    key_path = tmp_path / "reviewer.pem"
+    key_path.write_bytes(public_bytes)
+    reviewed_commit = "a" * 40
+    review["review"].update(
+        {
+            "status": "decided",
+            "disposition": "blocked",
+            "reviewedCommit": reviewed_commit,
+            "decisionBindingSha256": decision_binding_sha256(
+                "blocked",
+                review["evidenceBundleSha256"],
+                review["reviewEvidenceSha256"],
+                reviewed_commit,
+            ),
+        }
+    )
+    for key, record in review["review"]["reviewers"].items():
+        record.update(
+            {
+                "decision": "blocked",
+                "reviewer": f"Independent {key} reviewer",
+                "independenceStatement": "I did not implement the reviewed controls.",
+            }
+        )
+        payload = canonical_json_bytes(
+            {
+                "decision": record["decision"],
+                "evidenceBundleSha256": review["evidenceBundleSha256"],
+                "reviewEvidenceSha256": review["reviewEvidenceSha256"],
+                "independenceStatement": record["independenceStatement"],
+                "reviewedCommit": reviewed_commit,
+                "reviewer": record["reviewer"],
+                "role": record["role"],
+            }
+        )
+        record["proof"] = {
+            "kind": "ed25519-detached-signature",
+            "publicKeyPath": "reviewer.pem",
+            "publicKeySha256": hashlib.sha256(public_bytes).hexdigest(),
+            "signatureBase64": base64.b64encode(private_key.sign(payload)).decode("ascii"),
+        }
+    return review
+
+
+def test_independent_reviewer_proofs_are_cryptographically_verified(
+    tmp_path: Path,
+) -> None:
+    review = _signed_blocked_review(tmp_path)
+
+    validate_scope_connectivity_review(review)
+    verify_independent_review_proofs(review, tmp_path)
+
+    review["review"]["reviewers"]["product"]["proof"]["signatureBase64"] = (
+        base64.b64encode(b"x" * 64).decode("ascii")
+    )
+    with pytest.raises(ScienceContractError, match="signature is invalid"):
+        verify_independent_review_proofs(review, tmp_path)
+
+
+def test_decision_requires_both_named_signed_reviewers(tmp_path: Path) -> None:
+    review = _signed_blocked_review(tmp_path)
+    scientific = review["review"]["reviewers"]["scientific"]
+    scientific.update(
+        {
+            "decision": "pending",
+            "reviewer": None,
+            "independenceStatement": None,
+            "proof": None,
+        }
+    )
+
+    with pytest.raises(ScienceContractError, match="both named, signed"):
+        validate_scope_connectivity_review(review)
+
+
+def test_automation_cannot_self_approve_the_review() -> None:
+    review = deepcopy(load_scope_connectivity_review(REVIEW_PATH))
+    reviewed_commit = "a" * 40
+    review["review"].update(
+        {
+            "status": "decided",
+            "disposition": "approved",
+            "reviewedCommit": reviewed_commit,
+            "decisionBindingSha256": decision_binding_sha256(
+                "approved",
+                review["evidenceBundleSha256"],
+                review["reviewEvidenceSha256"],
+                reviewed_commit,
+            ),
+        }
+    )
+
+    with pytest.raises(ScienceContractError, match="approved disposition lacks"):
+        validate_scope_connectivity_review(review)
+
+
+def test_pending_or_blocked_review_never_passes_the_approval_guard(
+    tmp_path: Path,
+) -> None:
+    pending = load_scope_connectivity_review(REVIEW_PATH)
+    blocked = _signed_blocked_review(tmp_path)
+
+    with pytest.raises(ScienceContractError, match="is not approved"):
+        assert_scope_connectivity_approved(pending, REPO_ROOT)
+    with pytest.raises(ScienceContractError, match="is not approved"):
+        assert_scope_connectivity_approved(blocked, tmp_path)
