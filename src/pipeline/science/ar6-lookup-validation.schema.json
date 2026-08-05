@@ -54,10 +54,11 @@
         "decisionContract": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["contractId", "path"],
+          "required": ["contractId", "path", "sha256"],
           "properties": {
             "contractId": { "const": "ar6-regional-projection-v1" },
-            "path": { "const": "src/pipeline/science/ar6-projection-contract.json" }
+            "path": { "const": "src/pipeline/science/ar6-projection-contract.json" },
+            "sha256": { "$ref": "#/$defs/sha256" }
           }
         }
       }
@@ -83,11 +84,17 @@
         "distance": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["algorithm", "earthMeanRadiusKm", "boundary"],
+          "required": [
+            "algorithm",
+            "earthMeanRadiusKm",
+            "boundary",
+            "reportedDistanceDecimalPlaces"
+          ],
           "properties": {
             "algorithm": { "const": "haversine" },
             "earthMeanRadiusKm": { "const": 6371.0088 },
-            "boundary": { "const": "inclusive" }
+            "boundary": { "const": "inclusive" },
+            "reportedDistanceDecimalPlaces": { "const": 6 }
           }
         },
         "tieBreak": { "const": "lowest-source-location-id" },
@@ -127,7 +134,7 @@
           "properties": {
             "sourceValueNodata": { "const": "source-value-nodata" },
             "sourceGridBeyondMaximumDistance": {
-              "const": "source-grid-beyond-maximum-distance"
+              "const": "source-location-too-distant"
             },
             "outsideCoastalScope": { "const": "outside-coastal-scope" },
             "outsideEuropeSupport": { "const": "outside-europe-support" }
@@ -163,7 +170,7 @@
         "referenceStrategy": {
           "const": "offline-independent-netcdf4-read-of-sha256-locked-source-members"
         },
-        "numericToleranceMetres": { "const": 1e-12 },
+        "numericToleranceMetres": { "const": 1e-6 },
         "scenarioHorizonMatrix": {
           "type": "object",
           "additionalProperties": false,
@@ -269,7 +276,7 @@
           "enum": [
             "projection-available",
             "source-value-nodata",
-            "source-grid-beyond-maximum-distance"
+            "source-location-too-distant"
           ]
         }
       }
