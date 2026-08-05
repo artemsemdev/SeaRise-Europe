@@ -148,7 +148,7 @@ def test_complete_fixture_release_is_deterministic_but_cannot_approve_source(
     assert source_grid["path"] == "analysis/source-grid.json.gz"
     assert first_result.manifest == second_result.manifest
     assert comparison["status"] == "passed"
-    assert comparison["comparedArtifactCount"] == 19
+    assert comparison["comparedArtifactCount"] == 20
     assert first_result.gate["disposition"] == "blocked"
     assert first_result.gate["blockingChecks"] == ["sourceArchiveAndMembersVerified"]
     assert first_result.gate["phase1Unlocked"] is False
