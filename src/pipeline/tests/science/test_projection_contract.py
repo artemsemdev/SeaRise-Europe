@@ -17,6 +17,7 @@ CONTRACT_DIR = REPO_ROOT / "src" / "pipeline" / "science"
 def test_projection_contract_binds_source_quantity_and_states() -> None:
     contract = load_science_contracts(CONTRACT_DIR).projection_contract
 
+    assert contract is not None
     assert contract["sourceBinding"] == {
         "semanticsPath": "src/pipeline/science/source-semantics.json",
         "sourceKey": "ipcc-ar6-sea-level/20210809",
@@ -48,6 +49,7 @@ def test_projection_contract_binds_source_quantity_and_states() -> None:
 
 def test_projection_lookup_is_grid_only_and_does_not_skip_nodata() -> None:
     contract = load_science_contracts(CONTRACT_DIR).projection_contract
+    assert contract is not None
     point = contract["spatialLookup"]["point"]
 
     assert contract["spatialLookup"]["map"]["sourceLocationFamily"] == "grid"
@@ -74,6 +76,7 @@ def test_projection_lookup_is_grid_only_and_does_not_skip_nodata() -> None:
 def test_automation_cannot_approve_projection_release() -> None:
     contract = load_science_contracts(CONTRACT_DIR).projection_contract
 
+    assert contract is not None
     assert contract["validation"]["onlineReference"]["requiredForCi"] is False
     assert contract["validation"]["automatedValidationMeaning"] == (
         "source-and-implementation-parity-only"

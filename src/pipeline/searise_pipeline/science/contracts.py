@@ -40,12 +40,12 @@ class ScienceContracts:
     """The complete scientific decision documents used by a build."""
 
     source_semantics: Mapping[str, Any]
-    projection_contract: Mapping[str, Any]
     geography_rules: Mapping[str, Any]
     vertical_methodology: Mapping[str, Any]
     terrain_decision: Mapping[str, Any]
     final_gate: Mapping[str, Any]
     uncertainty_budget: Mapping[str, Any] | None = None
+    projection_contract: Mapping[str, Any] | None = None
 
 
 def _default_contract_dir() -> Path:
