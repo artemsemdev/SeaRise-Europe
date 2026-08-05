@@ -122,7 +122,13 @@
           ],
           "reason": "The selected members expose the source-native complete one-degree global grid; interpolation remains limited to valid source support."
         }
-      ]
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "Zenodo API metadata, complete archive SHA-256/MD5 stream, remote ZIP central directory, exact member extraction, and NetCDF metadata inspection",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "geonames-cities15000",
@@ -351,7 +357,13 @@
           ],
           "reason": "The locked product grid ends at 66.03125 degrees north."
         }
-      ]
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "Official product/dataset STAC metadata, complete anonymous object listing, 240-object byte/ETag/SHA-256 verification, and PUM/QUID inspection",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "copernicus-marine-eur-mdt",
@@ -449,7 +461,13 @@
           ],
           "reason": "The grid and land-water mask do not guarantee support inside every narrow coastal water body."
         }
-      ]
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "Official product/dataset STAC metadata, complete NetCDF byte/SHA-256 verification, HDF5 variable metadata, and PUM/QUID inspection",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "goco06s-gravity-model",
@@ -513,7 +531,13 @@
           ],
           "reason": "Spherical-harmonic model through degree 300; numerical use remains subject to tide, epoch, ellipsoid, truncation, and coefficient-error controls."
         }
-      ]
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "ICGEM canonical metadata, archive/member SHA-256 verification, and complete GFC header inspection",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "egm2008-gravity-model",
@@ -600,7 +624,13 @@
           ],
           "reason": "Tide-free spherical-harmonic model through degree 2190/order 2159 with calibrated coefficient errors and WGS84 evaluation guidance."
         }
-      ]
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "NGA canonical release, archive/member SHA-256 verification, coefficient records, and embedded README inspection",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "copernicus-dem-glo30",
@@ -625,19 +655,55 @@
       },
       "assets": [
         {
-          "id": "netherlands-n52-e004-sample",
-          "kind": "file",
-          "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_E004_00_DEM/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
-          "resolvedUrl": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N52_00_E004_00_DEM/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
+          "id": "regional-control-set",
+          "kind": "object-set",
+          "url": "https://copernicus-dem-30m.s3.amazonaws.com",
+          "resolvedUrl": "https://copernicus-dem-30m.s3.amazonaws.com",
           "resolvedVersion": "2021_1",
+          "nativeVersion": "COP-DEM-GLO30-F",
           "mediaType": "image/tiff",
-          "byteSize": 17037271,
-          "sha256": "edb307664fd717ca1805e77e8e16ad3267f1992f2614b2d0127193dfdf6851f1",
-          "upstreamChecksum": "etag:5d566daa39fbe2ebb43f5dc0a547c900",
-          "cachePath": "samples/Copernicus_DSM_COG_10_N52_00_E004_00_DEM.tif",
-          "availability": "locked"
+          "cachePath": "regional-controls",
+          "availability": "locked",
+          "roles": [
+            "terrain",
+            "edit-mask",
+            "fill-mask",
+            "height-error-mask",
+            "water-body-mask"
+          ],
+          "objectSet": {
+            "contract": "dem-control-set-v1",
+            "manifestPath": "manifests/cop-dem-glo-30-regional-controls-v2021_1.jsonl.gz",
+            "manifestMediaType": "application/gzip",
+            "manifestByteSize": 1959,
+            "manifestSha256": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6",
+            "payloadSha256": "a70daa87beeda161ae1ea6015ea908c817df63f21d159c730391c45a48373254",
+            "objectCount": 25,
+            "totalByteSize": 165670216,
+            "keyPrefix": "Copernicus_DSM_COG_10"
+          }
         }
-      ]
+      ],
+      "coverage": [
+        {
+          "region": "regional-controls",
+          "status": "partial",
+          "roles": [
+            "terrain",
+            "edit-mask",
+            "fill-mask",
+            "height-error-mask",
+            "water-body-mask"
+          ],
+          "reason": "The lock covers five representative European coastal tiles for Phase 0 controls, not the eventual full-Europe production tile set."
+        }
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "Complete byte/SHA-256 verification for DEM, EDM, FLM, HEM, and WBM layers in five representative European coastal tiles",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "copernicus-dem-glo90",
@@ -662,19 +728,55 @@
       },
       "assets": [
         {
-          "id": "netherlands-n52-e004-sample",
-          "kind": "file",
-          "url": "https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N52_00_E004_00_DEM/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
-          "resolvedUrl": "https://copernicus-dem-90m.s3.amazonaws.com/Copernicus_DSM_COG_30_N52_00_E004_00_DEM/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
+          "id": "regional-control-set",
+          "kind": "object-set",
+          "url": "https://copernicus-dem-90m.s3.amazonaws.com",
+          "resolvedUrl": "https://copernicus-dem-90m.s3.amazonaws.com",
           "resolvedVersion": "2021_1",
+          "nativeVersion": "COP-DEM-GLO90-F",
           "mediaType": "image/tiff",
-          "byteSize": 1998003,
-          "sha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2",
-          "upstreamChecksum": "etag:8af6b372f880c9fcb0e1e05280f6a171",
-          "cachePath": "samples/Copernicus_DSM_COG_30_N52_00_E004_00_DEM.tif",
-          "availability": "locked"
+          "cachePath": "regional-controls",
+          "availability": "locked",
+          "roles": [
+            "terrain",
+            "edit-mask",
+            "fill-mask",
+            "height-error-mask",
+            "water-body-mask"
+          ],
+          "objectSet": {
+            "contract": "dem-control-set-v1",
+            "manifestPath": "manifests/cop-dem-glo-90-regional-controls-v2021_1.jsonl.gz",
+            "manifestMediaType": "application/gzip",
+            "manifestByteSize": 1953,
+            "manifestSha256": "5c2d1848c5fefb81d9a280afbaaeb745490444ff7b5faded052f9eddc93d3e85",
+            "payloadSha256": "f1241cf9ee02f8eb5c1e5d7686f7810a802f9a8a78a7314a59836becd884a899",
+            "objectCount": 25,
+            "totalByteSize": 20555898,
+            "keyPrefix": "Copernicus_DSM_COG_30"
+          }
         }
-      ]
+      ],
+      "coverage": [
+        {
+          "region": "regional-controls",
+          "status": "partial",
+          "roles": [
+            "terrain",
+            "edit-mask",
+            "fill-mask",
+            "height-error-mask",
+            "water-body-mask"
+          ],
+          "reason": "The lock covers five representative European coastal tiles for Phase 0 controls, not the eventual full-Europe production tile set."
+        }
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-05",
+        "method": "Complete byte/SHA-256 verification for DEM, EDM, FLM, HEM, and WBM layers in five representative European coastal tiles",
+        "evidenceRef": "src/pipeline/science/evidence/vertical-source-inspection.json",
+        "result": "verified"
+      }
     },
     {
       "id": "copernicus-coastal-zones-2018",
