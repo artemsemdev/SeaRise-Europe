@@ -34,6 +34,11 @@ from .geoid import (
     evaluate_geoid_correction,
     reconcile_baseline_to_egm2008,
 )
+from .uncertainty import (
+    UncertaintyAggregate,
+    UncertaintyTerm,
+    aggregate_absolute_bounds,
+)
 
 __all__ = [
     "Ar6GridSlice",
@@ -46,8 +51,11 @@ __all__ = [
     "GeoidModelRequest",
     "ScienceContractError",
     "ScienceContracts",
+    "UncertaintyAggregate",
+    "UncertaintyTerm",
     "MonthlySlaField",
     "assert_publication_ready",
+    "aggregate_absolute_bounds",
     "bilinear_sample",
     "build_geoid_requests",
     "compare_dem_samples",
