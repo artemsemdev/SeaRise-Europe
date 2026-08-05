@@ -21,6 +21,12 @@ from shapely.geometry import Point
 
 LAYERS = ("DEM", "EDM", "FLM", "HEM", "WBM")
 BUILDER_VERSION = "1.0.0"
+EVIDENCE_RELATIVE_PATH = Path(
+    "src/pipeline/science/evidence/phase-0-12-basin-controls.json"
+)
+EVIDENCE_SCHEMA_RELATIVE_PATH = Path(
+    "src/pipeline/science/evidence/phase-0-12-basin-controls.schema.json"
+)
 
 
 class EvidenceBuildError(RuntimeError):
@@ -39,20 +45,28 @@ def _canonical_bytes(document: Mapping[str, Any]) -> bytes:
     return (json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
+def _validate_document(
+    document: Mapping[str, Any], schema: Mapping[str, Any], label: str
+) -> None:
+    errors = sorted(
+        Draft202012Validator(
+            schema, format_checker=FormatChecker()
+        ).iter_errors(document),
+        key=lambda item: list(item.path),
+    )
+    if errors:
+        first = errors[0]
+        location = ".".join(str(part) for part in first.path) or "<root>"
+        raise EvidenceBuildError(f"Invalid {label} at {location}: {first.message}")
+
+
 def _load_contract(repo_root: Path) -> dict[str, Any]:
     contract_dir = repo_root / "src/pipeline/science"
     contract = json.loads((contract_dir / "basin-controls.json").read_text(encoding="utf-8"))
     schema = json.loads(
         (contract_dir / "basin-controls.schema.json").read_text(encoding="utf-8")
     )
-    errors = sorted(
-        Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(contract),
-        key=lambda item: list(item.path),
-    )
-    if errors:
-        first = errors[0]
-        location = ".".join(str(part) for part in first.path) or "<root>"
-        raise EvidenceBuildError(f"Invalid basin control contract at {location}: {first.message}")
+    _validate_document(contract, schema, "basin control contract")
     return contract
 
 
@@ -116,6 +130,162 @@ def _manifest_records(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]],
     if not records or records[0].get("type") != "manifest":
         raise EvidenceBuildError(f"Manifest header is missing: {path}")
     return records[0], records[1:], payload
+
+
+def _file_lineage(repo_root: Path, relative_path: str | Path) -> dict[str, Any]:
+    path = Path(relative_path)
+    return {"path": path.as_posix(), "sha256": _sha256(repo_root / path)}
+
+
+def _verify_lineage_file(
+    repo_root: Path, descriptor: Mapping[str, Any], label: str
+) -> Path:
+    path = Path(descriptor["path"])
+    if path.is_absolute() or ".." in path.parts:
+        raise EvidenceBuildError(f"Unsafe {label} lineage path: {path}")
+    resolved = repo_root / path
+    if not resolved.is_file() or _sha256(resolved) != descriptor["sha256"]:
+        raise EvidenceBuildError(f"{label} lineage identity mismatch: {path}")
+    return resolved
+
+
+def _verify_manifest_lineage(
+    repo_root: Path, descriptor: Mapping[str, Any], label: str
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    path = _verify_lineage_file(repo_root, descriptor, label)
+    header, rows, payload = _manifest_records(path)
+    if header["objectCount"] != len(rows) or descriptor["objectCount"] != len(rows):
+        raise EvidenceBuildError(f"{label} object count mismatch")
+    if "payloadSha256" in descriptor and (
+        hashlib.sha256(payload).hexdigest() != descriptor["payloadSha256"]
+    ):
+        raise EvidenceBuildError(f"{label} payload identity mismatch")
+    if "totalByteSize" in descriptor and (
+        header["totalByteSize"] != descriptor["totalByteSize"]
+    ):
+        raise EvidenceBuildError(f"{label} byte total mismatch")
+    return header, rows
+
+
+def validate_checked_in_evidence(
+    repo_root: Path, evidence_path: Path | None = None
+) -> dict[str, Any]:
+    """Validate the committed receipt, all lineage, and canonical regeneration."""
+    repo_root = repo_root.resolve()
+    path = evidence_path or repo_root / EVIDENCE_RELATIVE_PATH
+    raw = path.read_bytes()
+    try:
+        evidence = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise EvidenceBuildError(f"Invalid basin evidence JSON: {path}") from exc
+
+    schema_path = repo_root / EVIDENCE_SCHEMA_RELATIVE_PATH
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    _validate_document(evidence, schema, "basin control evidence")
+    if raw != _canonical_bytes(evidence):
+        raise EvidenceBuildError("Basin evidence is not byte-identical canonical JSON")
+
+    expected_identity = {
+        "$schema": "./phase-0-12-basin-controls.schema.json",
+        "schemaVersion": 1,
+        "evidenceId": "phase-0.12-baltic-black-sea-controls-v1",
+        "issue": 96,
+        "builderVersion": BUILDER_VERSION,
+        "status": "source-pinning-complete-vertical-goldens-blocked",
+        "realSourceOnly": True,
+    }
+    for key, expected in expected_identity.items():
+        if evidence[key] != expected:
+            raise EvidenceBuildError(f"Unexpected evidence {key}: {evidence[key]!r}")
+    if evidence["review"] != {
+        "status": "pending-external",
+        "requiredRoles": ["independent scientific/data reviewer", "product owner"],
+        "executableGoldens": "blocked-by-issues-94-and-95",
+    }:
+        raise EvidenceBuildError("Basin review disposition is not fail-closed")
+    if evidence["publicationGate"] != {
+        "status": "blocked",
+        "europeWideClaimAllowed": False,
+        "blockingIssues": [94, 95, 97],
+    }:
+        raise EvidenceBuildError("Basin publication gate is not fail-closed")
+
+    lineage = evidence["lineage"]
+    expected_paths = {
+        "recipe": "scripts/science/build_basin_control_evidence.py",
+        "contract": "src/pipeline/science/basin-controls.json",
+        "contractSchema": "src/pipeline/science/basin-controls.schema.json",
+        "evidenceSchema": EVIDENCE_SCHEMA_RELATIVE_PATH.as_posix(),
+        "sourceLock": "src/pipeline/sources/source-lock.json",
+        "sourceLockSchema": "src/pipeline/sources/source-lock.schema.json",
+        "supportGeometry": "data/geometry/europe.geojson",
+        "coastalGeometry": "data/geometry/coastal_analysis_zone.geojson",
+        "connectivityControls": "src/pipeline/science/connectivity-controls.json",
+        "slaManifest": (
+            "src/pipeline/sources/manifests/"
+            "cmems-eur-monthly-sla-1995-2014-v202411.jsonl.gz"
+        ),
+        "terrainManifest": (
+            "src/pipeline/sources/manifests/"
+            "cop-dem-glo-30-baltic-black-sea-controls-v2021_1.jsonl.gz"
+        ),
+        "existingTerrainManifest": (
+            "src/pipeline/sources/manifests/"
+            "cop-dem-glo-30-regional-controls-v2021_1.jsonl.gz"
+        ),
+    }
+    if set(lineage) != set(expected_paths):
+        raise EvidenceBuildError("Basin evidence lineage set is incomplete or unexpected")
+    for key, expected_path in expected_paths.items():
+        if lineage[key]["path"] != expected_path:
+            raise EvidenceBuildError(f"Unexpected {key} lineage path")
+
+    for key in (
+        "recipe",
+        "contract",
+        "contractSchema",
+        "evidenceSchema",
+        "sourceLock",
+        "sourceLockSchema",
+        "supportGeometry",
+        "coastalGeometry",
+        "connectivityControls",
+    ):
+        _verify_lineage_file(repo_root, lineage[key], key)
+    for key in ("slaManifest", "terrainManifest", "existingTerrainManifest"):
+        _verify_manifest_lineage(repo_root, lineage[key], key)
+
+    contract = _load_contract(repo_root)
+    if (
+        contract["contractId"] != evidence["evidenceId"]
+        or contract["issue"] != evidence["issue"]
+        or contract["status"] != evidence["status"]
+    ):
+        raise EvidenceBuildError("Basin contract and evidence identity differ")
+    bindings = contract["sourceBindings"]
+    for lineage_key, contract_binding in (
+        ("supportGeometry", bindings["geography"]["support"]),
+        ("coastalGeometry", bindings["geography"]["coastal"]),
+        ("connectivityControls", bindings["connectivity"]),
+    ):
+        if dict(lineage[lineage_key]) != dict(contract_binding):
+            raise EvidenceBuildError(f"{lineage_key} differs from the basin contract")
+    sla = bindings["baseline"]["sla"]
+    terrain = bindings["terrain"]
+    for actual, expected in (
+        (lineage["slaManifest"]["sha256"], sla["manifestSha256"]),
+        (lineage["slaManifest"]["payloadSha256"], sla["payloadSha256"]),
+        (lineage["slaManifest"]["objectCount"], sla["objectCount"]),
+        (lineage["slaManifest"]["totalByteSize"], sla["totalByteSize"]),
+        (lineage["terrainManifest"]["sha256"], terrain["manifestSha256"]),
+        (lineage["terrainManifest"]["payloadSha256"], terrain["payloadSha256"]),
+        (lineage["terrainManifest"]["objectCount"], terrain["objectCount"]),
+        (lineage["terrainManifest"]["totalByteSize"], terrain["totalByteSize"]),
+    ):
+        if actual != expected:
+            raise EvidenceBuildError("Manifest lineage differs from the basin contract")
+    load_registry(repo_root / lineage["sourceLock"]["path"])
+    return evidence
 
 
 def _find_source(document: Mapping[str, Any], source_id: str) -> Mapping[str, Any]:
@@ -503,7 +673,9 @@ def build_evidence(
         repo_root
         / "src/pipeline/sources/manifests/cop-dem-glo-30-regional-controls-v2021_1.jsonl.gz"
     )
-    previous_header, _, _ = _manifest_records(previous_manifest_path)
+    previous_header, previous_rows, previous_payload = _manifest_records(
+        previous_manifest_path
+    )
     if previous_header["regions"] != contract["combinedSuite"]["existingWindows"]:
         raise EvidenceBuildError("Existing regional windows differ from the combined suite")
 
@@ -524,6 +696,7 @@ def build_evidence(
         }
     )
     return {
+        "$schema": "./phase-0-12-basin-controls.schema.json",
         "schemaVersion": 1,
         "evidenceId": "phase-0.12-baltic-black-sea-controls-v1",
         "issue": 96,
@@ -532,24 +705,35 @@ def build_evidence(
         "status": contract["status"],
         "realSourceOnly": True,
         "lineage": {
-            "recipe": {
-                "path": "scripts/science/build_basin_control_evidence.py",
-                "sha256": _sha256(
-                    repo_root / "scripts/science/build_basin_control_evidence.py"
-                ),
-            },
-            "contract": {
-                "path": "src/pipeline/science/basin-controls.json",
-                "sha256": _sha256(repo_root / "src/pipeline/science/basin-controls.json"),
-            },
-            "sourceLock": {
-                "path": "src/pipeline/sources/source-lock.json",
-                "sha256": _sha256(source_lock_path),
-            },
+            "recipe": _file_lineage(
+                repo_root, "scripts/science/build_basin_control_evidence.py"
+            ),
+            "contract": _file_lineage(
+                repo_root, "src/pipeline/science/basin-controls.json"
+            ),
+            "contractSchema": _file_lineage(
+                repo_root, "src/pipeline/science/basin-controls.schema.json"
+            ),
+            "evidenceSchema": _file_lineage(
+                repo_root, EVIDENCE_SCHEMA_RELATIVE_PATH
+            ),
+            "sourceLock": _file_lineage(
+                repo_root, "src/pipeline/sources/source-lock.json"
+            ),
+            "sourceLockSchema": _file_lineage(
+                repo_root, "src/pipeline/sources/source-lock.schema.json"
+            ),
+            "supportGeometry": dict(contract["sourceBindings"]["geography"]["support"]),
+            "coastalGeometry": dict(contract["sourceBindings"]["geography"]["coastal"]),
+            "connectivityControls": dict(contract["sourceBindings"]["connectivity"]),
             "slaManifest": {
                 "path": contract["sourceBindings"]["baseline"]["sla"]["manifestPath"],
                 "sha256": contract["sourceBindings"]["baseline"]["sla"]["manifestSha256"],
+                "payloadSha256": contract["sourceBindings"]["baseline"]["sla"][
+                    "payloadSha256"
+                ],
                 "objectCount": monthly_header["objectCount"],
+                "totalByteSize": monthly_header["totalByteSize"],
             },
             "terrainManifest": {
                 "path": terrain_binding["manifestPath"],
@@ -557,6 +741,13 @@ def build_evidence(
                 "payloadSha256": terrain_binding["payloadSha256"],
                 "objectCount": terrain_binding["objectCount"],
                 "totalByteSize": terrain_binding["totalByteSize"],
+            },
+            "existingTerrainManifest": {
+                "path": previous_manifest_path.relative_to(repo_root).as_posix(),
+                "sha256": _sha256(previous_manifest_path),
+                "payloadSha256": hashlib.sha256(previous_payload).hexdigest(),
+                "objectCount": len(previous_rows),
+                "totalByteSize": previous_header["totalByteSize"],
             },
         },
         "sourceAndLicence": {
@@ -586,22 +777,30 @@ def build_evidence(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--dem-dir", type=Path, required=True)
+    parser.add_argument("--dem-dir", type=Path)
     parser.add_argument("--monthly-sla-dir", type=Path)
     parser.add_argument("--mdt", type=Path)
     parser.add_argument("--write-dem-manifest", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--validate-checked-in", action="store_true")
     args = parser.parse_args()
 
     repo_root = args.repo_root.resolve()
+    action_selected = args.validate_checked_in
+    if args.validate_checked_in:
+        validate_checked_in_evidence(repo_root)
+    if (args.write_dem_manifest or args.output) and args.dem_dir is None:
+        parser.error("--write-dem-manifest and --output require --dem-dir")
     contract = _load_contract(repo_root)
     if args.write_dem_manifest:
+        action_selected = True
         output = args.write_dem_manifest
         if not output.is_absolute():
             output = repo_root / output
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(build_dem_manifest(contract, args.dem_dir))
     if args.output:
+        action_selected = True
         if args.monthly_sla_dir is None or args.mdt is None:
             parser.error("--output requires --monthly-sla-dir and --mdt")
         output = args.output if args.output.is_absolute() else repo_root / args.output
@@ -612,9 +811,13 @@ def main() -> None:
             args.monthly_sla_dir,
             args.mdt,
         )
+        schema = json.loads(
+            (repo_root / EVIDENCE_SCHEMA_RELATIVE_PATH).read_text(encoding="utf-8")
+        )
+        _validate_document(evidence, schema, "basin control evidence")
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(_canonical_bytes(evidence))
-    if args.write_dem_manifest is None and args.output is None:
+    if not action_selected:
         parser.error("choose --write-dem-manifest and/or --output")
 
 
