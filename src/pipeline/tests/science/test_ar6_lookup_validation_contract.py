@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -56,7 +57,7 @@ def test_golden_set_and_tolerance_are_predeclared() -> None:
     contract = _document("ar6-lookup-validation.json")
     validation = contract["validation"]
 
-    assert validation["numericToleranceMetres"] == 1e-12
+    assert validation["numericToleranceMetres"] == 1e-6
     assert validation["scenarioHorizonMatrix"] == {
         "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
         "horizons": [2030, 2050, 2100],
@@ -86,7 +87,7 @@ def test_algorithmic_controls_freeze_fail_closed_edges() -> None:
         "distance-boundary": ("ProjectionAvailable", "projection-available"),
         "beyond-maximum-distance": (
             "DataUnavailable",
-            "source-grid-beyond-maximum-distance",
+            "source-location-too-distant",
         ),
         "tie-break": ("ProjectionAvailable", "projection-available"),
     }
@@ -103,6 +104,7 @@ def test_lookup_is_grid_only_and_never_skips_nodata() -> None:
             "algorithm": "haversine",
             "earthMeanRadiusKm": 6371.0088,
             "boundary": "inclusive",
+            "reportedDistanceDecimalPlaces": 6,
         },
         "tieBreak": "lowest-source-location-id",
         "requiredQuantiles": [0.167, 0.5, 0.833],
@@ -112,6 +114,50 @@ def test_lookup_is_grid_only_and_never_skips_nodata() -> None:
         "interpolation": "forbidden",
         "extrapolation": "forbidden",
     }
+
+
+def test_file_bindings_match_exact_decision_and_source_contracts() -> None:
+    contract = _document("ar6-lookup-validation.json")
+    repo_root = SCIENCE_DIR.parents[2]
+    bindings = [
+        contract["source"]["sourceSemanticsBinding"],
+        contract["source"]["sourceLockBinding"],
+        contract["source"]["decisionContract"],
+    ]
+
+    for binding in bindings:
+        contents = (repo_root / binding["path"]).read_bytes()
+        assert hashlib.sha256(contents).hexdigest() == binding["sha256"]
+
+
+def test_lookup_parameters_match_the_accepted_projection_decision() -> None:
+    validation = _document("ar6-lookup-validation.json")
+    decision = _document("ar6-projection-contract.json")
+    lookup = validation["lookup"]
+    accepted = decision["spatialLookup"]["point"]
+
+    assert lookup["locationSelection"] == accepted["operator"]
+    assert lookup["maximumDistanceKm"] == accepted["maximumDistanceKilometres"]
+    assert lookup["distance"]["algorithm"] == accepted["distanceMetric"]
+    assert lookup["distance"]["earthMeanRadiusKm"] == accepted["earthRadiusKilometres"]
+    assert (
+        lookup["distance"]["reportedDistanceDecimalPlaces"]
+        == accepted["reportedDistanceDecimalPlaces"]
+    )
+    assert lookup["tieBreak"] == accepted["tieBreak"]
+    assert accepted["interpolation"] == "none"
+    assert accepted["tideGaugeFallback"] == "prohibited"
+    assert accepted["nodataSubstitution"] == "prohibited"
+    assert (
+        validation["resultContract"]["stableReasonCodes"][
+            "sourceGridBeyondMaximumDistance"
+        ]
+        in decision["resultContract"]["dataUnavailableReasons"]
+    )
+    assert (
+        validation["validation"]["numericToleranceMetres"]
+        == decision["validation"]["absoluteToleranceMetres"]
+    )
 
 
 def test_golden_scope_states_match_the_versioned_geometries() -> None:
