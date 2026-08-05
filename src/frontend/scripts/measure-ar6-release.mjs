@@ -54,9 +54,26 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function record(sample, kind, path, artifactPath, status, responseBytes, range) {
+function record(
+  sample,
+  kind,
+  path,
+  artifactPath,
+  status,
+  responseBytes,
+  range,
+  contentRange,
+) {
   const list = requests.get(sample) ?? [];
-  list.push({ kind, path, artifactPath, status, responseBytes, range: range ?? null });
+  list.push({
+    kind,
+    path,
+    artifactPath,
+    status,
+    responseBytes,
+    range: range ?? null,
+    contentRange: contentRange ?? null,
+  });
   requests.set(sample, list);
 }
 
@@ -80,19 +97,20 @@ function serveBytes(
   if (!match) {
     response.writeHead(200, { "Content-Length": bytes.length });
     response.end(bytes);
-    record(sample, kind, path, artifactPath, 200, bytes.length, range);
+    record(sample, kind, path, artifactPath, 200, bytes.length, range, null);
     return;
   }
   const start = Number(match[1]);
   const requestedEnd = match[2] ? Number(match[2]) : bytes.length - 1;
   const end = Math.min(requestedEnd, bytes.length - 1);
   const body = bytes.subarray(start, end + 1);
+  const contentRange = `bytes ${start}-${end}/${bytes.length}`;
   response.writeHead(206, {
     "Content-Length": body.length,
-    "Content-Range": `bytes ${start}-${end}/${bytes.length}`,
+    "Content-Range": contentRange,
   });
   response.end(body);
-  record(sample, kind, path, artifactPath, 206, body.length, range);
+  record(sample, kind, path, artifactPath, 206, body.length, range, contentRange);
 }
 
 const server = createServer((request, response) => {
@@ -233,6 +251,9 @@ try {
 const artifactHashes = Object.fromEntries(
   manifest.artifacts.map((artifact) => [artifact.path, artifact.sha256]),
 );
+const artifactByteSizes = Object.fromEntries(
+  manifest.artifacts.map((artifact) => [artifact.path, artifact.byteSize]),
+);
 const trace = {
   schemaVersion: 1,
   harness: "src/frontend/scripts/measure-ar6-release.mjs",
@@ -240,6 +261,7 @@ const trace = {
     releaseId: manifest.releaseId,
     manifestSha256: sha256(readFileSync(join(candidate, "manifest.json"))),
     artifactHashes,
+    artifactByteSizes,
   },
   profiles: {
     hardware: {
@@ -249,7 +271,11 @@ const trace = {
       totalMemoryBytes: totalmem(),
     },
     browser: { engine: "Chromium", version: browserVersion },
-    network: { transport: "loopback-http-1.1", cacheControl: "immutable" },
+    network: {
+      transport: "loopback-http-1.1",
+      cacheControl: "immutable",
+      origin,
+    },
   },
   target: {
     scenario: "ssp2-45",
