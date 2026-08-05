@@ -105,9 +105,9 @@
           "additionalProperties": false,
           "required": ["lower", "central", "upper"],
           "properties": {
-            "lower": { "const": 0.17 },
+            "lower": { "const": 0.167 },
             "central": { "const": 0.5 },
-            "upper": { "const": 0.83 }
+            "upper": { "const": 0.833 }
           }
         },
         "equation": { "const": "W_q = B_EGM2008 + 0.001 * AR6_q" }

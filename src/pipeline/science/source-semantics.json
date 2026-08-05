@@ -11,7 +11,8 @@
       "asset": "ar6-regional-confidence.zip",
       "byteSize": 9243771601,
       "upstreamChecksum": "md5:fec362a2385079fac32fa736d4a39944",
-      "sha256LockStatus": "blocking",
+      "sha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
+      "sha256LockStatus": "locked",
       "memberBasenameTemplate": "total_{scenario}_medium_confidence_values.nc"
     },
     "mapping": {
@@ -44,6 +45,12 @@
       "statistic": {
         "confidence": "medium",
         "quantile": 0.5
+      },
+      "intervalStatistics": {
+        "confidence": "medium",
+        "lowerQuantile": 0.167,
+        "centralQuantile": 0.5,
+        "upperQuantile": 0.833
       },
       "years": [2030, 2050, 2100],
       "baseline": "1995-2014 mean"
@@ -97,21 +104,65 @@
     },
     "productionChoice": "pending-scientific-review"
   },
+  "verticalInputs": {
+    "baseline": {
+      "reconstructionId": "monthly-sla-plus-static-mdt-v202411",
+      "slaSourceId": "copernicus-marine-eur-sla-monthly",
+      "mdtSourceId": "copernicus-marine-eur-mdt",
+      "sourceVersion": "202411",
+      "referencePeriod": {
+        "startInclusive": "1995-01-01",
+        "endExclusive": "2015-01-01"
+      },
+      "monthlyObjectCount": 240,
+      "calendarDayWeight": 7305,
+      "slaVariable": "sla",
+      "mdtVariable": "mdt",
+      "mdtErrorVariable": "err_mdt",
+      "equation": "mean_1995_2014(ADT_GOCO06S) = day_weighted_mean(monthly_SLA) + MDT_GOCO06S",
+      "missingPeriodRule": "nodata"
+    },
+    "sourceGeoid": {
+      "sourceId": "goco06s-gravity-model",
+      "model": "GOCO06S",
+      "version": "GOCO06S-2019-12-13",
+      "nativeTideSystem": "zero_tide",
+      "evaluationEpoch": "2010-01-01",
+      "maximumDegree": 300,
+      "coefficientErrors": "formal"
+    },
+    "targetGeoid": {
+      "sourceId": "egm2008-gravity-model",
+      "model": "EGM2008",
+      "version": "EGM2008-2008-07",
+      "nativeTideSystem": "tide_free",
+      "maximumDegree": 2190,
+      "maximumOrder": 2159,
+      "coefficientErrors": "calibrated-standard-deviations"
+    },
+    "terrainControls": {
+      "release": "2021_1",
+      "candidateSourceIds": ["copernicus-dem-glo30", "copernicus-dem-glo90"],
+      "requiredLayers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
+      "regionalControlCountPerResolution": 25
+    },
+    "evidence": "src/pipeline/science/evidence/vertical-source-inspection.json"
+  },
   "verticalCompatibility": {
     "status": "blocked",
-    "reason": "AR6 is relative sea-level change from a 1995-2014 baseline, while Copernicus DEM is an absolute EGM2008 orthometric DSM height.",
+    "reason": "The exact AR6, SLA, MDT, GOCO06S, EGM2008, and DEM control inputs are locked, but the uncertainty-aware vertical transform has not yet been implemented and independently validated.",
     "missingEvidence": [
-      "a pinned local baseline sea-surface or tidal datum",
-      "a reviewed transformation from that datum to EGM2008",
-      "uncertainty controls demonstrating that the combined vertical error is fit for classification"
+      "a validated zero-tide to tide-free GOCO06S-to-EGM2008 implementation",
+      "conservative combined baseline, datum, interpolation, DEM, and DSM uncertainty bounds",
+      "independent scientific/data review of the implemented transform"
     ],
     "prohibitedOperation": "publish classification from sea_level_change >= DEM elevation"
   },
   "publicationGate": {
     "status": "blocked",
     "blockingDecisions": [
-      "projection-archive-sha256",
       "vertical-datum-reconciliation",
+      "uncertainty-bound-validation",
       "dem-resolution-review"
     ]
   }
