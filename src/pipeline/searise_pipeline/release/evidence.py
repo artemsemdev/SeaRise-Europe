@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -45,6 +47,60 @@ def load_json(path: Path) -> Mapping[str, Any]:
     if not isinstance(document, dict):
         raise ScienceContractError("Release evidence must be a JSON object")
     return document
+
+
+def ensure_outside_candidate(
+    candidate: Path,
+    path: Path,
+    *,
+    label: str,
+    require_new: bool = False,
+) -> Path:
+    """Resolve an external record path without permitting candidate mutation."""
+    if candidate.is_symlink() or path.is_symlink():
+        raise ScienceContractError(f"{label} and candidate paths cannot be symlinks")
+    candidate_root = candidate.resolve(strict=False)
+    resolved = path.resolve(strict=False)
+    if resolved == candidate_root or candidate_root in resolved.parents:
+        raise ScienceContractError(f"{label} must be outside the immutable candidate")
+    if require_new and path.exists():
+        raise ScienceContractError(f"{label} already exists and cannot be overwritten")
+    return resolved
+
+
+def write_new_json_record(path: Path, document: Mapping[str, Any]) -> None:
+    """Atomically publish one JSON record without overwriting an existing path."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink() or path.exists():
+        raise ScienceContractError("Immutable evidence record already exists")
+    encoded = (
+        json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as stream:
+            temporary_path = Path(stream.name)
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary_path, path)
+        except FileExistsError as exc:
+            raise ScienceContractError(
+                "Immutable evidence record already exists"
+            ) from exc
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def binding_sha256(binding: Mapping[str, Any]) -> str:
@@ -205,6 +261,8 @@ def candidate_binding(
     contract: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     """Hash every declared artifact and the receipts before accepting evidence."""
+    if not root.is_dir():
+        raise ScienceContractError("Release candidate must be a real immutable directory")
     try:
         candidate_entries = list(root.rglob("*"))
     except OSError as exc:

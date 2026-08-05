@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from searise_pipeline.release.evidence import candidate_binding
+from searise_pipeline.release.evidence import candidate_binding, write_new_json_record
 from searise_pipeline.science import ScienceContractError
 
 from .test_source_fixture import contract
@@ -246,3 +246,24 @@ def test_candidate_seal_rejects_self_declared_receipt_drift(
 
     with pytest.raises(ScienceContractError, match="receipt|environment"):
         candidate_binding(tmp_path, contract=contract())
+
+
+def test_candidate_seal_rejects_symlinked_candidate_root(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate"
+    _candidate(candidate)
+    alias = tmp_path / "candidate-alias"
+    alias.symlink_to(candidate, target_is_directory=True)
+
+    with pytest.raises(ScienceContractError, match="symlink"):
+        candidate_binding(alias, contract=contract())
+
+
+def test_immutable_json_record_is_atomic_and_never_overwritten(tmp_path: Path) -> None:
+    record = tmp_path / "evidence.json"
+    write_new_json_record(record, {"status": "first"})
+
+    with pytest.raises(ScienceContractError, match="already exists"):
+        write_new_json_record(record, {"status": "second"})
+
+    assert json.loads(record.read_text(encoding="utf-8")) == {"status": "first"}
+    assert not list(tmp_path.glob(".evidence.json.*"))

@@ -770,6 +770,7 @@ def test_cli_wires_required_vector_trust_inputs(
     missing = tmp_path / "missing"
     output = tmp_path / "candidate"
     failure = tmp_path / "failure.json"
+    timing = tmp_path / "timing.json"
     monkeypatch.setattr(
         sys,
         "argv",
@@ -811,6 +812,8 @@ def test_cli_wires_required_vector_trust_inputs(
             str(output),
             "--failure-gate",
             str(failure),
+            "--timing-evidence",
+            str(timing),
         ],
     )
     captured: dict[str, object] = {}
@@ -838,6 +841,9 @@ def test_cli_wires_required_vector_trust_inputs(
 
     blocked = json.loads(failure.read_text(encoding="utf-8"))
     assert blocked["failure"]["type"] == "ScienceContractError"
+    assert blocked["automatedValidation"] == "failed"
+    assert blocked["releaseDisposition"] == "pending-owner"
+    assert blocked["phase1Unlocked"] is False
     assert captured["build_environment_id"] == "test-cli"
     assert captured["source_revision"] == "a" * 40
     assert isinstance(captured["workflow_started_monotonic"], float)
@@ -846,3 +852,68 @@ def test_cli_wires_required_vector_trust_inputs(
     assert captured["pmtiles_distribution_asset_path"] == missing
     assert captured["pmtiles_distribution_platform"] == "darwin-arm64"
     assert not output.exists()
+    assert not timing.exists()
+
+
+@pytest.mark.parametrize("record_name", ["failure", "timing"])
+def test_cli_rejects_records_inside_immutable_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    record_name: str,
+) -> None:
+    output = tmp_path / "candidate"
+    records = {
+        "failure": tmp_path / "failure.json",
+        "timing": tmp_path / "timing.json",
+    }
+    records[record_name] = output / f"{record_name}.json"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_ar6_regional_release.py",
+            "--fixture",
+            "unused",
+            "--source-lock",
+            "unused",
+            "--source-semantics",
+            "unused",
+            "--release-contract",
+            "unused",
+            "--lookup-goldens",
+            "unused",
+            "--tippecanoe",
+            "unused",
+            "--tippecanoe-decode",
+            "unused",
+            "--pmtiles",
+            "unused",
+            "--tippecanoe-source-archive",
+            "unused",
+            "--tippecanoe-build-receipt",
+            "unused",
+            "--pmtiles-distribution-asset",
+            "unused",
+            "--pmtiles-distribution-platform",
+            "darwin-arm64",
+            "--python-lock",
+            "unused",
+            "--build-environment-id",
+            "test-cli",
+            "--release-id",
+            "candidate-v1",
+            "--output",
+            str(output),
+            "--failure-gate",
+            str(records["failure"]),
+            "--timing-evidence",
+            str(records["timing"]),
+        ],
+    )
+
+    with pytest.raises(ScienceContractError, match="outside the immutable candidate"):
+        release_cli.main()
+
+    assert not output.exists()
+    assert not records["failure"].exists()
+    assert not records["timing"].exists()

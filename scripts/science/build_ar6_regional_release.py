@@ -17,18 +17,16 @@ from searise_pipeline.release import (
     load_release_contract,
     load_source_fixture,
 )
+from searise_pipeline.release.evidence import (
+    candidate_binding,
+    ensure_outside_candidate,
+    write_new_json_record,
+)
 from searise_pipeline.science import ScienceContractError
 
 
 def _load(path: Path) -> Mapping[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_json(path: Path, document: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
 
 
 def _git(repository: Path, *arguments: str) -> str:
@@ -69,12 +67,27 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--release-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--failure-gate", type=Path, required=True)
+    parser.add_argument("--timing-evidence", type=Path, required=True)
     return parser
 
 
 def main() -> None:
     args = _parser().parse_args()
     workflow_started = time.perf_counter()
+    ensure_outside_candidate(
+        args.output,
+        args.failure_gate,
+        label="Failure gate",
+        require_new=True,
+    )
+    ensure_outside_candidate(
+        args.output,
+        args.timing_evidence,
+        label="Build timing evidence",
+        require_new=True,
+    )
+    if args.failure_gate.resolve(strict=False) == args.timing_evidence.resolve(strict=False):
+        raise ScienceContractError("Failure and timing evidence paths must be distinct")
     try:
         repository = Path(__file__).resolve().parents[2]
         if _git(repository, "status", "--porcelain"):
@@ -117,19 +130,33 @@ def main() -> None:
             source_revision=source_revision,
             workflow_started_monotonic=workflow_started,
         )
+        write_new_json_record(
+            args.timing_evidence,
+            {
+                "schemaVersion": 1,
+                "candidate": candidate_binding(result.output_directory),
+                "timer": "python-time-perf-counter",
+                "startedBeforeSourceVerification": True,
+                "endedAfterAtomicCandidatePublish": True,
+                "fullCleanBuildDurationSeconds": result.build_duration_seconds,
+            },
+        )
     except (OSError, KeyError, ValueError, ScienceContractError) as exc:
         blocked = {
             "schemaVersion": 1,
             "gateId": "phase-0r-ar6-regional-release-v1",
             "issue": 110,
-            "disposition": "blocked",
-            "releaseDecision": "pending-owner",
+            "releaseId": args.release_id,
+            "scientificDisposition": "projection-only",
+            "automatedValidation": "failed",
+            "releaseDisposition": "pending-owner",
             "phase1Unlocked": False,
             "blockingChecks": ["preflight"],
+            "fallback": "do-not-publish-or-unlock-phase-1",
             "failure": {"type": type(exc).__name__, "message": str(exc)},
             "emittedScientificArtifacts": [],
         }
-        _write_json(args.failure_gate, blocked)
+        write_new_json_record(args.failure_gate, blocked)
         raise SystemExit(1) from exc
     print(
         json.dumps(
