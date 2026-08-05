@@ -142,6 +142,26 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertNotIn("inputs.release_source_revision || github.sha", workflow)
 
+    def test_release_evidence_pins_actions_and_checks_disk_before_download(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
+            "\n  infrastructure:", maxsplit=1
+        )[0]
+
+        for action in (
+            "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        ):
+            self.assertIn(action, evidence)
+        self.assertIn("required_kib=12582912", evidence)
+        self.assertIn("/tmp/phase-0r-ar6-preflight", evidence)
+        self.assertLess(evidence.index("df -Pk /tmp"), evidence.index("zenodo.org"))
+        self.assertIn("overwrite: false", evidence)
+
     def test_release_evidence_uses_only_hashed_python_install(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
