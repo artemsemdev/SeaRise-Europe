@@ -1,28 +1,45 @@
-# Historical Exposure Methodology — v1.0 (Not Publishable)
+# AR6 Regional Projection Methodology
 
-> **Status:** Phase 0 investigation `complete-with-no-go`; v1 superseded for publication
+> **Status:** Projection contract accepted; implementation and release gate pending
 > **Last reviewed:** 2026-08-05
-> **Decision sources:** [ADR-023](architecture/adr/ADR-023-vertical-reference-methodology.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md) and the [ADR-022](architecture/adr/ADR-022-phase-0-source-and-geography-gate.md) safety gate
-> **Blocking gate:** [Phase 0.14](evidence/phase-0-14-final-no-go.md) completed the investigation without a publishable result; the authoritative scientific and release disposition is `BLOCKED` because independent review is pending
-> **Automated recommendation:** `REJECTED` for `absolute-mean-water-surface-egm2008-interval-v1`; automation is not an independent reviewer
-> **Phase 1:** `LOCKED`; only an independently reviewed `approved` [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) may unlock [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48)
+> **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Machine contract:** [`ar6-projection-contract.json`](../src/pipeline/science/ar6-projection-contract.json)
+> **Blocking gate:** #135 must prove source/implementation parity and #110 must produce the measured regional release gate
+> **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's release decision
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
 
-This document preserves the v1 methodology investigated by Phase 0 and explains
-why it is not publishable. The repository implements its fail-closed
-computational contracts, but the locked evidence cannot supply finite coastal
-water and bare-earth terrain uncertainty bounds for the intended binary
-classification. Phase 0 therefore ended with an honest no-go rather than a
-scientific artifact.
+The active method reports three values directly from the locked IPCC AR6
+regional projection source: `q0.167`, `q0.5`, and `q0.833`. Values are converted
+from millimetres to metres and remain relative to the 1995–2014 mean. They form
+AR6's medium-confidence likely range; SeaRise Europe does not add a terrain,
+datum, or cross-source uncertainty model.
 
-No UI, README, portfolio page, fixture, or release may describe methodology
-`v1.0` as validated. Future validation must use the recovery product contract
-selected by [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106),
-not silently revive this candidate.
+For map and point results, the method uses only source-native 1° grid locations.
+Point lookup chooses the geometrically nearest grid location with unrounded
+haversine distance, a fixed `6371.0088 km` Earth radius, a `100 km` maximum,
+and lowest-location-ID tie-break. It never interpolates, falls back to a tide
+gauge, or skips source nodata in favour of a farther cell. Reported distance is
+rounded to six decimal places after selection.
+
+An available result shows the median, likely range, scenario, horizon,
+baseline, source location and distance, native resolution, method, and source
+release. The product says explicitly that this is regional relative sea-level
+change, not flooding, inundation, terrain exposure, or property risk.
+
+Offline goldens owned by #135 validate exact source identity and independent
+value extraction across the nine scenario/horizon combinations and four basin
+contexts. Python and TypeScript parity uses `0.000001 m` absolute and zero
+relative tolerance. A live web UI is not a required oracle. Automated evidence
+may pass without authorizing publication; #110 and an explicit project-owner
+release decision remain required.
+
+The remainder of this document preserves the v1 binary investigation and why
+it was not publishable. It is historical evidence, not an alternative active
+method.
 
 ## Historical candidate classification
 
@@ -252,20 +269,13 @@ All nine scenario/horizon attempts stopped before arrays. No classes, COGs,
 PMTiles, GeoParquet, statistics, release receipt, or synthetic substitute were
 created. Phase 1 remains locked.
 
-Recovery is a new, ordered scientific program rather than completion work on
-v1: [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) selects a
-post-no-go product contract; then
-[#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107) validates a
-datum-safe coastal mean-water reference and
-[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108) validates
-bare-earth coastal terrain in parallel; their approved evidence feeds
-[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109), which
-implements and independently reviews methodology v2; finally
-[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) rebuilds the
-regional proof. Only an independently reviewed `approved` #110 with zero
-blockers may unlock [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
+The original recovery plan through #107–#109 was superseded when ADR-024
+removed the absolute-water and terrain comparison. Current recovery is #135
+source/implementation parity followed by the #110 regional release gate. CI
+may record automated validation, but only the project owner may set the release
+decision that unlocks [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
 
-## Required preprocessing record
+## Historical v1 required preprocessing record
 
 Before approval, the pipeline must record and test:
 
@@ -409,3 +419,4 @@ ADR. Do not edit the v1 evidence or interpretation in place.
 | `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |
 | `v1.0` | 2026-08-05 | Phase 0.9 completed; scientific gate blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates; Phase 0 and Phase 1 remain blocked |
 | `v1.0` | 2026-08-05 | Phase 0 complete with no-go; publication superseded | Phase 0.14 preserved the authoritative `BLOCKED` state, recorded the automated `REJECTED` recommendation, emitted no release artifacts, and routed future work through #106–#110 |
+| `v2.0` | 2026-08-05 | Contract accepted; implementation blocked | ADR-024 replaced binary exposure with source-native AR6 q0.167/q0.5/q0.833 reporting; #135 and #110 remain required before release or Phase 1. |
