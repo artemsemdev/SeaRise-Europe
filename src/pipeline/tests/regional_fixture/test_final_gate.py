@@ -69,7 +69,7 @@ def _gate() -> dict:  # type: ignore[type-arg]
         "phase1": {
             "status": "blocked",
             "unlocked": False,
-            "nextDecision": "Supply the named evidence and repeat Phase 0.9.",
+            "nextDecision": "Supply the named evidence; #98 may re-evaluate the gate.",
         },
     }
 
@@ -167,6 +167,7 @@ def test_checked_in_gate_verifies_bound_attempt_and_stays_blocked() -> None:
     assert gate["decision"] == "blocked"
     assert gate["automation"] == {"status": "passed", "canAuthorizeDecision": False}
     assert gate["attemptSummary"]["blockedCombinations"] == 9
+    assert "#98 alone may re-evaluate" in gate["phase1"]["nextDecision"]
     assert gate["deliverables"] == {
         "scientificArrays": [],
         "analysisCogs": [],
