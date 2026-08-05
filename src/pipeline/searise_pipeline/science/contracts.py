@@ -92,6 +92,41 @@ def verify_geometry_assets(contracts: ScienceContracts, repo_root: Path) -> None
             )
 
 
+def verify_terrain_source_bindings(
+    contracts: ScienceContracts,
+    source_lock_path: Path,
+) -> None:
+    """Verify that terrain decision evidence names exact locked object sets."""
+    try:
+        source_lock = json.loads(source_lock_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Cannot read terrain source lock: {exc}") from exc
+
+    sources = {source["id"]: source for source in source_lock["sources"]}
+    for role, binding in contracts.terrain_decision["controlEvidence"].items():
+        source = sources.get(binding["sourceId"])
+        if source is None or source["version"] != binding["release"]:
+            raise ScienceContractError(f"{role} terrain source identity mismatch")
+        assets = {asset["id"]: asset for asset in source["assets"]}
+        asset = assets.get(binding["assetId"])
+        if asset is None or asset.get("availability") != "locked":
+            raise ScienceContractError(f"{role} terrain control set is not locked")
+        object_set = asset.get("objectSet", {})
+        expected = {
+            key: binding[key]
+            for key in (
+                "manifestPath",
+                "manifestSha256",
+                "payloadSha256",
+                "objectCount",
+                "totalByteSize",
+            )
+        }
+        actual = {key: object_set.get(key) for key in expected}
+        if actual != expected:
+            raise ScienceContractError(f"{role} terrain manifest identity mismatch")
+
+
 def assert_publication_ready(contracts: ScienceContracts) -> None:
     """Fail while any scientific or geography decision remains blocking."""
     blockers: list[str] = []

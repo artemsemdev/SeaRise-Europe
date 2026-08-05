@@ -69,7 +69,7 @@
       "gridConstruction": "validate explicit lat/lon coordinates, then reshape by coordinate value",
       "extrapolation": "none",
       "nodata": "propagate when the requested point or any required interpolation neighbour is missing",
-      "targetGrid": "pending-dem-resolution-review"
+      "targetGrid": "copernicus-dem-glo30/2021_1"
     },
     "review": {
       "status": "pending",
@@ -102,7 +102,7 @@
         "sampleSha256": "9a7bff2e790fe47e47784984e129a2d2116bbd3c08e4a41eb769acc55ede5ed2"
       }
     },
-    "productionChoice": "pending-scientific-review"
+    "productionChoice": "GLO-30-selected-for-external-review"
   },
   "verticalInputs": {
     "baseline": {
@@ -152,8 +152,10 @@
     "terrainControls": {
       "release": "2021_1",
       "candidateSourceIds": ["copernicus-dem-glo30", "copernicus-dem-glo90"],
+      "selectedSourceId": "copernicus-dem-glo30",
       "requiredLayers": ["DEM", "EDM", "FLM", "HEM", "WBM"],
-      "regionalControlCountPerResolution": 25
+      "regionalControlCountPerResolution": 25,
+      "decisionContract": "src/pipeline/science/terrain-decision.json"
     },
     "evidence": "src/pipeline/science/evidence/vertical-source-inspection.json",
     "implementationEvidence": "src/pipeline/science/evidence/vertical-transformation-implementation.json"

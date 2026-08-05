@@ -4,13 +4,14 @@
   "title": "SeaRise Europe Phase 0.8 terrain decision",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "contractId", "methodologyId", "decision", "uncertainty", "delivery", "review", "publicationGate"],
+  "required": ["schemaVersion", "contractId", "methodologyId", "decision", "controlEvidence", "uncertainty", "delivery", "review", "publicationGate"],
   "properties": {
     "$schema": { "type": "string" },
     "schemaVersion": { "const": 1 },
     "contractId": { "const": "phase-0.8-terrain-decision" },
     "methodologyId": { "const": "absolute-mean-water-surface-egm2008-interval-v1" },
     "decision": { "$ref": "#/$defs/decision" },
+    "controlEvidence": { "$ref": "#/$defs/controlEvidence" },
     "uncertainty": { "$ref": "#/$defs/uncertainty" },
     "delivery": { "$ref": "#/$defs/delivery" },
     "review": { "$ref": "#/$defs/review" },
@@ -45,6 +46,45 @@
             }
           }
         }
+      }
+    },
+    "controlEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "comparator"],
+      "properties": {
+        "selected": { "$ref": "#/$defs/glo30Control" },
+        "comparator": { "$ref": "#/$defs/glo90Control" }
+      }
+    },
+    "glo30Control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "assetId", "release", "manifestPath", "manifestSha256", "payloadSha256", "objectCount", "totalByteSize"],
+      "properties": {
+        "sourceId": { "const": "copernicus-dem-glo30" },
+        "assetId": { "const": "regional-control-set" },
+        "release": { "const": "2021_1" },
+        "manifestPath": { "const": "manifests/cop-dem-glo-30-regional-controls-v2021_1.jsonl.gz" },
+        "manifestSha256": { "const": "4803149548589b7c97d747ae99fd21267d1bc07b9ec02bf6b5e19d06c335f5e6" },
+        "payloadSha256": { "const": "a70daa87beeda161ae1ea6015ea908c817df63f21d159c730391c45a48373254" },
+        "objectCount": { "const": 25 },
+        "totalByteSize": { "const": 165670216 }
+      }
+    },
+    "glo90Control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "assetId", "release", "manifestPath", "manifestSha256", "payloadSha256", "objectCount", "totalByteSize"],
+      "properties": {
+        "sourceId": { "const": "copernicus-dem-glo90" },
+        "assetId": { "const": "regional-control-set" },
+        "release": { "const": "2021_1" },
+        "manifestPath": { "const": "manifests/cop-dem-glo-90-regional-controls-v2021_1.jsonl.gz" },
+        "manifestSha256": { "const": "5c2d1848c5fefb81d9a280afbaaeb745490444ff7b5faded052f9eddc93d3e85" },
+        "payloadSha256": { "const": "f1241cf9ee02f8eb5c1e5d7686f7810a802f9a8a78a7314a59836becd884a899" },
+        "objectCount": { "const": 25 },
+        "totalByteSize": { "const": 20555898 }
       }
     },
     "uncertainty": {
