@@ -59,7 +59,7 @@ def validate_python_toolchain(
     observed_python = ".".join(map(str, sys.version_info[:3]))
     observed_platform = current_python_platform()
     profile = pin["profiles"].get(observed_platform)
-    if profile is None or observed_python != profile["pythonVersion"]:
+    if profile is None:
         raise ScienceContractError("Python interpreter differs from the release platform")
     if (
         not lock_path.is_file()
@@ -77,6 +77,8 @@ def validate_python_toolchain(
         locked[match.group("name")] = match.group("version")
     if locked != pin["packageVersions"]:
         raise ScienceContractError("Python release lock differs from package-version pins")
+    if observed_python != profile["pythonVersion"]:
+        raise ScienceContractError("Python interpreter differs from the release platform")
     packages: dict[str, str] = {}
     for distribution, expected in locked.items():
         try:

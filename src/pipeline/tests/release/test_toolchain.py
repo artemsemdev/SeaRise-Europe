@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import sys
 from copy import deepcopy
 from pathlib import Path
 
@@ -23,6 +24,11 @@ def _lock_path() -> Path:
 
 
 def test_current_release_environment_matches_every_locked_distribution() -> None:
+    profile = contract()["toolchain"]["python"]["profiles"][current_python_platform()]
+    observed_python = ".".join(map(str, sys.version_info[:3]))
+    if observed_python != profile["pythonVersion"]:
+        pytest.skip("exact release runtime is validated by the dedicated CI job")
+
     evidence = validate_python_toolchain(_lock_path(), contract=contract())
 
     assert evidence.lock_sha256 == contract()["toolchain"]["python"]["profiles"][
