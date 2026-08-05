@@ -107,6 +107,15 @@ class Acquirer:
                 attempts=0,
             )
 
+        if asset.kind != "file":
+            self._reject(
+                source,
+                asset,
+                reason="manifest-driven-object-set-required",
+                cache_decision="not-checked",
+                attempts=0,
+            )
+
         target = self.cache_path(source, asset)
         if target.exists():
             if asset.availability != "locked":
@@ -145,6 +154,14 @@ class Acquirer:
 
     def verify(self, source: Source, asset: Asset) -> tuple[Path, Receipt]:
         """Verify cached bytes without making a network request."""
+        if asset.kind != "file":
+            self._reject(
+                source,
+                asset,
+                reason="manifest-driven-object-set-required",
+                cache_decision="not-checked",
+                attempts=0,
+            )
         target = self.cache_path(source, asset)
         if asset.availability != "locked" or not target.is_file():
             self._reject(
