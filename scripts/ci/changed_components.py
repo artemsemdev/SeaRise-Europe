@@ -15,6 +15,7 @@ OUTPUTS = (
     "frontend",
     "api",
     "pipeline",
+    "release",
     "infrastructure",
     "docker_frontend",
     "docker_api",
@@ -52,6 +53,34 @@ PIPELINE = (
     "data/geometry/**",
     "scripts/tests/**",
     "tests/**",
+)
+
+# The release route is intentionally narrower than PIPELINE. It owns the
+# expensive, pinned geospatial toolchain build and therefore runs only when a
+# release contract, implementation, fixture, tool lock, or its executable
+# browser benchmark changes.
+RELEASE = (
+    "scripts/science/*ar6*release*.py",
+    "scripts/science/build_ar6_lookup_goldens.py",
+    "scripts/science/validate_ar6_delivery_trace.py",
+    "src/frontend/package.json",
+    "src/frontend/package-lock.json",
+    "src/frontend/scripts/measure-ar6-release.mjs",
+    "src/pipeline/fixtures/ar6-regional-release/**",
+    "src/pipeline/requirements-release*.lock",
+    "src/pipeline/science/ar6-regional-release*.json",
+    "src/pipeline/science/ar6-release-promotion.schema.json",
+    "src/pipeline/science/ar6-lookup-validation*.json",
+    "src/pipeline/science/ar6-projection-contract*.json",
+    "src/pipeline/science/evidence/ar6-lookup-goldens*.json",
+    "src/pipeline/science/source-semantics*.json",
+    "src/pipeline/searise_pipeline/release/**",
+    "src/pipeline/searise_pipeline/science/ar6.py",
+    "src/pipeline/searise_pipeline/science/ar6_lookup.py",
+    "src/pipeline/tests/release/**",
+    "src/pipeline/tests/science/test_ar6_regional_release_contract.py",
+    "src/pipeline/toolchain/**",
+    "src/pipeline/sources/source-lock*.json",
 )
 
 INFRASTRUCTURE = (
@@ -134,6 +163,7 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
         "frontend": any(_matches(path, FRONTEND) for path in paths),
         "api": any(_matches(path, API) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
+        "release": any(_matches(path, RELEASE) for path in paths),
         "infrastructure": any(_matches(path, INFRASTRUCTURE) for path in paths),
         "docker_frontend": any(
             _matches(path, FRONTEND_IMAGE) and not _is_frontend_test(path)
