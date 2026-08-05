@@ -296,7 +296,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertNotIn("/tmp/build-timing-linux.json", macos)
         self.assertNotIn("-linux-x86_64", macos)
         self.assertEqual(linux.count("/tmp/phase-0r-ar6-v1"), 4)
-        self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 5)
+        self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 6)
 
     def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:
         workflow = (
@@ -313,6 +313,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"
         )
         measure = macos.index("Measure trusted browser delivery")
+        validate = macos.index("Validate browser delivery evidence")
         upload = macos.index("Upload independently built candidate and timing")
         self.assertLess(build, setup_node)
         self.assertLess(
@@ -320,7 +321,8 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             setup_node,
         )
         self.assertLess(setup_node, measure)
-        self.assertLess(measure, upload)
+        self.assertLess(measure, validate)
+        self.assertLess(validate, upload)
         self.assertIn("node-version: 20", macos)
         self.assertIn(
             "cache-dependency-path: src/frontend/package-lock.json",
@@ -339,6 +341,21 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertIn(command, macos)
         self.assertIn("test -s /tmp/browser-trace-macos-arm64.json", macos)
+        self.assertIn(
+            "python scripts/science/validate_ar6_delivery_trace.py",
+            macos,
+        )
+        self.assertIn("--candidate /tmp/phase-0r-ar6-v1", macos)
+        self.assertIn("--trace /tmp/browser-trace-macos-arm64.json", macos)
+        self.assertIn(
+            "--harness src/frontend/scripts/measure-ar6-release.mjs",
+            macos,
+        )
+        self.assertIn(
+            "--build-timing /tmp/build-timing-macos-arm64.json",
+            macos,
+        )
+        self.assertIn("test -s /tmp/delivery-report-macos-arm64.json", macos)
         self.assertIn("            /tmp/browser-trace-macos-arm64.json", macos)
         self.assertLess(
             macos.index("test -s /tmp/browser-trace-macos-arm64.json"),
