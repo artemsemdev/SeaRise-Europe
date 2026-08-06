@@ -17,7 +17,8 @@ estimate probability, or recommend adaptation measures.
 
 The target system is a static geospatial data product. Scientific processing
 occurs before publication; a browser searches places, checks scope, reads the
-selected classified value, and renders the result without an application API.
+selected native-grid projection values, and renders them without an application
+API.
 
 ## People and systems
 
@@ -99,7 +100,7 @@ The browser performs bounded, deterministic operations:
 2. Search a prebuilt settlement index in a Web Worker.
 3. Test a selected coordinate against versioned support geometries.
 4. Read only the required byte ranges from the selected analysis artifact.
-5. Map the classified value to one of five result states.
+5. Map the projection lookup to one of four result states.
 6. Render the synchronized map, explanation, methodology version, and source
    attribution.
 
@@ -123,9 +124,10 @@ The offline pipeline performs the expensive and stateful work:
 - Scenario IDs are `ssp1-26`, `ssp2-45`, and `ssp5-85`.
 - Horizons are `2030`, `2050`, and `2100`.
 - Defaults are `ssp2-45` and `2050`.
-- Every assessment returns exactly one of:
-  `ModeledExposureDetected`, `NoModeledExposureDetected`,
+- Every assessment returns exactly one of: `ProjectionAvailable`,
   `DataUnavailable`, `OutOfScope`, or `UnsupportedGeography`.
+- Every `ProjectionAvailable` result discloses the AR6 median, likely range,
+  baseline, source-grid identity and distance, and native 1° resolution.
 - `OutOfScope` and `UnsupportedGeography` are domain results, not failures.
 - Every visible result is tied to a methodology version and immutable data
   release.
