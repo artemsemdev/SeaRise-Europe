@@ -352,6 +352,44 @@ def _write_ndjson(path: Path, source: RegionalReleaseSource, layer: RegionalLaye
     _validate_ndjson(path, source, layer)
 
 
+_TIPPECANOE_GZIP_PREFIX = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00"
+# RFC 1952 assigns 3 to Unix and 19 to macOS. The portable value is 255.
+_PINNED_GZIP_OPERATING_SYSTEMS = {3, 19, 255}
+_CANONICAL_GZIP_OPERATING_SYSTEM = 255
+
+
+def _canonicalize_tippecanoe_gzip_headers(path: Path) -> int:
+    """Remove the platform-only OS byte from Tippecanoe's gzip tile members."""
+    try:
+        archive = bytearray(path.read_bytes())
+    except OSError as exc:
+        raise ScienceContractError(f"Cannot canonicalize PMTiles gzip headers: {exc}") from exc
+
+    member_count = 0
+    cursor = 0
+    while True:
+        header = archive.find(_TIPPECANOE_GZIP_PREFIX, cursor)
+        if header < 0:
+            break
+        operating_system = header + len(_TIPPECANOE_GZIP_PREFIX)
+        observed = archive[operating_system]
+        if observed not in _PINNED_GZIP_OPERATING_SYSTEMS:
+            raise ScienceContractError(
+                "Tippecanoe gzip member has an unsupported operating-system byte"
+            )
+        archive[operating_system] = _CANONICAL_GZIP_OPERATING_SYSTEM
+        member_count += 1
+        cursor = operating_system + 1
+
+    if member_count == 0:
+        raise ScienceContractError("Tippecanoe gzip members are absent from PMTiles")
+    try:
+        path.write_bytes(archive)
+    except OSError as exc:
+        raise ScienceContractError(f"Cannot persist canonical PMTiles gzip headers: {exc}") from exc
+    return member_count
+
+
 def _canonical_metadata(
     source: RegionalReleaseSource,
     layer: RegionalLayer,
@@ -569,6 +607,7 @@ def write_visual_pmtiles(
             ]
         )
         _run([str(pmtiles_path), "edit", str(archive_path), f"--metadata={metadata_path}"])
+        _canonicalize_tippecanoe_gzip_headers(archive_path)
         _run([str(pmtiles_path), "verify", str(archive_path)])
         metadata = json.loads(_run([str(pmtiles_path), "show", str(archive_path), "--metadata"]))
         expected_metadata = _expected_metadata(source, layer, contract)
