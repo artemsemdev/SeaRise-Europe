@@ -947,3 +947,105 @@ def _verify_validation_run(
         "jobs": {platform: matches[0] for platform, matches in matching_jobs.items()},
         "artifacts": artifact_records,
     }, candidates, timings, mac_trace
+
+
+def _verify_release_merges(
+    api: GitHubApi,
+    integration_pr_number: int,
+    evidence_pr_number: int,
+    source_revision: str,
+    context: Mapping[str, str],
+    repository_root: Path,
+) -> dict[str, Any]:
+    integration_pull = api.get_json(
+        f"/repos/{REPOSITORY}/pulls/{integration_pr_number}"
+    )
+    _require(
+        integration_pull.get("number") == integration_pr_number
+        and integration_pull.get("state") == "closed"
+        and integration_pull.get("merged") is True
+        and integration_pull.get("base", {}).get("ref") == "master"
+        and integration_pull.get("base", {}).get("repo", {}).get("full_name")
+        == REPOSITORY
+        and integration_pull.get("head", {}).get("repo", {}).get("full_name")
+        == REPOSITORY
+        and integration_pull.get("merge_commit_sha") == source_revision,
+        "Code integration pull request did not produce the candidate source revision",
+    )
+    evidence_pull = api.get_json(f"/repos/{REPOSITORY}/pulls/{evidence_pr_number}")
+    merge_sha = evidence_pull.get("merge_commit_sha", "")
+    evidence_revision = evidence_pull.get("head", {}).get("sha", "")
+    _require(
+        evidence_pull.get("number") == evidence_pr_number
+        and evidence_pull.get("state") == "closed"
+        and evidence_pull.get("merged") is True
+        and evidence_pull.get("base", {}).get("ref") == "master"
+        and evidence_pull.get("base", {}).get("sha") == source_revision
+        and evidence_pull.get("base", {}).get("repo", {}).get("full_name") == REPOSITORY
+        and _GIT_SHA.fullmatch(evidence_revision) is not None
+        and evidence_pull.get("head", {}).get("repo", {}).get("full_name") == REPOSITORY
+        and _GIT_SHA.fullmatch(merge_sha) is not None,
+        "Evidence-only pull request is not the exact merged source",
+    )
+    source_comparison = api.get_json(
+        f"/repos/{REPOSITORY}/compare/{source_revision}...{evidence_revision}"
+    )
+    _require(
+        source_comparison.get("status") == "ahead"
+        and source_comparison.get("merge_base_commit", {}).get("sha") == source_revision,
+        "Evidence head is not a direct descendant of the candidate source",
+    )
+    evidence_delta = _verify_evidence_only_delta(
+        repository_root,
+        source_revision,
+        evidence_revision,
+    )
+    master = api.get_json(f"/repos/{REPOSITORY}/commits/master")
+    _require(
+        master.get("sha") == context["GITHUB_SHA"] == merge_sha,
+        "Current GitHub master is not the exact evidence merge",
+    )
+    parents = _git(repository_root, "show", "-s", "--format=%P", merge_sha).split()
+    _require(
+        parents == [source_revision, evidence_revision]
+        and _git(repository_root, "rev-parse", "HEAD") == merge_sha
+        and _git(repository_root, "rev-parse", f"{evidence_revision}^{{tree}}")
+        == _git(repository_root, "rev-parse", f"{merge_sha}^{{tree}}"),
+        "Evidence merge parents or tree differ from the reviewed evidence head",
+    )
+    return {
+        "integrationPull": integration_pull,
+        "evidencePull": evidence_pull,
+        "master": master,
+        "sourceComparison": source_comparison,
+        "evidenceDelta": evidence_delta,
+    }
+
+
+def _external_binding_requirements(gate: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    try:
+        provenance = gate["externalVerificationRequired"]["reproducibilityProvenance"]
+        required = provenance["requiredExternalBindings"]
+    except (KeyError, TypeError) as exc:
+        raise ScienceContractError("Automated gate lacks external binding requirements") from exc
+    if (
+        provenance.get("status") != "pending-external-verification"
+        or provenance.get("provider") != "github-actions"
+        or set(provenance) != {"status", "provider", "requiredExternalBindings"}
+        or type(required) is not list
+        or len(required) != 2
+        or any(
+            type(item) is not dict
+            or set(item)
+            != {
+                "candidateBindingSha256",
+                "releaseId",
+                "sourceRevision",
+                "receiptBuildRunId",
+                "validatedEnvironmentProfile",
+            }
+            for item in required
+        )
+    ):
+        raise ScienceContractError("Automated gate requires another external binding set")
+    return required
