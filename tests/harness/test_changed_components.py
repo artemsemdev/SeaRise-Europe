@@ -321,6 +321,13 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("runs-on: macos-14", preflight)
         self.assertIn("src/pipeline/toolchain/build_macos_tippecanoe.sh", preflight)
         self.assertIn("tippecanoe-darwin-arm64-build-receipt.json", preflight)
+        self.assertIn('build_a="${RUNNER_TEMP}/ar6-tools-a"', preflight)
+        self.assertIn('build_b="${RUNNER_TEMP}/ar6-tools-b"', preflight)
+        self.assertIn('cmp "${build_a}/tippecanoe" "${build_b}/tippecanoe"', preflight)
+        self.assertIn(
+            'cmp "${build_a}/tippecanoe-decode" "${build_b}/tippecanoe-decode"',
+            preflight,
+        )
         self.assertIn("src/pipeline/toolchain/build_macos_tippecanoe.sh", producer)
 
     def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:
