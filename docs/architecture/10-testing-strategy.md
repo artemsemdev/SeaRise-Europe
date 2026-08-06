@@ -187,7 +187,7 @@ exact match incorrectly or create duplicate results.
 Playwright exercises the production static build against release fixtures:
 
 - load shell, focus search, initialize worker, and find a place;
-- select a result and obtain each of the five domain states;
+- select a result and obtain each of the four domain states;
 - switch all scenarios and horizons and keep map/assessment in sync;
 - share a URL, reload it, and reproduce the same pinned result;
 - show methodology, release, limitations, and source attribution;
@@ -196,8 +196,8 @@ Playwright exercises the production static build against release fixtures:
 - assert zero calls to `/assess`, `/geocode`, and `/config`.
 
 Browser lookup and Python pipeline sampling run against shared golden fixtures.
-Any difference in coordinate-to-cell conversion, nodata, or result state fails
-the parity gate.
+Any difference in source-grid selection, distance, quantile values, nodata, or
+result state fails the parity gate.
 
 ### 3.8 Offline, accessibility, and visual tests
 
