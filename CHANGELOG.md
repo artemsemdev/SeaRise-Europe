@@ -33,6 +33,9 @@ All notable changes to this project will be documented in this file.
   decision to two trusted GitHub candidate artifacts, raw browser/timing
   evidence, exact code and evidence merges, and a mandatory permanent
   owner-record pull request before Phase 1 can unlock.
+- Added the trusted Phase 0R Linux and macOS ARM64 release evidence bundle,
+  proving byte-identical artifacts, zero scientific-value difference, and
+  browser delivery within the release budgets before owner approval.
 
 ### Changed
 
