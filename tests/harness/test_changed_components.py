@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -460,6 +461,112 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertNotIn("ar6-regional-confidence.zip/content", preflight)
         gate = workflow[workflow.index("  ci-gate:") :]
         self.assertIn("      - release-toolchain", gate)
+
+    def test_owner_promotion_is_manual_protected_and_read_only(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/phase-0r-owner-promotion.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("  workflow_dispatch:", workflow)
+        self.assertNotIn("pull_request:", workflow)
+        self.assertNotIn("push:", workflow)
+        self.assertIn("environment: phase-0r-owner-approval", workflow)
+        self.assertIn("actions: read", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertIn("pull-requests: read", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("ref: master", workflow)
+        self.assertIn(
+            "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1",
+            workflow,
+        )
+        self.assertIn(
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0",
+            workflow,
+        )
+        self.assertIn(
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2",
+            workflow,
+        )
+        self.assertIn('[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]', workflow)
+        self.assertIn("retention-days: 90", workflow)
+        action_lines = [
+            line.strip() for line in workflow.splitlines() if "uses:" in line
+        ]
+        self.assertTrue(action_lines)
+        self.assertTrue(
+            all(
+                re.search(r"@[0-9a-f]{40}(?:\s+#\s+v\S+)?$", line)
+                for line in action_lines
+            )
+        )
+        self.assertLess(
+            workflow.index("Validate protected dispatch boundary"),
+            workflow.index("actions/checkout"),
+        )
+
+        routes = classify_paths([".github/workflows/phase-0r-owner-promotion.yml"])
+        self.assertTrue(routes["pipeline"])
+        self.assertTrue(routes["release"])
+        self.assertTrue(routes["heavy"])
+        self.assertFalse(routes["frontend"])
+        self.assertFalse(routes["api"])
+
+        script_routes = classify_paths(
+            ["scripts/science/promote_phase_0r_release.py"]
+        )
+        self.assertTrue(script_routes["pipeline"])
+        self.assertTrue(script_routes["release"])
+        self.assertTrue(script_routes["heavy"])
+        self.assertFalse(script_routes["frontend"])
+        self.assertFalse(script_routes["api"])
+
+        delivery_routes = classify_paths(
+            ["scripts/science/validate_ar6_delivery_trace.py"]
+        )
+        self.assertTrue(delivery_routes["pipeline"])
+        self.assertTrue(delivery_routes["release"])
+        self.assertTrue(delivery_routes["heavy"])
+
+    def test_owner_promotion_exposes_only_reviewed_inputs(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/phase-0r-owner-promotion.yml").read_text(
+            encoding="utf-8"
+        )
+        input_block = workflow[
+            workflow.index("    inputs:") : workflow.index("\npermissions:")
+        ]
+
+        self.assertEqual(input_block.count("      validation_run_id:"), 1)
+        self.assertEqual(input_block.count("      evidence_pr_number:"), 1)
+        self.assertEqual(input_block.count("      decision:"), 1)
+        for forbidden in (
+            "repository:",
+            "ref:",
+            "workflow:",
+            "artifact:",
+            "source_sha:",
+            "actor:",
+            "merged:",
+        ):
+            self.assertNotIn(forbidden, input_block)
+
+        verifier = (
+            root / "src/pipeline/searise_pipeline/release/owner_promotion.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('VALIDATION_WORKFLOW = ".github/workflows/ci.yml"', verifier)
+        self.assertIn('VALIDATION_JOB_ID = "ar6-release-evidence"', verifier)
+        self.assertIn(
+            'VALIDATION_JOB_NAME = "Full-source Linux AR6 candidate"', verifier
+        )
+        self.assertIn(
+            'MAC_VALIDATION_JOB_NAME = "Full-source macOS ARM64 AR6 candidate"',
+            verifier,
+        )
+        self.assertIn('REPOSITORY = "artemsemdev/SeaRise-Europe"', verifier)
+        self.assertIn('MASTER_REF = "refs/heads/master"', verifier)
 
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])

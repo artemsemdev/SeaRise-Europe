@@ -335,7 +335,7 @@
       "owner": "science",
       "purpose": "Enforce complete AR6 artifact evidence, engineering budgets, zero blockers, and separation between automated validation and owner release disposition.",
       "sourcePaths": ["src/pipeline/tests/release/test_owner_promotion.py", "src/pipeline/tests/release/test_promotion_cli.py", "src/pipeline/tests/release/test_recovery_gate.py"],
-      "changedPaths": ["scripts/science/finalize_ar6_regional_release.py", "scripts/science/promote_phase_0r_release.py", "scripts/science/validate_ar6_delivery_trace.py", "src/pipeline/searise_pipeline/release/gate.py", "src/pipeline/searise_pipeline/release/owner_promotion.py", "src/pipeline/searise_pipeline/release/promotion.py", "src/pipeline/tests/release/test_owner_promotion.py", "src/pipeline/tests/release/test_promotion_cli.py", "src/pipeline/tests/release/test_recovery_gate.py"],
+      "changedPaths": [".github/workflows/phase-0r-owner-promotion.yml", "scripts/science/finalize_ar6_regional_release.py", "scripts/science/promote_phase_0r_release.py", "scripts/science/validate_ar6_delivery_trace.py", "src/pipeline/searise_pipeline/release/gate.py", "src/pipeline/searise_pipeline/release/owner_promotion.py", "src/pipeline/searise_pipeline/release/promotion.py", "src/pipeline/tests/release/test_owner_promotion.py", "src/pipeline/tests/release/test_promotion_cli.py", "src/pipeline/tests/release/test_recovery_gate.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent fail-closed Phase 0R artifact-evidence and release-authority gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_owner_promotion.py src/pipeline/tests/release/test_promotion_cli.py src/pipeline/tests/release/test_recovery_gate.py -q", "full": "python -m pytest src/pipeline/tests -q" },
@@ -635,10 +635,10 @@
       "description": "Current CI has fast legacy jobs but no regional/release promotion workflow consuming this classification yet."
     },
     {
-      "id": "phase-0-final-gate-blockers",
+      "id": "phase-0r-owner-gate-blockers",
       "owner": "science",
-      "targetIssue": 85,
-      "description": "Phase 1 remains explicitly blocked on EGM2008 evaluator conventions, numerical uncertainty bounds, independent review, Baltic/Black Sea controls, product/connectivity approval, cross-environment reproducibility, and reviewed golden vectors."
+      "targetIssue": 110,
+      "description": "Phase 1 remains blocked until the protected owner workflow verifies the trusted Linux and macOS ARM64 candidate bindings, raw delivery evidence, exact release merge topology, and an approved owner releaseDisposition."
     }
   ]
 }
