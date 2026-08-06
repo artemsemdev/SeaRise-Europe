@@ -148,6 +148,8 @@ For every published candidate:
 - run PMTiles structural verification and sample tiles at multiple zooms;
 - prove PMTiles and GeoParquet integer values and source IDs agree exactly with
   the corresponding COG cells;
+- require a pinned metadata-free Arrow schema and the RFC 1952 portable gzip
+  operating-system marker before hashing cross-platform artifacts;
 - compare local and uploaded sizes and SHA-256 values;
 - issue `HEAD` and partial `GET` requests and verify `Accept-Ranges`,
   `Content-Range`, `ETag`, cache headers, and allowed CORS origin;
