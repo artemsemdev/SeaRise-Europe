@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import stat
 import subprocess
+import tempfile
 import urllib.error
 import urllib.request
 import zipfile
@@ -22,6 +24,7 @@ from .evidence import (
     load_json,
     load_json_snapshot,
     sha256,
+    write_new_json_record,
 )
 from .promotion import (
     _BUILD_CHECKS,
@@ -1179,3 +1182,166 @@ def _verify_no_prior_decision(
         raise ScienceContractError(
             "An authoritative owner decision already exists for this release candidate"
         )
+
+
+def _write_records(
+    output_root: Path,
+    *,
+    context: Mapping[str, str],
+    decision: str,
+    run_id: int,
+    pr_number: int,
+    mac_binding: Mapping[str, Any],
+    linux_binding: Mapping[str, Any],
+    automated_gate: Mapping[str, Any],
+    integration: Mapping[str, Any],
+    validation: Mapping[str, Any],
+    trusted_timings: Mapping[str, Mapping[str, Any]],
+    evidence_hashes: Mapping[str, str],
+    contract_sha256: str,
+) -> Mapping[str, Any]:
+    _require(
+        not output_root.exists() and not output_root.is_symlink(),
+        "Promotion output already exists",
+    )
+    output_root.mkdir(parents=True, exist_ok=False)
+    mac_hash = binding_sha256(mac_binding)
+    linux_hash = binding_sha256(linux_binding)
+    owner = {
+        "schemaVersion": 1,
+        "authority": "github-protected-environment",
+        "environment": OWNER_ENVIRONMENT,
+        "repository": REPOSITORY,
+        "ref": MASTER_REF,
+        "workflow": OWNER_WORKFLOW,
+        "workflowRunId": int(context["GITHUB_RUN_ID"]),
+        "workflowRunAttempt": int(context["GITHUB_RUN_ATTEMPT"]),
+        "actor": OWNER_LOGIN,
+        "triggeringActor": OWNER_LOGIN,
+        "decision": decision,
+        "candidateBindingSha256": mac_hash,
+        "decisionArtifactName": _decision_artifact_name(
+            mac_binding["releaseId"], mac_binding["sourceRevision"]
+        ),
+    }
+    merge_sha = integration["evidencePull"]["merge_commit_sha"]
+    integration_record = {
+        "schemaVersion": 1,
+        "repository": REPOSITORY,
+        "integrationPullRequest": integration["integrationPull"]["number"],
+        "evidencePullRequest": pr_number,
+        "baseBranch": "master",
+        "candidateSourceSha": mac_binding["sourceRevision"],
+        "evidenceHeadSha": integration["evidencePull"]["head"]["sha"],
+        "mergeCommitSha": merge_sha,
+        "masterSha": context["GITHUB_SHA"],
+        "mergeContainedInMaster": True,
+        "evidenceOnlyDelta": integration["evidenceDelta"],
+    }
+    promotion = {
+        "schemaVersion": 1,
+        "releaseId": mac_binding["releaseId"],
+        "releaseContractSha256": contract_sha256,
+        "repository": REPOSITORY,
+        "baseBranch": "master",
+        "integrationPullRequest": integration["integrationPull"]["number"],
+        "evidencePullRequest": pr_number,
+        "decisionArtifactName": owner["decisionArtifactName"],
+        "validationRunId": run_id,
+        "validationWorkflow": VALIDATION_WORKFLOW,
+        "trustedBuilds": [
+            {
+                "platform": platform,
+                "jobContractId": (
+                    VALIDATION_JOB_ID if platform == "linux" else MAC_VALIDATION_JOB_ID
+                ),
+                "jobId": validation["jobs"][platform]["id"],
+                "artifactId": validation["artifacts"][platform]["id"],
+                "artifactSha256": validation["artifacts"][platform]["downloadSha256"],
+                "artifactBytes": validation["artifacts"][platform]["downloadedBytes"],
+                "receiptBuildRunId": (
+                    linux_binding if platform == "linux" else mac_binding
+                )["environmentIdentity"]["buildRunId"],
+                "candidateBindingSha256": (
+                    linux_hash if platform == "linux" else mac_hash
+                ),
+                "buildTiming": dict(trusted_timings[platform]),
+            }
+            for platform in ("linux", "macos")
+        ],
+        "macCandidateBindingSha256": mac_hash,
+        "linuxCandidateBindingSha256": linux_hash,
+        "ownerEvidenceSha256": "",
+        "integrationMergeEvidenceSha256": "",
+        "committedEvidence": dict(evidence_hashes),
+    }
+    owner_path = output_root / "owner-attestation.json"
+    integration_path = output_root / "integration-merge.json"
+    write_new_json_record(owner_path, owner)
+    write_new_json_record(integration_path, integration_record)
+    promotion["ownerEvidenceSha256"] = sha256(owner_path)
+    promotion["integrationMergeEvidenceSha256"] = sha256(integration_path)
+    promotion_path = output_root / "promotion.json"
+    write_new_json_record(promotion_path, promotion)
+
+    final_gate = dict(automated_gate)
+    final_gate["automatedValidation"] = "passed"
+    final_gate["checks"] = {**final_gate["checks"], "crossEnvironmentReproducibility": True}
+    final_gate["blockingChecks"] = []
+    final_gate["ownerDecision"] = decision
+    final_gate["releaseDisposition"] = decision
+    final_gate["phase1Unlocked"] = decision == "approved"
+    final_gate["fallback"] = (
+        "publish-projection-release"
+        if decision == "approved"
+        else "do-not-publish-or-unlock-phase-1"
+    )
+    final_gate["externalVerificationRequired"] = {
+        "reproducibilityProvenance": {
+            "status": "verified-by-protected-workflow",
+            "validationRunId": run_id,
+            "trustedBuilds": promotion["trustedBuilds"],
+        }
+    }
+    final_gate["promotionEvidence"] = {
+        "ownerEvidenceSha256": promotion["ownerEvidenceSha256"],
+        "integrationMergeEvidenceSha256": promotion["integrationMergeEvidenceSha256"],
+        "promotionSha256": sha256(promotion_path),
+    }
+    final_path = output_root / "final-gate.json"
+    write_new_json_record(final_path, final_gate)
+    checksum_lines = [
+        f"{sha256(output_root / name)}  {name}"
+        for name in (
+            "owner-attestation.json",
+            "integration-merge.json",
+            "promotion.json",
+            "final-gate.json",
+        )
+    ]
+    checksum_path = output_root / "checksums.txt"
+    encoded_checksums = ("\n".join(checksum_lines) + "\n").encode("utf-8")
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=output_root,
+            prefix=".checksums.txt.",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(encoded_checksums)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, checksum_path)
+        except FileExistsError as exc:
+            raise ScienceContractError("Promotion checksums already exist") from exc
+        directory_fd = os.open(output_root, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return final_gate
