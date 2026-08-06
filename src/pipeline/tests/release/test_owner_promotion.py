@@ -1208,3 +1208,230 @@ def test_owner_verification_uses_real_contract_aware_candidate_binding(
 
     assert final_gate["automatedValidation"] == "passed"
     assert final_gate["releaseDisposition"] == "approved"
+
+
+@pytest.mark.parametrize(
+    ("field", "invalid"),
+    [
+        ("GITHUB_REPOSITORY", "fork/SeaRise-Europe"),
+        ("GITHUB_REF", "refs/heads/integration/phase-0r"),
+        ("GITHUB_ACTOR", "another-user"),
+        ("GITHUB_TRIGGERING_ACTOR", "another-user"),
+        ("GITHUB_WORKFLOW_REF", "invented.yml@refs/heads/master"),
+        ("SEARISE_OWNER_ENVIRONMENT", "unprotected"),
+    ],
+)
+def test_authority_context_is_not_caller_selectable(
+    field: str,
+    invalid: str,
+) -> None:
+    source_revision = _head()
+    context = _context(source_revision)
+    context[field] = invalid
+
+    with pytest.raises(ScienceContractError, match="authority boundary"):
+        owner_promotion._validate_context(context, REPOSITORY_ROOT)
+
+
+def test_owner_workflow_rerun_is_non_authoritative() -> None:
+    context = _context(_head())
+    context["GITHUB_RUN_ATTEMPT"] = "2"
+
+    with pytest.raises(ScienceContractError, match="fresh workflow run"):
+        owner_promotion._validate_context(context, REPOSITORY_ROOT)
+
+
+@pytest.mark.parametrize("value", ["0", "01", "-1", "1.0", "true", ""])
+def test_dispatch_identifiers_are_canonical_positive_decimals(value: str) -> None:
+    with pytest.raises(ScienceContractError, match="positive decimal"):
+        owner_promotion._exact_positive_decimal(value, "validation_run_id")
+
+
+def test_cli_exposes_only_the_three_reviewed_dispatch_inputs() -> None:
+    parser = _load_cli()._parser()
+    options = {
+        option
+        for action in parser._actions
+        for option in action.option_strings
+        if option not in {"-h", "--help"}
+    }
+
+    assert options == {"--validation-run-id", "--evidence-pr-number", "--decision"}
+
+
+@pytest.mark.parametrize(
+    ("response_path", "field", "invalid", "message"),
+    [
+        ("run", "conclusion", "failure", "provenance boundary"),
+        ("run", "run_attempt", 2, "provenance boundary"),
+        ("workflow", "path", "other.yml", "another workflow"),
+        ("job", "conclusion", "failure", "jobs did not pass"),
+        ("artifact", "name", "caller-selected.zip", "artifacts are unavailable"),
+        ("integration_pull", "merge_commit_sha", "f" * 40, "Code integration"),
+        ("evidence_pull", "merged", False, "Evidence-only pull request"),
+        ("evidence_base", "sha", "f" * 40, "Evidence-only pull request"),
+        ("source_compare", "status", "diverged", "not a direct descendant"),
+    ],
+)
+def test_github_metadata_tampering_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    response_path: str,
+    field: str,
+    invalid: object,
+    message: str,
+) -> None:
+    source_revision = _head()
+    evidence_revision = "e" * 40
+    mac, linux, report, gate, evidence_hashes, delivery = _promotion_evidence(
+        source_revision
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_load_committed_evidence",
+        lambda *_: (mac, report, gate, evidence_hashes, 201, delivery),
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "create_delivery_report",
+        lambda *_args, **_kwargs: delivery,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "candidate_binding",
+        _candidate_oracle(mac, linux),
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_verify_evidence_only_delta",
+        lambda *_: {owner_promotion.SUMMARY_PATH.as_posix(): {}},
+    )
+    api = MockGitHubApi(
+        source_revision,
+        evidence_revision,
+        master_revision=source_revision,
+        linux_binding=linux,
+        mac_binding=mac,
+    )
+    paths = {
+        "run": f"/repos/{owner_promotion.REPOSITORY}/actions/runs/101",
+        "workflow": f"/repos/{owner_promotion.REPOSITORY}/actions/workflows/303",
+        "job": (
+            f"/repos/{owner_promotion.REPOSITORY}/actions/runs/101/"
+            "attempts/1/jobs?per_page=100"
+        ),
+        "artifact": f"/repos/{owner_promotion.REPOSITORY}/actions/runs/101/artifacts?per_page=100",
+        "integration_pull": f"/repos/{owner_promotion.REPOSITORY}/pulls/201",
+        "evidence_pull": f"/repos/{owner_promotion.REPOSITORY}/pulls/202",
+        "evidence_base": f"/repos/{owner_promotion.REPOSITORY}/pulls/202",
+        "source_compare": (
+            f"/repos/{owner_promotion.REPOSITORY}/compare/{source_revision}...{evidence_revision}"
+        ),
+    }
+    document = api.responses[paths[response_path]]
+    if response_path in {"job", "artifact"}:
+        collection = "jobs" if response_path == "job" else "artifacts"
+        document[collection][0][field] = invalid
+    elif response_path == "evidence_base":
+        document["base"][field] = invalid
+    else:
+        document[field] = invalid
+
+    with pytest.raises(ScienceContractError, match=message):
+        owner_promotion.promote_phase_0r_release(
+            "101",
+            "202",
+            "approved",
+            repository_root=REPOSITORY_ROOT,
+            output_root=tmp_path / "promotion",
+            download_root=tmp_path / "download",
+            context=_context(source_revision),
+            api=api,
+        )
+
+    assert not (tmp_path / "promotion").exists()
+
+
+def test_validation_run_requires_exactly_one_artifact(tmp_path: Path) -> None:
+    source_revision = _head()
+    api = MockGitHubApi(source_revision, "e" * 40, master_revision=source_revision)
+    artifact_path = f"/repos/{owner_promotion.REPOSITORY}/actions/runs/101/artifacts?per_page=100"
+    api.responses[artifact_path]["total_count"] = 3
+
+    with pytest.raises(ScienceContractError, match="artifact inventory is incomplete"):
+        owner_promotion._verify_validation_run(
+            api,
+            101,
+            source_revision,
+            tmp_path / "download",
+        )
+
+
+def test_downloaded_candidate_must_match_required_external_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_revision = _head()
+    evidence_revision = "e" * 40
+    mac, _, report, gate, evidence_hashes, delivery = _promotion_evidence(source_revision)
+    release = json.loads(
+        (REPOSITORY_ROOT / owner_promotion.CONTRACT_PATH).read_text(encoding="utf-8")
+    )
+    unexpected = _synthetic_binding(
+        release,
+        source_revision,
+        _pinned_environment(
+            release,
+            platform="linux-x86_64-cp311",
+            vector_platform="linux-x86_64",
+            build_run_id="unexpected-build",
+        ),
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_load_committed_evidence",
+        lambda *_: (mac, report, gate, evidence_hashes, 201, delivery),
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "create_delivery_report",
+        lambda *_args, **_kwargs: delivery,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "candidate_binding",
+        _candidate_oracle(mac, unexpected),
+    )
+
+    with pytest.raises(ScienceContractError, match="differ from committed"):
+        owner_promotion.promote_phase_0r_release(
+            "101",
+            "202",
+            "approved",
+            repository_root=REPOSITORY_ROOT,
+            output_root=tmp_path / "promotion",
+            download_root=tmp_path / "download",
+            context=_context(source_revision),
+            api=MockGitHubApi(
+                source_revision,
+                evidence_revision,
+                master_revision=source_revision,
+                linux_binding=unexpected,
+                mac_binding=mac,
+            ),
+        )
+
+
+def test_validation_artifact_rejects_path_traversal(tmp_path: Path) -> None:
+    archive = tmp_path / "artifact.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("../escape", "forbidden")
+
+    with pytest.raises(ScienceContractError, match="unsafe path"):
+        owner_promotion._safe_extract(
+            archive,
+            tmp_path / "extracted",
+            platform="linux",
+        )
+
+    assert not (tmp_path / "escape").exists()
