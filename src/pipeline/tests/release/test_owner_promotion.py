@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
@@ -13,10 +14,11 @@ from pathlib import Path
 import pytest
 
 import searise_pipeline.release.owner_promotion as owner_promotion
+from searise_pipeline.release import create_delivery_report
 from searise_pipeline.release.evidence import binding_sha256, sha256
 from searise_pipeline.science import ScienceContractError
 
-from .test_recovery_gate import BUILD_CHECKS
+from .test_recovery_gate import BUILD_CHECKS, _finalize, _promotion_inputs
 
 REPOSITORY_ROOT = Path(__file__).parents[4]
 
@@ -864,4 +866,170 @@ def test_committed_summary_requires_exact_schema(
                 "releaseContractId": "ar6-europe-regional-release-v1",
                 "scientificDisposition": "projection-only",
             },
+        )
+
+
+def test_real_finalizer_output_hands_off_to_owner_validation(tmp_path: Path) -> None:
+    inputs = _promotion_inputs(tmp_path)
+    canonical_timing = tmp_path / "evidence/build-timing-macos-arm64.json"
+    inputs["timing"].rename(canonical_timing)
+    inputs["timing"] = canonical_timing
+    canonical_trace = tmp_path / "evidence/browser-trace-macos-arm64.json"
+    inputs["trace"].rename(canonical_trace)
+    inputs["trace"] = canonical_trace
+    gate = _finalize(inputs)
+    delivery = create_delivery_report(
+        inputs["candidate"],
+        inputs["trace"],
+        inputs["harness"],
+        inputs["timing"],
+        contract=inputs["release"],
+    )
+    binding = inputs["binding"]
+    root = tmp_path / owner_promotion.MAC_EVIDENCE_ROOT
+    root.mkdir(parents=True)
+    _write_json(root / "candidate-binding.json", binding)
+    shutil.copyfile(inputs["candidate"] / "build-receipt.json", root / "build-receipt.json")
+    shutil.copyfile(inputs["timing"], root / "build-timing-macos-arm64.json")
+    shutil.copyfile(inputs["trace"], root / "browser-trace-macos-arm64.json")
+    (root / "delivery-report.json").write_text(
+        json.dumps(delivery, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n",
+        encoding="utf-8",
+    )
+    shutil.copyfile(inputs["reproducibility"], root / "reproducibility-report.json")
+    _write_json(root / "automated-gate.json", gate)
+    hashes = {name: sha256(root / name) for name in owner_promotion._BUNDLE_FILES}
+    (root / "checksums.txt").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items()),
+        encoding="utf-8",
+    )
+    summary_hashes = {
+        **hashes,
+        "checksums.txt": sha256(root / "checksums.txt"),
+    }
+    _write_json(
+        tmp_path / owner_promotion.SUMMARY_PATH,
+        {
+            "schemaVersion": 1,
+            "releaseId": binding["releaseId"],
+            "sourceRevision": binding["sourceRevision"],
+            "integrationPullRequest": 201,
+            "committedEvidence": {
+                "files": {
+                    (owner_promotion.MAC_EVIDENCE_ROOT / name).as_posix(): digest
+                    for name, digest in summary_hashes.items()
+                }
+            },
+        },
+    )
+
+    observed = owner_promotion._load_committed_evidence(
+        tmp_path,
+        inputs["release"],
+    )
+
+    assert observed[0] == binding
+    assert observed[2] == gate
+    assert observed[4] == 201
+    assert observed[5] == delivery
+
+
+def test_direct_descendant_accepts_only_complete_evidence_delta(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(tmp_path)
+
+    records = owner_promotion._verify_evidence_only_delta(
+        repository,
+        source_revision,
+        evidence_revision,
+    )
+
+    assert set(records) == set(owner_promotion._REQUIRED_EVIDENCE_DELTA)
+    assert all(record["status"] == "A" for record in records.values())
+    assert all(len(record["sha256"]) == 64 for record in records.values())
+
+
+@pytest.mark.parametrize(
+    "extra_path",
+    [
+        "src/pipeline/searise_pipeline/release/gate.py",
+        ".github/workflows/ci.yml",
+        "src/pipeline/science/ar6-regional-release.json",
+        "docs/architecture/README.md",
+    ],
+)
+def test_evidence_delta_rejects_code_workflow_contract_and_unlisted_docs(
+    tmp_path: Path,
+    extra_path: str,
+) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        extra_path=extra_path,
+    )
+
+    with pytest.raises(ScienceContractError, match="forbidden (path|change)"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+def test_evidence_delta_rejects_deletion(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        deleted_path="CHANGELOG.md",
+    )
+
+    with pytest.raises(ScienceContractError, match="forbidden change"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+
+@pytest.mark.parametrize("entry_kind", ["symlink", "submodule"])
+def test_evidence_delta_rejects_symlink_and_submodule(
+    tmp_path: Path,
+    entry_kind: str,
+) -> None:
+    target = owner_promotion._REQUIRED_EVIDENCE_DELTA[0]
+    options = {f"{entry_kind}_path": target}
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        **options,
+    )
+
+    with pytest.raises(ScienceContractError, match="symlink or submodule"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+
+def test_evidence_delta_rejects_uncommitted_checkout_tampering(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(tmp_path)
+    path = repository / owner_promotion._REQUIRED_EVIDENCE_DELTA[0]
+    path.write_text("uncommitted replacement\n", encoding="utf-8")
+
+    with pytest.raises(ScienceContractError, match="checkout bytes differ"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+
+def test_evidence_delta_rejects_reverted_intermediate_code_change(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        reverted_path="src/pipeline/searise_pipeline/release/gate.py",
+    )
+
+    with pytest.raises(ScienceContractError, match="forbidden (path|change)"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
         )
