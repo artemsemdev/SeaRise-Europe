@@ -346,6 +346,11 @@ def test_pmtiles_rejects_common_mode_metadata_tampering(
         return ""
 
     monkeypatch.setattr(pmtiles_module, "_canonical_metadata", tampered_metadata)
+    monkeypatch.setattr(
+        pmtiles_module,
+        "_canonicalize_tippecanoe_gzip_headers",
+        lambda _path: None,
+    )
     monkeypatch.setattr(pmtiles_module, "validate_vector_toolchain", lambda **_kwargs: None)
     monkeypatch.setattr(pmtiles_module, "_run", fake_run)
 
@@ -364,6 +369,30 @@ def test_pmtiles_rejects_common_mode_metadata_tampering(
             pmtiles_distribution_asset_path=dummy,
             pmtiles_distribution_platform="test-platform",
         )
+
+
+def test_tippecanoe_gzip_headers_are_cross_platform_canonical(tmp_path: Path) -> None:
+    prefix = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00"
+    linux = tmp_path / "linux.pmtiles"
+    macos = tmp_path / "macos.pmtiles"
+    linux.write_bytes(b"header" + prefix + b"\x03payload" + prefix + b"\x03tail")
+    macos.write_bytes(b"header" + prefix + b"\x13payload" + prefix + b"\x13tail")
+
+    assert pmtiles_module._canonicalize_tippecanoe_gzip_headers(linux) == 2
+    assert pmtiles_module._canonicalize_tippecanoe_gzip_headers(macos) == 2
+
+    assert linux.read_bytes() == macos.read_bytes()
+    assert linux.read_bytes().count(prefix + b"\xff") == 2
+
+
+def test_tippecanoe_gzip_header_canonicalization_fails_closed_without_tiles(
+    tmp_path: Path,
+) -> None:
+    archive = tmp_path / "empty.pmtiles"
+    archive.write_bytes(b"not-a-tile-archive")
+
+    with pytest.raises(ScienceContractError, match="gzip members are absent"):
+        pmtiles_module._canonicalize_tippecanoe_gzip_headers(archive)
 
 
 TOOL_ENVIRONMENT = (
