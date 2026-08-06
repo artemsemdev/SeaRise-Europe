@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,6 +21,33 @@ def _workflow_job(workflow: str, job: str, next_job: str) -> str:
 
 
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_release_evidence_exports_exact_producer_contract(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        contract = json.loads(
+            (root / "tests/contracts/ar6-release-evidence-producers.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        workflow = (root / contract["workflow"]).read_text(encoding="utf-8")
+
+        self.assertEqual(contract["schemaVersion"], 1)
+        self.assertEqual(
+            [producer["jobId"] for producer in contract["producers"]],
+            ["ar6-release-evidence", "ar6-release-evidence-macos"],
+        )
+        for producer in contract["producers"]:
+            job = _workflow_job(
+                workflow,
+                producer["jobId"],
+                producer["nextJobId"],
+            )
+            artifact_name = producer["artifactNameTemplate"].replace(
+                "{sourceRevision}", "${{ inputs.release_source_revision }}"
+            ).replace("{runId}", "${{ github.run_id }}")
+
+            self.assertIn(f"name: {producer['jobName']}", job)
+            self.assertIn(f"name: {artifact_name}", job)
+
     def test_markdown_only_change_skips_heavy_jobs(self) -> None:
         outputs = classify_paths(["README.md", "docs/architecture/README.md"])
 

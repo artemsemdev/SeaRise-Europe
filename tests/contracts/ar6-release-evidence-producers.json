@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "workflow": ".github/workflows/ci.yml",
+  "producers": [
+    {
+      "profile": "linux-x86_64",
+      "jobId": "ar6-release-evidence",
+      "jobName": "Full-source Linux AR6 candidate",
+      "nextJobId": "ar6-release-evidence-macos",
+      "artifactNameTemplate": "ar6-linux-candidate-{sourceRevision}-{runId}"
+    },
+    {
+      "profile": "macos-arm64",
+      "jobId": "ar6-release-evidence-macos",
+      "jobName": "Full-source macOS ARM64 AR6 candidate",
+      "nextJobId": "infrastructure",
+      "artifactNameTemplate": "ar6-macos-arm64-candidate-{sourceRevision}-{runId}"
+    }
+  ]
+}
