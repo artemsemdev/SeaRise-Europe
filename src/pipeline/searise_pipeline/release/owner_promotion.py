@@ -15,8 +15,16 @@ from urllib.parse import urlsplit
 
 from searise_pipeline.science.contracts import ScienceContractError
 
-from .evidence import sha256
-from .promotion import _validate_binding
+from .evidence import (
+    binding_sha256,
+    load_json,
+    sha256,
+)
+from .promotion import (
+    _BUILD_CHECKS,
+    _validate_binding,
+    _validate_reproducibility_report,
+)
 
 REPOSITORY = "artemsemdev/SeaRise-Europe"
 OWNER_LOGIN = "artemsemdev"
@@ -516,3 +524,164 @@ def _parse_checksums(path: Path) -> dict[str, str]:
     if set(declared) != set(_BUNDLE_FILES):
         raise ScienceContractError("Committed macOS checksum inventory is incomplete")
     return declared
+
+
+def _load_committed_evidence(
+    repository_root: Path,
+    contract: Mapping[str, Any],
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    int,
+    dict[str, Any],
+]:
+    root = repository_root / MAC_EVIDENCE_ROOT
+    _require(root.is_dir() and not root.is_symlink(), "Committed macOS evidence root is missing")
+    files = {name: root / name for name in _BUNDLE_FILES}
+    _require(
+        all(path.is_file() and not path.is_symlink() for path in files.values()),
+        "Committed macOS evidence files are incomplete",
+    )
+    checksums = _parse_checksums(root / "checksums.txt")
+    actual = {name: sha256(path) for name, path in files.items()}
+    _require(actual == checksums, "Committed macOS evidence differs from checksums")
+    summary_hashes = {**actual, "checksums.txt": sha256(root / "checksums.txt")}
+
+    binding = _validate_binding(
+        load_json(files["candidate-binding.json"]),
+        release_contract_id=contract["releaseContractId"],
+    )
+    receipt = load_json(files["build-receipt.json"])
+    _require(
+        sha256(files["build-receipt.json"]) == binding["buildReceiptSha256"]
+        and receipt.get("releaseId") == binding["releaseId"]
+        and receipt.get("sourceRevision") == binding["sourceRevision"]
+        and receipt.get("environmentIdentity") == binding["environmentIdentity"],
+        "Committed macOS build receipt differs from its candidate binding",
+    )
+    delivery = _validate_delivery_report(
+        load_json(files["delivery-report.json"]),
+        binding=binding,
+        contract=contract,
+    )
+    _require(
+        delivery["trace"]["sha256"] == actual["browser-trace-macos-arm64.json"]
+        and delivery["buildTiming"]["sha256"]
+        == actual["build-timing-macos-arm64.json"],
+        "Committed raw delivery inputs differ from the delivery report",
+    )
+    reproducibility = _validate_reproducibility_report(
+        load_json(files["reproducibility-report.json"]),
+        binding=binding,
+        contract=contract,
+    )
+    automated_gate = dict(load_json(files["automated-gate.json"]))
+    gate_checks = automated_gate.get("checks")
+    _require(
+        set(automated_gate)
+        == {
+            "schemaVersion",
+            "gateId",
+            "issue",
+            "releaseId",
+            "scientificDisposition",
+            "automatedValidation",
+            "releaseDisposition",
+            "phase1Unlocked",
+            "checks",
+            "blockingChecks",
+            "fallback",
+            "evidenceBindings",
+            "externalVerificationRequired",
+        }
+        and type(automated_gate.get("schemaVersion")) is int
+        and automated_gate["schemaVersion"] == 1
+        and automated_gate.get("gateId") == "phase-0r-ar6-regional-release-v1"
+        and type(automated_gate.get("issue")) is int
+        and automated_gate["issue"] == 110
+        and automated_gate.get("releaseId") == binding["releaseId"]
+        and automated_gate.get("scientificDisposition")
+        == contract["scientificDisposition"]
+        and automated_gate.get("automatedValidation") == "pending"
+        and automated_gate.get("releaseDisposition") == "pending-owner"
+        and automated_gate.get("phase1Unlocked") is False
+        and automated_gate.get("blockingChecks") == ["crossEnvironmentReproducibility"]
+        and automated_gate.get("fallback") == "do-not-publish-or-unlock-phase-1",
+        "Committed automated gate is not the strict pending-external result",
+    )
+    _require(
+        type(gate_checks) is dict
+        and set(gate_checks)
+        == _BUILD_CHECKS | {"crossEnvironmentReproducibility", "deliveryMeasurements"}
+        and all(gate_checks[name] is True for name in _BUILD_CHECKS)
+        and gate_checks["crossEnvironmentReproducibility"] is False
+        and gate_checks["deliveryMeasurements"] is True,
+        "Committed automated gate checks are not the strict finalizer result",
+    )
+    bindings = automated_gate.get("evidenceBindings")
+    _require(
+        type(bindings) is dict
+        and bindings
+        == {
+            "candidateBindingSha256": binding_sha256(binding),
+            "manifestSha256": binding["manifestSha256"],
+            "reproducibilityReportSha256": actual["reproducibility-report.json"],
+            "deliveryReportSha256": actual["delivery-report.json"],
+            "deliveryTraceSha256": delivery["trace"]["sha256"],
+            "buildTimingSha256": delivery["buildTiming"]["sha256"],
+            "browserHarnessSha256": delivery["harness"]["sha256"],
+        },
+        "Committed automated gate evidence bindings differ",
+    )
+    required_external = reproducibility["requiredExternalBindings"]
+    required_verification = automated_gate.get("externalVerificationRequired")
+    _require(
+        required_verification
+        == {
+            "reproducibilityProvenance": {
+                "status": "pending-external-verification",
+                "provider": "github-actions",
+                "requiredExternalBindings": required_external,
+            }
+        },
+        "Committed automated gate requires another external binding set",
+    )
+    summary = load_json(repository_root / SUMMARY_PATH)
+    expected_summary_files = {
+        (MAC_EVIDENCE_ROOT / name).as_posix(): digest for name, digest in summary_hashes.items()
+    }
+    _require(
+        set(summary)
+        == {
+            "schemaVersion",
+            "releaseId",
+            "sourceRevision",
+            "integrationPullRequest",
+            "committedEvidence",
+        }
+        and type(summary.get("schemaVersion")) is int
+        and summary["schemaVersion"] == 1
+        and summary.get("releaseId") == binding["releaseId"]
+        and summary.get("sourceRevision") == binding["sourceRevision"]
+        and type(summary.get("integrationPullRequest")) is int
+        and summary["integrationPullRequest"] > 0
+        and summary.get("committedEvidence") == {"files": expected_summary_files},
+        "Committed evidence summary is detached from the fixed bundle",
+    )
+    _require(
+        delivery["status"] == "passed"
+        and reproducibility["status"] == "pending-external-provenance"
+        and reproducibility["localComparisonStatus"] == "passed"
+        and reproducibility["externalProvenanceStatus"] == "required",
+        "Committed evidence is not ready for protected provenance verification",
+    )
+    return (
+        binding,
+        reproducibility,
+        automated_gate,
+        summary_hashes,
+        summary["integrationPullRequest"],
+        delivery,
+    )
