@@ -11,6 +11,9 @@ import zipfile
 from pathlib import Path
 
 import searise_pipeline.release.owner_promotion as owner_promotion
+from searise_pipeline.release.evidence import binding_sha256
+
+from .test_recovery_gate import BUILD_CHECKS
 
 REPOSITORY_ROOT = Path(__file__).parents[4]
 
@@ -391,3 +394,184 @@ class FakeHttpResponse:
 
     def read(self, size: int = -1) -> bytes:
         return self._body.read(size)
+
+
+def _synthetic_binding(
+    release: dict[str, object],
+    source_revision: str,
+    environment: dict[str, object],
+) -> dict[str, object]:
+    artifact_hashes = {f"artifact-{index:02d}": "a" * 64 for index in range(31)}
+    vector = environment["vector"]
+    python = environment["python"]
+    return {
+        "releaseId": "phase-0r-ar6-v1",
+        "releaseContractId": release["releaseContractId"],
+        "manifestSha256": "b" * 64,
+        "buildReceiptSha256": "c" * 64,
+        "buildEvidenceSha256": "d" * 64,
+        "sourceReceiptSha256": "e" * 64,
+        "artifactHashes": artifact_hashes,
+        "candidateFileHashes": artifact_hashes,
+        "sourceRevision": source_revision,
+        "environmentIdentity": environment,
+        "validatedEnvironmentProfile": {
+            "pythonPlatform": python["platform"],
+            "pythonLockSha256": python["lock_sha256"],
+            "vectorPlatform": vector["pmtiles_distribution_platform"],
+            "tippecanoeBinarySha256": vector["tippecanoe_binary_sha256"],
+        },
+    }
+
+
+def _reproducibility_report(
+    release: dict[str, object],
+    mac: dict[str, object],
+    linux: dict[str, object],
+) -> dict[str, object]:
+    candidates = [mac, linux]
+    profiles = sorted(
+        {tuple(item["validatedEnvironmentProfile"].items()) for item in candidates}
+    )
+    required = [
+        {
+            "candidateBindingSha256": binding_sha256(item),
+            "releaseId": item["releaseId"],
+            "sourceRevision": item["sourceRevision"],
+            "receiptBuildRunId": item["environmentIdentity"]["buildRunId"],
+            "validatedEnvironmentProfile": item["validatedEnvironmentProfile"],
+        }
+        for item in candidates
+    ]
+    minimum = release["reproducibility"]["minimumIndependentEnvironments"]
+    return {
+        "schemaVersion": 1,
+        "status": "pending-external-provenance",
+        "localComparisonStatus": "passed",
+        "externalProvenanceStatus": "required",
+        "candidates": candidates,
+        "environments": [item["environmentIdentity"] for item in candidates],
+        "independentEnvironmentCount": 0,
+        "receiptProfileCount": len(profiles),
+        "receiptProfiles": [dict(profile) for profile in profiles],
+        "requiredExternalBindings": required,
+        "externalProvenanceRequirement": {
+            "provider": "github-actions",
+            "candidateBindingRequired": True,
+            "distinctTrustedRunCount": minimum,
+            "distinctValidatedProfileCount": minimum,
+            "receiptProfilesAreProof": False,
+        },
+        "maximumScientificValueDifferenceMillimetres": 0,
+        "validIdSetDifference": 0,
+        "byteIdentityWithinPinnedToolchain": True,
+        "comparedArtifactCount": 31,
+        "comparisonDurationSeconds": 1.0,
+    }
+
+
+def _promotion_evidence(source_revision: str):
+    release = json.loads(
+        (REPOSITORY_ROOT / owner_promotion.CONTRACT_PATH).read_text(encoding="utf-8")
+    )
+    mac = _synthetic_binding(
+        release,
+        source_revision,
+        _pinned_environment(
+            release,
+            platform="macos-arm64-cp39",
+            vector_platform="darwin-arm64",
+            build_run_id="github-101-1-macos-arm64",
+        ),
+    )
+    linux = _synthetic_binding(
+        release,
+        source_revision,
+        _pinned_environment(
+            release,
+            platform="linux-x86_64-cp311",
+            vector_platform="linux-x86_64",
+            build_run_id="github-101-1-linux-x86_64",
+        ),
+    )
+    report = _reproducibility_report(release, mac, linux)
+    gate = {
+        "schemaVersion": 1,
+        "gateId": "phase-0r-ar6-regional-release-v1",
+        "automatedValidation": "pending",
+        "releaseDisposition": "pending-owner",
+        "phase1Unlocked": False,
+        "checks": {**BUILD_CHECKS, "crossEnvironmentReproducibility": False},
+        "blockingChecks": ["crossEnvironmentReproducibility"],
+        "fallback": "do-not-publish-or-unlock-phase-1",
+        "externalVerificationRequired": {
+            "reproducibilityProvenance": {
+                "status": "pending-external-verification",
+                "provider": "github-actions",
+                "requiredExternalBindings": report["requiredExternalBindings"],
+            }
+        },
+    }
+    evidence_hashes = {
+        "candidate-binding.json": "1" * 64,
+        "build-receipt.json": "2" * 64,
+        "build-timing-macos-arm64.json": hashlib.sha256(_timing_bytes(mac)).hexdigest(),
+        "browser-trace-macos-arm64.json": hashlib.sha256(_trace_bytes()).hexdigest(),
+        "delivery-report.json": "3" * 64,
+        "reproducibility-report.json": "4" * 64,
+        "automated-gate.json": "5" * 64,
+        "checksums.txt": "6" * 64,
+    }
+    return mac, linux, report, gate, evidence_hashes, _committed_delivery(mac)
+
+
+def _candidate_oracle(mac: dict[str, object], linux: dict[str, object]):
+    def binding(candidate: Path, *, contract: dict[str, object]):
+        del contract
+        return mac if "macos-extracted" in candidate.parts else linux
+
+    return binding
+
+
+def _pinned_environment(
+    release: dict[str, object],
+    *,
+    platform: str,
+    vector_platform: str,
+    build_run_id: str,
+) -> dict[str, object]:
+    toolchain = release["toolchain"]
+    python = toolchain["python"]
+    tippecanoe = toolchain["tippecanoe"]
+    pmtiles = toolchain["pmtiles"]
+    profile = python["profiles"][platform]
+    reference = tippecanoe["referenceBuilds"][vector_platform]
+    asset = pmtiles["assets"][vector_platform]
+    return {
+        "buildRunId": build_run_id,
+        "python": {
+            "platform": platform,
+            "python_version": profile["pythonVersion"],
+            "lock_path": profile["lockPath"],
+            "lock_sha256": profile["lockSha256"],
+            "packages": python["packageVersions"],
+            "gdal_version": profile["gdal"],
+            "rasterio_proj_version": profile["rasterioProj"],
+            "pyproj_proj_version": profile["pyprojProj"],
+        },
+        "vector": {
+            "tippecanoe_version": tippecanoe["version"],
+            "tippecanoe_source_sha256": tippecanoe["sourceSha256"],
+            "tippecanoe_binary_sha256": reference["tippecanoeBinarySha256"],
+            "pmtiles_version": pmtiles["version"],
+            "pmtiles_commit": pmtiles["commit"],
+            "pmtiles_distribution_platform": vector_platform,
+            "pmtiles_distribution_sha256": asset["sha256"],
+            "decode_binary_sha256": reference["decodeBinarySha256"],
+        },
+    }
+
+
+def _write_json(path: Path, document: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, sort_keys=True) + "\n", encoding="utf-8")
