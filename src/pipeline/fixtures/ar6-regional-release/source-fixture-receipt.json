@@ -8,8 +8,8 @@
     "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
     "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
   },
-  "releaseContractSha256": "b0b000795039e3b406d5f154f6f016cdc41ca3a430d7264c5c74898e85f0c312",
+  "releaseContractSha256": "7f55571663cb98ab517fb9c523d66df2b3ffe4446b153052f7c04a046a3ff984",
   "scientificReleaseEligible": false,
-  "sha256": "22a0ad9ee4b3c2e9280916a8cfcb1369aba6a30caad70837a699c91014d11229",
+  "sha256": "d35fd50b982e19128b86476115cbfe49de3c107d6ce6ad6768dd3ee04d0217f7",
   "sourceArchiveVerifiedForThisWrite": true
 }
