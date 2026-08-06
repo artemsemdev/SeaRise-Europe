@@ -1,7 +1,7 @@
 # Architecture Decision Register
 
 > **Status:** Current
-> **Last reviewed:** 2026-08-05
+> **Last reviewed:** 2026-08-06
 
 This register contains only decisions that remain active in the accepted target
 architecture. [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
@@ -19,16 +19,16 @@ not as active guidance in this document.
 | ADR-015 | Use binary exposure methodology v1.0 | Superseded by ADR-023 and ADR-024 | The direct AR6-change versus DEM comparison is prohibited; the target product reports AR6 projections without classifying terrain. |
 | ADR-016 | Support three SSP scenarios | Accepted | `ssp1-26`, `ssp2-45`, and `ssp5-85`. |
 | ADR-017 | Default to SSP2-4.5 / 2050 | Accepted | Defaults remain `ssp2-45` and `2050`; the URL makes them explicit when shared. |
-| ADR-018 | Use a 25 km coastal analysis zone | Accepted with validation gate | The current Natural Earth-derived zone is explicitly approximate. Reconfirm or replace it after comparison with the canonical Copernicus coastal product. |
+| ADR-018 | Use a 25 km coastal analysis zone | Accepted, amended by ADR-024 | The versioned Natural Earth-derived zone defines product scope only; it is not a flood-reach or exposure boundary. |
 | ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; product contract amended by ADR-024** | Offline build plane, immutable open artifacts, React/Vite browser runtime, local search/lookup, Cloudflare Static Assets + R2, and no runtime API/database/tile server. |
 | ADR-023 | Use an uncertainty-aware EGM2008 mean-water baseline | Superseded for publication by ADR-024 | Historical acquisition and no-go evidence is retained; its terrain-classification path cannot produce a release. |
-| ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; implementation blocked** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. |
+| ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; contract and lookup implemented** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. Publication remains blocked only on #110 trusted evidence and owner disposition. |
 
-## Proposed decisions enforced as safety gates
+## Historical safety-gate decision
 
 | ID | Decision | Status | Current interpretation |
 |---|---|---|---|
-| ADR-022 | Stop publication at the Phase 0 source/geography gate | Proposed; gate enforced, amended by ADR-023 and Phase 0.8 evidence | Vertical, GLO-30, Europe/25 km scope, and connectivity candidates are selected; exact reconciliation, terrain uncertainty, regional evidence, and named approvals remain blocking. |
+| ADR-022 | Stop publication at the Phase 0 source/geography gate | Superseded for publication by ADR-024 | Its fail-closed terrain/datum evidence remains immutable, but terrain reconciliation and independent scientific review are not inputs to the AR6 projection product. |
 
 ## Decisions superseded by ADR-021
 
