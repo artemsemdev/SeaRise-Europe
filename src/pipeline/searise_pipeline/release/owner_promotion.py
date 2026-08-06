@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import math
 import re
+import stat
 import subprocess
 import urllib.error
 import urllib.request
+import zipfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,7 @@ from searise_pipeline.science.contracts import ScienceContractError
 from .evidence import (
     binding_sha256,
     load_json,
+    load_json_snapshot,
     sha256,
 )
 from .promotion import (
@@ -685,3 +688,262 @@ def _load_committed_evidence(
         summary["integrationPullRequest"],
         delivery,
     )
+
+
+def _safe_extract(
+    archive: Path,
+    destination: Path,
+    *,
+    platform: str,
+) -> tuple[Path, Path, Path | None]:
+    timing_name = {
+        "linux": "build-timing-linux.json",
+        "macos": "build-timing-macos-arm64.json",
+    }.get(platform)
+    _require(timing_name is not None, "Validation artifact platform is unsupported")
+    trace_name = "browser-trace-macos-arm64.json" if platform == "macos" else None
+    required_evidence = {timing_name}
+    if trace_name is not None:
+        required_evidence.add(trace_name)
+    destination.mkdir(parents=True, exist_ok=False)
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            names: set[str] = set()
+            total = 0
+            for item in bundle.infolist():
+                relative = Path(item.filename)
+                mode = item.external_attr >> 16
+                file_type = stat.S_IFMT(mode)
+                if (
+                    not item.filename
+                    or relative.is_absolute()
+                    or relative.as_posix() != item.filename.rstrip("/")
+                    or any(part in {"", ".", ".."} for part in relative.parts)
+                    or item.filename in names
+                    or stat.S_ISLNK(mode)
+                    or (file_type and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)))
+                ):
+                    raise ScienceContractError("Validation artifact ZIP contains an unsafe path")
+                names.add(item.filename)
+                total += item.file_size
+                if total > _MAX_ARTIFACT_BYTES:
+                    raise ScienceContractError(
+                        "Expanded validation artifact exceeds the fixed limit"
+                    )
+                allowed = (
+                    relative.parts[0] == LINUX_CANDIDATE_DIRECTORY
+                    or item.filename in required_evidence
+                )
+                if not allowed:
+                    raise ScienceContractError(
+                        "Validation artifact ZIP contains an unexpected path"
+                    )
+            _require(
+                required_evidence.issubset(names),
+                "Validation artifact lacks required platform evidence",
+            )
+            bundle.extractall(destination)
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ScienceContractError("Validation artifact is not a readable ZIP") from exc
+    candidate = destination / LINUX_CANDIDATE_DIRECTORY
+    _require(
+        candidate.is_dir() and not candidate.is_symlink(),
+        f"{platform} candidate is missing from validation artifact",
+    )
+    return (
+        candidate,
+        destination / timing_name,
+        destination / trace_name if trace_name is not None else None,
+    )
+
+
+def _validate_trusted_timing(
+    path: Path,
+    *,
+    binding: Mapping[str, Any],
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    timing, timing_sha256 = load_json_snapshot(path)
+    _require(
+        type(timing) is dict
+        and set(timing)
+        == {
+            "schemaVersion",
+            "candidate",
+            "timer",
+            "startedBeforeSourceVerification",
+            "endedAfterAtomicCandidatePublish",
+            "fullCleanBuildDurationSeconds",
+        }
+        and type(timing.get("schemaVersion")) is int
+        and timing["schemaVersion"] == 1
+        and timing.get("candidate") == binding
+        and timing.get("timer") == "python-time-perf-counter"
+        and timing.get("startedBeforeSourceVerification") is True
+        and timing.get("endedAfterAtomicCandidatePublish") is True,
+        "Trusted build timing is detached or incomplete",
+    )
+    duration = _finite_non_negative_number(
+        timing["fullCleanBuildDurationSeconds"],
+        "Trusted full clean build duration",
+    )
+    _require(
+        duration > 0 and duration <= contract["budgets"]["buildDurationSeconds"],
+        "Trusted full clean build exceeds the release budget",
+    )
+    return {
+        "path": path.name,
+        "sha256": timing_sha256,
+        "fullCleanBuildDurationSeconds": duration,
+    }
+
+
+def _verify_validation_run(
+    api: GitHubApi,
+    run_id: int,
+    source_revision: str,
+    download_root: Path,
+) -> tuple[dict[str, Any], dict[str, Path], dict[str, Path], Path]:
+    run = api.get_json(f"/repos/{REPOSITORY}/actions/runs/{run_id}")
+    workflow_id = run.get("workflow_id")
+    repository_id = run.get("repository", {}).get("id")
+    _require(
+        run.get("id") == run_id
+        and run.get("event") == "workflow_dispatch"
+        and run.get("status") == "completed"
+        and run.get("conclusion") == "success"
+        and run.get("head_sha") == source_revision
+        and run.get("head_branch") == "master"
+        and run.get("path") == VALIDATION_WORKFLOW
+        and run.get("repository", {}).get("full_name") == REPOSITORY
+        and run.get("head_repository", {}).get("full_name") == REPOSITORY
+        and type(repository_id) is int
+        and repository_id > 0
+        and run.get("head_repository", {}).get("id") == repository_id
+        and run.get("actor", {}).get("login") == OWNER_LOGIN
+        and run.get("triggering_actor", {}).get("login") == OWNER_LOGIN
+        and type(workflow_id) is int
+        and workflow_id > 0
+        and run.get("run_attempt") == 1,
+        "Release-validation run is outside the fixed provenance boundary",
+    )
+    workflow = api.get_json(f"/repos/{REPOSITORY}/actions/workflows/{workflow_id}")
+    _require(
+        workflow.get("path") == VALIDATION_WORKFLOW
+        and workflow.get("name") == VALIDATION_WORKFLOW_NAME
+        and workflow.get("state") == "active",
+        "Release-validation run used another workflow",
+    )
+    jobs_document = api.get_json(
+        f"/repos/{REPOSITORY}/actions/runs/{run_id}/attempts/1/jobs?per_page=100"
+    )
+    jobs = jobs_document.get("jobs")
+    _require(
+        type(jobs) is list and jobs_document.get("total_count") == len(jobs) and len(jobs) <= 100,
+        "Release-validation job inventory is incomplete",
+    )
+    expected_job_names = {
+        "linux": VALIDATION_JOB_NAME,
+        "macos": MAC_VALIDATION_JOB_NAME,
+    }
+    matching_jobs = {
+        platform: [job for job in jobs if job.get("name") == name]
+        for platform, name in expected_job_names.items()
+    }
+    _require(
+        all(
+            len(matches) == 1
+            and type(matches[0].get("id")) is int
+            and matches[0]["id"] > 0
+            and matches[0].get("run_id") == run_id
+            and matches[0].get("head_sha") == source_revision
+            and matches[0].get("status") == "completed"
+            and matches[0].get("conclusion") == "success"
+            for matches in matching_jobs.values()
+        )
+        and len({matches[0]["id"] for matches in matching_jobs.values()}) == 2,
+        "Exact Linux and macOS release-validation jobs did not pass independently",
+    )
+    expected_names = {
+        "linux": f"ar6-linux-candidate-{source_revision}-{run_id}",
+        "macos": f"ar6-macos-arm64-candidate-{source_revision}-{run_id}",
+    }
+    artifact_document = api.get_json(
+        f"/repos/{REPOSITORY}/actions/runs/{run_id}/artifacts?per_page=100"
+    )
+    artifacts = artifact_document.get("artifacts")
+    _require(
+        type(artifacts) is list
+        and artifact_document.get("total_count") == 2
+        and len(artifacts) == 2,
+        "Release-validation artifact inventory is incomplete",
+    )
+    matching = {
+        platform: [item for item in artifacts if item.get("name") == name]
+        for platform, name in expected_names.items()
+    }
+    _require(
+        all(
+            len(matches) == 1
+            and matches[0].get("expired") is False
+            and type(matches[0].get("id")) is int
+            and matches[0]["id"] > 0
+            and type(matches[0].get("size_in_bytes")) is int
+            and matches[0]["size_in_bytes"] > 0
+            and type(matches[0].get("digest")) is str
+            and matches[0]["digest"].startswith("sha256:")
+            and _SHA256.fullmatch(matches[0]["digest"].removeprefix("sha256:"))
+            is not None
+            and matches[0].get("workflow_run")
+            == {
+                "id": run_id,
+                "repository_id": repository_id,
+                "head_repository_id": repository_id,
+                "head_branch": "master",
+                "head_sha": source_revision,
+            }
+            for matches in matching.values()
+        )
+        and len({matches[0]["id"] for matches in matching.values()}) == 2,
+        "Exact Linux and macOS release-validation artifacts are unavailable",
+    )
+    download_root.mkdir(parents=True, exist_ok=False)
+    candidates: dict[str, Path] = {}
+    timings: dict[str, Path] = {}
+    mac_trace: Path | None = None
+    artifact_records: dict[str, dict[str, Any]] = {}
+    for platform in ("linux", "macos"):
+        artifact = dict(matching[platform][0])
+        archive = download_root / f"{platform}-candidate.zip"
+        api.download(
+            f"/repos/{REPOSITORY}/actions/artifacts/{artifact['id']}/zip",
+            archive,
+        )
+        _require(
+            archive.is_file()
+            and not archive.is_symlink()
+            and archive.stat().st_size == artifact["size_in_bytes"]
+            and sha256(archive) == artifact["digest"].removeprefix("sha256:"),
+            "Downloaded validation artifact differs from GitHub metadata",
+        )
+        artifact["downloadSha256"] = sha256(archive)
+        artifact["downloadedBytes"] = archive.stat().st_size
+        artifact_records[platform] = artifact
+        candidate, timing, trace = _safe_extract(
+            archive,
+            download_root / f"{platform}-extracted",
+            platform=platform,
+        )
+        candidates[platform] = candidate
+        timings[platform] = timing
+        if platform == "macos":
+            _require(trace is not None, "macOS validation trace is missing")
+            mac_trace = trace
+    if mac_trace is None:
+        raise ScienceContractError("macOS validation trace is missing")
+    return {
+        "run": run,
+        "workflow": workflow,
+        "jobs": {platform: matches[0] for platform, matches in matching_jobs.items()},
+        "artifacts": artifact_records,
+    }, candidates, timings, mac_trace
