@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,7 +14,40 @@ from scripts.ci.changed_components import (
 )
 
 
+def _workflow_job(workflow: str, job: str, next_job: str) -> str:
+    return workflow.split(f"  {job}:", maxsplit=1)[1].split(
+        f"\n  {next_job}:", maxsplit=1
+    )[0]
+
+
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_release_evidence_exports_exact_producer_contract(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        contract = json.loads(
+            (root / "tests/contracts/ar6-release-evidence-producers.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        workflow = (root / contract["workflow"]).read_text(encoding="utf-8")
+
+        self.assertEqual(contract["schemaVersion"], 1)
+        self.assertEqual(
+            [producer["jobId"] for producer in contract["producers"]],
+            ["ar6-release-evidence", "ar6-release-evidence-macos"],
+        )
+        for producer in contract["producers"]:
+            job = _workflow_job(
+                workflow,
+                producer["jobId"],
+                producer["nextJobId"],
+            )
+            artifact_name = producer["artifactNameTemplate"].replace(
+                "{sourceRevision}", "${{ inputs.release_source_revision }}"
+            ).replace("{runId}", "${{ github.run_id }}")
+
+            self.assertIn(f"name: {producer['jobName']}", job)
+            self.assertIn(f"name: {artifact_name}", job)
+
     def test_markdown_only_change_skips_heavy_jobs(self) -> None:
         outputs = classify_paths(["README.md", "docs/architecture/README.md"])
 
@@ -117,13 +151,21 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         changes = workflow.split("  changes:", maxsplit=1)[1].split(
             "\n  frontend:", maxsplit=1
         )[0]
-        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
-            "\n  infrastructure:", maxsplit=1
-        )[0]
+        evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence",
+            "ar6-release-evidence-macos",
+        )
+        macos_evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
         self.assertIn("release_evidence:\n", dispatch)
         self.assertIn("default: false", dispatch)
         self.assertIn("release_source_revision:\n", dispatch)
         self.assertIn("--release-only", changes)
+        self.assertIn('"${GITHUB_REF_NAME}" != "master"', changes)
         self.assertIn("^[0-9a-f]{40}$", changes)
         self.assertIn('"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"', changes)
         self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', changes)
@@ -132,7 +174,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             changes.index("uses: actions/checkout"),
         )
         self.assertIn("inputs.release_evidence == true", evidence)
+        self.assertIn("github.ref_name == 'master'", evidence)
         self.assertIn("needs: changes", evidence)
+        self.assertIn('"${GITHUB_REF_NAME}" != "master"', evidence)
         self.assertIn("^[0-9a-f]{40}$", evidence)
         self.assertIn('"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"', evidence)
         self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', evidence)
@@ -140,15 +184,36 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             evidence.index("Validate exact release source revision"),
             evidence.index("uses: actions/checkout"),
         )
+        self.assertIn("inputs.release_evidence == true", macos_evidence)
+        self.assertIn("github.ref_name == 'master'", macos_evidence)
+        self.assertIn("needs: changes", macos_evidence)
+        self.assertIn('"${GITHUB_REF_NAME}" != "master"', macos_evidence)
+        self.assertIn("^[0-9a-f]{40}$", macos_evidence)
+        self.assertIn(
+            '"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"',
+            macos_evidence,
+        )
+        self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', macos_evidence)
+        self.assertLess(
+            macos_evidence.index("Validate exact release source revision"),
+            macos_evidence.index("uses: actions/checkout"),
+        )
         self.assertNotIn("inputs.release_source_revision || github.sha", workflow)
 
     def test_release_evidence_pins_actions_and_checks_disk_before_download(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         ).read_text(encoding="utf-8")
-        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
-            "\n  infrastructure:", maxsplit=1
-        )[0]
+        evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence",
+            "ar6-release-evidence-macos",
+        )
+        macos_evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
 
         for action in (
             "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
@@ -157,36 +222,131 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         ):
             self.assertIn(action, evidence)
-        self.assertIn("required_kib=12582912", evidence)
+        self.assertIn("required_kib=10599985", evidence)
         self.assertIn("/tmp/phase-0r-ar6-preflight", evidence)
         self.assertLess(evidence.index("df -Pk /tmp"), evidence.index("zenodo.org"))
         self.assertIn("overwrite: false", evidence)
+        for action in (
+            "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        ):
+            self.assertIn(action, macos_evidence)
+        self.assertIn("required_kib=10599985", macos_evidence)
+        self.assertLess(
+            macos_evidence.index("df -Pk /tmp"),
+            macos_evidence.index("zenodo.org"),
+        )
+        self.assertIn("overwrite: false", macos_evidence)
+
+    def test_release_evidence_builds_two_exact_trusted_profiles(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        linux = _workflow_job(
+            workflow,
+            "ar6-release-evidence",
+            "ar6-release-evidence-macos",
+        )
+        macos = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
+
+        self.assertIn("name: Full-source Linux AR6 candidate", linux)
+        self.assertIn("runs-on: ubuntu-24.04", linux)
+        self.assertIn('python-version: "3.11.9"', linux)
+        self.assertIn("requirements-release.lock", linux)
+        self.assertIn(
+            'build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64"',
+            linux,
+        )
+        self.assertIn(
+            "name: ar6-linux-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}",
+            linux,
+        )
+        self.assertIn("/tmp/build-timing-linux.json", linux)
+        self.assertNotIn("/tmp/build-timing-macos-arm64.json", linux)
+        self.assertNotIn("-macos-arm64", linux)
+
+        self.assertIn("name: Full-source macOS ARM64 AR6 candidate", macos)
+        self.assertIn("runs-on: macos-14", macos)
+        self.assertIn('test "$(uname -m)" = "arm64"', macos)
+        self.assertIn('python-version: "3.9.6"', macos)
+        self.assertIn("requirements-release-macos-arm64.lock", macos)
+        self.assertIn("tippecanoe-darwin-arm64-build-receipt.json", macos)
+        self.assertIn("--pmtiles-distribution-platform darwin-arm64", macos)
+        self.assertIn(
+            'build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-macos-arm64"',
+            macos,
+        )
+        self.assertIn(
+            "name: ar6-macos-arm64-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}",
+            macos,
+        )
+        self.assertIn("/tmp/build-timing-macos-arm64.json", macos)
+        self.assertNotIn("/tmp/build-timing-linux.json", macos)
+        self.assertNotIn("-linux-x86_64", macos)
+        self.assertEqual(linux.count("/tmp/phase-0r-ar6-v1"), 4)
+        self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 4)
 
     def test_release_evidence_uses_only_hashed_python_install(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         ).read_text(encoding="utf-8")
-        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
-            "\n  infrastructure:", maxsplit=1
-        )[0]
+        evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence",
+            "ar6-release-evidence-macos",
+        )
+        macos_evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
 
         self.assertIn("--require-hashes -r requirements-release.lock", evidence)
         self.assertEqual(evidence.count("pip install"), 1)
         self.assertNotIn("pip install -e", evidence)
+        self.assertIn(
+            "--require-hashes -r requirements-release-macos-arm64.lock",
+            macos_evidence,
+        )
+        self.assertEqual(macos_evidence.count("pip install"), 1)
+        self.assertNotIn("pip install -e", macos_evidence)
 
     def test_release_evidence_preflights_before_source_download(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         ).read_text(encoding="utf-8")
-        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
-            "\n  infrastructure:", maxsplit=1
-        )[0]
+        evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence",
+            "ar6-release-evidence-macos",
+        )
+        macos_evidence = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
 
         preflight = evidence.index("Preflight exact release environment and fixture")
         acquire = evidence.index("Acquire and verify locked AR6 archive")
         self.assertLess(preflight, acquire)
         self.assertIn("--fixture src/pipeline/fixtures/ar6-regional-release", evidence)
         self.assertNotIn("ar6-archive-cache", evidence)
+        macos_preflight = macos_evidence.index(
+            "Preflight exact release environment and fixture"
+        )
+        macos_acquire = macos_evidence.index("Acquire and verify locked AR6 archive")
+        self.assertLess(macos_preflight, macos_acquire)
+        self.assertIn(
+            "--fixture src/pipeline/fixtures/ar6-regional-release",
+            macos_evidence,
+        )
+        self.assertNotIn("ar6-archive-cache", macos_evidence)
 
     def test_release_evidence_is_in_ci_gate_only_as_a_routed_job(self) -> None:
         workflow = (
@@ -200,6 +360,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("needs.changes.outputs.release == 'true'", toolchain)
         self.assertIn("inputs.release_evidence != true", toolchain)
         self.assertIn("      - ar6-release-evidence", gate)
+        self.assertIn("      - ar6-release-evidence-macos", gate)
 
     def test_release_environment_preflight_is_isolated_from_general_tests(self) -> None:
         workflow = (
