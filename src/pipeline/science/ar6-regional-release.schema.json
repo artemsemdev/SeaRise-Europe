@@ -122,9 +122,9 @@
               "lockSha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f",
               "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
             },
-            "macos-arm64-cp39": {
-              "pythonVersion": "3.9.6", "lockPath": "src/pipeline/requirements-release-macos-arm64.lock",
-              "lockSha256": "3f8160b8aee8d9fae73da298703fb00c1869a02def181316b75b1d6a917e7bed",
+            "macos-arm64-cp311": {
+              "pythonVersion": "3.11.9", "lockPath": "src/pipeline/requirements-release-macos-arm64.lock",
+              "lockSha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75",
               "gdal": "3.9.3", "rasterioProj": "9.4.1", "pyprojProj": "9.3.0"
             }
           }

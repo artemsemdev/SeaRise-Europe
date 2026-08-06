@@ -529,7 +529,7 @@ def _promotion_evidence(source_revision: str):
         source_revision,
         _pinned_environment(
             release,
-            platform="macos-arm64-cp39",
+            platform="macos-arm64-cp311",
             vector_platform="darwin-arm64",
             build_run_id="github-101-1-macos-arm64",
         ),
@@ -1187,7 +1187,7 @@ def test_owner_verification_uses_real_contract_aware_candidate_binding(
     mac_receipt = json.loads(mac_receipt_path.read_text(encoding="utf-8"))
     mac_receipt["environmentIdentity"] = _pinned_environment(
         release,
-        platform="macos-arm64-cp39",
+        platform="macos-arm64-cp311",
         vector_platform="darwin-arm64",
         build_run_id="github-101-1-macos-arm64",
     )

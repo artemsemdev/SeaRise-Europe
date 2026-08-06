@@ -1,4 +1,4 @@
-# Immutable Python 3.9 / macOS arm64 second reference environment for issue #110.
+# Immutable Python 3.11 / macOS arm64 second reference environment for issue #110.
 # Install only from the audited wheelhouse:
 #   python -m pip install --only-binary=:all: --require-hashes -r requirements-release-macos-arm64.lock
 
@@ -6,35 +6,35 @@ affine==2.4.0 --hash=sha256:8a3df80e2b2378aef598a83c1392efd47967afec4242021a0b06
 annotated-types==0.7.0 --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53
 attrs==26.1.0 --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309
 certifi==2026.7.22 --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775
-cffi==2.0.0 --hash=sha256:de8dad4425a6ca6e4e5e297b27b5c824ecc7581910bf9aee86cb6835e6812aa7
-cftime==1.6.4.post1 --hash=sha256:a90b6ef4a3fc65322c212a2c99cec75d1886f1ebaf0ff6189f7b327566762222
+cffi==2.0.0 --hash=sha256:2de9a304e27f7596cd03d16f1b7c72219bd944e99cc52b84d0145aefb07cbd3c
+cftime==1.6.4.post1 --hash=sha256:0f64ca83acc4e3029f737bf3a32530ffa1fbf53124f5bee70b47548bc58671a7
 click==8.1.8 --hash=sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2
 click-plugins==1.1.1.2 --hash=sha256:008d65743833ffc1f5417bf0e78e8d2c23aab04d9745ba817bd3e71b0feb6aa6
 cligj==0.7.2 --hash=sha256:c1ca117dbce1fe20a5809dc96f01e1c2840f6dcc939b3ddbb1111bf330ba82df
-cryptography==50.0.0 --hash=sha256:ccdc4a71a4dabae05de219404f9f4abc38e3b58422177ff93d0da05967dafa07
+cryptography==50.0.0 --hash=sha256:031e2d5dd4bb9caa3ca9c82e5a197fd8ae680232cee62603d1a813f3f07e3d03
 geopandas==1.0.1 --hash=sha256:01e147d9420cc374d26f51fc23716ac307f32b49406e4bd8462c07e82ed1d3d6
 importlib-metadata==8.7.1 --hash=sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151
 jsonschema==4.25.1 --hash=sha256:3fba0169e345c7175110351d456342c364814cfcf3b964ba4587f22915230a63
 jsonschema-specifications==2025.9.1 --hash=sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe
 morecantile==6.2.0 --hash=sha256:a3cc8f85c6afcddb6c2ec933ad692557f96e89689730dbbd4350bdcf6ac52be0
-netCDF4==1.7.2 --hash=sha256:59b403032774c723ee749d7f2135be311bad7d00d1db284bebfab58b9d5cdb92
-numpy==1.26.4 --hash=sha256:52b8b60467cd7dd1e9ed082188b4e6bb35aa5cdd01777621a1658910745b90be
+netCDF4==1.7.2 --hash=sha256:fd2a16dbddeb8fa7cf48c37bfc1967290332f2862bb82f984eec2007bb120aeb
+numpy==1.26.4 --hash=sha256:edd8b5fe47dab091176d21bb6de568acdd906d1887a4584a15a9a96a1dca06ef
 packaging==26.3 --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
-pandas==2.3.2 --hash=sha256:d4a558c7620340a0931828d8065688b3cc5b4c8eb674bcaf33d18ff4a6870b4a
-pyarrow==16.1.0 --hash=sha256:99f7549779b6e434467d2aa43ab2b7224dd9e41bdde486020bae198978c9e05e
+pandas==2.3.2 --hash=sha256:76972bcbd7de8e91ad5f0ca884a9f2c477a2125354af624e022c49e5bd0dfff4
+pyarrow==16.1.0 --hash=sha256:2e73cfc4a99e796727919c5541c65bb88b973377501e39b9842ea71401ca6c1c
 pycparser==2.23 --hash=sha256:e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934
 pydantic==2.13.4 --hash=sha256:45a282cde31d808236fd7ea9d919b128653c8b38b393d1c4ab335c62924d9aba
-pydantic-core==2.46.4 --hash=sha256:9f444c499b3eefd3a92e348059471ea0c3a6e303d9c1cec09fa748fd9f895201
-pyogrio==0.11.1 --hash=sha256:9ae8efbe4f9f215b2321655f988be8bb133829037dbefebc2643f52da4e7782a
+pydantic-core==2.46.4 --hash=sha256:e0d65b8c354be7fb5f720c3caa8bc940bc2d20ce749c8e06135f07f8ed95dd7c
+pyogrio==0.11.1 --hash=sha256:d36162ddc1a309bb941a3cfb550b8f88c862c67ef2f52df6460100e5e958bbc6
 pyparsing==3.3.2 --hash=sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d
-pyproj==3.6.1 --hash=sha256:18faa54a3ca475bfe6255156f2f2874e9a1c8917b0004eee9f664b86ccc513d3
+pyproj==3.6.1 --hash=sha256:447db19c7efad70ff161e5e46a54ab9cc2399acebb656b6ccf63e4bc4a04b97a
 python-dateutil==2.9.0.post0 --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427
 pytz==2026.3.post1 --hash=sha256:dd95840dd199baea12d9cc096a1d452caa6596a1c1e4b5f3dbd1541855d5e815
-rasterio==1.4.3 --hash=sha256:3f411a6a5bcb81ab6dc9128a8bccd13d3822cfa4a50c239e3a0528751a1ad5fc
+rasterio==1.4.3 --hash=sha256:812c854e7177064aeb58def2d59752887ad6b3d39ff3f858ed9df3f2ddc95613
 referencing==0.36.2 --hash=sha256:e8699adbbf8b5c7de96d8ffa0eb5c158b3beafce084968e2ea8bb08c6794dcd0
 rio-cogeo==5.4.2 --hash=sha256:6f11a11f4bc59added4c10a946b91c4f4ec186db0163039417cce784e56c3ebe
-rpds-py==0.27.1 --hash=sha256:1fea2b1a922c47c51fd07d656324531adc787e415c8b116530a1d29c0516c62d
-shapely==2.0.7 --hash=sha256:cd0e75d9124b73e06a42bf1615ad3d7d805f66871aa94538c3a9b7871d620013
+rpds-py==0.27.1 --hash=sha256:62ac3d4e3e07b58ee0ddecd71d6ce3b1637de2d373501412df395a0ec5f9beb5
+shapely==2.0.7 --hash=sha256:d8f1da01c04527f7da59ee3755d8ee112cd8967c15fab9e43bba936b81e2a013
 six==1.17.0 --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
 typing-extensions==4.16.0 --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8
 typing-inspection==0.4.2 --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7

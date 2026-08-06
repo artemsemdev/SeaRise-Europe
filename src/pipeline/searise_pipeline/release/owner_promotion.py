@@ -50,7 +50,7 @@ ARTIFACT_NAME_TEMPLATES_BY_PROFILE = {
     "macos-arm64": "ar6-macos-arm64-candidate-{sourceRevision}-{runId}",
 }
 OWNER_ENVIRONMENT = "phase-0r-owner-approval"
-MAC_EVIDENCE_ROOT = Path("src/pipeline/evidence/ar6-regional-release/macos-arm64-cp39")
+MAC_EVIDENCE_ROOT = Path("src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311")
 SUMMARY_PATH = Path("src/pipeline/evidence/ar6-regional-release-evidence.json")
 OWNER_RECORD_ROOT = Path("src/pipeline/evidence/ar6-regional-release/owner-promotion")
 CONTRACT_PATH = Path("src/pipeline/science/ar6-regional-release.json")
