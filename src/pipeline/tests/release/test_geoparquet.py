@@ -34,7 +34,7 @@ def geoparquet_case(tmp_path_factory: pytest.TempPathFactory):
     source = _real_source()
     path = tmp_path_factory.mktemp("geoparquet") / "baseline.parquet"
     write_geoparquet(source, path, contract=contract())
-    return source, pq.read_table(path)
+    return source, pq.read_table(path), pq.ParquetFile(path).metadata.metadata
 
 
 def test_geoparquet_is_byte_deterministic_and_exact(tmp_path: Path) -> None:
@@ -47,6 +47,9 @@ def test_geoparquet_is_byte_deterministic_and_exact(tmp_path: Path) -> None:
     validate_geoparquet(first, source, contract=contract())
 
     assert first.read_bytes() == second.read_bytes()
+    assert (pq.ParquetFile(first).metadata.metadata or {})[b"ARROW:schema"] == (
+        geoparquet_module._CANONICAL_ARROW_SCHEMA
+    )
     assert first_evidence.sha256 == second_evidence.sha256
     assert first_evidence.row_count == 27489
     assert first_evidence.byte_size <= contract()["budgets"]["geoparquetBytes"]
@@ -101,10 +104,12 @@ def test_geoparquet_rejects_semantic_tampering(
     tamper: str,
     message: str,
 ) -> None:
-    source, baseline = geoparquet_case
+    source, baseline, file_metadata = geoparquet_case
     release = contract()
     specification = release["artifacts"]["geoparquet"]
-    table = baseline
+    metadata = dict(file_metadata or {})
+    metadata[b"ARROW:schema"] = geoparquet_module._CANONICAL_ARROW_SCHEMA
+    table = baseline.replace_schema_metadata(metadata)
     compression = specification["compression"]
     row_group_size = specification["rowGroupSize"]
 

@@ -14,6 +14,20 @@ from searise_pipeline.science.contracts import ScienceContractError
 
 from .model import RegionalReleaseSource
 
+# Arrow 16 can serialize equivalent schema metadata differently across CPU
+# architectures. Pin the metadata-free logical schema; GeoParquet semantics
+# remain in the canonical `geo` footer metadata below.
+_CANONICAL_ARROW_SCHEMA = (
+    b"/////8gBAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAcAAABoAQAA"
+    b"HAEAANwAAACkAAAAbAAAADQAAAAEAAAAxP7//wAAAQQQAAAAHAAAAAQAAAAAAAAACAAAAGdlb21ldHJ5"
+    b"AAAAALT+///w/v//AAABAhAAAAAcAAAABAAAAAAAAAAIAAAAdXBwZXJfbW0AAAAALP///wAAAAEQAAAA"
+    b"JP///wAAAQIQAAAAHAAAAAQAAAAAAAAACQAAAG1lZGlhbl9tbQAAAGD///8AAAABEAAAAFj///8AAAECEAAA"
+    b"ABwAAAAEAAAAAAAAAAgAAABsb3dlcl9tbQAAAACU////AAAAARAAAACM////AAABAhAAAAAkAAAABAAA"
+    b"AAAAAAASAAAAc291cmNlX2xvY2F0aW9uX2lkAADQ////AAAAAUAAAADI////AAABAhAAAAAgAAAABAAA"
+    b"AAAAAAAHAAAAaG9yaXpvbgAIAAwACAAHAAgAAAAAAAABEAAAABAAFAAIAAYABwAMAAAAEAAQAAAAAAAB"
+    b"BRAAAAAgAAAABAAAAAAAAAAIAAAAc2NlbmFyaW8AAAAABAAEAAQAAAA="
+)
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -148,6 +162,7 @@ def write_geoparquet(
     metadata = dict(table.schema.metadata or {})
     metadata.update(
         {
+            b"ARROW:schema": _CANONICAL_ARROW_SCHEMA,
             b"searise:release_contract_id": contract["releaseContractId"].encode(),
             b"searise:source_archive_sha256": source.archive_sha256.encode(),
             b"searise:scientific_disposition": contract["scientificDisposition"].encode(),
@@ -186,6 +201,7 @@ def validate_geoparquet(
     parquet = pq.ParquetFile(path)
     metadata = parquet.metadata.metadata or {}
     required_metadata = {
+        b"ARROW:schema": _CANONICAL_ARROW_SCHEMA,
         b"searise:release_contract_id": contract["releaseContractId"].encode(),
         b"searise:source_archive_sha256": source.archive_sha256.encode(),
         b"searise:scientific_disposition": contract["scientificDisposition"].encode(),
