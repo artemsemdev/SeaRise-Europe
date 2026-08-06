@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
+import stat
 import subprocess
+import tempfile
 import urllib.error
 import urllib.request
+import zipfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -18,7 +22,9 @@ from searise_pipeline.science.contracts import ScienceContractError
 from .evidence import (
     binding_sha256,
     load_json,
+    load_json_snapshot,
     sha256,
+    write_new_json_record,
 )
 from .promotion import (
     _BUILD_CHECKS,
@@ -685,3 +691,657 @@ def _load_committed_evidence(
         summary["integrationPullRequest"],
         delivery,
     )
+
+
+def _safe_extract(
+    archive: Path,
+    destination: Path,
+    *,
+    platform: str,
+) -> tuple[Path, Path, Path | None]:
+    timing_name = {
+        "linux": "build-timing-linux.json",
+        "macos": "build-timing-macos-arm64.json",
+    }.get(platform)
+    _require(timing_name is not None, "Validation artifact platform is unsupported")
+    trace_name = "browser-trace-macos-arm64.json" if platform == "macos" else None
+    required_evidence = {timing_name}
+    if trace_name is not None:
+        required_evidence.add(trace_name)
+    destination.mkdir(parents=True, exist_ok=False)
+    try:
+        with zipfile.ZipFile(archive) as bundle:
+            names: set[str] = set()
+            total = 0
+            for item in bundle.infolist():
+                relative = Path(item.filename)
+                mode = item.external_attr >> 16
+                file_type = stat.S_IFMT(mode)
+                if (
+                    not item.filename
+                    or relative.is_absolute()
+                    or relative.as_posix() != item.filename.rstrip("/")
+                    or any(part in {"", ".", ".."} for part in relative.parts)
+                    or item.filename in names
+                    or stat.S_ISLNK(mode)
+                    or (file_type and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)))
+                ):
+                    raise ScienceContractError("Validation artifact ZIP contains an unsafe path")
+                names.add(item.filename)
+                total += item.file_size
+                if total > _MAX_ARTIFACT_BYTES:
+                    raise ScienceContractError(
+                        "Expanded validation artifact exceeds the fixed limit"
+                    )
+                allowed = (
+                    relative.parts[0] == LINUX_CANDIDATE_DIRECTORY
+                    or item.filename in required_evidence
+                )
+                if not allowed:
+                    raise ScienceContractError(
+                        "Validation artifact ZIP contains an unexpected path"
+                    )
+            _require(
+                required_evidence.issubset(names),
+                "Validation artifact lacks required platform evidence",
+            )
+            bundle.extractall(destination)
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ScienceContractError("Validation artifact is not a readable ZIP") from exc
+    candidate = destination / LINUX_CANDIDATE_DIRECTORY
+    _require(
+        candidate.is_dir() and not candidate.is_symlink(),
+        f"{platform} candidate is missing from validation artifact",
+    )
+    return (
+        candidate,
+        destination / timing_name,
+        destination / trace_name if trace_name is not None else None,
+    )
+
+
+def _validate_trusted_timing(
+    path: Path,
+    *,
+    binding: Mapping[str, Any],
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    timing, timing_sha256 = load_json_snapshot(path)
+    _require(
+        type(timing) is dict
+        and set(timing)
+        == {
+            "schemaVersion",
+            "candidate",
+            "timer",
+            "startedBeforeSourceVerification",
+            "endedAfterAtomicCandidatePublish",
+            "fullCleanBuildDurationSeconds",
+        }
+        and type(timing.get("schemaVersion")) is int
+        and timing["schemaVersion"] == 1
+        and timing.get("candidate") == binding
+        and timing.get("timer") == "python-time-perf-counter"
+        and timing.get("startedBeforeSourceVerification") is True
+        and timing.get("endedAfterAtomicCandidatePublish") is True,
+        "Trusted build timing is detached or incomplete",
+    )
+    duration = _finite_non_negative_number(
+        timing["fullCleanBuildDurationSeconds"],
+        "Trusted full clean build duration",
+    )
+    _require(
+        duration > 0 and duration <= contract["budgets"]["buildDurationSeconds"],
+        "Trusted full clean build exceeds the release budget",
+    )
+    return {
+        "path": path.name,
+        "sha256": timing_sha256,
+        "fullCleanBuildDurationSeconds": duration,
+    }
+
+
+def _verify_validation_run(
+    api: GitHubApi,
+    run_id: int,
+    source_revision: str,
+    download_root: Path,
+) -> tuple[dict[str, Any], dict[str, Path], dict[str, Path], Path]:
+    run = api.get_json(f"/repos/{REPOSITORY}/actions/runs/{run_id}")
+    workflow_id = run.get("workflow_id")
+    repository_id = run.get("repository", {}).get("id")
+    _require(
+        run.get("id") == run_id
+        and run.get("event") == "workflow_dispatch"
+        and run.get("status") == "completed"
+        and run.get("conclusion") == "success"
+        and run.get("head_sha") == source_revision
+        and run.get("head_branch") == "master"
+        and run.get("path") == VALIDATION_WORKFLOW
+        and run.get("repository", {}).get("full_name") == REPOSITORY
+        and run.get("head_repository", {}).get("full_name") == REPOSITORY
+        and type(repository_id) is int
+        and repository_id > 0
+        and run.get("head_repository", {}).get("id") == repository_id
+        and run.get("actor", {}).get("login") == OWNER_LOGIN
+        and run.get("triggering_actor", {}).get("login") == OWNER_LOGIN
+        and type(workflow_id) is int
+        and workflow_id > 0
+        and run.get("run_attempt") == 1,
+        "Release-validation run is outside the fixed provenance boundary",
+    )
+    workflow = api.get_json(f"/repos/{REPOSITORY}/actions/workflows/{workflow_id}")
+    _require(
+        workflow.get("path") == VALIDATION_WORKFLOW
+        and workflow.get("name") == VALIDATION_WORKFLOW_NAME
+        and workflow.get("state") == "active",
+        "Release-validation run used another workflow",
+    )
+    jobs_document = api.get_json(
+        f"/repos/{REPOSITORY}/actions/runs/{run_id}/attempts/1/jobs?per_page=100"
+    )
+    jobs = jobs_document.get("jobs")
+    _require(
+        type(jobs) is list and jobs_document.get("total_count") == len(jobs) and len(jobs) <= 100,
+        "Release-validation job inventory is incomplete",
+    )
+    expected_job_names = {
+        "linux": VALIDATION_JOB_NAME,
+        "macos": MAC_VALIDATION_JOB_NAME,
+    }
+    matching_jobs = {
+        platform: [job for job in jobs if job.get("name") == name]
+        for platform, name in expected_job_names.items()
+    }
+    _require(
+        all(
+            len(matches) == 1
+            and type(matches[0].get("id")) is int
+            and matches[0]["id"] > 0
+            and matches[0].get("run_id") == run_id
+            and matches[0].get("head_sha") == source_revision
+            and matches[0].get("status") == "completed"
+            and matches[0].get("conclusion") == "success"
+            for matches in matching_jobs.values()
+        )
+        and len({matches[0]["id"] for matches in matching_jobs.values()}) == 2,
+        "Exact Linux and macOS release-validation jobs did not pass independently",
+    )
+    expected_names = {
+        "linux": f"ar6-linux-candidate-{source_revision}-{run_id}",
+        "macos": f"ar6-macos-arm64-candidate-{source_revision}-{run_id}",
+    }
+    artifact_document = api.get_json(
+        f"/repos/{REPOSITORY}/actions/runs/{run_id}/artifacts?per_page=100"
+    )
+    artifacts = artifact_document.get("artifacts")
+    _require(
+        type(artifacts) is list
+        and artifact_document.get("total_count") == 2
+        and len(artifacts) == 2,
+        "Release-validation artifact inventory is incomplete",
+    )
+    matching = {
+        platform: [item for item in artifacts if item.get("name") == name]
+        for platform, name in expected_names.items()
+    }
+    _require(
+        all(
+            len(matches) == 1
+            and matches[0].get("expired") is False
+            and type(matches[0].get("id")) is int
+            and matches[0]["id"] > 0
+            and type(matches[0].get("size_in_bytes")) is int
+            and matches[0]["size_in_bytes"] > 0
+            and type(matches[0].get("digest")) is str
+            and matches[0]["digest"].startswith("sha256:")
+            and _SHA256.fullmatch(matches[0]["digest"].removeprefix("sha256:"))
+            is not None
+            and matches[0].get("workflow_run")
+            == {
+                "id": run_id,
+                "repository_id": repository_id,
+                "head_repository_id": repository_id,
+                "head_branch": "master",
+                "head_sha": source_revision,
+            }
+            for matches in matching.values()
+        )
+        and len({matches[0]["id"] for matches in matching.values()}) == 2,
+        "Exact Linux and macOS release-validation artifacts are unavailable",
+    )
+    download_root.mkdir(parents=True, exist_ok=False)
+    candidates: dict[str, Path] = {}
+    timings: dict[str, Path] = {}
+    mac_trace: Path | None = None
+    artifact_records: dict[str, dict[str, Any]] = {}
+    for platform in ("linux", "macos"):
+        artifact = dict(matching[platform][0])
+        archive = download_root / f"{platform}-candidate.zip"
+        api.download(
+            f"/repos/{REPOSITORY}/actions/artifacts/{artifact['id']}/zip",
+            archive,
+        )
+        _require(
+            archive.is_file()
+            and not archive.is_symlink()
+            and archive.stat().st_size == artifact["size_in_bytes"]
+            and sha256(archive) == artifact["digest"].removeprefix("sha256:"),
+            "Downloaded validation artifact differs from GitHub metadata",
+        )
+        artifact["downloadSha256"] = sha256(archive)
+        artifact["downloadedBytes"] = archive.stat().st_size
+        artifact_records[platform] = artifact
+        candidate, timing, trace = _safe_extract(
+            archive,
+            download_root / f"{platform}-extracted",
+            platform=platform,
+        )
+        candidates[platform] = candidate
+        timings[platform] = timing
+        if platform == "macos":
+            _require(trace is not None, "macOS validation trace is missing")
+            mac_trace = trace
+    if mac_trace is None:
+        raise ScienceContractError("macOS validation trace is missing")
+    return {
+        "run": run,
+        "workflow": workflow,
+        "jobs": {platform: matches[0] for platform, matches in matching_jobs.items()},
+        "artifacts": artifact_records,
+    }, candidates, timings, mac_trace
+
+
+def _verify_release_merges(
+    api: GitHubApi,
+    integration_pr_number: int,
+    evidence_pr_number: int,
+    source_revision: str,
+    context: Mapping[str, str],
+    repository_root: Path,
+) -> dict[str, Any]:
+    integration_pull = api.get_json(
+        f"/repos/{REPOSITORY}/pulls/{integration_pr_number}"
+    )
+    _require(
+        integration_pull.get("number") == integration_pr_number
+        and integration_pull.get("state") == "closed"
+        and integration_pull.get("merged") is True
+        and integration_pull.get("base", {}).get("ref") == "master"
+        and integration_pull.get("base", {}).get("repo", {}).get("full_name")
+        == REPOSITORY
+        and integration_pull.get("head", {}).get("repo", {}).get("full_name")
+        == REPOSITORY
+        and integration_pull.get("merge_commit_sha") == source_revision,
+        "Code integration pull request did not produce the candidate source revision",
+    )
+    evidence_pull = api.get_json(f"/repos/{REPOSITORY}/pulls/{evidence_pr_number}")
+    merge_sha = evidence_pull.get("merge_commit_sha", "")
+    evidence_revision = evidence_pull.get("head", {}).get("sha", "")
+    _require(
+        evidence_pull.get("number") == evidence_pr_number
+        and evidence_pull.get("state") == "closed"
+        and evidence_pull.get("merged") is True
+        and evidence_pull.get("base", {}).get("ref") == "master"
+        and evidence_pull.get("base", {}).get("sha") == source_revision
+        and evidence_pull.get("base", {}).get("repo", {}).get("full_name") == REPOSITORY
+        and _GIT_SHA.fullmatch(evidence_revision) is not None
+        and evidence_pull.get("head", {}).get("repo", {}).get("full_name") == REPOSITORY
+        and _GIT_SHA.fullmatch(merge_sha) is not None,
+        "Evidence-only pull request is not the exact merged source",
+    )
+    source_comparison = api.get_json(
+        f"/repos/{REPOSITORY}/compare/{source_revision}...{evidence_revision}"
+    )
+    _require(
+        source_comparison.get("status") == "ahead"
+        and source_comparison.get("merge_base_commit", {}).get("sha") == source_revision,
+        "Evidence head is not a direct descendant of the candidate source",
+    )
+    evidence_delta = _verify_evidence_only_delta(
+        repository_root,
+        source_revision,
+        evidence_revision,
+    )
+    master = api.get_json(f"/repos/{REPOSITORY}/commits/master")
+    _require(
+        master.get("sha") == context["GITHUB_SHA"] == merge_sha,
+        "Current GitHub master is not the exact evidence merge",
+    )
+    parents = _git(repository_root, "show", "-s", "--format=%P", merge_sha).split()
+    _require(
+        parents == [source_revision, evidence_revision]
+        and _git(repository_root, "rev-parse", "HEAD") == merge_sha
+        and _git(repository_root, "rev-parse", f"{evidence_revision}^{{tree}}")
+        == _git(repository_root, "rev-parse", f"{merge_sha}^{{tree}}"),
+        "Evidence merge parents or tree differ from the reviewed evidence head",
+    )
+    return {
+        "integrationPull": integration_pull,
+        "evidencePull": evidence_pull,
+        "master": master,
+        "sourceComparison": source_comparison,
+        "evidenceDelta": evidence_delta,
+    }
+
+
+def _external_binding_requirements(gate: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    try:
+        provenance = gate["externalVerificationRequired"]["reproducibilityProvenance"]
+        required = provenance["requiredExternalBindings"]
+    except (KeyError, TypeError) as exc:
+        raise ScienceContractError("Automated gate lacks external binding requirements") from exc
+    if (
+        provenance.get("status") != "pending-external-verification"
+        or provenance.get("provider") != "github-actions"
+        or set(provenance) != {"status", "provider", "requiredExternalBindings"}
+        or type(required) is not list
+        or len(required) != 2
+        or any(
+            type(item) is not dict
+            or set(item)
+            != {
+                "candidateBindingSha256",
+                "releaseId",
+                "sourceRevision",
+                "receiptBuildRunId",
+                "validatedEnvironmentProfile",
+            }
+            for item in required
+        )
+    ):
+        raise ScienceContractError("Automated gate requires another external binding set")
+    return required
+
+
+def _decision_title(validation_run_id: int, pr_number: int) -> str:
+    return (
+        f"Phase 0R owner decision from validation run {validation_run_id} "
+        f"for evidence PR #{pr_number}"
+    )
+
+
+def _decision_artifact_name(release_id: str, source_revision: str) -> str:
+    _require(
+        re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", release_id) is not None
+        and _GIT_SHA.fullmatch(source_revision) is not None,
+        "Owner decision identity is not canonical",
+    )
+    return f"phase-0r-owner-decision-{release_id}-{source_revision}"
+
+
+def _verify_no_prior_decision(
+    api: GitHubApi,
+    validation_run_id: int,
+    pr_number: int,
+    release_id: str,
+    source_revision: str,
+    context: Mapping[str, str],
+    repository_root: Path,
+) -> None:
+    """Reject concurrent or prior authority for the same release candidate."""
+    committed_records = _git(
+        repository_root,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "HEAD",
+        "--",
+        OWNER_RECORD_ROOT.as_posix(),
+    ).splitlines()
+    if committed_records:
+        expected_records = {
+            (OWNER_RECORD_ROOT / name).as_posix() for name in _OWNER_RECORD_FILES
+        }
+        _require(
+            set(committed_records) == expected_records,
+            "Permanent owner record root is incomplete or ambiguous",
+        )
+        raise ScienceContractError(
+            "A permanent authoritative owner decision already exists"
+        )
+    document = api.get_json(
+        f"/repos/{REPOSITORY}/actions/workflows/{Path(OWNER_WORKFLOW).name}/runs"
+        "?event=workflow_dispatch&per_page=100"
+    )
+    runs = document.get("workflow_runs")
+    _require(
+        type(runs) is list
+        and document.get("total_count") == len(runs)
+        and len(runs) <= 100,
+        "Owner decision history is incomplete or ambiguous",
+    )
+    current_run_id = int(context["GITHUB_RUN_ID"])
+    current_title = _decision_title(validation_run_id, pr_number)
+    artifact_name = _decision_artifact_name(release_id, source_revision)
+    for run in runs:
+        _require(type(run) is dict, "Owner decision history is malformed")
+        if run.get("id") == current_run_id:
+            _require(
+                run.get("display_title") == current_title,
+                "Current owner decision identity is ambiguous",
+            )
+            continue
+        if run.get("status") != "completed":
+            raise ScienceContractError("A concurrent owner decision run is already active")
+        if run.get("conclusion") != "success":
+            continue
+        _require(
+            type(run.get("id")) is int
+            and run["id"] > 0
+            and run.get("event") == "workflow_dispatch"
+            and run.get("run_attempt") == 1
+            and run.get("path") == OWNER_WORKFLOW
+            and run.get("head_branch") == "master"
+            and run.get("repository", {}).get("full_name") == REPOSITORY
+            and run.get("actor", {}).get("login") == OWNER_LOGIN
+            and run.get("triggering_actor", {}).get("login") == OWNER_LOGIN,
+            "Prior owner decision provenance is ambiguous",
+        )
+        title_match = re.fullmatch(
+            r"Phase 0R owner decision from validation run ([1-9][0-9]*) "
+            r"for evidence PR #([1-9][0-9]*)",
+            run.get("display_title", ""),
+        )
+        _require(title_match is not None, "Prior owner decision identity is ambiguous")
+        prior_validation_run_id = int(title_match.group(1))
+        prior_validation = api.get_json(
+            f"/repos/{REPOSITORY}/actions/runs/{prior_validation_run_id}"
+        )
+        _require(
+            prior_validation.get("id") == prior_validation_run_id
+            and prior_validation.get("event") == "workflow_dispatch"
+            and prior_validation.get("status") == "completed"
+            and prior_validation.get("conclusion") == "success"
+            and prior_validation.get("run_attempt") == 1
+            and prior_validation.get("path") == VALIDATION_WORKFLOW
+            and prior_validation.get("head_branch") == "master"
+            and _GIT_SHA.fullmatch(prior_validation.get("head_sha", "")) is not None,
+            "Prior owner decision validation identity is ambiguous",
+        )
+        if prior_validation["head_sha"] != source_revision:
+            continue
+        artifacts_document = api.get_json(
+            f"/repos/{REPOSITORY}/actions/runs/{run['id']}/artifacts?per_page=100"
+        )
+        artifacts = artifacts_document.get("artifacts")
+        _require(
+            type(artifacts) is list
+            and artifacts_document.get("total_count") == len(artifacts)
+            and len(artifacts) <= 100,
+            "Prior owner decision artifact history is ambiguous",
+        )
+        matching = [item for item in artifacts if item.get("name") == artifact_name]
+        _require(
+            len(matching) == 1
+            and matching[0].get("expired") is False
+            and type(matching[0].get("id")) is int
+            and matching[0]["id"] > 0,
+            "Prior owner decision artifact is missing or ambiguous",
+        )
+        raise ScienceContractError(
+            "An authoritative owner decision already exists for this release candidate"
+        )
+
+
+def _write_records(
+    output_root: Path,
+    *,
+    context: Mapping[str, str],
+    decision: str,
+    run_id: int,
+    pr_number: int,
+    mac_binding: Mapping[str, Any],
+    linux_binding: Mapping[str, Any],
+    automated_gate: Mapping[str, Any],
+    integration: Mapping[str, Any],
+    validation: Mapping[str, Any],
+    trusted_timings: Mapping[str, Mapping[str, Any]],
+    evidence_hashes: Mapping[str, str],
+    contract_sha256: str,
+) -> Mapping[str, Any]:
+    _require(
+        not output_root.exists() and not output_root.is_symlink(),
+        "Promotion output already exists",
+    )
+    output_root.mkdir(parents=True, exist_ok=False)
+    mac_hash = binding_sha256(mac_binding)
+    linux_hash = binding_sha256(linux_binding)
+    owner = {
+        "schemaVersion": 1,
+        "authority": "github-protected-environment",
+        "environment": OWNER_ENVIRONMENT,
+        "repository": REPOSITORY,
+        "ref": MASTER_REF,
+        "workflow": OWNER_WORKFLOW,
+        "workflowRunId": int(context["GITHUB_RUN_ID"]),
+        "workflowRunAttempt": int(context["GITHUB_RUN_ATTEMPT"]),
+        "actor": OWNER_LOGIN,
+        "triggeringActor": OWNER_LOGIN,
+        "decision": decision,
+        "candidateBindingSha256": mac_hash,
+        "decisionArtifactName": _decision_artifact_name(
+            mac_binding["releaseId"], mac_binding["sourceRevision"]
+        ),
+    }
+    merge_sha = integration["evidencePull"]["merge_commit_sha"]
+    integration_record = {
+        "schemaVersion": 1,
+        "repository": REPOSITORY,
+        "integrationPullRequest": integration["integrationPull"]["number"],
+        "evidencePullRequest": pr_number,
+        "baseBranch": "master",
+        "candidateSourceSha": mac_binding["sourceRevision"],
+        "evidenceHeadSha": integration["evidencePull"]["head"]["sha"],
+        "mergeCommitSha": merge_sha,
+        "masterSha": context["GITHUB_SHA"],
+        "mergeContainedInMaster": True,
+        "evidenceOnlyDelta": integration["evidenceDelta"],
+    }
+    promotion = {
+        "schemaVersion": 1,
+        "releaseId": mac_binding["releaseId"],
+        "releaseContractSha256": contract_sha256,
+        "repository": REPOSITORY,
+        "baseBranch": "master",
+        "integrationPullRequest": integration["integrationPull"]["number"],
+        "evidencePullRequest": pr_number,
+        "decisionArtifactName": owner["decisionArtifactName"],
+        "validationRunId": run_id,
+        "validationWorkflow": VALIDATION_WORKFLOW,
+        "trustedBuilds": [
+            {
+                "platform": platform,
+                "jobContractId": (
+                    VALIDATION_JOB_ID if platform == "linux" else MAC_VALIDATION_JOB_ID
+                ),
+                "jobId": validation["jobs"][platform]["id"],
+                "artifactId": validation["artifacts"][platform]["id"],
+                "artifactSha256": validation["artifacts"][platform]["downloadSha256"],
+                "artifactBytes": validation["artifacts"][platform]["downloadedBytes"],
+                "receiptBuildRunId": (
+                    linux_binding if platform == "linux" else mac_binding
+                )["environmentIdentity"]["buildRunId"],
+                "candidateBindingSha256": (
+                    linux_hash if platform == "linux" else mac_hash
+                ),
+                "buildTiming": dict(trusted_timings[platform]),
+            }
+            for platform in ("linux", "macos")
+        ],
+        "macCandidateBindingSha256": mac_hash,
+        "linuxCandidateBindingSha256": linux_hash,
+        "ownerEvidenceSha256": "",
+        "integrationMergeEvidenceSha256": "",
+        "committedEvidence": dict(evidence_hashes),
+    }
+    owner_path = output_root / "owner-attestation.json"
+    integration_path = output_root / "integration-merge.json"
+    write_new_json_record(owner_path, owner)
+    write_new_json_record(integration_path, integration_record)
+    promotion["ownerEvidenceSha256"] = sha256(owner_path)
+    promotion["integrationMergeEvidenceSha256"] = sha256(integration_path)
+    promotion_path = output_root / "promotion.json"
+    write_new_json_record(promotion_path, promotion)
+
+    final_gate = dict(automated_gate)
+    final_gate["automatedValidation"] = "passed"
+    final_gate["checks"] = {**final_gate["checks"], "crossEnvironmentReproducibility": True}
+    final_gate["blockingChecks"] = []
+    final_gate["ownerDecision"] = decision
+    final_gate["releaseDisposition"] = decision
+    final_gate["phase1Unlocked"] = decision == "approved"
+    final_gate["fallback"] = (
+        "publish-projection-release"
+        if decision == "approved"
+        else "do-not-publish-or-unlock-phase-1"
+    )
+    final_gate["externalVerificationRequired"] = {
+        "reproducibilityProvenance": {
+            "status": "verified-by-protected-workflow",
+            "validationRunId": run_id,
+            "trustedBuilds": promotion["trustedBuilds"],
+        }
+    }
+    final_gate["promotionEvidence"] = {
+        "ownerEvidenceSha256": promotion["ownerEvidenceSha256"],
+        "integrationMergeEvidenceSha256": promotion["integrationMergeEvidenceSha256"],
+        "promotionSha256": sha256(promotion_path),
+    }
+    final_path = output_root / "final-gate.json"
+    write_new_json_record(final_path, final_gate)
+    checksum_lines = [
+        f"{sha256(output_root / name)}  {name}"
+        for name in (
+            "owner-attestation.json",
+            "integration-merge.json",
+            "promotion.json",
+            "final-gate.json",
+        )
+    ]
+    checksum_path = output_root / "checksums.txt"
+    encoded_checksums = ("\n".join(checksum_lines) + "\n").encode("utf-8")
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=output_root,
+            prefix=".checksums.txt.",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(encoded_checksums)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, checksum_path)
+        except FileExistsError as exc:
+            raise ScienceContractError("Promotion checksums already exist") from exc
+        directory_fd = os.open(output_root, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return final_gate
