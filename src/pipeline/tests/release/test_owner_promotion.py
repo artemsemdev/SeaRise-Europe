@@ -18,6 +18,7 @@ from searise_pipeline.release import create_delivery_report
 from searise_pipeline.release.evidence import binding_sha256, sha256
 from searise_pipeline.science import ScienceContractError
 
+from .test_evidence import _candidate, _seal
 from .test_recovery_gate import BUILD_CHECKS, _finalize, _promotion_inputs
 
 REPOSITORY_ROOT = Path(__file__).parents[4]
@@ -1040,3 +1041,170 @@ def test_evidence_delta_rejects_reverted_intermediate_code_change(tmp_path: Path
             source_revision,
             evidence_revision,
         )
+
+
+@pytest.mark.parametrize(
+    ("decision", "unlocked"),
+    [("approved", True), ("rejected", False)],
+)
+def test_protected_workflow_produces_bound_immutable_records(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    decision: str,
+    unlocked: bool,
+) -> None:
+    repository, source_revision, evidence_revision, merge_revision = _evidence_repository(
+        tmp_path
+    )
+    mac, linux, report, gate, evidence_hashes, delivery = _promotion_evidence(
+        source_revision
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_load_committed_evidence",
+        lambda *_: (mac, report, gate, evidence_hashes, 201, delivery),
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "create_delivery_report",
+        lambda *_args, **_kwargs: delivery,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "candidate_binding",
+        _candidate_oracle(mac, linux),
+    )
+    release_contract = json.loads(
+        (REPOSITORY_ROOT / owner_promotion.CONTRACT_PATH).read_text(encoding="utf-8")
+    )
+    monkeypatch.setattr(owner_promotion, "load_json", lambda _: release_contract)
+    output = tmp_path / "promotion"
+
+    final_gate = owner_promotion.promote_phase_0r_release(
+        "101",
+        "202",
+        decision,
+        repository_root=repository,
+        output_root=output,
+        download_root=tmp_path / "download",
+        context=_context(merge_revision),
+        api=MockGitHubApi(
+            source_revision,
+            evidence_revision,
+            master_revision=merge_revision,
+            linux_binding=linux,
+            mac_binding=mac,
+        ),
+    )
+
+    assert final_gate["automatedValidation"] == "passed"
+    assert final_gate["releaseDisposition"] == decision
+    assert final_gate["phase1Unlocked"] is unlocked
+    assert final_gate["checks"]["crossEnvironmentReproducibility"] is True
+    integration = json.loads((output / "integration-merge.json").read_text())
+    assert integration["candidateSourceSha"] == source_revision
+    assert integration["evidenceHeadSha"] == evidence_revision
+    assert set(integration["evidenceOnlyDelta"]) == set(owner_promotion._REQUIRED_EVIDENCE_DELTA)
+    assert set(path.name for path in output.iterdir()) == {
+        "owner-attestation.json",
+        "integration-merge.json",
+        "promotion.json",
+        "final-gate.json",
+        "checksums.txt",
+    }
+    assert "github-protected-environment" in (output / "owner-attestation.json").read_text()
+    assert len((output / "checksums.txt").read_text().splitlines()) == 4
+
+
+def test_owner_verification_uses_real_contract_aware_candidate_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, source_revision, evidence_revision, merge_revision = _evidence_repository(
+        tmp_path
+    )
+    release = json.loads(
+        (REPOSITORY_ROOT / owner_promotion.CONTRACT_PATH).read_text(encoding="utf-8")
+    )
+    candidate = tmp_path / "linux-candidate"
+    _candidate(candidate)
+    receipt_path = candidate / "build-receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt["sourceRevision"] = source_revision
+    receipt["environmentIdentity"] = _pinned_environment(
+        release,
+        platform="linux-x86_64-cp311",
+        vector_platform="linux-x86_64",
+        build_run_id="github-101-1-linux-x86_64",
+    )
+    _write_json(receipt_path, receipt)
+    _seal(candidate)
+    linux = owner_promotion.candidate_binding(candidate, contract=release)
+    mac_candidate = tmp_path / "mac-candidate"
+    shutil.copytree(candidate, mac_candidate)
+    mac_receipt_path = mac_candidate / "build-receipt.json"
+    mac_receipt = json.loads(mac_receipt_path.read_text(encoding="utf-8"))
+    mac_receipt["environmentIdentity"] = _pinned_environment(
+        release,
+        platform="macos-arm64-cp39",
+        vector_platform="darwin-arm64",
+        build_run_id="github-101-1-macos-arm64",
+    )
+    _write_json(mac_receipt_path, mac_receipt)
+    _seal(mac_candidate)
+    mac = owner_promotion.candidate_binding(mac_candidate, contract=release)
+    report = _reproducibility_report(release, mac, linux)
+    gate = {
+        "checks": {**BUILD_CHECKS, "crossEnvironmentReproducibility": False},
+        "externalVerificationRequired": {
+            "reproducibilityProvenance": {
+                "status": "pending-external-verification",
+                "provider": "github-actions",
+                "requiredExternalBindings": report["requiredExternalBindings"],
+            }
+        },
+    }
+    trusted_input_hashes = {
+        "build-timing-macos-arm64.json": hashlib.sha256(_timing_bytes(mac)).hexdigest(),
+        "browser-trace-macos-arm64.json": hashlib.sha256(_trace_bytes()).hexdigest(),
+    }
+    monkeypatch.setattr(
+        owner_promotion,
+        "_load_committed_evidence",
+        lambda *_: (
+            mac,
+            report,
+            gate,
+            trusted_input_hashes,
+            201,
+            _committed_delivery(mac),
+        ),
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "create_delivery_report",
+        lambda *_args, **_kwargs: _committed_delivery(mac),
+    )
+    monkeypatch.setattr(owner_promotion, "load_json", lambda _: release)
+
+    final_gate = owner_promotion.promote_phase_0r_release(
+        "101",
+        "202",
+        "approved",
+        repository_root=repository,
+        output_root=tmp_path / "promotion-real-binding",
+        download_root=tmp_path / "download-real-binding",
+        context=_context(merge_revision),
+        api=MockGitHubApi(
+            source_revision,
+            evidence_revision,
+            master_revision=merge_revision,
+            candidate=candidate,
+            mac_candidate=mac_candidate,
+            linux_binding=linux,
+            mac_binding=mac,
+        ),
+    )
+
+    assert final_gate["automatedValidation"] == "passed"
+    assert final_gate["releaseDisposition"] == "approved"
