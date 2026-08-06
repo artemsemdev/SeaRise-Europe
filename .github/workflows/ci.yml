@@ -261,12 +261,19 @@ jobs:
 
       - name: Build and verify pinned Tippecanoe
         run: |
+          build_a="${RUNNER_TEMP}/ar6-tools-a"
+          build_b="${RUNNER_TEMP}/ar6-tools-b"
           src/pipeline/toolchain/build_macos_tippecanoe.sh \
             "${RUNNER_TEMP}/tippecanoe-2.79.0.tar.gz" \
-            "${RUNNER_TEMP}/ar6-tools"
+            "${build_a}"
+          src/pipeline/toolchain/build_macos_tippecanoe.sh \
+            "${RUNNER_TEMP}/tippecanoe-2.79.0.tar.gz" \
+            "${build_b}"
+          cmp "${build_a}/tippecanoe" "${build_b}/tippecanoe"
+          cmp "${build_a}/tippecanoe-decode" "${build_b}/tippecanoe-decode"
           jq -r '
-            .tippecanoeBinarySha256 + "  ${{ runner.temp }}/ar6-tools/tippecanoe",
-            .decodeBinarySha256 + "  ${{ runner.temp }}/ar6-tools/tippecanoe-decode"
+            .tippecanoeBinarySha256 + "  ${{ runner.temp }}/ar6-tools-a/tippecanoe",
+            .decodeBinarySha256 + "  ${{ runner.temp }}/ar6-tools-a/tippecanoe-decode"
           ' src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json \
             | shasum -a 256 -c -
 

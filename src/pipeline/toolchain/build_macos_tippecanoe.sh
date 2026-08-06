@@ -30,7 +30,13 @@ cxx="$(xcrun --find clang++)"
 xcodebuild -version
 printf 'macOS SDK %s\n' "$(xcrun --sdk macosx --show-sdk-version)"
 "${cxx}" --version | head -n 1
-make -C "${build_root}" -j4 CC="${cc}" CXX="${cxx}" tippecanoe tippecanoe-decode
+make -C "${build_root}" -j4 \
+  CC="${cc}" \
+  CXX="${cxx}" \
+  FINAL_FLAGS="-O3 -DNDEBUG" \
+  LDFLAGS="-Wl,-no_uuid" \
+  tippecanoe \
+  tippecanoe-decode
 
 mkdir -p "${output_directory}"
 install -m 0755 "${build_root}/tippecanoe" "${output_directory}/tippecanoe"
