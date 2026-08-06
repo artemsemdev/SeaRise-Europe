@@ -1,0 +1,1956 @@
+{
+  "schemaVersion": 1,
+  "harness": "src/frontend/scripts/measure-ar6-release.mjs",
+  "candidate": {
+    "releaseId": "phase-0r-ar6-v1",
+    "manifestSha256": "6fe1115ba80857a2dcdd39fefada92ec51122cd6f8e7a2704e20083dd3e616ac",
+    "artifactHashes": {
+      "analysis/ssp1-26/2030.tif": "03cc14d33cc75535ce8fdd83e3e2636e4203c8d828a723e254dfa4cb90b0e6d6",
+      "analysis/ssp1-26/2050.tif": "87030c7e7d0c3481353a06507dab4acc93d0b2fc3a3482b34b607ce6bc891831",
+      "analysis/ssp1-26/2100.tif": "554799b56ef3abbff2c5c42f9033860f06d2fa8f025d6c4f6518b8e2d14a90c4",
+      "analysis/ssp2-45/2030.tif": "b087b052c77fddfbb7add3634a1c6a3f6ac384d5652e18c67e2e3105c292d12c",
+      "analysis/ssp2-45/2050.tif": "d7998337ead737320cba98772284c7e7ee9372573f65e72f100071f38b90391f",
+      "analysis/ssp2-45/2100.tif": "423570ce5d8d862e65b050e901c3f206bc5dad67b7477290e717afde09116adf",
+      "analysis/ssp5-85/2030.tif": "a5b5f6eb410e989016b946bc89bbe22fde5ea220add5a5430bf96ea1d5182a52",
+      "analysis/ssp5-85/2050.tif": "cc91888b39f42b0e23827d50e0d99c94cb56553d6f318fc374838513fd546310",
+      "analysis/ssp5-85/2100.tif": "4695e3d482a14c4e7e4e8c02631e9909547d714adb2ba7813a45454182239d80",
+      "analysis/projections.parquet": "d32d6a1ec14161f71f76f68e056844c3b07fafde24e92a92ee22a2d5080888d5",
+      "layers/ssp1-26/2030.pmtiles": "51755e45ccfcb11f9b151358616d2b9769665b934702944da7dc2e52202e5dff",
+      "layers/ssp1-26/2050.pmtiles": "c5f7fcdbf56536d9f66eefdcea06ed7ec2952515b2c10e785651f66013048f24",
+      "layers/ssp1-26/2100.pmtiles": "8e3a84892c1d89c72275728efcaed63443085705ae4fd53bc154dc0a3c25e641",
+      "layers/ssp2-45/2030.pmtiles": "a83953a12c29b4e9a87133d8af58d2f74ff8ba2c52d9823fc10a4b69636e3fa8",
+      "layers/ssp2-45/2050.pmtiles": "8de5613f8af55e01f0a9cb61718803a5bb2f56aca043859faf032829da573126",
+      "layers/ssp2-45/2100.pmtiles": "bb54f780bca7778b0d0591e5af135312dbd992edf6d14d9a6117bd5d0810dc2d",
+      "layers/ssp5-85/2030.pmtiles": "5538829ae080402d4fe5cafa90fd8aa6ee8ac9f21669251ce66d14b7a4f84a72",
+      "layers/ssp5-85/2050.pmtiles": "7545146a7e8f481667d7a4130b20dbc397c11a55e3a357e102c70ded5a12cb63",
+      "layers/ssp5-85/2100.pmtiles": "3e68bcfdc4e891b05c77893d9a034795981bde72fe7056584678da8160e15b49",
+      "analysis/source-grid.json.gz": "771b77e3240a25f37d115a563f1b7115c2aaf0bd6f1a9eac5afc04395d28af71",
+      "NOTICE.md": "b95d08385471774b6e095c7b75a1822ba6550358169e6fa1712a7f1555657ef6",
+      "stac/collection.json": "1937ebb753c37643750924ae2c6f96923119890d14d7e322ea743a3444f816fc",
+      "stac/items/ssp1-26-2030.json": "ce7e2d130e579ccf61a03c395ebf394a42db9d6e97662571cb189b37cf7f9d10",
+      "stac/items/ssp1-26-2050.json": "390414beee09a9c820dcad223027e6d3f5543eb9d302f268b1c1f9ce6f231e0f",
+      "stac/items/ssp1-26-2100.json": "2b6b1c6731390d1ecd9d3dd65da1d49370f477c4999fbe955720ace74ce6b156",
+      "stac/items/ssp2-45-2030.json": "fa310b3cbf1d756c769e11ca9c79ed9707261ae504ee6c64994a8c3096bb8d1c",
+      "stac/items/ssp2-45-2050.json": "a881eee7f8b3f2a80c6d40bb6bde922368f96c3b98a2350c5cb4327e10c8f657",
+      "stac/items/ssp2-45-2100.json": "a085ece63d1d7087f95922f249299811ec123c56ccd371c323954398b10c38ac",
+      "stac/items/ssp5-85-2030.json": "ed1d2f61a61f97d2b65f31ec92be27ded0c11676a1bc6d5116d98db2f1b913e2",
+      "stac/items/ssp5-85-2050.json": "e1037d22cbb3bac317d41a2a847f129e1f172400dc6bff266d2e77a787778438",
+      "stac/items/ssp5-85-2100.json": "f732363986f72b25a48b89c36bd0fb87a62088ffd7433d236ef9a0124986bf76"
+    },
+    "artifactByteSizes": {
+      "analysis/ssp1-26/2030.tif": 18623,
+      "analysis/ssp1-26/2050.tif": 20137,
+      "analysis/ssp1-26/2100.tif": 22143,
+      "analysis/ssp2-45/2030.tif": 18778,
+      "analysis/ssp2-45/2050.tif": 20320,
+      "analysis/ssp2-45/2100.tif": 22333,
+      "analysis/ssp5-85/2030.tif": 19045,
+      "analysis/ssp5-85/2050.tif": 20568,
+      "analysis/ssp5-85/2100.tif": 22452,
+      "analysis/projections.parquet": 251231,
+      "layers/ssp1-26/2030.pmtiles": 586933,
+      "layers/ssp1-26/2050.pmtiles": 621823,
+      "layers/ssp1-26/2100.pmtiles": 665538,
+      "layers/ssp2-45/2030.pmtiles": 587387,
+      "layers/ssp2-45/2050.pmtiles": 624674,
+      "layers/ssp2-45/2100.pmtiles": 670481,
+      "layers/ssp5-85/2030.pmtiles": 590810,
+      "layers/ssp5-85/2050.pmtiles": 627003,
+      "layers/ssp5-85/2100.pmtiles": 681871,
+      "analysis/source-grid.json.gz": 7848,
+      "NOTICE.md": 502,
+      "stac/collection.json": 2230,
+      "stac/items/ssp1-26-2030.json": 3000,
+      "stac/items/ssp1-26-2050.json": 3000,
+      "stac/items/ssp1-26-2100.json": 3000,
+      "stac/items/ssp2-45-2030.json": 3000,
+      "stac/items/ssp2-45-2050.json": 3000,
+      "stac/items/ssp2-45-2100.json": 3000,
+      "stac/items/ssp5-85-2030.json": 3000,
+      "stac/items/ssp5-85-2050.json": 3000,
+      "stac/items/ssp5-85-2100.json": 3000
+    }
+  },
+  "profiles": {
+    "hardware": {
+      "operatingSystem": "darwin 23.6.0",
+      "architecture": "arm64",
+      "cpu": "Apple M1 (Virtual)",
+      "totalMemoryBytes": 7516192768
+    },
+    "browser": {
+      "engine": "Chromium",
+      "version": "151.0.7922.34"
+    },
+    "network": {
+      "transport": "loopback-http-1.1",
+      "cacheControl": "immutable",
+      "origin": "http://127.0.0.1:49238"
+    }
+  },
+  "target": {
+    "scenario": "ssp2-45",
+    "horizon": 2050,
+    "cogPath": "analysis/ssp2-45/2050.tif",
+    "sourceGridPath": "analysis/source-grid.json.gz",
+    "sourceRow": 22,
+    "sourceColumn": 34,
+    "cogRow": 23,
+    "sourceLocationId": 1003800040,
+    "expectedValuesMillimetres": [
+      156,
+      247,
+      351
+    ],
+    "goldenEvidenceSha256": "0d1187bacc6162585c3b48e3361b3fe3ab208847920d37ed54b10a331d58595c"
+  },
+  "toolchain": {
+    "playwrightVersion": "1.62.1",
+    "geotiffVersion": "3.0.5",
+    "packageLockSha256": "0cf125d429ffb54cd52342bbcfac73f5fee1eebf53a7111a2329dd64d099b979"
+  },
+  "coldLookupSamples": [
+    {
+      "durationMilliseconds": 81.1999999997206,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3564199,
+      "peakHeapBytes": 3562463,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 44.60000000009313,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3564259,
+      "peakHeapBytes": 3562523,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 78.39999999990687,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3538387,
+      "peakHeapBytes": 3536663,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 48.39999999990687,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3563539,
+      "peakHeapBytes": 3561803,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 31,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3563671,
+      "peakHeapBytes": 3561935,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 47.799999999813735,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3563591,
+      "peakHeapBytes": 3561855,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 29.399999999906868,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3563475,
+      "peakHeapBytes": 3561739,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 55.799999999813735,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3563623,
+      "peakHeapBytes": 3561887,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 53.5,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3563623,
+      "peakHeapBytes": 3561887,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    },
+    {
+      "durationMilliseconds": 71.60000000009313,
+      "heapBeforeBytes": 2236667,
+      "heapAfterBytes": 3565143,
+      "peakHeapBytes": 3563407,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 1,
+      "transferBytes": 28168,
+      "requests": [
+        {
+          "kind": "source-grid",
+          "path": "/source-grid.json.gz",
+          "artifactPath": "analysis/source-grid.json.gz",
+          "status": 200,
+          "responseBytes": 7848,
+          "range": null,
+          "contentRange": null
+        },
+        {
+          "kind": "cog",
+          "path": "/projection.tif",
+          "artifactPath": "analysis/ssp2-45/2050.tif",
+          "status": 206,
+          "responseBytes": 20320,
+          "range": "bytes=0-65535",
+          "contentRange": "bytes 0-20319/20320"
+        }
+      ]
+    }
+  ],
+  "warmLookupSamples": [
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 3577399,
+      "heapAfterBytes": 5164436,
+      "peakHeapBytes": 5164120,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 4510516,
+      "heapAfterBytes": 5391077,
+      "peakHeapBytes": 5390157,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 5402433,
+      "heapAfterBytes": 6292182,
+      "peakHeapBytes": 6291726,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 6314514,
+      "heapAfterBytes": 7807479,
+      "peakHeapBytes": 7807155,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.6000000000931323,
+      "heapBeforeBytes": 7220755,
+      "heapAfterBytes": 8091720,
+      "peakHeapBytes": 8091396,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1999999997206032,
+      "heapBeforeBytes": 8103180,
+      "heapAfterBytes": 8971337,
+      "peakHeapBytes": 8971013,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 8982557,
+      "heapAfterBytes": 9850606,
+      "peakHeapBytes": 9850262,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 9861798,
+      "heapAfterBytes": 10751187,
+      "peakHeapBytes": 10750863,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 10762495,
+      "heapAfterBytes": 11694660,
+      "peakHeapBytes": 11694348,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 11705840,
+      "heapAfterBytes": 12573685,
+      "peakHeapBytes": 12573361,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 12584897,
+      "heapAfterBytes": 13452666,
+      "peakHeapBytes": 13452366,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 12851306,
+      "heapAfterBytes": 3675628,
+      "peakHeapBytes": 12851306,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 3686804,
+      "heapAfterBytes": 4554597,
+      "peakHeapBytes": 4554273,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 4565761,
+      "heapAfterBytes": 5433554,
+      "peakHeapBytes": 5433230,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 5444898,
+      "heapAfterBytes": 6312691,
+      "peakHeapBytes": 6312367,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 6323867,
+      "heapAfterBytes": 7193496,
+      "peakHeapBytes": 7193172,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 7204672,
+      "heapAfterBytes": 8072465,
+      "peakHeapBytes": 8072141,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 8083641,
+      "heapAfterBytes": 8951434,
+      "peakHeapBytes": 8951110,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 8962678,
+      "heapAfterBytes": 9830471,
+      "peakHeapBytes": 9830147,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 9841647,
+      "heapAfterBytes": 10709428,
+      "peakHeapBytes": 10709116,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 10720604,
+      "heapAfterBytes": 11588397,
+      "peakHeapBytes": 11588073,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 11599573,
+      "heapAfterBytes": 12467366,
+      "peakHeapBytes": 12467042,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 12478542,
+      "heapAfterBytes": 13346335,
+      "peakHeapBytes": 13346011,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 13357511,
+      "heapAfterBytes": 14225304,
+      "peakHeapBytes": 14224980,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 14236480,
+      "heapAfterBytes": 15104333,
+      "peakHeapBytes": 15104009,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 15115509,
+      "heapAfterBytes": 15983302,
+      "peakHeapBytes": 15982978,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 15365390,
+      "heapAfterBytes": 3682704,
+      "peakHeapBytes": 15365390,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 3693880,
+      "heapAfterBytes": 4561661,
+      "peakHeapBytes": 4561349,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 4574381,
+      "heapAfterBytes": 5442174,
+      "peakHeapBytes": 5441850,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 5453350,
+      "heapAfterBytes": 6321143,
+      "peakHeapBytes": 6320819,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 6332319,
+      "heapAfterBytes": 7200100,
+      "peakHeapBytes": 7199788,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 7211276,
+      "heapAfterBytes": 8079085,
+      "peakHeapBytes": 8078761,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 8090261,
+      "heapAfterBytes": 8958054,
+      "peakHeapBytes": 8957730,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 8969218,
+      "heapAfterBytes": 9837011,
+      "peakHeapBytes": 9836687,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 9848187,
+      "heapAfterBytes": 10715968,
+      "peakHeapBytes": 10715656,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8000000002793968,
+      "heapBeforeBytes": 10727144,
+      "heapAfterBytes": 11594937,
+      "peakHeapBytes": 11594613,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1999999997206032,
+      "heapBeforeBytes": 11606113,
+      "heapAfterBytes": 12473906,
+      "peakHeapBytes": 12473582,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 12485082,
+      "heapAfterBytes": 13352875,
+      "peakHeapBytes": 13352551,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 13364063,
+      "heapAfterBytes": 14231856,
+      "peakHeapBytes": 14231532,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 14243032,
+      "heapAfterBytes": 15110825,
+      "peakHeapBytes": 15110501,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 15122001,
+      "heapAfterBytes": 15989794,
+      "peakHeapBytes": 15989470,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.3000000002793968,
+      "heapBeforeBytes": 16000958,
+      "heapAfterBytes": 16868751,
+      "peakHeapBytes": 16868427,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.900000000372529,
+      "heapBeforeBytes": 16879927,
+      "heapAfterBytes": 17747720,
+      "peakHeapBytes": 17747396,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 17758896,
+      "heapAfterBytes": 18626689,
+      "peakHeapBytes": 18626365,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 18637865,
+      "heapAfterBytes": 19517478,
+      "peakHeapBytes": 19517154,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 19528646,
+      "heapAfterBytes": 20396439,
+      "peakHeapBytes": 20396115,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 19560395,
+      "heapAfterBytes": 3694248,
+      "peakHeapBytes": 19560395,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 3705416,
+      "heapAfterBytes": 4573209,
+      "peakHeapBytes": 4572885,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1999999997206032,
+      "heapBeforeBytes": 4584377,
+      "heapAfterBytes": 5452170,
+      "peakHeapBytes": 5451846,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 5463714,
+      "heapAfterBytes": 6331507,
+      "peakHeapBytes": 6331183,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 6342675,
+      "heapAfterBytes": 7210468,
+      "peakHeapBytes": 7210144,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 7224456,
+      "heapAfterBytes": 8092249,
+      "peakHeapBytes": 8091925,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 8103337,
+      "heapAfterBytes": 8971178,
+      "peakHeapBytes": 8970854,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 8982266,
+      "heapAfterBytes": 9850059,
+      "peakHeapBytes": 9849735,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 9861147,
+      "heapAfterBytes": 10728928,
+      "peakHeapBytes": 10728616,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 10740016,
+      "heapAfterBytes": 11607809,
+      "peakHeapBytes": 11607485,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 11618897,
+      "heapAfterBytes": 12486690,
+      "peakHeapBytes": 12486366,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 12497778,
+      "heapAfterBytes": 13365571,
+      "peakHeapBytes": 13365247,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 13376659,
+      "heapAfterBytes": 14244456,
+      "peakHeapBytes": 14244132,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 14255544,
+      "heapAfterBytes": 15123337,
+      "peakHeapBytes": 15123013,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 15134425,
+      "heapAfterBytes": 16002218,
+      "peakHeapBytes": 16001894,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 16013306,
+      "heapAfterBytes": 16881099,
+      "peakHeapBytes": 16880775,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 16892187,
+      "heapAfterBytes": 17759980,
+      "peakHeapBytes": 17759656,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 17771068,
+      "heapAfterBytes": 18638861,
+      "peakHeapBytes": 18638537,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 18649949,
+      "heapAfterBytes": 19517742,
+      "peakHeapBytes": 19517418,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 19529630,
+      "heapAfterBytes": 20397423,
+      "peakHeapBytes": 20397099,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 20408511,
+      "heapAfterBytes": 21276292,
+      "peakHeapBytes": 21275980,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 20465296,
+      "heapAfterBytes": 3762452,
+      "peakHeapBytes": 20465296,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 3773540,
+      "heapAfterBytes": 4641333,
+      "peakHeapBytes": 4641009,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2999999998137355,
+      "heapBeforeBytes": 4652421,
+      "heapAfterBytes": 5520214,
+      "peakHeapBytes": 5519890,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 5531302,
+      "heapAfterBytes": 6399095,
+      "peakHeapBytes": 6398771,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.5,
+      "heapBeforeBytes": 6435035,
+      "heapAfterBytes": 7302828,
+      "peakHeapBytes": 7302504,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 7313836,
+      "heapAfterBytes": 8181653,
+      "peakHeapBytes": 8181329,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 8192661,
+      "heapAfterBytes": 9060454,
+      "peakHeapBytes": 9060130,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 9071462,
+      "heapAfterBytes": 9939243,
+      "peakHeapBytes": 9938931,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1999999997206032,
+      "heapBeforeBytes": 9950251,
+      "heapAfterBytes": 10818044,
+      "peakHeapBytes": 10817720,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 10829052,
+      "heapAfterBytes": 11696833,
+      "peakHeapBytes": 11696521,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 11710933,
+      "heapAfterBytes": 12578714,
+      "peakHeapBytes": 12578402,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 12589722,
+      "heapAfterBytes": 13457519,
+      "peakHeapBytes": 13457195,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 13468527,
+      "heapAfterBytes": 14336320,
+      "peakHeapBytes": 14335996,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 14347892,
+      "heapAfterBytes": 15215685,
+      "peakHeapBytes": 15215361,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8000000002793968,
+      "heapBeforeBytes": 15226693,
+      "heapAfterBytes": 16094486,
+      "peakHeapBytes": 16094162,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 3.2999999998137355,
+      "heapBeforeBytes": 16105494,
+      "heapAfterBytes": 16973287,
+      "peakHeapBytes": 16972963,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.5,
+      "heapBeforeBytes": 16993395,
+      "heapAfterBytes": 17861188,
+      "peakHeapBytes": 17860864,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.099999999627471,
+      "heapBeforeBytes": 17872196,
+      "heapAfterBytes": 18744009,
+      "peakHeapBytes": 18743685,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 18755017,
+      "heapAfterBytes": 19622854,
+      "peakHeapBytes": 19622530,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 19633862,
+      "heapAfterBytes": 20501655,
+      "peakHeapBytes": 20501331,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 19729491,
+      "heapAfterBytes": 3863344,
+      "peakHeapBytes": 19729491,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 3874352,
+      "heapAfterBytes": 4742145,
+      "peakHeapBytes": 4741821,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 4753153,
+      "heapAfterBytes": 5620934,
+      "peakHeapBytes": 5620622,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2999999998137355,
+      "heapBeforeBytes": 5631942,
+      "heapAfterBytes": 6499735,
+      "peakHeapBytes": 6499411,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 6510743,
+      "heapAfterBytes": 7378576,
+      "peakHeapBytes": 7378252,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 7389584,
+      "heapAfterBytes": 8257377,
+      "peakHeapBytes": 8257053,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 8268385,
+      "heapAfterBytes": 9136178,
+      "peakHeapBytes": 9135854,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2,
+      "heapBeforeBytes": 9147186,
+      "heapAfterBytes": 10014979,
+      "peakHeapBytes": 10014655,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.7999999998137355,
+      "heapBeforeBytes": 10025987,
+      "heapAfterBytes": 10893780,
+      "peakHeapBytes": 10893456,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 10904788,
+      "heapAfterBytes": 11772581,
+      "peakHeapBytes": 11772257,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.2000000001862645,
+      "heapBeforeBytes": 11783589,
+      "heapAfterBytes": 12653086,
+      "peakHeapBytes": 12652762,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 1.8999999999068677,
+      "heapBeforeBytes": 12664106,
+      "heapAfterBytes": 13535615,
+      "peakHeapBytes": 13535291,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    },
+    {
+      "durationMilliseconds": 2.1000000000931323,
+      "heapBeforeBytes": 13546623,
+      "heapAfterBytes": 14414416,
+      "peakHeapBytes": 14414092,
+      "locationId": 1003800040,
+      "valuesMillimetres": [
+        156,
+        247,
+        351
+      ],
+      "rangeRequestCount": 0,
+      "transferBytes": 0,
+      "requests": []
+    }
+  ]
+}

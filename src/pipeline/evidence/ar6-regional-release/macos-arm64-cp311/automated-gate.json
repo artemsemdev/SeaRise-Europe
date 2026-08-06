@@ -1,0 +1,71 @@
+{
+  "automatedValidation": "pending",
+  "blockingChecks": [
+    "crossEnvironmentReproducibility"
+  ],
+  "checks": {
+    "artifactBudgets": true,
+    "cogStructureAndValues": true,
+    "completeScenarioHorizonMatrix": true,
+    "crossArtifactSemanticParity": true,
+    "crossEnvironmentReproducibility": false,
+    "deliveryMeasurements": true,
+    "geoparquetSchemaAndValues": true,
+    "licenceAndAttribution": true,
+    "lookupGoldenParity": true,
+    "nonAllNodataLayers": true,
+    "pmtilesStructureAndProperties": true,
+    "sourceArchiveAndMembersVerified": true,
+    "sourceContentSeal": true,
+    "sourceGridIdentity": true
+  },
+  "evidenceBindings": {
+    "browserHarnessSha256": "3c0d8ba00d13fa2643e0ebf60c8e8f2f297da28d671b6f4ab52c2a3348bee509",
+    "buildTimingSha256": "e96d7b35ec27f1e11b5e380c23867f50680bc31de214877e35e5bd1a8647843f",
+    "candidateBindingSha256": "aff21bf005f37e3aa1e386e15694eca6715e2310373cd4f502a50685b5560cae",
+    "deliveryReportSha256": "f820bd3453b9ba97e43d3e78aa297adf0188f686758d4969aeb61f46db8ed068",
+    "deliveryTraceSha256": "829f83059eeed77d1f0b75f5bf8830dc900b3333f17e7648e261e501950b9d1a",
+    "manifestSha256": "6fe1115ba80857a2dcdd39fefada92ec51122cd6f8e7a2704e20083dd3e616ac",
+    "reproducibilityReportSha256": "d408a143295bec0c6fb0b3403a5a07adc9ea46585dc241d039d604c470040edf"
+  },
+  "externalVerificationRequired": {
+    "reproducibilityProvenance": {
+      "provider": "github-actions",
+      "requiredExternalBindings": [
+        {
+          "candidateBindingSha256": "442f65bb5a202fcb4c0ebab044fe179fc54c1398427dc75e6312b82dda0f53b1",
+          "receiptBuildRunId": "github-31113582612-1-linux-x86_64",
+          "releaseId": "phase-0r-ar6-v1",
+          "sourceRevision": "c2ed9074624c7cfe61bf610a1a67f4303aca7580",
+          "validatedEnvironmentProfile": {
+            "pythonLockSha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f",
+            "pythonPlatform": "linux-x86_64-cp311",
+            "tippecanoeBinarySha256": "a70bb67594919b0eae357ec4678c77f5c3b9d4a277bd11046e4d9d03b1c6c426",
+            "vectorPlatform": "linux-x86_64"
+          }
+        },
+        {
+          "candidateBindingSha256": "aff21bf005f37e3aa1e386e15694eca6715e2310373cd4f502a50685b5560cae",
+          "receiptBuildRunId": "github-31113582612-1-macos-arm64",
+          "releaseId": "phase-0r-ar6-v1",
+          "sourceRevision": "c2ed9074624c7cfe61bf610a1a67f4303aca7580",
+          "validatedEnvironmentProfile": {
+            "pythonLockSha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75",
+            "pythonPlatform": "macos-arm64-cp311",
+            "tippecanoeBinarySha256": "ef2b87f55ffe31296a436b2bcdaf3a68fa63f2a5ee1c9ce22ec36853c4f442ce",
+            "vectorPlatform": "darwin-arm64"
+          }
+        }
+      ],
+      "status": "pending-external-verification"
+    }
+  },
+  "fallback": "do-not-publish-or-unlock-phase-1",
+  "gateId": "phase-0r-ar6-regional-release-v1",
+  "issue": 110,
+  "phase1Unlocked": false,
+  "releaseDisposition": "pending-owner",
+  "releaseId": "phase-0r-ar6-v1",
+  "schemaVersion": 1,
+  "scientificDisposition": "projection-only"
+}
