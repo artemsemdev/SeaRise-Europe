@@ -760,6 +760,8 @@ def test_committed_bundle_tampering_fails_before_owner_decision(
                 "scientificDisposition": "projection-only",
             },
         )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -801,6 +803,7 @@ def test_committed_gate_requires_exact_contract_identity(
                 "scientificDisposition": "projection-only",
             },
         )
+
 
 def test_committed_gate_rejects_nested_external_verification_claim(
     tmp_path: Path,
@@ -981,6 +984,7 @@ def test_evidence_delta_rejects_code_workflow_contract_and_unlisted_docs(
             source_revision,
             evidence_revision,
         )
+
 
 def test_evidence_delta_rejects_deletion(tmp_path: Path) -> None:
     repository, source_revision, evidence_revision, _ = _evidence_repository(
@@ -1435,3 +1439,267 @@ def test_validation_artifact_rejects_path_traversal(tmp_path: Path) -> None:
         )
 
     assert not (tmp_path / "escape").exists()
+
+
+def test_artifact_download_drops_authorization_at_storage_boundary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = owner_promotion.GitHubApi("secret-token")
+    signed_url = (
+        "https://productionresultssa.blob.core.windows.net/actions-results/a.zip?sig=x"
+    )
+    payload = b"validated artifact bytes"
+    responses = iter(
+        [
+            FakeHttpResponse(302, "https://api.github.com", headers={"Location": signed_url}),
+            FakeHttpResponse(
+                200,
+                signed_url,
+                payload,
+                headers={"Content-Length": str(len(payload))},
+            ),
+        ]
+    )
+    requests = []
+
+    def open_without_redirect(request, *, timeout):
+        requests.append((request, timeout))
+        return next(responses)
+
+    monkeypatch.setattr(api, "_open_no_redirect", open_without_redirect)
+    destination = tmp_path / "artifact.zip"
+
+    api.download("/repos/artemsemdev/SeaRise-Europe/actions/artifacts/1/zip", destination)
+
+    first_headers = dict(requests[0][0].header_items())
+    second_headers = dict(requests[1][0].header_items())
+    assert first_headers["Authorization"] == "Bearer secret-token"
+    assert "Authorization" not in second_headers
+    assert requests[1][0].full_url == signed_url
+    assert destination.read_bytes() == payload
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "http://productionresultssa.blob.core.windows.net/a.zip?sig=x",
+        "https://evil.example/a.zip?sig=x",
+        "https://user@productionresultssa.blob.core.windows.net/a.zip?sig=x",
+    ],
+)
+def test_artifact_download_rejects_untrusted_redirect(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    location: str,
+) -> None:
+    api = owner_promotion.GitHubApi("secret-token")
+    monkeypatch.setattr(
+        api,
+        "_open_no_redirect",
+        lambda *_args, **_kwargs: FakeHttpResponse(
+            302,
+            "https://api.github.com",
+            headers={"Location": location},
+        ),
+    )
+
+    with pytest.raises(ScienceContractError, match="trusted HTTPS storage"):
+        api.download(
+            "/repos/artemsemdev/SeaRise-Europe/actions/artifacts/1/zip",
+            tmp_path / "artifact.zip",
+        )
+
+
+def test_artifact_download_rejects_second_redirect(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = owner_promotion.GitHubApi("secret-token")
+    signed_url = (
+        "https://productionresultssa.blob.core.windows.net/actions-results/a.zip?sig=x"
+    )
+    responses = iter(
+        [
+            FakeHttpResponse(302, "https://api.github.com", headers={"Location": signed_url}),
+            FakeHttpResponse(302, signed_url, headers={"Location": signed_url}),
+        ]
+    )
+    monkeypatch.setattr(
+        api,
+        "_open_no_redirect",
+        lambda *_args, **_kwargs: next(responses),
+    )
+
+    with pytest.raises(ScienceContractError, match="unexpected redirect"):
+        api.download(
+            "/repos/artemsemdev/SeaRise-Europe/actions/artifacts/1/zip",
+            tmp_path / "artifact.zip",
+        )
+
+
+@pytest.mark.parametrize(
+    ("platform", "timing_name"),
+    [
+        ("linux", "build-timing-macos-arm64.json"),
+        ("macos", "build-timing-linux.json"),
+        ("linux", None),
+    ],
+)
+def test_validation_artifact_rejects_swapped_or_missing_platform_timing(
+    tmp_path: Path,
+    platform: str,
+    timing_name: str | None,
+) -> None:
+    archive = tmp_path / f"{platform}.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr(
+            f"{owner_promotion.LINUX_CANDIDATE_DIRECTORY}/placeholder",
+            "candidate",
+        )
+        if timing_name is not None:
+            bundle.writestr(timing_name, "{}\n")
+
+    with pytest.raises(ScienceContractError, match="unexpected path|lacks required"):
+        owner_promotion._safe_extract(
+            archive,
+            tmp_path / f"extract-{platform}",
+            platform=platform,
+        )
+
+
+@pytest.mark.parametrize("mutation", ["digest", "size", "workflow", "job-id"])
+def test_validation_artifact_metadata_is_bound_to_exact_run(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    source_revision = _head()
+    api = MockGitHubApi(source_revision, "e" * 40, master_revision=source_revision)
+    artifacts_path = (
+        f"/repos/{owner_promotion.REPOSITORY}/actions/runs/101/artifacts?per_page=100"
+    )
+    jobs_path = (
+        f"/repos/{owner_promotion.REPOSITORY}/actions/runs/101/"
+        "attempts/1/jobs?per_page=100"
+    )
+    if mutation == "digest":
+        api.responses[artifacts_path]["artifacts"][0]["digest"] = f"sha256:{'0' * 64}"
+    elif mutation == "size":
+        api.responses[artifacts_path]["artifacts"][0]["size_in_bytes"] += 1
+    elif mutation == "workflow":
+        api.responses[artifacts_path]["artifacts"][0]["workflow_run"]["head_sha"] = (
+            "f" * 40
+        )
+    else:
+        api.responses[jobs_path]["jobs"][1]["id"] = api.responses[jobs_path]["jobs"][0][
+            "id"
+        ]
+
+    with pytest.raises(ScienceContractError):
+        owner_promotion._verify_validation_run(
+            api,
+            101,
+            source_revision,
+            tmp_path / "download",
+        )
+
+
+@pytest.mark.parametrize("state", ["queued", "in_progress"])
+def test_concurrent_owner_decision_is_rejected(state: str) -> None:
+    source_revision = _head()
+    api = MockGitHubApi(source_revision, "e" * 40, master_revision=source_revision)
+    history_path = (
+        f"/repos/{owner_promotion.REPOSITORY}/actions/workflows/"
+        "phase-0r-owner-promotion.yml/runs?event=workflow_dispatch&per_page=100"
+    )
+    api.responses[history_path] = {
+        "total_count": 1,
+        "workflow_runs": [{"id": 8000, "status": state}],
+    }
+
+    with pytest.raises(ScienceContractError, match="concurrent owner decision"):
+        owner_promotion._verify_no_prior_decision(
+            api,
+            101,
+            202,
+            "phase-0r-ar6-v1",
+            source_revision,
+            _context(source_revision),
+            REPOSITORY_ROOT,
+        )
+
+
+def test_prior_successful_decision_for_candidate_is_immutable() -> None:
+    source_revision = _head()
+    api = MockGitHubApi(source_revision, "e" * 40, master_revision=source_revision)
+    history_path = (
+        f"/repos/{owner_promotion.REPOSITORY}/actions/workflows/"
+        "phase-0r-owner-promotion.yml/runs?event=workflow_dispatch&per_page=100"
+    )
+    prior_run_id = 8000
+    api.responses[history_path] = {
+        "total_count": 1,
+        "workflow_runs": [
+            {
+                "id": prior_run_id,
+                "display_title": owner_promotion._decision_title(101, 199),
+                "status": "completed",
+                "conclusion": "success",
+                "event": "workflow_dispatch",
+                "run_attempt": 1,
+                "path": owner_promotion.OWNER_WORKFLOW,
+                "head_branch": "master",
+                "repository": {"full_name": owner_promotion.REPOSITORY},
+                "actor": {"login": owner_promotion.OWNER_LOGIN},
+                "triggering_actor": {"login": owner_promotion.OWNER_LOGIN},
+            }
+        ],
+    }
+    api.responses[
+        f"/repos/{owner_promotion.REPOSITORY}/actions/runs/{prior_run_id}/artifacts?per_page=100"
+    ] = {
+        "total_count": 1,
+        "artifacts": [
+            {
+                "id": 7000,
+                "name": owner_promotion._decision_artifact_name(
+                    "phase-0r-ar6-v1", source_revision
+                ),
+                "expired": False,
+            }
+        ],
+    }
+
+    with pytest.raises(ScienceContractError, match="already exists"):
+        owner_promotion._verify_no_prior_decision(
+            api,
+            101,
+            202,
+            "phase-0r-ar6-v1",
+            source_revision,
+            _context(source_revision),
+            REPOSITORY_ROOT,
+        )
+
+
+def test_permanent_owner_record_blocks_another_decision(tmp_path: Path) -> None:
+    repository, _, _, _ = _evidence_repository(tmp_path)
+    record_root = repository / owner_promotion.OWNER_RECORD_ROOT
+    record_root.mkdir(parents=True)
+    for name in owner_promotion._OWNER_RECORD_FILES:
+        (record_root / name).write_text(f"permanent {name}\n", encoding="utf-8")
+    _git(repository, "add", owner_promotion.OWNER_RECORD_ROOT.as_posix())
+    _git(repository, "commit", "-m", "docs: persist owner decision")
+    source_revision = _git(repository, "rev-parse", "HEAD")
+    api = MockGitHubApi(source_revision, source_revision, master_revision=source_revision)
+
+    with pytest.raises(ScienceContractError, match="permanent authoritative"):
+        owner_promotion._verify_no_prior_decision(
+            api,
+            101,
+            202,
+            "phase-0r-ar6-v1",
+            source_revision,
+            _context(source_revision),
+            repository,
+        )
