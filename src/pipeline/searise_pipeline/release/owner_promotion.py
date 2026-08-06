@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import subprocess
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
@@ -14,6 +15,7 @@ from urllib.parse import urlsplit
 
 from searise_pipeline.science.contracts import ScienceContractError
 
+from .evidence import sha256
 from .promotion import _validate_binding
 
 REPOSITORY = "artemsemdev/SeaRise-Europe"
@@ -340,3 +342,177 @@ def _validate_delivery_report(
         "Delivery status differs from measured budgets",
     )
     return report
+
+
+def _git(repository_root: Path, *arguments: str) -> str:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(repository_root), *arguments],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ScienceContractError("Git integration verification failed") from exc
+
+
+def _changed_paths(repository_root: Path, first: str, second: str) -> dict[str, str]:
+    output = _git(
+        repository_root,
+        "diff",
+        "--name-status",
+        "--no-renames",
+        first,
+        second,
+        "--",
+    )
+    changes: dict[str, str] = {}
+    for line in output.splitlines():
+        fields = line.split("\t")
+        if len(fields) != 2 or fields[0] not in {"A", "M"}:
+            raise ScienceContractError("Evidence-only revision contains a forbidden change")
+        status, path = fields
+        if path in changes or path not in _ALLOWED_EVIDENCE_DELTA:
+            raise ScienceContractError("Evidence-only revision changed a forbidden path")
+        changes[path] = status
+    return changes
+
+
+def _tree_blob(repository_root: Path, revision: str, path: str) -> str:
+    output = _git(repository_root, "ls-tree", revision, "--", path)
+    try:
+        metadata, observed_path = output.split("\t", 1)
+        mode, kind, object_id = metadata.split(" ", 2)
+    except ValueError as exc:
+        raise ScienceContractError("Evidence-only revision has an invalid tree entry") from exc
+    if (
+        observed_path != path
+        or mode != "100644"
+        or kind != "blob"
+        or _GIT_SHA.fullmatch(object_id) is None
+    ):
+        raise ScienceContractError("Evidence-only revision contains a symlink or submodule")
+    return object_id
+
+
+def _verify_evidence_only_delta(
+    repository_root: Path,
+    source_revision: str,
+    evidence_revision: str,
+) -> dict[str, dict[str, str]]:
+    """Allow a linear post-build delta containing only fixed evidence paths."""
+    _require(
+        source_revision != evidence_revision,
+        "Final evidence revision must advance the candidate source revision",
+    )
+    _git(repository_root, "merge-base", "--is-ancestor", source_revision, evidence_revision)
+    commits = _git(
+        repository_root,
+        "rev-list",
+        "--reverse",
+        "--ancestry-path",
+        f"{source_revision}..{evidence_revision}",
+    ).splitlines()
+    _require(bool(commits), "Final evidence revision has no direct ancestry path")
+    previous = source_revision
+    cumulative: set[str] = set()
+    for commit in commits:
+        parents = _git(repository_root, "show", "-s", "--format=%P", commit).split()
+        _require(
+            parents == [previous],
+            "Evidence-only revision must be a direct linear descendant",
+        )
+        commit_changes = _changed_paths(repository_root, previous, commit)
+        for path in commit_changes:
+            _tree_blob(repository_root, commit, path)
+        cumulative.update(commit_changes)
+        previous = commit
+    _require(previous == evidence_revision, "Evidence-only revision is not the direct head")
+    _require(
+        set(_REQUIRED_EVIDENCE_DELTA).issubset(cumulative),
+        "Evidence-only revision does not commit the complete fixed evidence bundle",
+    )
+
+    final_changes = _changed_paths(repository_root, source_revision, evidence_revision)
+    _require(
+        set(_REQUIRED_EVIDENCE_DELTA).issubset(final_changes),
+        "Required evidence was reverted before the final evidence revision",
+    )
+    records: dict[str, dict[str, str]] = {}
+    for path in sorted(final_changes):
+        evidence_blob = _tree_blob(repository_root, evidence_revision, path)
+        _require(
+            _tree_blob(repository_root, "HEAD", path) == evidence_blob,
+            "Committed evidence changed after the final integration head",
+        )
+        working_path = repository_root / path
+        _require(
+            working_path.is_file() and not working_path.is_symlink(),
+            "Committed evidence is not a regular checkout file",
+        )
+        _require(
+            _git(repository_root, "hash-object", "--", path) == evidence_blob,
+            "Committed evidence checkout bytes differ from the reviewed tree",
+        )
+        records[path] = {
+            "status": final_changes[path],
+            "gitBlobSha1": evidence_blob,
+            "sha256": sha256(working_path),
+        }
+    return records
+
+
+def _validate_context(context: Mapping[str, str], repository_root: Path) -> dict[str, str]:
+    required = {
+        "GITHUB_REPOSITORY": REPOSITORY,
+        "GITHUB_REF": MASTER_REF,
+        "GITHUB_ACTOR": OWNER_LOGIN,
+        "GITHUB_TRIGGERING_ACTOR": OWNER_LOGIN,
+        "GITHUB_WORKFLOW": "Phase 0R owner promotion",
+        "GITHUB_WORKFLOW_REF": f"{REPOSITORY}/{OWNER_WORKFLOW}@{MASTER_REF}",
+        "SEARISE_OWNER_ENVIRONMENT": OWNER_ENVIRONMENT,
+    }
+    for key, expected in required.items():
+        _require(context.get(key) == expected, f"{key} is outside the owner authority boundary")
+    for key in ("GITHUB_SHA",):
+        _require(_GIT_SHA.fullmatch(context.get(key, "")) is not None, f"{key} is invalid")
+    for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"):
+        _exact_positive_decimal(context.get(key, ""), key)
+    _require(
+        context["GITHUB_RUN_ATTEMPT"] == "1",
+        "Protected owner promotion must use a fresh workflow run",
+    )
+    _require(
+        repository_root.is_dir() and not repository_root.is_symlink(), "Repository root is invalid"
+    )
+    _require(
+        Path(_git(repository_root, "rev-parse", "--show-toplevel")).resolve()
+        == repository_root.resolve(),
+        "Repository root is not the exact worktree",
+    )
+    _require(
+        _git(repository_root, "rev-parse", "HEAD") == context["GITHUB_SHA"],
+        "Checked-out master differs from GITHUB_SHA",
+    )
+    return dict(context)
+
+
+def _parse_checksums(path: Path) -> dict[str, str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise ScienceContractError("Cannot read committed macOS checksums") from exc
+    declared: dict[str, str] = {}
+    for line in lines:
+        parts = line.split("  ", 1)
+        if (
+            len(parts) != 2
+            or _SHA256.fullmatch(parts[0]) is None
+            or parts[1] not in _BUNDLE_FILES
+            or parts[1] in declared
+        ):
+            raise ScienceContractError("Committed macOS checksum inventory is malformed")
+        declared[parts[1]] = parts[0]
+    if set(declared) != set(_BUNDLE_FILES):
+        raise ScienceContractError("Committed macOS checksum inventory is incomplete")
+    return declared
