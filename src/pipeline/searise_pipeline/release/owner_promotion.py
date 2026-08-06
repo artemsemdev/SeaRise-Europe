@@ -1049,3 +1049,133 @@ def _external_binding_requirements(gate: Mapping[str, Any]) -> list[Mapping[str,
     ):
         raise ScienceContractError("Automated gate requires another external binding set")
     return required
+
+
+def _decision_title(validation_run_id: int, pr_number: int) -> str:
+    return (
+        f"Phase 0R owner decision from validation run {validation_run_id} "
+        f"for evidence PR #{pr_number}"
+    )
+
+
+def _decision_artifact_name(release_id: str, source_revision: str) -> str:
+    _require(
+        re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", release_id) is not None
+        and _GIT_SHA.fullmatch(source_revision) is not None,
+        "Owner decision identity is not canonical",
+    )
+    return f"phase-0r-owner-decision-{release_id}-{source_revision}"
+
+
+def _verify_no_prior_decision(
+    api: GitHubApi,
+    validation_run_id: int,
+    pr_number: int,
+    release_id: str,
+    source_revision: str,
+    context: Mapping[str, str],
+    repository_root: Path,
+) -> None:
+    """Reject concurrent or prior authority for the same release candidate."""
+    committed_records = _git(
+        repository_root,
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "HEAD",
+        "--",
+        OWNER_RECORD_ROOT.as_posix(),
+    ).splitlines()
+    if committed_records:
+        expected_records = {
+            (OWNER_RECORD_ROOT / name).as_posix() for name in _OWNER_RECORD_FILES
+        }
+        _require(
+            set(committed_records) == expected_records,
+            "Permanent owner record root is incomplete or ambiguous",
+        )
+        raise ScienceContractError(
+            "A permanent authoritative owner decision already exists"
+        )
+    document = api.get_json(
+        f"/repos/{REPOSITORY}/actions/workflows/{Path(OWNER_WORKFLOW).name}/runs"
+        "?event=workflow_dispatch&per_page=100"
+    )
+    runs = document.get("workflow_runs")
+    _require(
+        type(runs) is list
+        and document.get("total_count") == len(runs)
+        and len(runs) <= 100,
+        "Owner decision history is incomplete or ambiguous",
+    )
+    current_run_id = int(context["GITHUB_RUN_ID"])
+    current_title = _decision_title(validation_run_id, pr_number)
+    artifact_name = _decision_artifact_name(release_id, source_revision)
+    for run in runs:
+        _require(type(run) is dict, "Owner decision history is malformed")
+        if run.get("id") == current_run_id:
+            _require(
+                run.get("display_title") == current_title,
+                "Current owner decision identity is ambiguous",
+            )
+            continue
+        if run.get("status") != "completed":
+            raise ScienceContractError("A concurrent owner decision run is already active")
+        if run.get("conclusion") != "success":
+            continue
+        _require(
+            type(run.get("id")) is int
+            and run["id"] > 0
+            and run.get("event") == "workflow_dispatch"
+            and run.get("run_attempt") == 1
+            and run.get("path") == OWNER_WORKFLOW
+            and run.get("head_branch") == "master"
+            and run.get("repository", {}).get("full_name") == REPOSITORY
+            and run.get("actor", {}).get("login") == OWNER_LOGIN
+            and run.get("triggering_actor", {}).get("login") == OWNER_LOGIN,
+            "Prior owner decision provenance is ambiguous",
+        )
+        title_match = re.fullmatch(
+            r"Phase 0R owner decision from validation run ([1-9][0-9]*) "
+            r"for evidence PR #([1-9][0-9]*)",
+            run.get("display_title", ""),
+        )
+        _require(title_match is not None, "Prior owner decision identity is ambiguous")
+        prior_validation_run_id = int(title_match.group(1))
+        prior_validation = api.get_json(
+            f"/repos/{REPOSITORY}/actions/runs/{prior_validation_run_id}"
+        )
+        _require(
+            prior_validation.get("id") == prior_validation_run_id
+            and prior_validation.get("event") == "workflow_dispatch"
+            and prior_validation.get("status") == "completed"
+            and prior_validation.get("conclusion") == "success"
+            and prior_validation.get("run_attempt") == 1
+            and prior_validation.get("path") == VALIDATION_WORKFLOW
+            and prior_validation.get("head_branch") == "master"
+            and _GIT_SHA.fullmatch(prior_validation.get("head_sha", "")) is not None,
+            "Prior owner decision validation identity is ambiguous",
+        )
+        if prior_validation["head_sha"] != source_revision:
+            continue
+        artifacts_document = api.get_json(
+            f"/repos/{REPOSITORY}/actions/runs/{run['id']}/artifacts?per_page=100"
+        )
+        artifacts = artifacts_document.get("artifacts")
+        _require(
+            type(artifacts) is list
+            and artifacts_document.get("total_count") == len(artifacts)
+            and len(artifacts) <= 100,
+            "Prior owner decision artifact history is ambiguous",
+        )
+        matching = [item for item in artifacts if item.get("name") == artifact_name]
+        _require(
+            len(matching) == 1
+            and matching[0].get("expired") is False
+            and type(matching[0].get("id")) is int
+            and matching[0]["id"] > 0,
+            "Prior owner decision artifact is missing or ambiguous",
+        )
+        raise ScienceContractError(
+            "An authoritative owner decision already exists for this release candidate"
+        )
