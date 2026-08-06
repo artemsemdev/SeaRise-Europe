@@ -60,7 +60,7 @@ summarized on `/about/architecture`.
 | Accessibility | No critical/serious automated findings and all manual core-flow checks pass | Automated scan plus keyboard/screen-reader checklist |
 
 A temporary waiver records the measured regression, rationale, owner, and
-expiry. It does not waive scientific integrity, licence, or five-state
+expiry. It does not waive scientific integrity, licence, or four-state
 correctness.
 
 ## 4. Search quality
@@ -99,15 +99,14 @@ reaches a completed state without facilitator help.
 Record time on task and confusion points; do not collect personal location
 queries.
 
-### 5.2 Five-state comprehension
+### 5.2 Four-state comprehension
 
 **Definition:** participant explains what each state means and, crucially, what
 it does not mean.
 
 **Target:** at least 80% correctly distinguish:
 
-- `ModeledExposureDetected` from a flood prediction;
-- `NoModeledExposureDetected` from a safety guarantee;
+- `ProjectionAvailable` from a flood, exposure, or safety conclusion;
 - `DataUnavailable` from a zero result;
 - `OutOfScope` from unsupported geography;
 - `UnsupportedGeography` from a technical error.

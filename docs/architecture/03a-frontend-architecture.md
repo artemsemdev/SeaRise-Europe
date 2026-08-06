@@ -187,10 +187,12 @@ It evaluates in a fixed order:
 3. Return `OutOfScope` when it lies inside Europe but outside the coastal
    analysis zone.
 4. Resolve the exact scenario/horizon artifact from the manifest.
-5. Read the nearest-neighbour classified pixel from the analysis COG.
-6. Return `DataUnavailable` for nodata or an unavailable scientific cell.
-7. Map `1` to `ModeledExposureDetected` and `0` to
-   `NoModeledExposureDetected`.
+5. Select the nearest native AR6 grid location by unrounded Haversine distance
+   and lowest-ID tie-break.
+6. Return `DataUnavailable` when that location is farther than 100 km or any
+   required quantile is source nodata.
+7. Otherwise return `ProjectionAvailable` with q0.167, q0.5, q0.833, source
+   identity and distance, baseline, scenario, horizon, and native resolution.
 
 Network, parse, integrity, and cache-miss failures are technical errors, not
 scientific result states. If a required range is unavailable, the engine does
@@ -198,7 +200,7 @@ not guess or convert the failure to `DataUnavailable`.
 
 The visual overlay is resolved independently from the same release/scenario/
 horizon key. It may use PMTiles, but the scientific value comes from the exact
-analysis artifact unless a future ADR proves a bit-exact PMTiles lookup.
+analysis artifact; PMTiles is visual-only.
 
 ## Application state
 
@@ -214,7 +216,7 @@ type AppState =
   | { phase: 'technical-error'; selection?: Selection; error: UserSafeError };
 ```
 
-`AssessmentResult.resultState` carries all five domain outcomes. Do not create
+`AssessmentResult.resultState` carries all four domain outcomes. Do not create
 separate error phases for `OutOfScope`, `UnsupportedGeography`, or
 `DataUnavailable`.
 
@@ -345,8 +347,8 @@ These are CI fitness functions, not aspirational prose.
 
 ## Test boundaries
 
-- Domain modules: unit and property tests for classification, pixel mapping,
-  coordinate edges, and all five states.
+- Domain modules: unit and property tests for scope classification, source-grid
+  selection, coordinate edges, quantile mapping, and all four states.
 - Search worker: normalization, multilingual aliases, deterministic ranking,
   duplicate places, stale tokens, and both shards.
 - Data adapters: manifest/schema failure, range reads, nodata, aborts, and

@@ -32,6 +32,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Aligned active architecture, runtime, product, and delivery documentation on
+  the four-state AR6 projection contract and its owner-controlled evidence flow.
 - Regional release comparison now reports local byte and value parity as
   pending until trusted external build provenance is bound to both candidate
   digests; self-declared receipt profiles can no longer prove independence.

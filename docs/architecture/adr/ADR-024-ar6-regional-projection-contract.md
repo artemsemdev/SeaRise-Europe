@@ -6,7 +6,7 @@
 >
 > **Decision owner:** Project owner
 >
-> **Implementation state:** Contract accepted; publication remains blocked on #135 and #110
+> **Implementation state:** Contract and #135 lookup parity implemented; publication remains blocked on #110 trusted evidence and owner disposition
 >
 > **Machine contract:** [`ar6-projection-contract.json`](../../../src/pipeline/science/ar6-projection-contract.json)
 >
@@ -114,7 +114,9 @@ Validation is offline and source-bound:
 The NASA/Rutgers tool and published reader may support a documented manual
 cross-check, but a mutable or unavailable web interface is not a CI oracle.
 CI may report `automatedValidation=passed`; it cannot set the owner-controlled
-`releaseDecision=approved` or describe the product as scientifically approved.
+release disposition or describe the product as approved. The machine-contract
+snapshot names this authority `releaseDecision`; measured release artifacts
+record the same boundary as `releaseDisposition`.
 
 ## Superseded decisions
 
@@ -158,10 +160,14 @@ Limitations:
 Implementation proceeds in dependency order:
 
 1. #135 implements and independently reproduces the grid-only lookup.
-2. #110 builds and measures the nine regional projection layers and records the
-   recovery gate.
-3. #48 may unlock Phase 1 only after the owner records an approved release
-   decision with all required automated evidence passing.
+2. #110 lands the reviewed builder and fixed workflows on `master`, then builds
+   and measures the nine regional projection layers on pinned Linux and macOS
+   ARM64 runners.
+3. An evidence-only pull request binds those trusted artifacts to the exact
+   source commit before the protected owner workflow records the disposition.
+4. #48 may unlock Phase 1 only after the owner records an approved release
+   disposition with all automated evidence passing and immutable decision
+   records committed.
 
 Rollback means keeping the projection release unpublished. It never means
 reviving the direct AR6-versus-terrain comparison or rewriting historical
@@ -175,5 +181,6 @@ evidence.
   documents point to this ADR and the four-state contract.
 - Tests reject tide-gauge fallback, interpolation, nodata substitution, changed
   source identity, weakened disclosure, or CI-as-approver semantics.
-- #135 and #110 remain blocking until their evidence exists; this decision
-  alone does not unlock Phase 1 or authorize publication.
+- #135 evidence is implemented; #110 remains blocking until trusted release
+  evidence and the owner disposition exist. This decision alone does not unlock
+  Phase 1 or authorize publication.

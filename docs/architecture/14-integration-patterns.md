@@ -39,7 +39,6 @@ flowchart LR
 | Boundary | Direction/time | Contract | Failure policy |
 |---|---|---|---|
 | IPCC AR6 | Inbound, build time | Pinned source URL/version, size, SHA-256, documented dimensions/units/licence | Fail build; never fall back to an unrecorded release |
-| Copernicus DEM/coastal data | Inbound, build time | Pinned product/version, CRS/datum/licence, size and SHA-256 | Fail build; no runtime acquisition |
 | GeoNames + alternate names | Inbound, build time | Pinned snapshot, feature-code policy, CC BY attribution, normalized schema | Fail build or explicitly quarantine invalid rows with counts |
 | Natural Earth | Inbound, build time | Pinned version/checksum and derived-geometry parameters | Fail geometry build |
 | Pipeline -> release | Internal, release time | Manifest/JSON Schema, static STAC, GeoParquet schemas, PMTiles/COG validation, provenance | Block publication on any incomplete or inconsistent contract |
@@ -83,14 +82,14 @@ silently switch scientific data inside a session.
 
 ### Analysis and visualization
 
-- Visual exposure layers are PMTiles archives addressable with HTTP ranges.
-- Exact binary assessment uses the corresponding lossless analysis COG until a
-  separately approved bit-exact PMTiles implementation replaces it.
-- Both representations derive from the same classified array and share bounds,
+- Visual projection layers are PMTiles archives addressable with HTTP ranges.
+- Exact projection lookup uses the corresponding three-band lossless analysis
+  COG; PMTiles is never a scientific lookup source.
+- Both representations derive from the same source-native array and share bounds,
   CRS/transform metadata, scenario, horizon, nodata, release, and checksum
   lineage.
-- Binary lookup uses nearest-neighbour semantics. Rendered colour is never read
-  as a scientific value.
+- Lookup selects the nearest native AR6 grid location within 100 km without
+  interpolation or fallback. Rendered colour is never read as a scientific value.
 - Static STAC describes discovery and provenance; there is no STAC API.
 
 ### Geography and search
@@ -180,14 +179,15 @@ The browser assessment order is stable:
 2. Return `UnsupportedGeography` outside the Europe support geometry.
 3. Return `OutOfScope` inside Europe but outside the coastal zone.
 4. Resolve the scenario/horizon artifact from the pinned manifest.
-5. Read the exact classified pixel.
-6. Map nodata, `1`, or `0` to `DataUnavailable`,
-   `ModeledExposureDetected`, or `NoModeledExposureDetected`.
+5. Select the nearest native AR6 grid location and read all three required
+   quantiles.
+6. Map a valid triplet to `ProjectionAvailable`; map excessive distance or
+   source nodata to the corresponding `DataUnavailable` reason.
 
 Technical failures do not masquerade as domain results. A missing uncached
 range, malformed manifest, checksum/schema mismatch, unsupported version, or
 network outage displays an explicit technical availability message. Domain
-states keep the meanings defined by ADR-021.
+states keep the meanings defined by ADR-024.
 
 The service worker namespaces caches by application and `dataReleaseId`.
 Previously loaded core data can work offline; the app does not promise that all

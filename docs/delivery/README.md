@@ -1,7 +1,7 @@
 # Static-First Migration Plan
 
-> **Status:** AR6 projection contract accepted; implementation and Phase 1 locked
-> **Last updated:** 2026-08-05
+> **Status:** AR6 projection implementation complete; trusted release evidence and Phase 1 locked
+> **Last updated:** 2026-08-06
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
 
 ## Purpose
@@ -18,8 +18,9 @@ The repository is currently in a transition state:
   browser-ready artifacts;
 - production migration has not started;
 - the binary Phase 0 investigation ended without a publishable release;
-- ADR-024 accepts a source-native AR6 projection contract, while #135 parity
-  evidence and the #110 regional release gate remain incomplete;
+- ADR-024 accepts a source-native AR6 projection contract and #135 parity is
+  complete, while #110 still requires trusted full-source builds and the
+  owner-controlled regional release disposition;
 - the current checked-in raster is demonstration data and must not be
   represented as a production scientific release.
 
@@ -99,17 +100,35 @@ Recovery follows this dependency order:
    nine regional projection layers and records the recovery gate.
 
 Only a zero-blocker #110 with passing automated evidence and a separate
-project-owner `releaseDecision=approved` may unlock
+project-owner `releaseDisposition=approved` may unlock
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48), Workstream 1,
 and Phase 1. Green CI cannot authorize that decision.
 
+The Phase 0R release sequence avoids self-referential evidence:
+
+1. merge the reviewed code and fixed workflows to `master` at source commit
+   `S`;
+2. manually run the pinned Linux and macOS ARM64 full-source jobs against `S`;
+3. merge an evidence-only pull request based exactly on `S` with the trusted
+   candidate bindings, receipts, timings, browser trace, reports, and gate;
+4. let the protected owner workflow verify the merge topology and trusted
+   artifacts before the owner records `releaseDisposition`;
+5. commit the immutable owner decision records before closing #110.
+
+The ADR-024 machine-contract snapshot calls its owner-authority field
+`releaseDecision`; measured release artifacts use `releaseDisposition`. They
+refer to the same owner-only authority boundary, not two independent approvals.
+
 Recovery exit evidence:
 
-- a source manifest with valid hashes and licences;
-- a regional fixture release using the public artifact layout;
-- offline golden locations covering projection, source nodata, inland, and
+- [x] a source manifest with valid hashes and licences;
+- [x] a regional fixture release using the public artifact layout;
+- [x] offline golden locations covering projection, source nodata, inland, and
   unsupported cases;
-- a written methodology decision with no unresolved publication blocker.
+- [x] Python/TypeScript and artifact parity for the exact grid-only contract;
+- [ ] dual-platform trusted full-source evidence with zero blockers;
+- [ ] protected project-owner `releaseDisposition=approved` and immutable
+  decision records.
 
 Source-lock operation, rights status, cache handling, and upstream incident
 response are documented in the

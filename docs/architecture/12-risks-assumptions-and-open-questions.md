@@ -1,7 +1,7 @@
 # Risks, Assumptions, and Open Questions
 
 > **Status:** Current migration register
-> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Authority:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
 > **Review rule:** Update evidence and disposition; do not silently convert an
 > assumption into a fact.
 >
@@ -31,7 +31,7 @@
 | R-04 | Browser exact lookup disagrees with the source-bound build values because of coordinate, location-ID, unit, quantile, or nodata differences | Low / Critical | #135 passed offline parity for seven real regional points, 189 q0.167/q0.5/q0.833 values, two scope controls, and synthetic nodata/distance/tie controls. Python and TypeScript agree bit-exactly on integer millimetres and source identity; metre output uses the fixed 1e-6 tolerance. Keep this as a permanent release regression gate. |
 | R-05 | Search indexes are too large or slow on mobile | Medium / High | Core/coastal shards, Brotli, lazy Web Worker load, representative mobile benchmarks, size/count report, deterministic ranking tests. |
 | R-06 | GeoNames misses, duplicates, or misclassifies settlements implied by “all coastal cities and villages” | High / High | Publish the operational definition, snapshot/date, feature-code rules, exclusions, corpus counts, duplicate/transcontinental QA, and limitations. |
-| R-07 | The approximate 25 km coastal zone is mistaken for flood reach | Medium / High | The deterministic v2 recipe, 27 named-place controls, topology invariant, and Copernicus Coastal Zones comparison are recorded. Keep product-scope language explicit; product-owner approval and release wording remain blocking. |
+| R-07 | The 25 km coastal product zone is mistaken for flood reach | Medium / High | The deterministic v2 recipe, 27 named-place controls, topology invariant, and prior comparison evidence are recorded. Keep product-scope language explicit: this scope filter is not modeled flood reach. |
 | R-08 | PMTiles plus analysis COGs exceed free storage or cause excessive R2 range operations | Medium / Medium | Regional size/request spike, range-locality measurement, cache tuning, release cost model, usage alerts; consolidate only after exact-lookup proof. |
 | R-09 | Service Worker mixes application and data releases | Medium / High | Namespace caches by app version and `dataReleaseId`; atomic activation; offline/mid-update tests; fail closed on mismatch. |
 | R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
@@ -42,24 +42,30 @@
 | R-15 | Relative AR6 change is compared directly with absolute terrain height | Inapplicable to ADR-024 / Historical Critical | ADR-024 prohibits terrain comparison and reports relative change directly. Tests must continue to reject any reintroduction of the legacy operation. |
 | R-16 | A geoid or vertical transform mixes model realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Inapplicable to ADR-024 / Historical Critical | The active path performs no geoid or vertical transform. Phase 0.10 remains immutable evidence for the superseded v1 path. |
 | R-17 | A DSM, HEM, MAE, or product accuracy target is treated as bare-earth terrain or a complete per-cell upper bound | Inapplicable to ADR-024 / Historical Critical | The active path consumes no terrain. Phase 0.11 remains immutable evidence and terrain cannot return without a new ADR. |
-| R-18 | Green CI or source-integrity checks are mistaken for scientific or release approval | Medium / Critical | The projection contract separates `automatedValidation` from the owner-controlled `releaseDecision`. Only the project owner may approve a zero-blocker #110 gate and unlock #48. |
+| R-18 | Green CI or source-integrity checks are mistaken for release approval | Medium / Critical | The projection contract separates `automatedValidation` from owner-controlled `releaseDisposition`. The ADR snapshot calls this authority `releaseDecision`; release artifacts use `releaseDisposition`. Only the project owner may approve a zero-blocker #110 gate and unlock #48. |
 | R-19 | An offshore mean-sea-surface grid, land filler, or ordinary tide-gauge record is treated as a datum-safe shoreline water reference | Inapplicable to ADR-024 / Historical Critical | ADR-024 does not construct an absolute water reference and prohibits tide-gauge fallback. Retain the v1 finding as historical evidence. |
 | R-20 | A global coastal DTM or multi-source mosaic is assumed to have finite European per-cell uncertainty from MAE/RMSE alone | Inapplicable to ADR-024 / Historical Critical | ADR-024 consumes no DTM or terrain uncertainty. Retain the v1 finding as historical evidence. |
 
+### Historical v1 risk disposition
+
+The following paragraph records why the binary v1 path stopped. Its terrain,
+datum, connectivity, and independent-review blockers are retired from the
+active product by ADR-024; the underlying evidence remains immutable.
+
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
-records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
-and R-13. It proves a small real COG and lookup/range mechanics, but closes none
-of those risks: datum compatibility, scientific controls, connectivity,
-canonical coastal scope, PMTiles, public hosting, and human review remain open.
+recorded the then-current blocked disposition for R-01, R-02, R-04, R-07,
+R-08, and R-13. It proved a small real COG and lookup/range mechanics, but did
+not close datum compatibility, scientific controls, connectivity, canonical
+coastal scope, PMTiles, public hosting, or human review.
 Phase 0.5 selects the vertical strategy but closes none of these measured or
-human-review risks by documentation alone. Phase 0.6 closes the exact-input
+human-review risks by documentation alone. Phase 0.6 closed the exact-input
 identity gap for R-01 and R-15 but does not lower the transformation or
 publication consequence. Phase 0.7 removes the direct-comparison implementation
-path and makes every remaining vertical blocker machine-readable; it does not
-lower R-16 until numerical controls and independent review pass.
+path and made every remaining vertical blocker machine-readable; it did not
+lower R-16 because numerical controls and independent review did not pass.
 Phase 0.8 selects terrain, product-scope, and connectivity candidates and adds
-executable controls. It reduces implementation ambiguity but does not close
-R-02, R-07, or R-17 without the named external reviews and regional evidence.
+executable controls. It reduced implementation ambiguity but did not close
+R-02, R-07, or R-17 under that historical method.
 Phase 0.9 attempted the exact nine-layer matrix and stopped before arrays. Its
 explicit blocked decision prevents R-13 and R-18 from being hidden by a green
 build, but R-02, R-04, R-07, R-08, R-16, and R-17 remain open because the
@@ -70,14 +76,14 @@ re-evaluation without rewriting it.
 Phase 0.11 quantifies the finite source terms but confirms that coastal SLA
 representativeness and DSM-to-bare-earth error are not finitely bounded by the
 locked evidence. The automated recommendation is therefore `rejected`, not
-`approved`; the independent review remains pending, so the authoritative
-disposition and publication gate remain `blocked` and a superseding method is
-required.
+`approved`; independent review was never obtained, so the authoritative
+disposition and publication gate ended `blocked` and required a superseding
+method.
 Phase 0.14 remains the immutable binary-path no-go. ADR-024 completes #106's
 contract decision without reinterpreting that evidence. #135 has now passed
 offline source/implementation parity and lowers R-01 and R-04 to permanent
 regression risks. Recovery proceeds through #110; only its measured artifacts
-and an explicit project-owner release decision may unlock #48.
+and an explicit project-owner release disposition may unlock #48.
 
 ## Assumptions that require evidence
 
@@ -116,9 +122,10 @@ new ADR.
 Do not remove the old runtime implementation or present the static path as the
 validated production product until all of these are true:
 
-- real IPCC, Copernicus DEM, and coastal source snapshots pass licence and
-  source-shape review;
-- a representative regional pipeline passes independent scientific controls;
+- real IPCC, GeoNames, and Natural Earth source snapshots pass licence and
+  source-shape review for the release that consumes them;
+- the AR6 release passes the trusted dual-platform source, artifact, browser,
+  and owner-disposition controls defined by #110;
 - Python and TypeScript exact lookup are bit-exact for approved fixtures;
 - browser, artifact, offline, performance, and accessibility gates pass;
 - staging proves public byte-range/CORS/cache behaviour;
@@ -126,13 +133,10 @@ validated production product until all of these are true:
 - rollback to a known application/release pair has been tested;
 - current cost and source limitations are visible on `/about/architecture`.
 
-If the scientific spike invalidates the binary methodology, pause the
-Europe-wide build and write a superseding ADR. Simpler infrastructure never
-overrides scientific correctness.
-
-That stop condition fired for binary exposure. Keep Phase 1 paused through
-#135 and #110. Passing CI records automated validation only; the project owner
-must separately approve the zero-blocker release decision before #48 unlocks.
+The scientific stop condition already fired for binary exposure; ADR-024 is its
+superseding decision. Keep Phase 1 paused through #110. Passing CI records
+automated validation only; the project owner must separately approve the
+zero-blocker `releaseDisposition` before #48 unlocks.
 
 ## Risk review cadence
 

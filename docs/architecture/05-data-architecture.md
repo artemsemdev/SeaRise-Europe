@@ -29,7 +29,7 @@ flowchart LR
 
 | Realm | Content | Location | Writer | Runtime reader |
 |---|---|---|---|---|
-| Source cache | Original IPCC, Copernicus, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
+| Source cache | Original IPCC, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
 | Build workspace | Normalized arrays, temporary rasters, DuckDB files, intermediate tables | Ephemeral local/CI workspace | Offline pipeline | None |
 | Release artifacts | Manifest, config, boundaries, search indexes, COG, PMTiles, GeoParquet, STAC, provenance | Versioned static host/object storage | Controlled publish job | Browser and reviewers |
 | Browser cache | App shell, config, search indexes, and requested byte ranges | User device | Service worker/browser | Browser only |
@@ -117,16 +117,16 @@ The UI must display the release and methodology used for every assessment.
 ### 4.3 Raster artifacts
 
 Each scenario/horizon produces two derived views of the same validated,
-classified source array:
+source-native projection array:
 
 | Artifact | Purpose | Contract |
 |---|---|---|
-| Analysis COG | Exact nearest-neighbour pixel lookup | Lossless class values `0`, `1`, or nodata; valid COG; fixed CRS/grid recorded in manifest |
+| Analysis COG | Exact nearest-grid projection lookup | Lossless Int16 millimetres for q0.167, q0.5, and q0.833 plus nodata; valid COG; fixed CRS/grid recorded in manifest |
 | Visual PMTiles | Efficient overlay rendering | Byte-range readable; visually consistent with the analysis COG; never interpreted from rendered colours |
 
-`0` maps to `NoModeledExposureDetected`, `1` to
-`ModeledExposureDetected`, and nodata to `DataUnavailable`. The COG remains the
-scientific lookup source until a later ADR proves bit-exact lookup from PMTiles.
+All three required quantiles map to `ProjectionAvailable`; source nodata or a
+nearest location beyond the 100 km guardrail maps to `DataUnavailable`. The
+COG is the scientific lookup source and PMTiles remains visual-only.
 
 ### 4.4 Boundaries and analytical tables
 
@@ -207,7 +207,7 @@ and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
 - Raw files are not published by default; redistribution must be explicitly
   permitted.
 - Every derivative maps to its source, licence, attribution, and checksum.
-- IPCC AR6, Copernicus, GeoNames, Natural Earth, and basemap attribution follow
+- IPCC AR6, GeoNames, Natural Earth, and basemap attribution follow
   the exact terms recorded in the release manifest.
 - Source and artifact SHA-256 values are verified before use and after upload.
 - The browser rejects an unsupported manifest schema or mismatched pinned

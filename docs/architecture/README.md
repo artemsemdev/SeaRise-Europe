@@ -1,18 +1,18 @@
 # Architecture Documentation
 
 > **Status:** Current for the accepted target architecture
-> **Last reviewed:** 2026-08-04
-> **Authoritative decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Last reviewed:** 2026-08-06
+> **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md)
 
 ## Architecture in one paragraph
 
 SeaRise Europe is becoming a static geospatial data product. A reproducible
-offline pipeline acquires pinned IPCC, Copernicus, GeoNames, and Natural Earth
+offline pipeline acquires pinned IPCC, GeoNames, and Natural Earth
 snapshots; validates and packages immutable COG, PMTiles, GeoParquet, JSON, and
 STAC artifacts; and publishes them with checksums and signed provenance. A
 static React browser application searches settlements, validates scope, and
-calculates one of five result states locally. Production has no application
-API, runtime database, tile server, or geocoding service.
+returns one of four projection result states locally. Production has no
+application API, runtime database, tile server, or geocoding service.
 
 ```mermaid
 flowchart LR
@@ -64,7 +64,7 @@ Read in this order:
 | [10 — Testing Strategy](10-testing-strategy.md) | Scientific, contract, artifact, browser, offline, accessibility, and parity gates |
 | [11 — Decision Register](11-architecture-decisions.md) | Compact list of active and superseded decisions |
 | [12 — Risks and Open Questions](12-risks-assumptions-and-open-questions.md) | Current uncertainty and required exit evidence |
-| [13 — Domain Model](13-domain-model.md) | Five result states and browser/pipeline domain contracts |
+| [13 — Domain Model](13-domain-model.md) | Four projection result states and browser/pipeline domain contracts |
 | [14 — Integration Patterns](14-integration-patterns.md) | Build ingestion, publication, HTTPS artifact contracts, basemap boundary |
 | [15 — Performance and Scalability](15-performance-and-scalability.md) | Browser/CDN budgets, caching, range requests, and cost controls |
 | [16 — Geospatial Pipeline](16-geospatial-data-pipeline.md) | Real-data workflow, settlement index, reproducibility, and validation |
@@ -98,14 +98,13 @@ target architecture without executable evidence.
 - Scenarios: `ssp1-26`, `ssp2-45`, `ssp5-85`.
 - Horizons: `2030`, `2050`, `2100`.
 - Defaults: `ssp2-45`, `2050`.
-- Result states: `ModeledExposureDetected`,
-  `NoModeledExposureDetected`, `DataUnavailable`, `OutOfScope`, and
+- Result states: `ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, and
   `UnsupportedGeography`.
 - Normal runtime API calls: zero.
 - Data selection: one pinned `dataReleaseId` per application session.
 - Published releases: immutable and checksum-addressable.
-- Binary assessment: exact nearest-neighbour class lookup, never rendered
-  colour sampling.
+- Projection lookup: nearest native AR6 grid location within 100 km, with no
+  interpolation, fallback, or rendered-colour sampling.
 - Search: local qualifying records from a declared GeoNames snapshot.
 
 ## Deliberately removed documents

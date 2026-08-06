@@ -1,27 +1,29 @@
 # 13 — Domain Model
 
 > **Status:** Accepted
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md)
 > **Scope:** Browser and pipeline domain contracts, independent of UI, hosting provider, and storage layout
 
 ## Domain question
 
 SeaRise Europe answers:
 
-> Is this supported coastal coordinate modeled as exposed to sea-level rise
-> under the selected scenario and time horizon in this data release?
+> How much does IPCC AR6 project regional relative sea level to change near
+> this supported coastal coordinate under the selected scenario and horizon?
 
-The answer is a classification derived from precomputed scientific artifacts.
-It is not a flood probability, a property-level forecast, a safety guarantee,
-or an adaptation recommendation.
+The answer reports the source median and medium-confidence likely range from a
+precomputed release. It is not a flood or exposure classification, absolute
+water level, property-level forecast, safety guarantee, or adaptation
+recommendation.
 
 The domain has four concerns:
 
 1. **Release identity** — which immutable data and methodology are in use?
 2. **Geography** — is the coordinate supported and within coastal scope?
-3. **Data availability** — is the classified scientific value available at
-   that coordinate?
-4. **Exposure classification** — is the exact value exposed or not exposed?
+3. **Source selection** — which nearest native AR6 grid location is within the
+   100 km product guardrail?
+4. **Projection availability** — are all three required source quantiles
+   available at that location?
 
 ## Aggregate and entity overview
 
@@ -43,7 +45,7 @@ classDiagram
         +HorizonYear year
         +bool isDefault
     }
-    class ExposureDataset {
+    class ProjectionDataset {
         +ScenarioId scenarioId
         +HorizonYear horizon
         +ArtifactRef analysis
@@ -75,10 +77,10 @@ classDiagram
 
     DataRelease "1" *-- "3" Scenario
     DataRelease "1" *-- "3" TimeHorizon
-    DataRelease "1" *-- "9" ExposureDataset
+    DataRelease "1" *-- "9" ProjectionDataset
     DataRelease "1" *-- "1" SupportGeometry
-    ExposureDataset --> Scenario
-    ExposureDataset --> TimeHorizon
+    ProjectionDataset --> Scenario
+    ProjectionDataset --> TimeHorizon
     Place --> AssessmentQuery : selected as
     AssessmentQuery --> AssessmentResult : evaluates to
     DataRelease --> AssessmentResult : identifies
@@ -99,7 +101,7 @@ DataRelease {
   gitCommit:            GitCommit
   scenarios:            Scenario[3]
   horizons:             TimeHorizon[3]
-  exposureDatasets:     ExposureDataset[9]
+  projectionDatasets:   ProjectionDataset[9]
   supportGeometry:      SupportGeometry
   settlementCatalog:    SettlementCatalogRef
   sources:              SourceSnapshot[]
@@ -156,39 +158,39 @@ Exactly one horizon is default: `2050`.
 MethodologyVersion {
   id:                    string
   projectionSource:      SourceRef
-  elevationSource:       SourceRef
   coastalGeometrySource: SourceRef
-  classificationRule:    string
-  coordinateReference:   string
-  verticalDatum:         string
+  lookupRule:            string
+  baseline:              string
+  confidence:            string
   resolution:            string
   limitations:           string[]
 }
 ```
 
 The version identifies the complete scientific method, not only the UI copy.
-Changing data interpretation, coastal connectivity, vertical datum, or the
-classification algorithm requires a new methodology version and release.
+Changing data interpretation, source-grid selection, distance guardrail,
+quantiles, baseline, or scope semantics requires a new methodology version and
+release.
 
-### ExposureDataset
+### ProjectionDataset
 
-One precomputed scientific dataset and one visual representation for a
+One exact scientific dataset and one visual representation for a
 scenario/horizon pair.
 
 ```text
-ExposureDataset {
+ProjectionDataset {
   scenarioId:       ScenarioId
   horizon:          HorizonYear
   methodology:      MethodologyVersionId
-  analysisArtifact: ArtifactRef    // exact classified lookup, normally COG
+  analysisArtifact: ArtifactRef    // exact q0.167/q0.5/q0.833 lookup, normally COG
   visualArtifact:   ArtifactRef    // map rendering, normally PMTiles
   legend:           LegendSpec
   bounds:           BoundingBox
 }
 ```
 
-The analysis and visual artifacts are two views of the same classified source
-array. A scientific result must not be inferred from a visual colour or an
+The analysis and visual artifacts are two views of the same source-native AR6
+grid. A scientific result must not be inferred from a visual colour or an
 interpolated value.
 
 ### ArtifactRef
@@ -273,16 +275,25 @@ GeographyClassification =
 ```
 
 Europe support is evaluated before coastal scope. Both geometries belong to the
-same data release as the selected exposure dataset.
+same data release as the selected projection dataset.
 
-### ClassifiedValue
+### ProjectionValue
 
 ```text
-ClassifiedValue = Exposed | NotExposed | NoData
+ProjectionValue {
+  sourceLocationId:          integer
+  sourceLocation:            Coordinates
+  sourceDistanceKilometres:  number
+  lowerMillimetres:          integer
+  medianMillimetres:         integer
+  upperMillimetres:          integer
+}
 ```
 
-The reader uses exact nearest-neighbour semantics. Bilinear interpolation and
-display-colour sampling are forbidden for this binary classification.
+The reader selects the nearest native grid location by unrounded Haversine
+distance, breaks exact ties by lowest source location ID, and accepts a
+location only within 100 km. Interpolation, extrapolation, tide-gauge fallback,
+nodata substitution, and display-colour sampling are forbidden.
 
 ### ResultState
 
@@ -290,8 +301,7 @@ The result vocabulary is fixed and exhaustive:
 
 ```text
 ResultState =
-  | ModeledExposureDetected
-  | NoModeledExposureDetected
+  | ProjectionAvailable
   | DataUnavailable
   | OutOfScope
   | UnsupportedGeography
@@ -301,9 +311,8 @@ Meanings:
 
 | Result state | Meaning |
 |---|---|
-| `ModeledExposureDetected` | Supported coastal coordinate; classified value is exposed for the selected scenario/horizon/release. |
-| `NoModeledExposureDetected` | Supported coastal coordinate; classified value is not exposed for the selected scenario/horizon/release. |
-| `DataUnavailable` | Supported coastal coordinate; the scientific artifact contains nodata or explicitly unavailable data at that coordinate. |
+| `ProjectionAvailable` | Supported coastal coordinate; all three AR6 quantiles are available at the selected source-grid location within 100 km. |
+| `DataUnavailable` | Supported coastal coordinate; the nearest source location is farther than 100 km or at least one required quantile is source nodata. |
 | `OutOfScope` | Coordinate is within the Europe support geometry but outside the versioned coastal analysis zone. |
 | `UnsupportedGeography` | Coordinate is outside the Europe support geometry. |
 
@@ -324,6 +333,10 @@ AssessmentResult {
   query:              AssessmentQuery
   resultState:        ResultState
   methodologyVersion: MethodologyVersionId
+  projection:         ProjectionValue?
+  baseline:           "1995-2014 mean"?
+  confidence:         "medium"?
+  nativeResolution:   "1 degree"?
   evaluatedAt:        Instant
   analysisArtifact:   ArtifactRef?
   visualArtifact:     ArtifactRef?
@@ -331,7 +344,10 @@ AssessmentResult {
 }
 ```
 
-The result always echoes the complete selection and methodology version.
+The result always echoes the complete selection and methodology version. A
+`ProjectionAvailable` result includes the source location and distance, exact
+integer millimetres, published metres, baseline, confidence family, and native
+resolution.
 Artifact references are present only when appropriate to the outcome and
 presentation. They always belong to the same release.
 
@@ -353,14 +369,16 @@ assess(query, release):
     return OutOfScope
 
   dataset = release.dataset(query.scenarioId, query.horizon)
-  value = readNearestClassifiedValue(dataset.analysisArtifact, query.location)
+  location = selectNearestAr6GridLocation(query.location)
 
-  if value == NoData:
-    return DataUnavailable
-  if value == Exposed:
-    return ModeledExposureDetected
-  if value == NotExposed:
-    return NoModeledExposureDetected
+  if location.distanceKilometres > 100:
+    return DataUnavailable(source-location-too-distant)
+
+  projection = readRequiredQuantiles(dataset.analysisArtifact, location)
+  if projection contains source nodata:
+    return DataUnavailable(source-value-nodata)
+
+  return ProjectionAvailable(projection, location)
 ```
 
 No alternative scenario, horizon, layer, or release is substituted. Missing or
@@ -375,21 +393,22 @@ flowchart TD
     E{Inside Europe support?}
     C{Inside coastal zone?}
     D[Resolve exact dataset]
-    P{Nearest classified value}
+    P{Nearest grid location within 100 km?}
+    V{All required quantiles available?}
     UG[UnsupportedGeography]
     OS[OutOfScope]
     DU[DataUnavailable]
-    ME[ModeledExposureDetected]
-    NM[NoModeledExposureDetected]
+    PA[ProjectionAvailable]
 
     Q --> E
     E -- No --> UG
     E -- Yes --> C
     C -- No --> OS
     C -- Yes --> D --> P
-    P -- nodata --> DU
-    P -- 1 --> ME
-    P -- 0 --> NM
+    P -- No --> DU
+    P -- Yes --> V
+    V -- No --> DU
+    V -- Yes --> PA
 ```
 
 ## Search ranking contract
@@ -447,15 +466,15 @@ result is discarded because it no longer matches the current selection token.
 
 | Term | Definition |
 |---|---|
-| Assessment | Deterministic classification of one selection against one immutable release. |
-| Modeled exposure | Binary output of the published scientific method; not observed flooding or probability. |
+| Assessment | Deterministic projection lookup for one selection against one immutable release. |
+| Regional relative sea-level projection | AR6 change relative to the 1995–2014 mean at the selected native grid location; not an absolute water level, flooding, exposure, or probability. |
 | Europe support geometry | Versioned boundary deciding whether a coordinate is supported. |
 | Coastal analysis zone | Versioned product-scope geometry; initially the documented 25 km approximation pending source validation. |
 | Data release | Immutable aggregate of artifacts, metadata, source records, quality evidence, and methodology. |
-| Analysis artifact | Lossless artifact used for exact classified lookup. |
+| Analysis artifact | Lossless artifact used for exact q0.167/q0.5/q0.833 projection lookup. |
 | Visual artifact | Map-optimized representation used for display. |
 | Settlement catalog | Versioned, normalized set of qualifying GeoNames populated places. |
-| Domain result | One of the five fixed `ResultState` values. |
+| Domain result | One of the four fixed `ResultState` values. |
 | Technical error | Delivery or execution failure that must never be disguised as a domain result. |
 
 ## Migration note

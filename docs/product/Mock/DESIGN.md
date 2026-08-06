@@ -72,9 +72,10 @@ from the classified analysis artifact declared by the active immutable release.
 - Deep Atlantic blue establishes the environmental context.
 - Off-white terrain and panels create editorial contrast.
 - Teal supports neutral interactive emphasis and selected locations.
-- Amber communicates modeled exposure cautiously; it is not an emergency red.
-- Green/teal for no modeled exposure must always be paired with language that
-  explicitly rejects a safety guarantee.
+- Teal and blue may encode the visual projection scale, but colour must not
+  imply a flood threshold or replace the numeric median and likely range.
+- Available projection styling must always be paired with language that rejects
+  flooding, exposure, property-risk, and safety interpretations.
 - Neutral grey communicates missing data and technical uncertainty.
 - Violet may distinguish scope boundaries without implying hazard severity.
 
@@ -116,13 +117,12 @@ Typography must remain bundled or self-hosted in the implemented static app.
 
 ### Result states
 
-The production UI must cover all five domain outcomes:
+The production UI must cover all four domain outcomes:
 
-1. `ModeledExposureDetected`
-2. `NoModeledExposureDetected`
-3. `DataUnavailable`
-4. `OutOfScope`
-5. `UnsupportedGeography`
+1. `ProjectionAvailable`
+2. `DataUnavailable`
+3. `OutOfScope`
+4. `UnsupportedGeography`
 
 Technical artifact, range, integrity, manifest, browser, and offline failures are
 separate presentations and must never be converted into a scientific result.
@@ -130,8 +130,9 @@ separate presentations and must never be converted into a scientific result.
 ### Methodology and release evidence
 
 - Progressive disclosure keeps the primary result concise.
-- Expanded content identifies methodology version, `dataReleaseId`, class value,
-  lookup method, artifact, source status, limitations, and disclaimer.
+- Expanded content identifies methodology version, `dataReleaseId`, AR6 median
+  and likely range, selected source-grid identity and distance, lookup method,
+  artifact, source status, limitations, and disclaimer.
 - The dedicated methodology surface adds exact sources, licences, processing
   steps, STAC, checksums, and provenance.
 
