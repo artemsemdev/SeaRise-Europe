@@ -81,6 +81,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Pinned the macOS ARM64 Tippecanoe reference build to the hosted Xcode 15.4
+  environment and added a lightweight release-change preflight so toolchain
+  drift fails before the full AR6 evidence build downloads source data.
 - Restored the macOS ARM64 trusted evidence producer with a supported,
   hash-locked CPython 3.11 runtime after GitHub retired Python 3.9 from that
   hosted runner.

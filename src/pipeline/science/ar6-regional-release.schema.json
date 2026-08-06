@@ -67,8 +67,17 @@
           "buildCommand": ["make", "-j4", "tippecanoe", "tippecanoe-decode"],
           "referenceBuilds": {
             "darwin-arm64": {
-              "tippecanoeBinarySha256": "12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92",
-              "decodeBinarySha256": "d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076"
+              "tippecanoeBinarySha256": "ef2b87f55ffe31296a436b2bcdaf3a68fa63f2a5ee1c9ce22ec36853c4f442ce",
+              "decodeBinarySha256": "5e99aef7cbbc514af3fb14e615b71d07fc69faba870560bbd91a3b96aced9436",
+              "buildEnvironment": {
+                "architecture": "arm64",
+                "buildRecipePath": "src/pipeline/toolchain/build_macos_tippecanoe.sh",
+                "buildRecipeSha256": "143cfd23ca2f051c60cc1221122236d4cb4305a554ca6fe44d66bec164432bc9",
+                "compiler": "Apple clang version 15.0.0 (clang-1500.3.9.4)",
+                "sdkVersion": "14.5",
+                "xcodeBuild": "15F31d",
+                "xcodeVersion": "15.4"
+              }
             },
             "linux-x86_64": {
               "tippecanoeBinarySha256": "a70bb67594919b0eae357ec4678c77f5c3b9d4a277bd11046e4d9d03b1c6c426",
