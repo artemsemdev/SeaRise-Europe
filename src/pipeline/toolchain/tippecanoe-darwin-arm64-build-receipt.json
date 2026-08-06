@@ -5,11 +5,19 @@
     "tippecanoe",
     "tippecanoe-decode"
   ],
+  "buildEnvironment": {
+    "architecture": "arm64",
+    "buildRecipePath": "src/pipeline/toolchain/build_macos_tippecanoe.sh",
+    "buildRecipeSha256": "e41a9a140e76d50ea31b680d5f13b838ea0e119976e345c2cc021e638be71631",
+    "compiler": "Apple clang version 15.0.0 (clang-1500.3.9.4)",
+    "xcodeBuild": "15F31d",
+    "xcodeVersion": "15.4"
+  },
   "commit": "68ab8dcc229f95b8b25877697d5e8d66783af503",
-  "decodeBinarySha256": "d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076",
+  "decodeBinarySha256": "bf325d0f5690a7b04331415b515985e0005fa0ab910b8b2896a02b143b0ff4e1",
   "platform": "darwin-arm64",
   "schemaVersion": 1,
   "sourceSha256": "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d",
-  "tippecanoeBinarySha256": "12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92",
+  "tippecanoeBinarySha256": "7dcff52ee5afd7bdd8ec48a609198782575df3d3cfb54c8d5bdcfa3b66909dc4",
   "version": "2.79.0"
 }

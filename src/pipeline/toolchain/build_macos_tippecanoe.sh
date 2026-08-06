@@ -28,6 +28,7 @@ cc="$(xcrun --find clang)"
 cxx="$(xcrun --find clang++)"
 
 xcodebuild -version
+printf 'macOS SDK %s\n' "$(xcrun --sdk macosx --show-sdk-version)"
 "${cxx}" --version | head -n 1
 make -C "${build_root}" -j4 CC="${cc}" CXX="${cxx}" tippecanoe tippecanoe-decode
 

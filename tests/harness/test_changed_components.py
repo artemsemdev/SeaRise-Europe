@@ -319,9 +319,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("needs.changes.outputs.release == 'true'", preflight)
         self.assertIn("inputs.release_evidence != true", preflight)
         self.assertIn("runs-on: macos-14", preflight)
-        self.assertIn("scripts/ci/build_macos_tippecanoe.sh", preflight)
+        self.assertIn("src/pipeline/toolchain/build_macos_tippecanoe.sh", preflight)
         self.assertIn("tippecanoe-darwin-arm64-build-receipt.json", preflight)
-        self.assertIn("scripts/ci/build_macos_tippecanoe.sh", producer)
+        self.assertIn("src/pipeline/toolchain/build_macos_tippecanoe.sh", producer)
 
     def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:
         workflow = (

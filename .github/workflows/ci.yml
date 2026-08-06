@@ -261,7 +261,7 @@ jobs:
 
       - name: Build and verify pinned Tippecanoe
         run: |
-          scripts/ci/build_macos_tippecanoe.sh \
+          src/pipeline/toolchain/build_macos_tippecanoe.sh \
             "${RUNNER_TEMP}/tippecanoe-2.79.0.tar.gz" \
             "${RUNNER_TEMP}/ar6-tools"
           jq -r '
@@ -516,7 +516,7 @@ jobs:
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ${{ runner.temp }}/ar6-tools
-          key: ar6-evidence-tools-darwin-arm64-${{ hashFiles('src/pipeline/science/ar6-regional-release.json', 'src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json', 'scripts/ci/build_macos_tippecanoe.sh') }}
+          key: ar6-evidence-tools-darwin-arm64-${{ hashFiles('src/pipeline/science/ar6-regional-release.json', 'src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json', 'src/pipeline/toolchain/build_macos_tippecanoe.sh') }}
 
       - name: Build and verify pinned Tippecanoe
         run: |
@@ -529,15 +529,12 @@ jobs:
               https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz
           fi
           if [[ ! -x "${tool_cache}/tippecanoe" || ! -x "${tool_cache}/tippecanoe-decode" ]]; then
-            scripts/ci/build_macos_tippecanoe.sh "${source_archive}" "${tool_cache}"
+            src/pipeline/toolchain/build_macos_tippecanoe.sh "${source_archive}" "${tool_cache}"
           fi
-          printf '%s  %s\n' \
-            12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92 \
-            "${tool_cache}/tippecanoe" \
-            | shasum -a 256 -c -
-          printf '%s  %s\n' \
-            d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076 \
-            "${tool_cache}/tippecanoe-decode" \
+          jq -r '
+            .tippecanoeBinarySha256 + "  ${{ runner.temp }}/ar6-tools/tippecanoe",
+            .decodeBinarySha256 + "  ${{ runner.temp }}/ar6-tools/tippecanoe-decode"
+          ' src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json \
             | shasum -a 256 -c -
 
       - name: Acquire and verify pinned go-pmtiles
