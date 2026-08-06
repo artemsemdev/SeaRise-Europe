@@ -53,35 +53,26 @@ pipeline cannot answer:
    browser memory.
 8. Complete redistribution and attribution review.
 
-A failed or ambiguous result stops publication. If it invalidates methodology
-v1.0, the methodology and ADR must be superseded before Europe-wide output is
-built.
+The [Phase 0.14 gate](../evidence/phase-0-14-final-no-go.md) preserves the
+terminal v1 binary result as `complete-with-no-go`. Permanent regression tests
+continue rejecting direct AR6-relative-versus-absolute-terrain comparison and
+any attempt to reinterpret that evidence as approved.
 
-The [Phase 0.9 gate](../evidence/phase-0-9-regional-gate.md) completed with an
-explicit `BLOCKED` decision: all nine combinations have exact preflight lineage
-but no arrays or artifacts. The later
-[Phase 0.14 gate](../evidence/phase-0-14-final-no-go.md) completed the
-investigation as `complete-with-no-go`. Issue #95's automated recommendation
-is `rejected`, while the authoritative scientific and release disposition
-remains `blocked` because independent review is pending.
-
-Recovery tests follow the dependency chain
+The active recovery chain is
 [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) →
-([#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107),
-[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108)) →
-[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) →
-[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Before an
-independently reviewed `approved` #110 with zero blockers:
+[#135](https://github.com/artemsemdev/SeaRise-Europe/issues/135) →
+[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). #135 has
+completed the independent-reader and Python/TypeScript lookup parity scope.
+#110 remains locked until:
 
-- v1 contract tests must continue rejecting release artifacts and direct
-  AR6-relative-versus-absolute-terrain comparison;
-- missing or unbounded MSS, DTM, transformation, mask, licence, or review
-  evidence must produce `DataUnavailable` or stop preflight;
-- blocked preflight must emit no all-nodata, synthetic, or placeholder release;
-- CI may validate hashes and invariants but may not populate or approve an
-  independent review;
+- both pinned Linux and macOS ARM64 jobs build the exact same source commit;
+- candidate digests and exact scientific values agree;
+- the committed evidence-only delta contains the trusted receipts, timings,
+  raw browser trace, reports, checksums, and zero-blocker automated gate;
+- a protected workflow verifies the `master@S` build and `S → E` evidence-only
+  merge topology before the project owner records `releaseDisposition`;
 - [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48) and Phase 1
-  remain locked.
+  remain locked until that disposition is `approved`.
 
 ## 3. Test layers
 
@@ -91,8 +82,9 @@ Pure functions and small fixture files cover:
 
 - source metadata parsing, URL pinning, and SHA-256 verification;
 - CRS and coordinate normalization;
-- grid alignment, nearest-neighbour class resampling, and nodata propagation;
-- binary result classification;
+- source-grid identity, Haversine distance, lowest-ID tie-break, and the
+  inclusive 100 km guardrail;
+- exact q0.167/q0.5/q0.833 integer values and nodata propagation;
 - shoreline distance and spatial predicates;
 - GeoNames feature-code filters, normalization, aliases, and deduplication;
 - deterministic search ranking;
@@ -114,8 +106,9 @@ Generated inputs exercise:
 - deterministic tie-breaking for equal search scores;
 - cache/release namespace isolation.
 
-Binary class lookup always uses nearest-neighbour semantics. Tests fail if an
-interpolation path invents a fractional class.
+Projection lookup always uses the native grid without interpolation or
+fallback. Tests fail if an alternate location or invented fractional value is
+substituted.
 
 ### 3.3 Data-contract tests
 
@@ -137,15 +130,15 @@ must reconcile with the pinned source snapshot.
 
 Required checks include:
 
-- approved exposed, non-exposed, nodata, inland, and unsupported control
-  locations;
-- known coastal cities, small villages, islands, ports, estuaries, and low
-  terrain;
+- independently extracted real-source projection values, source-nodata
+  mutation controls, inland, and unsupported locations;
+- known coastal cities, small villages, islands, ports, estuaries, and all four
+  European basin contexts;
 - source-unit and plausible-range checks before calculation;
-- raster bounds, dimensions, transform, CRS, class domain, nodata, and coverage;
+- raster bounds, dimensions, transform, CRS, band order, integer values,
+  nodata, and coverage;
 - topology validity for support/coastal geometry;
-- connectivity checks designed to reveal isolated inland exposure;
-- scenario/horizon monotonicity checks only where scientifically justified;
+- source-location identity and distance checks across runtimes and artifacts;
 - summary-statistic and spatial-difference reports against the prior release.
 
 Large changes are review evidence, not automatically failures. They must be
@@ -157,7 +150,8 @@ For every published candidate:
 
 - validate analysis GeoTIFFs as Cloud-Optimized GeoTIFFs;
 - run PMTiles structural verification and sample tiles at multiple zooms;
-- prove visual PMTiles classes agree with the corresponding COG samples;
+- prove PMTiles and GeoParquet integer values and source IDs agree exactly with
+  the corresponding COG cells;
 - compare local and uploaded sizes and SHA-256 values;
 - issue `HEAD` and partial `GET` requests and verify `Accept-Ranges`,
   `Content-Range`, `ETag`, cache headers, and allowed CORS origin;
@@ -253,15 +247,18 @@ current summary on `/about/architecture`.
 
 1. **Fast checks:** format, lint, type check, unit, property, schema, and small
    artifact tests.
-2. **Regional candidate:** after #106–#109 provide approved inputs, #110 runs
-   the reference-region transform, shared golden tests, browser parity, and
-   performance budgets; a failed preflight emits no substitute artifacts.
-3. **Full release build:** all sources and nine layer combinations, full data
-   QA, diff report, inventory, STAC, provenance, and signatures.
-4. **Staged delivery:** upload immutable prefix; verify hashes, range requests,
-   headers, CORS, and browser smoke tests from the public origin.
-5. **Promotion:** approval only after the required independent evidence review;
-   retain the prior app/release pair for rollback.
+2. **Regional candidate:** fixture and source-replay tests exercise the nine
+   layer combinations, exact parity, browser lookup, and budgets.
+3. **Trusted full-source build:** after code/workflows reach `master@S`, pinned
+   Linux and macOS ARM64 jobs independently build the same locked source.
+4. **Evidence-only merge:** commit the trusted candidate bindings, receipts,
+   timings, raw browser trace, reports, automated gate, and checksums on a head
+   based exactly on `S`.
+5. **Owner promotion:** a protected workflow verifies source/run/artifact
+   provenance and the `S → E` merge topology before recording the project
+   owner's disposition. Permanent decision records follow in Git.
+6. **Phase 1 delivery:** later work adds public-origin headers/CORS checks,
+   SLSA/Cosign evidence, activation, and rollback.
 
 A waiver must identify the failed budget, measured regression, rationale,
 owner, and expiry date. Scientific, integrity, licence, scenario completeness,
