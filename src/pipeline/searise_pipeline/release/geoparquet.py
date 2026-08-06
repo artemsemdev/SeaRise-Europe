@@ -14,19 +14,7 @@ from searise_pipeline.science.contracts import ScienceContractError
 
 from .model import RegionalReleaseSource
 
-# Arrow 16 can serialize equivalent schema metadata differently across CPU
-# architectures. Pin the metadata-free logical schema; GeoParquet semantics
-# remain in the canonical `geo` footer metadata below.
-_CANONICAL_ARROW_SCHEMA = (
-    b"/////8gBAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAAcAAABoAQAA"
-    b"HAEAANwAAACkAAAAbAAAADQAAAAEAAAAxP7//wAAAQQQAAAAHAAAAAQAAAAAAAAACAAAAGdlb21ldHJ5"
-    b"AAAAALT+///w/v//AAABAhAAAAAcAAAABAAAAAAAAAAIAAAAdXBwZXJfbW0AAAAALP///wAAAAEQAAAA"
-    b"JP///wAAAQIQAAAAHAAAAAQAAAAAAAAACQAAAG1lZGlhbl9tbQAAAGD///8AAAABEAAAAFj///8AAAECEAAA"
-    b"ABwAAAAEAAAAAAAAAAgAAABsb3dlcl9tbQAAAACU////AAAAARAAAACM////AAABAhAAAAAkAAAABAAA"
-    b"AAAAAAASAAAAc291cmNlX2xvY2F0aW9uX2lkAADQ////AAAAAUAAAADI////AAABAhAAAAAgAAAABAAA"
-    b"AAAAAAAHAAAAaG9yaXpvbgAIAAwACAAHAAgAAAAAAAABEAAAABAAFAAIAAYABwAMAAAAEAAQAAAAAAAB"
-    b"BRAAAAAgAAAABAAAAAAAAAAIAAAAc2NlbmFyaW8AAAAABAAEAAQAAAA="
-)
+_ARROW_SCHEMA_KEY = b"ARROW:schema"
 
 
 def _sha256(path: Path) -> str:
@@ -160,9 +148,13 @@ def write_geoparquet(
     )
     table = pq.read_table(path)
     metadata = dict(table.schema.metadata or {})
+    # The Parquet writer owns ARROW:schema. Keeping the schema emitted by the
+    # GeoPandas staging write would create a duplicate key beside the writer's
+    # fresh copy. Arrow serializes schema metadata in insertion order, so sort
+    # every remaining key before the final write to make that copy portable.
+    metadata.pop(_ARROW_SCHEMA_KEY, None)
     metadata.update(
         {
-            b"ARROW:schema": _CANONICAL_ARROW_SCHEMA,
             b"searise:release_contract_id": contract["releaseContractId"].encode(),
             b"searise:source_archive_sha256": source.archive_sha256.encode(),
             b"searise:scientific_disposition": contract["scientificDisposition"].encode(),
@@ -170,6 +162,7 @@ def write_geoparquet(
             b"searise:nearest_selection": specification["nearestSelection"].encode(),
         }
     )
+    metadata = dict(sorted(metadata.items()))
     pq.write_table(
         table.replace_schema_metadata(metadata),
         path,
@@ -201,7 +194,6 @@ def validate_geoparquet(
     parquet = pq.ParquetFile(path)
     metadata = parquet.metadata.metadata or {}
     required_metadata = {
-        b"ARROW:schema": _CANONICAL_ARROW_SCHEMA,
         b"searise:release_contract_id": contract["releaseContractId"].encode(),
         b"searise:source_archive_sha256": source.archive_sha256.encode(),
         b"searise:scientific_disposition": contract["scientificDisposition"].encode(),
@@ -210,6 +202,8 @@ def validate_geoparquet(
     }
     if any(metadata.get(key) != value for key, value in required_metadata.items()):
         raise ScienceContractError("GeoParquet release metadata differs from the contract")
+    if _ARROW_SCHEMA_KEY not in metadata or path.read_bytes().count(_ARROW_SCHEMA_KEY) != 1:
+        raise ScienceContractError("GeoParquet must contain one canonical Arrow schema")
     expected_fields = [
         ("scenario", pa.string()),
         ("horizon", pa.int16()),
