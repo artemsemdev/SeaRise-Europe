@@ -14,14 +14,17 @@ purpose, cases, and source metadata when applicable.
 - `synthetic` proves code behavior only. It cannot pass a scientific gate.
 - `source-sample` is a pinned real-source excerpt with licence, attribution,
   URL, and SHA-256. Redistribution must be reviewed.
-- `golden` is independently controlled expected evidence with
-  `approved-golden` review status and source metadata.
+- `golden` is expected evidence independently extracted from a pinned source,
+  with source hashes, reader/generator identity, provenance, and registered
+  tolerances.
 - `invalid` deliberately breaks a contract, geometry, artifact, or range.
 
-The declared owner maintains format and intent. Science approves semantics and
-golden expected values. Data approves extraction/reproducibility. Security
-reviews licence, integrity, provenance, and public-delivery fixtures. Frontend
-and platform review consumer and delivery behavior respectively.
+The declared owner maintains format and intent. Source contracts define
+semantics; independent extraction and a separate production reader prove the
+golden values without an absent scientific reviewer. Security checks licence,
+integrity, provenance, and public-delivery fixtures. Frontend and platform
+tests verify consumer and delivery behavior. Only the project owner records a
+release disposition, after automated fixture and release validation passes.
 
 ## Versioning and changes
 
@@ -30,19 +33,24 @@ methodology, coordinate interpretation, or expected public outcome changes.
 Additive cases that preserve meaning can update the current file, but the PR
 must show every consumer and independent control passing.
 
-Never generate expected states with the function under test. A real-source
-golden must record how the control was derived and who approved it. If review is
-pending, use `pending-science-review`; never label it approved to unblock CI.
+Never generate expected values with the function under test. A real-source
+golden records the pinned source, independent reader and generator, extraction
+parameters, checksums, and derivation date. CI may prove parity but cannot
+record the owner release disposition.
 
 ## Cross-language consumption
 
-The current characterization fixture is
+The historical v1 characterization fixture is
 [`five-state-characterization-v1.json`](../../tests/fixtures/tdd/five-state-characterization-v1.json).
-It is intentionally synthetic and marked `characterization-only`.
+It is intentionally synthetic and marked `characterization-only`; it protects
+the retiring legacy path and is not the target projection contract.
 
-- Python exercises the target pipeline/domain rule with table boundaries.
-- TypeScript exercises the target browser rule from the same JSON.
-- C# is an independent legacy control while that implementation exists.
+Active projection parity uses
+[`ar6-lookup-goldens.json`](../../src/pipeline/science/evidence/ar6-lookup-goldens.json),
+independently extracted with the pinned netCDF4 reader. Production Python and
+TypeScript verify the same source IDs, distances, quantiles, states, and reason
+codes. C# and the five-state fixture remain legacy controls until that runtime
+is removed.
 
 Test builders translate serialized fields into domain-intent inputs. They do
 not import or reproduce legacy HTTP DTOs, database entities, or blob paths.
@@ -53,7 +61,8 @@ Mocks are allowed at process boundaries when the assertion concerns caller
 behavior: timeout handling, abort propagation, retry limits, or provider error
 mapping. They are not acceptable substitutes for representative fixtures in:
 
-- scientific arrays, nodata, geometry, coordinate-to-cell, and class meaning;
+- scientific arrays, nodata, geometry, source-grid selection, distance, and
+  quantile meaning;
 - manifest/release schemas, checksums, provenance, and licence metadata;
 - COG/PMTiles byte-range and corruption behavior;
 - public-origin headers, cache, CORS, rollback, and zero-runtime-API journeys.
