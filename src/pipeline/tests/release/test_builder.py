@@ -760,7 +760,10 @@ def test_builder_rejects_unbound_python_environment_before_vector_tools(
 ) -> None:
     output = tmp_path / "candidate"
 
-    with pytest.raises(ScienceContractError, match="release lock differs"):
+    with pytest.raises(
+        ScienceContractError,
+        match="release lock differs|interpreter differs",
+    ):
         build_regional_release(
             _source(),
             output,
