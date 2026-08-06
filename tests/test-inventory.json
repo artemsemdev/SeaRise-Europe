@@ -611,12 +611,6 @@
   ],
   "knownGaps": [
     {
-      "id": "real-source-regional-science",
-      "owner": "science",
-      "targetIssue": 85,
-      "description": "Phase 0.9 attempted all nine combinations with exact lineage but stopped before arrays because the required numerical and reviewed scientific evidence is unavailable."
-    },
-    {
       "id": "pipeline-legacy-mypy",
       "owner": "data",
       "targetIssue": 68,
@@ -629,16 +623,10 @@
       "description": "No current Playwright suite proves production-static five-state journeys, zero legacy API calls, or offline behavior."
     },
     {
-      "id": "promotion-routing",
-      "owner": "platform",
-      "targetIssue": 61,
-      "description": "Current CI has fast legacy jobs but no regional/release promotion workflow consuming this classification yet."
-    },
-    {
       "id": "phase-0r-owner-gate-blockers",
       "owner": "science",
       "targetIssue": 110,
-      "description": "Phase 1 remains blocked until the protected owner workflow verifies the trusted Linux and macOS ARM64 candidate bindings, raw delivery evidence, exact release merge topology, and an approved owner releaseDisposition."
+      "description": "The protected workflow and producer contract are implemented, but Phase 1 remains blocked until an actual trusted master@S dual-platform run, evidence-only E-to-M merge, owner releaseDisposition, and permanent owner records complete successfully."
     }
   ]
 }
