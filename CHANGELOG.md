@@ -81,9 +81,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Canonicalized the single writer-owned GeoParquet Arrow schema and Tippecanoe
-  gzip platform markers so the Linux and macOS ARM64 release profiles produce
-  identical analytical and visual artifact bytes without changing their values.
+- Pinned the single writer-owned GeoParquet Arrow schema FlatBuffer and
+  canonicalized Tippecanoe gzip platform markers so the Linux and macOS ARM64
+  release profiles produce identical analytical and visual artifact bytes
+  without changing their values.
 - Pinned the macOS ARM64 Tippecanoe reference build to the hosted Xcode 15.4
   environment and added a lightweight release-change preflight so toolchain
   drift fails before the full AR6 evidence build downloads source data.

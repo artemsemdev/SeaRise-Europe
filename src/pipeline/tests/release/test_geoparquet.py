@@ -49,6 +49,9 @@ def test_geoparquet_is_byte_deterministic_and_exact(tmp_path: Path) -> None:
 
     assert first.read_bytes() == second.read_bytes()
     assert first.read_bytes().count(b"ARROW:schema") == 1
+    assert (pq.ParquetFile(first).metadata.metadata or {})[b"ARROW:schema"] == (
+        geoparquet_module._CANONICAL_ARROW_SCHEMA
+    )
     schema_metadata = pq.read_table(first).schema.metadata or {}
     assert list(schema_metadata) == sorted(schema_metadata)
     assert first_evidence.sha256 == second_evidence.sha256
@@ -194,3 +197,37 @@ def test_geoparquet_rejects_duplicate_arrow_schema(tmp_path: Path) -> None:
 
     with pytest.raises(ScienceContractError, match="one canonical Arrow schema"):
         validate_geoparquet(duplicate, source, contract=contract())
+
+
+def test_arrow_schema_payload_replaces_a_platform_variant(tmp_path: Path) -> None:
+    generated = b"x" * len(geoparquet_module._CANONICAL_ARROW_SCHEMA)
+    path = tmp_path / "footer.bin"
+    path.write_bytes(b"PAR1" + b"ARROW:schema" + generated + b"PAR1")
+
+    geoparquet_module._replace_arrow_schema_payload(path, generated)
+
+    assert path.read_bytes() == (
+        b"PAR1"
+        + b"ARROW:schema"
+        + geoparquet_module._CANONICAL_ARROW_SCHEMA
+        + b"PAR1"
+    )
+
+
+def test_staging_dependency_metadata_is_replaced_by_the_pin(geoparquet_case) -> None:
+    _, baseline, _ = geoparquet_case
+    fields = list(baseline.schema)
+    fields[-1] = fields[-1].with_metadata(
+        {
+            b"ARROW:extension:name": b"platform-specific",
+            b"ARROW:extension:metadata": b"platform-specific",
+        }
+    )
+    staging = pa.Table.from_arrays(
+        baseline.columns,
+        schema=pa.schema(fields, metadata={b"geo": b"platform-specific"}),
+    )
+
+    canonical = geoparquet_module._table_with_canonical_schema(staging, arrow=pa)
+
+    assert canonical.schema.equals(baseline.schema, check_metadata=True)
