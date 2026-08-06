@@ -72,9 +72,10 @@ from the classified analysis artifact declared by the active immutable release.
 - Deep Atlantic blue establishes the environmental context.
 - Off-white terrain and panels create editorial contrast.
 - Teal supports neutral interactive emphasis and selected locations.
-- Amber communicates modeled exposure cautiously; it is not an emergency red.
-- Green/teal for no modeled exposure must always be paired with language that
-  explicitly rejects a safety guarantee.
+- Teal and blue may encode the visual projection scale, but colour must not
+  imply a flood threshold or replace the numeric median and likely range.
+- Available projection styling must always be paired with language that rejects
+  flooding, exposure, property-risk, and safety interpretations.
 - Neutral grey communicates missing data and technical uncertainty.
 - Violet may distinguish scope boundaries without implying hazard severity.
 

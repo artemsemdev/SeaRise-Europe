@@ -35,8 +35,8 @@ not professional advice.
 - Find the intended settlement despite diacritics, aliases, or duplicate names.
 - Compare lower-, intermediate-, and higher-emissions scenarios at 2030, 2050,
   and 2100.
-- Distinguish modeled exposure, no modeled exposure, missing data, inland
-  scope, and unsupported geography.
+- Distinguish an available regional projection from missing data, inland scope,
+  and unsupported geography without treating it as a local flood result.
 - See what data and assumptions produced the result.
 - Know what additional professional or local evidence would still be needed.
 
