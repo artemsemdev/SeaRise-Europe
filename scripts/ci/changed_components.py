@@ -47,6 +47,9 @@ API = (
 )
 
 PIPELINE = (
+    ".github/workflows/phase-0r-owner-promotion.yml",
+    "scripts/science/promote_phase_0r_release.py",
+    "scripts/science/validate_ar6_delivery_trace.py",
     "src/pipeline/**",
     ".env.pipeline.example",
     ".gitignore",
@@ -59,6 +62,8 @@ PIPELINE = (
 # pinned geospatial toolchain preflight, while the 9.24 GB real-source build is
 # further isolated behind an explicit manual evidence dispatch.
 RELEASE = (
+    ".github/workflows/phase-0r-owner-promotion.yml",
+    "scripts/science/promote_phase_0r_release.py",
     "scripts/science/*ar6*release*.py",
     "scripts/science/build_ar6_lookup_goldens.py",
     "scripts/science/validate_ar6_delivery_trace.py",
@@ -127,13 +132,9 @@ COMPOSE = (
     "src/api/SeaRise.Api/appsettings*.json",
 )
 
-CODEQL_JAVASCRIPT = (
-    "src/frontend/**",
-)
+CODEQL_JAVASCRIPT = ("src/frontend/**",)
 
-CODEQL_CSHARP = (
-    "src/api/**",
-)
+CODEQL_CSHARP = ("src/api/**",)
 
 
 def _normalize(path: str) -> str:
@@ -172,9 +173,7 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
             _matches(path, API_IMAGE) and not _is_api_test(path) for path in paths
         ),
         "compose": any(_matches(path, COMPOSE) for path in paths),
-        "codeql_javascript": any(
-            _matches(path, CODEQL_JAVASCRIPT) for path in paths
-        ),
+        "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
         "codeql_csharp": any(_matches(path, CODEQL_CSHARP) for path in paths),
     }
     result["heavy"] = any(result.values())

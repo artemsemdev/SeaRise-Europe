@@ -24,6 +24,43 @@ from .test_recovery_gate import BUILD_CHECKS, _finalize, _promotion_inputs
 REPOSITORY_ROOT = Path(__file__).parents[4]
 
 
+def test_owner_consumer_matches_ci_producer_contract() -> None:
+    contract = json.loads(
+        (
+            REPOSITORY_ROOT
+            / "tests/contracts/ar6-release-evidence-producers.json"
+        ).read_text(encoding="utf-8")
+    )
+    producers = {producer["profile"]: producer for producer in contract["producers"]}
+    source_revision = "a" * 40
+    run_id = 123456
+
+    self_contract = {
+        "linux-x86_64": {
+            "jobId": owner_promotion.VALIDATION_JOB_ID,
+            "jobName": owner_promotion.VALIDATION_JOB_NAME,
+        },
+        "macos-arm64": {
+            "jobId": owner_promotion.MAC_VALIDATION_JOB_ID,
+            "jobName": owner_promotion.MAC_VALIDATION_JOB_NAME,
+        },
+    }
+    assert set(producers) == set(self_contract)
+    for profile, owner_job in self_contract.items():
+        producer = producers[profile]
+        assert owner_job["jobId"] == producer["jobId"]
+        assert owner_job["jobName"] == producer["jobName"]
+        assert (
+            owner_promotion.ARTIFACT_NAME_TEMPLATES_BY_PROFILE[profile]
+            == producer["artifactNameTemplate"]
+        )
+        assert owner_promotion.artifact_name(profile, source_revision, run_id) == (
+            producer["artifactNameTemplate"]
+            .replace("{sourceRevision}", source_revision)
+            .replace("{runId}", str(run_id))
+        )
+
+
 def _load_cli():
     path = REPOSITORY_ROOT / "scripts/science/promote_phase_0r_release.py"
     spec = importlib.util.spec_from_file_location("phase_0r_owner_promotion_cli", path)
