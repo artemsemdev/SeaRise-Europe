@@ -22,6 +22,7 @@ tar -xzf "${source_archive}" -C "${build_root}" --strip-components=1
 
 export DEVELOPER_DIR="${xcode_root}"
 export LC_ALL=C
+export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
 export TZ=UTC
 cc="$(xcrun --find clang)"
 cxx="$(xcrun --find clang++)"
