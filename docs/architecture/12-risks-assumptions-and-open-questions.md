@@ -46,20 +46,26 @@
 | R-19 | An offshore mean-sea-surface grid, land filler, or ordinary tide-gauge record is treated as a datum-safe shoreline water reference | Inapplicable to ADR-024 / Historical Critical | ADR-024 does not construct an absolute water reference and prohibits tide-gauge fallback. Retain the v1 finding as historical evidence. |
 | R-20 | A global coastal DTM or multi-source mosaic is assumed to have finite European per-cell uncertainty from MAE/RMSE alone | Inapplicable to ADR-024 / Historical Critical | ADR-024 consumes no DTM or terrain uncertainty. Retain the v1 finding as historical evidence. |
 
+### Historical v1 risk disposition
+
+The following paragraph records why the binary v1 path stopped. Its terrain,
+datum, connectivity, and independent-review blockers are retired from the
+active product by ADR-024; the underlying evidence remains immutable.
+
 The [Phase 0.3 regional gate evidence](../evidence/phase-0-regional-fixture.md)
-records the current blocked disposition for R-01, R-02, R-04, R-07, R-08,
-and R-13. It proves a small real COG and lookup/range mechanics, but closes none
-of those risks: datum compatibility, scientific controls, connectivity,
-canonical coastal scope, PMTiles, public hosting, and human review remain open.
+recorded the then-current blocked disposition for R-01, R-02, R-04, R-07,
+R-08, and R-13. It proved a small real COG and lookup/range mechanics, but did
+not close datum compatibility, scientific controls, connectivity, canonical
+coastal scope, PMTiles, public hosting, or human review.
 Phase 0.5 selects the vertical strategy but closes none of these measured or
-human-review risks by documentation alone. Phase 0.6 closes the exact-input
+human-review risks by documentation alone. Phase 0.6 closed the exact-input
 identity gap for R-01 and R-15 but does not lower the transformation or
 publication consequence. Phase 0.7 removes the direct-comparison implementation
-path and makes every remaining vertical blocker machine-readable; it does not
-lower R-16 until numerical controls and independent review pass.
+path and made every remaining vertical blocker machine-readable; it did not
+lower R-16 because numerical controls and independent review did not pass.
 Phase 0.8 selects terrain, product-scope, and connectivity candidates and adds
-executable controls. It reduces implementation ambiguity but does not close
-R-02, R-07, or R-17 without the named external reviews and regional evidence.
+executable controls. It reduced implementation ambiguity but did not close
+R-02, R-07, or R-17 under that historical method.
 Phase 0.9 attempted the exact nine-layer matrix and stopped before arrays. Its
 explicit blocked decision prevents R-13 and R-18 from being hidden by a green
 build, but R-02, R-04, R-07, R-08, R-16, and R-17 remain open because the
@@ -70,9 +76,9 @@ re-evaluation without rewriting it.
 Phase 0.11 quantifies the finite source terms but confirms that coastal SLA
 representativeness and DSM-to-bare-earth error are not finitely bounded by the
 locked evidence. The automated recommendation is therefore `rejected`, not
-`approved`; the independent review remains pending, so the authoritative
-disposition and publication gate remain `blocked` and a superseding method is
-required.
+`approved`; independent review was never obtained, so the authoritative
+disposition and publication gate ended `blocked` and required a superseding
+method.
 Phase 0.14 remains the immutable binary-path no-go. ADR-024 completes #106's
 contract decision without reinterpreting that evidence. #135 has now passed
 offline source/implementation parity and lowers R-01 and R-04 to permanent
