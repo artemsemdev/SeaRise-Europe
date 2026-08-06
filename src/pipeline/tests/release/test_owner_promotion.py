@@ -10,8 +10,11 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 import searise_pipeline.release.owner_promotion as owner_promotion
-from searise_pipeline.release.evidence import binding_sha256
+from searise_pipeline.release.evidence import binding_sha256, sha256
+from searise_pipeline.science import ScienceContractError
 
 from .test_recovery_gate import BUILD_CHECKS
 
@@ -575,3 +578,290 @@ def _pinned_environment(
 def _write_json(path: Path, document: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _committed_bundle(repository_root: Path, source_revision: str) -> Path:
+    root = repository_root / owner_promotion.MAC_EVIDENCE_ROOT
+    root.mkdir(parents=True)
+    receipt = {
+        "releaseId": "phase-0r-ar6-v1",
+        "sourceRevision": source_revision,
+        "environmentIdentity": {"buildRunId": "local-mac-build"},
+    }
+    _write_json(root / "build-receipt.json", receipt)
+    binding = {
+        "releaseId": receipt["releaseId"],
+        "sourceRevision": source_revision,
+        "environmentIdentity": receipt["environmentIdentity"],
+        "manifestSha256": "a" * 64,
+        "buildReceiptSha256": sha256(root / "build-receipt.json"),
+    }
+    _write_json(root / "candidate-binding.json", binding)
+    (root / "build-timing-macos-arm64.json").write_bytes(_timing_bytes(binding))
+    (root / "browser-trace-macos-arm64.json").write_bytes(_trace_bytes())
+    delivery = {
+        "status": "passed",
+        "trace": {
+            "path": "browser-trace-macos-arm64.json",
+            "sha256": sha256(root / "browser-trace-macos-arm64.json"),
+        },
+        "buildTiming": {
+            "path": "build-timing-macos-arm64.json",
+            "sha256": sha256(root / "build-timing-macos-arm64.json"),
+        },
+        "harness": {"path": "harness.mjs", "sha256": "9" * 64},
+    }
+    _write_json(root / "delivery-report.json", delivery)
+    reproducibility = {
+        "status": "pending-external-provenance",
+        "localComparisonStatus": "passed",
+        "externalProvenanceStatus": "required",
+        "requiredExternalBindings": [],
+    }
+    _write_json(root / "reproducibility-report.json", reproducibility)
+    delivery_hash = sha256(root / "delivery-report.json")
+    reproducibility_hash = sha256(root / "reproducibility-report.json")
+    _write_json(
+        root / "automated-gate.json",
+        {
+            "schemaVersion": 1,
+            "gateId": "phase-0r-ar6-regional-release-v1",
+            "issue": 110,
+            "releaseId": binding["releaseId"],
+            "scientificDisposition": "projection-only",
+            "automatedValidation": "pending",
+            "releaseDisposition": "pending-owner",
+            "phase1Unlocked": False,
+            "blockingChecks": ["crossEnvironmentReproducibility"],
+            "fallback": "do-not-publish-or-unlock-phase-1",
+            "checks": {
+                **BUILD_CHECKS,
+                "crossEnvironmentReproducibility": False,
+                "deliveryMeasurements": True,
+            },
+            "evidenceBindings": {
+                "candidateBindingSha256": binding_sha256(binding),
+                "manifestSha256": binding["manifestSha256"],
+                "deliveryReportSha256": delivery_hash,
+                "deliveryTraceSha256": delivery["trace"]["sha256"],
+                "buildTimingSha256": delivery["buildTiming"]["sha256"],
+                "browserHarnessSha256": delivery["harness"]["sha256"],
+                "reproducibilityReportSha256": reproducibility_hash,
+            },
+            "externalVerificationRequired": {
+                "reproducibilityProvenance": {
+                    "status": "pending-external-verification",
+                    "provider": "github-actions",
+                    "requiredExternalBindings": reproducibility[
+                        "requiredExternalBindings"
+                    ],
+                }
+            },
+        },
+    )
+    hashes = {name: sha256(root / name) for name in owner_promotion._BUNDLE_FILES}
+    (root / "checksums.txt").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items()),
+        encoding="utf-8",
+    )
+    summary_files = {
+        (owner_promotion.MAC_EVIDENCE_ROOT / name).as_posix(): digest
+        for name, digest in {
+            **hashes,
+            "checksums.txt": sha256(root / "checksums.txt"),
+        }.items()
+    }
+    _write_json(
+        repository_root / owner_promotion.SUMMARY_PATH,
+        {
+            "schemaVersion": 1,
+            "releaseId": binding["releaseId"],
+            "sourceRevision": source_revision,
+            "integrationPullRequest": 201,
+            "committedEvidence": {"files": summary_files},
+        },
+    )
+    return root
+
+
+def _refresh_committed_bundle(repository_root: Path) -> None:
+    root = repository_root / owner_promotion.MAC_EVIDENCE_ROOT
+    hashes = {name: sha256(root / name) for name in owner_promotion._BUNDLE_FILES}
+    (root / "checksums.txt").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items()),
+        encoding="utf-8",
+    )
+    summary_path = repository_root / owner_promotion.SUMMARY_PATH
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["committedEvidence"]["files"] = {
+        (owner_promotion.MAC_EVIDENCE_ROOT / name).as_posix(): digest
+        for name, digest in {
+            **hashes,
+            "checksums.txt": sha256(root / "checksums.txt"),
+        }.items()
+    }
+    _write_json(summary_path, summary)
+
+
+def test_committed_bundle_is_bound_by_checksums_and_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    binding = json.loads((root / "candidate-binding.json").read_text())
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    observed, _, _, hashes, integration_pr, _ = owner_promotion._load_committed_evidence(
+        tmp_path,
+        {
+            "releaseContractId": "ar6-europe-regional-release-v1",
+            "scientificDisposition": "projection-only",
+        },
+    )
+
+    assert observed == binding
+    assert integration_pr == 201
+    assert set(hashes) == {*owner_promotion._BUNDLE_FILES, "checksums.txt"}
+
+
+def test_committed_bundle_tampering_fails_before_owner_decision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    (root / "delivery-report.json").write_text('{"status":"failed"}\n')
+
+    with pytest.raises(ScienceContractError, match="differs from checksums"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("schemaVersion", True),
+        ("issue", True),
+        ("fallback", "publish-anyway"),
+        ("unexpected", "claim"),
+    ],
+)
+def test_committed_gate_requires_exact_contract_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    gate_path = root / "automated-gate.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate[field] = value
+    _write_json(gate_path, gate)
+    _refresh_committed_bundle(tmp_path)
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    with pytest.raises(ScienceContractError, match="strict pending-external"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+
+def test_committed_gate_rejects_nested_external_verification_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    gate_path = root / "automated-gate.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate["externalVerificationRequired"]["unexpected"] = "claim"
+    _write_json(gate_path, gate)
+    _refresh_committed_bundle(tmp_path)
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    with pytest.raises(ScienceContractError, match="external binding set"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "nested"),
+    [
+        ("integrationPullRequest", True, False),
+        ("unexpected", "claim", False),
+        ("unexpected", "claim", True),
+    ],
+)
+def test_committed_summary_requires_exact_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+    nested: bool,
+) -> None:
+    _committed_bundle(tmp_path, _head())
+    summary_path = tmp_path / owner_promotion.SUMMARY_PATH
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    target = summary["committedEvidence"] if nested else summary
+    target[field] = value
+    _write_json(summary_path, summary)
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    with pytest.raises(ScienceContractError, match="summary is detached"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
