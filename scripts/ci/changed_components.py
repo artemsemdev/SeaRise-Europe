@@ -15,6 +15,7 @@ OUTPUTS = (
     "frontend",
     "api",
     "pipeline",
+    "release",
     "infrastructure",
     "docker_frontend",
     "docker_api",
@@ -52,6 +53,33 @@ PIPELINE = (
     "data/geometry/**",
     "scripts/tests/**",
     "tests/**",
+)
+
+# The release route is intentionally narrower than PIPELINE. It owns the
+# pinned geospatial toolchain preflight, while the 9.24 GB real-source build is
+# further isolated behind an explicit manual evidence dispatch.
+RELEASE = (
+    "scripts/science/*ar6*release*.py",
+    "scripts/science/build_ar6_lookup_goldens.py",
+    "scripts/science/validate_ar6_delivery_trace.py",
+    "src/frontend/package.json",
+    "src/frontend/package-lock.json",
+    "src/frontend/scripts/measure-ar6-release.mjs",
+    "src/pipeline/fixtures/ar6-regional-release/**",
+    "src/pipeline/requirements-release*.lock",
+    "src/pipeline/science/ar6-regional-release*.json",
+    "src/pipeline/science/ar6-release-promotion.schema.json",
+    "src/pipeline/science/ar6-lookup-validation*.json",
+    "src/pipeline/science/ar6-projection-contract*.json",
+    "src/pipeline/science/evidence/ar6-lookup-goldens*.json",
+    "src/pipeline/science/source-semantics*.json",
+    "src/pipeline/searise_pipeline/release/**",
+    "src/pipeline/searise_pipeline/science/ar6.py",
+    "src/pipeline/searise_pipeline/science/ar6_lookup.py",
+    "src/pipeline/tests/release/**",
+    "src/pipeline/tests/science/test_ar6_regional_release_contract.py",
+    "src/pipeline/toolchain/**",
+    "src/pipeline/sources/source-lock*.json",
 )
 
 INFRASTRUCTURE = (
@@ -134,6 +162,7 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
         "frontend": any(_matches(path, FRONTEND) for path in paths),
         "api": any(_matches(path, API) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
+        "release": any(_matches(path, RELEASE) for path in paths),
         "infrastructure": any(_matches(path, INFRASTRUCTURE) for path in paths),
         "docker_frontend": any(
             _matches(path, FRONTEND_IMAGE) and not _is_frontend_test(path)
@@ -150,6 +179,11 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
     }
     result["heavy"] = any(result.values())
     return result
+
+
+def release_only_outputs() -> dict[str, bool]:
+    """Route a manual full-source build without fanning out ordinary CI."""
+    return {name: name in {"release", "heavy"} for name in OUTPUTS}
 
 
 def parse_name_status(output: str) -> list[str]:
@@ -198,6 +232,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--all", action="store_true", help="Enable every route")
+    source.add_argument(
+        "--release-only",
+        action="store_true",
+        help="Enable only the AR6 release-evidence route",
+    )
     source.add_argument("--changed", nargs="+", help="Explicit repository paths")
     source.add_argument("--base", help="Git base revision for BASE...HEAD")
     parser.add_argument("--head", default="HEAD")
@@ -205,8 +244,17 @@ def main() -> int:
     parser.add_argument("--github-output", type=Path)
     args = parser.parse_args()
 
-    paths = [] if args.all else (args.changed or git_changed_paths(args.base, args.head, args.repo_root))
-    outputs = {name: True for name in OUTPUTS} if args.all else classify_paths(paths)
+    paths = (
+        []
+        if args.all or args.release_only
+        else (args.changed or git_changed_paths(args.base, args.head, args.repo_root))
+    )
+    if args.all:
+        outputs = {name: True for name in OUTPUTS}
+    elif args.release_only:
+        outputs = release_only_outputs()
+    else:
+        outputs = classify_paths(paths)
     if args.github_output:
         write_github_outputs(args.github_output, outputs)
     print(json.dumps({"changedPaths": sorted(paths), "outputs": outputs}, indent=2))

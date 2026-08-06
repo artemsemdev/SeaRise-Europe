@@ -8,6 +8,7 @@ from scripts.ci.changed_components import (
     OUTPUTS,
     classify_paths,
     parse_name_status,
+    release_only_outputs,
     write_github_outputs,
 )
 
@@ -41,10 +42,34 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["src/pipeline/searise_pipeline/science/ar6.py"])
 
         self.assertTrue(outputs["pipeline"])
+        self.assertTrue(outputs["release"])
         self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["infrastructure"])
         self.assertFalse(outputs["compose"])
+
+    def test_ordinary_pipeline_change_skips_release_toolchain(self) -> None:
+        outputs = classify_paths(["src/pipeline/searise_pipeline/config.py"])
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
+    def test_release_contract_routes_release_toolchain(self) -> None:
+        outputs = classify_paths(["src/pipeline/science/ar6-regional-release.json"])
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertTrue(outputs["release"])
+
+    def test_release_source_evidence_routes_release_toolchain(self) -> None:
+        paths = [
+            "src/pipeline/science/evidence/ar6-lookup-goldens.json",
+            "src/pipeline/science/source-semantics.json",
+            "src/pipeline/sources/source-lock.json",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertTrue(classify_paths([path])["release"])
 
     def test_infrastructure_schema_change_routes_api_and_compose(self) -> None:
         outputs = classify_paths(["infra/db/init.sql"])
@@ -70,13 +95,119 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(all(outputs[name] for name in OUTPUTS))
 
+    def test_release_evidence_dispatch_skips_unrelated_jobs(self) -> None:
+        outputs = release_only_outputs()
+
+        self.assertTrue(outputs["release"])
+        self.assertTrue(outputs["heavy"])
+        self.assertTrue(
+            all(
+                not outputs[name]
+                for name in OUTPUTS
+                if name not in {"release", "heavy"}
+            )
+        )
+
+    def test_release_evidence_requires_selector_and_exact_revision(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        dispatch = workflow.split("permissions:", maxsplit=1)[0]
+        changes = workflow.split("  changes:", maxsplit=1)[1].split(
+            "\n  frontend:", maxsplit=1
+        )[0]
+        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
+            "\n  infrastructure:", maxsplit=1
+        )[0]
+        self.assertIn("release_evidence:\n", dispatch)
+        self.assertIn("default: false", dispatch)
+        self.assertIn("release_source_revision:\n", dispatch)
+        self.assertIn("--release-only", changes)
+        self.assertIn("^[0-9a-f]{40}$", changes)
+        self.assertIn('"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"', changes)
+        self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', changes)
+        self.assertLess(
+            changes.index("Validate manual workflow request"),
+            changes.index("uses: actions/checkout"),
+        )
+        self.assertIn("inputs.release_evidence == true", evidence)
+        self.assertIn("needs: changes", evidence)
+        self.assertIn("^[0-9a-f]{40}$", evidence)
+        self.assertIn('"${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}"', evidence)
+        self.assertIn('"${GITHUB_RUN_ATTEMPT}" != "1"', evidence)
+        self.assertLess(
+            evidence.index("Validate exact release source revision"),
+            evidence.index("uses: actions/checkout"),
+        )
+        self.assertNotIn("inputs.release_source_revision || github.sha", workflow)
+
+    def test_release_evidence_pins_actions_and_checks_disk_before_download(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
+            "\n  infrastructure:", maxsplit=1
+        )[0]
+
+        for action in (
+            "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            "actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809",
+            "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        ):
+            self.assertIn(action, evidence)
+        self.assertIn("required_kib=12582912", evidence)
+        self.assertIn("/tmp/phase-0r-ar6-preflight", evidence)
+        self.assertLess(evidence.index("df -Pk /tmp"), evidence.index("zenodo.org"))
+        self.assertIn("overwrite: false", evidence)
+
+    def test_release_evidence_uses_only_hashed_python_install(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
+            "\n  infrastructure:", maxsplit=1
+        )[0]
+
+        self.assertIn("--require-hashes -r requirements-release.lock", evidence)
+        self.assertEqual(evidence.count("pip install"), 1)
+        self.assertNotIn("pip install -e", evidence)
+
+    def test_release_evidence_preflights_before_source_download(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        evidence = workflow.split("  ar6-release-evidence:", maxsplit=1)[1].split(
+            "\n  infrastructure:", maxsplit=1
+        )[0]
+
+        preflight = evidence.index("Preflight exact release environment and fixture")
+        acquire = evidence.index("Acquire and verify locked AR6 archive")
+        self.assertLess(preflight, acquire)
+        self.assertIn("--fixture src/pipeline/fixtures/ar6-regional-release", evidence)
+        self.assertNotIn("ar6-archive-cache", evidence)
+
+    def test_release_evidence_is_in_ci_gate_only_as_a_routed_job(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        toolchain = workflow.split("  release-toolchain:", maxsplit=1)[1].split(
+            "\n  ar6-release-evidence:", maxsplit=1
+        )[0]
+        gate = workflow.split("  ci-gate:", maxsplit=1)[1]
+        self.assertIn("needs.changes.outputs.release == 'true'", toolchain)
+        self.assertIn("inputs.release_evidence != true", toolchain)
+        self.assertIn("      - ar6-release-evidence", gate)
+
     def test_release_environment_preflight_is_isolated_from_general_tests(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         ).read_text(encoding="utf-8")
 
         start = workflow.index("  release-toolchain:")
-        end = workflow.index("  infrastructure:", start)
+        end = workflow.index("  ar6-release-evidence:", start)
         preflight = workflow[start:end]
         self.assertIn("--require-hashes -r requirements-release.lock", preflight)
         self.assertIn("tests/release/test_toolchain.py", preflight)
