@@ -300,6 +300,17 @@ EXTERNAL_TOOLS_AVAILABLE = all(
 )
 
 
+def test_lookup_evidence_seals_browser_benchmark_target() -> None:
+    evidence = release_builder._validate_lookup_goldens(_source(), GOLDENS_PATH)
+
+    assert evidence["browserBenchmarkTarget"] == {
+        "scenario": "ssp2-45",
+        "horizon": 2050,
+        "sourceLocationId": 1003800040,
+        "expectedValuesMillimetres": [156, 247, 351],
+    }
+
+
 @pytest.mark.parametrize(
     "mutation",
     ["missing-extent", "wrong-bbox", "wrong-temporal", "extra-field"],
