@@ -99,6 +99,21 @@ def _canonicalize_arrow_schema(path: Path, *, parquet: Any) -> None:
         raise ScienceContractError("GeoParquet Arrow schema canonicalization failed")
 
 
+def _table_with_canonical_schema(table: Any, *, arrow: Any) -> Any:
+    """Bind arrays to the pinned logical and metadata schema before writing."""
+    try:
+        schema = arrow.ipc.read_schema(
+            arrow.BufferReader(base64.b64decode(_CANONICAL_ARROW_SCHEMA))
+        )
+    except (ValueError, arrow.ArrowInvalid) as exc:
+        raise ScienceContractError("Pinned Arrow schema cannot be decoded") from exc
+    if table.column_names != schema.names or any(
+        column.type != field.type for column, field in zip(table.columns, schema)
+    ):
+        raise ScienceContractError("GeoParquet staging table differs from the pin")
+    return arrow.Table.from_arrays(table.columns, schema=schema)
+
+
 @dataclass(frozen=True)
 class GeoParquetEvidence:
     """Identity and row counts for the analytical parity artifact."""
@@ -186,6 +201,8 @@ def write_geoparquet(
 ) -> GeoParquetEvidence:
     """Write valid rows only; this table must never drive nearest selection."""
     gpd, pd, pq = _dependencies()
+    import pyarrow as pa
+
     specification = contract["artifacts"]["geoparquet"]
     if specification["nearestSelection"] != "prohibited":
         raise ScienceContractError("GeoParquet cannot replace exact COG source-node lookup")
@@ -220,25 +237,9 @@ def write_geoparquet(
         schema_version=specification["schemaVersion"],
         row_group_size=specification["rowGroupSize"],
     )
-    table = pq.read_table(path)
-    metadata = dict(table.schema.metadata or {})
-    # The Parquet writer owns ARROW:schema. Keeping the schema emitted by the
-    # GeoPandas staging write would create a duplicate key beside the writer's
-    # fresh copy. Arrow serializes schema metadata in insertion order, so sort
-    # every remaining key before the final write to make that copy portable.
-    metadata.pop(_ARROW_SCHEMA_KEY, None)
-    metadata.update(
-        {
-            b"searise:release_contract_id": contract["releaseContractId"].encode(),
-            b"searise:source_archive_sha256": source.archive_sha256.encode(),
-            b"searise:scientific_disposition": contract["scientificDisposition"].encode(),
-            b"searise:semantic_role": specification["role"].encode(),
-            b"searise:nearest_selection": specification["nearestSelection"].encode(),
-        }
-    )
-    metadata = dict(sorted(metadata.items()))
+    table = _table_with_canonical_schema(pq.read_table(path), arrow=pa)
     pq.write_table(
-        table.replace_schema_metadata(metadata),
+        table,
         path,
         compression=specification["compression"],
         row_group_size=specification["rowGroupSize"],

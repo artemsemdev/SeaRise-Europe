@@ -212,3 +212,22 @@ def test_arrow_schema_payload_replaces_a_platform_variant(tmp_path: Path) -> Non
         + geoparquet_module._CANONICAL_ARROW_SCHEMA
         + b"PAR1"
     )
+
+
+def test_staging_dependency_metadata_is_replaced_by_the_pin(geoparquet_case) -> None:
+    _, baseline, _ = geoparquet_case
+    fields = list(baseline.schema)
+    fields[-1] = fields[-1].with_metadata(
+        {
+            b"ARROW:extension:name": b"platform-specific",
+            b"ARROW:extension:metadata": b"platform-specific",
+        }
+    )
+    staging = pa.Table.from_arrays(
+        baseline.columns,
+        schema=pa.schema(fields, metadata={b"geo": b"platform-specific"}),
+    )
+
+    canonical = geoparquet_module._table_with_canonical_schema(staging, arrow=pa)
+
+    assert canonical.schema.equals(baseline.schema, check_metadata=True)
