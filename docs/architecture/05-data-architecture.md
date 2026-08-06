@@ -117,16 +117,16 @@ The UI must display the release and methodology used for every assessment.
 ### 4.3 Raster artifacts
 
 Each scenario/horizon produces two derived views of the same validated,
-classified source array:
+source-native projection array:
 
 | Artifact | Purpose | Contract |
 |---|---|---|
-| Analysis COG | Exact nearest-neighbour pixel lookup | Lossless class values `0`, `1`, or nodata; valid COG; fixed CRS/grid recorded in manifest |
+| Analysis COG | Exact nearest-grid projection lookup | Lossless Int16 millimetres for q0.167, q0.5, and q0.833 plus nodata; valid COG; fixed CRS/grid recorded in manifest |
 | Visual PMTiles | Efficient overlay rendering | Byte-range readable; visually consistent with the analysis COG; never interpreted from rendered colours |
 
-`0` maps to `NoModeledExposureDetected`, `1` to
-`ModeledExposureDetected`, and nodata to `DataUnavailable`. The COG remains the
-scientific lookup source until a later ADR proves bit-exact lookup from PMTiles.
+All three required quantiles map to `ProjectionAvailable`; source nodata or a
+nearest location beyond the 100 km guardrail maps to `DataUnavailable`. The
+COG is the scientific lookup source and PMTiles remains visual-only.
 
 ### 4.4 Boundaries and analytical tables
 

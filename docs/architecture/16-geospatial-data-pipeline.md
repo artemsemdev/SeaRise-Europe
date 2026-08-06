@@ -62,10 +62,8 @@ are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
 | Source | Role | Pinning requirements |
 |---|---|---|
 | IPCC AR6 sea-level projections | Scenario/horizon projection input | Authoritative release/version, exact asset URL, size, SHA-256, citation, licence/acknowledgements |
-| Copernicus DEM GLO-30 | Selected terrain input | Release `2021_1`, exact DEM/EDM/FLM/HEM/WBM tiles, datum/CRS, size, SHA-256, derivative attribution, and reviewed error bounds |
-| Copernicus coastal product or approved replacement | Canonical analysis-zone evidence | Product/version, acquisition record, interpretation rule, licence, SHA-256 |
+| Natural Earth product geometries | Europe support and 25 km coastal product scope | Release, layer names, processing recipe, licence, SHA-256, topology controls |
 | GeoNames dump + `alternateNamesV2` | Places and multilingual search | Snapshot date, exact dump files, sizes, SHA-256, CC BY 4.0 attribution |
-| Natural Earth | Support/shoreline seed and labels | Dataset/release, layer names, public-domain provenance, SHA-256 |
 
 Acquisition writes to an ignored cache such as `data/raw/{source}/{version}/`.
 It never relies on an unversioned “latest” response without capturing the
@@ -79,28 +77,27 @@ means no publication.
 
 ## 4. Phase 0 — prove the science first
 
-Phase 0 uses a small region that includes straightforward coast, a port or
-estuary, low terrain, inland low terrain, nodata, and an island. It must:
+Phase 0R proves the direct AR6 projection product over a regional fixture that
+includes all four European basin contexts, estuaries, islands, scope failures,
+distance boundaries, and source nodata controls. It must:
 
 1. Inspect the exact IPCC variables, dimensions, coordinates/locations,
    quantiles, units, and missing-value semantics.
-2. Document and test the transformation from projection locations to the
-   analysis grid. A regular lat/lon raster must not be assumed.
-3. Inspect the DEM grid, horizontal and vertical datum, resolution, units,
-   masks, voids, and resampling requirements.
-4. Define the target CRS/grid and every reprojection/resampling operation.
-5. Compare the current coastal approximation with the intended canonical
-   coastal product.
-6. Test whether the binary exposure model creates disconnected inland regions
-   that should not be considered coastal exposure.
-7. Compare independently reviewed control locations with array values and
-   exact browser lookup.
-8. Measure source, intermediate, COG, PMTiles, and index size; build time;
+2. Preserve exact native grid IDs and integer millimetres while packaging the
+   nine scenario/horizon combinations; no scientific resampling is permitted.
+3. Validate nearest-grid selection, the inclusive 100 km guardrail, tie-break,
+   scope precedence, and stable unavailable reason codes.
+4. Compare independently extracted source values with Python, TypeScript, COG,
+   GeoParquet, PMTiles, and exact browser lookup.
+5. Prove complete source, licence, manifest, STAC, provenance, and receipt
+   binding plus byte-identical clean rebuilds.
+6. Measure source, intermediate, COG, PMTiles, and index size; build time;
    browser range requests; latency; and memory.
 
 Results and reviewer decisions are committed as methodology documentation and
-machine-readable golden fixtures. If the binary model is not defensible, stop
-and supersede the methodology/ADR before building Europe.
+machine-readable golden fixtures. The Phase 0 v1 binary model already stopped
+with a no-go and remains historical evidence; ADR-024 is the only active
+publication contract.
 
 ## 5. Workspace and release directories
 
