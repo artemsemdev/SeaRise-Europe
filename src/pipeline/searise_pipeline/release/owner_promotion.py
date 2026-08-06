@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -19,8 +20,10 @@ from urllib.parse import urlsplit
 
 from searise_pipeline.science.contracts import ScienceContractError
 
+from .delivery import create_delivery_report
 from .evidence import (
     binding_sha256,
+    candidate_binding,
     load_json,
     load_json_snapshot,
     sha256,
@@ -1345,3 +1348,172 @@ def _write_records(
         if temporary is not None:
             temporary.unlink(missing_ok=True)
     return final_gate
+
+
+def promote_phase_0r_release(
+    validation_run_id: str,
+    evidence_pr_number: str,
+    decision: str,
+    *,
+    repository_root: Path,
+    output_root: Path,
+    download_root: Path,
+    context: Mapping[str, str],
+    api: GitHubApi,
+) -> Mapping[str, Any]:
+    """Verify fixed GitHub provenance and produce the only authoritative owner gate."""
+    run_id = _exact_positive_decimal(validation_run_id, "validation_run_id")
+    pr_number = _exact_positive_decimal(evidence_pr_number, "evidence_pr_number")
+    _require(decision in {"approved", "rejected"}, "decision must be approved or rejected")
+    checked_context = _validate_context(context, repository_root)
+    contract = load_json(repository_root / CONTRACT_PATH)
+    (
+        mac_binding,
+        reproducibility,
+        automated_gate,
+        evidence_hashes,
+        integration_pr_number,
+        committed_delivery,
+    ) = _load_committed_evidence(repository_root, contract)
+    validation, candidates, timing_paths, trusted_mac_trace = _verify_validation_run(
+        api,
+        run_id,
+        mac_binding["sourceRevision"],
+        download_root,
+    )
+    linux_binding = _validate_binding(
+        candidate_binding(candidates["linux"], contract=contract),
+        release_contract_id=contract["releaseContractId"],
+    )
+    trusted_mac_binding = _validate_binding(
+        candidate_binding(candidates["macos"], contract=contract),
+        release_contract_id=contract["releaseContractId"],
+    )
+    trusted_timings = {
+        "linux": _validate_trusted_timing(
+            timing_paths["linux"], binding=linux_binding, contract=contract
+        ),
+        "macos": _validate_trusted_timing(
+            timing_paths["macos"], binding=trusted_mac_binding, contract=contract
+        ),
+    }
+    _require(
+        sha256(trusted_mac_trace)
+        == evidence_hashes["browser-trace-macos-arm64.json"]
+        and trusted_timings["macos"]["sha256"]
+        == evidence_hashes["build-timing-macos-arm64.json"]
+        == committed_delivery["buildTiming"]["sha256"]
+        and trusted_timings["macos"]["fullCleanBuildDurationSeconds"]
+        == committed_delivery["fullCleanBuildDurationSeconds"],
+        "Committed delivery inputs differ from trusted macOS evidence",
+    )
+    recomputed_delivery = create_delivery_report(
+        candidates["macos"],
+        trusted_mac_trace,
+        repository_root / contract["deliveryMeasurement"]["harnessPath"],
+        timing_paths["macos"],
+        contract=contract,
+    )
+    _require(
+        recomputed_delivery == committed_delivery,
+        "Committed delivery report differs from trusted raw evidence",
+    )
+    expected_linux_build = f"github-{run_id}-{validation['run']['run_attempt']}-linux-x86_64"
+    expected_mac_build = f"github-{run_id}-{validation['run']['run_attempt']}-macos-arm64"
+    report_bindings = reproducibility["candidates"]
+    _require(
+        trusted_mac_binding == mac_binding
+        and mac_binding in report_bindings
+        and linux_binding in report_bindings
+        and linux_binding["environmentIdentity"]["buildRunId"] == expected_linux_build
+        and mac_binding["environmentIdentity"]["buildRunId"] == expected_mac_build
+        and linux_binding["sourceRevision"] == mac_binding["sourceRevision"]
+        and linux_binding["artifactHashes"] == mac_binding["artifactHashes"],
+        "Downloaded candidates differ from committed reproducibility evidence",
+    )
+    _require(
+        validation["jobs"]["linux"]["id"] != validation["jobs"]["macos"]["id"]
+        and linux_binding["environmentIdentity"]["buildRunId"]
+        != mac_binding["environmentIdentity"]["buildRunId"]
+        and linux_binding["validatedEnvironmentProfile"]
+        != mac_binding["validatedEnvironmentProfile"],
+        "Trusted release candidates do not prove two independent executions",
+    )
+    required = _external_binding_requirements(automated_gate)
+    minimum_environments = contract["reproducibility"]["minimumIndependentEnvironments"]
+    expected_required = [
+        {
+            "candidateBindingSha256": binding_sha256(item),
+            "releaseId": item["releaseId"],
+            "sourceRevision": item["sourceRevision"],
+            "receiptBuildRunId": item["environmentIdentity"]["buildRunId"],
+            "validatedEnvironmentProfile": item["validatedEnvironmentProfile"],
+        }
+        for item in report_bindings
+    ]
+    _require(
+        reproducibility["requiredExternalBindings"] == expected_required
+        and required == expected_required
+        and reproducibility["externalProvenanceRequirement"]
+        == {
+            "provider": "github-actions",
+            "candidateBindingRequired": True,
+            "distinctTrustedRunCount": minimum_environments,
+            "distinctValidatedProfileCount": minimum_environments,
+            "receiptProfilesAreProof": False,
+        },
+        "Automated gate requires different external candidate bindings",
+    )
+    integration = _verify_release_merges(
+        api,
+        integration_pr_number,
+        pr_number,
+        mac_binding["sourceRevision"],
+        checked_context,
+        repository_root,
+    )
+    _verify_no_prior_decision(
+        api,
+        run_id,
+        pr_number,
+        mac_binding["releaseId"],
+        mac_binding["sourceRevision"],
+        checked_context,
+        repository_root,
+    )
+    canonical_contract = (
+        json.dumps(contract, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    contract_sha = hashlib.sha256(canonical_contract).hexdigest()
+    return _write_records(
+        output_root,
+        context=checked_context,
+        decision=decision,
+        run_id=run_id,
+        pr_number=pr_number,
+        mac_binding=mac_binding,
+        linux_binding=linux_binding,
+        automated_gate=automated_gate,
+        integration=integration,
+        validation=validation,
+        trusted_timings=trusted_timings,
+        evidence_hashes=evidence_hashes,
+        contract_sha256=contract_sha,
+    )
+
+
+def context_from_environment() -> dict[str, str]:
+    """Read the fixed GitHub context; CLI callers cannot supply authority fields."""
+    names = (
+        "GITHUB_REPOSITORY",
+        "GITHUB_REF",
+        "GITHUB_ACTOR",
+        "GITHUB_TRIGGERING_ACTOR",
+        "GITHUB_WORKFLOW",
+        "GITHUB_WORKFLOW_REF",
+        "SEARISE_OWNER_ENVIRONMENT",
+        "GITHUB_SHA",
+        "GITHUB_RUN_ID",
+        "GITHUB_RUN_ATTEMPT",
+    )
+    return {name: os.environ.get(name, "") for name in names}
