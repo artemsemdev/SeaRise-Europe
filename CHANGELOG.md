@@ -29,6 +29,10 @@ All notable changes to this project will be documented in this file.
 - Added a checksum-first AR6 projection reader, source-native grid lookup, and
   offline real-source goldens with independent Python-reader and browser parity
   across all nine scenario/horizon combinations.
+- Added a protected, owner-only Phase 0R promotion gate that binds the final
+  decision to two trusted GitHub candidate artifacts, raw browser/timing
+  evidence, exact code and evidence merges, and a mandatory permanent
+  owner-record pull request before Phase 1 can unlock.
 
 ### Changed
 
