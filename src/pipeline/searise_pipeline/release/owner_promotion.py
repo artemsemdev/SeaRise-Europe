@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import urllib.error
 import urllib.request
@@ -12,6 +13,8 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from searise_pipeline.science.contracts import ScienceContractError
+
+from .promotion import _validate_binding
 
 REPOSITORY = "artemsemdev/SeaRise-Europe"
 OWNER_LOGIN = "artemsemdev"
@@ -198,3 +201,142 @@ def _exact_positive_decimal(value: str, label: str) -> int:
 def _require(value: bool, message: str) -> None:
     if not value:
         raise ScienceContractError(message)
+
+
+def _exact_object(value: object, keys: set[str], label: str) -> dict[str, Any]:
+    if type(value) is not dict or set(value) != keys:
+        raise ScienceContractError(f"{label} does not match its exact schema")
+    return value
+
+
+def _exact_non_negative_integer(value: object, label: str) -> int:
+    if type(value) is not int or value < 0:
+        raise ScienceContractError(f"{label} must be an exact non-negative integer")
+    return value
+
+
+def _finite_non_negative_number(value: object, label: str) -> float:
+    if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+        raise ScienceContractError(f"{label} must be finite and non-negative")
+    return float(value)
+
+
+def _validate_file_reference(value: object, label: str) -> None:
+    reference = _exact_object(value, {"path", "sha256"}, label)
+    path = Path(reference["path"]) if type(reference["path"]) is str else None
+    _require(
+        path is not None
+        and not path.is_absolute()
+        and bool(reference["path"])
+        and path.as_posix() == reference["path"]
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and type(reference["sha256"]) is str
+        and _SHA256.fullmatch(reference["sha256"]) is not None,
+        f"{label} is not canonical",
+    )
+
+
+def _validate_delivery_report(
+    value: object,
+    *,
+    binding: Mapping[str, Any],
+    contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate the immutable report emitted from the raw delivery trace."""
+    report = _exact_object(
+        value,
+        {
+            "schemaVersion",
+            "status",
+            "candidate",
+            "trace",
+            "buildTiming",
+            "harness",
+            "profiles",
+            "coldLookupSampleCount",
+            "warmLookupSampleCount",
+            "fullCleanBuildDurationSeconds",
+            "browserHeapBytes",
+            "rangeRequestCount",
+            "coldTransferBytes",
+            "lookupP95Milliseconds",
+        },
+        "Delivery report",
+    )
+    _require(
+        type(report["schemaVersion"]) is int and report["schemaVersion"] == 1,
+        "Delivery schema version is invalid",
+    )
+    _require(
+        report["status"] in {"passed", "failed"} and type(report["status"]) is str,
+        "Delivery status is invalid",
+    )
+    observed_binding = _validate_binding(
+        report["candidate"],
+        release_contract_id=contract["releaseContractId"],
+    )
+    _require(observed_binding == binding, "Delivery report is detached from the candidate")
+    _validate_file_reference(report["trace"], "Delivery trace")
+    _validate_file_reference(report["buildTiming"], "Build timing")
+    _validate_file_reference(report["harness"], "Browser harness")
+    profiles = _exact_object(
+        report["profiles"],
+        {"hardware", "network", "browser"},
+        "Delivery profiles",
+    )
+    _require(
+        all(type(profile) is dict and bool(profile) for profile in profiles.values()),
+        "Delivery profiles are incomplete",
+    )
+    specification = contract["deliveryMeasurement"]
+    browser = profiles["browser"]
+    _require(
+        browser.get("engine") == "Chromium"
+        and type(browser.get("version")) is str
+        and bool(browser["version"])
+        and report["harness"]
+        == {
+            "path": specification["harnessPath"],
+            "sha256": specification["harnessSha256"],
+        }
+        and report["trace"]["path"] == "browser-trace-macos-arm64.json"
+        and report["buildTiming"]["path"] == "build-timing-macos-arm64.json",
+        "Delivery tool identity differs from the contract",
+    )
+    _require(
+        _exact_non_negative_integer(
+            report["coldLookupSampleCount"], "Cold lookup sample count"
+        )
+        == specification["minimumColdLookups"]
+        and _exact_non_negative_integer(
+            report["warmLookupSampleCount"], "Warm lookup sample count"
+        )
+        == specification["minimumWarmLookups"],
+        "Delivery report lacks required lookup samples",
+    )
+    metrics = {
+        "buildDurationSeconds": _finite_non_negative_number(
+            report["fullCleanBuildDurationSeconds"], "Build duration"
+        ),
+        "browserHeapBytes": _exact_non_negative_integer(
+            report["browserHeapBytes"], "Browser heap bytes"
+        ),
+        "rangeRequestCount": _exact_non_negative_integer(
+            report["rangeRequestCount"], "Range request count"
+        ),
+        "coldTransferBytes": _exact_non_negative_integer(
+            report["coldTransferBytes"], "Cold transfer bytes"
+        ),
+        "lookupP95Milliseconds": _finite_non_negative_number(
+            report["lookupP95Milliseconds"], "Lookup p95"
+        ),
+    }
+    passed = all(
+        metrics[name] <= contract["budgets"][name]
+        for name in metrics
+    )
+    _require(
+        passed == (report["status"] == "passed"),
+        "Delivery status differs from measured budgets",
+    )
+    return report
