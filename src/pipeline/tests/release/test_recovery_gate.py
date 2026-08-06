@@ -222,7 +222,7 @@ def _source_revision() -> str:
 
 
 def _environment(release: dict[str, object], platform: str) -> dict[str, object]:
-    if platform == "macos-arm64-cp39":
+    if platform == "macos-arm64-cp311":
         environment = _environment_identity(release)
         environment["buildRunId"] = "mac-build"
         return environment
@@ -379,7 +379,7 @@ def _promotion_inputs(tmp_path: Path) -> dict[str, object]:
         candidate,
         release=release,
         source_revision=source_revision,
-        platform="macos-arm64-cp39",
+        platform="macos-arm64-cp311",
     )
     other_binding = _real_candidate(
         other_candidate,

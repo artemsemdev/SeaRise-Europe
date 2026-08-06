@@ -78,3 +78,9 @@ All notable changes to this project will be documented in this file.
   a new product-contract decision through independently validated coastal
   water, bare-earth terrain, methodology v2, and a final reviewed regional
   gate. Historical receipts remain unchanged.
+
+### Fixed
+
+- Restored the macOS ARM64 trusted evidence producer with a supported,
+  hash-locked CPython 3.11 runtime after GitHub retired Python 3.9 from that
+  hosted runner.

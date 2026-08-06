@@ -18,13 +18,22 @@ from searise_pipeline.science import ScienceContractError
 from .test_source_fixture import REPO_ROOT, contract
 
 
+def _current_profile() -> dict[str, object]:
+    profile = contract()["toolchain"]["python"]["profiles"].get(
+        current_python_platform()
+    )
+    if profile is None:
+        pytest.skip("local interpreter is not a pinned release runtime")
+    return profile
+
+
 def _lock_path() -> Path:
-    profile = contract()["toolchain"]["python"]["profiles"][current_python_platform()]
+    profile = _current_profile()
     return REPO_ROOT / profile["lockPath"]
 
 
 def test_current_release_environment_matches_every_locked_distribution() -> None:
-    profile = contract()["toolchain"]["python"]["profiles"][current_python_platform()]
+    profile = _current_profile()
     observed_python = ".".join(map(str, sys.version_info[:3]))
     if observed_python != profile["pythonVersion"]:
         pytest.skip("exact release runtime is validated by the dedicated CI job")
@@ -65,6 +74,8 @@ def test_python_toolchain_rejects_missing_runtime_import(tmp_path: Path) -> None
 
 def test_python_toolchain_rejects_the_other_platform_lock() -> None:
     profiles = contract()["toolchain"]["python"]["profiles"]
+    if current_python_platform() not in profiles:
+        pytest.skip("local interpreter is not a pinned release runtime")
     wrong_profile = next(
         profile for name, profile in profiles.items() if name != current_python_platform()
     )

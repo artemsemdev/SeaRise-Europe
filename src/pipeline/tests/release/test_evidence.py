@@ -93,7 +93,7 @@ def _environment_identity(release: dict[str, object]) -> dict[str, object]:
     assert isinstance(python_pin, dict)
     assert isinstance(tippecanoe, dict)
     assert isinstance(pmtiles, dict)
-    platform = "macos-arm64-cp39"
+    platform = "macos-arm64-cp311"
     vector_platform = "darwin-arm64"
     profile = python_pin["profiles"][platform]
     reference = tippecanoe["referenceBuilds"][vector_platform]
