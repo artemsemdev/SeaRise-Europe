@@ -63,6 +63,13 @@ def _evidence_repository(
     repository = tmp_path / "repository"
     repository.mkdir()
     _git(repository, "init")
+    _git(repository, "config", "user.name", "Artem")
+    _git(
+        repository,
+        "config",
+        "user.email",
+        "6793222+artemsemdev@users.noreply.github.com",
+    )
     _git(repository, "symbolic-ref", "HEAD", "refs/heads/master")
     (repository / "source.txt").write_text("candidate source\n", encoding="utf-8")
     if deleted_path is not None:
