@@ -10,7 +10,7 @@
 
 ## Vision
 
-> Make scenario-based coastal sea-level exposure understandable for people
+> Make scenario-based regional sea-level projections understandable for people
 > exploring European places, without overstating what the science can say.
 
 SeaRise Europe connects authoritative climate data to a familiar city, town,
@@ -45,8 +45,9 @@ scientific work in a reproducible build pipeline.
 ### 1. Scientific honesty
 
 Every result is scenario-based, release-specific, and bounded by known
-limitations. The five result states remain distinct. “No modeled exposure” is
-never presented as “safe,” and missing data is never treated as a zero result.
+limitations. The four result states remain distinct. `ProjectionAvailable`
+reports a median and likely range; it never implies flooding, exposure, or
+safety, and missing data is never treated as a zero result.
 
 ### 2. Place-based clarity
 
@@ -70,7 +71,8 @@ being guessed.
 
 ### 5. Minimal scope, maximum depth
 
-The baseline is Europe, coastal sea-level exposure, three scenarios, and three
+The baseline is Europe, regional relative sea-level projection near the coast,
+three scenarios, and three
 horizons. Street addresses, inland hazards, accounts, and live alerts are not
 quietly pulled into the MVP.
 
@@ -94,7 +96,7 @@ These audiences are working hypotheses until validated through research; see
 
 ## Positioning
 
-SeaRise Europe is a transparent, scenario-based coastal exposure explorer for
+SeaRise Europe is a transparent, scenario-based regional sea-level projection explorer for
 European settlements. It combines a simple place-search experience with
 versioned scientific artifacts and explicit limitations. Unlike a conventional
 request-time application, it precomputes deterministic geospatial work and

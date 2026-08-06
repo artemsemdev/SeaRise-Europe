@@ -43,7 +43,7 @@ not professional advice.
 ### Frustrations and risks
 
 - A precise marker can look more accurate than the underlying raster.
-- “No exposure” can be misread as a safety guarantee.
+- A regional projection can be misread as a local flood or safety result.
 - Provider names used as scenario labels can obscure the actual SSP pathway.
 - A slow or fragile backend undermines confidence even when the data is valid.
 - Exact address language creates expectations the settlement catalog cannot
@@ -70,8 +70,8 @@ need the experience to continue after an intermittent network connection.
 
 - Prepare and repeat a demonstration against a pinned data release.
 - Explain why the three scenarios are possible pathways, not forecasts.
-- Show why `DataUnavailable` differs from
-  `NoModeledExposureDetected`.
+- Show why `DataUnavailable` differs from `ProjectionAvailable`, and why a
+  projection is not a flood assessment.
 - Cite source snapshots, licences, and methodology.
 - Use a cached demo without depending on backend warm-up.
 
@@ -125,7 +125,7 @@ planned and implemented work.
 - The page exposes the data release, code revision, artifact sizes, checks,
   STAC catalog, and signed provenance.
 - Browser tests prove there are no `/assess`, `/geocode`, or `/config` calls.
-- Demo fixtures include all five domain states and basemap/network degradation.
+- Demo fixtures include all four domain states and basemap/network degradation.
 - Migration status is explicit until real data and parity gates pass.
 
 ## Comparison
@@ -143,7 +143,7 @@ planned and implemented work.
 | Hypothesis | Method | Minimum evidence |
 |---|---|---|
 | Non-specialists can find a settlement and interpret a result | Five moderated task sessions across coastal and inland examples | At least 90% task completion; observed language problems recorded |
-| Users distinguish all five states | Screenshot/card comprehension test | At least 80% correctly explain each state and its limits |
+| Users distinguish all four states | Screenshot/card comprehension test | At least 80% correctly explain each state and its limits |
 | Three scenarios and three years are understandable | Think-aloud comparison task | Users identify scenario and horizon without provider-name shortcuts |
 | Offline wording is honest | Network-toggle usability test | Users can tell cached availability from unavailable content |
 | Portfolio story is legible | Three technical-review walkthroughs | Reviewer identifies value, static-first trade-off, limits, and evidence within three minutes |
