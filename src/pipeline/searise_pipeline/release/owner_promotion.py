@@ -45,6 +45,10 @@ VALIDATION_JOB_ID = "ar6-release-evidence"
 VALIDATION_JOB_NAME = "Full-source Linux AR6 candidate"
 MAC_VALIDATION_JOB_ID = "ar6-release-evidence-macos"
 MAC_VALIDATION_JOB_NAME = "Full-source macOS ARM64 AR6 candidate"
+ARTIFACT_NAME_TEMPLATES_BY_PROFILE = {
+    "linux-x86_64": "ar6-linux-candidate-{sourceRevision}-{runId}",
+    "macos-arm64": "ar6-macos-arm64-candidate-{sourceRevision}-{runId}",
+}
 OWNER_ENVIRONMENT = "phase-0r-owner-approval"
 MAC_EVIDENCE_ROOT = Path("src/pipeline/evidence/ar6-regional-release/macos-arm64-cp39")
 SUMMARY_PATH = Path("src/pipeline/evidence/ar6-regional-release-evidence.json")
@@ -86,6 +90,13 @@ _OWNER_RECORD_FILES = {
     "final-gate.json",
     "checksums.txt",
 }
+
+
+def artifact_name(profile: str, source_revision: str, run_id: int) -> str:
+    """Render the canonical artifact name exported by the CI producer contract."""
+    template = ARTIFACT_NAME_TEMPLATES_BY_PROFILE.get(profile)
+    _require(template is not None, f"Unknown release-evidence profile: {profile}")
+    return template.format(sourceRevision=source_revision, runId=run_id)
 
 
 class GitHubApi:
@@ -871,8 +882,8 @@ def _verify_validation_run(
         "Exact Linux and macOS release-validation jobs did not pass independently",
     )
     expected_names = {
-        "linux": f"ar6-linux-candidate-{source_revision}-{run_id}",
-        "macos": f"ar6-macos-arm64-candidate-{source_revision}-{run_id}",
+        "linux": artifact_name("linux-x86_64", source_revision, run_id),
+        "macos": artifact_name("macos-arm64", source_revision, run_id),
     }
     artifact_document = api.get_json(
         f"/repos/{REPOSITORY}/actions/runs/{run_id}/artifacts?per_page=100"
