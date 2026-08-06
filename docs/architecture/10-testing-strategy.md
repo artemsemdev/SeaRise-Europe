@@ -1,8 +1,8 @@
 # 10 — Testing Strategy
 
-> **Status:** Accepted target strategy; Phase 1 locked after the Phase 0 no-go
+> **Status:** Accepted target strategy; Phase 0R owner gate pending
 >
-> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
 > **Quality rule:** no artifact is publishable merely because it builds. Scientific validity, contracts, browser parity, and delivery behaviour are release gates.
 
 The executable inventory, changed-path commands, fixture ownership, and legacy
@@ -22,7 +22,7 @@ flowchart LR
     Publish --> Browser["Search + local assessment"]
 
     Contracts["Schemas + checksums"] -. gate .-> Inspect
-    Science["Golden points + review"] -. gate .-> Transform
+    Science["Pinned AR6 goldens + parity"] -. gate .-> Transform
     Integrity["Format + range tests"] -. gate .-> Artifacts
     E2E["Browser + offline tests"] -. gate .-> Browser
 ```
@@ -33,25 +33,21 @@ the smaller gates pass and still cannot publish without the full release gate.
 
 ## 2. Phase 0 scientific gate
 
-Phase 0 precedes the static migration and uses real, licensed inputs for a
-small representative region. It must answer questions the existing synthetic
-pipeline cannot answer:
+Phase 0R precedes the static migration and uses the locked, licensed AR6 source
+with independently extracted golden values. Its active gates are:
 
 1. Inspect the actual IPCC AR6 dimensions, coordinate model, quantiles, units,
    and missing values.
-2. Document how location-based projections become an analysis grid; do not
-   assume a regular latitude/longitude raster.
-3. Confirm DEM product/resolution, CRS, vertical datum, resampling, and nodata
-   treatment.
-4. Compare the checked-in coastal approximation with the intended canonical
-   coastal product.
-5. Test coastline connectivity and disconnected inland false positives only
-   after the approved uncertainty interval produces vertically eligible cells.
-6. Compare independently reviewed control locations with the derived array
-   and browser lookup.
-7. Measure COG/PMTiles size, byte-range count, lookup latency, map quality, and
-   browser memory.
-8. Complete redistribution and attribution review.
+2. Preserve native grid location IDs, exact integer millimetres, required
+   quantiles, nodata, and scope precedence without interpolation or fallback.
+3. Compare independently extracted NetCDF values and source identities with
+   Python, TypeScript, COG, GeoParquet, PMTiles, and real browser lookup.
+4. Prove archive/member hashes, licences, attribution, manifest/STAC, receipts,
+   candidate binding, and cross-environment reproducibility.
+5. Measure COG/PMTiles size, build duration, byte-range count and bytes, cold
+   and warm lookup latency, and browser memory.
+6. Bind the owner disposition to the exact trusted build and evidence-only
+   merge topology; CI cannot approve it.
 
 The [Phase 0.14 gate](../evidence/phase-0-14-final-no-go.md) preserves the
 terminal v1 binary result as `complete-with-no-go`. Permanent regression tests
@@ -213,14 +209,15 @@ purpose:
 - `synthetic`: proves code behaviour only;
 - `source-sample`: a pinned excerpt of a real source where redistribution is
   permitted;
-- `golden`: independently reviewed expected result with methodology/release;
+- `golden`: expected AR6 values, source identity, and selection result extracted
+  independently from a pinned source with complete provenance;
 - `invalid`: deliberately corrupt schema, geometry, COG, PMTiles, or index.
 
 Each golden coordinate records longitude, latitude, expected support/coastal
-classification, expected pixel class or nodata, scenario, horizon,
-methodology, and rationale. Python and TypeScript consume the same serialized
-fixture. Synthetic results must never be presented as evidence that the real
-Europe-wide data is valid.
+classification, source location ID and coordinates, distance, q0.167/q0.5/
+q0.833 values or nodata reason, scenario, horizon, method, and provenance.
+Python and TypeScript consume the same serialized fixture. Synthetic results
+must never be presented as evidence that the real Europe-wide data is valid.
 
 ## 5. CI and release fitness functions
 

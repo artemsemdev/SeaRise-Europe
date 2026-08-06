@@ -1,8 +1,8 @@
 # 16 — Offline Geospatial Data Pipeline
 
-> **Status:** Accepted target design; not yet implemented end to end with real sources
+> **Status:** Phase 0R artifact path implemented; trusted full-source gate pending
 >
-> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
 > **Publication warning:** the repository's current `demo.tif` and synthetic tests prove software mechanics only. They are not scientific evidence or a production data release.
 
 ## 1. Purpose
@@ -18,7 +18,7 @@ flowchart LR
     Fetch --> Inspect["Inspect real schemas/units"]
     Inspect --> Geo["Normalize geometry + settlements"]
     Inspect --> Raster["Normalize raster/projection inputs"]
-    Geo --> Compute["Build classified arrays"]
+    Geo --> Compute["Build projection arrays"]
     Raster --> Compute
     Compute --> Pack["COG + PMTiles + GeoParquet + indexes"]
     Pack --> QA["Scientific + contract + artifact QA"]
@@ -275,7 +275,8 @@ promotion.
 1. Implement the Phase 0 regional spike and source-inspection reports.
 2. Define schemas and shared Python/TypeScript golden fixtures.
 3. Add DuckDB Spatial boundary/GeoNames processing and GeoParquet/index output.
-4. Produce COG and PMTiles from one classified array and prove exact parity.
+4. Produce COG, GeoParquet, and PMTiles from the same projection arrays and
+   prove exact integer/source-ID parity.
 5. Generate manifest, static STAC, provenance, and signature bundle.
 6. Publish a non-production immutable release and run public delivery tests.
 7. Build all nine real-data layers and complete old/new browser parity.
