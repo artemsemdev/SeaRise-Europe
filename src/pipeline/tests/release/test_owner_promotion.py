@@ -6,11 +6,19 @@ import hashlib
 import importlib.util
 import io
 import json
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 import searise_pipeline.release.owner_promotion as owner_promotion
+from searise_pipeline.release import create_delivery_report
+from searise_pipeline.release.evidence import binding_sha256, sha256
+from searise_pipeline.science import ScienceContractError
+
+from .test_recovery_gate import BUILD_CHECKS, _finalize, _promotion_inputs
 
 REPOSITORY_ROOT = Path(__file__).parents[4]
 
@@ -55,6 +63,13 @@ def _evidence_repository(
     repository = tmp_path / "repository"
     repository.mkdir()
     _git(repository, "init")
+    _git(repository, "config", "user.name", "Artem")
+    _git(
+        repository,
+        "config",
+        "user.email",
+        "6793222+artemsemdev@users.noreply.github.com",
+    )
     _git(repository, "symbolic-ref", "HEAD", "refs/heads/master")
     (repository / "source.txt").write_text("candidate source\n", encoding="utf-8")
     if deleted_path is not None:
@@ -391,3 +406,637 @@ class FakeHttpResponse:
 
     def read(self, size: int = -1) -> bytes:
         return self._body.read(size)
+
+
+def _synthetic_binding(
+    release: dict[str, object],
+    source_revision: str,
+    environment: dict[str, object],
+) -> dict[str, object]:
+    artifact_hashes = {f"artifact-{index:02d}": "a" * 64 for index in range(31)}
+    vector = environment["vector"]
+    python = environment["python"]
+    return {
+        "releaseId": "phase-0r-ar6-v1",
+        "releaseContractId": release["releaseContractId"],
+        "manifestSha256": "b" * 64,
+        "buildReceiptSha256": "c" * 64,
+        "buildEvidenceSha256": "d" * 64,
+        "sourceReceiptSha256": "e" * 64,
+        "artifactHashes": artifact_hashes,
+        "candidateFileHashes": artifact_hashes,
+        "sourceRevision": source_revision,
+        "environmentIdentity": environment,
+        "validatedEnvironmentProfile": {
+            "pythonPlatform": python["platform"],
+            "pythonLockSha256": python["lock_sha256"],
+            "vectorPlatform": vector["pmtiles_distribution_platform"],
+            "tippecanoeBinarySha256": vector["tippecanoe_binary_sha256"],
+        },
+    }
+
+
+def _reproducibility_report(
+    release: dict[str, object],
+    mac: dict[str, object],
+    linux: dict[str, object],
+) -> dict[str, object]:
+    candidates = [mac, linux]
+    profiles = sorted(
+        {tuple(item["validatedEnvironmentProfile"].items()) for item in candidates}
+    )
+    required = [
+        {
+            "candidateBindingSha256": binding_sha256(item),
+            "releaseId": item["releaseId"],
+            "sourceRevision": item["sourceRevision"],
+            "receiptBuildRunId": item["environmentIdentity"]["buildRunId"],
+            "validatedEnvironmentProfile": item["validatedEnvironmentProfile"],
+        }
+        for item in candidates
+    ]
+    minimum = release["reproducibility"]["minimumIndependentEnvironments"]
+    return {
+        "schemaVersion": 1,
+        "status": "pending-external-provenance",
+        "localComparisonStatus": "passed",
+        "externalProvenanceStatus": "required",
+        "candidates": candidates,
+        "environments": [item["environmentIdentity"] for item in candidates],
+        "independentEnvironmentCount": 0,
+        "receiptProfileCount": len(profiles),
+        "receiptProfiles": [dict(profile) for profile in profiles],
+        "requiredExternalBindings": required,
+        "externalProvenanceRequirement": {
+            "provider": "github-actions",
+            "candidateBindingRequired": True,
+            "distinctTrustedRunCount": minimum,
+            "distinctValidatedProfileCount": minimum,
+            "receiptProfilesAreProof": False,
+        },
+        "maximumScientificValueDifferenceMillimetres": 0,
+        "validIdSetDifference": 0,
+        "byteIdentityWithinPinnedToolchain": True,
+        "comparedArtifactCount": 31,
+        "comparisonDurationSeconds": 1.0,
+    }
+
+
+def _promotion_evidence(source_revision: str):
+    release = json.loads(
+        (REPOSITORY_ROOT / owner_promotion.CONTRACT_PATH).read_text(encoding="utf-8")
+    )
+    mac = _synthetic_binding(
+        release,
+        source_revision,
+        _pinned_environment(
+            release,
+            platform="macos-arm64-cp39",
+            vector_platform="darwin-arm64",
+            build_run_id="github-101-1-macos-arm64",
+        ),
+    )
+    linux = _synthetic_binding(
+        release,
+        source_revision,
+        _pinned_environment(
+            release,
+            platform="linux-x86_64-cp311",
+            vector_platform="linux-x86_64",
+            build_run_id="github-101-1-linux-x86_64",
+        ),
+    )
+    report = _reproducibility_report(release, mac, linux)
+    gate = {
+        "schemaVersion": 1,
+        "gateId": "phase-0r-ar6-regional-release-v1",
+        "automatedValidation": "pending",
+        "releaseDisposition": "pending-owner",
+        "phase1Unlocked": False,
+        "checks": {**BUILD_CHECKS, "crossEnvironmentReproducibility": False},
+        "blockingChecks": ["crossEnvironmentReproducibility"],
+        "fallback": "do-not-publish-or-unlock-phase-1",
+        "externalVerificationRequired": {
+            "reproducibilityProvenance": {
+                "status": "pending-external-verification",
+                "provider": "github-actions",
+                "requiredExternalBindings": report["requiredExternalBindings"],
+            }
+        },
+    }
+    evidence_hashes = {
+        "candidate-binding.json": "1" * 64,
+        "build-receipt.json": "2" * 64,
+        "build-timing-macos-arm64.json": hashlib.sha256(_timing_bytes(mac)).hexdigest(),
+        "browser-trace-macos-arm64.json": hashlib.sha256(_trace_bytes()).hexdigest(),
+        "delivery-report.json": "3" * 64,
+        "reproducibility-report.json": "4" * 64,
+        "automated-gate.json": "5" * 64,
+        "checksums.txt": "6" * 64,
+    }
+    return mac, linux, report, gate, evidence_hashes, _committed_delivery(mac)
+
+
+def _candidate_oracle(mac: dict[str, object], linux: dict[str, object]):
+    def binding(candidate: Path, *, contract: dict[str, object]):
+        del contract
+        return mac if "macos-extracted" in candidate.parts else linux
+
+    return binding
+
+
+def _pinned_environment(
+    release: dict[str, object],
+    *,
+    platform: str,
+    vector_platform: str,
+    build_run_id: str,
+) -> dict[str, object]:
+    toolchain = release["toolchain"]
+    python = toolchain["python"]
+    tippecanoe = toolchain["tippecanoe"]
+    pmtiles = toolchain["pmtiles"]
+    profile = python["profiles"][platform]
+    reference = tippecanoe["referenceBuilds"][vector_platform]
+    asset = pmtiles["assets"][vector_platform]
+    return {
+        "buildRunId": build_run_id,
+        "python": {
+            "platform": platform,
+            "python_version": profile["pythonVersion"],
+            "lock_path": profile["lockPath"],
+            "lock_sha256": profile["lockSha256"],
+            "packages": python["packageVersions"],
+            "gdal_version": profile["gdal"],
+            "rasterio_proj_version": profile["rasterioProj"],
+            "pyproj_proj_version": profile["pyprojProj"],
+        },
+        "vector": {
+            "tippecanoe_version": tippecanoe["version"],
+            "tippecanoe_source_sha256": tippecanoe["sourceSha256"],
+            "tippecanoe_binary_sha256": reference["tippecanoeBinarySha256"],
+            "pmtiles_version": pmtiles["version"],
+            "pmtiles_commit": pmtiles["commit"],
+            "pmtiles_distribution_platform": vector_platform,
+            "pmtiles_distribution_sha256": asset["sha256"],
+            "decode_binary_sha256": reference["decodeBinarySha256"],
+        },
+    }
+
+
+def _write_json(path: Path, document: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _committed_bundle(repository_root: Path, source_revision: str) -> Path:
+    root = repository_root / owner_promotion.MAC_EVIDENCE_ROOT
+    root.mkdir(parents=True)
+    receipt = {
+        "releaseId": "phase-0r-ar6-v1",
+        "sourceRevision": source_revision,
+        "environmentIdentity": {"buildRunId": "local-mac-build"},
+    }
+    _write_json(root / "build-receipt.json", receipt)
+    binding = {
+        "releaseId": receipt["releaseId"],
+        "sourceRevision": source_revision,
+        "environmentIdentity": receipt["environmentIdentity"],
+        "manifestSha256": "a" * 64,
+        "buildReceiptSha256": sha256(root / "build-receipt.json"),
+    }
+    _write_json(root / "candidate-binding.json", binding)
+    (root / "build-timing-macos-arm64.json").write_bytes(_timing_bytes(binding))
+    (root / "browser-trace-macos-arm64.json").write_bytes(_trace_bytes())
+    delivery = {
+        "status": "passed",
+        "trace": {
+            "path": "browser-trace-macos-arm64.json",
+            "sha256": sha256(root / "browser-trace-macos-arm64.json"),
+        },
+        "buildTiming": {
+            "path": "build-timing-macos-arm64.json",
+            "sha256": sha256(root / "build-timing-macos-arm64.json"),
+        },
+        "harness": {"path": "harness.mjs", "sha256": "9" * 64},
+    }
+    _write_json(root / "delivery-report.json", delivery)
+    reproducibility = {
+        "status": "pending-external-provenance",
+        "localComparisonStatus": "passed",
+        "externalProvenanceStatus": "required",
+        "requiredExternalBindings": [],
+    }
+    _write_json(root / "reproducibility-report.json", reproducibility)
+    delivery_hash = sha256(root / "delivery-report.json")
+    reproducibility_hash = sha256(root / "reproducibility-report.json")
+    _write_json(
+        root / "automated-gate.json",
+        {
+            "schemaVersion": 1,
+            "gateId": "phase-0r-ar6-regional-release-v1",
+            "issue": 110,
+            "releaseId": binding["releaseId"],
+            "scientificDisposition": "projection-only",
+            "automatedValidation": "pending",
+            "releaseDisposition": "pending-owner",
+            "phase1Unlocked": False,
+            "blockingChecks": ["crossEnvironmentReproducibility"],
+            "fallback": "do-not-publish-or-unlock-phase-1",
+            "checks": {
+                **BUILD_CHECKS,
+                "crossEnvironmentReproducibility": False,
+                "deliveryMeasurements": True,
+            },
+            "evidenceBindings": {
+                "candidateBindingSha256": binding_sha256(binding),
+                "manifestSha256": binding["manifestSha256"],
+                "deliveryReportSha256": delivery_hash,
+                "deliveryTraceSha256": delivery["trace"]["sha256"],
+                "buildTimingSha256": delivery["buildTiming"]["sha256"],
+                "browserHarnessSha256": delivery["harness"]["sha256"],
+                "reproducibilityReportSha256": reproducibility_hash,
+            },
+            "externalVerificationRequired": {
+                "reproducibilityProvenance": {
+                    "status": "pending-external-verification",
+                    "provider": "github-actions",
+                    "requiredExternalBindings": reproducibility[
+                        "requiredExternalBindings"
+                    ],
+                }
+            },
+        },
+    )
+    hashes = {name: sha256(root / name) for name in owner_promotion._BUNDLE_FILES}
+    (root / "checksums.txt").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items()),
+        encoding="utf-8",
+    )
+    summary_files = {
+        (owner_promotion.MAC_EVIDENCE_ROOT / name).as_posix(): digest
+        for name, digest in {
+            **hashes,
+            "checksums.txt": sha256(root / "checksums.txt"),
+        }.items()
+    }
+    _write_json(
+        repository_root / owner_promotion.SUMMARY_PATH,
+        {
+            "schemaVersion": 1,
+            "releaseId": binding["releaseId"],
+            "sourceRevision": source_revision,
+            "integrationPullRequest": 201,
+            "committedEvidence": {"files": summary_files},
+        },
+    )
+    return root
+
+
+def _refresh_committed_bundle(repository_root: Path) -> None:
+    root = repository_root / owner_promotion.MAC_EVIDENCE_ROOT
+    hashes = {name: sha256(root / name) for name in owner_promotion._BUNDLE_FILES}
+    (root / "checksums.txt").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items()),
+        encoding="utf-8",
+    )
+    summary_path = repository_root / owner_promotion.SUMMARY_PATH
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["committedEvidence"]["files"] = {
+        (owner_promotion.MAC_EVIDENCE_ROOT / name).as_posix(): digest
+        for name, digest in {
+            **hashes,
+            "checksums.txt": sha256(root / "checksums.txt"),
+        }.items()
+    }
+    _write_json(summary_path, summary)
+
+
+def test_committed_bundle_is_bound_by_checksums_and_summary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    binding = json.loads((root / "candidate-binding.json").read_text())
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    observed, _, _, hashes, integration_pr, _ = owner_promotion._load_committed_evidence(
+        tmp_path,
+        {
+            "releaseContractId": "ar6-europe-regional-release-v1",
+            "scientificDisposition": "projection-only",
+        },
+    )
+
+    assert observed == binding
+    assert integration_pr == 201
+    assert set(hashes) == {*owner_promotion._BUNDLE_FILES, "checksums.txt"}
+
+
+def test_committed_bundle_tampering_fails_before_owner_decision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    (root / "delivery-report.json").write_text('{"status":"failed"}\n')
+
+    with pytest.raises(ScienceContractError, match="differs from checksums"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("schemaVersion", True),
+        ("issue", True),
+        ("fallback", "publish-anyway"),
+        ("unexpected", "claim"),
+    ],
+)
+def test_committed_gate_requires_exact_contract_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    gate_path = root / "automated-gate.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate[field] = value
+    _write_json(gate_path, gate)
+    _refresh_committed_bundle(tmp_path)
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    with pytest.raises(ScienceContractError, match="strict pending-external"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+
+def test_committed_gate_rejects_nested_external_verification_claim(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = _committed_bundle(tmp_path, _head())
+    gate_path = root / "automated-gate.json"
+    gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    gate["externalVerificationRequired"]["unexpected"] = "claim"
+    _write_json(gate_path, gate)
+    _refresh_committed_bundle(tmp_path)
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    with pytest.raises(ScienceContractError, match="external binding set"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "nested"),
+    [
+        ("integrationPullRequest", True, False),
+        ("unexpected", "claim", False),
+        ("unexpected", "claim", True),
+    ],
+)
+def test_committed_summary_requires_exact_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+    nested: bool,
+) -> None:
+    _committed_bundle(tmp_path, _head())
+    summary_path = tmp_path / owner_promotion.SUMMARY_PATH
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    target = summary["committedEvidence"] if nested else summary
+    target[field] = value
+    _write_json(summary_path, summary)
+    monkeypatch.setattr(owner_promotion, "_validate_binding", lambda value, **_: value)
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_delivery_report",
+        lambda value, **_: value,
+    )
+    monkeypatch.setattr(
+        owner_promotion,
+        "_validate_reproducibility_report",
+        lambda value, **_: value,
+    )
+
+    with pytest.raises(ScienceContractError, match="summary is detached"):
+        owner_promotion._load_committed_evidence(
+            tmp_path,
+            {
+                "releaseContractId": "ar6-europe-regional-release-v1",
+                "scientificDisposition": "projection-only",
+            },
+        )
+
+
+def test_real_finalizer_output_hands_off_to_owner_validation(tmp_path: Path) -> None:
+    inputs = _promotion_inputs(tmp_path)
+    canonical_timing = tmp_path / "evidence/build-timing-macos-arm64.json"
+    inputs["timing"].rename(canonical_timing)
+    inputs["timing"] = canonical_timing
+    canonical_trace = tmp_path / "evidence/browser-trace-macos-arm64.json"
+    inputs["trace"].rename(canonical_trace)
+    inputs["trace"] = canonical_trace
+    gate = _finalize(inputs)
+    delivery = create_delivery_report(
+        inputs["candidate"],
+        inputs["trace"],
+        inputs["harness"],
+        inputs["timing"],
+        contract=inputs["release"],
+    )
+    binding = inputs["binding"]
+    root = tmp_path / owner_promotion.MAC_EVIDENCE_ROOT
+    root.mkdir(parents=True)
+    _write_json(root / "candidate-binding.json", binding)
+    shutil.copyfile(inputs["candidate"] / "build-receipt.json", root / "build-receipt.json")
+    shutil.copyfile(inputs["timing"], root / "build-timing-macos-arm64.json")
+    shutil.copyfile(inputs["trace"], root / "browser-trace-macos-arm64.json")
+    (root / "delivery-report.json").write_text(
+        json.dumps(delivery, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n",
+        encoding="utf-8",
+    )
+    shutil.copyfile(inputs["reproducibility"], root / "reproducibility-report.json")
+    _write_json(root / "automated-gate.json", gate)
+    hashes = {name: sha256(root / name) for name in owner_promotion._BUNDLE_FILES}
+    (root / "checksums.txt").write_text(
+        "".join(f"{digest}  {name}\n" for name, digest in hashes.items()),
+        encoding="utf-8",
+    )
+    summary_hashes = {
+        **hashes,
+        "checksums.txt": sha256(root / "checksums.txt"),
+    }
+    _write_json(
+        tmp_path / owner_promotion.SUMMARY_PATH,
+        {
+            "schemaVersion": 1,
+            "releaseId": binding["releaseId"],
+            "sourceRevision": binding["sourceRevision"],
+            "integrationPullRequest": 201,
+            "committedEvidence": {
+                "files": {
+                    (owner_promotion.MAC_EVIDENCE_ROOT / name).as_posix(): digest
+                    for name, digest in summary_hashes.items()
+                }
+            },
+        },
+    )
+
+    observed = owner_promotion._load_committed_evidence(
+        tmp_path,
+        inputs["release"],
+    )
+
+    assert observed[0] == binding
+    assert observed[2] == gate
+    assert observed[4] == 201
+    assert observed[5] == delivery
+
+
+def test_direct_descendant_accepts_only_complete_evidence_delta(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(tmp_path)
+
+    records = owner_promotion._verify_evidence_only_delta(
+        repository,
+        source_revision,
+        evidence_revision,
+    )
+
+    assert set(records) == set(owner_promotion._REQUIRED_EVIDENCE_DELTA)
+    assert all(record["status"] == "A" for record in records.values())
+    assert all(len(record["sha256"]) == 64 for record in records.values())
+
+
+@pytest.mark.parametrize(
+    "extra_path",
+    [
+        "src/pipeline/searise_pipeline/release/gate.py",
+        ".github/workflows/ci.yml",
+        "src/pipeline/science/ar6-regional-release.json",
+        "docs/architecture/README.md",
+    ],
+)
+def test_evidence_delta_rejects_code_workflow_contract_and_unlisted_docs(
+    tmp_path: Path,
+    extra_path: str,
+) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        extra_path=extra_path,
+    )
+
+    with pytest.raises(ScienceContractError, match="forbidden (path|change)"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+def test_evidence_delta_rejects_deletion(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        deleted_path="CHANGELOG.md",
+    )
+
+    with pytest.raises(ScienceContractError, match="forbidden change"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+
+@pytest.mark.parametrize("entry_kind", ["symlink", "submodule"])
+def test_evidence_delta_rejects_symlink_and_submodule(
+    tmp_path: Path,
+    entry_kind: str,
+) -> None:
+    target = owner_promotion._REQUIRED_EVIDENCE_DELTA[0]
+    options = {f"{entry_kind}_path": target}
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        **options,
+    )
+
+    with pytest.raises(ScienceContractError, match="symlink or submodule"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+
+def test_evidence_delta_rejects_uncommitted_checkout_tampering(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(tmp_path)
+    path = repository / owner_promotion._REQUIRED_EVIDENCE_DELTA[0]
+    path.write_text("uncommitted replacement\n", encoding="utf-8")
+
+    with pytest.raises(ScienceContractError, match="checkout bytes differ"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
+
+
+def test_evidence_delta_rejects_reverted_intermediate_code_change(tmp_path: Path) -> None:
+    repository, source_revision, evidence_revision, _ = _evidence_repository(
+        tmp_path,
+        reverted_path="src/pipeline/searise_pipeline/release/gate.py",
+    )
+
+    with pytest.raises(ScienceContractError, match="forbidden (path|change)"):
+        owner_promotion._verify_evidence_only_delta(
+            repository,
+            source_revision,
+            evidence_revision,
+        )
