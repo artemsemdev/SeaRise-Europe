@@ -39,7 +39,6 @@ flowchart LR
 | Boundary | Direction/time | Contract | Failure policy |
 |---|---|---|---|
 | IPCC AR6 | Inbound, build time | Pinned source URL/version, size, SHA-256, documented dimensions/units/licence | Fail build; never fall back to an unrecorded release |
-| Copernicus DEM/coastal data | Inbound, build time | Pinned product/version, CRS/datum/licence, size and SHA-256 | Fail build; no runtime acquisition |
 | GeoNames + alternate names | Inbound, build time | Pinned snapshot, feature-code policy, CC BY attribution, normalized schema | Fail build or explicitly quarantine invalid rows with counts |
 | Natural Earth | Inbound, build time | Pinned version/checksum and derived-geometry parameters | Fail geometry build |
 | Pipeline -> release | Internal, release time | Manifest/JSON Schema, static STAC, GeoParquet schemas, PMTiles/COG validation, provenance | Block publication on any incomplete or inconsistent contract |

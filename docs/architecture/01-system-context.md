@@ -27,7 +27,7 @@ API.
 | Public visitor | Searches for a settlement, selects a scenario and horizon, explores the map, and reads methodology and limitations. No account is required. |
 | Portfolio reviewer | Inspects the architecture page, release provenance, fitness results, open formats, cost model, and source code. |
 | Maintainer | Pins source snapshots, runs and reviews the offline build, publishes an immutable release, and can roll back to an earlier app/release pair. |
-| IPCC, Copernicus, GeoNames, Natural Earth | Versioned upstream sources used only by the offline build plane. They are not request-time dependencies. |
+| IPCC, GeoNames, Natural Earth | Versioned upstream sources used only by the offline build plane. They are not request-time dependencies. |
 | Static host and object storage/CDN | Deliver the application shell, metadata, search indexes, and byte ranges from large geospatial artifacts. |
 | OpenFreeMap | Supplies non-authoritative visual context. Search and assessment remain functional if it is unavailable. |
 | GitHub Actions | Validates and publishes reviewed releases; it is outside the user request path. |
@@ -68,7 +68,7 @@ flowchart LR
         Evidence[Architecture, methodology and provenance]
     end
 
-    Sources[IPCC / Copernicus / GeoNames / Natural Earth]
+    Sources[IPCC / GeoNames / Natural Earth]
     Host[Static host + object storage/CDN]
     Basemap[OpenFreeMap]
     CI[GitHub Actions]

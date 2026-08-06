@@ -29,7 +29,7 @@ flowchart LR
 
 | Realm | Content | Location | Writer | Runtime reader |
 |---|---|---|---|---|
-| Source cache | Original IPCC, Copernicus, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
+| Source cache | Original IPCC, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
 | Build workspace | Normalized arrays, temporary rasters, DuckDB files, intermediate tables | Ephemeral local/CI workspace | Offline pipeline | None |
 | Release artifacts | Manifest, config, boundaries, search indexes, COG, PMTiles, GeoParquet, STAC, provenance | Versioned static host/object storage | Controlled publish job | Browser and reviewers |
 | Browser cache | App shell, config, search indexes, and requested byte ranges | User device | Service worker/browser | Browser only |
@@ -207,7 +207,7 @@ and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
 - Raw files are not published by default; redistribution must be explicitly
   permitted.
 - Every derivative maps to its source, licence, attribution, and checksum.
-- IPCC AR6, Copernicus, GeoNames, Natural Earth, and basemap attribution follow
+- IPCC AR6, GeoNames, Natural Earth, and basemap attribution follow
   the exact terms recorded in the release manifest.
 - Source and artifact SHA-256 values are verified before use and after upload.
 - The browser rejects an unsupported manifest schema or mismatched pinned

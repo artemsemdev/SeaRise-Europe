@@ -7,12 +7,12 @@
 ## Architecture in one paragraph
 
 SeaRise Europe is becoming a static geospatial data product. A reproducible
-offline pipeline acquires pinned IPCC, Copernicus, GeoNames, and Natural Earth
+offline pipeline acquires pinned IPCC, GeoNames, and Natural Earth
 snapshots; validates and packages immutable COG, PMTiles, GeoParquet, JSON, and
 STAC artifacts; and publishes them with checksums and signed provenance. A
 static React browser application searches settlements, validates scope, and
-returns one of four projection result states locally. Production has no application
-API, runtime database, tile server, or geocoding service.
+returns one of four projection result states locally. Production has no
+application API, runtime database, tile server, or geocoding service.
 
 ```mermaid
 flowchart LR

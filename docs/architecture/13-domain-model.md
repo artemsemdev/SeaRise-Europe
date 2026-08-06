@@ -466,15 +466,15 @@ result is discarded because it no longer matches the current selection token.
 
 | Term | Definition |
 |---|---|
-| Assessment | Deterministic classification of one selection against one immutable release. |
-| Modeled exposure | Binary output of the published scientific method; not observed flooding or probability. |
+| Assessment | Deterministic projection lookup for one selection against one immutable release. |
+| Regional relative sea-level projection | AR6 change relative to the 1995–2014 mean at the selected native grid location; not an absolute water level, flooding, exposure, or probability. |
 | Europe support geometry | Versioned boundary deciding whether a coordinate is supported. |
 | Coastal analysis zone | Versioned product-scope geometry; initially the documented 25 km approximation pending source validation. |
 | Data release | Immutable aggregate of artifacts, metadata, source records, quality evidence, and methodology. |
-| Analysis artifact | Lossless artifact used for exact classified lookup. |
+| Analysis artifact | Lossless artifact used for exact q0.167/q0.5/q0.833 projection lookup. |
 | Visual artifact | Map-optimized representation used for display. |
 | Settlement catalog | Versioned, normalized set of qualifying GeoNames populated places. |
-| Domain result | One of the five fixed `ResultState` values. |
+| Domain result | One of the four fixed `ResultState` values. |
 | Technical error | Delivery or execution failure that must never be disguised as a domain result. |
 
 ## Migration note
