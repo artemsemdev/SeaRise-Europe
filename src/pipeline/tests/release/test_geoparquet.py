@@ -34,7 +34,8 @@ def geoparquet_case(tmp_path_factory: pytest.TempPathFactory):
     source = _real_source()
     path = tmp_path_factory.mktemp("geoparquet") / "baseline.parquet"
     write_geoparquet(source, path, contract=contract())
-    return source, pq.read_table(path), pq.ParquetFile(path).metadata.metadata
+    table = pq.read_table(path)
+    return source, table, table.schema.metadata
 
 
 def test_geoparquet_is_byte_deterministic_and_exact(tmp_path: Path) -> None:
@@ -47,9 +48,9 @@ def test_geoparquet_is_byte_deterministic_and_exact(tmp_path: Path) -> None:
     validate_geoparquet(first, source, contract=contract())
 
     assert first.read_bytes() == second.read_bytes()
-    assert (pq.ParquetFile(first).metadata.metadata or {})[b"ARROW:schema"] == (
-        geoparquet_module._CANONICAL_ARROW_SCHEMA
-    )
+    assert first.read_bytes().count(b"ARROW:schema") == 1
+    schema_metadata = pq.read_table(first).schema.metadata or {}
+    assert list(schema_metadata) == sorted(schema_metadata)
     assert first_evidence.sha256 == second_evidence.sha256
     assert first_evidence.row_count == 27489
     assert first_evidence.byte_size <= contract()["budgets"]["geoparquetBytes"]
@@ -108,7 +109,6 @@ def test_geoparquet_rejects_semantic_tampering(
     release = contract()
     specification = release["artifacts"]["geoparquet"]
     metadata = dict(file_metadata or {})
-    metadata[b"ARROW:schema"] = geoparquet_module._CANONICAL_ARROW_SCHEMA
     table = baseline.replace_schema_metadata(metadata)
     compression = specification["compression"]
     row_group_size = specification["rowGroupSize"]
@@ -171,3 +171,26 @@ def test_geoparquet_rejects_semantic_tampering(
 
     with pytest.raises(ScienceContractError, match=message):
         validate_geoparquet(path, source, contract=release)
+
+
+def test_geoparquet_rejects_duplicate_arrow_schema(tmp_path: Path) -> None:
+    source = _real_source()
+    baseline = tmp_path / "baseline.parquet"
+    duplicate = tmp_path / "duplicate.parquet"
+    write_geoparquet(source, baseline, contract=contract())
+
+    table = pq.read_table(baseline)
+    metadata = dict(table.schema.metadata or {})
+    metadata[b"ARROW:schema"] = (pq.ParquetFile(baseline).metadata.metadata or {})[
+        b"ARROW:schema"
+    ]
+    pq.write_table(
+        table.replace_schema_metadata(metadata),
+        duplicate,
+        compression=contract()["artifacts"]["geoparquet"]["compression"],
+        row_group_size=contract()["artifacts"]["geoparquet"]["rowGroupSize"],
+        use_dictionary=["scenario"],
+    )
+
+    with pytest.raises(ScienceContractError, match="one canonical Arrow schema"):
+        validate_geoparquet(duplicate, source, contract=contract())
