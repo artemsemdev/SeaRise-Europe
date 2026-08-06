@@ -14,8 +14,9 @@ Unless a test is specifically exercising one of these inputs, use:
   replay seed and keep minimized regressions as tables;
 - ordering: sort filesystem, feature, object-key, and equal-score inputs by the
   documented stable key before assertions;
-- floating point: compare exact class integers and nodata masks; use a stated
-  tolerance only for continuous scientific controls;
+- numeric evidence: compare source location IDs and integer-millimetre
+  q0.167/q0.5/q0.833 values exactly; use the registered tolerance only for
+  published metre conversions and reported distance;
 - concurrency: await or control work explicitly; never use sleep as readiness;
 - identifiers: fixed builders or injected factories, not ambient UUID/time.
 
@@ -58,7 +59,7 @@ viewport. The production-static suite introduced by #70 must include:
 
 Screenshot tests mask only documented volatile external pixels; result text,
 attribution, focus, state, and map alternatives remain asserted semantically.
-Snapshots cannot be the sole evidence for the five domain states.
+Snapshots cannot be the sole evidence for the four domain states.
 
 ## Performance profiles
 

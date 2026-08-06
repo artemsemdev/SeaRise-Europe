@@ -1,0 +1,212 @@
+"""Lossless three-band Cloud Optimized GeoTIFF output for AR6 projections."""
+
+from __future__ import annotations
+
+import hashlib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Mapping
+
+import numpy as np
+import rasterio
+from rasterio.io import MemoryFile
+from rasterio.transform import from_origin
+from rio_cogeo.cogeo import cog_validate
+
+from searise_pipeline.science.contracts import ScienceContractError
+
+from .model import RegionalLayer
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+@dataclass(frozen=True)
+class CogEvidence:
+    """Deterministic identity and source-domain statistics for one COG."""
+
+    path: str
+    byte_size: int
+    sha256: str
+    valid_cells: int
+    nodata_cells: int
+
+
+def _nearest_overviews(values: np.ndarray, *, count: int, nodata: int) -> list[np.ndarray]:
+    """Build canonical overviews independently from the stored COG overviews."""
+    with MemoryFile() as memory:
+        with memory.open(
+            driver="COG",
+            width=values.shape[2],
+            height=values.shape[1],
+            count=values.shape[0],
+            dtype=values.dtype,
+            transform=from_origin(0, values.shape[1], 1, 1),
+            nodata=nodata,
+            blocksize=256,
+            compress="DEFLATE",
+            predictor=2,
+            overview_count=count,
+            overview_resampling="NEAREST",
+        ) as base:
+            base.write(values)
+        overviews: list[np.ndarray] = []
+        for overview_index in range(count):
+            with memory.open(OVERVIEW_LEVEL=overview_index) as overview:
+                overviews.append(overview.read())
+        return overviews
+
+
+def write_analysis_cog(
+    layer: RegionalLayer,
+    path: Path,
+    *,
+    contract: Mapping[str, Any],
+) -> CogEvidence:
+    """Write exact integer millimetres; no scientific resampling is performed."""
+    grid = contract["grid"]
+    values = contract["values"]
+    cog = contract["artifacts"]["cog"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not np.any(layer.valid):
+        raise ScienceContractError("AR6 analysis layer cannot be entirely nodata")
+    bands = np.stack(
+        [np.flipud(layer.lower_mm), np.flipud(layer.central_mm), np.flipud(layer.upper_mm)]
+    )
+    with rasterio.open(
+        path,
+        "w",
+        driver="COG",
+        width=grid["width"],
+        height=grid["height"],
+        count=3,
+        dtype="int16",
+        crs=grid["crs"],
+        transform=from_origin(
+            grid["bounds"][0],
+            grid["bounds"][3],
+            grid["nativeResolutionDegrees"],
+            grid["nativeResolutionDegrees"],
+        ),
+        nodata=values["nodata"],
+        blocksize=cog["blockSize"],
+        compress=cog["compression"],
+        predictor=cog["predictor"],
+        overview_count=cog["overviewCount"],
+        overview_resampling=cog["overviewResampling"],
+    ) as dataset:
+        dataset.write(bands)
+        dataset.descriptions = tuple(cog["bands"])
+        dataset.update_tags(
+            BASELINE=values["baseline"],
+            HORIZON=str(layer.horizon),
+            NATIVE_RESOLUTION_DEGREES=str(grid["nativeResolutionDegrees"]),
+            SCALE_TO_METRES=str(values["scaleToMetres"]),
+            SCENARIO=layer.scenario,
+            SOURCE_ARCHIVE_SHA256=contract["source"]["archiveSha256"],
+            SOURCE_MEMBER_SHA256=layer.member_sha256,
+            SOURCE_RELEASE=contract["source"]["version"],
+            METHOD_VERSION="ar6-regional-projection-v1",
+            CONFIDENCE=values["confidence"],
+            SCIENTIFIC_DISPOSITION=contract["scientificDisposition"],
+            UNITS=values["storageUnits"],
+        )
+    valid, errors, warnings = cog_validate(path, strict=True, quiet=True)
+    if not valid or errors or warnings:
+        raise ScienceContractError(
+            f"Generated AR6 COG is invalid: errors={errors}, warnings={warnings}"
+        )
+    validate_analysis_cog(path, layer, contract=contract)
+    valid_cells = int(layer.valid.sum())
+    return CogEvidence(
+        path=f"analysis/{layer.scenario}/{layer.horizon}.tif",
+        byte_size=path.stat().st_size,
+        sha256=_sha256(path),
+        valid_cells=valid_cells,
+        nodata_cells=int(layer.valid.size - valid_cells),
+    )
+
+
+def validate_analysis_cog(
+    path: Path,
+    layer: RegionalLayer,
+    *,
+    contract: Mapping[str, Any],
+) -> None:
+    """Prove structural and bit-exact agreement with the source arrays."""
+    valid, errors, warnings = cog_validate(path, strict=True, quiet=True)
+    if not valid or errors or warnings:
+        raise ScienceContractError("AR6 analysis COG fails structural validation")
+    grid = contract["grid"]
+    values = contract["values"]
+    with rasterio.open(path) as dataset:
+        expected_transform = from_origin(
+            grid["bounds"][0],
+            grid["bounds"][3],
+            grid["nativeResolutionDegrees"],
+            grid["nativeResolutionDegrees"],
+        )
+        image_structure = dataset.tags(ns="IMAGE_STRUCTURE")
+        expected_image_structure = {
+            "COMPRESSION": contract["artifacts"]["cog"]["compression"],
+            "INTERLEAVE": "PIXEL",
+            "LAYOUT": "COG",
+            "PREDICTOR": str(contract["artifacts"]["cog"]["predictor"]),
+        }
+        expected_tags = {
+            "BASELINE": values["baseline"],
+            "HORIZON": str(layer.horizon),
+            "NATIVE_RESOLUTION_DEGREES": str(grid["nativeResolutionDegrees"]),
+            "SCALE_TO_METRES": str(values["scaleToMetres"]),
+            "SCENARIO": layer.scenario,
+            "SOURCE_ARCHIVE_SHA256": contract["source"]["archiveSha256"],
+            "SOURCE_MEMBER_SHA256": layer.member_sha256,
+            "SOURCE_RELEASE": contract["source"]["version"],
+            "METHOD_VERSION": "ar6-regional-projection-v1",
+            "CONFIDENCE": values["confidence"],
+            "SCIENTIFIC_DISPOSITION": contract["scientificDisposition"],
+            "UNITS": values["storageUnits"],
+        }
+        if (
+            dataset.count != 3
+            or dataset.width != grid["width"]
+            or dataset.height != grid["height"]
+            or dataset.dtypes != ("int16", "int16", "int16")
+            or dataset.nodata != values["nodata"]
+            or dataset.descriptions != tuple(contract["artifacts"]["cog"]["bands"])
+            or dataset.crs is None
+            or dataset.crs.to_string() != grid["crs"]
+            or dataset.transform != expected_transform
+            or list(dataset.bounds) != grid["bounds"]
+            or dataset.block_shapes != [(256, 256)] * 3
+            or image_structure != expected_image_structure
+            or dataset.overviews(1) != contract["artifacts"]["cog"]["overviewFactors"]
+            or any(dataset.tags().get(key) != value for key, value in expected_tags.items())
+        ):
+            raise ScienceContractError("AR6 analysis COG schema differs from the contract")
+        expected = np.stack(
+            [
+                np.flipud(layer.lower_mm),
+                np.flipud(layer.central_mm),
+                np.flipud(layer.upper_mm),
+            ]
+        )
+        if not np.array_equal(dataset.read(), expected):
+            raise ScienceContractError("AR6 analysis COG values differ from source millimetres")
+        nearest_overviews = _nearest_overviews(
+            expected,
+            count=len(contract["artifacts"]["cog"]["overviewFactors"]),
+            nodata=values["nodata"],
+        )
+        for overview_index, nearest in enumerate(nearest_overviews):
+            with rasterio.open(path, OVERVIEW_LEVEL=overview_index) as overview:
+                observed = overview.read()
+            if not np.array_equal(observed, nearest):
+                raise ScienceContractError(
+                    "AR6 analysis COG overview values differ from nearest-neighbour decimation"
+                )

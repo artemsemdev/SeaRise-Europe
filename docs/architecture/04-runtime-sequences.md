@@ -91,7 +91,7 @@ sequenceDiagram
     UI->>UI: Freeze selection + evaluation token
     UI->>G: classify(coordinate, release geometry)
     G-->>UI: InEuropeAndCoastalZone
-    UI->>A: readExactPixel(layer, coordinate)
+    UI->>A: lookupNearestProjection(layer, coordinate)
     A->>C: Read required COG range
     alt Range cached
         C-->>A: Bytes
@@ -100,16 +100,16 @@ sequenceDiagram
         CDN-->>C: 206 Partial Content
         C-->>A: Bytes
     end
-    A-->>UI: Classified value 0, 1, or nodata
-    UI->>UI: Map value to one of five result states
+    A-->>UI: Required quantiles + source identity, or unavailable reason
+    UI->>UI: Map lookup to one of four result states
     UI->>Map: Set marker + matching PMTiles layer + legend
     Map->>CDN: Range GET missing visual tile data
     UI-->>U: Result + methodology + data release
 ```
 
-The analysis value is read with nearest-neighbour semantics. It is never
-derived from a rendered colour. Result, layer, and legend share the same
-release/scenario/horizon identity.
+The analysis values come from the nearest native AR6 grid location within
+100 km. They are never interpolated or derived from rendered colour. Result,
+layer, and legend share the same release/scenario/horizon identity.
 
 ## 4. Scope short-circuits
 
@@ -130,13 +130,13 @@ sequenceDiagram
         UI-->>U: OutOfScope
     else In supported coastal zone
         G-->>UI: InEuropeAndCoastalZone
-        UI->>A: Read selected analysis value
-        A-->>UI: Continue exposure evaluation
+        UI->>A: Read selected projection values
+        A-->>UI: Continue projection lookup
     end
 ```
 
 `UnsupportedGeography` and `OutOfScope` are successful domain outcomes. They do
-not trigger retries and do not read an exposure layer.
+not trigger retries and do not read a projection layer.
 
 ## 5. Result-state mapping
 
@@ -147,9 +147,9 @@ exhaustive mapping:
 |---|---|
 | Outside Europe support geometry | `UnsupportedGeography` |
 | Inside Europe, outside coastal analysis zone | `OutOfScope` |
-| Coastal coordinate; layer cell is nodata or scientifically unavailable | `DataUnavailable` |
-| Coastal coordinate; exact classified value is `1` | `ModeledExposureDetected` |
-| Coastal coordinate; exact classified value is `0` | `NoModeledExposureDetected` |
+| Coastal coordinate; nearest grid location exceeds 100 km | `DataUnavailable/source-location-too-distant` |
+| Coastal coordinate; any required source quantile is nodata | `DataUnavailable/source-value-nodata` |
+| Coastal coordinate; q0.167, q0.5, and q0.833 are available | `ProjectionAvailable` |
 
 An HTTP failure, corrupt byte range, invalid manifest, unsupported browser, or
 missing uncached resource is a technical error. It must not be mapped to

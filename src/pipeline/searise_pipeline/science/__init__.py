@@ -10,6 +10,14 @@ from .ar6 import (
     projection_member_identity,
     validate_ar6_schema,
 )
+from .ar6_lookup import (
+    Ar6ProjectionLookupResult,
+    Ar6SourceLocation,
+    VerifiedAr6Archive,
+    lookup_ar6_projection,
+    open_verified_ar6_member,
+    verify_ar6_archive,
+)
 from .baseline import BaselineSurface, MonthlySlaField, reconstruct_baseline_surface
 from .connectivity import (
     connectivity_comparison,
@@ -92,6 +100,8 @@ __all__ = [
     "Ar6GridSlice",
     "Ar6MemberIdentity",
     "Ar6ProjectionInterval",
+    "Ar6ProjectionLookupResult",
+    "Ar6SourceLocation",
     "BaselineSurface",
     "CandidateGeometries",
     "ClassificationReason",
@@ -106,6 +116,7 @@ __all__ = [
     "UncertaintyAggregate",
     "UncertaintyTerm",
     "VerticalResult",
+    "VerifiedAr6Archive",
     "MonthlySlaField",
     "assert_publication_ready",
     "assert_scope_connectivity_approved",
@@ -130,9 +141,11 @@ __all__ = [
     "load_geoid_evaluator_evidence",
     "load_geoid_evaluator_policy",
     "load_science_contracts",
+    "lookup_ar6_projection",
     "load_review_geometries",
     "load_scope_connectivity_review",
     "ocean_connected_cells",
+    "open_verified_ar6_member",
     "observe_connectivity_control",
     "observe_semantic_control",
     "review_evidence_sha256",
@@ -152,6 +165,7 @@ __all__ = [
     "reconcile_vertical_interval",
     "rebuild_approximation",
     "verify_geometry_assets",
+    "verify_ar6_archive",
     "verify_evidence_bindings",
     "verify_independent_review_proofs",
     "verify_terrain_source_bindings",

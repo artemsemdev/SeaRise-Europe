@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.dev/schemas/ar6-lookup-validation.schema.json",
+  "title": "AR6 source-native point lookup validation contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "issue",
+    "registrationStatus",
+    "source",
+    "lookup",
+    "resultContract",
+    "publicationMetadata",
+    "validation"
+  ],
+  "properties": {
+    "$schema": { "const": "./ar6-lookup-validation.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "contractId": { "const": "phase-0r.2-ar6-grid-lookup-validation" },
+    "issue": { "const": "https://github.com/artemsemdev/SeaRise-Europe/issues/135" },
+    "registrationStatus": { "const": "registered-before-reference-extraction" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "version",
+        "record",
+        "archiveSha256",
+        "memberSha256ByScenario",
+        "sourceSemanticsBinding",
+        "sourceLockBinding",
+        "decisionContract"
+      ],
+      "properties": {
+        "sourceId": { "const": "ipcc-ar6-sea-level" },
+        "version": { "const": "20210809" },
+        "record": { "const": "https://zenodo.org/records/6382554" },
+        "archiveSha256": { "$ref": "#/$defs/sha256" },
+        "memberSha256ByScenario": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ssp1-26", "ssp2-45", "ssp5-85"],
+          "properties": {
+            "ssp1-26": { "$ref": "#/$defs/sha256" },
+            "ssp2-45": { "$ref": "#/$defs/sha256" },
+            "ssp5-85": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "sourceSemanticsBinding": { "$ref": "#/$defs/fileBinding" },
+        "sourceLockBinding": { "$ref": "#/$defs/fileBinding" },
+        "decisionContract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contractId", "path", "sha256"],
+          "properties": {
+            "contractId": { "const": "ar6-regional-projection-v1" },
+            "path": { "const": "src/pipeline/science/ar6-projection-contract.json" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "lookup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFamily",
+        "locationSelection",
+        "maximumDistanceKm",
+        "distance",
+        "tieBreak",
+        "requiredQuantiles",
+        "nodataRule",
+        "interpolation",
+        "extrapolation"
+      ],
+      "properties": {
+        "sourceFamily": { "const": "native-one-degree-grid" },
+        "locationSelection": { "const": "nearest-source-grid-location" },
+        "maximumDistanceKm": { "const": 100 },
+        "distance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "algorithm",
+            "earthMeanRadiusKm",
+            "boundary",
+            "reportedDistanceDecimalPlaces"
+          ],
+          "properties": {
+            "algorithm": { "const": "haversine" },
+            "earthMeanRadiusKm": { "const": 6371.0088 },
+            "boundary": { "const": "inclusive" },
+            "reportedDistanceDecimalPlaces": { "const": 6 }
+          }
+        },
+        "tieBreak": { "const": "lowest-source-location-id" },
+        "requiredQuantiles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": 0.167 },
+            { "const": 0.5 },
+            { "const": 0.833 }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "nodataRule": {
+          "const": "resolve-nearest-location-first-then-fail-if-any-required-quantile-is-fill"
+        },
+        "interpolation": { "const": "forbidden" },
+        "extrapolation": { "const": "forbidden" }
+      }
+    },
+    "resultContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availableState", "stableReasonCodes", "sourceIdentityFields"],
+      "properties": {
+        "availableState": { "const": "ProjectionAvailable" },
+        "stableReasonCodes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sourceValueNodata",
+            "sourceGridBeyondMaximumDistance",
+            "outsideCoastalScope",
+            "outsideEuropeSupport"
+          ],
+          "properties": {
+            "sourceValueNodata": { "const": "source-value-nodata" },
+            "sourceGridBeyondMaximumDistance": {
+              "const": "source-location-too-distant"
+            },
+            "outsideCoastalScope": { "const": "outside-coastal-scope" },
+            "outsideEuropeSupport": { "const": "outside-europe-support" }
+          }
+        },
+        "sourceIdentityFields": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "locationId" },
+            { "const": "latitude" },
+            { "const": "longitude" },
+            { "const": "family" },
+            { "const": "distanceKm" }
+          ],
+          "items": false,
+          "minItems": 5,
+          "maxItems": 5
+        }
+      }
+    },
+    "publicationMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidence",
+        "nativeResolutionDegrees",
+        "methodVersion",
+        "sourceRelease"
+      ],
+      "properties": {
+        "confidence": { "const": "medium" },
+        "nativeResolutionDegrees": { "const": 1 },
+        "methodVersion": { "const": "ar6-regional-projection-v1" },
+        "sourceRelease": { "const": "20210809" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "referenceStrategy",
+        "numericToleranceMetres",
+        "scenarioHorizonMatrix",
+        "goldenPoints",
+        "algorithmicControls",
+        "requiredProvenance"
+      ],
+      "properties": {
+        "referenceStrategy": {
+          "const": "offline-independent-netcdf4-read-of-sha256-locked-source-members"
+        },
+        "numericToleranceMetres": { "const": 1e-6 },
+        "scenarioHorizonMatrix": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scenarios", "horizons"],
+          "properties": {
+            "scenarios": {
+              "type": "array",
+              "prefixItems": [
+                { "const": "ssp1-26" },
+                { "const": "ssp2-45" },
+                { "const": "ssp5-85" }
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "horizons": {
+              "type": "array",
+              "prefixItems": [{ "const": 2030 }, { "const": 2050 }, { "const": 2100 }],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "goldenPoints": {
+          "type": "array",
+          "minItems": 9,
+          "items": { "$ref": "#/$defs/goldenPoint" }
+        },
+        "algorithmicControls": {
+          "type": "array",
+          "minItems": 4,
+          "items": { "$ref": "#/$defs/algorithmicControl" }
+        },
+        "requiredProvenance": {
+          "type": "array",
+          "uniqueItems": true,
+          "contains": { "const": "retrievedAt" },
+          "items": {
+            "enum": [
+              "retrievedAt",
+              "sourceRecord",
+              "archiveSha256",
+              "memberSha256",
+              "readerName",
+              "readerVersion",
+              "generatorPath",
+              "generatorSha256"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "coordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
+    "goldenPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "coverage", "coordinates", "expectedState"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "kind": {
+          "enum": ["port", "estuary", "island", "high-latitude", "scope-control"]
+        },
+        "coverage": { "type": "string", "minLength": 1 },
+        "coordinates": { "$ref": "#/$defs/coordinates" },
+        "expectedState": {
+          "enum": ["ProjectionAvailable", "OutOfScope", "UnsupportedGeography"]
+        }
+      }
+    },
+    "algorithmicControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "purpose", "expectedState", "expectedReasonCode"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "purpose": {
+          "enum": ["nodata", "distance-boundary", "beyond-maximum-distance", "tie-break"]
+        },
+        "expectedState": { "enum": ["ProjectionAvailable", "DataUnavailable"] },
+        "expectedReasonCode": {
+          "enum": [
+            "projection-available",
+            "source-value-nodata",
+            "source-location-too-distant"
+          ]
+        }
+      }
+    }
+  }
+}

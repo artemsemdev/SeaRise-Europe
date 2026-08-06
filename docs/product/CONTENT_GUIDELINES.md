@@ -4,23 +4,24 @@
 >
 > **Status:** Active
 >
-> **Version:** 1.0
+> **Version:** 2.0
 >
 > **Last updated:** 2026-08-04
 
 This document governs user-facing labels, result summaries, map legends,
 loading and offline states, methodology text, and architecture-page claims.
 The canonical domain states and product scope come from
-[ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+[ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md),
+[ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md),
 and the [PRD](PRD.md).
 
 ## 1. Voice
 
 - **Clear:** plain language; explain a scientific term when first used.
 - **Honest:** name limitations next to the claim they qualify.
-- **Calm:** neither dramatize exposure nor minimize it.
-- **Direct:** lead with the selected result and its context.
-- **Precise about uncertainty:** distinguish no modeled exposure, nodata,
+- **Calm:** neither dramatize projected change nor minimize it.
+- **Direct:** lead with the median, likely range, scenario, and horizon.
+- **Precise about uncertainty:** distinguish AR6's likely range, source nodata,
   product scope, delivery failure, and unsupported geography.
 
 ## 2. Non-negotiable scientific rules
@@ -29,13 +30,13 @@ and the [PRD](PRD.md).
 
 | Use | Do not use |
 |---|---|
-| “The model indicates coastal exposure for this point under SSP2-4.5 in 2050.” | “This place will flood by 2050.” |
-| “No modeled coastal exposure was detected at this point for the selected scenario and year.” | “No risk detected.” |
-| “The marker identifies the assessed point; result precision is limited by the source data.” | “This property is outside the flood zone.” |
+| “Near this point, AR6 projects a median regional relative sea-level change of [value] by 2050 under SSP2-4.5.” | “Sea level at this property will be [value] higher in 2050.” |
+| “The likely range published by AR6 is [lower] to [upper], relative to the 1995–2014 mean.” | “There is a 66% chance this place floods.” |
+| “This value comes from a 1° source-grid location [distance] km from the marker.” | “This marker has property-level precision.” |
 
-Use **modeled exposure**, not “flooding,” unless explaining that the product
-does not model a specific flood event. Never call an output a regulatory flood
-zone.
+Use **projected regional relative sea-level change**, not “flooding,”
+“inundation,” or “exposure.” The product does not compare with terrain or model
+a flood event. Never call an output a regulatory flood zone or property risk.
 
 ### Keep scenario and horizon visible
 
@@ -44,6 +45,8 @@ Every completed result names:
 - the selected place or point;
 - the SSP scenario;
 - the absolute horizon (`2030`, `2050`, or `2100`);
+- median and likely range in metres relative to the 1995–2014 mean;
+- source-grid location, distance, and native 1° resolution;
 - the methodology version and data release.
 
 Do not use relative horizons such as “+50 years.” They become ambiguous and do
@@ -62,36 +65,23 @@ identify organizations or data roles, not three competing scenario models.
 Avoid “optimistic,” “moderate,” and “worst case” unless approved scientific
 review establishes exact meanings.
 
-## 3. Five result states
+## 3. Four result states
 
 Internal state IDs must remain stable. User-facing headlines may be localized,
 but must preserve the meaning below.
 
-### `ModeledExposureDetected`
+### `ProjectionAvailable`
 
-**Headline:** `Modeled coastal exposure detected`
-
-**Template:**
-
-> Under **[Scenario label]** in **[Year]**, the selected point falls within the
-> modeled coastal exposure area in data release **[Release]**. This is a
-> scenario-based model result at the source dataset's resolution, not a
-> site-specific flood forecast.
-
-Do not shorten the headline to “Risk detected.” The product does not calculate
-overall or probabilistic risk.
-
-### `NoModeledExposureDetected`
-
-**Headline:** `No modeled coastal exposure detected`
+**Headline:** `Projected regional sea-level change available`
 
 **Template:**
 
-> Under **[Scenario label]** in **[Year]**, the selected point does not
-> intersect the active modeled exposure area in data release **[Release]**.
-> This does not mean the place is safe or unaffected by coastal hazards.
-
-Do not use “No risk detected,” a green safety badge, “safe,” or “protected.”
+> Near this point, IPCC AR6 projects a median regional relative sea-level
+> change of **[Median] m** by **[Year]** under **[Scenario label]**. Its
+> medium-confidence likely range is **[Lower]–[Upper] m**, relative to the
+> **1995–2014 mean**. The source-grid location is **[Distance] km** from the
+> marker at native **1°** resolution. This is not a flood, inundation,
+> terrain-exposure, or property-risk assessment.
 
 ### `DataUnavailable`
 
@@ -101,7 +91,7 @@ Do not use “No risk detected,” a green safety badge, “safe,” or “prote
 
 > The active dataset has no usable value for this point under **[Scenario
 > label]** in **[Year]**. No other scenario, year, or dataset was substituted.
-> This is not a no-exposure result.
+> This is not a zero-change or no-risk result.
 
 Nodata is a scientific domain state. A failed network request is described
 separately as a delivery problem.
@@ -141,28 +131,28 @@ Transient states are not additional scientific outcomes.
 | Search index unavailable | `Place search data could not be loaded. Check your connection and try again.` |
 | Required range not cached while offline | `This result is not available offline yet. Reconnect to load the selected data.` |
 | Artifact request failed online | `The selected data could not be loaded. Try again.` |
-| Basemap unavailable | `The background map is unavailable. Search and assessment can still be used.` |
+| Basemap unavailable | `The background map is unavailable. Search and projection lookup can still be used.` |
 | Release/schema invalid | `This data release cannot be used safely. Try again later.` |
 
 Never say “the server is calculating,” “geocoding,” or “calling the assessment
-service” in the target product. Search and assessment are local; network waits
+service” in the target product. Search and lookup are local; network waits
 are for immutable data artifacts or optional map context.
 
 ## 5. Search copy
 
 ### Initial state
 
-**Heading:** `Explore modeled coastal exposure across Europe`
+**Heading:** `Explore regional sea-level projections across Europe`
 
 **Body:**
 
-> Search for a European city, town, or village, then compare three emissions
-> scenarios for 2030, 2050, and 2100.
+> Search for a European city, town, or village, then compare IPCC AR6 regional
+> relative sea-level projections for three scenarios and three horizons.
 
 **Support text:**
 
-> Results are scenario-based estimates, not property or engineering
-> assessments.
+> Results show regional projected change and a likely range, not flooding,
+> property risk, or engineering assessments.
 
 ### Search control
 
@@ -179,10 +169,11 @@ Candidate rows show place name, country, and first-level administration.
 ## 6. Required disclaimer
 
 Show this disclaimer, or an editorial revision preserving every exclusion, on
-every completed assessment:
+every completed projection:
 
-> This scenario-based model result is for informational and educational use.
-> It is not a site-specific flood forecast, engineering assessment, structural
+> This regional sea-level projection is for informational and educational use.
+> It does not determine flooding, inundation, terrain exposure, or property
+> risk. It is not an engineering assessment, structural
 > survey, legal determination, insurance evaluation, mortgage guidance, or
 > financial advice. Do not use it as a substitute for appropriate professional
 > or local evidence.
@@ -198,9 +189,8 @@ The methodology surface includes:
 | Release identity | Data release ID, build date, and methodology version |
 | Scenario/horizon | Exact SSP pathway and absolute year |
 | Sea-level source | Dataset name, version/snapshot, role, licence, and required acknowledgement |
-| Elevation source | Copernicus product/version, datum/resolution where validated, derivative attribution |
 | Support/coastal geometry | Source/version and the current coastal-zone rule |
-| Method summary | Plain-language description of preprocessing and exact point lookup |
+| Method summary | Plain-language description of the source-native grid-only lookup |
 | Not modeled | Flood defences, storm surge, local drainage, hydrodynamic connectivity, subsidence, and other omitted effects as applicable |
 | Resolution | What source resolution permits and why a precise marker is not property precision |
 | Integrity | Manifest, STAC catalog, checksums, and signed provenance links |
@@ -214,8 +204,9 @@ past tense.
 Lead with outcomes:
 
 > SeaRise Europe precomputes deterministic geospatial work, publishes
-> verifiable data artifacts, and lets the browser search and assess locally—so
-> the normal user journey has no application backend, database, or tile server.
+> verifiable data artifacts, and lets the browser search and look up projections
+> locally—so the normal user journey has no application backend, database, or
+> tile server.
 
 Then support the statement with measured bundle size, timings, network traces,
 artifact sizes, current cost model, release identity, licences, and provenance.
@@ -256,8 +247,9 @@ scope, required corrections, missing states, and GitHub issue links.
 |---|---|
 | Scenario | One possible emissions pathway used to select a sea-level projection; not a forecast of which future will occur |
 | Horizon | The absolute year (`2030`, `2050`, or `2100`) evaluated for the selected scenario |
-| Modeled exposure | The selected point intersects the classified exposure data for one scenario, horizon, methodology, and release |
-| Coastal analysis area | The versioned product geometry within which exposure assessment is attempted; it is a scope rule, not a flood-reach claim |
+| Projected regional relative sea-level change | AR6 change at the selected source-grid location relative to the 1995–2014 mean; not an absolute water level |
+| Likely range | The source-published medium-confidence q0.167–q0.833 interval; not a project-derived flood probability |
+| Coastal analysis area | The versioned product geometry within which projection lookup is offered; it is a scope rule, not a flood-reach claim |
 | Support geometry | The versioned boundary defining which European coordinates the product supports |
 | Data release | An immutable, identified set of artifacts, metadata, checksums, and provenance |
 | Available offline | The browser has cached every artifact required for the stated interaction |

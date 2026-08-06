@@ -14,7 +14,9 @@ dependencies = [
     "xarray>=2024.1,<2025.0",
     "netcdf4>=1.6,<2.0",
     "shapely>=2.0,<3.0",
-    "geopandas>=0.14,<2.0",
+    "geopandas==1.0.1",
+    "pandas==2.3.2",
+    "pyarrow==16.1.0",
     "psycopg2-binary>=2.9,<3.0",
     "azure-storage-blob>=12.19,<13.0",
     "cryptography>=42,<51",
@@ -37,6 +39,7 @@ packages = [
     "searise_pipeline",
     "searise_pipeline.domain",
     "searise_pipeline.regional_fixture",
+    "searise_pipeline.release",
     "searise_pipeline.science",
     "searise_pipeline.sources",
 ]

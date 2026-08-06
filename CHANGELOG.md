@@ -26,9 +26,29 @@ All notable changes to this project will be documented in this file.
 - Added a machine-readable 90% coastal uncertainty budget with source hashes,
   eligibility masks, sensitivity controls, and mutation-resistant fail-closed
   semantics.
+- Added a checksum-first AR6 projection reader, source-native grid lookup, and
+  offline real-source goldens with independent Python-reader and browser parity
+  across all nine scenario/horizon combinations.
+- Added a protected, owner-only Phase 0R promotion gate that binds the final
+  decision to two trusted GitHub candidate artifacts, raw browser/timing
+  evidence, exact code and evidence merges, and a mandatory permanent
+  owner-record pull request before Phase 1 can unlock.
 
 ### Changed
 
+- Aligned active architecture, runtime, product, and delivery documentation on
+  the four-state AR6 projection contract and its owner-controlled evidence flow.
+- Full-source AR6 release evidence now builds independently on pinned Linux
+  and macOS ARM64 profiles from one exact `master` SHA, with fail-closed
+  dispatch guards, separate candidate artifacts, and a locked Chromium
+  delivery trace for owner validation.
+- Regional release comparison now reports local byte and value parity as
+  pending until trusted external build provenance is bound to both candidate
+  digests; self-declared receipt profiles can no longer prove independence.
+- Replaced the blocked binary terrain-exposure contract with a source-native
+  IPCC AR6 regional projection contract that reports the median and published
+  likely range, uses one grid-only lookup rule, and keeps release approval
+  separate from automated validation.
 - Selected fail-closed GLO-30 terrain, explicit Europe and 25 km coastal
   product-scope rules, and an ocean-seeded connectivity screen backed by
   measured controls; scientific publication remains blocked pending complete

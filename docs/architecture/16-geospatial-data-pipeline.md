@@ -1,8 +1,8 @@
 # 16 — Offline Geospatial Data Pipeline
 
-> **Status:** Accepted target design; not yet implemented end to end with real sources
+> **Status:** Phase 0R artifact path implemented; trusted full-source gate pending
 >
-> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
 > **Publication warning:** the repository's current `demo.tif` and synthetic tests prove software mechanics only. They are not scientific evidence or a production data release.
 
 ## 1. Purpose
@@ -18,7 +18,7 @@ flowchart LR
     Fetch --> Inspect["Inspect real schemas/units"]
     Inspect --> Geo["Normalize geometry + settlements"]
     Inspect --> Raster["Normalize raster/projection inputs"]
-    Geo --> Compute["Build classified arrays"]
+    Geo --> Compute["Build projection arrays"]
     Raster --> Compute
     Compute --> Pack["COG + PMTiles + GeoParquet + indexes"]
     Pack --> QA["Scientific + contract + artifact QA"]
@@ -39,20 +39,14 @@ TiTiler flow: they assume an IPCC grid, create COGs, upload to Blob Storage,
 register database rows, and optionally spot-check TiTiler. That code remains a
 migration input, not the target pipeline described here.
 
-Known gaps that prohibit a production claim (see the
-[Phase 0.2 blocking evidence](../science/phase-0-2-source-and-geography-evidence.md)):
-
-- the documented IPCC AR6 mapping is now fail-closed and tested, but the large
-  regional archive still needs a SHA-256 lock and direct member inspection;
-- the selected ADT/GOCO06S-to-EGM2008 interval method still lacks a reviewed
-  complete transform and terrain uncertainty chain;
-- checked-in demo output is synthetic;
-- AR6 alignment now validates the actual flattened one-degree location model;
-  GLO-30 is the selected target grid pending external review;
-- the checked-in Natural Earth 25 km product scope is selected as an explicit
-  approximation pending product-owner review;
-- PMTiles, GeoNames catalogs/indexes, GeoParquet, manifest/STAC generation,
-  release signing, and R2 publication are not yet the proven end-to-end path.
+The Phase 0R implementation now includes the SHA-256-locked AR6 reader, exact
+source-grid lookup, nine COG/GeoParquet/PMTiles triplets, manifest/STAC,
+candidate sealing, cross-artifact parity, and browser budget measurement.
+Publication is still prohibited until #110 produces two trusted full-source
+builds, commits the evidence-only bundle, and records the protected owner
+disposition. Checked-in legacy application output remains synthetic, while
+GeoNames catalogs, supply-chain signatures, R2 publication, and the static
+application remain later roadmap work.
 
 The target pipeline is introduced incrementally. Legacy upload/register steps
 are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
@@ -62,10 +56,8 @@ are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
 | Source | Role | Pinning requirements |
 |---|---|---|
 | IPCC AR6 sea-level projections | Scenario/horizon projection input | Authoritative release/version, exact asset URL, size, SHA-256, citation, licence/acknowledgements |
-| Copernicus DEM GLO-30 | Selected terrain input | Release `2021_1`, exact DEM/EDM/FLM/HEM/WBM tiles, datum/CRS, size, SHA-256, derivative attribution, and reviewed error bounds |
-| Copernicus coastal product or approved replacement | Canonical analysis-zone evidence | Product/version, acquisition record, interpretation rule, licence, SHA-256 |
+| Natural Earth product geometries | Europe support and 25 km coastal product scope | Release, layer names, processing recipe, licence, SHA-256, topology controls |
 | GeoNames dump + `alternateNamesV2` | Places and multilingual search | Snapshot date, exact dump files, sizes, SHA-256, CC BY 4.0 attribution |
-| Natural Earth | Support/shoreline seed and labels | Dataset/release, layer names, public-domain provenance, SHA-256 |
 
 Acquisition writes to an ignored cache such as `data/raw/{source}/{version}/`.
 It never relies on an unversioned “latest” response without capturing the
@@ -79,28 +71,27 @@ means no publication.
 
 ## 4. Phase 0 — prove the science first
 
-Phase 0 uses a small region that includes straightforward coast, a port or
-estuary, low terrain, inland low terrain, nodata, and an island. It must:
+Phase 0R proves the direct AR6 projection product over a regional fixture that
+includes all four European basin contexts, estuaries, islands, scope failures,
+distance boundaries, and source nodata controls. It must:
 
 1. Inspect the exact IPCC variables, dimensions, coordinates/locations,
    quantiles, units, and missing-value semantics.
-2. Document and test the transformation from projection locations to the
-   analysis grid. A regular lat/lon raster must not be assumed.
-3. Inspect the DEM grid, horizontal and vertical datum, resolution, units,
-   masks, voids, and resampling requirements.
-4. Define the target CRS/grid and every reprojection/resampling operation.
-5. Compare the current coastal approximation with the intended canonical
-   coastal product.
-6. Test whether the binary exposure model creates disconnected inland regions
-   that should not be considered coastal exposure.
-7. Compare independently reviewed control locations with array values and
-   exact browser lookup.
-8. Measure source, intermediate, COG, PMTiles, and index size; build time;
+2. Preserve exact native grid IDs and integer millimetres while packaging the
+   nine scenario/horizon combinations; no scientific resampling is permitted.
+3. Validate nearest-grid selection, the inclusive 100 km guardrail, tie-break,
+   scope precedence, and stable unavailable reason codes.
+4. Compare independently extracted source values with Python, TypeScript, COG,
+   GeoParquet, PMTiles, and exact browser lookup.
+5. Prove complete source, licence, manifest, STAC, provenance, and receipt
+   binding plus byte-identical clean rebuilds.
+6. Measure source, intermediate, COG, PMTiles, and index size; build time;
    browser range requests; latency; and memory.
 
 Results and reviewer decisions are committed as methodology documentation and
-machine-readable golden fixtures. If the binary model is not defensible, stop
-and supersede the methodology/ADR before building Europe.
+machine-readable golden fixtures. The Phase 0 v1 binary model already stopped
+with a no-go and remains historical evidence; ADR-024 is the only active
+publication contract.
 
 ## 5. Workspace and release directories
 
@@ -171,49 +162,47 @@ coastal set keeps every qualifying active place in the coastal zone, including
 villages with zero or missing population. Catalog membership is a statement
 about the pinned GeoNames snapshot, not a claim of perfect real-world coverage.
 
-### 6.4 Normalize projection and terrain inputs
+### 6.4 Preserve the source-native projection grid
 
-The output grid, CRS, resolution, extent, transform, vertical reference, and
-nodata rule are fixed by methodology metadata. Projection and DEM values are
-converted to compatible units and references using transformations proven in
-Phase 0.
+Read `sea_level_change` from each locked AR6 member at q0.167, q0.5, and
+q0.833. Preserve the native one-degree grid identity and exact integer
+millimetres. Package the declared 76 x 46 regional subset without scientific
+interpolation, extrapolation, tide-gauge fallback, or nodata substitution.
 
-Continuous values may use a scientifically approved interpolation during
-normalization. The final binary class is never bilinearly/cubically resampled;
-categorical reprojection and browser lookup use nearest neighbour.
+The browser selects the nearest source-grid location by unrounded Haversine
+distance, uses the lowest source location ID for an exact tie, and rejects a
+location beyond 100 km. The same source identity and values must survive every
+artifact representation.
 
-### 6.5 Compute classified exposure arrays
+### 6.5 Build exact projection arrays
 
-The current methodology candidate is the uncertainty-aware interval selected
-by ADR-023:
+For each scenario/horizon combination, write three ordered Int16 bands:
 
 ```text
-C_low  = (B_EGM2008 - U_B) + 0.001 * AR6_q17 - (Z_DSM_EGM2008 + U_Z)
-C_high = (B_EGM2008 + U_B) + 0.001 * AR6_q83 - (Z_DSM_EGM2008 - U_Z)
-
-classified = 1      where C_low >= 0 and approved connectivity passes
-classified = 0      where C_high < 0, or eligible terrain is disconnected
-classified = nodata where the interval crosses zero or required evidence is absent
+band 1 = AR6 q0.167 in integer millimetres
+band 2 = AR6 q0.5   in integer millimetres
+band 3 = AR6 q0.833 in integer millimetres
+nodata = source fill value -32768
 ```
 
-This formula is not considered validated until Phase 0 establishes the
-projection-to-grid method, vertical compatibility, coastal masking, and
-connectivity behaviour. Calculations use chunked arrays, preserve masks, and
-write statistics for each of the nine scenario/horizon combinations.
+The pipeline does not construct an absolute water surface or compare values
+with terrain. `ProjectionAvailable` reports the source median and likely range;
+it is not a flood, inundation, terrain-exposure, or property-risk class.
 
 ### 6.6 Package scientific and visual artifacts
 
-From the same validated class array, produce:
+From the same validated projection arrays, produce:
 
-- a lossless analysis COG for exact lookup;
+- a lossless three-band analysis COG for exact lookup;
 - visual PMTiles for MapLibre overlay rendering;
+- an exact GeoParquet long table with the same integer values;
 - browser PMTiles and analytical GeoParquet for support/coastal geometry;
 - canonical settlement GeoParquet and compact search indexes.
 
 COG validation covers tiling, overviews, compression, CRS/transform, nodata,
-and class domain. PMTiles validation covers archive structure, zoom/bounds,
-sample tiles, byte ranges, and parity with sampled COG classes. Rendered colour
-is never a source value.
+band order, and integer domain. PMTiles validation covers archive structure,
+zoom/bounds, sample tiles, byte ranges, and exact feature-property parity with
+COG and GeoParquet values. Rendered colour is never a source value.
 
 ### 6.7 Generate contracts and evidence
 
@@ -286,7 +275,8 @@ promotion.
 1. Implement the Phase 0 regional spike and source-inspection reports.
 2. Define schemas and shared Python/TypeScript golden fixtures.
 3. Add DuckDB Spatial boundary/GeoNames processing and GeoParquet/index output.
-4. Produce COG and PMTiles from one classified array and prove exact parity.
+4. Produce COG, GeoParquet, and PMTiles from the same projection arrays and
+   prove exact integer/source-ID parity.
 5. Generate manifest, static STAC, provenance, and signature bundle.
 6. Publish a non-production immutable release and run public delivery tests.
 7. Build all nine real-data layers and complete old/new browser parity.

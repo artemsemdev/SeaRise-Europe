@@ -1,8 +1,8 @@
 # Static-First Migration Plan
 
-> **Status:** Phase 0 investigation complete with no-go; Phase 1 locked
-> **Last updated:** 2026-08-05
-> **Decision source:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Status:** AR6 projection implementation complete; trusted release evidence and Phase 1 locked
+> **Last updated:** 2026-08-06
+> **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
 
 ## Purpose
 
@@ -17,8 +17,10 @@ The repository is currently in a transition state:
 - the accepted target is a React/Vite static application backed by immutable
   browser-ready artifacts;
 - production migration has not started;
-- the real-source Phase 0 investigation ended without a publishable method or
-  regional release; the authoritative scientific disposition remains blocked;
+- the binary Phase 0 investigation ended without a publishable release;
+- ADR-024 accepts a source-native AR6 projection contract and #135 parity is
+  complete, while #110 still requires trusted full-source builds and the
+  owner-controlled regional release disposition;
 - the current checked-in raster is demonstration data and must not be
   represented as a production scientific release.
 
@@ -47,7 +49,7 @@ Use Conventional Commits and the repository pull-request template.
 |---|---|---|
 | Frontend | Next.js 14 / React 18 | React 19 / Vite 8 static build |
 | Search | Runtime geocoder through .NET API | GeoNames index in a Web Worker |
-| Assessment | .NET orchestration + PostGIS + TiTiler | Browser boundary checks + exact COG lookup |
+| Result lookup | .NET orchestration + PostGIS + TiTiler | Browser boundary checks + exact source-grid projection lookup |
 | Map layers | TiTiler reads COGs | MapLibre reads PMTiles ranges from object storage |
 | Configuration | PostgreSQL via `/v1/config/*` | Versioned JSON manifest/config |
 | Data processing | Python modules; synthetic local demo | Reproducible real-data offline release pipeline |
@@ -55,12 +57,12 @@ Use Conventional Commits and the repository pull-request template.
 | Infrastructure | Terraform for Azure | OpenTofu for static host/object delivery |
 | Provenance | Source notes and tests | Checksums + STAC + SLSA + Cosign |
 
-## Workstream 0 — scientific proof (`complete-with-no-go`)
+## Workstream 0 — scientific proof and recovery (`in progress`)
 
 This workstream blocks a production data release and destructive removal of the
-legacy assessment path. The investigation is terminal, but its positive exit
-criteria were not met; unchecked items below are deliberately not rewritten as
-completed deliverables.
+legacy assessment path. The v1 binary investigation is terminal, but its
+positive exit criteria were not met; the historical unchecked items below are
+deliberately not rewritten as completed deliverables.
 
 - [x] Pin and inspect the exact IPCC AR6 source release and members.
 - [x] Record source URL, version/date, licence, size, and SHA-256.
@@ -78,7 +80,8 @@ completed deliverables.
 - [ ] Record artifact size, build duration, browser memory, range-request count,
   and lookup latency.
 
-Phase 0.14 records an honest terminal no-go. Issue #95's automated analysis
+Phase 0.14 records the historical v1 terminal no-go. Issue #95's automated
+analysis
 recommends `REJECTED` because the locked evidence has no finite shoreline SLA
 representativeness or GLO-30 DSM-to-bare-earth bound. The authoritative
 scientific and release disposition remains `BLOCKED` because independent
@@ -86,30 +89,46 @@ review is pending. All nine combinations stopped before arrays; no scientific
 class, COG, PMTiles, GeoParquet, statistics, or synthetic substitute was
 created.
 
+ADR-024 replaces the binary path with a grid-only AR6 projection contract.
 Recovery follows this dependency order:
 
-1. [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) selects a
-   post-no-go product contract and superseding ADR.
-2. [#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107) validates a
-   datum-safe coastal mean-water reference and
-   [#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108) validates a
-   bare-earth terrain source; these may run in parallel after #106.
-3. [#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) implements
-   and independently reviews methodology v2 from approved inputs.
-4. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) rebuilds
-   the regional proof and records the recovery gate.
+1. [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) records the
+   accepted product decision in ADR-024 and its machine contract.
+2. [#135](https://github.com/artemsemdev/SeaRise-Europe/issues/135) implements
+   source-native lookup and offline golden parity.
+3. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) builds the
+   nine regional projection layers and records the recovery gate.
 
-Only an independently reviewed `approved` #110 with zero blockers may unlock
+Only a zero-blocker #110 with passing automated evidence and a separate
+project-owner `releaseDisposition=approved` may unlock
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48), Workstream 1,
-and Phase 1. Green CI cannot authorize that change.
+and Phase 1. Green CI cannot authorize that decision.
+
+The Phase 0R release sequence avoids self-referential evidence:
+
+1. merge the reviewed code and fixed workflows to `master` at source commit
+   `S`;
+2. manually run the pinned Linux and macOS ARM64 full-source jobs against `S`;
+3. merge an evidence-only pull request based exactly on `S` with the trusted
+   candidate bindings, receipts, timings, browser trace, reports, and gate;
+4. let the protected owner workflow verify the merge topology and trusted
+   artifacts before the owner records `releaseDisposition`;
+5. commit the immutable owner decision records before closing #110.
+
+The ADR-024 machine-contract snapshot calls its owner-authority field
+`releaseDecision`; measured release artifacts use `releaseDisposition`. They
+refer to the same owner-only authority boundary, not two independent approvals.
 
 Recovery exit evidence:
 
-- a source manifest with valid hashes and licences;
-- a regional fixture release using the public artifact layout;
-- reviewed golden locations covering exposed, unexposed, nodata, inland, and
+- [x] a source manifest with valid hashes and licences;
+- [x] a regional fixture release using the public artifact layout;
+- [x] offline golden locations covering projection, source nodata, inland, and
   unsupported cases;
-- a written methodology decision with no unresolved publication blocker.
+- [x] Python/TypeScript and artifact parity for the exact grid-only contract;
+- [ ] dual-platform trusted full-source evidence with zero blockers;
+- [ ] protected project-owner `releaseDisposition=approved` and immutable
+  decision records.
 
 Source-lock operation, rights status, cache handling, and upstream incident
 response are documented in the
@@ -124,8 +143,9 @@ response are documented in the
   duplicate checks, and GeoParquet output.
 - [ ] Produce `europe-core` and `europe-coastal` search shards from a pinned
   GeoNames snapshot.
-- [ ] Produce nine exact analysis COGs with nearest-neighbour class semantics.
-- [ ] Produce nine visual PMTiles archives from the same classified arrays.
+- [ ] Produce nine exact analysis COGs with q0.167/q0.5/q0.833 projection
+  bands and source-grid identity.
+- [ ] Produce nine visual PMTiles archives from the same projection arrays.
 - [ ] Produce PMTiles support/coastal geometry.
 - [ ] Generate and validate a static STAC catalog.
 - [ ] Generate an artifact inventory, SHA-256 checksums, and data-quality
@@ -151,10 +171,10 @@ Exit evidence:
 - [ ] Add MapLibre and the PMTiles protocol as lazy chunks.
 - [ ] Add the local search Web Worker and measured ranking fixtures.
 - [ ] Implement local Europe/coastal boundary checks.
-- [ ] Implement exact COG pixel lookup and five-state result mapping.
+- [ ] Implement exact COG projection lookup and four-state result mapping.
 - [ ] Keep location, scenario, horizon, and release in shareable URL state.
 - [ ] Add versioned service-worker caches and honest offline indicators.
-- [ ] Add graceful basemap failure; assessment must remain functional.
+- [ ] Add graceful basemap failure; projection lookup must remain functional.
 - [ ] Add `/about/architecture` with release/provenance/quality evidence.
 - [ ] Remove runtime requests to `/geocode`, `/assess`, and `/config`.
 
@@ -162,7 +182,7 @@ Exit evidence:
 
 - the complete fixture journey passes without an application API;
 - old/new parity is documented for the approved golden set;
-- search and assessment performance budgets pass on the reference mobile
+- search and projection-lookup performance budgets pass on the reference mobile
   profile;
 - accessibility, content-language, responsive, and offline tests pass.
 
@@ -213,23 +233,21 @@ Exit evidence:
 
 | Order | Focused change | Depends on |
 |---:|---|---|
-| 1 | #106 select the post-no-go scientific product contract | Phase 0.14 no-go |
-| 2 | #107 validate a datum-safe coastal mean-water reference | Approved #106 |
-| 3 | #108 validate bare-earth coastal terrain; may run with order 2 | Approved #106 |
-| 4 | #109 implement and independently review methodology v2 | Approved #107 and #108 |
-| 5 | #110 rebuild the regional proof and record the recovery gate | Approved #109 |
-| 6 | Define manifest/config/search JSON Schemas | Independently reviewed `approved` #110 |
-| 7 | Build GeoNames core/coastal GeoParquet datasets | 6 |
-| 8 | Serialize and benchmark the Web Worker search index | 7 |
-| 9 | Produce/verify regional COG and PMTiles artifacts | 5–6 |
-| 10 | Add STAC, checksums, provenance, and signing | 6, 9 |
-| 11 | Introduce the Vite static shell beside the legacy frontend | 6 |
-| 12 | Add local search and boundary validation | 7–8, 11 |
-| 13 | Add exact exposure lookup and map overlay | 9, 11 |
-| 14 | Add offline caching and architecture evidence page | 10, 12–13 |
-| 15 | Provision preview static hosting and R2 via OpenTofu | 10–11 |
-| 16 | Run parity, performance, accessibility, and cost gates | 12–15 |
-| 17 | Switch production and delete the legacy runtime | 16 |
+| 1 | #106 adopt the AR6 regional projection contract | Phase 0.14 no-go |
+| 2 | #135 implement grid-only projection lookup and offline parity | Approved #106 |
+| 3 | #110 build nine projection layers and record the recovery gate | Approved #135 |
+| 4 | Define manifest/config/search JSON Schemas | Owner-approved zero-blocker #110 |
+| 5 | Build GeoNames core/coastal GeoParquet datasets | 4 |
+| 6 | Serialize and benchmark the Web Worker search index | 5 |
+| 7 | Produce/verify regional COG and PMTiles artifacts | 3, 4 |
+| 8 | Add STAC, checksums, provenance, and signing | 4, 7 |
+| 9 | Introduce the Vite static shell beside the legacy frontend | 4 |
+| 10 | Add local search and boundary validation | 5–6, 9 |
+| 11 | Add exact projection lookup and map overlay | 7, 9 |
+| 12 | Add offline caching and architecture evidence page | 8, 10–11 |
+| 13 | Provision preview static hosting and R2 via OpenTofu | 8–9 |
+| 14 | Run parity, performance, accessibility, and cost gates | 10–13 |
+| 15 | Switch production and delete the legacy runtime | 14 |
 
 ## Required pull-request evidence
 
@@ -244,8 +262,8 @@ Use the repository PR template. In addition:
 
 ## Active reference artifacts
 
-- [Methodology specification](../methodology.md) — historical v1 no-go;
-  superseded for publication while #106–#110 define and validate recovery.
+- [Methodology specification](../methodology.md) — active ADR-024 projection
+  contract with the historical v1 no-go retained for audit.
 - Accessibility and content evidence for the legacy frontend is local build
   output, not an authoritative target-architecture artifact; both audits must
   be regenerated for the static frontend.

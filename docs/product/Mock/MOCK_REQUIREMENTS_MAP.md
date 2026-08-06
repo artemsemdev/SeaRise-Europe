@@ -49,8 +49,8 @@ documents win.
 | [#55](https://github.com/artemsemdev/SeaRise-Europe/issues/55) | Release badge, scenario/horizon/release metadata, startup and invalid-release presentation | Schema validation, release isolation, safe URL resolution, exhaustive bootstrap errors |
 | [#56](https://github.com/artemsemdev/SeaRise-Europe/issues/56) | Settlement combobox, duplicate names, local/privacy note, candidate status | Worker protocol, accessible combobox, ranking fixtures, performance and zero-query-leak trace |
 | [#57](https://github.com/artemsemdev/SeaRise-Europe/issues/57) | Terrain/map scene, marker, overlay, legend, attribution, graceful context degradation | PMTiles range trace, atomic overlay swap, basemap failure, reduced motion, non-map equivalent |
-| [#58](https://github.com/artemsemdev/SeaRise-Europe/issues/58) | Exact result explanation, class value, artifact identity, incomplete-range failure | Shared Python/TypeScript goldens, exact nearest-cell COG lookup, abort/range/corruption tests |
-| [#59](https://github.com/artemsemdev/SeaRise-Europe/issues/59) | Atomic result panel, five domain states, controls, transient/technical separation | State-machine tests, approved copy, all five outcomes, accessibility and stale-work tests |
+| [#58](https://github.com/artemsemdev/SeaRise-Europe/issues/58) | Exact result explanation, AR6 values, source-grid and artifact identity, incomplete-range failure | Shared Python/TypeScript goldens, exact nearest-grid COG lookup, abort/range/corruption tests |
+| [#59](https://github.com/artemsemdev/SeaRise-Europe/issues/59) | Atomic result panel, four domain states, controls, transient/technical separation | State-machine tests, approved copy, all four outcomes, accessibility and stale-work tests |
 | [#60](https://github.com/artemsemdev/SeaRise-Europe/issues/60) | Partly cached/offline presentation and safe update concepts | Release-scoped cache tests, actual capability inventory, mixed-release prevention, quota/eviction tests |
 | [#63](https://github.com/artemsemdev/SeaRise-Europe/issues/63) | Privacy statement, inert release metadata, public attribution | CSP/CORS, XSS fixtures, no-secret build, no project-controlled query/coordinate transmission |
 | [#65](https://github.com/artemsemdev/SeaRise-Europe/issues/65) | Browser journey and visual state reference | Cross-browser E2E, screenshot/a11y evidence, performance budgets, zero legacy API calls |
@@ -61,14 +61,13 @@ documents win.
 
 | Domain outcome | Mock coverage | Production requirement |
 |---|---|---|
-| `ModeledExposureDetected` | Present | Keep cautious amber emphasis, exact selection identity, limitations, and non-colour cue |
-| `NoModeledExposureDetected` | Present in the interactive fixture data | Never imply safety; cover in desktop/mobile screenshots and semantic tests |
+| `ProjectionAvailable` | The mock's two binary cards are obsolete | Replace them with median + likely range, scenario/horizon/baseline, source distance/resolution, limitations, and a non-colour cue |
 | `DataUnavailable` | Present in the interactive fixture data | Keep distinct from missing network/cache/range data; never substitute another combination |
 | `OutOfScope` | Present in the interactive fixture data | Explain the release-scoped coastal boundary; do not imply absence of climate risk |
 | `UnsupportedGeography` | **Not represented as a named state in the export** | Add before #59 can close and cover outside-versioned-Europe support semantics |
 
 The mock also demonstrates an incomplete-artifact technical failure. This is not
-a sixth scientific state and must not be stored as `DataUnavailable`.
+a fifth scientific state and must not be stored as `DataUnavailable`.
 
 ## Known corrections before implementation
 
@@ -95,7 +94,7 @@ a sixth scientific state and must not be stored as `DataUnavailable`.
   fixture values as product facts.
 - [ ] Exactly three scenarios and three absolute horizons are present.
 - [ ] Search is local, settlement-only, duplicate-aware, and keyboard operable.
-- [ ] All five domain states plus technical and offline failures are designed and
+- [ ] All four domain states plus technical and offline failures are designed and
   tested.
 - [ ] Scenario, horizon, methodology, release, limitations, and attribution remain
   synchronized with the accepted selection.

@@ -15,13 +15,23 @@ on:
       - master
       - "integration/**"
   workflow_dispatch:
+    inputs:
+      release_evidence:
+        description: Build both full-source AR6 evidence candidates
+        required: true
+        default: false
+        type: boolean
+      release_source_revision:
+        description: Exact master commit for an AR6 evidence build
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  group: ci-${{ inputs.release_evidence && inputs.release_source_revision || github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ inputs.release_evidence != true }}
 
 jobs:
   changes:
@@ -31,16 +41,45 @@ jobs:
       frontend: ${{ steps.route.outputs.frontend }}
       api: ${{ steps.route.outputs.api }}
       pipeline: ${{ steps.route.outputs.pipeline }}
+      release: ${{ steps.route.outputs.release }}
       infrastructure: ${{ steps.route.outputs.infrastructure }}
       docker_frontend: ${{ steps.route.outputs.docker_frontend }}
       docker_api: ${{ steps.route.outputs.docker_api }}
       compose: ${{ steps.route.outputs.compose }}
       heavy: ${{ steps.route.outputs.heavy }}
     steps:
-      - uses: actions/checkout@v4.3.1
+      - name: Validate manual workflow request
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
+        run: |
+          if [[ "${RELEASE_EVIDENCE}" == "true" ]]; then
+            if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+              echo "release evidence must be dispatched from master" >&2
+              exit 1
+            fi
+            if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "release_source_revision must be one exact lowercase commit SHA" >&2
+              exit 1
+            fi
+            if [[ "${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}" ]]; then
+              echo "release_source_revision must equal the dispatched ref SHA" >&2
+              exit 1
+            fi
+            if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
+              echo "release evidence must use the first workflow run attempt" >&2
+              exit 1
+            fi
+          elif [[ -n "${RELEASE_SOURCE_REVISION}" ]]; then
+            echo "release_source_revision is valid only with release_evidence=true" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.release_evidence && inputs.release_source_revision || github.event.pull_request.head.sha || github.sha }}
 
       - id: route
         name: Route changed paths
@@ -48,8 +87,11 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
         run: |
-          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" && "${RELEASE_EVIDENCE}" == "true" ]]; then
+            python3 scripts/ci/changed_components.py --release-only --github-output "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             python3 scripts/ci/changed_components.py --all --github-output "${GITHUB_OUTPUT}"
           else
             python3 scripts/ci/changed_components.py --base "${BASE_SHA}" --head "${HEAD_SHA}" --github-output "${GITHUB_OUTPUT}"
@@ -169,6 +211,485 @@ jobs:
       - name: Unit tests
         run: pytest tests/ -v
 
+  release-toolchain:
+    name: AR6 release toolchain (pinned Linux)
+    needs: changes
+    if: >-
+      needs.changes.outputs.release == 'true' &&
+      inputs.release_evidence != true
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/pipeline
+    steps:
+      - uses: actions/checkout@v4.3.1
+
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11.9"
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
+
+      - name: Install immutable release environment
+        run: |
+          pip install --only-binary=:all: --require-hashes -r requirements-release.lock
+          pip install pytest==8.4.2
+
+      - name: Preflight exact AR6 release environment and fixture
+        run: |
+          pytest \
+            tests/release/test_source_fixture.py \
+            tests/release/test_toolchain.py \
+            tests/science/test_ar6_regional_release_contract.py \
+            -q
+
+  # The two clean profiles run independently from the same exact dispatch SHA.
+  # They never run for pushes or pull requests.
+  ar6-release-evidence:
+    name: Full-source Linux AR6 candidate
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_name == 'master' &&
+      inputs.release_evidence == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Validate exact release source revision
+        env:
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
+        run: |
+          if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "release evidence must be dispatched from master" >&2
+            exit 1
+          fi
+          if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "release_source_revision must be one exact lowercase commit SHA" >&2
+            exit 1
+          fi
+          if [[ "${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}" ]]; then
+            echo "release_source_revision must equal the dispatched ref SHA" >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
+            echo "release evidence must use the first workflow run attempt" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_source_revision }}
+
+      - name: Verify checked-out release revision
+        env:
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
+        run: test "$(git rev-parse HEAD)" = "${RELEASE_SOURCE_REVISION}"
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11.9"
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
+
+      - name: Install immutable Python release environment
+        working-directory: src/pipeline
+        run: |
+          pip install --only-binary=:all: --require-hashes -r requirements-release.lock
+
+      - name: Restore verified release tools
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ${{ runner.temp }}/ar6-tools
+          key: ar6-evidence-tools-linux-x86_64-${{ hashFiles('src/pipeline/science/ar6-regional-release.json', 'src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64', 'src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json') }}
+
+      - name: Build and verify pinned Tippecanoe
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          mkdir -p "${tool_cache}"
+          if [[ ! -f "${tool_cache}/tippecanoe-2.79.0.tar.gz" ]]; then
+            curl --fail --location --retry 4 \
+              --output "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+              https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz
+          fi
+          echo "b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d  ${tool_cache}/tippecanoe-2.79.0.tar.gz" | sha256sum -c -
+          echo '8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5  src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64' | sha256sum -c -
+          if [[ ! -x "${tool_cache}/tippecanoe" || ! -x "${tool_cache}/tippecanoe-decode" ]]; then
+            docker build --platform linux/amd64 --tag searise-tippecanoe:2.79.0 \
+              --file src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64 \
+              "${tool_cache}"
+            docker run --platform linux/amd64 --rm \
+              --volume "${tool_cache}:/out" \
+              searise-tippecanoe:2.79.0
+          fi
+          echo "a70bb67594919b0eae357ec4678c77f5c3b9d4a277bd11046e4d9d03b1c6c426  ${tool_cache}/tippecanoe" | sha256sum -c -
+          echo "27d15c0f9394b2b29187312103a94579a9262a365d5b3eb71f1e5677751d2c36  ${tool_cache}/tippecanoe-decode" | sha256sum -c -
+
+      - name: Acquire and verify pinned go-pmtiles
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          pmtiles_asset="${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz"
+          if [[ ! -f "${pmtiles_asset}" ]]; then
+            curl --fail --location --retry 4 \
+              --output "${pmtiles_asset}" \
+              https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles_1.31.2_Linux_x86_64.tar.gz
+          fi
+          echo "3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f  ${pmtiles_asset}" | sha256sum -c -
+          if [[ ! -x "${tool_cache}/pmtiles" ]]; then
+            tar -xzf "${pmtiles_asset}" -C "${tool_cache}" pmtiles
+          fi
+
+      - name: Preflight exact release environment and fixture
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          python -c 'import searise_pipeline.release'
+          python scripts/science/build_ar6_regional_release.py \
+            --fixture src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz \
+            --fixture-receipt src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json \
+            --source-lock src/pipeline/sources/source-lock.json \
+            --source-semantics src/pipeline/science/source-semantics.json \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --lookup-goldens src/pipeline/science/evidence/ar6-lookup-goldens.json \
+            --tippecanoe "${tool_cache}/tippecanoe" \
+            --tippecanoe-decode "${tool_cache}/tippecanoe-decode" \
+            --pmtiles "${tool_cache}/pmtiles" \
+            --tippecanoe-source-archive "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+            --tippecanoe-build-receipt src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json \
+            --pmtiles-distribution-asset "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" \
+            --pmtiles-distribution-platform linux-x86_64 \
+            --python-lock src/pipeline/requirements-release.lock \
+            --build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64-preflight" \
+            --release-id phase-0r-ar6-preflight \
+            --output /tmp/phase-0r-ar6-preflight \
+            --failure-gate /tmp/ar6-release-preflight-failure.json \
+            --timing-evidence /tmp/build-timing-preflight.json
+
+      - name: Acquire and verify locked AR6 archive
+        run: |
+          rm -rf -- /tmp/phase-0r-ar6-preflight
+          rm -f -- /tmp/ar6-release-preflight-failure.json /tmp/build-timing-preflight.json
+          available_kib="$(df -Pk /tmp | awk 'END {print $4}')"
+          # Locked archive bytes plus 1.5 GiB for one extracted member and outputs.
+          required_kib=10599985
+          if [[ ! "${available_kib}" =~ ^[0-9]+$ || "${available_kib}" -lt "${required_kib}" ]]; then
+            echo "AR6 evidence build requires at least ${required_kib} KiB free in /tmp; found ${available_kib}" >&2
+            exit 1
+          fi
+          curl --fail --location --retry 8 --retry-all-errors \
+            --output /tmp/ar6-regional-confidence.zip \
+            https://zenodo.org/api/records/6382554/files/ar6-regional-confidence.zip/content
+          echo 'd3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91  /tmp/ar6-regional-confidence.zip' | sha256sum -c -
+
+      - name: Build full real-source candidate
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          python scripts/science/build_ar6_regional_release.py \
+            --archive /tmp/ar6-regional-confidence.zip \
+            --source-lock src/pipeline/sources/source-lock.json \
+            --source-semantics src/pipeline/science/source-semantics.json \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --lookup-goldens src/pipeline/science/evidence/ar6-lookup-goldens.json \
+            --tippecanoe "${tool_cache}/tippecanoe" \
+            --tippecanoe-decode "${tool_cache}/tippecanoe-decode" \
+            --pmtiles "${tool_cache}/pmtiles" \
+            --tippecanoe-source-archive "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+            --tippecanoe-build-receipt src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json \
+            --pmtiles-distribution-asset "${tool_cache}/go-pmtiles_1.31.2_Linux_x86_64.tar.gz" \
+            --pmtiles-distribution-platform linux-x86_64 \
+            --python-lock src/pipeline/requirements-release.lock \
+            --build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64" \
+            --release-id phase-0r-ar6-v1 \
+            --output /tmp/phase-0r-ar6-v1 \
+            --failure-gate /tmp/ar6-release-failure.json \
+            --timing-evidence /tmp/build-timing-linux.json
+
+      - name: Summarize candidate
+        run: |
+          {
+            echo '## AR6 Linux release candidate'
+            echo
+            jq -r '"Source revision: `\(.sourceRevision)`"' /tmp/phase-0r-ar6-v1/build-receipt.json
+            echo
+            jq -r '"Core artifacts: \(.totals.coreArtifactBytes) bytes\n\nCOGs: \(.totals.cogBytes) bytes\n\nPMTiles: \(.totals.pmtilesBytes) bytes\n\nGeoParquet: \(.totals.geoparquetBytes) bytes"' /tmp/phase-0r-ar6-v1/manifest.json
+            echo
+            jq -r '"Full clean build: \(.fullCleanBuildDurationSeconds) seconds"' /tmp/build-timing-linux.json
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload independently built candidate and timing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ar6-linux-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}
+          path: |
+            /tmp/phase-0r-ar6-v1
+            /tmp/build-timing-linux.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 14
+
+  ar6-release-evidence-macos:
+    name: Full-source macOS ARM64 AR6 candidate
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref_name == 'master' &&
+      inputs.release_evidence == true
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: Validate exact release source revision
+        env:
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
+        run: |
+          if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "release evidence must be dispatched from master" >&2
+            exit 1
+          fi
+          if [[ ! "${RELEASE_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "release_source_revision must be one exact lowercase commit SHA" >&2
+            exit 1
+          fi
+          if [[ "${RELEASE_SOURCE_REVISION}" != "${GITHUB_SHA}" ]]; then
+            echo "release_source_revision must equal the dispatched ref SHA" >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_RUN_ATTEMPT}" != "1" ]]; then
+            echo "release evidence must use the first workflow run attempt" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_source_revision }}
+
+      - name: Verify checked-out release revision and runner
+        env:
+          RELEASE_SOURCE_REVISION: ${{ inputs.release_source_revision }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${RELEASE_SOURCE_REVISION}"
+          test "$(uname -s)" = "Darwin"
+          test "$(uname -m)" = "arm64"
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.9.6"
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release-macos-arm64.lock
+
+      - name: Install immutable Python release environment
+        working-directory: src/pipeline
+        run: |
+          pip install --only-binary=:all: --require-hashes -r requirements-release-macos-arm64.lock
+
+      - name: Restore verified release tools
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ${{ runner.temp }}/ar6-tools
+          key: ar6-evidence-tools-darwin-arm64-${{ hashFiles('src/pipeline/science/ar6-regional-release.json', 'src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json') }}
+
+      - name: Build and verify pinned Tippecanoe
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          source_archive="${tool_cache}/tippecanoe-2.79.0.tar.gz"
+          mkdir -p "${tool_cache}"
+          if [[ ! -f "${source_archive}" ]]; then
+            curl --fail --location --retry 4 \
+              --output "${source_archive}" \
+              https://github.com/felt/tippecanoe/archive/refs/tags/2.79.0.tar.gz
+          fi
+          printf '%s  %s\n' \
+            b0fd9df49b6efc988288ea48774822c6de19eb48428017f27ee0b3b01d44f05d \
+            "${source_archive}" \
+            | shasum -a 256 -c -
+          if [[ ! -x "${tool_cache}/tippecanoe" || ! -x "${tool_cache}/tippecanoe-decode" ]]; then
+            build_root="${RUNNER_TEMP}/tippecanoe-2.79.0-build"
+            rm -rf -- "${build_root}"
+            mkdir -p "${build_root}"
+            tar -xzf "${source_archive}" -C "${build_root}" --strip-components=1
+            (
+              cd "${build_root}"
+              make -j4 tippecanoe tippecanoe-decode
+            )
+            install -m 0755 "${build_root}/tippecanoe" "${tool_cache}/tippecanoe"
+            install -m 0755 "${build_root}/tippecanoe-decode" "${tool_cache}/tippecanoe-decode"
+            rm -rf -- "${build_root}"
+          fi
+          printf '%s  %s\n' \
+            12654e789140aaac9422c2b403f1a0a691c9877b9a43c3405888acc672166d92 \
+            "${tool_cache}/tippecanoe" \
+            | shasum -a 256 -c -
+          printf '%s  %s\n' \
+            d4e173268c5e9c22f75d16b9c4337423ffe3ec4dc4a03704c9d1a967e3a87076 \
+            "${tool_cache}/tippecanoe-decode" \
+            | shasum -a 256 -c -
+
+      - name: Acquire and verify pinned go-pmtiles
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          pmtiles_asset="${tool_cache}/go-pmtiles-1.31.2_Darwin_arm64.zip"
+          if [[ ! -f "${pmtiles_asset}" ]]; then
+            curl --fail --location --retry 4 \
+              --output "${pmtiles_asset}" \
+              https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/go-pmtiles-1.31.2_Darwin_arm64.zip
+          fi
+          printf '%s  %s\n' \
+            40528f7f616fcbf91207cd48c8fc023d213f6d86c0cbf1f748732803d1880f3d \
+            "${pmtiles_asset}" \
+            | shasum -a 256 -c -
+          if [[ ! -x "${tool_cache}/pmtiles" ]]; then
+            unzip -p "${pmtiles_asset}" pmtiles > "${tool_cache}/pmtiles"
+            chmod 0755 "${tool_cache}/pmtiles"
+          fi
+          embedded_sha="$(unzip -p "${pmtiles_asset}" pmtiles | shasum -a 256 | awk '{print $1}')"
+          executable_sha="$(shasum -a 256 "${tool_cache}/pmtiles" | awk '{print $1}')"
+          test "${embedded_sha}" = "${executable_sha}"
+
+      - name: Preflight exact release environment and fixture
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          python -c 'import searise_pipeline.release'
+          python scripts/science/build_ar6_regional_release.py \
+            --fixture src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz \
+            --fixture-receipt src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json \
+            --source-lock src/pipeline/sources/source-lock.json \
+            --source-semantics src/pipeline/science/source-semantics.json \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --lookup-goldens src/pipeline/science/evidence/ar6-lookup-goldens.json \
+            --tippecanoe "${tool_cache}/tippecanoe" \
+            --tippecanoe-decode "${tool_cache}/tippecanoe-decode" \
+            --pmtiles "${tool_cache}/pmtiles" \
+            --tippecanoe-source-archive "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+            --tippecanoe-build-receipt src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json \
+            --pmtiles-distribution-asset "${tool_cache}/go-pmtiles-1.31.2_Darwin_arm64.zip" \
+            --pmtiles-distribution-platform darwin-arm64 \
+            --python-lock src/pipeline/requirements-release-macos-arm64.lock \
+            --build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-macos-arm64-preflight" \
+            --release-id phase-0r-ar6-preflight \
+            --output /tmp/phase-0r-ar6-preflight \
+            --failure-gate /tmp/ar6-release-preflight-failure.json \
+            --timing-evidence /tmp/build-timing-preflight.json
+
+      - name: Acquire and verify locked AR6 archive
+        run: |
+          rm -rf -- /tmp/phase-0r-ar6-preflight
+          rm -f -- /tmp/ar6-release-preflight-failure.json /tmp/build-timing-preflight.json
+          available_kib="$(df -Pk /tmp | awk 'END {print $4}')"
+          # Locked archive bytes plus 1.5 GiB for one extracted member and outputs.
+          required_kib=10599985
+          if [[ ! "${available_kib}" =~ ^[0-9]+$ || "${available_kib}" -lt "${required_kib}" ]]; then
+            echo "AR6 evidence build requires at least ${required_kib} KiB free in /tmp; found ${available_kib}" >&2
+            exit 1
+          fi
+          curl --fail --location --retry 8 --retry-all-errors \
+            --output /tmp/ar6-regional-confidence.zip \
+            https://zenodo.org/api/records/6382554/files/ar6-regional-confidence.zip/content
+          printf '%s  %s\n' \
+            d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91 \
+            /tmp/ar6-regional-confidence.zip \
+            | shasum -a 256 -c -
+
+      - name: Build full real-source candidate
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          tool_cache="${RUNNER_TEMP}/ar6-tools"
+          python scripts/science/build_ar6_regional_release.py \
+            --archive /tmp/ar6-regional-confidence.zip \
+            --source-lock src/pipeline/sources/source-lock.json \
+            --source-semantics src/pipeline/science/source-semantics.json \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --lookup-goldens src/pipeline/science/evidence/ar6-lookup-goldens.json \
+            --tippecanoe "${tool_cache}/tippecanoe" \
+            --tippecanoe-decode "${tool_cache}/tippecanoe-decode" \
+            --pmtiles "${tool_cache}/pmtiles" \
+            --tippecanoe-source-archive "${tool_cache}/tippecanoe-2.79.0.tar.gz" \
+            --tippecanoe-build-receipt src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json \
+            --pmtiles-distribution-asset "${tool_cache}/go-pmtiles-1.31.2_Darwin_arm64.zip" \
+            --pmtiles-distribution-platform darwin-arm64 \
+            --python-lock src/pipeline/requirements-release-macos-arm64.lock \
+            --build-environment-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-macos-arm64" \
+            --release-id phase-0r-ar6-v1 \
+            --output /tmp/phase-0r-ar6-v1 \
+            --failure-gate /tmp/ar6-release-failure.json \
+            --timing-evidence /tmp/build-timing-macos-arm64.json
+
+      - name: Release source archive before browser measurement
+        run: rm -f -- /tmp/ar6-regional-confidence.zip
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install locked browser measurement environment
+        working-directory: src/frontend
+        run: npm ci
+
+      - name: Install package-lock-owned Playwright Chromium
+        working-directory: src/frontend
+        run: ./node_modules/.bin/playwright install chromium
+
+      - name: Measure trusted browser delivery
+        working-directory: src/frontend
+        run: |
+          rm -f -- /tmp/browser-trace-macos-arm64.json
+          node scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 /tmp/browser-trace-macos-arm64.json
+          test -s /tmp/browser-trace-macos-arm64.json
+
+      - name: Validate browser delivery evidence
+        env:
+          PYTHONPATH: src/pipeline
+        run: |
+          rm -f -- /tmp/delivery-report-macos-arm64.json
+          python scripts/science/validate_ar6_delivery_trace.py \
+            --candidate /tmp/phase-0r-ar6-v1 \
+            --trace /tmp/browser-trace-macos-arm64.json \
+            --harness src/frontend/scripts/measure-ar6-release.mjs \
+            --release-contract src/pipeline/science/ar6-regional-release.json \
+            --build-timing /tmp/build-timing-macos-arm64.json \
+            --output /tmp/delivery-report-macos-arm64.json
+          test -s /tmp/delivery-report-macos-arm64.json
+          jq -e '
+            .schemaVersion == 1 and
+            .status == "passed" and
+            .candidate.releaseId == "phase-0r-ar6-v1" and
+            .trace.path == "browser-trace-macos-arm64.json" and
+            .buildTiming.path == "build-timing-macos-arm64.json" and
+            .profiles.hardware.architecture == "arm64" and
+            .profiles.browser.engine == "Chromium"
+          ' /tmp/delivery-report-macos-arm64.json
+
+      - name: Summarize candidate
+        run: |
+          {
+            echo '## AR6 macOS ARM64 release candidate'
+            echo
+            jq -r '"Source revision: `\(.sourceRevision)`"' /tmp/phase-0r-ar6-v1/build-receipt.json
+            echo
+            jq -r '"Core artifacts: \(.totals.coreArtifactBytes) bytes\n\nCOGs: \(.totals.cogBytes) bytes\n\nPMTiles: \(.totals.pmtilesBytes) bytes\n\nGeoParquet: \(.totals.geoparquetBytes) bytes"' /tmp/phase-0r-ar6-v1/manifest.json
+            echo
+            jq -r '"Full clean build: \(.fullCleanBuildDurationSeconds) seconds"' /tmp/build-timing-macos-arm64.json
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload independently built candidate and timing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ar6-macos-arm64-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}
+          path: |
+            /tmp/phase-0r-ar6-v1
+            /tmp/build-timing-macos-arm64.json
+            /tmp/browser-trace-macos-arm64.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 14
+
   infrastructure:
     name: Infrastructure (compose config)
     needs: changes
@@ -235,6 +756,9 @@ jobs:
       - frontend
       - api
       - pipeline
+      - release-toolchain
+      - ar6-release-evidence
+      - ar6-release-evidence-macos
       - infrastructure
       - docker-frontend
       - docker-api

@@ -43,7 +43,7 @@ runtime.
 
 SeaRise Europe aims to combine four qualities:
 
-1. **Scientific restraint:** five explicit outcomes, cautious copy, and no
+1. **Scientific restraint:** four explicit outcomes, cautious copy, and no
    property-level claim.
 2. **Place-based clarity:** local settlement search across European cities,
    towns, and coastal villages.
@@ -62,7 +62,7 @@ qualities.
 
 - A settlement search reaches a result without requiring SSP or GIS knowledge
   up front.
-- `NoModeledExposureDetected`, `DataUnavailable`, `OutOfScope`, and
+- `ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, and
   `UnsupportedGeography` are visibly different.
 - The result always carries scenario, horizon, release, resolution limits, and
   methodology.

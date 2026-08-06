@@ -1,7 +1,7 @@
 # 02 — Container View
 
 > **Status:** Accepted target architecture
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md)
 
 In this document, a container is an independently executed or deployed unit.
 It does not necessarily mean a Docker container. The target production system
@@ -13,8 +13,8 @@ has two deployed origins and no continuously running application service.
 |---|---|---|---|
 | Web application | React 19, TypeScript, Vite 8 | Cloudflare Workers Static Assets; browser | Delivers the shell, user interface, local domain logic, and architecture page. |
 | Browser search worker | Web Worker, serialized MiniSearch-compatible index | Browser | Loads, normalizes, ranks, and returns settlement matches off the UI thread. |
-| Browser assessment engine | TypeScript, geometry and COG/PMTiles readers | Browser | Validates scope and maps an exact classified value to a domain result. |
-| Map renderer | MapLibre GL JS with PMTiles protocol | Browser | Renders basemap, selected location, support geometry, and exposure overlay. |
+| Browser assessment engine | TypeScript, geometry and COG readers | Browser | Validates scope, selects the nearest AR6 grid location, and returns exact projection values or an unavailable reason. |
+| Map renderer | MapLibre GL JS with PMTiles protocol | Browser | Renders basemap, selected location, support geometry, and visual projection overlay. |
 | Service worker | Web platform Cache API | Browser | Precaches the shell and caches versioned search/geospatial resources within a bounded policy. |
 | Release artifact store | R2 through a custom domain/CDN | Cloudflare edge/object storage | Serves immutable PMTiles, COG, GeoParquet, STAC, manifest, and provenance objects with byte-range support. |
 | Offline build pipeline | Python, GDAL, Rasterio, DuckDB Spatial, packaging/signing tools | Developer workstation or GitHub Actions | Acquires sources, produces artifacts, runs QA, records provenance, and publishes a complete release. |
@@ -65,7 +65,6 @@ geocoding service, or tile-rendering service.
 ```mermaid
 flowchart LR
     IPCC[IPCC AR6]
-    Cop[Copernicus data]
     Geo[GeoNames]
     NE[Natural Earth]
 
@@ -84,7 +83,6 @@ flowchart LR
     R2[R2]
 
     IPCC --> Fetch
-    Cop --> Fetch
     Geo --> Fetch
     NE --> Fetch
     Fetch --> Cache
@@ -133,9 +131,10 @@ release tooling, not production services.
   layer.
 - Evaluates Europe support geometry before coastal scope.
 - Resolves exactly one of nine artifacts from the pinned manifest.
-- Uses nearest-neighbour lookup of the classified value; it never infers a
-  result from display colours.
-- Maps nodata, zero, and one to the fixed result-state vocabulary.
+- Selects the nearest native AR6 grid location by the ADR-024 distance and
+  tie-break rules; it never infers a result from display colours.
+- Maps a complete q0.167/q0.5/q0.833 triplet to `ProjectionAvailable` and
+  excessive distance or source nodata to stable `DataUnavailable` reasons.
 - Supplies the same artifact identity to the result panel and map.
 
 ### Map renderer
