@@ -300,6 +300,29 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertEqual(linux.count("/tmp/phase-0r-ar6-v1"), 4)
         self.assertEqual(macos.count("/tmp/phase-0r-ar6-v1"), 6)
 
+    def test_macos_vector_toolchain_is_preflighted_on_release_changes(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        preflight = _workflow_job(
+            workflow,
+            "release-toolchain-macos",
+            "ar6-release-evidence",
+        )
+        producer = _workflow_job(
+            workflow,
+            "ar6-release-evidence-macos",
+            "infrastructure",
+        )
+
+        self.assertIn("name: AR6 release toolchain (pinned macOS ARM64)", preflight)
+        self.assertIn("needs.changes.outputs.release == 'true'", preflight)
+        self.assertIn("inputs.release_evidence != true", preflight)
+        self.assertIn("runs-on: macos-14", preflight)
+        self.assertIn("scripts/ci/build_macos_tippecanoe.sh", preflight)
+        self.assertIn("tippecanoe-darwin-arm64-build-receipt.json", preflight)
+        self.assertIn("scripts/ci/build_macos_tippecanoe.sh", producer)
+
     def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
@@ -462,6 +485,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertNotIn("ar6-regional-confidence.zip/content", preflight)
         gate = workflow[workflow.index("  ci-gate:") :]
         self.assertIn("      - release-toolchain", gate)
+        self.assertIn("      - release-toolchain-macos", gate)
 
     def test_owner_promotion_is_manual_protected_and_read_only(self) -> None:
         root = Path(__file__).resolve().parents[2]
