@@ -39,20 +39,14 @@ TiTiler flow: they assume an IPCC grid, create COGs, upload to Blob Storage,
 register database rows, and optionally spot-check TiTiler. That code remains a
 migration input, not the target pipeline described here.
 
-Known gaps that prohibit a production claim (see the
-[Phase 0.2 blocking evidence](../science/phase-0-2-source-and-geography-evidence.md)):
-
-- the documented IPCC AR6 mapping is now fail-closed and tested, but the large
-  regional archive still needs a SHA-256 lock and direct member inspection;
-- the selected ADT/GOCO06S-to-EGM2008 interval method still lacks a reviewed
-  complete transform and terrain uncertainty chain;
-- checked-in demo output is synthetic;
-- AR6 alignment now validates the actual flattened one-degree location model;
-  GLO-30 is the selected target grid pending external review;
-- the checked-in Natural Earth 25 km product scope is selected as an explicit
-  approximation pending product-owner review;
-- PMTiles, GeoNames catalogs/indexes, GeoParquet, manifest/STAC generation,
-  release signing, and R2 publication are not yet the proven end-to-end path.
+The Phase 0R implementation now includes the SHA-256-locked AR6 reader, exact
+source-grid lookup, nine COG/GeoParquet/PMTiles triplets, manifest/STAC,
+candidate sealing, cross-artifact parity, and browser budget measurement.
+Publication is still prohibited until #110 produces two trusted full-source
+builds, commits the evidence-only bundle, and records the protected owner
+disposition. Checked-in legacy application output remains synthetic, while
+GeoNames catalogs, supply-chain signatures, R2 publication, and the static
+application remain later roadmap work.
 
 The target pipeline is introduced incrementally. Legacy upload/register steps
 are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
@@ -168,49 +162,47 @@ coastal set keeps every qualifying active place in the coastal zone, including
 villages with zero or missing population. Catalog membership is a statement
 about the pinned GeoNames snapshot, not a claim of perfect real-world coverage.
 
-### 6.4 Normalize projection and terrain inputs
+### 6.4 Preserve the source-native projection grid
 
-The output grid, CRS, resolution, extent, transform, vertical reference, and
-nodata rule are fixed by methodology metadata. Projection and DEM values are
-converted to compatible units and references using transformations proven in
-Phase 0.
+Read `sea_level_change` from each locked AR6 member at q0.167, q0.5, and
+q0.833. Preserve the native one-degree grid identity and exact integer
+millimetres. Package the declared 76 x 46 regional subset without scientific
+interpolation, extrapolation, tide-gauge fallback, or nodata substitution.
 
-Continuous values may use a scientifically approved interpolation during
-normalization. The final binary class is never bilinearly/cubically resampled;
-categorical reprojection and browser lookup use nearest neighbour.
+The browser selects the nearest source-grid location by unrounded Haversine
+distance, uses the lowest source location ID for an exact tie, and rejects a
+location beyond 100 km. The same source identity and values must survive every
+artifact representation.
 
-### 6.5 Compute classified exposure arrays
+### 6.5 Build exact projection arrays
 
-The current methodology candidate is the uncertainty-aware interval selected
-by ADR-023:
+For each scenario/horizon combination, write three ordered Int16 bands:
 
 ```text
-C_low  = (B_EGM2008 - U_B) + 0.001 * AR6_q17 - (Z_DSM_EGM2008 + U_Z)
-C_high = (B_EGM2008 + U_B) + 0.001 * AR6_q83 - (Z_DSM_EGM2008 - U_Z)
-
-classified = 1      where C_low >= 0 and approved connectivity passes
-classified = 0      where C_high < 0, or eligible terrain is disconnected
-classified = nodata where the interval crosses zero or required evidence is absent
+band 1 = AR6 q0.167 in integer millimetres
+band 2 = AR6 q0.5   in integer millimetres
+band 3 = AR6 q0.833 in integer millimetres
+nodata = source fill value -32768
 ```
 
-This formula is not considered validated until Phase 0 establishes the
-projection-to-grid method, vertical compatibility, coastal masking, and
-connectivity behaviour. Calculations use chunked arrays, preserve masks, and
-write statistics for each of the nine scenario/horizon combinations.
+The pipeline does not construct an absolute water surface or compare values
+with terrain. `ProjectionAvailable` reports the source median and likely range;
+it is not a flood, inundation, terrain-exposure, or property-risk class.
 
 ### 6.6 Package scientific and visual artifacts
 
-From the same validated class array, produce:
+From the same validated projection arrays, produce:
 
-- a lossless analysis COG for exact lookup;
+- a lossless three-band analysis COG for exact lookup;
 - visual PMTiles for MapLibre overlay rendering;
+- an exact GeoParquet long table with the same integer values;
 - browser PMTiles and analytical GeoParquet for support/coastal geometry;
 - canonical settlement GeoParquet and compact search indexes.
 
 COG validation covers tiling, overviews, compression, CRS/transform, nodata,
-and class domain. PMTiles validation covers archive structure, zoom/bounds,
-sample tiles, byte ranges, and parity with sampled COG classes. Rendered colour
-is never a source value.
+band order, and integer domain. PMTiles validation covers archive structure,
+zoom/bounds, sample tiles, byte ranges, and exact feature-property parity with
+COG and GeoParquet values. Rendered colour is never a source value.
 
 ### 6.7 Generate contracts and evidence
 
