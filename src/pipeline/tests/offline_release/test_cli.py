@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -19,6 +20,10 @@ PROFILE = REPO_ROOT / "src/pipeline/offline_release/profiles/fixture.json"
 RECEIPT_SCHEMA = (
     REPO_ROOT
     / "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json"
+)
+RECEIPT_EXAMPLE = (
+    REPO_ROOT
+    / "docs/evidence/fixtures/offline-release-execution-receipt.example.json"
 )
 
 
@@ -55,6 +60,29 @@ def _json(path: Path) -> dict[str, object]:
 
 def test_operator_receipt_schema_is_a_valid_draft_2020_12_contract() -> None:
     Draft202012Validator.check_schema(_json(RECEIPT_SCHEMA))
+
+
+def test_committed_operator_receipt_example_is_schema_and_inventory_valid() -> None:
+    receipt = _json(RECEIPT_EXAMPLE)
+    Draft202012Validator(_json(RECEIPT_SCHEMA)).validate(receipt)
+    outputs = receipt["finalOutputs"]
+    encoded = json.dumps(
+        outputs,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+    assert [stage["stage"] for stage in receipt["stages"]] == [
+        stage.value for stage in StageName
+    ]
+    assert receipt["stages"][-1]["outputs"] == outputs
+    assert receipt["candidate"] == {
+        "fileCount": len(outputs),
+        "byteSize": sum(output["byteSize"] for output in outputs),
+        "inventorySha256": hashlib.sha256(encoded).hexdigest(),
+    }
 
 
 def test_cli_builds_candidate_and_commits_complete_execution_receipt(

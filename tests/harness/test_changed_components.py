@@ -626,6 +626,17 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertFalse(outputs["infrastructure"])
                 self.assertFalse(outputs["compose"])
 
+    def test_offline_receipt_example_routes_pipeline_validation(self) -> None:
+        outputs = classify_paths(
+            ["docs/evidence/fixtures/offline-release-execution-receipt.example.json"]
+        )
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["frontend"])
+        self.assertFalse(outputs["api"])
+        self.assertFalse(outputs["infrastructure"])
+        self.assertFalse(outputs["compose"])
+
     def test_controlled_offline_build_is_manual_identity_bound_and_offline(self) -> None:
         workflow = (
             Path(__file__).resolve().parents[2]

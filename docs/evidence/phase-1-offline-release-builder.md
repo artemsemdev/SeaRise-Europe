@@ -35,11 +35,18 @@ pinned CI clean/resume job separately compares all 42 candidate files and
 requires seven misses followed by seven verified hits. PR #206's
 [CI run](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31415497149)
 passed the pipeline suite and the native Ubuntu offline fixture job with
-network disabled. The controlled workflow's
-[integration run](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31417398625)
+network disabled. The controlled workflow definition's routed
+[pull-request CI](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31417398625)
 and receipt-hardening
 [integration run](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31418317694)
 also passed their routed pipeline, fixture, and required gates.
+
+The manual regional/full workflow has not been dispatched. It is intentionally
+guarded to the exact `master` workflow revision, so its first controlled run is
+possible only after the final Phase 1 integration pull request is explicitly
+approved and merged, the environment is protected, and a reviewed input bundle
+exists. PR CI validates the workflow definition; it is not real-source build
+evidence.
 
 A host-side macOS diagnostic execution at reviewed integration commit
 `e55427f1801c70dad4e7e6cea3ddc2a8bc146067` recorded this receipt summary. It
