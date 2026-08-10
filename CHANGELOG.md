@@ -32,6 +32,8 @@ All notable changes to this project will be documented in this file.
   public contract change runs both browser and Python contract suites.
 - Added deterministic browser-facing TypeScript types generated from the
   authoritative public JSON Schema, with CI-enforced drift detection.
+- Added a complete committed 3 × 3 public release fixture with real geospatial
+  formats, exact inventory hashes, STAC links, rights, and safe pending status.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and

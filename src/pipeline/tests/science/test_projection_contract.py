@@ -26,6 +26,12 @@ from searise_pipeline.science import ScienceContractError, load_science_contract
 REPO_ROOT = Path(__file__).parents[4]
 CONTRACT_DIR = REPO_ROOT / "src" / "pipeline" / "science"
 PUBLIC_CONTRACT_DIR = REPO_ROOT / "contracts" / "release" / "v1"
+PUBLIC_RELEASE_FIXTURE = (
+    PUBLIC_CONTRACT_DIR
+    / "fixtures"
+    / "release"
+    / "searise-europe-v1.0.0-20260810-c096aeab4e09"
+)
 
 
 def _public_contract_validator(schema_name: str) -> Draft202012Validator:
@@ -1002,6 +1008,86 @@ def test_manifest_schema_accepts_one_complete_synthetic_release_inventory() -> N
 
     assert len(manifest["datasets"]) == 9
     assert len(manifest["artifacts"]) == 41
+
+
+def test_committed_public_release_tree_is_complete_and_fail_closed() -> None:
+    def document(relative: str) -> dict[str, Any]:
+        return json.loads((PUBLIC_RELEASE_FIXTURE / relative).read_text(encoding="utf-8"))
+
+    manifest = document("manifest.json")
+    attribution = document("config/source-attribution.json")
+    catalog = document("stac/catalog.json")
+    collection = document("stac/collection.json")
+    items = [
+        document(f"stac/items/{scenario}-{horizon}.json")
+        for scenario in ("ssp1-26", "ssp2-45", "ssp5-85")
+        for horizon in (2030, 2050, 2100)
+    ]
+
+    summary = validate_public_manifest(manifest, schema_directory=PUBLIC_CONTRACT_DIR)
+    validate_release_rights(manifest, attribution, schema_directory=PUBLIC_CONTRACT_DIR)
+    validate_release_stac(
+        manifest,
+        catalog,
+        collection,
+        items,
+        schema_directory=PUBLIC_CONTRACT_DIR,
+    )
+    validate_release_artifacts(manifest, release_root=PUBLIC_RELEASE_FIXTURE)
+
+    schema_documents = {
+        "manifest.json": "manifest.schema.json",
+        "config/scenarios.json": "scenario-config.schema.json",
+        "config/methodology.json": "methodology.schema.json",
+        "config/source-attribution.json": "attribution.schema.json",
+        "receipts/sources/ipcc-ar6.json": "source-receipt.schema.json",
+        "receipts/build.json": "build-receipt.schema.json",
+        "evidence/quality-summary.json": "quality-summary.schema.json",
+        "evidence/architecture.json": "architecture-evidence.schema.json",
+    }
+    for relative, schema_name in schema_documents.items():
+        _public_contract_validator(schema_name).validate(document(relative))
+
+    inventoried = {artifact["path"] for artifact in manifest["artifacts"]}
+    committed = {
+        path.relative_to(PUBLIC_RELEASE_FIXTURE).as_posix()
+        for path in PUBLIC_RELEASE_FIXTURE.rglob("*")
+        if path.is_file()
+    }
+    assert committed == inventoried | {"manifest.json"}
+    assert (summary.artifact_count, summary.dataset_count) == (41, 9)
+    assert manifest["releaseAuthority"] == {
+        "automatedValidation": "passed",
+        "releaseDisposition": "pending-owner",
+        "dataProvenanceClass": "synthetic-fixture",
+        "statusDisclosureRequired": True,
+    }
+
+    artifacts = {artifact["artifactId"]: artifact for artifact in manifest["artifacts"]}
+    for artifact in artifacts.values():
+        payload = (PUBLIC_RELEASE_FIXTURE / artifact["path"]).read_bytes()
+        if artifact["role"] == "projection-analysis-cog":
+            assert payload[:4] in {b"II*\x00", b"MM\x00*"}
+        elif artifact["role"] == "projection-visual-pmtiles":
+            assert payload.startswith(b"PMTiles")
+        elif artifact["role"] in {"projection-geoparquet", "settlement-geoparquet"}:
+            assert payload.startswith(b"PAR1") and payload.endswith(b"PAR1")
+
+    text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in PUBLIC_RELEASE_FIXTURE.rglob("*")
+        if path.suffix in {".json", ".jsonl", ".txt"}
+    )
+    assert all(
+        prohibited not in text
+        for prohibited in (
+            "providerCredential",
+            "backendId",
+            "requestId",
+            "tileUrlTemplate",
+            "accessToken",
+        )
+    )
 
 
 def test_manifest_stac_and_rights_semantics_accept_one_complete_inventory() -> None:
