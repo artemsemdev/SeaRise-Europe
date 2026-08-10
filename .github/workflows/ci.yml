@@ -359,7 +359,8 @@ jobs:
 
       - name: Install immutable release environment
         working-directory: src/pipeline
-        run: pip install --only-binary=:all: --require-hashes -r requirements-release-macos-arm64.lock
+        run: |
+          pip install --only-binary=:all: --require-hashes -r requirements-release-macos-arm64.lock
 
       - name: Acquire pinned Tippecanoe source
         run: |
