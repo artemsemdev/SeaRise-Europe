@@ -5,9 +5,9 @@ import { createHash } from "node:crypto";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { constants, deflateSync, gunzipSync } from "node:zlib";
 
 import { VectorTile } from "@mapbox/vector-tile";
+import { gunzipSync, zlibSync } from "fflate";
 import Pbf from "pbf";
 import { PMTiles, TileType } from "pmtiles";
 
@@ -98,6 +98,7 @@ function renderLayer(layer, property) {
   for (let index = 0; index < layer.length; index += 1) {
     const feature = layer.feature(index);
     const value = feature.properties[property];
+    requireCondition(feature.type === 3, "MVT render feature is not a polygon");
     requireCondition(Number.isSafeInteger(feature.id), "MVT feature ID is not an exact integer");
     requireCondition(Number.isSafeInteger(value), `${property} is not an exact integer`);
     requireCondition(
@@ -178,7 +179,7 @@ function encodePng(rgba) {
     scanlines[outputOffset] = 0;
     rgba.copy(scanlines, outputOffset + 1, row * size * 4, (row + 1) * size * 4);
   }
-  const compressed = deflateSync(scanlines, { level: 9, strategy: constants.Z_FIXED });
+  const compressed = Buffer.from(zlibSync(scanlines, { level: 9 }));
   return Buffer.concat([
     Buffer.from("89504e470d0a1a0a", "hex"),
     chunk("IHDR", header),
@@ -250,7 +251,7 @@ async function buildEvidence() {
   );
 
   const sourceFixtureBytes = readFileSync(sourceFixturePath);
-  const source = JSON.parse(gunzipSync(sourceFixtureBytes));
+  const source = JSON.parse(Buffer.from(gunzipSync(sourceFixtureBytes)).toString("utf8"));
   const sourceReceiptBytes = readFileSync(sourceReceiptPath);
   const sourceReceipt = JSON.parse(sourceReceiptBytes);
   requireCondition(sourceReceipt.sha256 === sha256(sourceFixtureBytes), "source fixture receipt differs");
@@ -380,12 +381,17 @@ async function buildEvidence() {
         height: size,
         sampling: "pixel-centre-even-odd",
         background: "transparent-rgba-0-0-0-0",
-        pngEncoding: "rgba8-filter0-zlib9-fixed-no-interlace",
+        pngEncoding: "rgba8-filter0-fflate-zlib9-no-interlace",
+        pngCompressor: {
+          name: "fflate",
+          version: packageLock.packages["node_modules/fflate"].version,
+        },
         palette: bins,
         packageLockPath: relative(root, packageLockPath),
         packageLockSha256: sha256(packageLockBytes),
         packages: {
           "@mapbox/vector-tile": packageLock.packages["node_modules/@mapbox/vector-tile"].version,
+          fflate: packageLock.packages["node_modules/fflate"].version,
           pbf: packageLock.packages["node_modules/pbf"].version,
           pmtiles: packageLock.packages["node_modules/pmtiles"].version,
         },

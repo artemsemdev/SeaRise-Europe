@@ -73,6 +73,20 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["frontend"])
         self.assertFalse(outputs["docker_frontend"])
 
+    def test_pmtiles_render_authorities_route_frontend_evidence_check(self) -> None:
+        paths = [
+            "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
+            "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
+            "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["frontend"])
+                self.assertTrue(outputs["pipeline"])
+                self.assertFalse(outputs["docker_frontend"])
+
     def test_pipeline_change_does_not_route_runtime_stack(self) -> None:
         outputs = classify_paths(["src/pipeline/searise_pipeline/science/ar6.py"])
 

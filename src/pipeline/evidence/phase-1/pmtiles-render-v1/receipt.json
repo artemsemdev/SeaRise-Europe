@@ -39,12 +39,16 @@
   "renderer": {
     "id": "projection-pmtiles-software-raster-v1",
     "scriptPath": "src/frontend/scripts/render-pmtiles-evidence.mjs",
-    "scriptSha256": "a65eead89702be934cd1e32ffd372da0a10eda72de560fdddc305f0b094bf915",
+    "scriptSha256": "5656374059dcc60f66053e79594ba4232f06824010df2dad3b1e8576880f64fc",
     "width": 512,
     "height": 512,
     "sampling": "pixel-centre-even-odd",
     "background": "transparent-rgba-0-0-0-0",
-    "pngEncoding": "rgba8-filter0-zlib9-fixed-no-interlace",
+    "pngEncoding": "rgba8-filter0-fflate-zlib9-no-interlace",
+    "pngCompressor": {
+      "name": "fflate",
+      "version": "0.8.3"
+    },
     "palette": [
       {
         "id": "below-0-mm",
@@ -101,9 +105,10 @@
       }
     ],
     "packageLockPath": "src/frontend/package-lock.json",
-    "packageLockSha256": "0c2a6927ff99ab49a27948fcaee8455cbc069fa2d40932e7f772d913cd113495",
+    "packageLockSha256": "783eec30ac7cca6cc1973533023458ed509db999e3922f82b8c87a0fd6046f3d",
     "packages": {
       "@mapbox/vector-tile": "2.0.4",
+      "fflate": "0.8.3",
       "pbf": "4.0.1",
       "pmtiles": "4.5.0"
     }
@@ -170,8 +175,8 @@
       "rawRgbaSha256": "fd49166b430d78cdbbf3de1ce69b6ac67b993d7267ef196685b2430f27174032",
       "png": {
         "path": "z0-0-0-lower_mm.png",
-        "byteSize": 7452,
-        "sha256": "89c1e1ff218062a48fffc4d115e55ccf00b1719f15426537291d244461f677d5"
+        "byteSize": 1981,
+        "sha256": "f16b6ffdb8b2a53c3c2b8e9829320e3ac46beade48fa717cc72860161278842c"
       }
     },
     {
@@ -208,8 +213,8 @@
       "rawRgbaSha256": "45f0bb4d08bd1be549aefbe023fb53370517be3b3dc9d0764a4638205525b7da",
       "png": {
         "path": "z3-4-2-median_mm.png",
-        "byteSize": 9744,
-        "sha256": "65d05e19f41fe1009a222dad909ebd44a148d6190fd28671727522640a7f88fc"
+        "byteSize": 4598,
+        "sha256": "9320a01dfb4e466c47bf8a36ca4f8d38620550393b8d2692912930994e620ca2"
       }
     },
     {
@@ -246,8 +251,8 @@
       "rawRgbaSha256": "3a37f6789c713161cad391408c372c69262693c0f156b1f6da0867e87e857c4f",
       "png": {
         "path": "z6-35-22-upper_mm.png",
-        "byteSize": 7457,
-        "sha256": "4873ed463fa4188023499a475c6b38d7f98b941bbfd9400f7e8fd6324a4b1c57"
+        "byteSize": 2102,
+        "sha256": "17b4244a1328a5ff0c1c98920d82a309d5dbbb65170eb12ee423518dfce84fc3"
       }
     }
   ]

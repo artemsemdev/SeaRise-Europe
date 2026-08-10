@@ -41,6 +41,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.29",
+    "fflate": "0.8.3",
     "geotiff": "^3.0.5",
     "jsdom": "^29.0.1",
     "json-schema-to-typescript": "15.0.4",
