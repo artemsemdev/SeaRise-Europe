@@ -1642,8 +1642,11 @@ def test_validation_artifact_metadata_is_bound_to_exact_run(
 
 
 @pytest.mark.parametrize("state", ["queued", "in_progress"])
-def test_concurrent_owner_decision_is_rejected(state: str) -> None:
-    source_revision = _head()
+def test_concurrent_owner_decision_is_rejected(
+    tmp_path: Path,
+    state: str,
+) -> None:
+    repository, _, _, source_revision = _evidence_repository(tmp_path)
     api = MockGitHubApi(source_revision, "e" * 40, master_revision=source_revision)
     history_path = (
         f"/repos/{owner_promotion.REPOSITORY}/actions/workflows/"
@@ -1662,7 +1665,7 @@ def test_concurrent_owner_decision_is_rejected(state: str) -> None:
             "phase-0r-ar6-v1",
             source_revision,
             _context(source_revision),
-            REPOSITORY_ROOT,
+            repository,
         )
 
 
