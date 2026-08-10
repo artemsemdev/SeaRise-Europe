@@ -1,0 +1,140 @@
+{
+  "$schema": "./source-lock.schema.json",
+  "schemaVersion": 2,
+  "sources": [
+    {
+      "id": "geonames-settlement-catalogue",
+      "selectionStatus": "selected",
+      "publisher": "GeoNames",
+      "canonicalRecord": "https://download.geonames.org/export/dump/",
+      "version": "2026-08-10",
+      "snapshotDate": "2026-08-10",
+      "licence": {
+        "name": "Creative Commons Attribution 4.0 International",
+        "url": "https://creativecommons.org/licenses/by/4.0/",
+        "spdx": "CC-BY-4.0",
+        "attribution": "GeoNames geographical database, https://www.geonames.org/.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-04",
+        "requiredAcknowledgements": [
+          "Retain GeoNames attribution and the CC BY 4.0 licence link in derived settlement indexes."
+        ],
+        "notes": "The hash-locked readme binds the tab-delimited UTF-8 formats and licence notice. Daily download URLs are mutable; SHA-256 and byte size are the only byte-identity authority."
+      },
+      "assets": [
+        {
+          "id": "all-countries",
+          "kind": "file",
+          "url": "https://download.geonames.org/export/dump/allCountries.zip",
+          "resolvedUrl": "https://download.geonames.org/export/dump/allCountries.zip",
+          "resolvedVersion": "2026-08-10",
+          "mediaType": "application/zip",
+          "byteSize": 419923777,
+          "sha256": "06f423eaf760d28101cd11a9744ade90f65c618d073ac2168501c388e1bd4afa",
+          "cachePath": "allCountries.zip",
+          "availability": "locked",
+          "roles": [
+            "settlement-place-records"
+          ],
+          "members": [
+            {
+              "id": "all-countries-records",
+              "path": "allCountries.txt",
+              "role": "settlement-place-records",
+              "byteSize": 1782635669,
+              "compressedByteSize": 419923631,
+              "crc32": "27133946",
+              "sha256": "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8"
+            }
+          ]
+        },
+        {
+          "id": "alternate-names-v2",
+          "kind": "file",
+          "url": "https://download.geonames.org/export/dump/alternateNamesV2.zip",
+          "resolvedUrl": "https://download.geonames.org/export/dump/alternateNamesV2.zip",
+          "resolvedVersion": "2026-08-10",
+          "mediaType": "application/zip",
+          "byteSize": 202510374,
+          "sha256": "eaea640b50b7081f7270d9563720b66d6b345af81522a6eb8ee55873507b17fe",
+          "cachePath": "alternateNamesV2.zip",
+          "availability": "locked",
+          "roles": [
+            "settlement-alternate-names",
+            "settlement-language-metadata"
+          ],
+          "members": [
+            {
+              "id": "alternate-name-records",
+              "path": "alternateNamesV2.txt",
+              "role": "settlement-alternate-names",
+              "byteSize": 777625687,
+              "compressedByteSize": 202448178,
+              "crc32": "e311a5a6",
+              "sha256": "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612"
+            },
+            {
+              "id": "iso-language-codes",
+              "path": "iso-languagecodes.txt",
+              "role": "settlement-language-metadata",
+              "byteSize": 137908,
+              "compressedByteSize": 61908,
+              "crc32": "4e1f14da",
+              "sha256": "cb0d34f492775deec8ec5713da6efa4463dad99b5e7ba2172bd094cfdcb76571"
+            }
+          ]
+        },
+        {
+          "id": "admin1-codes-ascii",
+          "kind": "file",
+          "url": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+          "resolvedUrl": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+          "resolvedVersion": "2026-08-10",
+          "mediaType": "text/plain",
+          "byteSize": 151572,
+          "sha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+          "cachePath": "admin1CodesASCII.txt",
+          "availability": "locked",
+          "roles": [
+            "settlement-admin1-context"
+          ]
+        },
+        {
+          "id": "format-readme",
+          "kind": "file",
+          "url": "https://download.geonames.org/export/dump/readme.txt",
+          "resolvedUrl": "https://download.geonames.org/export/dump/readme.txt",
+          "resolvedVersion": "2026-08-10",
+          "mediaType": "text/plain",
+          "byteSize": 8843,
+          "sha256": "b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5",
+          "cachePath": "readme.txt",
+          "availability": "locked",
+          "roles": [
+            "settlement-format-contract",
+            "source-licence-notice"
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "region": "global",
+          "status": "global",
+          "roles": [
+            "settlement-place-records",
+            "settlement-alternate-names",
+            "settlement-admin1-context"
+          ],
+          "reason": "The full global dump is retained so Europe inclusion and rejection are derived reproducibly rather than prefiltered by a population threshold."
+        }
+      ],
+      "inspection": {
+        "inspectedAt": "2026-08-10",
+        "method": "Official HTTPS download, response metadata capture, complete SHA-256 stream, ZIP central-directory inspection, and exact member hashing",
+        "evidenceRef": "src/pipeline/sources/evidence/geonames-settlement-snapshot-20260810.json",
+        "result": "verified"
+      }
+    }
+  ]
+}

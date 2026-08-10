@@ -1,7 +1,7 @@
 """Audited, checksum-first source acquisition."""
 
 from .acquire import Acquirer, AcquisitionError, Receipt
-from .registry import Registry, RegistryError, load_registry
+from .registry import Registry, RegistryError, load_registry, load_settlement_registry
 
 __all__ = [
     "Acquirer",
@@ -10,4 +10,5 @@ __all__ = [
     "Registry",
     "RegistryError",
     "load_registry",
+    "load_settlement_registry",
 ]

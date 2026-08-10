@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "geonames-settlement-snapshot-20260810",
+  "sourceId": "geonames-settlement-catalogue",
+  "snapshotDate": "2026-08-10",
+  "canonicalRecord": "https://download.geonames.org/export/dump/",
+  "identityAuthority": "sha256-and-byte-size",
+  "sourceLockBinding": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlements.json",
+    "sha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee"
+  },
+  "endpointClass": "mutable-daily",
+  "reproducibilityCaveat": "GeoNames daily endpoints can change after observation. Exact bytes are reproducible only from a hash-verified cache or archive; any reacquisition mismatch must fail and become a new reviewed snapshot.",
+  "licenceBinding": {
+    "assetId": "format-readme",
+    "spdx": "CC-BY-4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "attribution": "GeoNames geographical database, https://www.geonames.org/."
+  },
+  "assets": [
+    {
+      "assetId": "all-countries",
+      "requestedUrl": "https://download.geonames.org/export/dump/allCountries.zip",
+      "resolvedUrl": "https://download.geonames.org/export/dump/allCountries.zip",
+      "observedAt": "2026-08-10T19:28:40Z",
+      "httpStatus": 200,
+      "contentType": "application/zip",
+      "lastModified": "2026-08-10T02:05:17Z",
+      "etag": "19078741-658a7c924301e",
+      "etagUse": "diagnostic-only",
+      "byteSize": 419923777,
+      "sha256": "06f423eaf760d28101cd11a9744ade90f65c618d073ac2168501c388e1bd4afa"
+    },
+    {
+      "assetId": "alternate-names-v2",
+      "requestedUrl": "https://download.geonames.org/export/dump/alternateNamesV2.zip",
+      "resolvedUrl": "https://download.geonames.org/export/dump/alternateNamesV2.zip",
+      "observedAt": "2026-08-10T19:28:40Z",
+      "httpStatus": 200,
+      "contentType": "application/zip",
+      "lastModified": "2026-08-10T02:10:40Z",
+      "etag": "c121026-658a7dc696f36",
+      "etagUse": "diagnostic-only",
+      "byteSize": 202510374,
+      "sha256": "eaea640b50b7081f7270d9563720b66d6b345af81522a6eb8ee55873507b17fe"
+    },
+    {
+      "assetId": "admin1-codes-ascii",
+      "requestedUrl": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "resolvedUrl": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+      "observedAt": "2026-08-10T19:28:40Z",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "lastModified": "2026-08-10T02:05:17Z",
+      "etag": "25014-658a7c9243406",
+      "etagUse": "diagnostic-only",
+      "byteSize": 151572,
+      "sha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992"
+    },
+    {
+      "assetId": "format-readme",
+      "requestedUrl": "https://download.geonames.org/export/dump/readme.txt",
+      "resolvedUrl": "https://download.geonames.org/export/dump/readme.txt",
+      "observedAt": "2026-08-10T19:29:05Z",
+      "httpStatus": 200,
+      "contentType": "text/plain; charset=utf-8",
+      "lastModified": "2026-08-10T01:55:15Z",
+      "etag": "228b-658a7a5411559",
+      "etagUse": "diagnostic-only",
+      "byteSize": 8843,
+      "sha256": "b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5"
+    }
+  ]
+}
