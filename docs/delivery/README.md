@@ -152,7 +152,7 @@ response are documented in the
 - [ ] Generate an artifact inventory, SHA-256 checksums, and data-quality
   summary.
 - [ ] Generate SLSA-compatible provenance and sign the manifest with Cosign.
-- [ ] Provide a small committed fixture release; keep large/raw data ignored.
+- [x] Provide a small committed fixture release; keep large/raw data ignored.
 
 Exit evidence:
 

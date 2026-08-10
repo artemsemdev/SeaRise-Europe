@@ -37,6 +37,10 @@ SHA-256 hashes. TypeScript AJV and Python validate the same committed positive
 and negative fixtures. Browser-facing types are generated from the schemas;
 `npm --prefix src/frontend run contracts:check` fails on drift.
 
+The committed [complete release fixture](v1/fixtures/release/README.md) exercises
+the full manifest/STAC/artifact graph with real COG, PMTiles, and GeoParquet
+formats while remaining explicitly synthetic and pending owner disposition.
+
 ## Version identities
 
 Three identities are intentionally independent:
