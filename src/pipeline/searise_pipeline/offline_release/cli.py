@@ -88,3 +88,7 @@ def cli(
         f"offline build complete: {result.execution_receipt['dataReleaseId']} "
         "(publication not attempted)"
     )
+
+
+if __name__ == "__main__":
+    cli()
