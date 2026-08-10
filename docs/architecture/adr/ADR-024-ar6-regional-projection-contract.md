@@ -6,7 +6,7 @@
 >
 > **Decision owner:** Project owner
 >
-> **Implementation state:** Contract and #135 lookup parity implemented; publication remains blocked on #110 trusted evidence and owner disposition
+> **Implementation state:** Contract, #135 lookup parity, trusted #110 evidence, and owner release approval complete; Phase 1 open
 >
 > **Machine contract:** [`ar6-projection-contract.json`](../../../src/pipeline/science/ar6-projection-contract.json)
 >
@@ -181,6 +181,6 @@ evidence.
   documents point to this ADR and the four-state contract.
 - Tests reject tide-gauge fallback, interpolation, nodata substitution, changed
   source identity, weakened disclosure, or CI-as-approver semantics.
-- #135 evidence is implemented; #110 remains blocking until trusted release
-  evidence and the owner disposition exist. This decision alone does not unlock
-  Phase 1 or authorize publication.
+- #135 evidence, trusted dual-platform #110 evidence, and the separate owner
+  disposition are recorded. Phase 1 is open; this does not by itself authorize
+  a later production publication.

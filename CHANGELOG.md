@@ -65,6 +65,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Published the public-contract compatibility, deprecation, and rollback policy,
+  and aligned active architecture/delivery status with the approved Phase 0R gate.
 - Aligned active architecture, runtime, product, and delivery documentation on
   the four-state AR6 projection contract and its owner-controlled evidence flow.
 - Full-source AR6 release evidence now builds independently on pinned Linux

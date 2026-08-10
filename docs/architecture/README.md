@@ -68,6 +68,7 @@ Read in this order:
 | [14 — Integration Patterns](14-integration-patterns.md) | Build ingestion, publication, HTTPS artifact contracts, basemap boundary |
 | [15 — Performance and Scalability](15-performance-and-scalability.md) | Browser/CDN budgets, caching, range requests, and cost controls |
 | [16 — Geospatial Pipeline](16-geospatial-data-pipeline.md) | Real-data workflow, settlement index, reproducibility, and validation |
+| [Public release contracts](../../contracts/release/README.md) | Authoritative JSON Schemas, version compatibility, deprecation, and rollback |
 | [ADR directory](adr/README.md) | Standalone architecture decision records and ADR conventions |
 | [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
 

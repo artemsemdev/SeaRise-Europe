@@ -19,7 +19,7 @@
 >
 > **Phase 0.14 decision:** [terminal no-go](../evidence/phase-0-14-final-no-go.md) — investigation `COMPLETE-WITH-NO-GO`; authoritative disposition `BLOCKED`
 >
-> **Recovery decision:** [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md) — projection contract and #135 source/lookup parity accepted; release remains blocked on #110
+> **Recovery decision:** [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md) — #135 parity and the trusted, owner-approved #110 gate are complete; Phase 1 is open
 
 ## Current risk register
 
@@ -37,12 +37,12 @@
 | R-10 | OpenFreeMap changes or is unavailable | Medium / Low | Treat it as non-authoritative visual context; graceful no-basemap mode; preserve a documented self-host/alternate-style path. |
 | R-11 | Cloudflare pricing, limits, or custom-domain behaviour changes | Medium / Medium | Date the cost model, alert on usage, avoid proprietary runtime services, and retain a static host + byte-range object storage portability test. |
 | R-12 | Build dependency, source, action, or publication credential is compromised | Medium / Critical | Pin dependencies/actions, verify checksums, scan dependencies/secrets, generate SLSA provenance, Cosign-sign manifests, protect production and use least privilege. |
-| R-13 | Static architecture is presented as complete before real-data validation | Medium / Critical | #135 supplies real-source lookup evidence, but production claims, Phase 1, and decommissioning remain blocked until the owner approves a zero-blocker #110 release gate with measured artifacts. |
+| R-13 | Static architecture is presented as complete before migration validation | Medium / Critical | #135 and the owner-approved #110 gate supply real-source evidence and open Phase 1. Production claims and decommissioning remain blocked on the later artifact, browser, delivery, and rollback gates. |
 | R-14 | Documentation and implementation diverge during staged migration | High / Medium | Mark target vs current state, link to ADR-021, enforce architecture fitness tests, and remove old service docs only as their target contracts are documented. |
 | R-15 | Relative AR6 change is compared directly with absolute terrain height | Inapplicable to ADR-024 / Historical Critical | ADR-024 prohibits terrain comparison and reports relative change directly. Tests must continue to reject any reintroduction of the legacy operation. |
 | R-16 | A geoid or vertical transform mixes model realization, ellipsoid, permanent-tide convention, epoch, or interpolation semantics | Inapplicable to ADR-024 / Historical Critical | The active path performs no geoid or vertical transform. Phase 0.10 remains immutable evidence for the superseded v1 path. |
 | R-17 | A DSM, HEM, MAE, or product accuracy target is treated as bare-earth terrain or a complete per-cell upper bound | Inapplicable to ADR-024 / Historical Critical | The active path consumes no terrain. Phase 0.11 remains immutable evidence and terrain cannot return without a new ADR. |
-| R-18 | Green CI or source-integrity checks are mistaken for release approval | Medium / Critical | The projection contract separates `automatedValidation` from owner-controlled `releaseDisposition`. The ADR snapshot calls this authority `releaseDecision`; release artifacts use `releaseDisposition`. Only the project owner may approve a zero-blocker #110 gate and unlock #48. |
+| R-18 | Green CI or source-integrity checks are mistaken for release approval | Medium / Critical | The projection contract separates `automatedValidation` from owner-controlled `releaseDisposition`. The ADR snapshot calls this authority `releaseDecision`; release artifacts use `releaseDisposition`. The completed #110 records prove that the project owner, not CI, approved the gate. |
 | R-19 | An offshore mean-sea-surface grid, land filler, or ordinary tide-gauge record is treated as a datum-safe shoreline water reference | Inapplicable to ADR-024 / Historical Critical | ADR-024 does not construct an absolute water reference and prohibits tide-gauge fallback. Retain the v1 finding as historical evidence. |
 | R-20 | A global coastal DTM or multi-source mosaic is assumed to have finite European per-cell uncertainty from MAE/RMSE alone | Inapplicable to ADR-024 / Historical Critical | ADR-024 consumes no DTM or terrain uncertainty. Retain the v1 finding as historical evidence. |
 
@@ -134,9 +134,9 @@ validated production product until all of these are true:
 - current cost and source limitations are visible on `/about/architecture`.
 
 The scientific stop condition already fired for binary exposure; ADR-024 is its
-superseding decision. Keep Phase 1 paused through #110. Passing CI records
-automated validation only; the project owner must separately approve the
-zero-blocker `releaseDisposition` before #48 unlocks.
+superseding decision. Phase 0R subsequently passed automated validation and the
+project owner separately approved its zero-blocker `releaseDisposition`, so
+#48 and Phase 1 are open. Later releases retain the same authority separation.
 
 ## Risk review cadence
 

@@ -24,10 +24,10 @@ is still pending, the authoritative scientific and release disposition remains
 `blocked`; automation cannot turn that state into a human rejection.
 
 This ADR remains the immutable explanation of the v1 acquisition and
-validation path. It is superseded for publication by the Phase 0.14 recovery
-decision, which starts at
-[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106). No replacement
-method is accepted yet, and Phase 1 remains locked.
+validation path. Phase 0.14 started recovery at
+[#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106); ADR-024 later
+accepted the replacement projection method, and the owner-approved Phase 0R
+gate opened Phase 1 without changing this v1 no-go.
 
 ## Decision
 
@@ -151,8 +151,9 @@ constants and engine policy, numeric QUID/terrain bounds, Baltic and Black Sea
 controls, cross-environment reproducibility, and independent scientific/data
 review.
 
-Phase 1 remains locked. CI success, source download, or code completion cannot
-substitute for the named review and validation evidence.
+At this historical decision point, Phase 1 remained locked. CI success, source
+download, or code completion could not substitute for the named review and
+validation evidence.
 
 ## Rollback and replacement
 
@@ -173,9 +174,10 @@ Recovery follows this dependency order:
 4. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) rebuilds
    the regional proof and records the recovery gate.
 
-Only an independently reviewed `approved` #110 with zero blockers may unlock
-[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48). A `blocked` or
-`rejected` outcome remains a valid no-go and authorizes no release.
+This was superseded by the #106 → #135 → #110 recovery actually completed
+under ADR-024. Its independently verified, owner-approved #110 gate unlocked
+[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48); the v1 outcome
+in this ADR remains a valid no-go and authorizes no release.
 
 ## Subsequent Phase 0.8 evidence
 
