@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import struct
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -16,9 +17,23 @@ from .pmtiles import VectorToolchainEvidence
 
 _MINIMUM_ZOOM = 0
 _MAXIMUM_ZOOM = 6
+_FULL_DETAIL = 14
 _STATUS = "selected-scope-approximation"
 _PURPOSE = "product-eligibility-only"
 _SHAPELY_VERSION = "2.0.7"
+_MVT_EXTENT = 2**_FULL_DETAIL
+_QUANTIZATION_STEP_DEGREES = 360 / (2**_MAXIMUM_ZOOM * _MVT_EXTENT)
+_PER_STAGE_ERROR_DEGREES = _QUANTIZATION_STEP_DEGREES / 2
+_COORDINATE_ERROR_DEGREES = 2 * _PER_STAGE_ERROR_DEGREES
+_GEOMETRY_TOLERANCE_DEGREES = math.sqrt(2) * _COORDINATE_ERROR_DEGREES
+# One ULP prevents a mathematically exact threshold from failing after binary
+# arithmetic without changing either declared semantic tolerance.
+_COORDINATE_COMPARISON_LIMIT_DEGREES = math.nextafter(
+    _COORDINATE_ERROR_DEGREES, math.inf
+)
+_GEOMETRY_COMPARISON_LIMIT_DEGREES = math.nextafter(
+    _GEOMETRY_TOLERANCE_DEGREES, math.inf
+)
 _PMTILES_HEADER = struct.Struct("<7sB11Q6B4iB2i")
 
 
@@ -30,6 +45,7 @@ class _BoundarySpecification:
     source_byte_size: int
     source_sha256: str
     layer_id: str
+    feature_id: int
     header_bounds: tuple[float, float, float, float]
     header_center: tuple[float, float, int]
 
@@ -42,6 +58,7 @@ _BOUNDARIES = {
         source_byte_size=267676,
         source_sha256="531c6042a33cf3be9bc3ea340b0e557cb66bafb34de7954db0d7e47be90d35a9",
         layer_id="support_boundary",
+        feature_id=1,
         header_bounds=(-28.851018, 30.021176, 40.1733959, 74.536347),
         header_center=(25.3125, 38.788894, 6),
     ),
@@ -52,10 +69,12 @@ _BOUNDARIES = {
         source_byte_size=667750,
         source_sha256="3ba4d5eaba24d1202482bc33fd64fde8ce54b7ff1dd1456990d3c8cfece43366",
         layer_id="coastal_boundary",
+        feature_id=2,
         header_bounds=(-28.850986, 30.021211, 38.3141589, 74.536318),
         header_center=(25.3125, 38.788894, 6),
     ),
 }
+_DECODED_FEATURE_IDS = {"support-boundary": 1, "coastal-boundary": 2}
 
 
 @dataclass(frozen=True)
@@ -171,6 +190,58 @@ def _load_source(
     )
 
 
+def _writer_feature_properties(source: _BoundarySource) -> dict[str, object]:
+    specification = source.specification
+    return {
+        "analytical_lookup": "prohibited",
+        "boundary_id": specification.boundary_id,
+        "canonical": False,
+        "hazard_extent_claim": False,
+        "production": False,
+        "publication_eligible": False,
+        "purpose": _PURPOSE,
+        "role": specification.role,
+        "source_geoparquet_byte_size": specification.source_byte_size,
+        "source_geoparquet_sha256": specification.source_sha256,
+        "status": _STATUS,
+        "version": source.version,
+        "visual_only": True,
+    }
+
+
+def _expected_decoded_properties(source: _BoundarySource) -> dict[str, object]:
+    specification = source.specification
+    return {
+        "analytical_lookup": "prohibited",
+        "boundary_id": specification.boundary_id,
+        "canonical": False,
+        "hazard_extent_claim": False,
+        "production": False,
+        "publication_eligible": False,
+        "purpose": "product-eligibility-only",
+        "role": specification.role,
+        "source_geoparquet_byte_size": specification.source_byte_size,
+        "source_geoparquet_sha256": specification.source_sha256,
+        "status": "selected-scope-approximation",
+        "version": source.version,
+        "visual_only": True,
+    }
+
+
+def _generation_parameters(source: _BoundarySource) -> dict[str, object]:
+    return {
+        "angular_error_model": {
+            "comparison": "symmetric-hausdorff-plus-per-axis-envelope",
+            "coordinate_error_degrees": _COORDINATE_ERROR_DEGREES,
+            "geometry_tolerance_degrees": _GEOMETRY_TOLERANCE_DEGREES,
+            "maximum_rounding_stages": 2,
+            "model": "web-mercator-mvt-quantization-plus-tile-clipping",
+            "per_stage_coordinate_error_degrees": _PER_STAGE_ERROR_DEGREES,
+            "quantization_step_degrees": _QUANTIZATION_STEP_DEGREES,
+        }
+    }
+
+
 def _toolchain_metadata(
     evidence: VectorToolchainEvidence,
     *,
@@ -199,6 +270,7 @@ def _expected_metadata(
         "searise": {
             "analytical_lookup": "prohibited",
             "canonical": False,
+            "generation": _generation_parameters(source),
             "hazard_extent_claim": False,
             "lineage": source.lineage,
             "production": False,
@@ -344,3 +416,70 @@ def _validate_header(
         )
     ):
         raise ScienceContractError("Boundary PMTiles sections are not canonical and contiguous")
+
+
+def _polygon_topology(geometry: Any) -> tuple[int, int]:
+    if geometry.geom_type == "Polygon":
+        polygons = [geometry]
+    elif geometry.geom_type == "MultiPolygon":
+        polygons = list(geometry.geoms)
+    else:
+        return (-1, -1)
+    return len(polygons), sum(len(polygon.interiors) for polygon in polygons)
+
+
+def _validate_decoded_document(document: object, source: _BoundarySource) -> int:
+    _require_shapely()
+    try:
+        from shapely import union_all
+        from shapely.geometry import shape
+    except ImportError as exc:
+        raise ScienceContractError("Decoded PMTiles parity requires Shapely") from exc
+    if type(document) is not dict or type(document.get("features")) is not list:
+        raise ScienceContractError("Decoded boundary PMTiles document is malformed")
+    fragments: list[Any] = []
+    for tile in document["features"]:
+        if type(tile) is not dict or type(tile.get("features")) is not list:
+            raise ScienceContractError("Decoded boundary PMTiles tile is malformed")
+        for layer in tile["features"]:
+            if (
+                type(layer) is not dict
+                or layer.get("properties")
+                != {
+                    "extent": _MVT_EXTENT,
+                    "layer": source.specification.layer_id,
+                    "version": 2,
+                }
+                or type(layer.get("features")) is not list
+            ):
+                raise ScienceContractError("Decoded boundary PMTiles layer differs")
+            for feature in layer["features"]:
+                if (
+                    type(feature) is not dict
+                    or feature.get("id") != _DECODED_FEATURE_IDS[source.specification.role]
+                    or type(feature.get("id")) is not int
+                    or feature.get("properties") != _expected_decoded_properties(source)
+                ):
+                    raise ScienceContractError("Decoded boundary PMTiles properties differ")
+                try:
+                    fragments.append(shape(feature["geometry"]))
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ScienceContractError(
+                        "Decoded boundary PMTiles geometry is malformed"
+                    ) from exc
+    if not fragments:
+        raise ScienceContractError("Decoded boundary PMTiles contains no boundary fragments")
+    merged = union_all(fragments)
+    if (
+        not merged.is_valid
+        or merged.is_empty
+        or _polygon_topology(merged) != _polygon_topology(source.geometry)
+        or any(
+            abs(observed - expected) > _COORDINATE_COMPARISON_LIMIT_DEGREES
+            for observed, expected in zip(merged.bounds, source.geometry.bounds)
+        )
+        or source.geometry.hausdorff_distance(merged)
+        > _GEOMETRY_COMPARISON_LIMIT_DEGREES
+    ):
+        raise ScienceContractError("Decoded boundary PMTiles geometry parity differs")
+    return len(fragments)
