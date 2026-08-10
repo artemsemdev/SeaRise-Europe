@@ -69,7 +69,7 @@
     "contractArtifacts": { "$ref": "#/$defs/contractArtifacts" },
     "artifacts": {
       "type": "array",
-      "minItems": 19,
+      "minItems": 41,
       "uniqueItems": true,
       "items": { "$ref": "artifact.schema.json" }
     },
@@ -132,6 +132,7 @@
         "architectureEvidence",
         "stacCatalog",
         "stacCollection",
+        "stacItems",
         "checksums",
         "provenance",
         "signature"
@@ -152,6 +153,24 @@
         "architectureEvidence": { "$ref": "#/$defs/artifactId" },
         "stacCatalog": { "$ref": "#/$defs/artifactId" },
         "stacCollection": { "$ref": "#/$defs/artifactId" },
+        "stacItems": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "stac-ssp1-26-2030" },
+            { "const": "stac-ssp1-26-2050" },
+            { "const": "stac-ssp1-26-2100" },
+            { "const": "stac-ssp2-45-2030" },
+            { "const": "stac-ssp2-45-2050" },
+            { "const": "stac-ssp2-45-2100" },
+            { "const": "stac-ssp5-85-2030" },
+            { "const": "stac-ssp5-85-2050" },
+            { "const": "stac-ssp5-85-2100" }
+          ],
+          "items": false,
+          "minItems": 9,
+          "maxItems": 9,
+          "uniqueItems": true
+        },
         "checksums": { "$ref": "#/$defs/artifactId" },
         "provenance": { "$ref": "#/$defs/artifactId" },
         "signature": { "$ref": "#/$defs/artifactId" }
@@ -165,14 +184,16 @@
         "horizon",
         "analysisArtifactId",
         "visualArtifactId",
-        "analyticalArtifactId"
+        "analyticalArtifactId",
+        "stacItemArtifactId"
       ],
       "properties": {
         "scenario": { "$ref": "defs.schema.json#/$defs/scenarioId" },
         "horizon": { "$ref": "defs.schema.json#/$defs/horizonYear" },
         "analysisArtifactId": { "$ref": "#/$defs/artifactId" },
         "visualArtifactId": { "$ref": "#/$defs/artifactId" },
-        "analyticalArtifactId": { "const": "projection-matrix-geoparquet" }
+        "analyticalArtifactId": { "const": "projection-matrix-geoparquet" },
+        "stacItemArtifactId": { "$ref": "#/$defs/artifactId" }
       }
     },
     "ssp1262030": {
@@ -181,7 +202,8 @@
         "scenario": { "const": "ssp1-26" },
         "horizon": { "const": 2030 },
         "analysisArtifactId": { "const": "projection-ssp1-26-2030-cog" },
-        "visualArtifactId": { "const": "projection-ssp1-26-2030-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp1-26-2030-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp1-26-2030" }
       }
     },
     "ssp1262050": {
@@ -190,7 +212,8 @@
         "scenario": { "const": "ssp1-26" },
         "horizon": { "const": 2050 },
         "analysisArtifactId": { "const": "projection-ssp1-26-2050-cog" },
-        "visualArtifactId": { "const": "projection-ssp1-26-2050-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp1-26-2050-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp1-26-2050" }
       }
     },
     "ssp1262100": {
@@ -199,7 +222,8 @@
         "scenario": { "const": "ssp1-26" },
         "horizon": { "const": 2100 },
         "analysisArtifactId": { "const": "projection-ssp1-26-2100-cog" },
-        "visualArtifactId": { "const": "projection-ssp1-26-2100-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp1-26-2100-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp1-26-2100" }
       }
     },
     "ssp2452030": {
@@ -208,7 +232,8 @@
         "scenario": { "const": "ssp2-45" },
         "horizon": { "const": 2030 },
         "analysisArtifactId": { "const": "projection-ssp2-45-2030-cog" },
-        "visualArtifactId": { "const": "projection-ssp2-45-2030-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp2-45-2030-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp2-45-2030" }
       }
     },
     "ssp2452050": {
@@ -217,7 +242,8 @@
         "scenario": { "const": "ssp2-45" },
         "horizon": { "const": 2050 },
         "analysisArtifactId": { "const": "projection-ssp2-45-2050-cog" },
-        "visualArtifactId": { "const": "projection-ssp2-45-2050-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp2-45-2050-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp2-45-2050" }
       }
     },
     "ssp2452100": {
@@ -226,7 +252,8 @@
         "scenario": { "const": "ssp2-45" },
         "horizon": { "const": 2100 },
         "analysisArtifactId": { "const": "projection-ssp2-45-2100-cog" },
-        "visualArtifactId": { "const": "projection-ssp2-45-2100-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp2-45-2100-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp2-45-2100" }
       }
     },
     "ssp5852030": {
@@ -235,7 +262,8 @@
         "scenario": { "const": "ssp5-85" },
         "horizon": { "const": 2030 },
         "analysisArtifactId": { "const": "projection-ssp5-85-2030-cog" },
-        "visualArtifactId": { "const": "projection-ssp5-85-2030-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp5-85-2030-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp5-85-2030" }
       }
     },
     "ssp5852050": {
@@ -244,7 +272,8 @@
         "scenario": { "const": "ssp5-85" },
         "horizon": { "const": 2050 },
         "analysisArtifactId": { "const": "projection-ssp5-85-2050-cog" },
-        "visualArtifactId": { "const": "projection-ssp5-85-2050-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp5-85-2050-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp5-85-2050" }
       }
     },
     "ssp5852100": {
@@ -253,7 +282,8 @@
         "scenario": { "const": "ssp5-85" },
         "horizon": { "const": 2100 },
         "analysisArtifactId": { "const": "projection-ssp5-85-2100-cog" },
-        "visualArtifactId": { "const": "projection-ssp5-85-2100-pmtiles" }
+        "visualArtifactId": { "const": "projection-ssp5-85-2100-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp5-85-2100" }
       }
     }
   }

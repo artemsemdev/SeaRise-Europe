@@ -14,6 +14,13 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
+from searise_pipeline.release import (
+    PublicReleaseContractError,
+    validate_public_manifest,
+    validate_release_artifacts,
+    validate_release_rights,
+    validate_release_stac,
+)
 from searise_pipeline.science import ScienceContractError, load_science_contracts
 
 REPO_ROOT = Path(__file__).parents[4]
@@ -746,6 +753,7 @@ def _valid_manifest() -> dict[str, Any]:
         for horizon in (2030, 2050, 2100):
             analysis_id = f"projection-{scenario}-{horizon}-cog"
             visual_id = f"projection-{scenario}-{horizon}-pmtiles"
+            stac_id = f"stac-{scenario}-{horizon}"
             cog = copy.deepcopy(cog_template)
             cog.update(
                 {
@@ -766,7 +774,14 @@ def _valid_manifest() -> dict[str, Any]:
             )
             visual["projectionContext"].update({"scenario": scenario, "horizon": horizon})
             visual["projectionContext"]["source"]["memberSha256"] = member_hash
-            artifacts.extend([cog, visual])
+            stac_item = _manifest_artifact(
+                metadata_template,
+                artifact_id=stac_id,
+                path=f"stac/items/{scenario}-{horizon}.json",
+                role="stac-item",
+                media_type="application/geo+json",
+            )
+            artifacts.extend([cog, visual, stac_item])
             datasets.append(
                 {
                     "scenario": scenario,
@@ -774,6 +789,7 @@ def _valid_manifest() -> dict[str, Any]:
                     "analysisArtifactId": analysis_id,
                     "visualArtifactId": visual_id,
                     "analyticalArtifactId": "projection-matrix-geoparquet",
+                    "stacItemArtifactId": stac_id,
                 }
             )
     metadata = [
@@ -858,6 +874,11 @@ def _valid_manifest() -> dict[str, Any]:
             "architectureEvidence": "architecture-evidence",
             "stacCatalog": "stac-catalog",
             "stacCollection": "stac-collection",
+            "stacItems": [
+                f"stac-{scenario}-{horizon}"
+                for scenario in ("ssp1-26", "ssp2-45", "ssp5-85")
+                for horizon in (2030, 2050, 2100)
+            ],
             "checksums": "checksums",
             "provenance": "provenance",
             "signature": "signature",
@@ -867,13 +888,209 @@ def _valid_manifest() -> dict[str, Any]:
     }
 
 
+def _valid_attribution_for_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    attribution = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "attribution.json"
+        ).read_text(encoding="utf-8")
+    )
+    non_projection_roles = sorted(
+        {
+            artifact["role"]
+            for artifact in manifest["artifacts"]
+            if artifact["rights"]["attributionIds"] == ["geonames-fixture"]
+        }
+    )
+    attribution["records"].append(
+        {
+            "attributionId": "geonames-fixture",
+            "sourceId": "fixture/geonames",
+            "title": "Synthetic settlement and release metadata",
+            "sourceUrl": "https://fixtures.searise.invalid/geonames",
+            "licence": {
+                "spdxId": "CC-BY-4.0",
+                "name": "Creative Commons Attribution 4.0 International",
+                "url": "https://creativecommons.org/licenses/by/4.0/",
+            },
+            "attributionText": "Synthetic fixture metadata; not real-source output.",
+            "redistribution": "allowed",
+            "sourceSha256": "8" * 64,
+            "appliesToRoles": non_projection_roles,
+        }
+    )
+    return attribution
+
+
+def _valid_stac_bundle(
+    manifest: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+    fixture_dir = PUBLIC_CONTRACT_DIR / "fixtures" / "valid"
+    catalog = json.loads((fixture_dir / "stac-catalog.json").read_text(encoding="utf-8"))
+    collection = json.loads(
+        (fixture_dir / "stac-collection.json").read_text(encoding="utf-8")
+    )
+    item_template = json.loads(
+        (fixture_dir / "stac-item.json").read_text(encoding="utf-8")
+    )
+    artifacts = {artifact["artifactId"]: artifact for artifact in manifest["artifacts"]}
+    items = []
+    for dataset in manifest["datasets"]:
+        scenario = dataset["scenario"]
+        horizon = dataset["horizon"]
+        item = copy.deepcopy(item_template)
+        item["id"] = f"{scenario}-{horizon}"
+        item["properties"].update(
+            {
+                "datetime": f"{horizon}-01-01T00:00:00Z",
+                "searise:scenario": scenario,
+                "searise:horizon": horizon,
+                "searise:source_member_sha256": artifacts[
+                    dataset["analysisArtifactId"]
+                ]["projectionContext"]["source"]["memberSha256"],
+            }
+        )
+        for key, artifact_id in (
+            ("analysis", dataset["analysisArtifactId"]),
+            ("visual", dataset["visualArtifactId"]),
+            ("table", dataset["analyticalArtifactId"]),
+        ):
+            artifact = artifacts[artifact_id]
+            item["assets"][key].update(
+                {
+                    "href": f"../../{artifact['path']}",
+                    "file:size": artifact["byteSize"],
+                    "checksum:multihash": f"1220{artifact['sha256']}",
+                    "searise:artifact_id": artifact_id,
+                }
+            )
+        items.append(item)
+    return catalog, collection, items
+
+
 def test_manifest_schema_accepts_one_complete_synthetic_release_inventory() -> None:
     manifest = _valid_manifest()
 
     _public_contract_validator("manifest.schema.json").validate(manifest)
 
     assert len(manifest["datasets"]) == 9
-    assert len(manifest["artifacts"]) == 32
+    assert len(manifest["artifacts"]) == 41
+
+
+def test_manifest_stac_and_rights_semantics_accept_one_complete_inventory() -> None:
+    manifest = _valid_manifest()
+    attribution = _valid_attribution_for_manifest(manifest)
+    catalog, collection, items = _valid_stac_bundle(manifest)
+
+    summary = validate_public_manifest(manifest, schema_directory=PUBLIC_CONTRACT_DIR)
+    validate_release_rights(
+        manifest,
+        attribution,
+        schema_directory=PUBLIC_CONTRACT_DIR,
+    )
+    validate_release_stac(
+        manifest,
+        catalog,
+        collection,
+        items,
+        schema_directory=PUBLIC_CONTRACT_DIR,
+    )
+
+    assert summary.data_release_id == manifest["dataReleaseId"]
+    assert summary.artifact_count == 41
+    assert summary.dataset_count == 9
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda manifest: manifest["artifacts"][1].__setitem__(
+                "artifactId", manifest["artifacts"][0]["artifactId"]
+            ),
+            "artifact IDs must be unique",
+        ),
+        (
+            lambda manifest: manifest["artifacts"][-1].__setitem__(
+                "path", manifest["artifacts"][-2]["path"]
+            ),
+            "artifact paths must be unique",
+        ),
+        (
+            lambda manifest: manifest["artifacts"][0].__setitem__(
+                "dataReleaseId", "searise-europe-v1.0.1-20260810-c096aeab4e09"
+            ),
+            "mismatched release ID",
+        ),
+        (
+            lambda manifest: manifest["artifacts"][1]["projectionContext"].__setitem__(
+                "scenario", "ssp5-85"
+            ),
+            "contradicts its dataset context",
+        ),
+        (
+            lambda manifest: manifest["artifacts"][3].__setitem__(
+                "path", "stac/items/ssp1-26-2030-wrong.json"
+            ),
+            "contradicts its dataset path",
+        ),
+    ],
+)
+def test_manifest_semantics_reject_cross_document_contradictions(
+    mutate: Callable[[dict[str, Any]], object],
+    message: str,
+) -> None:
+    manifest = _valid_manifest()
+    mutate(manifest)
+
+    with pytest.raises(PublicReleaseContractError, match=message):
+        validate_public_manifest(manifest, schema_directory=PUBLIC_CONTRACT_DIR)
+
+
+def test_release_rights_reject_role_not_covered_by_attribution() -> None:
+    manifest = _valid_manifest()
+    attribution = _valid_attribution_for_manifest(manifest)
+    attribution["records"][1]["appliesToRoles"].remove("stac-item")
+
+    with pytest.raises(PublicReleaseContractError, match="does not cover role stac-item"):
+        validate_release_rights(
+            manifest,
+            attribution,
+            schema_directory=PUBLIC_CONTRACT_DIR,
+        )
+
+
+def test_release_artifact_integrity_rejects_tampered_bytes(tmp_path: Path) -> None:
+    manifest = _valid_manifest()
+    for artifact in manifest["artifacts"]:
+        path = tmp_path / artifact["path"]
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = (artifact["artifactId"] + "\n").encode()
+        path.write_bytes(payload)
+        artifact["byteSize"] = len(payload)
+        artifact["sha256"] = hashlib.sha256(payload).hexdigest()
+
+    validate_public_manifest(manifest, schema_directory=PUBLIC_CONTRACT_DIR)
+    validate_release_artifacts(manifest, release_root=tmp_path)
+
+    first = manifest["artifacts"][0]
+    (tmp_path / first["path"]).write_bytes(b"tampered but same declared identity\n")
+    with pytest.raises(PublicReleaseContractError, match="byte size differs|SHA-256 differs"):
+        validate_release_artifacts(manifest, release_root=tmp_path)
+
+
+def test_release_stac_rejects_asset_identity_drift() -> None:
+    manifest = _valid_manifest()
+    catalog, collection, items = _valid_stac_bundle(manifest)
+    items[0]["assets"]["analysis"]["checksum:multihash"] = "1220" + "0" * 64
+
+    with pytest.raises(PublicReleaseContractError, match="mismatched analysis hash"):
+        validate_release_stac(
+            manifest,
+            catalog,
+            collection,
+            items,
+            schema_directory=PUBLIC_CONTRACT_DIR,
+        )
 
 
 @pytest.mark.parametrize(
@@ -888,6 +1105,7 @@ def test_manifest_schema_accepts_one_complete_synthetic_release_inventory() -> N
             "releasePath", "https://provider.example/release"
         ),
         lambda manifest: manifest["contractArtifacts"].pop("qualitySummary"),
+        lambda manifest: manifest["contractArtifacts"]["stacItems"].pop(),
         lambda manifest: manifest["artifacts"][0].__setitem__("path", "../escape.parquet"),
     ],
 )
