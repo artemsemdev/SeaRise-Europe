@@ -389,7 +389,7 @@
       "owner": "data",
       "purpose": "Enforce the typed Phase 1 build graph, strict plan identities, shared profiles, and closed failure taxonomy for the offline release builder.",
       "sourcePaths": ["src/pipeline/tests/offline_release/test_*.py"],
-      "changedPaths": [".github/workflows/offline-release-controlled.yml", "scripts/release/prepare_controlled_offline_inputs.py", "src/pipeline/searise_pipeline/offline_release/**", "src/pipeline/tests/offline_release/**", "src/pipeline/pyproject.toml"],
+      "changedPaths": [".github/workflows/offline-release-controlled.yml", "docs/evidence/fixtures/offline-release-execution-receipt.example.json", "scripts/release/prepare_controlled_offline_inputs.py", "src/pipeline/searise_pipeline/offline_release/**", "src/pipeline/tests/offline_release/**", "src/pipeline/pyproject.toml"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent deterministic offline build-plan, stage-graph, identity, and failure-contract gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/offline_release -q", "full": "python -m pytest src/pipeline/tests -q" },
