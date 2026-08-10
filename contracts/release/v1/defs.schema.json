@@ -40,6 +40,7 @@
     "artifactRole": {
       "enum": [
         "release-manifest",
+        "contract-schema",
         "scenario-config",
         "methodology",
         "source-attribution",

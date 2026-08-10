@@ -1,0 +1,50 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "artifactId": "projection-ssp2-45-2050-pmtiles",
+  "path": "layers/ssp2-45/2050.pmtiles",
+  "role": "projection-visual-pmtiles",
+  "mediaType": "application/vnd.pmtiles",
+  "byteSize": 1024,
+  "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "immutable": true,
+  "scientificUse": "visual-only",
+  "lineage": [
+    {
+      "path": "receipts/build.json",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "rights": {
+    "attributionIds": ["ipcc-ar6-sl-projections-20210809"],
+    "redistribution": "allowed"
+  },
+  "spatialBounds": [-30.5, 29.5, 45.5, 75.5],
+  "projectionContext": {
+    "scenario": "ssp2-45",
+    "horizon": 2050,
+    "source": {
+      "sourceRelease": "20210809",
+      "archiveSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "memberSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "methodologyVersion": "ar6-regional-projection-v1"
+    },
+    "grid": {
+      "crs": "EPSG:4326",
+      "bounds": [-30.5, 29.5, 45.5, 75.5],
+      "transform": [1, 0, -30.5, 0, -1, 75.5],
+      "width": 76,
+      "height": 46,
+      "nativeResolutionDegrees": 1,
+      "nodata": -32768
+    },
+    "values": {
+      "storedUnits": "mm",
+      "scaleToMetres": 0.001,
+      "baseline": "1995-2014 mean",
+      "quantiles": [0.167, 0.5, 0.833]
+    }
+  }
+}

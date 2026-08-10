@@ -148,6 +148,7 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
 
     assert {path.name for path in schemas} == {
         "architecture-evidence.schema.json",
+        "artifact.schema.json",
         "attribution.schema.json",
         "build-receipt.schema.json",
         "defs.schema.json",
@@ -545,3 +546,67 @@ def test_release_pointer_rejects_origins_and_unsafe_cache_policy() -> None:
     errors = list(_public_contract_validator("release-pointer.schema.json").iter_errors(document))
 
     assert len(errors) >= 2
+
+
+def test_public_artifact_fixtures_lock_exact_and_visual_roles() -> None:
+    validator = _public_contract_validator("artifact.schema.json")
+    paths = sorted((PUBLIC_CONTRACT_DIR / "fixtures" / "valid").glob("artifact-*.json"))
+    artifacts = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+
+    for artifact in artifacts:
+        validator.validate(artifact)
+
+    assert {artifact["scientificUse"] for artifact in artifacts} == {
+        "exact-lookup",
+        "exact-analytics",
+        "visual-only",
+        "not-applicable",
+    }
+    assert all(artifact["dataProvenanceClass"] == "synthetic-fixture" for artifact in artifacts)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda artifact: artifact.__setitem__("path", "../analysis.tif"),
+        lambda artifact: artifact.__setitem__("mediaType", "application/vnd.pmtiles"),
+        lambda artifact: artifact.__setitem__("scientificUse", "visual-only"),
+        lambda artifact: artifact.__setitem__("sha256", "not-a-hash"),
+        lambda artifact: artifact.__setitem__("rights", {"attributionIds": []}),
+        lambda artifact: artifact["projectionContext"]["grid"].__setitem__(
+            "nativeResolutionDegrees", 0.5
+        ),
+    ],
+)
+def test_analysis_artifact_rejects_contract_weakening(
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    artifact = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "artifact-analysis-cog.json"
+        ).read_text(encoding="utf-8")
+    )
+    mutate(artifact)
+
+    assert list(_public_contract_validator("artifact.schema.json").iter_errors(artifact))
+
+
+def test_non_projection_artifact_cannot_claim_projection_context() -> None:
+    artifact = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "artifact-search-index.json"
+        ).read_text(encoding="utf-8")
+    )
+    artifact["mediaType"] = "application/json"
+    validator = _public_contract_validator("artifact.schema.json")
+
+    assert list(validator.iter_errors(artifact))
+
+    artifact["mediaType"] = "application/vnd.searise.search-index+json"
+    artifact["projectionContext"] = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "artifact-analysis-cog.json"
+        ).read_text(encoding="utf-8")
+    )["projectionContext"]
+
+    assert list(validator.iter_errors(artifact))

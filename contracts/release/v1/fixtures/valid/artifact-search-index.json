@@ -1,0 +1,25 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "artifactId": "search-europe-core",
+  "path": "search/europe-core.index.br",
+  "role": "settlement-search-index",
+  "mediaType": "application/vnd.searise.search-index+json",
+  "byteSize": 256,
+  "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+  "immutable": true,
+  "scientificUse": "not-applicable",
+  "lineage": [
+    {
+      "path": "receipts/build.json",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "rights": {
+    "attributionIds": ["geonames-fixture"],
+    "redistribution": "allowed"
+  },
+  "spatialBounds": null
+}
