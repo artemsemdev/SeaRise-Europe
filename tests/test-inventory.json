@@ -51,6 +51,12 @@
       "reference": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py",
       "environment": "macOS arm64; Python 3.9.6; 5 structure contract and mutation tests passed in 2.24s; no external vector build executed"
     },
+    "local-2026-08-10-boundary-pmtiles-parity": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T00:14:17+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py",
+      "environment": "macOS arm64; Python 3.9.6 and Shapely 2.0.7; 5 closed-oracle, tolerance-boundary, and topology-loss tests passed in 13.11s; no external vector build executed"
+    },
     "local-2026-08-10-settlement-contracts": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T21:00:00+02:00",
@@ -468,6 +474,20 @@
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in source bytes and synthetic PMTiles header mutations; no external vector executable, credentials, clock input, randomness, or network." }
     },
     {
+      "id": "pipeline-boundary-pmtiles-parity",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify decoded boundary IDs, properties, and geometry against an independent closed oracle and a derived MVT quantization error model.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_pmtiles_parity.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/release/boundary_pmtiles.py", "src/pipeline/tests/release/test_boundary_pmtiles_parity.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent independent decoded ID/property oracle and pass-at/fail-over derived geometry-threshold gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_pmtiles_parity.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 14, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-parity", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact source geometry and deterministic in-memory decoded mutations; pinned Shapely version, no vector executable, credentials, randomness, or network." }
+    },
+    {
       "id": "pipeline-ar6-release-pmtiles",
       "layer": "scientific",
       "owner": "science",
@@ -761,6 +781,7 @@
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py", "suite": "pipeline-boundary-pmtiles-structure", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py", "suite": "pipeline-boundary-pmtiles-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_owner_promotion.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_promotion_cli.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
