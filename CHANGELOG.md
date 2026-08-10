@@ -74,6 +74,10 @@ All notable changes to this project will be documented in this file.
 - Added derive-stage validation for the owner-approved Phase 0R projection
   bundle, rechecking exact COG and GeoParquet semantics, independent lookup
   goldens, and the byte-bound decoded-PMTiles parity evidence before promotion.
+- Added deterministic analytical GeoParquet packaging for the checked-in support
+  and coastal engineering boundaries, preserving their approximate,
+  product-eligibility-only status and Natural Earth attribution while preventing
+  them from being presented as canonical, production, or publication-ready data.
 
 ### Changed
 

@@ -19,6 +19,7 @@ netCDF4>=1.6,<2.0
 shapely>=2.0,<3.0
 geopandas>=0.14,<2.0
 pyarrow==16.1.0
+pyproj==3.6.1
 psycopg2-binary>=2.9,<3.0
 azure-storage-blob>=12.19,<13.0
 cryptography>=42,<51
