@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "snapshotDate": "2026-08-10",
+  "rawAnomalyPolicyVersion": "geonames-place-raw-anomalies-v1",
+  "fixtureClass": "hash-verified-real-format-excerpt",
+  "productionInput": false,
+  "sourceLock": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlements.json",
+    "sha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee"
+  },
+  "sources": [
+    {
+      "fixtureFile": "allCountries.rows.txt",
+      "fixtureSha256": "b03a2432314ec83031c75011d265806db0002c4c964dcc2773406e0a7ca026a3",
+      "assetId": "all-countries",
+      "sourceFile": "allCountries.txt",
+      "sourceAssetSha256": "06f423eaf760d28101cd11a9744ade90f65c618d073ac2168501c388e1bd4afa",
+      "sourceAssetByteSize": 419923777,
+      "sourceSha256": "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8",
+      "sourceByteSize": 1782635669,
+      "sourceCompressedByteSize": 419923631,
+      "sourceCrc32": "27133946",
+      "rows": [
+        { "fixtureLine": 1, "sourceLine": 179, "sourceRecordId": 3038987 },
+        { "fixtureLine": 2, "sourceLine": 513, "sourceRecordId": 3039322 },
+        { "fixtureLine": 3, "sourceLine": 5540, "sourceRecordId": 292688 },
+        { "fixtureLine": 4, "sourceLine": 25330, "sourceRecordId": 1134032 },
+        { "fixtureLine": 5, "sourceLine": 221763, "sourceRecordId": 6638545 },
+        { "fixtureLine": 6, "sourceLine": 221772, "sourceRecordId": 6638554 },
+        { "fixtureLine": 7, "sourceLine": 616544, "sourceRecordId": 3344077 },
+        { "fixtureLine": 8, "sourceLine": 3924439, "sourceRecordId": 2967788 },
+        { "fixtureLine": 9, "sourceLine": 6250082, "sourceRecordId": 7576740 },
+        { "fixtureLine": 10, "sourceLine": 6463757, "sourceRecordId": 1524311 },
+        { "fixtureLine": 11, "sourceLine": 6767742, "sourceRecordId": 6546165 },
+        { "fixtureLine": 12, "sourceLine": 9122961, "sourceRecordId": 1482375 },
+        { "fixtureLine": 13, "sourceLine": 3759, "sourceRecordId": 290854 },
+        { "fixtureLine": 14, "sourceLine": 274837, "sourceRecordId": 12564634 },
+        { "fixtureLine": 15, "sourceLine": 6250147, "sourceRecordId": 7576827 },
+        { "fixtureLine": 16, "sourceLine": 13448033, "sourceRecordId": 281173 }
+      ]
+    },
+    {
+      "fixtureFile": "admin1CodesASCII.rows.txt",
+      "fixtureSha256": "fe277fb964061d6d5cb1ee0ffa2b265b2cb7199463422d21547951001dc1508b",
+      "assetId": "admin1-codes-ascii",
+      "sourceFile": "admin1CodesASCII.txt",
+      "sourceAssetSha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+      "sourceAssetByteSize": 151572,
+      "sourceSha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+      "sourceByteSize": 151572,
+      "sourceCompressedByteSize": null,
+      "sourceCrc32": null,
+      "rows": [
+        { "fixtureLine": 1, "sourceLine": 2, "sourceRecordId": 3039676 },
+        { "fixtureLine": 2, "sourceLine": 7, "sourceRecordId": 3338529 },
+        { "fixtureLine": 3, "sourceLine": 14, "sourceRecordId": 292969 }
+      ]
+    }
+  ]
+}

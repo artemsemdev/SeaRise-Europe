@@ -151,6 +151,21 @@ after comparison with Copernicus Coastal Zones; it is not a hazard extent.
 
 ### 6.3 Build the settlement catalog
 
+Before any join, the typed GeoNames boundary parser binds `allCountries.txt`
+and `admin1CodesASCII.txt` to the scoped 2026-08-10 source identities. It
+requires strict UTF-8, exact 19/4-column rows, canonical IDs and numeric/date
+forms, finite bounded coordinates, and per-row lineage. Provider-native
+Unicode, nullable feature fields, signed raw population, and free-form admin
+values are preserved at this raw boundary; catalog eligibility and join
+semantics are separate fail-closed stages.
+
+The snapshot-bound `geonames-place-raw-anomalies-v1` policy preserves and flags
+DEL/C1 codepoints, edge ASCII spaces in aliases, negative raw populations, and
+the provider's four non-place leading-empty country placeholders. Downstream
+normalization must quarantine flagged rows unless its contract accepts the
+specific class; trailing/interior empty tokens remain invalid. The admin1 asset
+has no accepted anomaly class and fails closed on unexpected controls.
+
 DuckDB Spatial performs the reproducible joins:
 
 1. ingest pinned GeoNames places and alternate names;

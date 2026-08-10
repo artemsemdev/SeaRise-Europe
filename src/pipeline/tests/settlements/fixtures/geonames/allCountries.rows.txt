@@ -1,0 +1,16 @@
+3038987	Sornàs	Sornas	Sornas,Sornàs	42.56461	1.52757	P	PPL	AD		05				251		1328	Europe/Andorra	2025-07-14
+3039322	Ràmio	Ramio		42.49734	1.57401	P	PPL	AD		08				0		1639	Europe/Andorra	2015-05-06
+292688	Ar Ruways	Ar Ruways	Ar Ru'ays,Ar Ruways,Ar Ru’ays,Ar-Ruvais,Ruwais,alrwys,ar-Ruways,lu wa si,ruvais,Ар-Руваис,الرويس,الرویس,റുവൈസ്,魯瓦斯,鲁瓦斯	24.11028	52.73056	P	PPL	AE		01	103	12748114		25000		16	Asia/Dubai	2024-03-14
+1134032	Mana’ī 	Mana'ir	Mana'i,Mana’ī ,منعی	29.89804	64.62061	T	DUNE	AF		23				0		966	Asia/Kabul	2011-11-05
+6638545	Namako Hyôga	Namako Hyoga		-72.56667	31.26667	H		AQ						0		2113	Antarctica/Syowa	2008-01-20
+6638554	African-Antarctic Basin	African-Antarctic Basin		-61	15			AQ						0		-9999		2008-01-20
+3344077	Novi Grad Sarajevo	Novi Grad Sarajevo	Novi Grad,Novi Grad Sarajevo,Opcina Novi Grad Sarajevo,Opshtina Novi Grad Sarajevo,Opstina Novi Grad Sarajevo,Općina Novi Grad Sarajevo,Opština Novi Grad Sarajevo,Sarajevo-Novi Grad,Нови Град Сарајево,Општина Нови Град Сарајево	43.85806	18.32	A	ADM3	BA		01	Kanton Sarajevo	3344077		0		499	Europe/Sarajevo	2016-06-05
+2967788	Vœlfling-lès-Bouzonville	Vœlfling-les-Bouzonville	Voelfling,Voelfling-les-Bouzonville,Voelfling-lès-Bouzonville,Vœlfling-lès-Bouzonville	49.29176	6.60844	P	PPL	FR		44	57	573	57749	0		246	Europe/Paris	2020-07-09
+7576740	East Spit	East Spit		0.21458	173.47575	H	RFC	KI		01	KU			-12		-9999	Pacific/Tarawa	2010-10-29
+1524311	Enbekshinskiy Rayon	Enbekshinskiy Rayon		42.3	69.6	A	ADM3	KZ		Shymkent (undefined)		1524311		0		513	Asia/Almaty	2018-08-03
+6546165	Mlilia	Mlilia	Mlilia,Mlilia (TO),frkhant,فرخانة	35.29252	-2.94979	A	ADM3	MA			000	1e+010		0		13	Africa/Casablanca	2007-07-14
+1482375	Shingli Bala	Shingli Bala	Bar Shinglai,Shingli Bala,shngly bala,شنگلی بالا	34.67872	72.98491	P	PPL	PK		03	8224052	9072722	Deshiwal (undefined)	4000	1050	1041	Asia/Karachi	2017-04-16
+290854	Wadi Shakh	Wadi Shakh	Wadi Al Shaikh ,Wadi Shakh,Wadi Shakhkh,Wādī Shakh,Wādī Shakhkh	25.58769	56.14287	H	WAD	AE		04				0	240	245	Asia/Dubai	2025-05-21
+12564634	Padre Ángel Buodo	Padre Angel Buodo	Padre Angel Buodo,Padre Ángel Buodo	-37.30722	-64.28867	P	PPL	AR		11				0		173	America/Argentina/Salta	2023-09-07
+7576827	NW Shoals	NW Shoals		1.01841	172.96914	H	RFC	KI		01	MI			-3		-9999	Pacific/Tarawa	2010-11-01
+281173	Ra's Sālim	Ra's Salim	Ra's Salim,Ra's Sālim,Ras Salem,Rās Sālem,Salim er Ras,Sālim er Rās	31.76667	35.23333	T	SPUR		,PS	00				0		669	Asia/Hebron	2022-01-04

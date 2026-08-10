@@ -44,6 +44,7 @@ packages = [
     "searise_pipeline.regional_fixture",
     "searise_pipeline.release",
     "searise_pipeline.science",
+    "searise_pipeline.settlements",
     "searise_pipeline.sources",
 ]
 

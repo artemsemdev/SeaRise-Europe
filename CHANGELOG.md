@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added lossless typed GeoNames `allCountries` and `admin1CodesASCII` row parsers
+  with pinned source identity, exact lineage, explicit raw anomaly flags, and
+  hash-bound real-format fixtures.
 - Added the first versioned Phase 1 public release contracts, locking the exact
   scenario/horizon matrix, defaults, discriminated four-state result payloads,
   grid-only 100 km lookup semantics, source identity, owner authority, and

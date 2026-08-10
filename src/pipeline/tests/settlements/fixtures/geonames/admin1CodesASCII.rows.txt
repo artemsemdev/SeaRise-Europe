@@ -1,0 +1,3 @@
+AD.05	Ordino	Ordino	3039676
+AD.08	Escaldes-Engordany	Escaldes-Engordany	3338529
+AE.01	Abu Dhabi	Abu Dhabi	292969
