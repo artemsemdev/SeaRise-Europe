@@ -162,6 +162,7 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
         "scenario-config.schema.json",
         "search-record.schema.json",
         "source-receipt.schema.json",
+        "stac.schema.json",
     }
     for path in schemas:
         Draft202012Validator.check_schema(json.loads(path.read_text(encoding="utf-8")))
@@ -566,6 +567,94 @@ def test_public_artifact_fixtures_lock_exact_and_visual_roles() -> None:
         "not-applicable",
     }
     assert all(artifact["dataProvenanceClass"] == "synthetic-fixture" for artifact in artifacts)
+
+
+def test_static_stac_fixtures_use_the_pinned_1_1_0_profile() -> None:
+    validator = _public_contract_validator("stac.schema.json")
+    fixture_dir = PUBLIC_CONTRACT_DIR / "fixtures" / "valid"
+    documents = [
+        json.loads((fixture_dir / name).read_text(encoding="utf-8"))
+        for name in ("stac-catalog.json", "stac-collection.json", "stac-item.json")
+    ]
+
+    for document in documents:
+        validator.validate(document)
+
+    item = documents[-1]
+    assert all(document["stac_version"] == "1.1.0" for document in documents)
+    assert item["assets"]["analysis"]["roles"] == [
+        "data",
+        "searise:exact-lookup",
+    ]
+    assert item["assets"]["visual"]["roles"] == [
+        "visual",
+        "searise:visual-only",
+    ]
+
+
+def test_static_stac_negative_fixture_rejects_mutable_origin() -> None:
+    document = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR
+            / "fixtures"
+            / "invalid"
+            / "stac-catalog-unsafe-origin.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert list(_public_contract_validator("stac.schema.json").iter_errors(document))
+
+
+def test_stac_item_artifacts_use_geojson_media_type() -> None:
+    artifact = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR
+            / "fixtures"
+            / "valid"
+            / "artifact-search-index.json"
+        ).read_text(encoding="utf-8")
+    )
+    artifact.update(
+        {
+            "artifactId": "stac-ssp2-45-2050",
+            "path": "stac/items/ssp2-45-2050.json",
+            "role": "stac-item",
+            "mediaType": "application/geo+json",
+        }
+    )
+    validator = _public_contract_validator("artifact.schema.json")
+
+    validator.validate(artifact)
+    artifact["mediaType"] = "application/json"
+    assert list(validator.iter_errors(artifact))
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda item: item.__setitem__("stac_version", "1.0.0"),
+        lambda item: item["assets"]["analysis"].__setitem__(
+            "href", "https://provider.example/analysis.tif"
+        ),
+        lambda item: item["assets"]["visual"].__setitem__(
+            "roles", ["data", "searise:exact-lookup"]
+        ),
+        lambda item: item["properties"].__setitem__(
+            "searise:scientific_use", "pmtiles-exact"
+        ),
+    ],
+)
+def test_static_stac_item_rejects_unsafe_or_contradictory_metadata(
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    item = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "stac-item.json"
+        ).read_text(encoding="utf-8")
+    )
+    mutate(item)
+
+    assert list(_public_contract_validator("stac.schema.json").iter_errors(item))
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,506 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/stac.schema.json",
+  "title": "SeaRise Europe static STAC v1",
+  "description": "A fail-closed STAC 1.1.0 profile for an immutable SeaRise Europe release.",
+  "oneOf": [
+    { "$ref": "#/$defs/catalog" },
+    { "$ref": "#/$defs/collection" },
+    { "$ref": "#/$defs/item" }
+  ],
+  "$defs": {
+    "releaseFields": {
+      "properties": {
+        "$schema": {
+          "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/stac.schema.json"
+        },
+        "stac_version": { "const": "1.1.0" },
+        "searise:schema_version": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+        "searise:data_release_id": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+        "searise:data_provenance_class": {
+          "$ref": "defs.schema.json#/$defs/dataProvenanceClass"
+        }
+      }
+    },
+    "localLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rel", "href", "type"],
+      "properties": {
+        "rel": { "enum": ["root", "parent", "child", "item", "collection"] },
+        "href": {
+          "type": "string",
+          "pattern": "^(?:\\.\\./){0,2}[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+        },
+        "type": { "enum": ["application/json", "application/geo+json"] }
+      }
+    },
+    "externalLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rel", "href"],
+      "properties": {
+        "rel": { "enum": ["license", "cite-as"] },
+        "href": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://[^?#]+/?$"
+        }
+      }
+    },
+    "rootLink": {
+      "$ref": "#/$defs/localLink",
+      "properties": {
+        "rel": { "const": "root" },
+        "href": { "enum": ["catalog.json", "../catalog.json"] },
+        "type": { "const": "application/json" }
+      }
+    },
+    "catalogChildLink": {
+      "$ref": "#/$defs/localLink",
+      "properties": {
+        "rel": { "const": "child" },
+        "href": { "const": "collection.json" },
+        "type": { "const": "application/json" }
+      }
+    },
+    "catalogParentLink": {
+      "$ref": "#/$defs/localLink",
+      "properties": {
+        "rel": { "const": "parent" },
+        "href": { "const": "catalog.json" },
+        "type": { "const": "application/json" }
+      }
+    },
+    "collectionLink": {
+      "$ref": "#/$defs/localLink",
+      "properties": {
+        "rel": { "const": "collection" },
+        "href": { "const": "../collection.json" },
+        "type": { "const": "application/json" }
+      }
+    },
+    "itemLink": {
+      "$ref": "#/$defs/localLink",
+      "properties": {
+        "rel": { "const": "item" },
+        "href": {
+          "pattern": "^items/(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)\\.json$"
+        },
+        "type": { "const": "application/geo+json" }
+      }
+    },
+    "fileIdentity": {
+      "properties": {
+        "file:size": { "type": "integer", "minimum": 1 },
+        "checksum:multihash": {
+          "type": "string",
+          "pattern": "^1220[a-f0-9]{64}$"
+        },
+        "searise:artifact_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]+$"
+        }
+      }
+    },
+    "analysisAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "href",
+        "type",
+        "roles",
+        "file:size",
+        "checksum:multihash",
+        "searise:artifact_id"
+      ],
+      "properties": {
+        "href": {
+          "type": "string",
+          "pattern": "^\\.\\./\\.\\./analysis/(ssp1-26|ssp2-45|ssp5-85)/(2030|2050|2100)\\.tif$"
+        },
+        "type": {
+          "const": "image/tiff; application=geotiff; profile=cloud-optimized"
+        },
+        "roles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "data" },
+            { "const": "searise:exact-lookup" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "file:size": { "$ref": "#/$defs/fileIdentity/properties/file:size" },
+        "checksum:multihash": {
+          "$ref": "#/$defs/fileIdentity/properties/checksum:multihash"
+        },
+        "searise:artifact_id": {
+          "$ref": "#/$defs/fileIdentity/properties/searise:artifact_id"
+        }
+      }
+    },
+    "visualAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "href",
+        "type",
+        "roles",
+        "file:size",
+        "checksum:multihash",
+        "searise:artifact_id"
+      ],
+      "properties": {
+        "href": {
+          "type": "string",
+          "pattern": "^\\.\\./\\.\\./layers/(ssp1-26|ssp2-45|ssp5-85)/(2030|2050|2100)\\.pmtiles$"
+        },
+        "type": { "const": "application/vnd.pmtiles" },
+        "roles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "visual" },
+            { "const": "searise:visual-only" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "file:size": { "$ref": "#/$defs/fileIdentity/properties/file:size" },
+        "checksum:multihash": {
+          "$ref": "#/$defs/fileIdentity/properties/checksum:multihash"
+        },
+        "searise:artifact_id": {
+          "$ref": "#/$defs/fileIdentity/properties/searise:artifact_id"
+        }
+      }
+    },
+    "tableAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "href",
+        "type",
+        "roles",
+        "file:size",
+        "checksum:multihash",
+        "searise:artifact_id"
+      ],
+      "properties": {
+        "href": { "const": "../../analysis/projections.parquet" },
+        "type": { "const": "application/vnd.apache.parquet" },
+        "roles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "data" },
+            { "const": "searise:exact-analytics" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "file:size": { "$ref": "#/$defs/fileIdentity/properties/file:size" },
+        "checksum:multihash": {
+          "$ref": "#/$defs/fileIdentity/properties/checksum:multihash"
+        },
+        "searise:artifact_id": { "const": "projection-matrix-geoparquet" }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "stac_version",
+        "stac_extensions",
+        "type",
+        "id",
+        "title",
+        "description",
+        "searise:schema_version",
+        "searise:data_release_id",
+        "searise:data_provenance_class",
+        "links"
+      ],
+      "properties": {
+        "$schema": {},
+        "stac_version": {},
+        "stac_extensions": { "const": [] },
+        "type": { "const": "Catalog" },
+        "id": {
+          "type": "string",
+          "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}-catalog$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "searise:schema_version": {},
+        "searise:data_release_id": {},
+        "searise:data_provenance_class": {},
+        "links": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/rootLink" },
+            { "$ref": "#/$defs/catalogChildLink" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "allOf": [{ "$ref": "#/$defs/releaseFields" }]
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "stac_version",
+        "stac_extensions",
+        "type",
+        "id",
+        "title",
+        "description",
+        "license",
+        "providers",
+        "extent",
+        "summaries",
+        "searise:schema_version",
+        "searise:data_release_id",
+        "searise:data_provenance_class",
+        "links"
+      ],
+      "properties": {
+        "$schema": {},
+        "stac_version": {},
+        "stac_extensions": { "const": [] },
+        "type": { "const": "Collection" },
+        "id": {
+          "type": "string",
+          "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}-projections$"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "license": { "const": "CC-BY-4.0" },
+        "providers": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "roles", "url"],
+              "properties": {
+                "name": { "const": "IPCC AR6 projection authors via Zenodo" },
+                "roles": {
+                  "type": "array",
+                  "prefixItems": [
+                    { "const": "producer" },
+                    { "const": "licensor" }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "url": {
+                  "const": "https://doi.org/10.5281/zenodo.6382554"
+                }
+              }
+            }
+          ],
+          "items": false,
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "extent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spatial", "temporal"],
+          "properties": {
+            "spatial": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["bbox"],
+              "properties": {
+                "bbox": { "const": [[-30.5, 29.5, 45.5, 75.5]] }
+              }
+            },
+            "temporal": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["interval"],
+              "properties": {
+                "interval": {
+                  "const": [["2030-01-01T00:00:00Z", "2100-01-01T00:00:00Z"]]
+                }
+              }
+            }
+          }
+        },
+        "summaries": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "searise:scenario",
+            "searise:horizon",
+            "searise:baseline",
+            "searise:method_version",
+            "searise:source_release"
+          ],
+          "properties": {
+            "searise:scenario": { "const": ["ssp1-26", "ssp2-45", "ssp5-85"] },
+            "searise:horizon": { "const": [2030, 2050, 2100] },
+            "searise:baseline": { "const": ["1995-2014 mean"] },
+            "searise:method_version": { "const": ["ar6-regional-projection-v1"] },
+            "searise:source_release": { "const": ["20210809"] }
+          }
+        },
+        "searise:schema_version": {},
+        "searise:data_release_id": {},
+        "searise:data_provenance_class": {},
+        "links": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/rootLink" },
+            { "$ref": "#/$defs/catalogParentLink" },
+            { "$ref": "#/$defs/externalLink", "properties": { "rel": { "const": "license" } } },
+            { "$ref": "#/$defs/externalLink", "properties": { "rel": { "const": "cite-as" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp1-26-2030.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp1-26-2050.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp1-26-2100.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp2-45-2030.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp2-45-2050.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp2-45-2100.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp5-85-2030.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp5-85-2050.json" } } },
+            { "$ref": "#/$defs/itemLink", "properties": { "href": { "const": "items/ssp5-85-2100.json" } } }
+          ],
+          "items": false,
+          "minItems": 13,
+          "maxItems": 13
+        }
+      },
+      "allOf": [{ "$ref": "#/$defs/releaseFields" }]
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "stac_version",
+        "stac_extensions",
+        "type",
+        "id",
+        "collection",
+        "bbox",
+        "geometry",
+        "properties",
+        "assets",
+        "links",
+        "searise:schema_version",
+        "searise:data_release_id",
+        "searise:data_provenance_class"
+      ],
+      "properties": {
+        "$schema": {},
+        "stac_version": {},
+        "stac_extensions": {
+          "const": [
+            "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+            "https://stac-extensions.github.io/checksum/v1.0.0/schema.json"
+          ]
+        },
+        "type": { "const": "Feature" },
+        "id": {
+          "type": "string",
+          "pattern": "^(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)$"
+        },
+        "collection": {
+          "type": "string",
+          "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}-projections$"
+        },
+        "bbox": { "const": [-30.5, 29.5, 45.5, 75.5] },
+        "geometry": {
+          "const": {
+            "type": "Polygon",
+            "coordinates": [[
+              [-30.5, 29.5],
+              [45.5, 29.5],
+              [45.5, 75.5],
+              [-30.5, 75.5],
+              [-30.5, 29.5]
+            ]]
+          }
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "datetime",
+            "searise:scenario",
+            "searise:horizon",
+            "searise:baseline",
+            "searise:quantiles",
+            "searise:source_release",
+            "searise:source_archive_sha256",
+            "searise:source_member_sha256",
+            "searise:method_version",
+            "searise:stored_units",
+            "searise:scale_to_metres",
+            "searise:scientific_use"
+          ],
+          "properties": {
+            "datetime": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(2030|2050|2100)-01-01T00:00:00Z$"
+            },
+            "searise:scenario": { "$ref": "defs.schema.json#/$defs/scenarioId" },
+            "searise:horizon": { "$ref": "defs.schema.json#/$defs/horizonYear" },
+            "searise:baseline": { "const": "1995-2014 mean" },
+            "searise:quantiles": { "const": [0.167, 0.5, 0.833] },
+            "searise:source_release": { "const": "20210809" },
+            "searise:source_archive_sha256": {
+              "$ref": "defs.schema.json#/$defs/sha256"
+            },
+            "searise:source_member_sha256": {
+              "$ref": "defs.schema.json#/$defs/sha256"
+            },
+            "searise:method_version": { "const": "ar6-regional-projection-v1" },
+            "searise:stored_units": { "const": "mm" },
+            "searise:scale_to_metres": { "const": 0.001 },
+            "searise:scientific_use": {
+              "const": "analysis-cog-exact-pmtiles-visual-only"
+            }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["analysis", "visual", "table"],
+          "properties": {
+            "analysis": { "$ref": "#/$defs/analysisAsset" },
+            "visual": { "$ref": "#/$defs/visualAsset" },
+            "table": { "$ref": "#/$defs/tableAsset" }
+          }
+        },
+        "links": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/rootLink" },
+            { "$ref": "#/$defs/collectionLink" },
+            { "$ref": "#/$defs/externalLink", "properties": { "rel": { "const": "license" } } },
+            { "$ref": "#/$defs/externalLink", "properties": { "rel": { "const": "cite-as" } } }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "searise:schema_version": {},
+        "searise:data_release_id": {},
+        "searise:data_provenance_class": {}
+      },
+      "allOf": [{ "$ref": "#/$defs/releaseFields" }]
+    }
+  }
+}

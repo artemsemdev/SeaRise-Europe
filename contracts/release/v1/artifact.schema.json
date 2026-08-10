@@ -365,14 +365,22 @@
                   "quality-summary",
                   "architecture-evidence",
                   "stac-catalog",
-                  "stac-collection",
-                  "stac-item"
+                  "stac-collection"
                 ]
               }
             },
             "required": ["role"]
           },
           "then": { "properties": { "mediaType": { "const": "application/json" } } }
+        },
+        {
+          "if": {
+            "properties": { "role": { "const": "stac-item" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": { "mediaType": { "const": "application/geo+json" } }
+          }
         },
         {
           "if": {

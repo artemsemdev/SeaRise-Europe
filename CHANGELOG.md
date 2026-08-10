@@ -22,6 +22,9 @@ All notable changes to this project will be documented in this file.
 - Added the versioned release manifest contract as the only browser entry point,
   with the complete 3 × 3 dataset index, source/authority bindings, immutable
   publication policy, and references to all contract and evidence artifacts.
+- Added a pinned STAC 1.1.0 profile for the static catalog, collection, and
+  projection items, preserving exact COG, analytical GeoParquet, and visual-only
+  PMTiles roles without runtime discovery endpoints.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and
