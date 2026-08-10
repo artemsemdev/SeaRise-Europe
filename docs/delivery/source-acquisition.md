@@ -3,15 +3,18 @@
 > **Issue:** [#45](https://github.com/artemsemdev/SeaRise-Europe/issues/45)
 > **Boundary:** acquisition and integrity only; scientific interpretation starts in #46/#47.
 
-The static-first pipeline acquires source bytes only through the reviewed lock
-at `src/pipeline/sources/source-lock.json`. The legacy
+The default `src/pipeline/sources/source-lock.json` is the historical global
+lock bound into approved Phase 0R evidence and remains byte-identical. Phase 1
+settlement production uses the isolated
+`src/pipeline/sources/source-lock.phase-1-settlements.json`; it is never merged
+with or substituted by the historical GeoNames `cities15000` entry. The legacy
 `src/pipeline/download.py` remains comparison infrastructure and cannot feed a
 publishable release.
 
 ## Commands
 
 Run commands from `src/pipeline` after installing the project with its `dev`
-extra:
+extra. These default commands operate on the historical global lock:
 
 ```bash
 python -m searise_pipeline.sources validate
@@ -20,10 +23,23 @@ python -m searise_pipeline.sources fetch --target natural-earth-10m:ocean
 python -m searise_pipeline.sources verify --target natural-earth-10m:ocean
 ```
 
+Use the scoped lock explicitly for every Phase 1 settlement operation. Fetch
+downloads all four locked assets; verify is offline and checks the same cache:
+
+```bash
+python -m searise_pipeline.sources validate --lock sources/source-lock.phase-1-settlements.json
+python -m searise_pipeline.sources publication-check --lock sources/source-lock.phase-1-settlements.json
+python -m searise_pipeline.sources fetch --lock sources/source-lock.phase-1-settlements.json
+python -m searise_pipeline.sources verify --lock sources/source-lock.phase-1-settlements.json
+```
+
 Without `--target`, `fetch` and `verify` process every source whose
-`selectionStatus` is `selected`. Candidate sources must be named explicitly.
-Acquisition still fails closed when their redistribution status is
-`unknown`, `restricted`, or `review-required`.
+`selectionStatus` is `selected` in the explicitly chosen lock. Candidate
+sources must be named explicitly. Acquisition still fails closed when their
+redistribution status is `unknown`, `restricted`, or `review-required`. The
+scoped filename also activates `load_settlement_registry`, which rejects any
+publisher, licence, inspection, asset, or archive-member identity drift before
+acquisition.
 
 The default cache is `data/raw/sources/<source>/<version>/`; receipts go to
 `artifacts/acquisition-receipts/`. Both roots are ignored by Git, separate from
@@ -35,7 +51,8 @@ builder introduced by #49 must use an allow-list of validated derivatives.
 | Source | Selection | Version/snapshot | Rights status | Reviewer | Locked evidence |
 |---|---|---|---|---|---|
 | IPCC AR6 sea-level projections | Selected | `20210809` | Approved, CC BY 4.0 | SeaRise Europe maintainers, 2026-08-04 | `location_list.lst`, 2,659,137 bytes, SHA-256 `431bf1a6…58d88d` |
-| GeoNames `cities15000` | Selected | `2026-08-04` | Approved, CC BY 4.0 | SeaRise Europe maintainers, 2026-08-04 | 3,304,425 bytes, SHA-256 `e61d9aeb…fa75c2` |
+| GeoNames complete settlement snapshot | Selected in scoped Phase 1 lock | `2026-08-10` | Approved, CC BY 4.0 | SeaRise Europe maintainers, 2026-08-04 | Four official assets with exact sizes/SHA-256 and archive-member hashes |
+| GeoNames `cities15000` | Selected in historical global lock | `2026-08-04` | Approved, CC BY 4.0 | SeaRise Europe maintainers, 2026-08-04 | Legacy Phase 0 controls only; prohibited as the Phase 1 production input |
 | Natural Earth 10m | Selected | `5.1.1` | Approved, public domain | SeaRise Europe maintainers, 2026-08-04 | Admin 0 and ocean ZIPs with exact sizes/SHA-256 |
 | Copernicus DEM GLO-30 | Candidate | `2021_1` | Approved with mandatory notices | SeaRise Europe maintainers, 2026-08-04 | N52/E004 sample tile, 17,037,271 bytes, SHA-256 `edb30766…851f1` |
 | Copernicus Coastal Zones 2018 | Candidate | `V1-2018` | Review required | Unassigned | Metadata only; authenticated asset identity and publication rights remain blocked |
@@ -60,9 +77,16 @@ review metadata is present.
    followed by an offline verify. Include the receipt and before/after metadata
    in the PR without committing raw bytes.
 
-GeoNames uses a mutable daily URL. Once its bytes change, the old lock must fail
-instead of silently accepting the new snapshot. Retain the verified raw cache
-needed by an in-progress build and update the snapshot only through review.
+GeoNames uses mutable daily URLs. The Phase 1 parser introduced by #50 must use
+`src/pipeline/sources/source-lock.phase-1-settlements.json` through
+`load_settlement_registry`; it must never treat the historical `cities15000`
+entry as a production input. The scoped lock contains one snapshot with
+`allCountries.zip`, `alternateNamesV2.zip`, `admin1CodesASCII.txt`, and the
+format/licence `readme.txt`. Once any bytes change, the old lock must fail
+instead of silently accepting a mixed or newer snapshot. Retain the verified
+raw cache needed by an in-progress build and update all pins only through
+review. The historical global lock remains byte-identical so approved Phase 0R
+evidence keeps its original binding.
 
 ## Cache cleanup
 
