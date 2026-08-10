@@ -1,0 +1,48 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/stac.schema.json",
+  "stac_version": "1.1.0",
+  "stac_extensions": [],
+  "type": "Collection",
+  "id": "searise-europe-v1.0.0-20260810-c096aeab4e09-projections",
+  "title": "SeaRise Europe regional projections",
+  "description": "Projection-only IPCC AR6 regional relative sea-level change.",
+  "license": "CC-BY-4.0",
+  "providers": [
+    {
+      "name": "IPCC AR6 projection authors via Zenodo",
+      "roles": ["producer", "licensor"],
+      "url": "https://doi.org/10.5281/zenodo.6382554"
+    }
+  ],
+  "extent": {
+    "spatial": { "bbox": [[-30.5, 29.5, 45.5, 75.5]] },
+    "temporal": {
+      "interval": [["2030-01-01T00:00:00Z", "2100-01-01T00:00:00Z"]]
+    }
+  },
+  "summaries": {
+    "searise:scenario": ["ssp1-26", "ssp2-45", "ssp5-85"],
+    "searise:horizon": [2030, 2050, 2100],
+    "searise:baseline": ["1995-2014 mean"],
+    "searise:method_version": ["ar6-regional-projection-v1"],
+    "searise:source_release": ["20210809"]
+  },
+  "searise:schema_version": "1.0.0",
+  "searise:data_release_id": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "searise:data_provenance_class": "synthetic-fixture",
+  "links": [
+    { "rel": "root", "href": "catalog.json", "type": "application/json" },
+    { "rel": "parent", "href": "catalog.json", "type": "application/json" },
+    { "rel": "license", "href": "https://creativecommons.org/licenses/by/4.0/" },
+    { "rel": "cite-as", "href": "https://doi.org/10.5281/zenodo.6382554" },
+    { "rel": "item", "href": "items/ssp1-26-2030.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp1-26-2050.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp1-26-2100.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp2-45-2030.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp2-45-2050.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp2-45-2100.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp5-85-2030.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp5-85-2050.json", "type": "application/geo+json" },
+    { "rel": "item", "href": "items/ssp5-85-2100.json", "type": "application/geo+json" }
+  ]
+}

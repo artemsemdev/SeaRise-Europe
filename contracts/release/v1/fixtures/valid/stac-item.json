@@ -1,0 +1,71 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/stac.schema.json",
+  "stac_version": "1.1.0",
+  "stac_extensions": [
+    "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+    "https://stac-extensions.github.io/checksum/v1.0.0/schema.json"
+  ],
+  "type": "Feature",
+  "id": "ssp2-45-2050",
+  "collection": "searise-europe-v1.0.0-20260810-c096aeab4e09-projections",
+  "bbox": [-30.5, 29.5, 45.5, 75.5],
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-30.5, 29.5],
+      [45.5, 29.5],
+      [45.5, 75.5],
+      [-30.5, 75.5],
+      [-30.5, 29.5]
+    ]]
+  },
+  "properties": {
+    "datetime": "2050-01-01T00:00:00Z",
+    "searise:scenario": "ssp2-45",
+    "searise:horizon": 2050,
+    "searise:baseline": "1995-2014 mean",
+    "searise:quantiles": [0.167, 0.5, 0.833],
+    "searise:source_release": "20210809",
+    "searise:source_archive_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "searise:source_member_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "searise:method_version": "ar6-regional-projection-v1",
+    "searise:stored_units": "mm",
+    "searise:scale_to_metres": 0.001,
+    "searise:scientific_use": "analysis-cog-exact-pmtiles-visual-only"
+  },
+  "assets": {
+    "analysis": {
+      "href": "../../analysis/ssp2-45/2050.tif",
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "roles": ["data", "searise:exact-lookup"],
+      "file:size": 1024,
+      "checksum:multihash": "1220eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "searise:artifact_id": "projection-ssp2-45-2050-cog"
+    },
+    "visual": {
+      "href": "../../layers/ssp2-45/2050.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "roles": ["visual", "searise:visual-only"],
+      "file:size": 1536,
+      "checksum:multihash": "12203333333333333333333333333333333333333333333333333333333333333333",
+      "searise:artifact_id": "projection-ssp2-45-2050-pmtiles"
+    },
+    "table": {
+      "href": "../../analysis/projections.parquet",
+      "type": "application/vnd.apache.parquet",
+      "roles": ["data", "searise:exact-analytics"],
+      "file:size": 2048,
+      "checksum:multihash": "12204444444444444444444444444444444444444444444444444444444444444444",
+      "searise:artifact_id": "projection-matrix-geoparquet"
+    }
+  },
+  "links": [
+    { "rel": "root", "href": "../catalog.json", "type": "application/json" },
+    { "rel": "collection", "href": "../collection.json", "type": "application/json" },
+    { "rel": "license", "href": "https://creativecommons.org/licenses/by/4.0/" },
+    { "rel": "cite-as", "href": "https://doi.org/10.5281/zenodo.6382554" }
+  ],
+  "searise:schema_version": "1.0.0",
+  "searise:data_release_id": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "searise:data_provenance_class": "synthetic-fixture"
+}
