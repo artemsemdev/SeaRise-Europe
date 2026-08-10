@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import shutil
 from collections.abc import Callable
@@ -153,6 +155,7 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
         "build-receipt.schema.json",
         "defs.schema.json",
         "methodology.schema.json",
+        "manifest.schema.json",
         "projection-result.schema.json",
         "quality-summary.schema.json",
         "release-pointer.schema.json",
@@ -610,3 +613,199 @@ def test_non_projection_artifact_cannot_claim_projection_context() -> None:
     )["projectionContext"]
 
     assert list(validator.iter_errors(artifact))
+
+
+def _manifest_artifact(
+    template: dict[str, Any],
+    *,
+    artifact_id: str,
+    path: str,
+    role: str,
+    media_type: str,
+) -> dict[str, Any]:
+    artifact = copy.deepcopy(template)
+    artifact.update(
+        {
+            "artifactId": artifact_id,
+            "path": path,
+            "role": role,
+            "mediaType": media_type,
+            "sha256": hashlib.sha256(artifact_id.encode()).hexdigest(),
+        }
+    )
+    return artifact
+
+
+def _valid_manifest() -> dict[str, Any]:
+    fixture_dir = PUBLIC_CONTRACT_DIR / "fixtures" / "valid"
+    cog_template = json.loads(
+        (fixture_dir / "artifact-analysis-cog.json").read_text(encoding="utf-8")
+    )
+    pmtiles_template = json.loads(
+        (fixture_dir / "artifact-visual-pmtiles.json").read_text(encoding="utf-8")
+    )
+    geoparquet = json.loads(
+        (fixture_dir / "artifact-projection-geoparquet.json").read_text(encoding="utf-8")
+    )
+    metadata_template = json.loads(
+        (fixture_dir / "artifact-search-index.json").read_text(encoding="utf-8")
+    )
+    datasets: list[dict[str, Any]] = []
+    artifacts: list[dict[str, Any]] = [geoparquet]
+    for scenario in ("ssp1-26", "ssp2-45", "ssp5-85"):
+        member_hash = hashlib.sha256(scenario.encode()).hexdigest()
+        for horizon in (2030, 2050, 2100):
+            analysis_id = f"projection-{scenario}-{horizon}-cog"
+            visual_id = f"projection-{scenario}-{horizon}-pmtiles"
+            cog = copy.deepcopy(cog_template)
+            cog.update(
+                {
+                    "artifactId": analysis_id,
+                    "path": f"analysis/{scenario}/{horizon}.tif",
+                    "sha256": hashlib.sha256(analysis_id.encode()).hexdigest(),
+                }
+            )
+            cog["projectionContext"].update({"scenario": scenario, "horizon": horizon})
+            cog["projectionContext"]["source"]["memberSha256"] = member_hash
+            visual = copy.deepcopy(pmtiles_template)
+            visual.update(
+                {
+                    "artifactId": visual_id,
+                    "path": f"layers/{scenario}/{horizon}.pmtiles",
+                    "sha256": hashlib.sha256(visual_id.encode()).hexdigest(),
+                }
+            )
+            visual["projectionContext"].update({"scenario": scenario, "horizon": horizon})
+            visual["projectionContext"]["source"]["memberSha256"] = member_hash
+            artifacts.extend([cog, visual])
+            datasets.append(
+                {
+                    "scenario": scenario,
+                    "horizon": horizon,
+                    "analysisArtifactId": analysis_id,
+                    "visualArtifactId": visual_id,
+                    "analyticalArtifactId": "projection-matrix-geoparquet",
+                }
+            )
+    metadata = [
+        ("scenario-config", "config/scenarios.json", "scenario-config", "application/json"),
+        ("methodology", "config/methodology.json", "methodology", "application/json"),
+        ("attribution", "config/source-attribution.json", "source-attribution", "application/json"),
+        ("source-receipt", "receipts/sources/ipcc-ar6.json", "source-receipt", "application/json"),
+        ("build-receipt", "receipts/build.json", "build-receipt", "application/json"),
+        (
+            "search-records",
+            "search/settlements.parquet",
+            "settlement-geoparquet",
+            "application/vnd.apache.parquet",
+        ),
+        ("quality-summary", "evidence/quality-summary.json", "quality-summary", "application/json"),
+        (
+            "architecture-evidence",
+            "evidence/architecture.json",
+            "architecture-evidence",
+            "application/json",
+        ),
+        ("stac-catalog", "stac/catalog.json", "stac-catalog", "application/json"),
+        ("stac-collection", "stac/collection.json", "stac-collection", "application/json"),
+        ("checksums", "checksums.txt", "checksums", "text/plain"),
+        ("provenance", "provenance.intoto.jsonl", "provenance", "application/x-ndjson"),
+        (
+            "signature",
+            "manifest.sigstore.json",
+            "signature",
+            "application/vnd.dev.sigstore.bundle+json;version=0.3",
+        ),
+    ]
+    artifacts.extend(
+        _manifest_artifact(
+            metadata_template,
+            artifact_id=artifact_id,
+            path=path,
+            role=role,
+            media_type=media_type,
+        )
+        for artifact_id, path, role, media_type in metadata
+    )
+    release_id = cog_template["dataReleaseId"]
+    return {
+        "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/manifest.schema.json",
+        "schemaVersion": "1.0.0",
+        "dataReleaseId": release_id,
+        "dataProvenanceClass": "synthetic-fixture",
+        "releaseAuthority": {
+            "automatedValidation": "pending",
+            "releaseDisposition": "pending-owner",
+            "dataProvenanceClass": "synthetic-fixture",
+            "statusDisclosureRequired": True,
+        },
+        "createdAt": "2026-08-10T12:05:00Z",
+        "codeRevision": "c096aeab4e0994faa7a9d2253b47215ef897dfcb",
+        "previousReleaseId": None,
+        "methodologyVersion": "ar6-regional-projection-v1",
+        "defaults": {"scenario": "ssp2-45", "horizon": 2050},
+        "publication": {
+            "releasePath": f"releases/{release_id}",
+            "cacheControl": "public, max-age=31536000, immutable",
+            "appendOnly": True,
+        },
+        "sources": [
+            {
+                "sourceId": "fixture/ipcc-ar6-regional",
+                "sourceRelease": "20210809-fixture",
+                "archiveSha256": "1" * 64,
+                "attributionId": "ipcc-ar6-sl-projections-20210809",
+                "receiptArtifactId": "source-receipt",
+            }
+        ],
+        "contractArtifacts": {
+            "scenarioConfig": "scenario-config",
+            "methodology": "methodology",
+            "attribution": "attribution",
+            "sourceReceipts": ["source-receipt"],
+            "buildReceipt": "build-receipt",
+            "searchRecords": "search-records",
+            "qualitySummary": "quality-summary",
+            "architectureEvidence": "architecture-evidence",
+            "stacCatalog": "stac-catalog",
+            "stacCollection": "stac-collection",
+            "checksums": "checksums",
+            "provenance": "provenance",
+            "signature": "signature",
+        },
+        "artifacts": artifacts,
+        "datasets": datasets,
+    }
+
+
+def test_manifest_schema_accepts_one_complete_synthetic_release_inventory() -> None:
+    manifest = _valid_manifest()
+
+    _public_contract_validator("manifest.schema.json").validate(manifest)
+
+    assert len(manifest["datasets"]) == 9
+    assert len(manifest["artifacts"]) == 32
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda manifest: manifest["datasets"].pop(),
+        lambda manifest: manifest["datasets"][0].__setitem__("horizon", 2050),
+        lambda manifest: manifest["releaseAuthority"].__setitem__(
+            "releaseDisposition", "approved"
+        ),
+        lambda manifest: manifest["publication"].__setitem__(
+            "releasePath", "https://provider.example/release"
+        ),
+        lambda manifest: manifest["contractArtifacts"].pop("qualitySummary"),
+        lambda manifest: manifest["artifacts"][0].__setitem__("path", "../escape.parquet"),
+    ],
+)
+def test_manifest_schema_rejects_incomplete_or_unsafe_inventory(
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    manifest = _valid_manifest()
+    mutate(manifest)
+
+    assert list(_public_contract_validator("manifest.schema.json").iter_errors(manifest))
