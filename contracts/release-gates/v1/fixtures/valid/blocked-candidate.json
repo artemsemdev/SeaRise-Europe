@@ -1,0 +1,69 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release-gates/v1/gate-report.schema.json",
+  "schemaVersion": "1.0.0",
+  "rendererVersion": "markdown-v1",
+  "ordering": "check-id-then-evidence-path-utf8-bytewise",
+  "candidateId": "candidate-fixture-20260810-0123456789ab",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-0123456789ab",
+  "dataProvenanceClass": "synthetic-fixture",
+  "generatedAt": "2026-08-10T20:00:00Z",
+  "authority": {
+    "kind": "automation",
+    "automatedValidation": "fail",
+    "ownerDisposition": "not-recorded"
+  },
+  "releasable": false,
+  "checks": [
+    {
+      "checkId": "artifact-integrity",
+      "label": "Artifact integrity mismatches",
+      "status": "pass",
+      "nonWaivable": true,
+      "unit": "count",
+      "target": { "operator": "exactly", "value": 0 },
+      "measuredValue": 0,
+      "evidence": [
+        {
+          "path": "evidence/artifact-integrity.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ]
+    },
+    {
+      "checkId": "reproducibility",
+      "label": "Reproducibility parity ratio",
+      "status": "not-measured",
+      "nonWaivable": true,
+      "unit": "ratio",
+      "target": { "operator": "exactly", "value": 1 },
+      "measuredValue": null,
+      "evidence": [
+        {
+          "path": "evidence/reproducibility.json",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "stopReasonCode": "required-measurement-missing"
+    },
+    {
+      "checkId": "rights-completeness",
+      "label": "Artifacts missing rights records",
+      "status": "fail",
+      "nonWaivable": true,
+      "unit": "count",
+      "target": { "operator": "exactly", "value": 0 },
+      "measuredValue": 1,
+      "evidence": [
+        {
+          "path": "evidence/rights.json",
+          "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "stopReasonCode": "rights-incomplete"
+    }
+  ],
+  "stopReasonCodes": [
+    "required-measurement-missing",
+    "rights-incomplete"
+  ]
+}

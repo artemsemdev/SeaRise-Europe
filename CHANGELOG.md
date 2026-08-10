@@ -81,6 +81,10 @@ All notable changes to this project will be documented in this file.
 - Added a scoped, hash-locked GeoNames 2026-08-10 settlement snapshot with full
   place, alternate-name, language, admin, format, and licence inputs, while
   preserving the historical Phase 0R source lock byte-for-byte.
+- Added a versioned release gate-report contract with closed decision states,
+  metric-bound evidence, owner-only release authority, non-downgradable
+  critical stops, shared Python/TypeScript semantics, and a deterministic
+  human-readable Markdown rendering.
 
 ### Changed
 
