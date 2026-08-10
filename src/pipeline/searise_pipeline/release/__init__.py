@@ -23,6 +23,7 @@ from .promotion import finalize_recovery_gate
 from .public_contracts import (
     PublicManifestSummary,
     PublicReleaseContractError,
+    validate_public_document,
     validate_public_manifest,
     validate_release_artifacts,
     validate_release_rights,
@@ -51,6 +52,7 @@ __all__ = [
     "validate_analysis_cog",
     "validate_geoparquet",
     "validate_public_manifest",
+    "validate_public_document",
     "validate_release_artifacts",
     "validate_release_rights",
     "validate_release_stac",

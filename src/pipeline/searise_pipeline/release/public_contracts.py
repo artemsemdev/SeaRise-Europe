@@ -85,6 +85,13 @@ def _schema_validate(
         _fail(f"{schema_name} rejected {location}: {error.message}")
 
 
+def validate_public_document(
+    document: Mapping[str, Any], *, schema_directory: Path, schema_name: str
+) -> None:
+    """Validate one document against a named authoritative public schema."""
+    _schema_validate(document, schema_directory, schema_name)
+
+
 def _artifacts_by_id(manifest: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     artifacts = manifest["artifacts"]
     by_id = {artifact["artifactId"]: artifact for artifact in artifacts}

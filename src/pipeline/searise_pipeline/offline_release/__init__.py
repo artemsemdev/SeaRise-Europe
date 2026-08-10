@@ -8,6 +8,7 @@ from .engine import (
     StageOutcome,
     run_build,
 )
+from .handlers import release_handlers, validate_complete_release
 from .model import (
     BuildPlan,
     BuildPlanError,
@@ -52,4 +53,6 @@ __all__ = [
     "load_profile_definition",
     "stage_graph",
     "run_build",
+    "release_handlers",
+    "validate_complete_release",
 ]
