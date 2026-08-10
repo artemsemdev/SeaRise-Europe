@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -231,4 +233,70 @@ def test_receipt_failure_preserves_candidate_path_replacement(
     assert set(replacement.parent.iterdir()) == {replacement}
     failure = _json(tmp_path / "failure-one.json")
     assert failure["candidateState"] == "identity-mismatch-preserved"
+    assert "do-not-record" not in result.output
+
+
+def test_directory_fsync_failure_rolls_back_receipt_and_candidate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    original_fsync = build_runner.os.fsync
+    failed = False
+
+    def fail_first_directory_fsync(file_descriptor: int) -> None:
+        nonlocal failed
+        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            failed = True
+            raise OSError("credential=do-not-record")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(build_runner.os, "fsync", fail_first_directory_fsync)
+
+    result = CliRunner().invoke(cli, _arguments(tmp_path))
+
+    assert result.exit_code == 1
+    assert failed
+    assert not (tmp_path / "execution-one.json").exists()
+    assert not (tmp_path / "candidate-one").exists()
+    failure_path = tmp_path / "failure-one.json"
+    failure = _json(failure_path)
+    assert failure["candidateState"] == "discarded-unreceipted"
+    assert failure["failure"]["code"] == "incomplete-build"  # type: ignore[index]
+    assert "do-not-record" not in result.output
+    assert "do-not-record" not in failure_path.read_text(encoding="utf-8")
+    assert not list(tmp_path.glob(".searise-receipt-rollback-*"))
+
+
+def test_receipt_rollback_preserves_concurrent_path_replacement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    original_fsync = build_runner.os.fsync
+    receipt_path = tmp_path / "execution-one.json"
+    failed = False
+
+    def replace_receipt_before_fsync_failure(file_descriptor: int) -> None:
+        nonlocal failed
+        if not failed and stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            failed = True
+            receipt_path.unlink()
+            receipt_path.write_bytes(b"unrelated replacement\n")
+            raise OSError("credential=do-not-record")
+        original_fsync(file_descriptor)
+
+    monkeypatch.setattr(
+        build_runner.os,
+        "fsync",
+        replace_receipt_before_fsync_failure,
+    )
+
+    result = CliRunner().invoke(cli, _arguments(tmp_path))
+
+    assert result.exit_code == 1
+    assert failed
+    assert receipt_path.read_bytes() == b"unrelated replacement\n"
+    assert not (tmp_path / "candidate-one").exists()
+    failure = _json(tmp_path / "failure-one.json")
+    assert failure["candidateState"] == "discarded-unreceipted"
+    assert failure["failure"]["code"] == "incomplete-build"  # type: ignore[index]
     assert "do-not-record" not in result.output
