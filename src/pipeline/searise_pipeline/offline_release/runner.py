@@ -43,6 +43,12 @@ class _PromotedCandidate:
     outputs: tuple[OutputIdentity, ...]
 
 
+@dataclass(frozen=True)
+class _ReceiptLinkIdentity:
+    device: int
+    inode: int
+
+
 def execute_profile_build(
     *,
     profile_path: Path,
@@ -337,6 +343,8 @@ def _write_immutable_json(path: Path, document: Mapping[str, Any]) -> None:
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     ).encode("utf-8")
     temporary_name: str | None = None
+    linked_identity: _ReceiptLinkIdentity | None = None
+    link_created = False
     try:
         with tempfile.NamedTemporaryFile(
             prefix=f".{path.name}.",
@@ -347,19 +355,32 @@ def _write_immutable_json(path: Path, document: Mapping[str, Any]) -> None:
             stream.write(payload)
             stream.flush()
             os.fsync(stream.fileno())
-        os.link(temporary_name, path)
+            metadata = os.fstat(stream.fileno())
+            linked_identity = _ReceiptLinkIdentity(
+                device=metadata.st_dev,
+                inode=metadata.st_ino,
+            )
+        try:
+            os.link(temporary_name, path)
+            link_created = True
+        except FileExistsError as exc:
+            raise StageFailure(
+                FailureCode.INVALID_PLAN,
+                None,
+                "immutable operator receipt already exists",
+            ) from exc
         directory_fd = os.open(path.parent, os.O_RDONLY)
         try:
             os.fsync(directory_fd)
         finally:
             os.close(directory_fd)
-    except FileExistsError as exc:
-        raise StageFailure(
-            FailureCode.INVALID_PLAN,
-            None,
-            "immutable operator receipt already exists",
-        ) from exc
+        os.unlink(temporary_name)
+        temporary_name = None
+    except StageFailure:
+        raise
     except OSError as exc:
+        if link_created and linked_identity is not None:
+            _rollback_receipt_link(path, linked_identity)
         raise StageFailure(
             FailureCode.INCOMPLETE_BUILD,
             None,
@@ -369,5 +390,45 @@ def _write_immutable_json(path: Path, document: Mapping[str, Any]) -> None:
         if temporary_name is not None:
             try:
                 os.unlink(temporary_name)
-            except FileNotFoundError:
+            except OSError:
                 pass
+
+
+def _rollback_receipt_link(path: Path, expected: _ReceiptLinkIdentity) -> None:
+    """Remove only the exact hard link created by this invocation."""
+    if not _receipt_link_matches(path, expected):
+        return
+    quarantine_root: Path | None = None
+    renamed = False
+    try:
+        quarantine_root = Path(
+            tempfile.mkdtemp(prefix=".searise-receipt-rollback-", dir=path.parent)
+        )
+        quarantined = quarantine_root / "receipt"
+        os.rename(path, quarantined)
+        renamed = True
+        if not _receipt_link_matches(quarantined, expected):
+            if not os.path.lexists(path):
+                os.rename(quarantined, path)
+                quarantine_root.rmdir()
+            return
+        os.unlink(quarantined)
+        quarantine_root.rmdir()
+    except OSError:
+        if quarantine_root is not None and not renamed:
+            try:
+                quarantine_root.rmdir()
+            except OSError:
+                pass
+
+
+def _receipt_link_matches(path: Path, expected: _ReceiptLinkIdentity) -> bool:
+    try:
+        metadata = path.lstat()
+        return (
+            stat.S_ISREG(metadata.st_mode)
+            and metadata.st_dev == expected.device
+            and metadata.st_ino == expected.inode
+        )
+    except OSError:
+        return False
