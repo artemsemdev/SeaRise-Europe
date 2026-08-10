@@ -81,6 +81,9 @@ All notable changes to this project will be documented in this file.
   and coastal engineering boundaries, preserving their approximate,
   product-eligibility-only status and Natural Earth attribution while preventing
   them from being presented as canonical, production, or publication-ready data.
+- Added deterministic visual-only PMTiles packaging for those exact boundary
+  GeoParquet bytes, with pinned-tool verification and independently decoded
+  property and geometry parity that prohibits analytical lookup.
 - Added a scoped, hash-locked GeoNames 2026-08-10 settlement snapshot with full
   place, alternate-name, language, admin, format, and licence inputs, while
   preserving the historical Phase 0R source lock byte-for-byte.

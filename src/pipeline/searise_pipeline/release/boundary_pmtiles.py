@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import struct
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping, cast
@@ -13,11 +15,17 @@ from typing import Any, Mapping, cast
 from searise_pipeline.science.contracts import ScienceContractError
 
 from .boundary_geoparquet import validate_boundary_geoparquet
-from .pmtiles import VectorToolchainEvidence
+from .pmtiles import (
+    VectorToolchainEvidence,
+    _canonicalize_tippecanoe_gzip_headers,
+    _run,
+    validate_vector_toolchain,
+)
 
 _MINIMUM_ZOOM = 0
 _MAXIMUM_ZOOM = 6
 _FULL_DETAIL = 14
+_BUFFER = 0
 _STATUS = "selected-scope-approximation"
 _PURPOSE = "product-eligibility-only"
 _SHAPELY_VERSION = "2.0.7"
@@ -44,6 +52,7 @@ class _BoundarySpecification:
     source_path: str
     source_byte_size: int
     source_sha256: str
+    output_path: str
     layer_id: str
     feature_id: int
     header_bounds: tuple[float, float, float, float]
@@ -57,6 +66,7 @@ _BOUNDARIES = {
         source_path="boundaries/europe.parquet",
         source_byte_size=267676,
         source_sha256="531c6042a33cf3be9bc3ea340b0e557cb66bafb34de7954db0d7e47be90d35a9",
+        output_path="boundaries/europe.pmtiles",
         layer_id="support_boundary",
         feature_id=1,
         header_bounds=(-28.851018, 30.021176, 40.1733959, 74.536347),
@@ -68,6 +78,7 @@ _BOUNDARIES = {
         source_path="boundaries/coastal-analysis-zone.parquet",
         source_byte_size=667750,
         source_sha256="3ba4d5eaba24d1202482bc33fd64fde8ce54b7ff1dd1456990d3c8cfece43366",
+        output_path="boundaries/coastal-analysis-zone.pmtiles",
         layer_id="coastal_boundary",
         feature_id=2,
         header_bounds=(-28.850986, 30.021211, 38.3141589, 74.536318),
@@ -84,6 +95,46 @@ class _BoundarySource:
     version: str
     lineage: Mapping[str, Any]
     rights: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class BoundaryPmtilesEvidence:
+    """Identity and decoded parity for one boundary visualization archive."""
+
+    path: str
+    byte_size: int
+    sha256: str
+    source_geoparquet_byte_size: int
+    source_geoparquet_sha256: str
+    decoded_fragment_count: int
+    header: Mapping[str, Any]
+    metadata: Mapping[str, Any]
+    toolchain: VectorToolchainEvidence
+
+
+@dataclass(frozen=True)
+class BoundaryVectorToolPaths:
+    """Paths required to prove and run one pinned vector toolchain."""
+
+    tippecanoe: Path
+    decode: Path
+    pmtiles: Path
+    tippecanoe_source: Path
+    tippecanoe_build_receipt: Path
+    pmtiles_distribution_asset: Path
+    platform: str
+
+    def validate(self, contract: Mapping[str, Any]) -> VectorToolchainEvidence:
+        return validate_vector_toolchain(
+            tippecanoe_path=self.tippecanoe,
+            decode_path=self.decode,
+            pmtiles_path=self.pmtiles,
+            tippecanoe_source_archive_path=self.tippecanoe_source,
+            tippecanoe_build_receipt_path=self.tippecanoe_build_receipt,
+            pmtiles_distribution_asset_path=self.pmtiles_distribution_asset,
+            pmtiles_distribution_platform=self.platform,
+            contract=contract,
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -228,6 +279,39 @@ def _expected_decoded_properties(source: _BoundarySource) -> dict[str, object]:
     }
 
 
+def _write_ndjson(path: Path, source: _BoundarySource) -> None:
+    from shapely.geometry import mapping
+
+    feature = {
+        "geometry": mapping(source.geometry),
+        "id": source.specification.feature_id,
+        "properties": _writer_feature_properties(source),
+        "type": "Feature",
+    }
+    path.write_text(
+        json.dumps(feature, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _tippecanoe_options(source: _BoundarySource) -> list[str]:
+    return [
+        "--force",
+        f"--layer={source.specification.layer_id}",
+        "--projection=EPSG:4326",
+        f"--minimum-zoom={_MINIMUM_ZOOM}",
+        f"--maximum-zoom={_MAXIMUM_ZOOM}",
+        f"--full-detail={_FULL_DETAIL}",
+        f"--buffer={_BUFFER}",
+        "--no-feature-limit",
+        "--no-tile-size-limit",
+        "--no-line-simplification",
+        "--no-tiny-polygon-reduction",
+        "--no-tiny-polygon-reduction-at-maximum-zoom",
+        "--preserve-input-order",
+    ]
+
+
 def _generation_parameters(source: _BoundarySource) -> dict[str, object]:
     return {
         "angular_error_model": {
@@ -238,7 +322,13 @@ def _generation_parameters(source: _BoundarySource) -> dict[str, object]:
             "model": "web-mercator-mvt-quantization-plus-tile-clipping",
             "per_stage_coordinate_error_degrees": _PER_STAGE_ERROR_DEGREES,
             "quantization_step_degrees": _QUANTIZATION_STEP_DEGREES,
-        }
+        },
+        "gzip_canonicalization": {
+            "method": "tippecanoe-tile-member-os-byte-rewrite",
+            "operating_system_byte": 255,
+        },
+        "pmtiles_metadata_edit": "canonical-json-replacement",
+        "tippecanoe_options": _tippecanoe_options(source),
     }
 
 
@@ -261,6 +351,7 @@ def _expected_metadata(
     build_receipt_sha256: str,
 ) -> dict[str, Any]:
     specification = source.specification
+    properties = _expected_decoded_properties(source)
     return {
         "attribution": source.rights["attribution"],
         "description": (f"SeaRise {specification.boundary_id} engineering boundary; visual only"),
@@ -268,7 +359,7 @@ def _expected_metadata(
         "generator": f"tippecanoe v{evidence.tippecanoe_version}",
         "name": f"SeaRise {specification.boundary_id}",
         "searise": {
-            "analytical_lookup": "prohibited",
+            "analytical_lookup": properties["analytical_lookup"],
             "canonical": False,
             "generation": _generation_parameters(source),
             "hazard_extent_claim": False,
@@ -297,19 +388,14 @@ def _expected_metadata(
             {
                 "description": "Engineering product-eligibility boundary; visual only",
                 "fields": {
-                    "analytical_lookup": "String",
-                    "boundary_id": "String",
-                    "canonical": "Boolean",
-                    "hazard_extent_claim": "Boolean",
-                    "production": "Boolean",
-                    "publication_eligible": "Boolean",
-                    "purpose": "String",
-                    "role": "String",
-                    "source_geoparquet_byte_size": "Number",
-                    "source_geoparquet_sha256": "String",
-                    "status": "String",
-                    "version": "String",
-                    "visual_only": "Boolean",
+                    key: (
+                        "Boolean"
+                        if type(value) is bool
+                        else "Number"
+                        if type(value) is int
+                        else "String"
+                    )
+                    for key, value in properties.items()
                 },
                 "id": specification.layer_id,
                 "maxzoom": _MAXIMUM_ZOOM,
@@ -446,7 +532,7 @@ def _validate_decoded_document(document: object, source: _BoundarySource) -> int
                 type(layer) is not dict
                 or layer.get("properties")
                 != {
-                    "extent": _MVT_EXTENT,
+                    "extent": 2**_FULL_DETAIL,
                     "layer": source.specification.layer_id,
                     "version": 2,
                 }
@@ -483,3 +569,112 @@ def _validate_decoded_document(document: object, source: _BoundarySource) -> int
     ):
         raise ScienceContractError("Decoded boundary PMTiles geometry parity differs")
     return len(fragments)
+
+
+def validate_boundary_pmtiles(
+    path: Path,
+    source_geoparquet_path: Path,
+    source_geojson_path: Path,
+    *,
+    role: str,
+    contract: Mapping[str, Any],
+    tools: BoundaryVectorToolPaths,
+) -> BoundaryPmtilesEvidence:
+    """Validate structure and decoded visual parity against exact GeoParquet."""
+    source = _load_source(source_geoparquet_path, source_geojson_path, role=role)
+    evidence = tools.validate(contract)
+    build_receipt_sha256 = _sha256(tools.tippecanoe_build_receipt)
+    _run([str(tools.pmtiles), "verify", str(path)])
+    try:
+        metadata = json.loads(_run([str(tools.pmtiles), "show", str(path), "--metadata"]))
+        reported_header = json.loads(_run([str(tools.pmtiles), "show", str(path), "--header-json"]))
+    except json.JSONDecodeError as exc:
+        raise ScienceContractError("Boundary PMTiles metadata or header is malformed") from exc
+    validated_metadata = _validate_metadata(
+        metadata,
+        source,
+        evidence,
+        build_receipt_sha256=build_receipt_sha256,
+    )
+    header = _read_pmtiles_header(path)
+    _validate_header(header, reported_header, source, byte_size=path.stat().st_size)
+    try:
+        decoded = json.loads(
+            _run(
+                [
+                    str(tools.decode),
+                    f"-Z{_MAXIMUM_ZOOM}",
+                    f"-z{_MAXIMUM_ZOOM}",
+                    str(path),
+                ]
+            )
+        )
+    except json.JSONDecodeError as exc:
+        raise ScienceContractError("Decoded boundary PMTiles JSON is malformed") from exc
+    fragments = _validate_decoded_document(decoded, source)
+    return BoundaryPmtilesEvidence(
+        path=source.specification.output_path,
+        byte_size=path.stat().st_size,
+        sha256=_sha256(path),
+        source_geoparquet_byte_size=source.specification.source_byte_size,
+        source_geoparquet_sha256=source.specification.source_sha256,
+        decoded_fragment_count=fragments,
+        header=header,
+        metadata=validated_metadata,
+        toolchain=evidence,
+    )
+
+
+def write_boundary_pmtiles(
+    source_geoparquet_path: Path,
+    source_geojson_path: Path,
+    path: Path,
+    *,
+    role: str,
+    contract: Mapping[str, Any],
+    tools: BoundaryVectorToolPaths,
+) -> BoundaryPmtilesEvidence:
+    """Build one visual archive only from the exact PR #214 GeoParquet."""
+    source = _load_source(source_geoparquet_path, source_geojson_path, role=role)
+    evidence = tools.validate(contract)
+    build_receipt_sha256 = _sha256(tools.tippecanoe_build_receipt)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="searise-boundary-pmtiles-", dir=path.parent) as temp:
+        staging = Path(temp)
+        ndjson = staging / "boundary.ndjson"
+        archive = staging / "boundary.pmtiles"
+        metadata_path = staging / "metadata.json"
+        _write_ndjson(ndjson, source)
+        metadata_path.write_text(
+            json.dumps(
+                _expected_metadata(
+                    source,
+                    evidence,
+                    build_receipt_sha256=build_receipt_sha256,
+                ),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        _run(
+            [
+                str(tools.tippecanoe),
+                f"--output={archive}",
+                *_tippecanoe_options(source),
+                str(ndjson),
+            ]
+        )
+        _run([str(tools.pmtiles), "edit", str(archive), f"--metadata={metadata_path}"])
+        _canonicalize_tippecanoe_gzip_headers(archive)
+        validated = validate_boundary_pmtiles(
+            archive,
+            source_geoparquet_path,
+            source_geojson_path,
+            role=role,
+            contract=contract,
+            tools=tools,
+        )
+        os.replace(archive, path)
+    return validated

@@ -57,6 +57,12 @@
       "reference": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py",
       "environment": "macOS arm64; Python 3.9.6 and Shapely 2.0.7; 5 closed-oracle, tolerance-boundary, and topology-loss tests passed in 13.11s; no external vector build executed"
     },
+    "local-2026-08-10-boundary-pmtiles-writer": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T23:35:56+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_pmtiles.py",
+      "environment": "macOS arm64; Python 3.9.6; 3 writer contract tests passed in 1.78s; 2 exact-pinned real-build tests skipped because official pinned assets were unavailable"
+    },
     "local-2026-08-10-settlement-contracts": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T21:00:00+02:00",
@@ -488,6 +494,20 @@
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact source geometry and deterministic in-memory decoded mutations; pinned Shapely version, no vector executable, credentials, randomness, or network." }
     },
     {
+      "id": "pipeline-boundary-pmtiles-writer",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify the atomic boundary PMTiles writer binds every material vector option, metadata edit, gzip canonicalization step, and exact-pinned determinism gate.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_pmtiles.py"],
+      "changedPaths": ["data/geometry/**", "src/pipeline/searise_pipeline/release/boundary_pmtiles.py", "src/pipeline/tests/release/test_boundary_pmtiles.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent atomic writer, complete generation-parameter, pinned-tool, corruption, and repeated-build determinism gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_pmtiles.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-writer", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Three contract/mutation tests are unconditional; two real-build determinism tests require exact pinned local assets and remain skipped when unavailable." }
+    },
+    {
       "id": "pipeline-ar6-release-pmtiles",
       "layer": "scientific",
       "owner": "science",
@@ -782,6 +802,7 @@
     { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py", "suite": "pipeline-boundary-pmtiles-structure", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py", "suite": "pipeline-boundary-pmtiles-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_pmtiles.py", "suite": "pipeline-boundary-pmtiles-writer", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_owner_promotion.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_promotion_cli.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
