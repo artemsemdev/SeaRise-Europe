@@ -64,6 +64,9 @@ All notable changes to this project will be documented in this file.
 - Added the trusted Phase 0R Linux and macOS ARM64 release evidence bundle,
   proving byte-identical artifacts, zero scientific-value difference, and
   browser delivery within the release budgets before owner approval.
+- Added a deterministic receipt-driven offline release builder with one typed
+  fixture/regional/full stage graph, identity-safe resume, atomic immutable
+  candidates, pinned network-disabled execution, and separate controlled runs.
 
 ### Changed
 
