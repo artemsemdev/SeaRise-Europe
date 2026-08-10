@@ -1,0 +1,38 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v2/place.schema.json",
+  "schemaVersion": "2.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "id": "geonames:900000001",
+  "sourceSpelling": "Fixturehafen",
+  "canonicalName": { "value": "Fixturehafen", "language": "de", "script": "Latn" },
+  "asciiName": "Fixturehafen",
+  "alternateNames": [
+    { "value": "Fixture Harbour", "language": "en", "script": "Latn" }
+  ],
+  "countryCode": "DE",
+  "admin1Code": "HH",
+  "admin1Name": "Hamburg",
+  "location": { "latitude": 53.55, "longitude": 9.9937 },
+  "population": 1000,
+  "featureCode": "PPL",
+  "spatialClassification": {
+    "supportGeometryVersion": "natural-earth-5.1.1-explicit-scope-v2",
+    "coastalGeometryVersion": "natural-earth-5.1.1-25km-scope-v2",
+    "predicate": "covers",
+    "distanceToCoastMeters": 250,
+    "isCoastal": true,
+    "catalogMembership": ["europe-core", "europe-coastal"]
+  },
+  "sourceUpdatedAt": "2026-01-01",
+  "lineage": [
+    {
+      "sourceId": "geonames",
+      "sourceRelease": "2026-01-01",
+      "sourceFile": "fixture-settlements.txt",
+      "sourceLine": 1,
+      "sourceRecordId": 900000001,
+      "sourceSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ]
+}

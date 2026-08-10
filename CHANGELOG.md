@@ -67,6 +67,10 @@ All notable changes to this project will be documented in this file.
 - Added a deterministic receipt-driven offline release builder with one typed
   fixture/regional/full stage graph, identity-safe resume, atomic immutable
   candidates, pinned network-disabled execution, and separate controlled runs.
+- Added a separate settlement v2 public contract with exact source spelling,
+  per-record lineage, language/script metadata, and synthetic representative
+  GeoParquet and search-shard envelopes that reject incompatible schema,
+  format, serialization, geography-publication, and field-identity metadata.
 
 ### Changed
 
