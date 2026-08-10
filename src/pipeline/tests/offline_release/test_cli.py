@@ -153,3 +153,51 @@ def test_nested_receipt_path_cannot_create_a_partial_candidate(tmp_path: Path) -
     failure = _json(tmp_path / "failure-one.json")
     assert failure["candidateState"] == "not-created"
     assert failure["failure"]["code"] == "invalid-plan"  # type: ignore[index]
+
+
+def test_execution_receipt_commit_failure_discards_new_candidate(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    original_write = build_runner._write_immutable_json
+
+    def fail_execution_receipt(path, document):
+        if document.get("receiptType") == "offline-build-execution":
+            raise OSError("credential=do-not-record")
+        original_write(path, document)
+
+    monkeypatch.setattr(build_runner, "_write_immutable_json", fail_execution_receipt)
+
+    result = CliRunner().invoke(cli, _arguments(tmp_path))
+
+    assert result.exit_code == 1
+    assert "incomplete-build at preflight" in result.output
+    assert "do-not-record" not in result.output
+    assert not (tmp_path / "candidate-one").exists()
+    assert not (tmp_path / "execution-one.json").exists()
+    assert not list(tmp_path.glob(".searise-unreceipted-*"))
+    failure_path = tmp_path / "failure-one.json"
+    failure = _json(failure_path)
+    assert failure["candidateState"] == "discarded-unreceipted"
+    assert failure["failure"] == {
+        "code": "incomplete-build",
+        "stage": None,
+        "detail": "operator execution did not complete",
+    }
+    assert "do-not-record" not in failure_path.read_text(encoding="utf-8")
+
+
+def test_failed_invocation_never_changes_a_preexisting_output(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate-one"
+    candidate.mkdir()
+    sentinel = candidate / "owner.txt"
+    sentinel.write_bytes(b"pre-existing\n")
+
+    result = CliRunner().invoke(cli, _arguments(tmp_path))
+
+    assert result.exit_code == 1
+    assert sentinel.read_bytes() == b"pre-existing\n"
+    assert set(candidate.iterdir()) == {sentinel}
+    failure = _json(tmp_path / "failure-one.json")
+    assert failure["candidateState"] == "pre-existing"
+    assert failure["failure"]["code"] == "atomic-promotion-failed"  # type: ignore[index]

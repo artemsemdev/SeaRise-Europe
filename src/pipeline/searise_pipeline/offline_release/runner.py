@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import resource
+import shutil
 import sys
 import tempfile
 import time
@@ -49,6 +50,7 @@ def execute_profile_build(
     started = time.perf_counter()
     compiled: CompiledProfile | None = None
     output_preexisting = os.path.lexists(output_directory)
+    promoted_candidate: Path | None = None
     execution_candidate = execution_receipt_path.resolve(strict=False)
     failure_candidate = failure_receipt_path.resolve(strict=False)
     cache_candidate = cache_directory.resolve(strict=False)
@@ -96,6 +98,7 @@ def execute_profile_build(
             output_directory=output_directory,
             handlers=release_handlers(compiled),
         )
+        promoted_candidate = result.output_directory
         receipt = _success_receipt(
             result,
             total_duration_seconds=time.perf_counter() - started,
@@ -104,16 +107,19 @@ def execute_profile_build(
         return result
     except Exception as exc:
         failure = _classify_failure(exc)
+        candidate_state = _candidate_state(
+            output_directory,
+            preexisting=output_preexisting,
+        )
+        if promoted_candidate is not None and not output_preexisting:
+            candidate_state = _discard_unreceipted_candidate(promoted_candidate)
         _write_immutable_json(
             failure_path,
             _failure_receipt(
                 failure,
                 compiled=compiled,
                 total_duration_seconds=time.perf_counter() - started,
-                candidate_state=_candidate_state(
-                    output_directory,
-                    preexisting=output_preexisting,
-                ),
+                candidate_state=candidate_state,
             ),
         )
         if failure is exc:
@@ -197,6 +203,31 @@ def _candidate_state(path: Path, *, preexisting: bool) -> str:
     if preexisting:
         return "pre-existing"
     return "complete-unreceipted" if os.path.lexists(path) else "not-created"
+
+
+def _discard_unreceipted_candidate(path: Path) -> str:
+    """Remove only the candidate promoted by this invocation from its public path."""
+    if not os.path.lexists(path):
+        return "not-created"
+    quarantine_root: Path | None = None
+    try:
+        quarantine_root = Path(
+            tempfile.mkdtemp(prefix=".searise-unreceipted-", dir=path.parent)
+        )
+        quarantined = quarantine_root / "candidate"
+        os.rename(path, quarantined)
+        shutil.rmtree(quarantine_root)
+        return "discarded-unreceipted"
+    except OSError:
+        if not os.path.lexists(path):
+            return "quarantined-unreceipted"
+        return "complete-unreceipted"
+    finally:
+        if quarantine_root is not None and os.path.lexists(quarantine_root):
+            try:
+                shutil.rmtree(quarantine_root)
+            except OSError:
+                pass
 
 
 def _prepare_receipt_path(path: Path, *, label: str) -> Path:
