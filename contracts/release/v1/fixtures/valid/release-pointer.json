@@ -1,0 +1,12 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/release-pointer.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "manifest": {
+    "path": "releases/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json",
+    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  },
+  "publishedAt": "2026-08-10T12:04:00Z",
+  "cacheControl": "public, max-age=60, must-revalidate"
+}

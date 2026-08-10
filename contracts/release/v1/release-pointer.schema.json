@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/release-pointer.schema.json",
+  "title": "SeaRise Europe mutable release discovery pointer v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "manifest",
+    "publishedAt",
+    "cacheControl"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/release-pointer.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "manifest": { "$ref": "#/$defs/manifestIdentity" },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "cacheControl": { "const": "public, max-age=60, must-revalidate" }
+  },
+  "$defs": {
+    "manifestIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^releases/searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}/manifest\\.json$"
+        },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    }
+  }
+}
