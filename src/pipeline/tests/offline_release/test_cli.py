@@ -201,3 +201,34 @@ def test_failed_invocation_never_changes_a_preexisting_output(tmp_path: Path) ->
     failure = _json(tmp_path / "failure-one.json")
     assert failure["candidateState"] == "pre-existing"
     assert failure["failure"]["code"] == "atomic-promotion-failed"  # type: ignore[index]
+
+
+def test_receipt_failure_preserves_candidate_path_replacement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    original_write = build_runner._write_immutable_json
+    replacement = tmp_path / "candidate-one/replacement.txt"
+
+    def replace_candidate_before_failure(path, document):
+        if document.get("receiptType") == "offline-build-execution":
+            (tmp_path / "candidate-one").rename(tmp_path / "original-candidate")
+            replacement.parent.mkdir()
+            replacement.write_bytes(b"unrelated replacement\n")
+            raise OSError("credential=do-not-record")
+        original_write(path, document)
+
+    monkeypatch.setattr(
+        build_runner,
+        "_write_immutable_json",
+        replace_candidate_before_failure,
+    )
+
+    result = CliRunner().invoke(cli, _arguments(tmp_path))
+
+    assert result.exit_code == 1
+    assert replacement.read_bytes() == b"unrelated replacement\n"
+    assert set(replacement.parent.iterdir()) == {replacement}
+    failure = _json(tmp_path / "failure-one.json")
+    assert failure["candidateState"] == "identity-mismatch-preserved"
+    assert "do-not-record" not in result.output

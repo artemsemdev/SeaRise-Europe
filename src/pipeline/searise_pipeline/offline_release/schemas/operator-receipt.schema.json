@@ -190,6 +190,8 @@
             "pre-existing",
             "discarded-unreceipted",
             "quarantined-unreceipted",
+            "identity-mismatch-preserved",
+            "identity-mismatch-quarantined",
             "complete-unreceipted"
           ]
         },
