@@ -45,6 +45,12 @@
       "reference": "src/pipeline/tests/release/test_boundary_geoparquet.py",
       "environment": "macOS arm64; Python 3.11; pinned PyArrow/PROJ boundary packaging and mutation tests"
     },
+    "local-2026-08-10-boundary-pmtiles-structure": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T23:29:47+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py",
+      "environment": "macOS arm64; Python 3.9.6; 5 structure contract and mutation tests passed in 2.24s; no external vector build executed"
+    },
     "local-2026-08-10-settlement-contracts": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T21:00:00+02:00",
@@ -448,6 +454,20 @@
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in inputs, pinned local toolchain, no clock, random input, credentials, or network." }
     },
     {
+      "id": "pipeline-boundary-pmtiles-structure",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify exact boundary GeoParquet source identity, safe metadata, Shapely identity, and canonical PMTiles v3 header, section, and count contracts.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_pmtiles_structure.py"],
+      "changedPaths": ["data/geometry/**", "src/pipeline/searise_pipeline/release/boundary_geoparquet.py", "src/pipeline/searise_pipeline/release/boundary_pmtiles.py", "src/pipeline/tests/release/test_boundary_pmtiles_structure.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-source, safe-metadata, Python-geometry-tool, and PMTiles v3 structure mutation gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_pmtiles_structure.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-structure", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in source bytes and synthetic PMTiles header mutations; no external vector executable, credentials, clock input, randomness, or network." }
+    },
+    {
       "id": "pipeline-ar6-release-pmtiles",
       "layer": "scientific",
       "owner": "science",
@@ -740,6 +760,7 @@
     { "path": "src/pipeline/tests/release/test_gate_report.py", "suite": "pipeline-release-gate-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py", "suite": "pipeline-boundary-pmtiles-structure", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_owner_promotion.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_promotion_cli.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
