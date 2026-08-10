@@ -48,7 +48,9 @@ API = (
 )
 
 PIPELINE = (
+    ".github/workflows/offline-release-controlled.yml",
     ".github/workflows/phase-0r-owner-promotion.yml",
+    "scripts/release/prepare_controlled_offline_inputs.py",
     "scripts/science/promote_phase_0r_release.py",
     "scripts/science/validate_ar6_delivery_trace.py",
     "src/pipeline/**",
@@ -64,7 +66,9 @@ PIPELINE = (
 # pinned geospatial toolchain preflight, while the 9.24 GB real-source build is
 # further isolated behind an explicit manual evidence dispatch.
 RELEASE = (
+    ".github/workflows/offline-release-controlled.yml",
     ".github/workflows/phase-0r-owner-promotion.yml",
+    "scripts/release/prepare_controlled_offline_inputs.py",
     "scripts/science/promote_phase_0r_release.py",
     "scripts/science/*ar6*release*.py",
     "scripts/science/build_ar6_lookup_goldens.py",

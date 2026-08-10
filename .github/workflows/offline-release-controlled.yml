@@ -1,0 +1,250 @@
+name: Controlled offline release build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Exact controlled build profile
+        required: true
+        type: choice
+        options:
+          - regional
+          - full-europe
+      source_revision:
+        description: Exact reviewed master commit (40 lowercase hex)
+        required: true
+        type: string
+      input_run_id:
+        description: Exact same-repository run that produced the reviewed input artifact
+        required: true
+        type: string
+      input_artifact_name:
+        description: Exact reviewed GitHub artifact containing offline-inputs.tar
+        required: true
+        type: string
+      input_bundle_sha256:
+        description: Reviewed SHA-256 of the uncompressed offline-inputs.tar
+        required: true
+        type: string
+      release_date:
+        description: Explicit candidate date in YYYYMMDD form
+        required: true
+        type: string
+      started_at:
+        description: Explicit build-receipt start time in UTC
+        required: true
+        type: string
+      completed_at:
+        description: Explicit build-receipt completion time in UTC
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: >-
+    offline-release-controlled-${{ inputs.profile }}-${{ inputs.source_revision }}-${{ inputs.input_bundle_sha256 }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ inputs.profile }} candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    environment: phase-1-controlled-offline-build
+    steps:
+      - name: Validate protected dispatch boundary
+        env:
+          PROFILE: ${{ inputs.profile }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          INPUT_RUN_ID: ${{ inputs.input_run_id }}
+          INPUT_ARTIFACT_NAME: ${{ inputs.input_artifact_name }}
+          INPUT_BUNDLE_SHA256: ${{ inputs.input_bundle_sha256 }}
+          RELEASE_DATE: ${{ inputs.release_date }}
+          STARTED_AT: ${{ inputs.started_at }}
+          COMPLETED_AT: ${{ inputs.completed_at }}
+        run: |
+          [[ "${GITHUB_REF}" == "refs/heads/master" ]]
+          [[ "${GITHUB_WORKFLOW_REF}" == "artemsemdev/SeaRise-Europe/.github/workflows/offline-release-controlled.yml@refs/heads/master" ]]
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]
+          [[ "${PROFILE}" =~ ^(regional|full-europe)$ ]]
+          [[ "${SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${SOURCE_REVISION}" == "${GITHUB_SHA}" ]]
+          [[ "${INPUT_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${INPUT_RUN_ID}" != "${GITHUB_RUN_ID}" ]]
+          [[ "${INPUT_ARTIFACT_NAME}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]
+          [[ "${INPUT_BUNDLE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${RELEASE_DATE}" =~ ^[0-9]{8}$ ]]
+          [[ "${STARTED_AT}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]
+          [[ "${COMPLETED_AT}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]
+          mkdir -p "${RUNNER_TEMP}/offline-release-run"
+          jq -n \
+            --arg profile "${PROFILE}" \
+            --arg sourceRevision "${SOURCE_REVISION}" \
+            --arg inputRunId "${INPUT_RUN_ID}" \
+            --arg inputArtifactName "${INPUT_ARTIFACT_NAME}" \
+            --arg inputBundleSha256 "${INPUT_BUNDLE_SHA256}" \
+            --arg releaseDate "${RELEASE_DATE}" \
+            --arg startedAt "${STARTED_AT}" \
+            --arg completedAt "${COMPLETED_AT}" \
+            --arg workflowRunId "${GITHUB_RUN_ID}" \
+            '{
+              schemaVersion: 1,
+              profile: $profile,
+              sourceRevision: $sourceRevision,
+              reviewedInput: {
+                runId: $inputRunId,
+                artifactName: $inputArtifactName,
+                bundleSha256: $inputBundleSha256
+              },
+              releaseDate: $releaseDate,
+              receiptTimestamps: {
+                startedAt: $startedAt,
+                completedAt: $completedAt
+              },
+              workflowRunId: $workflowRunId,
+              publicationAttempted: false,
+              activationAttempted: false
+            }' > "${RUNNER_TEMP}/offline-release-run/dispatch.json"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ inputs.source_revision }}
+
+      - name: Verify checked-out builder revision
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_REVISION}"
+          test "$(uname -s)" = "Linux"
+          test "$(uname -m)" = "x86_64"
+
+      - name: Download exact reviewed input artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ inputs.input_artifact_name }}
+          path: ${{ runner.temp }}/offline-release-download
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.input_run_id }}
+
+      - name: Verify and safely prepare reviewed inputs
+        env:
+          PROFILE: ${{ inputs.profile }}
+          INPUT_BUNDLE_SHA256: ${{ inputs.input_bundle_sha256 }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          test "$(find "${RUNNER_TEMP}/offline-release-download" -mindepth 1 | wc -l | tr -d ' ')" = "1"
+          test -f "${RUNNER_TEMP}/offline-release-download/offline-inputs.tar"
+          test ! -L "${RUNNER_TEMP}/offline-release-download/offline-inputs.tar"
+          python3 scripts/release/prepare_controlled_offline_inputs.py \
+            --archive "${RUNNER_TEMP}/offline-release-download/offline-inputs.tar" \
+            --destination "${RUNNER_TEMP}/offline-release-input-root" \
+            --profile "${PROFILE}" \
+            --expected-sha256 "${INPUT_BUNDLE_SHA256}"
+
+      - name: Build pinned offline builder image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --tag searise-offline-builder:controlled \
+            --file src/pipeline/offline_release/Dockerfile \
+            .
+
+      - name: Verify declared runtime identity
+        run: |
+          docker run \
+            --rm \
+            --network none \
+            --platform linux/amd64 \
+            --read-only \
+            --entrypoint python \
+            searise-offline-builder:controlled \
+            -c 'import platform; assert platform.python_version() == "3.11.15"; assert platform.system() == "Linux"; assert platform.machine() == "x86_64"'
+
+      - id: build
+        name: Build validated immutable candidate
+        env:
+          PROFILE: ${{ inputs.profile }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          RELEASE_DATE: ${{ inputs.release_date }}
+          STARTED_AT: ${{ inputs.started_at }}
+          COMPLETED_AT: ${{ inputs.completed_at }}
+        run: |
+          docker run \
+            --rm \
+            --network none \
+            --platform linux/amd64 \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=1g \
+            --user "$(id -u):$(id -g)" \
+            --volume "${RUNNER_TEMP}/offline-release-input-root/build-inputs/offline-release/${PROFILE}:/workspace/build-inputs/offline-release/${PROFILE}:ro" \
+            --volume "${RUNNER_TEMP}/offline-release-run:/run:rw" \
+            searise-offline-builder:controlled \
+            --profile "src/pipeline/offline_release/profiles/${PROFILE}.json" \
+            --input-root /workspace \
+            --code-revision "${SOURCE_REVISION}" \
+            --release-date "${RELEASE_DATE}" \
+            --started-at "${STARTED_AT}" \
+            --completed-at "${COMPLETED_AT}" \
+            --cache-dir /run/cache \
+            --output-dir /run/candidate \
+            --execution-receipt /run/execution.json \
+            --failure-receipt /run/failure.json
+
+      - name: Validate controlled build evidence
+        env:
+          PROFILE: ${{ inputs.profile }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          run_root="${RUNNER_TEMP}/offline-release-run"
+          test ! -e "${run_root}/failure.json"
+          test -d "${run_root}/candidate"
+          jq -e --arg profile "${PROFILE}" '
+            .receiptType == "offline-build-execution" and
+            .status == "complete" and
+            .profile == $profile and
+            .networkAccess == "disabled" and
+            .candidate.fileCount > 0 and
+            .resourceUsage.peakProcessRssBytes > 0 and
+            ([.stages[].cacheStatus] | all(. == "miss"))
+          ' "${run_root}/execution.json"
+          jq -e --arg revision "${SOURCE_REVISION}" '
+            .codeRevision == $revision and
+            .buildMode == "offline" and
+            .networkAccess == "disabled" and
+            (.outputs | length) > 0
+          ' "${run_root}/candidate/receipts/build.json"
+
+      - name: Summarize controlled candidate
+        if: ${{ success() }}
+        run: |
+          run_root="${RUNNER_TEMP}/offline-release-run"
+          {
+            echo "## Controlled offline release candidate"
+            echo
+            jq -r '"Profile: `\(.profile)`"' "${run_root}/execution.json"
+            jq -r '"Release: `\(.dataReleaseId)`"' "${run_root}/execution.json"
+            jq -r '"Files: \(.candidate.fileCount); bytes: \(.candidate.byteSize)"' "${run_root}/execution.json"
+            echo
+            echo "Publication and activation were not attempted."
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload candidate and immutable evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: offline-release-${{ inputs.profile }}-${{ inputs.source_revision }}-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/offline-release-run/candidate
+            ${{ runner.temp }}/offline-release-run/execution.json
+            ${{ runner.temp }}/offline-release-run/failure.json
+            ${{ runner.temp }}/offline-release-run/dispatch.json
+          if-no-files-found: error
+          overwrite: false
+          include-hidden-files: false
+          retention-days: 14
