@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -12,19 +13,47 @@ interface ContractDocument {
   [key: string]: unknown;
 }
 
-const contractDirectory = resolve(process.cwd(), "../../contracts/release/v1");
-const fixtureDirectory = resolve(contractDirectory, "fixtures");
+const contractDirectories = [
+  resolve(process.cwd(), "../../contracts/release/v1"),
+  resolve(process.cwd(), "../../contracts/settlements/v2"),
+];
+const settlementContractDirectory = contractDirectories[1];
 
 function readJson(path: string): ContractDocument {
   return JSON.parse(readFileSync(path, "utf8")) as ContractDocument;
 }
 
+function lexicographicKeyJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(lexicographicKeyJson).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${lexicographicKeyJson(record[key])}`)
+      .join(",")}}`;
+  }
+  const encoded = JSON.stringify(value);
+  if (encoded === undefined) throw new TypeError("value is not JSON serializable");
+  return encoded;
+}
+
+function assertSearchSemantics(document: ContractDocument): void {
+  const records = document.documents;
+  if (!Array.isArray(records) || document.recordCount !== records.length) {
+    throw new TypeError("search shard recordCount differs from documents length");
+  }
+}
+
 function fixturePaths(kind: "valid" | "invalid"): string[] {
-  const directory = resolve(fixtureDirectory, kind);
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".json"))
-    .sort()
-    .map((name) => resolve(directory, name));
+  return contractDirectories.flatMap((contractDirectory) => {
+    const directory = resolve(contractDirectory, "fixtures", kind);
+    return readdirSync(directory)
+      .filter((name) => name.endsWith(".json"))
+      .sort()
+      .map((name) => resolve(directory, name));
+  });
 }
 
 function contractValidator(): Ajv2020 {
@@ -35,9 +64,11 @@ function contractValidator(): Ajv2020 {
     strictTypes: false,
   });
   addFormats(ajv);
-  for (const name of readdirSync(contractDirectory).sort()) {
-    if (!name.endsWith(".schema.json")) continue;
-    ajv.addSchema(readJson(resolve(contractDirectory, name)));
+  for (const contractDirectory of contractDirectories) {
+    for (const name of readdirSync(contractDirectory).sort()) {
+      if (!name.endsWith(".schema.json")) continue;
+      ajv.addSchema(readJson(resolve(contractDirectory, name)));
+    }
   }
   return ajv;
 }
@@ -71,5 +102,33 @@ describe("Python and TypeScript public contract parity", () => {
       expect(validate, path).toBeDefined();
       expect(validate?.(document), path).toBe(false);
     }
+  });
+
+  it("shares Arrow-field JSON identity and search-count semantics with Python", () => {
+    const geoparquet = readJson(
+      resolve(
+        settlementContractDirectory,
+        "fixtures/valid/settlement-geoparquet.json",
+      ),
+    );
+    const search = readJson(
+      resolve(
+        settlementContractDirectory,
+        "fixtures/valid/settlement-search-shard.json",
+      ),
+    );
+    const preimage = lexicographicKeyJson(geoparquet.arrowFields);
+
+    expect(geoparquet.arrowFieldsCanonicalization).toBe(
+      "lexicographic-key-json-v1",
+    );
+    expect(createHash("sha256").update(preimage, "utf8").digest("hex")).toBe(
+      geoparquet.arrowFieldsJsonSha256,
+    );
+    expect(() => assertSearchSemantics(search)).not.toThrow();
+
+    expect(() =>
+      assertSearchSemantics({ ...search, recordCount: Number(search.recordCount) + 1 }),
+    ).toThrow(/recordCount/);
   });
 });

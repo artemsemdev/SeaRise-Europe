@@ -39,6 +39,12 @@
       "reference": "src/pipeline/tests/offline_release/test_model.py",
       "environment": "macOS arm64; Python 3.11; deterministic offline model, engine, and profile tests"
     },
+    "local-2026-08-10-settlement-contracts": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T21:00:00+02:00",
+      "reference": "src/pipeline/tests/settlements/test_settlement_contracts.py",
+      "environment": "macOS arm64; Python 3.11 and Node 20-compatible Vitest; fixed synthetic JSON Schema goldens"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -284,6 +290,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "ci-30959043087", "scope": "shared-ci-job" },
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic checked-in contracts and evidence passed in the successful combined Phase 0.2/0.3 run." }
+    },
+    {
+      "id": "pipeline-settlement-public-contracts",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep versioned settlement records, GeoParquet envelopes, search-shard envelopes, and compatibility rejection executable.",
+      "sourcePaths": ["src/pipeline/tests/settlements/test_*.py"],
+      "changedPaths": ["contracts/settlements/**", "src/pipeline/tests/settlements/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent settlement artifact shape, provenance, and fail-closed format/version compatibility gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-settlement-contracts", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Only fixed local schemas and synthetic fixtures are read; no clock, random input, network, or source archive is used." }
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
@@ -643,6 +663,7 @@
     { "path": "src/pipeline/tests/science/test_uncertainty.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical_source_evidence.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/tdd/test_result_state_characterization.py", "suite": "pipeline-five-state-characterization", "status": "active", "removalGate": null, "replacementEvidence": null },
