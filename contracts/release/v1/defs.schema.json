@@ -24,6 +24,9 @@
         "UnsupportedGeography"
       ]
     },
+    "dataProvenanceClass": {
+      "enum": ["real-source", "synthetic-fixture"]
+    },
     "sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
@@ -33,6 +36,45 @@
       "minLength": 1,
       "maxLength": 512,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[?#\\\\])(?:[A-Za-z0-9][A-Za-z0-9._-]*)(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+    },
+    "artifactRole": {
+      "enum": [
+        "release-manifest",
+        "scenario-config",
+        "methodology",
+        "source-attribution",
+        "source-receipt",
+        "build-receipt",
+        "support-boundary",
+        "coastal-boundary",
+        "settlement-search-index",
+        "settlement-geoparquet",
+        "projection-analysis-cog",
+        "projection-visual-pmtiles",
+        "projection-geoparquet",
+        "quality-summary",
+        "architecture-evidence",
+        "stac-catalog",
+        "stac-collection",
+        "stac-item",
+        "checksums",
+        "provenance",
+        "signature"
+      ]
+    },
+    "mediaType": {
+      "enum": [
+        "application/json",
+        "application/geo+json",
+        "application/vnd.apache.parquet",
+        "application/vnd.in-toto+json",
+        "application/vnd.pmtiles",
+        "application/vnd.searise.search-index+json",
+        "application/vnd.dev.sigstore.bundle+json;version=0.3",
+        "application/x-ndjson",
+        "image/tiff; application=geotiff; profile=cloud-optimized",
+        "text/plain"
+      ]
     },
     "coordinates": {
       "type": "object",
@@ -68,7 +110,7 @@
           "enum": ["pending-owner", "approved", "rejected", "blocked"]
         },
         "dataProvenanceClass": {
-          "enum": ["real-source", "synthetic-fixture"]
+          "$ref": "#/$defs/dataProvenanceClass"
         },
         "statusDisclosureRequired": {
           "type": "boolean"
