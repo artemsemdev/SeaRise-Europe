@@ -91,6 +91,9 @@ All notable changes to this project will be documented in this file.
 - Added fail-closed byte-range validation for all nine owner-reviewed analysis
   COG identities, covering canonical and TIFF-reader-driven requests plus
   malformed, ignored, truncated, substituted, and corrupted responses.
+- Added a fail-closed PMTiles v3 structure contract for visual-only boundary
+  candidates, binding checked-in source geometry, lineage, safe metadata,
+  directory sections, and tile counts without granting canonical status.
 
 ### Changed
 
