@@ -88,6 +88,13 @@ raw cache needed by an in-progress build and update all pins only through
 review. The historical global lock remains byte-identical so approved Phase 0R
 evidence keeps its original binding.
 
+Validate the locked place/admin1 parser against an ignored local cache with the
+offline command recorded in
+`src/pipeline/tests/settlements/fixtures/geonames/full-scan-report.json`. The
+validator compares outer/member hashes, sizes, CRC, row counts, nullable-field
+counts, and the exact reviewed anomaly counts. Its report is local engineering
+evidence and makes no publication or scientific-validation claim.
+
 ## Cache cleanup
 
 List the exact source/version directory first. Remove or move only that

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "local-offline-source-validation",
+  "publicationClaim": false,
+  "snapshotDate": "2026-08-10",
+  "sourceLock": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlements.json",
+    "sha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee"
+  },
+  "command": "PYTHONPATH=src/pipeline python scripts/release/validate_geonames_place_snapshot.py --source-lock src/pipeline/sources/source-lock.phase-1-settlements.json --all-countries-zip <local-verified-cache>/allCountries.zip --admin1 <local-verified-cache>/admin1CodesASCII.txt --expected-report src/pipeline/tests/settlements/fixtures/geonames/full-scan-report.json",
+  "observation": {
+    "environment": "macOS arm64; Python 3.11; ignored local source cache",
+    "elapsedSeconds": 374.800
+  },
+  "result": {
+    "policyVersion": "geonames-place-raw-anomalies-v1",
+    "sourceLockSha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee",
+    "allCountries": {
+      "assetSha256": "06f423eaf760d28101cd11a9744ade90f65c618d073ac2168501c388e1bd4afa",
+      "assetByteSize": 419923777,
+      "memberSha256": "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8",
+      "memberByteSize": 1782635669,
+      "memberCompressedByteSize": 419923631,
+      "memberCrc32": "27133946"
+    },
+    "admin1": {
+      "assetSha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+      "assetByteSize": 151572
+    },
+    "counts": {
+      "admin1ParsedRows": 3865,
+      "admin1Rows": 3865,
+      "allCountriesParsedRows": 13455006,
+      "allCountriesRows": 13455006,
+      "delC1AliasRows": 32,
+      "delC1NameRows": 3,
+      "edgeAsciiSpaceAliasRows": 588,
+      "leadingEmptyAlternateCountryRows": 4,
+      "negativePlacePopulationRows": 0,
+      "negativePopulationRows": 2,
+      "nullFeatureClassRows": 5003,
+      "nullFeatureCodeRows": 94937,
+      "nullPopulationRows": 0,
+      "placeNullAdmin1Rows": 967,
+      "placeRows": 5220666
+    },
+    "failures": { "count": 0, "overflowCount": 0, "signatures": {} }
+  }
+}
