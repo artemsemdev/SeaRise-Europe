@@ -147,12 +147,16 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
     schemas = list(PUBLIC_CONTRACT_DIR.glob("*.schema.json"))
 
     assert {path.name for path in schemas} == {
+        "architecture-evidence.schema.json",
         "attribution.schema.json",
         "build-receipt.schema.json",
         "defs.schema.json",
         "methodology.schema.json",
         "projection-result.schema.json",
+        "quality-summary.schema.json",
+        "release-pointer.schema.json",
         "scenario-config.schema.json",
+        "search-record.schema.json",
         "source-receipt.schema.json",
     }
     for path in schemas:
@@ -461,3 +465,83 @@ def test_build_receipt_rejects_network_and_unsafe_output_identity() -> None:
     errors = list(_public_contract_validator("build-receipt.schema.json").iter_errors(document))
 
     assert len(errors) >= 3
+
+
+@pytest.mark.parametrize(
+    "schema_name",
+    [
+        "search-record.schema.json",
+        "quality-summary.schema.json",
+        "architecture-evidence.schema.json",
+        "release-pointer.schema.json",
+    ],
+)
+def test_public_consumer_metadata_fixtures_are_schema_valid(schema_name: str) -> None:
+    fixture_name = schema_name.removesuffix(".schema.json") + ".json"
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / fixture_name).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    _public_contract_validator(schema_name).validate(document)
+    assert document["dataProvenanceClass"] == "synthetic-fixture"
+
+
+def test_search_record_rejects_historical_and_contradictory_records() -> None:
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "search-record.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["featureCode"] = "PPLH"
+    document["isCoastal"] = False
+
+    errors = list(_public_contract_validator("search-record.schema.json").iter_errors(document))
+
+    assert len(errors) >= 2
+
+
+def test_quality_and_architecture_evidence_fail_closed() -> None:
+    quality = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "quality-summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    quality["blockingChecks"].append(
+        {"code": "fixture-blocker", "evidencePath": "evidence/blocker.json"}
+    )
+    quality["validations"][0]["status"] = "failed"
+    quality["releaseDisposition"] = "approved"
+    architecture = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "architecture-evidence.json"
+        ).read_text(encoding="utf-8")
+    )
+    architecture["runtime"]["applicationApiCalls"] = 1
+    architecture["privacy"]["searchSentToProjectServer"] = True
+
+    assert len(
+        list(_public_contract_validator("quality-summary.schema.json").iter_errors(quality))
+    ) >= 3
+    assert len(
+        list(
+            _public_contract_validator("architecture-evidence.schema.json").iter_errors(
+                architecture
+            )
+        )
+    ) >= 2
+
+
+def test_release_pointer_rejects_origins_and_unsafe_cache_policy() -> None:
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "release-pointer.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["manifest"]["path"] = "https://provider.example/manifest.json"
+    document["cacheControl"] = "public, max-age=31536000, immutable"
+
+    errors = list(_public_contract_validator("release-pointer.schema.json").iter_errors(document))
+
+    assert len(errors) >= 2

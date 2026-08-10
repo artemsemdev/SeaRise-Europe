@@ -1,0 +1,58 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/quality-summary.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "authority": "automation",
+  "generatedAt": "2026-08-10T12:02:00Z",
+  "automatedValidation": "passed",
+  "validatedCombinations": 9,
+  "validations": [
+    {
+      "category": "schema",
+      "status": "passed",
+      "evidencePath": "evidence/schema-validation.json"
+    },
+    {
+      "category": "rights",
+      "status": "passed",
+      "evidencePath": "evidence/rights-validation.json"
+    },
+    {
+      "category": "hash",
+      "status": "passed",
+      "evidencePath": "evidence/hash-validation.json"
+    },
+    {
+      "category": "matrix",
+      "status": "passed",
+      "evidencePath": "evidence/matrix-validation.json"
+    },
+    {
+      "category": "projection-parity",
+      "status": "passed",
+      "evidencePath": "evidence/projection-parity.json"
+    },
+    {
+      "category": "search-reconciliation",
+      "status": "passed",
+      "evidencePath": "evidence/search-reconciliation.json"
+    },
+    {
+      "category": "stac",
+      "status": "passed",
+      "evidencePath": "evidence/stac-validation.json"
+    },
+    {
+      "category": "provenance",
+      "status": "passed",
+      "evidencePath": "evidence/provenance-validation.json"
+    }
+  ],
+  "sourceRecordReconciliation": {
+    "input": 1,
+    "accepted": 1,
+    "rejected": 0
+  },
+  "blockingChecks": []
+}

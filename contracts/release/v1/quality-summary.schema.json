@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/quality-summary.schema.json",
+  "title": "SeaRise Europe automated release quality summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "authority",
+    "generatedAt",
+    "automatedValidation",
+    "validatedCombinations",
+    "validations",
+    "sourceRecordReconciliation",
+    "blockingChecks"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/quality-summary.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "authority": { "const": "automation" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "automatedValidation": { "enum": ["pending", "passed", "failed"] },
+    "validatedCombinations": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "validations": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/schemaValidation" },
+        { "$ref": "#/$defs/rightsValidation" },
+        { "$ref": "#/$defs/hashValidation" },
+        { "$ref": "#/$defs/matrixValidation" },
+        { "$ref": "#/$defs/projectionParityValidation" },
+        { "$ref": "#/$defs/searchReconciliationValidation" },
+        { "$ref": "#/$defs/stacValidation" },
+        { "$ref": "#/$defs/provenanceValidation" }
+      ],
+      "items": false,
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true
+    },
+    "sourceRecordReconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "accepted", "rejected"],
+      "properties": {
+        "input": { "type": "integer", "minimum": 0 },
+        "accepted": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "blockingChecks": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "evidencePath"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+          "evidencePath": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "automatedValidation": { "const": "passed" } },
+        "required": ["automatedValidation"]
+      },
+      "then": {
+        "properties": {
+          "validatedCombinations": { "const": 9 },
+          "blockingChecks": { "maxItems": 0 },
+          "validations": {
+            "not": {
+              "contains": {
+                "properties": { "status": { "enum": ["pending", "failed"] } },
+                "required": ["status"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "status", "evidencePath"],
+      "properties": {
+        "category": {
+          "enum": [
+            "schema",
+            "rights",
+            "hash",
+            "matrix",
+            "projection-parity",
+            "search-reconciliation",
+            "stac",
+            "provenance"
+          ]
+        },
+        "status": { "enum": ["pending", "passed", "failed"] },
+        "evidencePath": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" }
+      }
+    },
+    "schemaValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "schema" } }
+    },
+    "rightsValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "rights" } }
+    },
+    "hashValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "hash" } }
+    },
+    "matrixValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "matrix" } }
+    },
+    "projectionParityValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "projection-parity" } }
+    },
+    "searchReconciliationValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "search-reconciliation" } }
+    },
+    "stacValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "stac" } }
+    },
+    "provenanceValidation": {
+      "$ref": "#/$defs/validation",
+      "properties": { "category": { "const": "provenance" } }
+    }
+  }
+}
