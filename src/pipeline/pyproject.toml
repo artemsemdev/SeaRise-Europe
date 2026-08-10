@@ -38,6 +38,7 @@ packages = [
     "pipeline",
     "searise_pipeline",
     "searise_pipeline.domain",
+    "searise_pipeline.offline_release",
     "searise_pipeline.regional_fixture",
     "searise_pipeline.release",
     "searise_pipeline.science",
