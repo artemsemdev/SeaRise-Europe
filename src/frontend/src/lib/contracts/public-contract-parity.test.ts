@@ -6,6 +6,8 @@ import { resolve } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
+import { validateGateReportSemantics } from "./gate-report-semantics";
+import type { GateReportDocument } from "./gate-report-semantics";
 
 interface ContractDocument {
   $id?: string;
@@ -15,9 +17,11 @@ interface ContractDocument {
 
 const contractDirectories = [
   resolve(process.cwd(), "../../contracts/release/v1"),
+  resolve(process.cwd(), "../../contracts/release-gates/v1"),
   resolve(process.cwd(), "../../contracts/settlements/v2"),
 ];
-const settlementContractDirectory = contractDirectories[1];
+const releaseGateContractDirectory = contractDirectories[1];
+const settlementContractDirectory = contractDirectories[2];
 
 function readJson(path: string): ContractDocument {
   return JSON.parse(readFileSync(path, "utf8")) as ContractDocument;
@@ -101,6 +105,62 @@ describe("Python and TypeScript public contract parity", () => {
         : undefined;
       expect(validate, path).toBeDefined();
       expect(validate?.(document), path).toBe(false);
+    }
+  });
+
+  it("shares release gate semantic valid and invalid vectors", () => {
+    const ajv = contractValidator();
+    const validate = ajv.getSchema(
+      "https://artemsemdev.github.io/SeaRise-Europe/contracts/release-gates/v1/gate-report.schema.json",
+    );
+    const validPaths = readdirSync(
+      resolve(releaseGateContractDirectory, "fixtures/valid"),
+    )
+      .filter((name) => name.endsWith(".json"))
+      .sort();
+    const invalidPaths = readdirSync(
+      resolve(releaseGateContractDirectory, "fixtures/semantic-invalid"),
+    )
+      .filter((name) => name.endsWith(".json"))
+      .sort();
+
+    for (const name of validPaths) {
+      const document = readJson(
+        resolve(releaseGateContractDirectory, "fixtures/valid", name),
+      );
+      expect(validate?.(document), JSON.stringify(validate?.errors)).toBe(true);
+      expect(() =>
+        validateGateReportSemantics(
+          document as unknown as GateReportDocument,
+        ),
+      ).not.toThrow();
+    }
+    for (const name of invalidPaths) {
+      const document = readJson(
+        resolve(releaseGateContractDirectory, "fixtures/semantic-invalid", name),
+      );
+      expect(validate?.(document), JSON.stringify(validate?.errors)).toBe(true);
+      expect(() =>
+        validateGateReportSemantics(
+          document as unknown as GateReportDocument,
+        ),
+      ).toThrow();
+    }
+    for (const name of [
+      "automation-release.json",
+      "blocked-waivable-metric-releasable.json",
+      "critical-flag-downgrade.json",
+      "waivable-metric-automation.json",
+    ]) {
+      const document = readJson(
+        resolve(releaseGateContractDirectory, "fixtures/invalid", name),
+      );
+      expect(validate?.(document), name).toBe(false);
+      expect(() =>
+        validateGateReportSemantics(
+          document as unknown as GateReportDocument,
+        ),
+      ).toThrow();
     }
   });
 

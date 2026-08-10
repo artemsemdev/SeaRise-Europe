@@ -51,6 +51,12 @@
       "reference": "src/pipeline/tests/settlements/test_settlement_contracts.py",
       "environment": "macOS arm64; Python 3.11 and Node 20-compatible Vitest; fixed synthetic JSON Schema goldens"
     },
+    "local-2026-08-10-release-gate-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T22:00:00+02:00",
+      "reference": "src/pipeline/tests/release/test_gate_report.py",
+      "environment": "macOS arm64; Python and Node 20-compatible Vitest; fixed JSON Schema fixtures and deterministic Markdown golden"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -175,8 +181,8 @@
       "id": "frontend-public-contract-parity",
       "layer": "contract",
       "owner": "frontend",
-      "purpose": "Require TypeScript and Python to accept and reject the same versioned public release fixtures.",
-      "sourcePaths": ["src/frontend/src/lib/contracts/*.test.ts"],
+      "purpose": "Require TypeScript and Python to accept, reject, and semantically derive the same versioned public contract fixtures.",
+      "sourcePaths": ["src/frontend/src/lib/contracts/*.test.ts", "src/frontend/src/lib/contracts/gate-report-semantics.ts"],
       "changedPaths": ["contracts/**", "src/frontend/src/lib/contracts/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent shared-schema parity gate; replacement must validate the same fixtures in both runtimes." },
@@ -310,6 +316,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-settlement-contracts", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Only fixed local schemas and synthetic fixtures are read; no clock, random input, network, or source archive is used." }
+    },
+    {
+      "id": "pipeline-release-gate-contract",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep release gate decisions fail-closed, authority-explicit, metric-bound, evidence-addressed, and deterministically renderable.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/gate_report.py", "src/pipeline/tests/release/test_gate_report.py"],
+      "changedPaths": ["contracts/release-gates/**", "src/pipeline/searise_pipeline/gate_report.py", "src/pipeline/tests/release/test_gate_report.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent release-decision schema, semantic validation, cross-runtime rejection, and byte-stable human-rendering gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_gate_report.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-release-gate-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Fixed local schema, JSON fixtures, and Markdown golden use no clock, random input, network, or source archive." }
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
@@ -656,6 +676,7 @@
     { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_delivery.py", "suite": "pipeline-ar6-release-delivery", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_gate_report.py", "suite": "pipeline-release-gate-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },

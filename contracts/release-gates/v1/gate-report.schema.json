@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release-gates/v1/gate-report.schema.json",
+  "title": "SeaRise Europe release gate report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "rendererVersion",
+    "ordering",
+    "candidateId",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "generatedAt",
+    "authority",
+    "releasable",
+    "checks",
+    "stopReasonCodes"
+  ],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release-gates/v1/gate-report.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "rendererVersion": { "const": "markdown-v1" },
+    "ordering": { "const": "check-id-then-evidence-path-utf8-bytewise" },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^candidate-[a-z0-9][a-z0-9-]*-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataProvenanceClass": {
+      "enum": ["synthetic-fixture", "real-source"]
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "releasable": { "type": "boolean" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/check" }
+    },
+    "stopReasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/stopReasonCode" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "releasable": { "const": true } },
+        "required": ["releasable"]
+      },
+      "then": {
+        "properties": {
+          "authority": {
+            "type": "object",
+            "properties": {
+              "kind": { "const": "owner" },
+              "ownerDisposition": { "const": "approved" }
+            },
+            "required": ["kind", "ownerDisposition"]
+          },
+          "checks": {
+            "not": {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "status": { "enum": ["fail", "not-measured"] }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "checks": {
+            "contains": {
+              "type": "object",
+              "properties": { "nonWaivable": { "const": false } },
+              "required": ["nonWaivable"]
+            }
+          }
+        },
+        "required": ["checks"]
+      },
+      "then": {
+        "properties": {
+          "authority": {
+            "type": "object",
+            "properties": { "kind": { "const": "owner" } },
+            "required": ["kind"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "automatedValidation", "ownerDisposition"],
+      "properties": {
+        "kind": { "enum": ["automation", "owner"] },
+        "automatedValidation": { "enum": ["pass", "fail", "not-measured"] },
+        "ownerDisposition": { "enum": ["not-recorded", "approved", "rejected", "blocked"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "automation" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": { "ownerDisposition": { "const": "not-recorded" } }
+          },
+          "else": {
+            "properties": {
+              "ownerDisposition": { "enum": ["approved", "rejected", "blocked"] }
+            }
+          }
+        }
+      ]
+    },
+    "stopReasonCode": {
+      "enum": [
+        "artifact-integrity-failed",
+        "cross-runtime-parity-failed",
+        "metric-target-missed",
+        "owner-approval-missing",
+        "reproducibility-failed",
+        "required-measurement-missing",
+        "rights-incomplete",
+        "schema-invalid",
+        "scientific-parity-failed",
+        "supply-chain-invalid"
+      ]
+    },
+    "criticalStopReasonCode": {
+      "enum": [
+        "artifact-integrity-failed",
+        "cross-runtime-parity-failed",
+        "owner-approval-missing",
+        "reproducibility-failed",
+        "required-measurement-missing",
+        "rights-incomplete",
+        "schema-invalid",
+        "scientific-parity-failed",
+        "supply-chain-invalid"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+        },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operator", "value"],
+      "properties": {
+        "operator": { "enum": ["at-most", "at-least", "exactly"] },
+        "value": { "type": "number" }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkId",
+        "label",
+        "status",
+        "nonWaivable",
+        "unit",
+        "target",
+        "measuredValue",
+        "evidence"
+      ],
+      "properties": {
+        "checkId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9 .(),:+/_-]*$"
+        },
+        "status": { "enum": ["pass", "fail", "not-measured"] },
+        "nonWaivable": { "type": "boolean" },
+        "unit": { "enum": ["bytes", "count", "milliseconds", "percent", "ratio", "seconds"] },
+        "target": { "$ref": "#/$defs/target" },
+        "measuredValue": { "type": ["number", "null"] },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "stopReasonCode": { "$ref": "#/$defs/stopReasonCode" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "stopReasonCode": { "$ref": "#/$defs/criticalStopReasonCode" }
+            },
+            "required": ["stopReasonCode"]
+          },
+          "then": {
+            "properties": { "nonWaivable": { "const": true } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "nonWaivable": { "const": false } },
+            "required": ["nonWaivable"]
+          },
+          "then": {
+            "required": ["stopReasonCode"],
+            "properties": {
+              "status": { "const": "fail" },
+              "stopReasonCode": { "const": "metric-target-missed" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "pass" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "measuredValue": { "type": "number" } },
+            "not": { "required": ["stopReasonCode"] }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "fail" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["stopReasonCode"],
+            "properties": { "measuredValue": { "type": "number" } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "not-measured" } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["stopReasonCode"],
+            "properties": { "measuredValue": { "type": "null" } }
+          }
+        }
+      ]
+    }
+  }
+}

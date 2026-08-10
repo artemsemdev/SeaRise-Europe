@@ -1,0 +1,34 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release-gates/v1/gate-report.schema.json",
+  "schemaVersion": "1.0.0",
+  "rendererVersion": "markdown-v1",
+  "ordering": "check-id-then-evidence-path-utf8-bytewise",
+  "candidateId": "candidate-approved-20260810-abcdef123456",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-abcdef123456",
+  "dataProvenanceClass": "real-source",
+  "generatedAt": "2026-08-10T20:30:00Z",
+  "authority": {
+    "kind": "owner",
+    "automatedValidation": "pass",
+    "ownerDisposition": "approved"
+  },
+  "releasable": true,
+  "checks": [
+    {
+      "checkId": "release-integrity",
+      "label": "Release integrity mismatches",
+      "status": "pass",
+      "nonWaivable": true,
+      "unit": "count",
+      "target": { "operator": "exactly", "value": 0 },
+      "measuredValue": 0,
+      "evidence": [
+        {
+          "path": "evidence/release-integrity.json",
+          "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ]
+    }
+  ],
+  "stopReasonCodes": []
+}
