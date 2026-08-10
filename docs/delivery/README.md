@@ -139,7 +139,8 @@ response are documented in the
 - [x] Add authoritative JSON Schemas for the release manifest, artifacts,
   scenarios, results, methodology, attribution, receipts, search, quality,
   architecture evidence, STAC, and release pointer.
-- [ ] Add a deterministic release-directory builder.
+- [x] Add a deterministic receipt-driven release-directory builder with
+  identity-safe resume, pinned offline execution, and atomic candidates.
 - [ ] Use DuckDB Spatial for GeoNames normalization, support/coastal joins,
   duplicate checks, and GeoParquet output.
 - [ ] Produce `europe-core` and `europe-coastal` search shards from a pinned
