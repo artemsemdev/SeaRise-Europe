@@ -611,6 +611,68 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn('REPOSITORY = "artemsemdev/SeaRise-Europe"', verifier)
         self.assertIn('MASTER_REF = "refs/heads/master"', verifier)
 
+    def test_controlled_offline_build_routes_pipeline_and_release_only(self) -> None:
+        for path in (
+            ".github/workflows/offline-release-controlled.yml",
+            "scripts/release/prepare_controlled_offline_inputs.py",
+        ):
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["pipeline"])
+                self.assertTrue(outputs["release"])
+                self.assertTrue(outputs["heavy"])
+                self.assertFalse(outputs["frontend"])
+                self.assertFalse(outputs["api"])
+                self.assertFalse(outputs["infrastructure"])
+                self.assertFalse(outputs["compose"])
+
+    def test_controlled_offline_build_is_manual_identity_bound_and_offline(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2]
+            / ".github/workflows/offline-release-controlled.yml"
+        ).read_text(encoding="utf-8")
+        dispatch = workflow.split("permissions:", maxsplit=1)[0]
+        first_step = workflow.split("      - uses: actions/checkout", maxsplit=1)[0]
+
+        self.assertIn("  workflow_dispatch:", dispatch)
+        self.assertNotIn("pull_request:", dispatch)
+        self.assertNotIn("push:", dispatch)
+        self.assertIn("actions: read", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertIn("environment: phase-1-controlled-offline-build", workflow)
+        self.assertIn("regional", dispatch)
+        self.assertIn("full-europe", dispatch)
+        self.assertIn('[[ "${SOURCE_REVISION}" == "${GITHUB_SHA}" ]]', first_step)
+        self.assertIn('[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]', first_step)
+        self.assertIn("input_bundle_sha256:", dispatch)
+        self.assertIn("input_run_id:", dispatch)
+        self.assertIn("input_artifact_name:", dispatch)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertEqual(workflow.count("--network none"), 2)
+        self.assertIn('--user "$(id -u):$(id -g)"', workflow)
+        self.assertEqual(workflow.count("--read-only"), 2)
+        self.assertIn(
+            ":/workspace/build-inputs/offline-release/${PROFILE}:ro",
+            workflow,
+        )
+        self.assertIn("publicationAttempted: false", workflow)
+        self.assertIn("activationAttempted: false", workflow)
+        self.assertNotIn("azure", workflow.lower())
+        self.assertNotIn("cloudflare", workflow.lower())
+        self.assertNotIn("database", workflow.lower())
+
+        action_lines = [
+            line.strip() for line in workflow.splitlines() if "uses:" in line
+        ]
+        self.assertTrue(action_lines)
+        self.assertTrue(
+            all(
+                re.search(r"@[0-9a-f]{40}(?:\s+#\s+v\S+)?$", line)
+                for line in action_lines
+            )
+        )
+
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])
 
