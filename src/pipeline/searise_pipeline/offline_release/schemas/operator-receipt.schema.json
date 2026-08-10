@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise.example/contracts/offline-release/operator-receipt-v1.schema.json",
+  "title": "SeaRise offline release operator receipt",
+  "oneOf": [
+    { "$ref": "#/$defs/executionReceipt" },
+    { "$ref": "#/$defs/failureReceipt" }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "profile": {
+      "enum": ["fixture", "regional", "full-europe"]
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "byteSize", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "resourceUsage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalDurationSeconds", "peakProcessRssBytes"],
+      "properties": {
+        "totalDurationSeconds": { "type": "number", "minimum": 0 },
+        "peakProcessRssBytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "stageKeySha256",
+        "cacheStatus",
+        "durationSeconds",
+        "outputs",
+        "warnings",
+        "qualityResults"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "verify-sources",
+            "inspect",
+            "normalize",
+            "derive",
+            "package",
+            "validate",
+            "assemble-release"
+          ]
+        },
+        "stageKeySha256": { "$ref": "#/$defs/sha256" },
+        "cacheStatus": { "enum": ["hit", "miss"] },
+        "durationSeconds": { "type": "number", "minimum": 0 },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/output" }
+        },
+        "warnings": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "qualityResults": { "type": "object" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileCount", "byteSize", "inventorySha256"],
+      "properties": {
+        "fileCount": { "type": "integer", "minimum": 1 },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "inventorySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "executionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "receiptType",
+        "buildId",
+        "planIdentitySha256",
+        "dataReleaseId",
+        "profile",
+        "networkAccess",
+        "status",
+        "stages",
+        "finalOutputs",
+        "candidate",
+        "resourceUsage"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "receiptType": { "const": "offline-build-execution" },
+        "buildId": { "type": "string", "pattern": "^build-[a-z-]+-[a-f0-9]{12}$" },
+        "planIdentitySha256": { "$ref": "#/$defs/sha256" },
+        "dataReleaseId": {
+          "type": "string",
+          "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+        },
+        "profile": { "$ref": "#/$defs/profile" },
+        "networkAccess": { "const": "disabled" },
+        "status": { "const": "complete" },
+        "stages": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": { "$ref": "#/$defs/stage" }
+        },
+        "finalOutputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/output" }
+        },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "resourceUsage": { "$ref": "#/$defs/resourceUsage" }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "stage", "detail"],
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid-plan",
+            "source-verification-failed",
+            "stale-cache",
+            "stage-execution-failed",
+            "output-validation-failed",
+            "atomic-promotion-failed",
+            "incomplete-build",
+            "disk-pressure"
+          ]
+        },
+        "stage": {
+          "type": ["string", "null"],
+          "enum": [
+            null,
+            "verify-sources",
+            "inspect",
+            "normalize",
+            "derive",
+            "package",
+            "validate",
+            "assemble-release"
+          ]
+        },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "failureReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "receiptType",
+        "networkAccess",
+        "status",
+        "candidateState",
+        "failure",
+        "resourceUsage"
+      ],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "receiptType": { "const": "offline-build-failure" },
+        "buildId": { "type": "string", "pattern": "^build-[a-z-]+-[a-f0-9]{12}$" },
+        "planIdentitySha256": { "$ref": "#/$defs/sha256" },
+        "dataReleaseId": {
+          "type": "string",
+          "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+        },
+        "profile": { "$ref": "#/$defs/profile" },
+        "networkAccess": { "const": "disabled" },
+        "status": { "const": "failed" },
+        "candidateState": {
+          "enum": ["not-created", "pre-existing", "complete-unreceipted"]
+        },
+        "failure": { "$ref": "#/$defs/failure" },
+        "resourceUsage": { "$ref": "#/$defs/resourceUsage" }
+      }
+    }
+  }
+}

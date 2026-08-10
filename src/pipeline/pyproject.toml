@@ -24,6 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
+searise-release = "searise_pipeline.offline_release.cli:cli"
 searise-sources = "searise_pipeline.sources.cli:cli"
 
 [project.optional-dependencies]
@@ -48,6 +49,9 @@ packages = [
 [tool.setuptools.package-dir]
 pipeline = "."
 searise_pipeline = "searise_pipeline"
+
+[tool.setuptools.package-data]
+"searise_pipeline.offline_release" = ["schemas/*.schema.json"]
 
 [tool.ruff]
 target-version = "py39"
