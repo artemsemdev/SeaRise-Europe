@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 from searise_pipeline.science import ScienceContractError, load_science_contracts
@@ -27,7 +27,11 @@ def _public_contract_validator(schema_name: str) -> Draft202012Validator:
     registry = Registry().with_resources(
         (schema["$id"], Resource.from_contents(schema)) for schema in schemas.values()
     )
-    return Draft202012Validator(schemas[schema_name], registry=registry)
+    return Draft202012Validator(
+        schemas[schema_name],
+        registry=registry,
+        format_checker=FormatChecker(),
+    )
 
 
 def test_projection_contract_binds_source_quantity_and_states() -> None:
@@ -143,7 +147,9 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
     schemas = list(PUBLIC_CONTRACT_DIR.glob("*.schema.json"))
 
     assert {path.name for path in schemas} == {
+        "attribution.schema.json",
         "defs.schema.json",
+        "methodology.schema.json",
         "projection-result.schema.json",
         "scenario-config.schema.json",
     }
@@ -163,13 +169,20 @@ def test_public_scenario_config_locks_the_complete_projection_matrix() -> None:
 
     assert len(fixture["layerMatrix"]) == 9
     assert fixture["defaults"] == {"scenario": "ssp2-45", "horizon": 2050}
+    assert fixture["dataProvenanceClass"] == "synthetic-fixture"
 
 
 def test_public_release_authority_keeps_machine_owner_and_provenance_separate() -> None:
     definitions = json.loads(
         (PUBLIC_CONTRACT_DIR / "defs.schema.json").read_text(encoding="utf-8")
     )
-    validator = Draft202012Validator(definitions["$defs"]["releaseAuthority"])
+    registry = Registry().with_resource(
+        definitions["$id"], Resource.from_contents(definitions)
+    )
+    validator = Draft202012Validator(
+        {"$ref": f'{definitions["$id"]}#/$defs/releaseAuthority'},
+        registry=registry,
+    )
 
     validator.validate(
         {
@@ -275,10 +288,11 @@ def test_public_scenario_config_fails_closed(
 def test_public_projection_result_schema_accepts_exactly_four_fixture_states() -> None:
     validator = _public_contract_validator("projection-result.schema.json")
     paths = sorted((PUBLIC_CONTRACT_DIR / "fixtures" / "valid").glob("*.json"))
+    documents = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     results = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in paths
-        if path.name != "scenario-config.json"
+        document
+        for document in documents
+        if document["$schema"].endswith("/projection-result.schema.json")
     ]
 
     for result in results:
@@ -357,3 +371,46 @@ def test_too_distant_reason_requires_distance_above_the_inclusive_limit() -> Non
 
     result["source"]["distanceKilometres"] = 100.000001
     validator.validate(result)
+
+
+@pytest.mark.parametrize(
+    "schema_name",
+    ["methodology.schema.json", "attribution.schema.json"],
+)
+def test_public_source_metadata_fixtures_are_schema_valid(schema_name: str) -> None:
+    fixture_name = schema_name.removesuffix(".schema.json") + ".json"
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / fixture_name).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    _public_contract_validator(schema_name).validate(document)
+    assert document["dataProvenanceClass"] == "synthetic-fixture"
+
+
+def test_methodology_rejects_scientific_semantic_weakening() -> None:
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "methodology.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["lookup"]["scientificArtifactRole"] = "projection-visual-pmtiles"
+
+    assert list(
+        _public_contract_validator("methodology.schema.json").iter_errors(document)
+    )
+
+
+def test_attribution_rejects_incomplete_rights_and_non_https_sources() -> None:
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "attribution.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["records"][0]["redistribution"] = "conditional"
+    document["records"][0]["sourceUrl"] = "http://provider.example/source.zip"
+
+    errors = list(_public_contract_validator("attribution.schema.json").iter_errors(document))
+
+    assert len(errors) >= 2

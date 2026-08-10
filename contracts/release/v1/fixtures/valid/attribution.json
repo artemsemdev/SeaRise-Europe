@@ -1,0 +1,27 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/attribution.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "records": [
+    {
+      "attributionId": "ipcc-ar6-sl-projections-20210809",
+      "sourceId": "ipcc-ar6-sea-level/20210809",
+      "title": "IPCC AR6 Sea Level Projections",
+      "sourceUrl": "https://doi.org/10.5281/zenodo.6382554",
+      "licence": {
+        "spdxId": "CC-BY-4.0",
+        "name": "Creative Commons Attribution 4.0 International",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "attributionText": "IPCC AR6 Sea Level Projections, version 20210809.",
+      "redistribution": "allowed",
+      "sourceSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "appliesToRoles": [
+        "projection-analysis-cog",
+        "projection-visual-pmtiles",
+        "projection-geoparquet"
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@
     "$schema",
     "schemaVersion",
     "dataReleaseId",
+    "dataProvenanceClass",
     "scenarios",
     "horizons",
     "defaults",
@@ -26,6 +27,9 @@
     },
     "dataReleaseId": {
       "$ref": "defs.schema.json#/$defs/dataReleaseId"
+    },
+    "dataProvenanceClass": {
+      "$ref": "defs.schema.json#/$defs/dataProvenanceClass"
     },
     "scenarios": {
       "type": "array",

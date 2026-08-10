@@ -2,6 +2,7 @@
   "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/scenario-config.schema.json",
   "schemaVersion": "1.0.0",
   "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
   "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
   "horizons": [2030, 2050, 2100],
   "defaults": {
