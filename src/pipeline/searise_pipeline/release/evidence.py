@@ -138,7 +138,7 @@ def safe_candidate_path(root: Path, relative: str) -> Path:
     return resolved
 
 
-def _validate_build_receipt(
+def validate_build_receipt(
     receipt: Mapping[str, Any],
     *,
     manifest: Mapping[str, Any],
@@ -349,7 +349,7 @@ def candidate_binding(
     load_json(source_receipt_path)
     load_json(statistics_path)
     load_json(gate_path)
-    validated_profile = _validate_build_receipt(
+    validated_profile = validate_build_receipt(
         receipt,
         manifest=manifest,
         contract=contract,

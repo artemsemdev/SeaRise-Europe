@@ -18,6 +18,7 @@ from ..release import (
 from .engine import StageContext, StageHandler, StageOutcome
 from .model import BuildPlan, StageName
 from .profiles import CompiledProfile
+from .projection_bundle import validate_reviewed_projection_bundle
 
 _SCIENTIFIC_OUTPUT_ROLES = {
     "projection-analysis-cog",
@@ -106,6 +107,10 @@ def release_handlers(compiled: CompiledProfile) -> Mapping[StageName, StageHandl
 
     def derive(context: StageContext) -> StageOutcome:
         root = source_root(context)
+        projection_validation = validate_reviewed_projection_bundle(
+            root,
+            repository_root=context.input_root,
+        )
         manifest = _read_json(root / "manifest.json")
         outputs = [
             artifact
@@ -124,7 +129,12 @@ def release_handlers(compiled: CompiledProfile) -> Mapping[StageName, StageHandl
                 "artifacts": [artifact["path"] for artifact in outputs],
             },
         )
-        return StageOutcome(quality_results={"derivedArtifactCount": len(outputs)})
+        return StageOutcome(
+            quality_results={
+                "derivedArtifactCount": len(outputs),
+                **projection_validation,
+            }
+        )
 
     def package(context: StageContext) -> StageOutcome:
         root = source_root(context)
