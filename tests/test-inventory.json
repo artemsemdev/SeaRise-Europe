@@ -599,6 +599,7 @@
     { "path": "src/frontend/src/lib/contracts/public-contract-parity.test.ts", "suite": "frontend-public-contract-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_cli.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_engine.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_handlers.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_model.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },

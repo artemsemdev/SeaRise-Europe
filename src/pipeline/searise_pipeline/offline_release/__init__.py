@@ -29,6 +29,7 @@ from .profiles import (
     compile_profile,
     load_profile_definition,
 )
+from .runner import execute_profile_build
 
 __all__ = [
     "BuildPlan",
@@ -50,6 +51,7 @@ __all__ = [
     "StageOutcome",
     "ToolIdentity",
     "compile_profile",
+    "execute_profile_build",
     "load_profile_definition",
     "stage_graph",
     "run_build",

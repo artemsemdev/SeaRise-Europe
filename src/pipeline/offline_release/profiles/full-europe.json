@@ -14,10 +14,13 @@
       "version": "0.1.0",
       "identityPaths": [
         "src/pipeline/searise_pipeline/offline_release/__init__.py",
+        "src/pipeline/searise_pipeline/offline_release/cli.py",
         "src/pipeline/searise_pipeline/offline_release/engine.py",
         "src/pipeline/searise_pipeline/offline_release/handlers.py",
         "src/pipeline/searise_pipeline/offline_release/model.py",
-        "src/pipeline/searise_pipeline/offline_release/profiles.py"
+        "src/pipeline/searise_pipeline/offline_release/profiles.py",
+        "src/pipeline/searise_pipeline/offline_release/runner.py",
+        "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json"
       ]
     }
   ],
