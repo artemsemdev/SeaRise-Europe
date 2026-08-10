@@ -9,15 +9,24 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from searise_pipeline.offline_release import (
     BuildPlan,
     FailureCode,
+    OutputIdentity,
     StageContext,
     StageFailure,
     StageName,
     StageOutcome,
     run_build,
+)
+from searise_pipeline.offline_release import engine as build_engine
+
+REPO_ROOT = Path(__file__).parents[4]
+STAGE_RECEIPT_SCHEMA = (
+    REPO_ROOT
+    / "src/pipeline/searise_pipeline/offline_release/schemas/stage-receipt.schema.json"
 )
 
 
@@ -130,6 +139,41 @@ def _run(
         output_directory=tmp_path / output_name,
         handlers=handlers,
     )
+
+
+def test_stage_receipt_schema_is_a_valid_draft_2020_12_contract() -> None:
+    schema = json.loads(STAGE_RECEIPT_SCHEMA.read_text(encoding="utf-8"))
+
+    Draft202012Validator.check_schema(schema)
+
+
+def test_schema_invalid_stage_receipt_is_rejected_before_cache_promotion(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root, document = _fixture(tmp_path)
+
+    monkeypatch.setattr(
+        build_engine,
+        "_inventory",
+        lambda root, *, stage: (
+            OutputIdentity(path="../escape.json", byte_size=1, sha256="a" * 64),
+        ),
+    )
+
+    with pytest.raises(StageFailure) as raised:
+        _run(
+            tmp_path,
+            BuildPlan.from_mapping(document),
+            root,
+            _handlers([]),
+            output_name="candidate",
+        )
+
+    assert raised.value.code is FailureCode.OUTPUT_VALIDATION_FAILED
+    assert raised.value.stage is StageName.VERIFY_SOURCES
+    assert not (tmp_path / "candidate").exists()
+    assert not list((tmp_path / "cache").rglob("receipt.json"))
 
 
 def test_clean_build_runs_one_graph_and_atomically_publishes_candidate(
@@ -263,6 +307,49 @@ def test_tampered_cache_fails_closed_instead_of_being_reused(tmp_path: Path) -> 
         / "payload/verify-sources.json"
     )
     cached.write_bytes(cached.read_bytes() + b"tamper")
+
+    with pytest.raises(StageFailure) as raised:
+        _run(
+            tmp_path,
+            plan,
+            root,
+            _handlers([]),
+            output_name="second",
+        )
+
+    assert raised.value.code is FailureCode.STALE_CACHE
+    assert raised.value.stage is StageName.VERIFY_SOURCES
+    assert not (tmp_path / "second").exists()
+
+
+@pytest.mark.parametrize("mutation", ["schema-invalid", "identity-tampered"])
+def test_invalid_cache_receipt_fails_closed_before_resume(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    root, document = _fixture(tmp_path)
+    plan = BuildPlan.from_mapping(document)
+    first = _run(
+        tmp_path,
+        plan,
+        root,
+        _handlers([]),
+        output_name="first",
+    )
+    stage = first.stages[0]
+    receipt_path = (
+        tmp_path
+        / "cache/stages"
+        / stage.stage.value
+        / stage.stage_key_sha256
+        / "receipt.json"
+    )
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if mutation == "schema-invalid":
+        receipt["unexpected"] = True
+    else:
+        receipt["stageKeySha256"] = "f" * 64
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
 
     with pytest.raises(StageFailure) as raised:
         _run(
