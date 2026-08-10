@@ -69,6 +69,11 @@ performance budgets:
 }
 ```
 
+The complete synthetic
+[`offline-build-execution` receipt example](fixtures/offline-release-execution-receipt.example.json)
+validates against the checked-in operator receipt schema and shows the exact
+external shape without presenting diagnostic values as release evidence.
+
 Two local clean invocations used independent cache roots and produced the same
 42-file candidate inventory above; recursive byte diff returned no
 differences. A third invocation using the first cache produced seven hits and

@@ -1,0 +1,148 @@
+{
+  "buildId": "build-fixture-111111111111",
+  "candidate": {
+    "byteSize": 1024,
+    "fileCount": 1,
+    "inventorySha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-333333333333",
+  "finalOutputs": [
+    {
+      "byteSize": 1024,
+      "path": "manifest.json",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    }
+  ],
+  "networkAccess": "disabled",
+  "planIdentitySha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "profile": "fixture",
+  "receiptType": "offline-build-execution",
+  "resourceUsage": {
+    "peakProcessRssBytes": 104857600,
+    "totalDurationSeconds": 1.25
+  },
+  "schemaVersion": 1,
+  "stages": [
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.01,
+      "outputs": [
+        {
+          "byteSize": 128,
+          "path": "source-verification.json",
+          "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      ],
+      "qualityResults": {
+        "verifiedSourceReceipts": 1
+      },
+      "stage": "verify-sources",
+      "stageKeySha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "warnings": []
+    },
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.02,
+      "outputs": [
+        {
+          "byteSize": 128,
+          "path": "inspection.json",
+          "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      ],
+      "qualityResults": {
+        "artifactCount": 1,
+        "datasetCount": 1
+      },
+      "stage": "inspect",
+      "stageKeySha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "warnings": []
+    },
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.03,
+      "outputs": [
+        {
+          "byteSize": 128,
+          "path": "normalization.json",
+          "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+        }
+      ],
+      "qualityResults": {
+        "parametersCanonical": true
+      },
+      "stage": "normalize",
+      "stageKeySha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "warnings": []
+    },
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.1,
+      "outputs": [
+        {
+          "byteSize": 256,
+          "path": "derived/manifest.json",
+          "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ],
+      "qualityResults": {
+        "derivedArtifactCount": 1
+      },
+      "stage": "derive",
+      "stageKeySha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "warnings": []
+    },
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.2,
+      "outputs": [
+        {
+          "byteSize": 512,
+          "path": "candidate/manifest.json",
+          "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+        }
+      ],
+      "qualityResults": {
+        "candidatePackaged": true
+      },
+      "stage": "package",
+      "stageKeySha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "warnings": []
+    },
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.3,
+      "outputs": [
+        {
+          "byteSize": 512,
+          "path": "candidate/manifest.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "qualityResults": {
+        "complete": true
+      },
+      "stage": "validate",
+      "stageKeySha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "warnings": []
+    },
+    {
+      "cacheStatus": "miss",
+      "durationSeconds": 0.4,
+      "outputs": [
+        {
+          "byteSize": 1024,
+          "path": "manifest.json",
+          "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ],
+      "qualityResults": {
+        "complete": true
+      },
+      "stage": "assemble-release",
+      "stageKeySha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "warnings": []
+    }
+  ],
+  "status": "complete"
+}
