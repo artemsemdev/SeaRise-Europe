@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the first versioned Phase 1 public release contracts, locking the exact
+  scenario/horizon matrix, defaults, four result states, grid-only 100 km
+  lookup semantics, and prohibited scientific claims in JSON Schema.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and
