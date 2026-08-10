@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
 - Added one immutable artifact contract for release-relative paths, typed media
   roles, byte/hash identity, lineage, rights, exact COG/GeoParquet use, and
   visual-only PMTiles use.
+- Added the versioned release manifest contract as the only browser entry point,
+  with the complete 3 × 3 dataset index, source/authority bindings, immutable
+  publication policy, and references to all contract and evidence artifacts.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and
