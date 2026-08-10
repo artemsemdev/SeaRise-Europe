@@ -102,7 +102,15 @@ The visual error bound comes only from MVT Web Mercator quantization. At zoom 6
 and extent 16,384, the maximum angular grid step is
 `360 / (2^6 × 16,384)` degrees. MVT coordinate quantization and clipped-fragment
 quantization each permit at most half a step per axis, so the composed bound is
-one step per axis. Decoded geometry must remain within a bidirectional Euclidean
-buffer of `sqrt(2)` steps, and each decoded bound within one step. This tolerance
-authorizes visual quantization only; it does not permit analytical lookup or any
-scientific/geographic accuracy claim.
+one step per axis. Decoded geometry must remain within a symmetric Hausdorff
+distance of `sqrt(2)` steps, and each decoded bound within one step per axis.
+This tolerance authorizes visual quantization only; it does not permit analytical
+lookup or any scientific/geographic accuracy claim.
+
+The controlled macOS ARM64 release-toolchain job builds both boundary roles
+twice from the exact GeoParquet bytes. It accepts only the pinned Python,
+Tippecanoe, decoder, and go-pmtiles identities, runs the official PMTiles
+integrity check plus decoded parity inspection, and uploads an immutable package
+containing the four artifacts, candidate-bound build receipt, validation report,
+and checksums. The boundary status remains engineering-only even when every
+automated check passes.
