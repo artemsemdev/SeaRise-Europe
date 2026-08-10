@@ -102,7 +102,8 @@ The visual error bound comes only from MVT Web Mercator quantization. At zoom 6
 and extent 16,384, the maximum angular grid step is
 `360 / (2^6 × 16,384)` degrees. MVT coordinate quantization and clipped-fragment
 quantization each permit at most half a step per axis, so the composed bound is
-one step per axis. Decoded geometry must remain within a bidirectional Euclidean
-buffer of `sqrt(2)` steps, and each decoded bound within one step. This tolerance
+one step per axis. Decoded geometry must have a symmetric Hausdorff distance of
+at most `sqrt(2)` steps from the canonical geometry, and every decoded envelope
+coordinate must remain within one step of its canonical value. This tolerance
 authorizes visual quantization only; it does not permit analytical lookup or any
 scientific/geographic accuracy claim.
