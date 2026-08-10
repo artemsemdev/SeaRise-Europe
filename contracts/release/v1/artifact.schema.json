@@ -1,0 +1,454 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json",
+  "title": "SeaRise Europe immutable release artifact v1",
+  "oneOf": [
+    { "$ref": "#/$defs/analysisCog" },
+    { "$ref": "#/$defs/visualPmtiles" },
+    { "$ref": "#/$defs/projectionGeoParquet" },
+    { "$ref": "#/$defs/nonProjectionArtifact" }
+  ],
+  "$defs": {
+    "common": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "dataReleaseId",
+        "dataProvenanceClass",
+        "artifactId",
+        "path",
+        "role",
+        "mediaType",
+        "byteSize",
+        "sha256",
+        "immutable",
+        "scientificUse",
+        "lineage",
+        "rights"
+      ],
+      "properties": {
+        "$schema": {
+          "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json"
+        },
+        "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+        "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+        "dataProvenanceClass": {
+          "$ref": "defs.schema.json#/$defs/dataProvenanceClass"
+        },
+        "artifactId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]+$"
+        },
+        "path": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+        "role": { "$ref": "defs.schema.json#/$defs/artifactRole" },
+        "mediaType": { "$ref": "defs.schema.json#/$defs/mediaType" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "immutable": { "const": true },
+        "scientificUse": {
+          "enum": ["exact-lookup", "exact-analytics", "visual-only", "not-applicable"]
+        },
+        "lineage": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/fileIdentity" }
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attributionIds", "redistribution"],
+          "properties": {
+            "attributionIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9.-]+$"
+              }
+            },
+            "redistribution": { "enum": ["allowed", "conditional"] }
+          }
+        },
+        "spatialBounds": {
+          "oneOf": [
+            { "$ref": "#/$defs/boundingBox" },
+            { "type": "null" }
+          ]
+        },
+        "projectionContext": { "$ref": "#/$defs/projectionContext" },
+        "projectionMatrixContext": { "$ref": "#/$defs/projectionMatrixContext" }
+      }
+    },
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    },
+    "boundingBox": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 },
+        { "type": "number", "minimum": -180, "maximum": 180 },
+        { "type": "number", "minimum": -90, "maximum": 90 }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceRelease",
+        "archiveSha256",
+        "memberSha256",
+        "methodologyVersion"
+      ],
+      "properties": {
+        "sourceRelease": { "const": "20210809" },
+        "archiveSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "memberSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "methodologyVersion": { "const": "ar6-regional-projection-v1" }
+      }
+    },
+    "matrixSourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRelease", "archiveSha256", "members", "methodologyVersion"],
+      "properties": {
+        "sourceRelease": { "const": "20210809" },
+        "archiveSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "members": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/ssp126Member" },
+            { "$ref": "#/$defs/ssp245Member" },
+            { "$ref": "#/$defs/ssp585Member" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "methodologyVersion": { "const": "ar6-regional-projection-v1" }
+      }
+    },
+    "member": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "sha256"],
+      "properties": {
+        "scenario": { "$ref": "defs.schema.json#/$defs/scenarioId" },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    },
+    "ssp126Member": {
+      "$ref": "#/$defs/member",
+      "properties": { "scenario": { "const": "ssp1-26" } }
+    },
+    "ssp245Member": {
+      "$ref": "#/$defs/member",
+      "properties": { "scenario": { "const": "ssp2-45" } }
+    },
+    "ssp585Member": {
+      "$ref": "#/$defs/member",
+      "properties": { "scenario": { "const": "ssp5-85" } }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crs",
+        "bounds",
+        "transform",
+        "width",
+        "height",
+        "nativeResolutionDegrees",
+        "nodata"
+      ],
+      "properties": {
+        "crs": { "const": "EPSG:4326" },
+        "bounds": {
+          "type": "array",
+          "prefixItems": [
+            { "const": -30.5 },
+            { "const": 29.5 },
+            { "const": 45.5 },
+            { "const": 75.5 }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "transform": {
+          "type": "array",
+          "prefixItems": [
+            { "const": 1 },
+            { "const": 0 },
+            { "const": -30.5 },
+            { "const": 0 },
+            { "const": -1 },
+            { "const": 75.5 }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "width": { "const": 76 },
+        "height": { "const": 46 },
+        "nativeResolutionDegrees": { "const": 1 },
+        "nodata": { "const": -32768 }
+      }
+    },
+    "valueSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storedUnits", "scaleToMetres", "baseline", "quantiles"],
+      "properties": {
+        "storedUnits": { "const": "mm" },
+        "scaleToMetres": { "const": 0.001 },
+        "baseline": { "const": "1995-2014 mean" },
+        "quantiles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": 0.167 },
+            { "const": 0.5 },
+            { "const": 0.833 }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "projectionContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "horizon", "source", "grid", "values"],
+      "properties": {
+        "scenario": { "$ref": "defs.schema.json#/$defs/scenarioId" },
+        "horizon": { "$ref": "defs.schema.json#/$defs/horizonYear" },
+        "source": { "$ref": "#/$defs/sourceBinding" },
+        "grid": { "$ref": "#/$defs/grid" },
+        "values": { "$ref": "#/$defs/valueSemantics" }
+      }
+    },
+    "projectionMatrixContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenarios", "horizons", "source", "grid", "values"],
+      "properties": {
+        "scenarios": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "ssp1-26" },
+            { "const": "ssp2-45" },
+            { "const": "ssp5-85" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "horizons": {
+          "type": "array",
+          "prefixItems": [
+            { "const": 2030 },
+            { "const": 2050 },
+            { "const": 2100 }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "source": { "$ref": "#/$defs/matrixSourceBinding" },
+        "grid": { "$ref": "#/$defs/grid" },
+        "values": { "$ref": "#/$defs/valueSemantics" }
+      }
+    },
+    "analysisCog": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "required": ["projectionContext", "spatialBounds"],
+          "properties": {
+            "path": {
+              "pattern": "^analysis/(ssp1-26|ssp2-45|ssp5-85)/(2030|2050|2100)\\.tif$"
+            },
+            "role": { "const": "projection-analysis-cog" },
+            "mediaType": {
+              "const": "image/tiff; application=geotiff; profile=cloud-optimized"
+            },
+            "scientificUse": { "const": "exact-lookup" },
+            "spatialBounds": { "$ref": "#/$defs/boundingBox" }
+          },
+          "not": { "required": ["projectionMatrixContext"] }
+        }
+      ]
+    },
+    "visualPmtiles": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "required": ["projectionContext", "spatialBounds"],
+          "properties": {
+            "path": {
+              "pattern": "^layers/(ssp1-26|ssp2-45|ssp5-85)/(2030|2050|2100)\\.pmtiles$"
+            },
+            "role": { "const": "projection-visual-pmtiles" },
+            "mediaType": { "const": "application/vnd.pmtiles" },
+            "scientificUse": { "const": "visual-only" },
+            "spatialBounds": { "$ref": "#/$defs/boundingBox" }
+          },
+          "not": { "required": ["projectionMatrixContext"] }
+        }
+      ]
+    },
+    "projectionGeoParquet": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "required": ["projectionMatrixContext", "spatialBounds"],
+          "properties": {
+            "path": { "const": "analysis/projections.parquet" },
+            "role": { "const": "projection-geoparquet" },
+            "mediaType": { "const": "application/vnd.apache.parquet" },
+            "scientificUse": { "const": "exact-analytics" },
+            "spatialBounds": { "$ref": "#/$defs/boundingBox" }
+          },
+          "not": { "required": ["projectionContext"] }
+        }
+      ]
+    },
+    "nonProjectionArtifact": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "properties": {
+            "role": {
+              "not": {
+                "enum": [
+                  "projection-analysis-cog",
+                  "projection-visual-pmtiles",
+                  "projection-geoparquet"
+                ]
+              }
+            },
+            "scientificUse": { "const": "not-applicable" }
+          },
+          "not": {
+            "anyOf": [
+              { "required": ["projectionContext"] },
+              { "required": ["projectionMatrixContext"] }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "enum": [
+                  "release-manifest",
+                  "contract-schema",
+                  "scenario-config",
+                  "methodology",
+                  "source-attribution",
+                  "source-receipt",
+                  "build-receipt",
+                  "quality-summary",
+                  "architecture-evidence",
+                  "stac-catalog",
+                  "stac-collection",
+                  "stac-item"
+                ]
+              }
+            },
+            "required": ["role"]
+          },
+          "then": { "properties": { "mediaType": { "const": "application/json" } } }
+        },
+        {
+          "if": {
+            "properties": { "role": { "const": "settlement-search-index" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "mediaType": { "const": "application/vnd.searise.search-index+json" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "role": { "const": "settlement-geoparquet" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "mediaType": { "const": "application/vnd.apache.parquet" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": { "enum": ["support-boundary", "coastal-boundary"] }
+            },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "mediaType": {
+                "enum": [
+                  "application/geo+json",
+                  "application/vnd.apache.parquet",
+                  "application/vnd.pmtiles"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "role": { "const": "checksums" } },
+            "required": ["role"]
+          },
+          "then": { "properties": { "mediaType": { "const": "text/plain" } } }
+        },
+        {
+          "if": {
+            "properties": { "role": { "const": "provenance" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "mediaType": {
+                "enum": ["application/vnd.in-toto+json", "application/x-ndjson"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "role": { "const": "signature" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "mediaType": {
+                "const": "application/vnd.dev.sigstore.bundle+json;version=0.3"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
 - Added versioned settlement search, automated quality, architecture evidence,
   and release-pointer contracts with explicit synthetic labels, local-only
   search/privacy guarantees, and zero application API calls.
+- Added one immutable artifact contract for release-relative paths, typed media
+  roles, byte/hash identity, lineage, rights, exact COG/GeoParquet use, and
+  visual-only PMTiles use.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and
