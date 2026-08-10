@@ -148,10 +148,12 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
 
     assert {path.name for path in schemas} == {
         "attribution.schema.json",
+        "build-receipt.schema.json",
         "defs.schema.json",
         "methodology.schema.json",
         "projection-result.schema.json",
         "scenario-config.schema.json",
+        "source-receipt.schema.json",
     }
     for path in schemas:
         Draft202012Validator.check_schema(json.loads(path.read_text(encoding="utf-8")))
@@ -414,3 +416,48 @@ def test_attribution_rejects_incomplete_rights_and_non_https_sources() -> None:
     errors = list(_public_contract_validator("attribution.schema.json").iter_errors(document))
 
     assert len(errors) >= 2
+
+
+@pytest.mark.parametrize(
+    "schema_name",
+    ["source-receipt.schema.json", "build-receipt.schema.json"],
+)
+def test_public_receipt_fixtures_are_schema_valid(schema_name: str) -> None:
+    fixture_name = schema_name.removesuffix(".schema.json") + ".json"
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / fixture_name).read_text(
+            encoding="utf-8"
+        )
+    )
+
+    _public_contract_validator(schema_name).validate(document)
+    assert document["dataProvenanceClass"] == "synthetic-fixture"
+
+
+def test_source_receipt_rejects_secret_urls_and_publishable_cache() -> None:
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "source-receipt.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["sourceUrl"] += "?token=secret"
+    document["cache"]["publicationAllowed"] = True
+
+    errors = list(_public_contract_validator("source-receipt.schema.json").iter_errors(document))
+
+    assert len(errors) >= 2
+
+
+def test_build_receipt_rejects_network_and_unsafe_output_identity() -> None:
+    document = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "build-receipt.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    document["networkAccess"] = "enabled"
+    document["outputs"][0]["path"] = "../outside.json"
+    document["outputs"][0]["mediaType"] = "application/octet-stream"
+
+    errors = list(_public_contract_validator("build-receipt.schema.json").iter_errors(document))
+
+    assert len(errors) >= 3

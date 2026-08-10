@@ -1,0 +1,27 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/source-receipt.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "receiptId": "source-ipcc-ar6-fixture-555555555555",
+  "sourceId": "fixture/ipcc-ar6-regional",
+  "sourceVersion": "20210809-fixture",
+  "sourceUrl": "https://fixtures.searise.invalid/ipcc/ar6-regional.bin",
+  "byteSize": 1024,
+  "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "attributionId": "ipcc-ar6-sl-projections-20210809",
+  "acquiredAt": "2026-08-10T12:00:00Z",
+  "verification": {
+    "algorithm": "sha256",
+    "status": "passed",
+    "verifiedBeforeUse": true
+  },
+  "cache": {
+    "key": "sha256/5555555555555555555555555555555555555555555555555555555555555555",
+    "publicationAllowed": false
+  },
+  "sourceLock": {
+    "path": "locks/source-lock.json",
+    "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  }
+}
