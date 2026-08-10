@@ -40,16 +40,14 @@ def _decoded(source: object, *, geometry: object | None = None) -> dict[str, obj
 
 def test_angular_error_model_is_derived_from_z6_mvt_quantization(tmp_path: Path) -> None:
     source = _loaded_source(tmp_path)
-    assert boundary_pmtiles._generation_parameters(source) == {
-        "angular_error_model": {
-            "comparison": "symmetric-hausdorff-plus-per-axis-envelope",
-            "coordinate_error_degrees": 360 / 2**20,
-            "geometry_tolerance_degrees": 2**0.5 * 360 / 2**20,
-            "maximum_rounding_stages": 2,
-            "model": "web-mercator-mvt-quantization-plus-tile-clipping",
-            "per_stage_coordinate_error_degrees": 180 / 2**20,
-            "quantization_step_degrees": 360 / 2**20,
-        }
+    assert boundary_pmtiles._generation_parameters(source)["angular_error_model"] == {
+        "comparison": "symmetric-hausdorff-plus-per-axis-envelope",
+        "coordinate_error_degrees": 360 / 2**20,
+        "geometry_tolerance_degrees": 2**0.5 * 360 / 2**20,
+        "maximum_rounding_stages": 2,
+        "model": "web-mercator-mvt-quantization-plus-tile-clipping",
+        "per_stage_coordinate_error_degrees": 180 / 2**20,
+        "quantization_step_degrees": 360 / 2**20,
     }
 
 
