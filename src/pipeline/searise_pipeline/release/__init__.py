@@ -20,6 +20,14 @@ from .pmtiles import (
     write_visual_pmtiles,
 )
 from .promotion import finalize_recovery_gate
+from .public_contracts import (
+    PublicManifestSummary,
+    PublicReleaseContractError,
+    validate_public_manifest,
+    validate_release_artifacts,
+    validate_release_rights,
+    validate_release_stac,
+)
 from .reproducibility import compare_release_candidates
 
 __all__ = [
@@ -29,6 +37,8 @@ __all__ = [
     "RegionalReleaseSource",
     "ReleaseBuildResult",
     "PmtilesEvidence",
+    "PublicManifestSummary",
+    "PublicReleaseContractError",
     "VectorToolchainEvidence",
     "build_source_from_verified_archive",
     "compare_release_candidates",
@@ -40,6 +50,10 @@ __all__ = [
     "load_source_fixture",
     "validate_analysis_cog",
     "validate_geoparquet",
+    "validate_public_manifest",
+    "validate_release_artifacts",
+    "validate_release_rights",
+    "validate_release_stac",
     "validate_vector_toolchain",
     "write_analysis_cog",
     "write_geoparquet",

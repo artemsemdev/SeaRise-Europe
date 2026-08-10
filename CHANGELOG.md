@@ -25,6 +25,9 @@ All notable changes to this project will be documented in this file.
 - Added a pinned STAC 1.1.0 profile for the static catalog, collection, and
   projection items, preserving exact COG, analytical GeoParquet, and visual-only
   PMTiles roles without runtime discovery endpoints.
+- Added fail-closed manifest, rights, and STAC semantic validation so individually
+  valid documents cannot disagree on release identity, dataset context, artifact
+  paths, roles, sizes, or hashes.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and
