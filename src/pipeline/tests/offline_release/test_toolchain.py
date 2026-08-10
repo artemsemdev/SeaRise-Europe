@@ -41,6 +41,7 @@ def test_builder_context_contains_only_reviewed_contract_code_and_lock() -> None
 
 def test_every_profile_binds_the_same_container_identity() -> None:
     identities = []
+    pipeline_identities = []
     for profile in BuildProfile:
         definition = load_profile_definition(PROFILE_ROOT / f"{profile.value}.json")
         container = definition.tools[0]
@@ -53,5 +54,13 @@ def test_every_profile_binds_the_same_container_identity() -> None:
             "src/pipeline/offline_release/Dockerfile.dockerignore",
         )
         identities.append(container)
+        pipeline = definition.tools[1]
+        assert pipeline.name == "searise-pipeline"
+        assert pipeline.identity_paths[-2:] == (
+            "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json",
+            "src/pipeline/searise_pipeline/offline_release/schemas/stage-receipt.schema.json",
+        )
+        pipeline_identities.append(pipeline)
 
     assert identities[0] == identities[1] == identities[2]
+    assert pipeline_identities[0] == pipeline_identities[1] == pipeline_identities[2]

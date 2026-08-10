@@ -185,7 +185,15 @@
         "networkAccess": { "const": "disabled" },
         "status": { "const": "failed" },
         "candidateState": {
-          "enum": ["not-created", "pre-existing", "complete-unreceipted"]
+          "enum": [
+            "not-created",
+            "pre-existing",
+            "discarded-unreceipted",
+            "quarantined-unreceipted",
+            "identity-mismatch-preserved",
+            "identity-mismatch-quarantined",
+            "complete-unreceipted"
+          ]
         },
         "failure": { "$ref": "#/$defs/failure" },
         "resourceUsage": { "$ref": "#/$defs/resourceUsage" }

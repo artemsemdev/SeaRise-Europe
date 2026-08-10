@@ -14,6 +14,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
+from jsonschema import (  # type: ignore[import-untyped]
+    Draft202012Validator,
+    SchemaError,
+    ValidationError,
+)
+
 from .model import (
     BuildPlan,
     FailureCode,
@@ -23,6 +29,8 @@ from .model import (
     _canonical_json,
     stage_graph,
 )
+
+_STAGE_RECEIPT_SCHEMA = Path(__file__).parent / "schemas/stage-receipt.schema.json"
 
 
 @dataclass(frozen=True, order=True)
@@ -262,18 +270,29 @@ def _execute_stage(
                     "handler did not return StageOutcome",
                 )
             outputs = _inventory(payload, stage=stage)
-            _write_json(
-                temporary_root / "receipt.json",
-                {
-                    "schemaVersion": 1,
-                    "stage": stage.value,
-                    "stageKeySha256": stage_key,
-                    "status": "complete",
-                    "outputs": [output.as_dict() for output in outputs],
-                    "warnings": list(outcome.warnings),
-                    "qualityResults": dict(outcome.quality_results),
-                },
-            )
+            receipt = {
+                "schemaVersion": 1,
+                "stage": stage.value,
+                "stageKeySha256": stage_key,
+                "status": "complete",
+                "outputs": [output.as_dict() for output in outputs],
+                "warnings": list(outcome.warnings),
+                "qualityResults": dict(outcome.quality_results),
+            }
+            try:
+                _validate_stage_receipt(receipt)
+            except (
+                OSError,
+                json.JSONDecodeError,
+                SchemaError,
+                ValidationError,
+            ) as exc:
+                raise StageFailure(
+                    FailureCode.OUTPUT_VALIDATION_FAILED,
+                    stage,
+                    "stage receipt failed schema validation",
+                ) from exc
+            _write_json(temporary_root / "receipt.json", receipt)
             if cache_root.exists():
                 cached = _load_cache(cache_root, stage=stage, stage_key=stage_key)
                 if cached is None:
@@ -321,6 +340,7 @@ def _load_cache(
         if receipt_path.is_symlink():
             raise ValueError("cache receipt is a symlink")
         receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        _validate_stage_receipt(receipt)
         expected_keys = {
             "schemaVersion",
             "stage",
@@ -347,7 +367,15 @@ def _load_cache(
             quality_results=receipt["qualityResults"],
         )
         return outputs, outcome
-    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        json.JSONDecodeError,
+        SchemaError,
+        ValidationError,
+    ) as exc:
         raise StageFailure(
             FailureCode.STALE_CACHE,
             stage,
@@ -518,6 +546,11 @@ def _write_json(path: Path, document: Mapping[str, Any]) -> None:
         json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _validate_stage_receipt(document: Any) -> None:
+    schema = json.loads(_STAGE_RECEIPT_SCHEMA.read_text(encoding="utf-8"))
+    Draft202012Validator(schema).validate(document)
 
 
 def _sha256(path: Path) -> str:

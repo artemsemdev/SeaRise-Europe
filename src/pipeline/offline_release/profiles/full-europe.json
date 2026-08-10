@@ -28,7 +28,8 @@
         "src/pipeline/searise_pipeline/offline_release/model.py",
         "src/pipeline/searise_pipeline/offline_release/profiles.py",
         "src/pipeline/searise_pipeline/offline_release/runner.py",
-        "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json"
+        "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json",
+        "src/pipeline/searise_pipeline/offline_release/schemas/stage-receipt.schema.json"
       ]
     }
   ],
