@@ -175,6 +175,34 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
         Draft202012Validator.check_schema(json.loads(path.read_text(encoding="utf-8")))
 
 
+@pytest.mark.parametrize(
+    "fixture_path",
+    sorted((PUBLIC_CONTRACT_DIR / "fixtures" / "valid").glob("*.json")),
+    ids=lambda path: path.name,
+)
+def test_python_accepts_every_shared_public_contract_fixture(
+    fixture_path: Path,
+) -> None:
+    document = json.loads(fixture_path.read_text(encoding="utf-8"))
+    schema_name = document["$schema"].rsplit("/", maxsplit=1)[-1]
+
+    _public_contract_validator(schema_name).validate(document)
+
+
+@pytest.mark.parametrize(
+    "fixture_path",
+    sorted((PUBLIC_CONTRACT_DIR / "fixtures" / "invalid").glob("*.json")),
+    ids=lambda path: path.name,
+)
+def test_python_rejects_every_shared_negative_public_contract_fixture(
+    fixture_path: Path,
+) -> None:
+    document = json.loads(fixture_path.read_text(encoding="utf-8"))
+    schema_name = document["$schema"].rsplit("/", maxsplit=1)[-1]
+
+    assert list(_public_contract_validator(schema_name).iter_errors(document))
+
+
 def test_public_scenario_config_locks_the_complete_projection_matrix() -> None:
     fixture = json.loads(
         (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "scenario-config.json").read_text(

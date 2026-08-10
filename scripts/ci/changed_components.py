@@ -36,6 +36,7 @@ FORCE_ALL = (
 
 FRONTEND = (
     "src/frontend/**",
+    "contracts/**",
     "tests/fixtures/tdd/**",
 )
 
@@ -55,6 +56,7 @@ PIPELINE = (
     ".gitignore",
     "data/geometry/**",
     "scripts/tests/**",
+    "contracts/**",
     "tests/**",
 )
 
