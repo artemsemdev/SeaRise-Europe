@@ -24,6 +24,8 @@ The merge sequence into `integration/phase-1-public-contracts` is:
 | [#204](https://github.com/artemsemdev/SeaRise-Europe/pull/204) | CLI and immutable schema-validated operator receipts |
 | [#205](https://github.com/artemsemdev/SeaRise-Europe/pull/205) | required fixture clean/resume CI |
 | [#206](https://github.com/artemsemdev/SeaRise-Europe/pull/206) | pinned offline container and runtime identity |
+| [#207](https://github.com/artemsemdev/SeaRise-Europe/pull/207) | controlled regional/full input verification and build workflow |
+| [#208](https://github.com/artemsemdev/SeaRise-Europe/pull/208) | schema-valid stage receipts and safe unreceipted-candidate cleanup |
 
 ## Determinism and resource evidence
 
@@ -33,7 +35,11 @@ pinned CI clean/resume job separately compares all 42 candidate files and
 requires seven misses followed by seven verified hits. PR #206's
 [CI run](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31415497149)
 passed the pipeline suite and the native Ubuntu offline fixture job with
-network disabled.
+network disabled. The controlled workflow's
+[integration run](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31417398625)
+and receipt-hardening
+[integration run](https://github.com/artemsemdev/SeaRise-Europe/actions/runs/31418317694)
+also passed their routed pipeline, fixture, and required gates.
 
 A host-side macOS diagnostic execution at reviewed integration commit
 `e55427f1801c70dad4e7e6cea3ddc2a8bc146067` recorded this receipt summary. It
@@ -105,6 +111,14 @@ two hits followed by five misses. Other tests cover empty stage output,
 pre-existing immutable candidate, incomplete/extra/tampered cache entries,
 unsafe paths, receipt overwrite, and a receipt path nested in a candidate.
 
+Execution-receipt commit failure is injected after candidate promotion. The
+builder proves the exact device/inode and full final inventory before removing
+that unreceipted candidate from the public path, records
+`discarded-unreceipted`, and emits no raw exception. A second test replaces the
+candidate path before the injected failure; identity mismatch preserves the
+replacement and its sentinel bytes instead of deleting an object the current
+invocation did not promote.
+
 The CLI failure test injects `disk-pressure` with a credential-like raw
 diagnostic. It proves that the candidate and execution receipt do not exist,
 the failure receipt says `candidateState=not-created`, and neither stdout nor
@@ -119,8 +133,9 @@ and a changed or incomplete graph.
   describe a candidate build.
 - Clean, independent, and resumed fixture builds preserve public bytes and
   stable artifact identities.
-- Stage outputs and receipts are inventoried, validated, and atomically
-  promoted; partial work cannot become a complete candidate.
+- Stage outputs are inventoried; each internal receipt is Draft 2020-12 and
+  semantically validated before atomic cache promotion and again on resume.
+  Partial or unreceipted work cannot be treated as a complete candidate.
 - No graph stage can upload, mutate a database, change a release pointer, or
   activate production.
 - The legacy modules remain checked in for parity through Phase 3.

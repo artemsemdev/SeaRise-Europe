@@ -40,9 +40,10 @@ Each stage receives a typed context containing the immutable build plan, its
 direct dependency directories, and their sorted output identities. A stage
 may write only into its temporary output directory. The engine inventories
 every non-empty file, records byte size and SHA-256, writes a complete stage
-receipt, and atomically renames the cache object. The final candidate is copied
-to a sibling temporary directory, re-inventoried, and atomically promoted only
-after all seven stages pass.
+receipt, validates it against the internal Draft 2020-12 schema, and atomically
+renames the cache object. Resume repeats schema and semantic identity checks.
+The final candidate is copied to a sibling temporary directory, re-inventoried,
+and atomically promoted only after all seven stages pass.
 
 `fixture`, `regional`, and `full-europe` change only explicit profile data:
 provenance class, reviewed input path, source-receipt path, and data volume.
@@ -134,6 +135,9 @@ CI performs the same clean/resume operation in the pinned Linux image.
 commit supplied as `source_revision`. The workflow also requires the same-repo
 producer run ID, canonical GitHub artifact name, SHA-256 of the contained
 `offline-inputs.tar`, release date, and explicit start/completion timestamps.
+Before the first run, repository owners must configure protection and the
+appropriate reviewers for the `phase-1-controlled-offline-build` environment;
+the workflow's own branch/revision guards do not replace that approval.
 
 The downloaded artifact must contain exactly one uncompressed
 `offline-inputs.tar`. The tar may contain only regular files and directories
@@ -183,7 +187,7 @@ are not serialized into failure receipts.
 | `stage-execution-failed` | a typed stage failed without a more specific classification | inspect the stage and its bounded quality evidence; restart with the same verified cache after fixing the cause |
 | `output-validation-failed` | stage output is empty, unsafe, or violates its output/public contract | keep the failure receipt and repair the producer; do not promote the partial tree |
 | `atomic-promotion-failed` | the final copy differs or the immutable target appeared | choose a new output path or investigate concurrent use; never overwrite the target |
-| `incomplete-build` | receipt commit or unexpected operator execution failed | treat any candidate as unreceipted and unusable; investigate storage and rerun to new paths |
+| `incomplete-build` | receipt commit or unexpected operator execution failed | inspect `candidateState`; treat every preserved/quarantined candidate as unusable evidence and rerun to new paths |
 | `disk-pressure` | `ENOSPC`/quota prevented stage or receipt completion | follow the disk-pressure procedure below, then resume from verified cache |
 
 ### Restart after interruption
@@ -191,9 +195,14 @@ are not serialized into failure receipts.
 1. Confirm there is no success receipt for the attempted candidate.
 2. Do not rename a partial directory into place. The engine normally leaves no
    candidate because stage and final promotion are atomic.
-3. If an interrupted or older builder reports `complete-unreceipted`,
-   quarantine that directory immediately. It is unusable evidence and must
-   never be passed to publication or renamed as a complete candidate.
+3. If execution-receipt commit fails, the builder verifies device/inode and the
+   full promoted inventory before moving that exact candidate out of the public
+   path and deleting it. `discarded-unreceipted` is the normal safe result.
+   `quarantined-unreceipted` or `identity-mismatch-quarantined` requires
+   inspection of the private `.searise-unreceipted-*` directory.
+   `identity-mismatch-preserved` or `complete-unreceipted` means the public path
+   was deliberately left untouched because cleanup identity could not be
+   proven. Quarantine it manually; none of these states is publishable.
 4. Preserve the failure receipt and cache for diagnosis.
 5. Re-run the exact reviewed plan with the same cache and new immutable output
    and receipt paths. Verified stages become hits; the interrupted stage and
