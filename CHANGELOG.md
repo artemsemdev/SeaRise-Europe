@@ -71,6 +71,9 @@ All notable changes to this project will be documented in this file.
   per-record lineage, language/script metadata, and synthetic representative
   GeoParquet and search-shard envelopes that reject incompatible schema,
   format, serialization, geography-publication, and field-identity metadata.
+- Added derive-stage validation for the owner-approved Phase 0R projection
+  bundle, rechecking exact COG and GeoParquet semantics, independent lookup
+  goldens, and the byte-bound decoded-PMTiles parity evidence before promotion.
 
 ### Changed
 

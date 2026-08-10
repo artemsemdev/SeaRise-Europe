@@ -1,6 +1,6 @@
 """Deterministic AR6 regional release construction."""
 
-from .builder import ReleaseBuildResult, build_regional_release
+from .builder import ReleaseBuildResult, build_regional_release, validate_lookup_goldens
 from .cog import CogEvidence, validate_analysis_cog, write_analysis_cog
 from .delivery import create_delivery_report
 from .gate import evaluate_recovery_gate
@@ -51,6 +51,7 @@ __all__ = [
     "load_source_fixture",
     "validate_analysis_cog",
     "validate_geoparquet",
+    "validate_lookup_goldens",
     "validate_public_manifest",
     "validate_public_document",
     "validate_release_artifacts",

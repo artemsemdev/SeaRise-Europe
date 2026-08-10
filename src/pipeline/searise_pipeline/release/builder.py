@@ -203,7 +203,7 @@ def _attach_lineage(
     }
 
 
-def _validate_lookup_goldens(
+def validate_lookup_goldens(
     source: RegionalReleaseSource,
     goldens_path: Path,
 ) -> Mapping[str, Any]:
@@ -979,7 +979,7 @@ def build_regional_release(
         pmtiles_distribution_platform=pmtiles_distribution_platform,
         contract=contract,
     )
-    lookup_evidence = _validate_lookup_goldens(source, lookup_goldens_path)
+    lookup_evidence = validate_lookup_goldens(source, lookup_goldens_path)
     with tempfile.TemporaryDirectory(
         prefix="searise-release-", dir=output_directory.parent
     ) as temporary:

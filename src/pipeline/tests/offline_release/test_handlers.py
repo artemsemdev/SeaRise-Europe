@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
+import pytest
+
+import searise_pipeline.offline_release.projection_bundle as projection_bundle_module
 from searise_pipeline.offline_release import (
     StageName,
     compile_profile,
@@ -12,11 +16,16 @@ from searise_pipeline.offline_release import (
     run_build,
     validate_complete_release,
 )
+from searise_pipeline.offline_release.projection_bundle import (
+    validate_reviewed_projection_bundle,
+)
+from searise_pipeline.science import ScienceContractError
 
 REPO_ROOT = Path(__file__).parents[4]
 PROFILE = REPO_ROOT / "src/pipeline/offline_release/profiles/fixture.json"
 SCHEMAS = REPO_ROOT / "contracts/release/v1"
 OLD_RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09"
+BUNDLE = REPO_ROOT / "contracts/release/v1/fixtures/release" / OLD_RELEASE_ID
 
 
 def _compiled():
@@ -77,6 +86,15 @@ def test_fixture_handlers_build_a_complete_new_public_release(tmp_path: Path) ->
     )
     assert OLD_RELEASE_ID not in text
     assert any(OLD_RELEASE_ID in item["path"] for item in receipt["inputs"])
+    derive = next(stage for stage in result.stages if stage.stage is StageName.DERIVE)
+    assert derive.quality_results == {
+        "derivedArtifactCount": 19,
+        "reviewedProjectionArtifactCount": 19,
+        "reviewedProjectionCogsValidated": 9,
+        "reviewedProjectionGeoparquetValidated": True,
+        "reviewedProjectionPmtilesDecodedParity": "approved-byte-identical",
+        "reviewedProjectionGoldenParity": True,
+    }
 
 
 def test_two_independent_fixture_builds_are_byte_identical(tmp_path: Path) -> None:
@@ -104,3 +122,62 @@ def test_handlers_expose_no_publication_or_activation_stage() -> None:
 
     assert set(handlers) == set(StageName)
     assert not ({"publish", "upload", "activate"} & {stage.value for stage in handlers})
+
+
+def test_projection_bundle_adapter_reuses_semantic_validators(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"cog": 0, "geoparquet": 0, "goldens": 0}
+    original_cog = projection_bundle_module.validate_analysis_cog
+    original_geoparquet = projection_bundle_module.validate_geoparquet
+    original_goldens = projection_bundle_module.validate_lookup_goldens
+
+    def count_cog(*args, **kwargs):
+        calls["cog"] += 1
+        return original_cog(*args, **kwargs)
+
+    def count_geoparquet(*args, **kwargs):
+        calls["geoparquet"] += 1
+        return original_geoparquet(*args, **kwargs)
+
+    def count_goldens(*args, **kwargs):
+        calls["goldens"] += 1
+        return original_goldens(*args, **kwargs)
+
+    monkeypatch.setattr(projection_bundle_module, "validate_analysis_cog", count_cog)
+    monkeypatch.setattr(projection_bundle_module, "validate_geoparquet", count_geoparquet)
+    monkeypatch.setattr(projection_bundle_module, "validate_lookup_goldens", count_goldens)
+
+    summary = validate_reviewed_projection_bundle(BUNDLE, repository_root=REPO_ROOT)
+
+    assert calls == {"cog": 9, "geoparquet": 1, "goldens": 1}
+    assert summary["reviewedProjectionArtifactCount"] == 19
+
+
+def test_projection_bundle_adapter_rejects_pmtiles_outside_approved_bytes(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate"
+    shutil.copytree(BUNDLE, candidate)
+    archive = candidate / "layers/ssp2-45/2050.pmtiles"
+    archive.write_bytes(archive.read_bytes() + b"tampered")
+
+    with pytest.raises(ScienceContractError, match="reviewed #110 identity"):
+        validate_reviewed_projection_bundle(candidate, repository_root=REPO_ROOT)
+
+
+def test_projection_bundle_adapter_rejects_unapproved_owner_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_read = projection_bundle_module._read_json
+
+    def read_with_rejected_gate(path: Path):
+        document = original_read(path)
+        if path.name == "final-gate.json":
+            document["releaseDisposition"] = "rejected"
+        return document
+
+    monkeypatch.setattr(projection_bundle_module, "_read_json", read_with_rejected_gate)
+
+    with pytest.raises(ScienceContractError, match="owner-approved"):
+        validate_reviewed_projection_bundle(BUNDLE, repository_root=REPO_ROOT)

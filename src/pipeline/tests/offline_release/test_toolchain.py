@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from fnmatch import fnmatchcase
+from pathlib import Path, PurePosixPath
 
 from searise_pipeline.offline_release import BuildProfile, load_profile_definition
 
@@ -56,11 +57,45 @@ def test_every_profile_binds_the_same_container_identity() -> None:
         identities.append(container)
         pipeline = definition.tools[1]
         assert pipeline.name == "searise-pipeline"
-        assert pipeline.identity_paths[-2:] == (
+        assert {
+            "src/pipeline/searise_pipeline/offline_release/projection_bundle.py",
             "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json",
             "src/pipeline/searise_pipeline/offline_release/schemas/stage-receipt.schema.json",
-        )
+            "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
+            "src/pipeline/science/ar6-regional-release.json",
+        }.issubset(pipeline.identity_paths)
         pipeline_identities.append(pipeline)
 
     assert identities[0] == identities[1] == identities[2]
     assert pipeline_identities[0] == pipeline_identities[1] == pipeline_identities[2]
+
+
+def test_every_pipeline_identity_is_available_to_the_builder_image() -> None:
+    context_patterns = [
+        line[1:].rstrip("/")
+        for line in IGNORE.read_text(encoding="utf-8").splitlines()
+        if line.startswith("!")
+    ]
+    copy_mappings = []
+    workspace = PurePosixPath("/workspace")
+    for line in DOCKERFILE.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("COPY "):
+            continue
+        _, raw_source, raw_destination = line.split()
+        destination = PurePosixPath(raw_destination)
+        if workspace in destination.parents:
+            copy_mappings.append(
+                (PurePosixPath(raw_source), destination.relative_to(workspace))
+            )
+
+    for profile in BuildProfile:
+        definition = load_profile_definition(PROFILE_ROOT / f"{profile.value}.json")
+        for relative in definition.tools[1].identity_paths:
+            path = PurePosixPath(relative)
+            assert (REPO_ROOT / relative).is_file()
+            assert any(fnmatchcase(relative, pattern) for pattern in context_patterns)
+            assert any(
+                (source == path and destination == path)
+                or (source in path.parents and destination == source)
+                for source, destination in copy_mappings
+            )
