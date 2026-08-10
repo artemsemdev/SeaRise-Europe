@@ -1,0 +1,15 @@
+{
+  "actor": "artemsemdev",
+  "authority": "github-protected-environment",
+  "candidateBindingSha256": "aff21bf005f37e3aa1e386e15694eca6715e2310373cd4f502a50685b5560cae",
+  "decision": "approved",
+  "decisionArtifactName": "phase-0r-owner-decision-phase-0r-ar6-v1-c2ed9074624c7cfe61bf610a1a67f4303aca7580",
+  "environment": "phase-0r-owner-approval",
+  "ref": "refs/heads/master",
+  "repository": "artemsemdev/SeaRise-Europe",
+  "schemaVersion": 1,
+  "triggeringActor": "artemsemdev",
+  "workflow": ".github/workflows/phase-0r-owner-promotion.yml",
+  "workflowRunAttempt": 1,
+  "workflowRunId": 31395573924
+}

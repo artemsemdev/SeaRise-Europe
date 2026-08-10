@@ -1,0 +1,69 @@
+{
+  "baseBranch": "master",
+  "candidateSourceSha": "c2ed9074624c7cfe61bf610a1a67f4303aca7580",
+  "evidenceHeadSha": "103badd722132b30f7bb521c52f13aa05f3db041",
+  "evidenceOnlyDelta": {
+    "CHANGELOG.md": {
+      "gitBlobSha1": "3aa9a04a2d4657e800b2400765ebb554eb483424",
+      "sha256": "bfa589b304a344ec97baaad95d037a59e222186fb3e2361178224dddec20d2ea",
+      "status": "M"
+    },
+    "docs/evidence/phase-0r-regional-release.md": {
+      "gitBlobSha1": "cedda507b6b29cd5d473800533b4f4e3092e35c2",
+      "sha256": "9a472e9e59b958c96ec96797cd0d7d951b3b06fd394254ea99b8bd18b3ad6ead",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release-evidence.json": {
+      "gitBlobSha1": "a7e4a8dfc8702a242cb32797ff776a5f3b89dac2",
+      "sha256": "f4d115eb49f122260376b484a116e79f841c754be761398bfec3c19639fe75d8",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/automated-gate.json": {
+      "gitBlobSha1": "649ee7f70c20edd36297c00997f70d8a20770792",
+      "sha256": "ea4a2734ff1a09c4961cf67cd5a274018e84f1349adbac3612489193d2ac8e45",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/browser-trace-macos-arm64.json": {
+      "gitBlobSha1": "1477d07fd271ce7358d7d2a482a048d208b26ce4",
+      "sha256": "829f83059eeed77d1f0b75f5bf8830dc900b3333f17e7648e261e501950b9d1a",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/build-receipt.json": {
+      "gitBlobSha1": "ce553691602bf43c29d82edabe5a917a79107f73",
+      "sha256": "f02e636ab4542ae52adb17b91bf67d00a3bf1e68c2e4d785610c48ec22d39098",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/build-timing-macos-arm64.json": {
+      "gitBlobSha1": "c487b3fb0294611f877cea443d6ae11a8b61bbf9",
+      "sha256": "e96d7b35ec27f1e11b5e380c23867f50680bc31de214877e35e5bd1a8647843f",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/candidate-binding.json": {
+      "gitBlobSha1": "971acdc82894bd56eafc79157c8e77785dbf5a13",
+      "sha256": "857632bc4b804f2310d8395ab69741abd1835e0b3a64bcbd5e7d5df4a5e09480",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/checksums.txt": {
+      "gitBlobSha1": "ee3e57291a7733a188eccc3b65131537c9d28f8d",
+      "sha256": "54ba4b450de4b7891f9298bb399780a4fcb8879ddc6694496d20bcd9fc89a769",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/delivery-report.json": {
+      "gitBlobSha1": "c1eb5615078d546e9811999138379169c7cf75fe",
+      "sha256": "f820bd3453b9ba97e43d3e78aa297adf0188f686758d4969aeb61f46db8ed068",
+      "status": "A"
+    },
+    "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/reproducibility-report.json": {
+      "gitBlobSha1": "f0168ae1bed80e20611d79e1815eeedea5640a9f",
+      "sha256": "d408a143295bec0c6fb0b3403a5a07adc9ea46585dc241d039d604c470040edf",
+      "status": "A"
+    }
+  },
+  "evidencePullRequest": 184,
+  "integrationPullRequest": 183,
+  "masterSha": "f6a36db4887f44cdf601c2504de0999979ae0ec8",
+  "mergeCommitSha": "f6a36db4887f44cdf601c2504de0999979ae0ec8",
+  "mergeContainedInMaster": true,
+  "repository": "artemsemdev/SeaRise-Europe",
+  "schemaVersion": 1
+}

@@ -1,0 +1,58 @@
+{
+  "baseBranch": "master",
+  "committedEvidence": {
+    "automated-gate.json": "ea4a2734ff1a09c4961cf67cd5a274018e84f1349adbac3612489193d2ac8e45",
+    "browser-trace-macos-arm64.json": "829f83059eeed77d1f0b75f5bf8830dc900b3333f17e7648e261e501950b9d1a",
+    "build-receipt.json": "f02e636ab4542ae52adb17b91bf67d00a3bf1e68c2e4d785610c48ec22d39098",
+    "build-timing-macos-arm64.json": "e96d7b35ec27f1e11b5e380c23867f50680bc31de214877e35e5bd1a8647843f",
+    "candidate-binding.json": "857632bc4b804f2310d8395ab69741abd1835e0b3a64bcbd5e7d5df4a5e09480",
+    "checksums.txt": "54ba4b450de4b7891f9298bb399780a4fcb8879ddc6694496d20bcd9fc89a769",
+    "delivery-report.json": "f820bd3453b9ba97e43d3e78aa297adf0188f686758d4969aeb61f46db8ed068",
+    "reproducibility-report.json": "d408a143295bec0c6fb0b3403a5a07adc9ea46585dc241d039d604c470040edf"
+  },
+  "decisionArtifactName": "phase-0r-owner-decision-phase-0r-ar6-v1-c2ed9074624c7cfe61bf610a1a67f4303aca7580",
+  "evidencePullRequest": 184,
+  "integrationMergeEvidenceSha256": "4eb4ac878f9d9f8e9697d2a920d34ebd623d85e746e43c449e66c12516edd6f0",
+  "integrationPullRequest": 183,
+  "linuxCandidateBindingSha256": "442f65bb5a202fcb4c0ebab044fe179fc54c1398427dc75e6312b82dda0f53b1",
+  "macCandidateBindingSha256": "aff21bf005f37e3aa1e386e15694eca6715e2310373cd4f502a50685b5560cae",
+  "ownerEvidenceSha256": "8f622aaf0cad437eb181838de0db4881545e3fd78d9abcfd418a94ac19a78e93",
+  "releaseContractSha256": "be5f9a1b43a97819a0a06a4cfdeb388896205e8361d7aa3f70158ac3d7eec93f",
+  "releaseId": "phase-0r-ar6-v1",
+  "repository": "artemsemdev/SeaRise-Europe",
+  "schemaVersion": 1,
+  "trustedBuilds": [
+    {
+      "artifactBytes": 5771132,
+      "artifactId": 8973691730,
+      "artifactSha256": "f864246cbec477339c3246dadca9b4ad9f64bcd92f4b87c6a91ad01a96c40540",
+      "buildTiming": {
+        "fullCleanBuildDurationSeconds": 23.393164,
+        "path": "build-timing-linux.json",
+        "sha256": "93b12a7efc8d8bb57ead1662409d36851e5bdf359302db02b286ffe9f5fb7c99"
+      },
+      "candidateBindingSha256": "442f65bb5a202fcb4c0ebab044fe179fc54c1398427dc75e6312b82dda0f53b1",
+      "jobContractId": "ar6-release-evidence",
+      "jobId": 92657393273,
+      "platform": "linux",
+      "receiptBuildRunId": "github-31113582612-1-linux-x86_64"
+    },
+    {
+      "artifactBytes": 5776298,
+      "artifactId": 8973969557,
+      "artifactSha256": "ebca8d2e841a9c2df3f2c51dcd55c4ada739cf2523e91e39b632a762b82c7046",
+      "buildTiming": {
+        "fullCleanBuildDurationSeconds": 19.911667,
+        "path": "build-timing-macos-arm64.json",
+        "sha256": "e96d7b35ec27f1e11b5e380c23867f50680bc31de214877e35e5bd1a8647843f"
+      },
+      "candidateBindingSha256": "aff21bf005f37e3aa1e386e15694eca6715e2310373cd4f502a50685b5560cae",
+      "jobContractId": "ar6-release-evidence-macos",
+      "jobId": 92657393125,
+      "platform": "macos",
+      "receiptBuildRunId": "github-31113582612-1-macos-arm64"
+    }
+  ],
+  "validationRunId": 31113582612,
+  "validationWorkflow": ".github/workflows/ci.yml"
+}
