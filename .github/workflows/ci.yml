@@ -136,6 +136,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Validate deterministic PMTiles render evidence
+        run: npm run evidence:pmtiles-render
+
   api:
     name: API (format, build, test)
     needs: changes

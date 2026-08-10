@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "phase-1-pmtiles-render-v1",
+  "issue": 51,
+  "status": "passed",
+  "purpose": "Deterministic QA renders; not a scientific lookup or production map-style contract.",
+  "input": {
+    "releaseFixtureId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+    "path": "layers/ssp5-85/2100.pmtiles",
+    "byteSize": 681871,
+    "sha256": "3e68bcfdc4e891b05c77893d9a034795981bde72fe7056584678da8160e15b49",
+    "manifestPath": "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json",
+    "manifestSha256": "9b39b8aee86d1e53cce1561898f37e4c6708d25798561c29d97562c268fd622c",
+    "approvedPhase0rReleaseId": "phase-0r-ar6-v1",
+    "ownerGatePath": "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
+    "ownerGateSha256": "f176b41d7cfe6a64ab1578e266f41838b2ffe4c915fb378d577468ba2104f638",
+    "reproducibilityReportPath": "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/reproducibility-report.json",
+    "reproducibilityReportSha256": "d408a143295bec0c6fb0b3403a5a07adc9ea46585dc241d039d604c470040edf",
+    "pmtilesHeader": {
+      "tileType": "mvt",
+      "tileCompression": "gzip",
+      "minimumZoom": 0,
+      "maximumZoom": 6
+    },
+    "pmtilesMetadata": {
+      "scenario": "ssp5-85",
+      "horizon": 2100,
+      "visualOnly": true,
+      "scientificLookup": "prohibited"
+    }
+  },
+  "sourceNodataOracle": {
+    "path": "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
+    "sha256": "edd929a5ce15447d6a960cbc94ec716e2d22f44613dce1e009a6855463c4544c",
+    "receiptPath": "src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json",
+    "receiptSha256": "06e670a641bf339f984ec7a7b798c2ee8873987fa147762457b46f58b2feb78c",
+    "nodata": -32768
+  },
+  "renderer": {
+    "id": "projection-pmtiles-software-raster-v1",
+    "scriptPath": "src/frontend/scripts/render-pmtiles-evidence.mjs",
+    "scriptSha256": "a65eead89702be934cd1e32ffd372da0a10eda72de560fdddc305f0b094bf915",
+    "width": 512,
+    "height": 512,
+    "sampling": "pixel-centre-even-odd",
+    "background": "transparent-rgba-0-0-0-0",
+    "pngEncoding": "rgba8-filter0-zlib9-fixed-no-interlace",
+    "palette": [
+      {
+        "id": "below-0-mm",
+        "maximum": -1,
+        "rgba": [
+          49,
+          54,
+          149,
+          255
+        ]
+      },
+      {
+        "id": "0-249-mm",
+        "minimum": 0,
+        "maximum": 249,
+        "rgba": [
+          69,
+          117,
+          180,
+          255
+        ]
+      },
+      {
+        "id": "250-499-mm",
+        "minimum": 250,
+        "maximum": 499,
+        "rgba": [
+          145,
+          191,
+          219,
+          255
+        ]
+      },
+      {
+        "id": "500-749-mm",
+        "minimum": 500,
+        "maximum": 749,
+        "rgba": [
+          244,
+          109,
+          67,
+          255
+        ]
+      },
+      {
+        "id": "750-mm-and-above",
+        "minimum": 750,
+        "rgba": [
+          165,
+          0,
+          38,
+          255
+        ]
+      }
+    ],
+    "packageLockPath": "src/frontend/package-lock.json",
+    "packageLockSha256": "0c2a6927ff99ab49a27948fcaee8455cbc069fa2d40932e7f772d913cd113495",
+    "packages": {
+      "@mapbox/vector-tile": "2.0.4",
+      "pbf": "4.0.1",
+      "pmtiles": "4.5.0"
+    }
+  },
+  "assertions": {
+    "zooms": [
+      0,
+      3,
+      6
+    ],
+    "quantileProperties": [
+      "lower_mm",
+      "median_mm",
+      "upper_mm"
+    ],
+    "everySampleContainsTransparentNodataProbe": true,
+    "everyValueBinContainsFeatures": {
+      "below-0-mm": 409,
+      "0-249-mm": 459,
+      "250-499-mm": 1123,
+      "500-749-mm": 1761,
+      "750-mm-and-above": 300
+    },
+    "everyValueBinContainsPixels": {
+      "below-0-mm": 11160,
+      "0-249-mm": 19545,
+      "250-499-mm": 28357,
+      "500-749-mm": 94339,
+      "750-mm-and-above": 108586
+    }
+  },
+  "samples": [
+    {
+      "zoom": 0,
+      "x": 0,
+      "y": 0,
+      "quantileProperty": "lower_mm",
+      "decodedTileSha256": "fac3aaed7d5204d2b1e693f2f792f65bb9dc08adc440d38a6c426ca5453c3e70",
+      "decodedFeatureFragmentCount": 3054,
+      "uniqueSourceLocationCount": 3054,
+      "featureBinCounts": {
+        "below-0-mm": 379,
+        "0-249-mm": 386,
+        "250-499-mm": 1012,
+        "500-749-mm": 1260,
+        "750-mm-and-above": 17
+      },
+      "pixelBinCounts": {
+        "below-0-mm": 2256,
+        "0-249-mm": 2088,
+        "250-499-mm": 3889,
+        "500-749-mm": 3656,
+        "750-mm-and-above": 91
+      },
+      "transparentPixelCount": 250164,
+      "nodataProbe": {
+        "sourceLocationId": 1006003540,
+        "longitude": -6,
+        "latitude": 30,
+        "pixelX": 247,
+        "pixelY": 211,
+        "alpha": 0
+      },
+      "rawRgbaSha256": "fd49166b430d78cdbbf3de1ce69b6ac67b993d7267ef196685b2430f27174032",
+      "png": {
+        "path": "z0-0-0-lower_mm.png",
+        "byteSize": 7452,
+        "sha256": "89c1e1ff218062a48fffc4d115e55ccf00b1719f15426537291d244461f677d5"
+      }
+    },
+    {
+      "zoom": 3,
+      "x": 4,
+      "y": 2,
+      "quantileProperty": "median_mm",
+      "decodedTileSha256": "f3ef10f7417c60e6b6ed69d12f95793bf13ce7aa54afec1027ea601ec113d972",
+      "decodedFeatureFragmentCount": 990,
+      "uniqueSourceLocationCount": 990,
+      "featureBinCounts": {
+        "below-0-mm": 30,
+        "0-249-mm": 73,
+        "250-499-mm": 111,
+        "500-749-mm": 501,
+        "750-mm-and-above": 275
+      },
+      "pixelBinCounts": {
+        "below-0-mm": 8904,
+        "0-249-mm": 17457,
+        "250-499-mm": 24468,
+        "500-749-mm": 90683,
+        "750-mm-and-above": 52058
+      },
+      "transparentPixelCount": 68574,
+      "nodataProbe": {
+        "sourceLocationId": 1004600220,
+        "longitude": 22,
+        "latitude": 44,
+        "pixelX": 250,
+        "pixelY": 465,
+        "alpha": 0
+      },
+      "rawRgbaSha256": "45f0bb4d08bd1be549aefbe023fb53370517be3b3dc9d0764a4638205525b7da",
+      "png": {
+        "path": "z3-4-2-median_mm.png",
+        "byteSize": 9744,
+        "sha256": "65d05e19f41fe1009a222dad909ebd44a148d6190fd28671727522640a7f88fc"
+      }
+    },
+    {
+      "zoom": 6,
+      "x": 35,
+      "y": 22,
+      "quantileProperty": "upper_mm",
+      "decodedTileSha256": "9317e83d4d3572b72a34bc2e436959dded2a5dd30112ab1bdc0325033e7f6be5",
+      "decodedFeatureFragmentCount": 8,
+      "uniqueSourceLocationCount": 8,
+      "featureBinCounts": {
+        "below-0-mm": 0,
+        "0-249-mm": 0,
+        "250-499-mm": 0,
+        "500-749-mm": 0,
+        "750-mm-and-above": 8
+      },
+      "pixelBinCounts": {
+        "below-0-mm": 0,
+        "0-249-mm": 0,
+        "250-499-mm": 0,
+        "500-749-mm": 0,
+        "750-mm-and-above": 56437
+      },
+      "transparentPixelCount": 205707,
+      "nodataProbe": {
+        "sourceLocationId": 1004400200,
+        "longitude": 20,
+        "latitude": 46,
+        "pixelX": 284,
+        "pixelY": 393,
+        "alpha": 0
+      },
+      "rawRgbaSha256": "3a37f6789c713161cad391408c372c69262693c0f156b1f6da0867e87e857c4f",
+      "png": {
+        "path": "z6-35-22-upper_mm.png",
+        "byteSize": 7457,
+        "sha256": "4873ed463fa4188023499a475c6b38d7f98b941bbfd9400f7e8fd6324a4b1c57"
+      }
+    }
+  ]
+}

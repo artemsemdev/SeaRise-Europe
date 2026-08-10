@@ -1,7 +1,7 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-10",
+  "updatedAt": "2026-08-11",
   "evidence": {
     "ci-30949490661": {
       "kind": "github-actions",
@@ -92,6 +92,12 @@
       "observedAt": "2026-08-10T23:00:00+02:00",
       "reference": "src/pipeline/tests/offline_release/test_cog_range.py",
       "environment": "macOS arm64; Python 3.11; exact checked-in reviewed COG bytes and deterministic in-process range transport"
+    },
+    "local-2026-08-11-phase1-pmtiles-render": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T01:40:32+02:00",
+      "reference": "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
+      "environment": "macOS arm64; Node 20.20.1; 3 deterministic 512px PMTiles renders checked in under 1 second from fixed local bytes"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -506,6 +512,53 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-writer", "scope": "focused-suite" },
       "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Three contract/mutation tests are unconditional; two real-build determinism tests require exact pinned local assets and remain skipped when unavailable." }
+    },
+    {
+      "id": "frontend-pmtiles-render-evidence",
+      "layer": "integration",
+      "owner": "science",
+      "purpose": "Rebuild immutable z0/z3/z6 projection-PMTiles QA renders and prove quantile/value-bin coverage plus source-nodata transparency against approved Phase 0R bytes.",
+      "sourcePaths": [
+        "src/frontend/scripts/render-pmtiles-evidence.mjs",
+        "src/pipeline/evidence/phase-1/pmtiles-render-v1/**"
+      ],
+      "changedPaths": [
+        "contracts/release/v1/fixtures/release/**/layers/**/*.pmtiles",
+        "src/frontend/scripts/render-pmtiles-evidence.mjs",
+        "src/frontend/package-lock.json",
+        "src/pipeline/evidence/ar6-regional-release/**",
+        "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
+        "src/pipeline/fixtures/ar6-regional-release/**"
+      ],
+      "disposition": "keep-permanently",
+      "replacementGate": {
+        "issue": null,
+        "evidenceRequired": "Permanent approved-artifact binding, deterministic z0/z3/z6 RGBA/PNG identity, representative value-bin, and transparent source-nodata gate."
+      },
+      "commands": {
+        "focused": "cd src/frontend && npm run evidence:pmtiles-render",
+        "full": "cd src/frontend && npm run evidence:pmtiles-render && npm test"
+      },
+      "execution": {
+        "tier": "fast",
+        "ciWorkflow": "ci.yml",
+        "ciJob": "frontend",
+        "requiresDocker": false,
+        "requiresCredentials": false
+      },
+      "cost": {
+        "estimatedSeconds": 1,
+        "class": "fast",
+        "evidenceRef": "local-2026-08-11-phase1-pmtiles-render",
+        "scope": "focused-suite"
+      },
+      "flakiness": {
+        "status": "none-observed",
+        "owner": "science",
+        "issue": null,
+        "expiresAt": null,
+        "evidence": "Fixed checked-in PMTiles/source bytes, pinned JavaScript decoders, integer software rasterization, and no clock, random input, browser, credentials, external executable, or network."
+      }
     },
     {
       "id": "pipeline-ar6-release-pmtiles",

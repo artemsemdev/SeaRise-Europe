@@ -97,6 +97,9 @@ All notable changes to this project will be documented in this file.
 - Added a fail-closed PMTiles v3 structure contract for visual-only boundary
   candidates, binding checked-in source geometry, lineage, safe metadata,
   directory sections, and tile counts without granting canonical status.
+- Added immutable z0/z3/z6 projection-PMTiles QA renders bound to the approved
+  Phase 0R bytes, with lower/median/upper value-bin coverage and exact
+  source-nodata transparency probes.
 - Added an independent decoded boundary-PMTiles parity oracle with exact IDs
   and properties, zoom-6 quantization bounds, symmetric geometry checks, and
   topology-loss rejection.

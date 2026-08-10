@@ -11,6 +11,7 @@
     "lint:i18n": "node --import tsx scripts/lint-i18n-externalization.ts",
     "contracts:generate": "node scripts/generate-public-contract-types.mjs",
     "contracts:check": "node scripts/generate-public-contract-types.mjs --check",
+    "evidence:pmtiles-render": "node scripts/render-pmtiles-evidence.mjs --check",
     "type-check": "npm run contracts:check && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -30,6 +31,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@mapbox/vector-tile": "2.0.4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -42,7 +44,9 @@
     "geotiff": "^3.0.5",
     "jsdom": "^29.0.1",
     "json-schema-to-typescript": "15.0.4",
+    "pbf": "4.0.1",
     "playwright": "^1.62.1",
+    "pmtiles": "4.5.0",
     "tsx": "^4.19.0",
     "typescript": "^5.8.3",
     "vitest": "^4.1.2"

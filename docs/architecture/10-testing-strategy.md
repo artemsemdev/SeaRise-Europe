@@ -145,7 +145,9 @@ explained by an intentional source or methodology change.
 For every published candidate:
 
 - validate analysis GeoTIFFs as Cloud-Optimized GeoTIFFs;
-- run PMTiles structural verification and sample tiles at multiple zooms;
+- run PMTiles structural verification and deterministic QA renders at zooms
+  0, 3, and 6, covering lower/median/upper value bins and transparent
+  source-nodata probes;
 - prove PMTiles and GeoParquet integer values and source IDs agree exactly with
   the corresponding COG cells;
 - require a pinned metadata-free Arrow schema and the RFC 1952 portable gzip
