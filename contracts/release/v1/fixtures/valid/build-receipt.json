@@ -1,0 +1,63 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/build-receipt.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "buildId": "build-regional-fixture-777777777777",
+  "codeRevision": "c096aeab4e0994faa7a9d2253b47215ef897dfcb",
+  "buildMode": "offline",
+  "networkAccess": "disabled",
+  "startedAt": "2026-08-10T12:01:00Z",
+  "completedAt": "2026-08-10T12:01:01Z",
+  "environment": {
+    "platform": "linux",
+    "architecture": "x86_64",
+    "pythonVersion": "3.11.13",
+    "lock": {
+      "path": "locks/python-linux-x86_64.txt",
+      "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
+  },
+  "tools": [
+    {
+      "name": "searise-pipeline",
+      "version": "0.1.0",
+      "identitySha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ],
+  "sourceReceipts": [
+    {
+      "path": "receipts/sources/ipcc-ar6.json",
+      "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "recipes/regional-fixture.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "parametersSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "outputs": [
+    {
+      "path": "config/scenarios.json",
+      "role": "scenario-config",
+      "mediaType": "application/json",
+      "byteSize": 2048,
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "reproducibilityComparison": {
+    "identityFields": [
+      "dataReleaseId",
+      "codeRevision",
+      "environment.lock.sha256",
+      "tools",
+      "sourceReceipts",
+      "inputs",
+      "parametersSha256",
+      "outputs"
+    ],
+    "excludedVolatileFields": ["startedAt", "completedAt"]
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/build-receipt.schema.json",
+  "title": "SeaRise Europe offline release build receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "buildId",
+    "codeRevision",
+    "buildMode",
+    "networkAccess",
+    "startedAt",
+    "completedAt",
+    "environment",
+    "tools",
+    "sourceReceipts",
+    "inputs",
+    "parametersSha256",
+    "outputs",
+    "reproducibilityComparison"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/build-receipt.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "buildId": {
+      "type": "string",
+      "pattern": "^build-[a-z0-9][a-z0-9.-]+-[a-f0-9]{12}$"
+    },
+    "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "buildMode": { "const": "offline" },
+    "networkAccess": { "const": "disabled" },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "architecture", "pythonVersion", "lock"],
+      "properties": {
+        "platform": { "enum": ["linux", "darwin"] },
+        "architecture": { "enum": ["x86_64", "arm64"] },
+        "pythonVersion": { "type": "string", "pattern": "^3\\.[0-9]+\\.[0-9]+$" },
+        "lock": { "$ref": "#/$defs/fileIdentity" }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "version", "identitySha256"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]+$" },
+          "version": { "type": "string", "minLength": 1 },
+          "identitySha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+        }
+      }
+    },
+    "sourceReceipts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/fileIdentity" }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/fileIdentity" }
+    },
+    "parametersSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/outputIdentity" }
+    },
+    "reproducibilityComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityFields", "excludedVolatileFields"],
+      "properties": {
+        "identityFields": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "dataReleaseId" },
+            { "const": "codeRevision" },
+            { "const": "environment.lock.sha256" },
+            { "const": "tools" },
+            { "const": "sourceReceipts" },
+            { "const": "inputs" },
+            { "const": "parametersSha256" },
+            { "const": "outputs" }
+          ],
+          "items": false,
+          "minItems": 8,
+          "maxItems": 8
+        },
+        "excludedVolatileFields": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "startedAt" },
+            { "const": "completedAt" }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    }
+  },
+  "$defs": {
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    },
+    "outputIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "role", "mediaType", "byteSize", "sha256"],
+      "properties": {
+        "path": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+        "role": { "$ref": "defs.schema.json#/$defs/artifactRole" },
+        "mediaType": { "$ref": "defs.schema.json#/$defs/mediaType" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    }
+  }
+}

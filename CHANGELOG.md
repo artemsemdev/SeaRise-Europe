@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   scenario/horizon matrix, defaults, discriminated four-state result payloads,
   grid-only 100 km lookup semantics, source identity, owner authority, and
   prohibited scientific claims in JSON Schema.
+- Added audited v1 source and build receipt contracts that bind offline inputs,
+  hashes, licences, toolchain/environment identity, outputs, and reproducibility
+  comparison fields without publishing source-cache content.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and

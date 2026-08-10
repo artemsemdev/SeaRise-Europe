@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/source-receipt.schema.json",
+  "title": "SeaRise Europe audited source receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "receiptId",
+    "sourceId",
+    "sourceVersion",
+    "sourceUrl",
+    "byteSize",
+    "sha256",
+    "attributionId",
+    "acquiredAt",
+    "verification",
+    "cache",
+    "sourceLock"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/source-receipt.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "receiptId": {
+      "type": "string",
+      "pattern": "^source-[a-z0-9][a-z0-9.-]+-[a-f0-9]{12}$"
+    },
+    "sourceId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9./_-]+$"
+    },
+    "sourceVersion": { "type": "string", "minLength": 1 },
+    "sourceUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://[^?#]+$"
+    },
+    "byteSize": { "type": "integer", "minimum": 1 },
+    "sha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+    "attributionId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]+$"
+    },
+    "acquiredAt": { "type": "string", "format": "date-time" },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "status", "verifiedBeforeUse"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "status": { "const": "passed" },
+        "verifiedBeforeUse": { "const": true }
+      }
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "publicationAllowed"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^sha256/[a-f0-9]{64}$" },
+        "publicationAllowed": { "const": false }
+      }
+    },
+    "sourceLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    }
+  }
+}
