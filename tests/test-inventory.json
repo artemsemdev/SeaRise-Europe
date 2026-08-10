@@ -37,7 +37,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-10T18:29:34+02:00",
       "reference": "src/pipeline/tests/offline_release/test_model.py",
-      "environment": "macOS arm64; Python 3.11; 16 deterministic contract tests completed in 0.03 seconds"
+      "environment": "macOS arm64; Python 3.11; 27 deterministic contract and integration tests completed in 0.17 seconds"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -599,6 +599,7 @@
     { "path": "src/frontend/src/lib/contracts/public-contract-parity.test.ts", "suite": "frontend-public-contract-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_engine.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_model.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_evidence.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_final_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
