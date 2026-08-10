@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, NoReturn
 
 from ..release import (
+    RegionalReleaseSource,
     load_release_contract,
     load_source_fixture,
     validate_analysis_cog,
@@ -31,14 +33,21 @@ _MAC_EVIDENCE = Path("src/pipeline/evidence/ar6-regional-release/macos-arm64-cp3
 _OWNER_EVIDENCE = Path("src/pipeline/evidence/ar6-regional-release/owner-promotion")
 
 
-def validate_reviewed_projection_bundle(
-    bundle_root: Path,
-    *,
+@dataclass(frozen=True)
+class ReviewedProjectionEvidence:
+    """Strictly validated Phase 0R authority and artifact identity evidence."""
+
+    contract: Mapping[str, Any]
+    source: RegionalReleaseSource
+    binding: Mapping[str, Any]
+    delivery_trace: Mapping[str, Any]
+
+
+def load_reviewed_projection_evidence(
     repository_root: Path,
-) -> dict[str, Any]:
-    """Revalidate exact projection semantics before derive-stage promotion."""
-    contract_path = repository_root / _CONTRACT
-    contract = load_release_contract(contract_path)
+) -> ReviewedProjectionEvidence:
+    """Validate the complete owner chain once for all Phase 1 consumers."""
+    contract = load_release_contract(repository_root / _CONTRACT)
     receipt = _read_json(repository_root / _SOURCE_RECEIPT)
     source = load_source_fixture(
         repository_root / _SOURCE_FIXTURE,
@@ -46,12 +55,47 @@ def validate_reviewed_projection_bundle(
         release_contract=contract,
     )
     binding = _read_json(repository_root / _MAC_EVIDENCE / "candidate-binding.json")
-    _validate_approved_evidence(
+    final_gate = _validate_approved_evidence(
         repository_root,
         binding=binding,
         contract=contract,
         contract_sha256=source.contract_sha256,
     )
+    trace_path = repository_root / _MAC_EVIDENCE / "browser-trace-macos-arm64.json"
+    trace = _read_json(trace_path)
+    evidence_bindings = final_gate.get("evidenceBindings")
+    candidate = trace.get("candidate")
+    binding_hashes = binding.get("artifactHashes")
+    if (
+        not isinstance(evidence_bindings, dict)
+        or evidence_bindings.get("deliveryTraceSha256") != sha256(trace_path)
+        or not isinstance(candidate, dict)
+        or candidate.get("releaseId") != binding.get("releaseId")
+        or candidate.get("manifestSha256") != binding.get("manifestSha256")
+        or not isinstance(binding_hashes, dict)
+        or candidate.get("artifactHashes") != binding_hashes
+    ):
+        _fail("reviewed projection delivery trace changed identity")
+    sizes = candidate.get("artifactByteSizes")
+    if (
+        not isinstance(sizes, dict)
+        or set(sizes) != set(binding_hashes)
+        or any(type(size) is not int or size <= 0 for size in sizes.values())
+    ):
+        _fail("reviewed projection delivery sizes are invalid")
+    return ReviewedProjectionEvidence(contract, source, binding, trace)
+
+
+def validate_reviewed_projection_bundle(
+    bundle_root: Path,
+    *,
+    repository_root: Path,
+) -> dict[str, Any]:
+    """Revalidate exact projection semantics before derive-stage promotion."""
+    evidence = load_reviewed_projection_evidence(repository_root)
+    contract = evidence.contract
+    source = evidence.source
+    binding = evidence.binding
 
     matrix = {(layer.scenario, layer.horizon): layer for layer in source.layers}
     cog_paths = {
@@ -139,7 +183,7 @@ def _validate_approved_evidence(
     binding: Mapping[str, Any],
     contract: Mapping[str, Any],
     contract_sha256: str,
-) -> None:
+) -> Mapping[str, Any]:
     mac_root = repository_root / _MAC_EVIDENCE
     owner_root = repository_root / _OWNER_EVIDENCE
     final_gate = _read_json(owner_root / "final-gate.json")
@@ -164,6 +208,8 @@ def _validate_approved_evidence(
         "sourceGridIdentity",
     }
     checks = final_gate.get("checks")
+    evidence_bindings = final_gate.get("evidenceBindings")
+    promotion_evidence = final_gate.get("promotionEvidence")
     if (
         final_gate.get("issue") != 110
         or final_gate.get("automatedValidation") != "passed"
@@ -175,8 +221,8 @@ def _validate_approved_evidence(
         or not isinstance(checks, dict)
         or set(checks) != required_checks
         or any(checks.get(name) is not True for name in required_checks)
-        or final_gate.get("evidenceBindings", {}).get("candidateBindingSha256")
-        != binding_digest
+        or not isinstance(evidence_bindings, dict)
+        or evidence_bindings.get("candidateBindingSha256") != binding_digest
         or owner.get("decision") != "approved"
         or owner.get("candidateBindingSha256") != binding_digest
         or promotion.get("macCandidateBindingSha256") != binding_digest
@@ -198,19 +244,17 @@ def _validate_approved_evidence(
         or promotion.get("releaseContractSha256") != contract_sha256
         or promotion.get("ownerEvidenceSha256")
         != sha256(owner_root / "owner-attestation.json")
-        or final_gate.get("promotionEvidence", {}).get("ownerEvidenceSha256")
-        != promotion.get("ownerEvidenceSha256")
+        or not isinstance(promotion_evidence, dict)
+        or promotion_evidence.get("ownerEvidenceSha256") != promotion.get("ownerEvidenceSha256")
         or promotion.get("integrationMergeEvidenceSha256")
         != sha256(owner_root / "integration-merge.json")
-        or final_gate.get("promotionEvidence", {}).get(
-            "integrationMergeEvidenceSha256"
-        )
+        or promotion_evidence.get("integrationMergeEvidenceSha256")
         != promotion.get("integrationMergeEvidenceSha256")
-        or final_gate.get("promotionEvidence", {}).get("promotionSha256")
-        != sha256(owner_root / "promotion.json")
+        or promotion_evidence.get("promotionSha256") != sha256(owner_root / "promotion.json")
     ):
         _fail("reviewed projection source, tool, or build identity changed")
     _validate_owner_checksums(owner_root)
+    return final_gate
 
 
 def _validate_owner_checksums(root: Path) -> None:

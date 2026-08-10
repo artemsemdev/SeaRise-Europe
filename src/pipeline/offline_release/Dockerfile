@@ -19,6 +19,7 @@ RUN python -m pip install \
 
 COPY contracts/release/v1 /workspace/contracts/release/v1
 COPY src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/build-receipt.json /workspace/src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/build-receipt.json
+COPY src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/browser-trace-macos-arm64.json /workspace/src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/browser-trace-macos-arm64.json
 COPY src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/candidate-binding.json /workspace/src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/candidate-binding.json
 COPY src/pipeline/evidence/ar6-regional-release/owner-promotion/checksums.txt /workspace/src/pipeline/evidence/ar6-regional-release/owner-promotion/checksums.txt
 COPY src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json /workspace/src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json

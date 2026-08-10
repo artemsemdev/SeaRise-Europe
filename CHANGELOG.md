@@ -85,6 +85,9 @@ All notable changes to this project will be documented in this file.
   metric-bound evidence, owner-only release authority, non-downgradable
   critical stops, shared Python/TypeScript semantics, and a deterministic
   human-readable Markdown rendering.
+- Added fail-closed byte-range validation for all nine owner-reviewed analysis
+  COG identities, covering canonical and TIFF-reader-driven requests plus
+  malformed, ignored, truncated, substituted, and corrupted responses.
 
 ### Changed
 

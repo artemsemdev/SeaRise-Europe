@@ -75,3 +75,19 @@ Artifacts are retained for 14 days and cannot overwrite an artifact from the
 same run. A successful build remains a candidate with a pending scientific
 disposition until the owner-validation workflow verifies both artifacts and
 their cross-environment bindings.
+
+## Phase 1 COG range validation
+
+Phase 1 binds the exact nine analysis COG paths, SHA-256 digests, and byte sizes
+to the approved candidate binding, browser trace, and owner gate before testing
+delivery. Each artifact must first match its reviewed local identity. A
+transport adapter is then required to return exact `206` responses with
+canonical `Content-Range`, `Content-Length`, and `Accept-Ranges: bytes` headers.
+Beginning, middle, end, and TIFF-directory ranges derived by the reader are
+compared byte-for-byte with the trusted artifact.
+
+The ordinary suite uses the checked-in release fixture and an in-process range
+transport. Its result is labelled `fixture-validation-only`: it proves the
+validator and reviewed byte identities without making a network, CDN,
+publication, latency, or production-readiness claim. Public-host validation
+must run separately against the same immutable identities before activation.
