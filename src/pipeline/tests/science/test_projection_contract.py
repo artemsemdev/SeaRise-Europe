@@ -144,6 +144,7 @@ def test_public_contract_schemas_pass_the_draft_2020_12_metaschema() -> None:
 
     assert {path.name for path in schemas} == {
         "defs.schema.json",
+        "projection-result.schema.json",
         "scenario-config.schema.json",
     }
     for path in schemas:
@@ -269,3 +270,90 @@ def test_public_scenario_config_fails_closed(
     assert errors
     observed_paths = [".".join(str(part) for part in error.absolute_path) for error in errors]
     assert expected_path in observed_paths
+
+
+def test_public_projection_result_schema_accepts_exactly_four_fixture_states() -> None:
+    validator = _public_contract_validator("projection-result.schema.json")
+    paths = sorted((PUBLIC_CONTRACT_DIR / "fixtures" / "valid").glob("*.json"))
+    results = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in paths
+        if path.name != "scenario-config.json"
+    ]
+
+    for result in results:
+        validator.validate(result)
+
+    assert {result["state"] for result in results} == {
+        "ProjectionAvailable",
+        "DataUnavailable",
+        "OutOfScope",
+        "UnsupportedGeography",
+    }
+    assert all(
+        result["releaseAuthority"]["dataProvenanceClass"] == "synthetic-fixture"
+        for result in results
+    )
+
+    available = next(result for result in results if result["state"] == "ProjectionAvailable")
+    available["source"]["distanceKilometres"] = 100
+    validator.validate(available)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda result: result["source"].__setitem__("distanceKilometres", 100.000001),
+        lambda result: result["releaseAuthority"].__setitem__(
+            "releaseDisposition", "approved"
+        ),
+        lambda result: result.__setitem__("reasonCode", "source-value-nodata"),
+        lambda result: result.__setitem__("renderedColourMetres", 0.201),
+        lambda result: result["projection"].__setitem__("baseline", "absolute sea level"),
+    ],
+)
+def test_projection_available_result_rejects_contradictory_semantics(
+    mutate: Callable[[dict[str, Any]], object],
+) -> None:
+    result = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "projection-available.json"
+        ).read_text(encoding="utf-8")
+    )
+    mutate(result)
+
+    errors = list(_public_contract_validator("projection-result.schema.json").iter_errors(result))
+
+    assert errors
+
+
+def test_non_projection_states_cannot_carry_scientific_values() -> None:
+    result = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "out-of-scope.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    result["projection"] = {
+        "lowerMillimetres": 100,
+        "medianMillimetres": 200,
+        "upperMillimetres": 300,
+    }
+
+    errors = list(_public_contract_validator("projection-result.schema.json").iter_errors(result))
+
+    assert errors
+
+
+def test_too_distant_reason_requires_distance_above_the_inclusive_limit() -> None:
+    result = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "data-unavailable.json"
+        ).read_text(encoding="utf-8")
+    )
+    result["reasonCode"] = "source-location-too-distant"
+    validator = _public_contract_validator("projection-result.schema.json")
+
+    assert list(validator.iter_errors(result))
+
+    result["source"]["distanceKilometres"] = 100.000001
+    validator.validate(result)
