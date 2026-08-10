@@ -1,0 +1,12 @@
+**
+!contracts/
+!contracts/release/
+!contracts/release/v1/
+!contracts/release/v1/**
+!src/
+!src/pipeline/
+!src/pipeline/offline_release/
+!src/pipeline/offline_release/**
+!src/pipeline/requirements-release.lock
+!src/pipeline/searise_pipeline/
+!src/pipeline/searise_pipeline/**

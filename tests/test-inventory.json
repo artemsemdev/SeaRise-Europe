@@ -604,6 +604,7 @@
     { "path": "src/pipeline/tests/offline_release/test_handlers.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_model.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_profiles.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_toolchain.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_evidence.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_final_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
