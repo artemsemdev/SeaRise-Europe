@@ -10,14 +10,14 @@ REPO_ROOT = Path(__file__).parents[4]
 PROFILE_ROOT = REPO_ROOT / "src/pipeline/offline_release/profiles"
 DOCKERFILE = REPO_ROOT / "src/pipeline/offline_release/Dockerfile"
 IGNORE = REPO_ROOT / "src/pipeline/offline_release/Dockerfile.dockerignore"
-BASE_DIGEST = "d29f48a31a8b408ed19272ca1e7b10ebae13b240a27e862d3d4217c528e2e0c3"
+BASE_DIGEST = "a8f8fbe1a0edc9e4dddafa64ba73f7e04be7be5ebc23f332362e779e0a2e4e52"
 
 
 def test_builder_image_pins_base_runtime_lock_and_deterministic_environment() -> None:
     text = DOCKERFILE.read_text(encoding="utf-8")
 
     assert text.splitlines()[0] == (
-        "FROM python:3.11.15-slim-bookworm@sha256:" + BASE_DIGEST
+        "FROM python:3.11.15-bookworm@sha256:" + BASE_DIGEST
     )
     assert "--only-binary=:all:" in text
     assert "--require-hashes" in text
@@ -46,7 +46,7 @@ def test_every_profile_binds_the_same_container_identity() -> None:
         container = definition.tools[0]
         assert container.name == "offline-release-container"
         assert container.version == (
-            "python-3.11.15-slim-bookworm@sha256:" + BASE_DIGEST[:12]
+            "python-3.11.15-bookworm@sha256:" + BASE_DIGEST[:12]
         )
         assert container.identity_paths == (
             "src/pipeline/offline_release/Dockerfile",
