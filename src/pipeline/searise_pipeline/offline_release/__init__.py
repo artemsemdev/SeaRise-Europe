@@ -21,16 +21,26 @@ from .model import (
     ToolIdentity,
     stage_graph,
 )
+from .profiles import (
+    CompiledProfile,
+    ProfileAvailability,
+    ProfileDefinition,
+    compile_profile,
+    load_profile_definition,
+)
 
 __all__ = [
     "BuildPlan",
     "BuildPlanError",
     "BuildProfile",
     "BuildRunResult",
+    "CompiledProfile",
     "EnvironmentIdentity",
     "FailureCode",
     "FileIdentity",
     "OutputIdentity",
+    "ProfileAvailability",
+    "ProfileDefinition",
     "StageContext",
     "StageDefinition",
     "StageFailure",
@@ -38,6 +48,8 @@ __all__ = [
     "StageName",
     "StageOutcome",
     "ToolIdentity",
+    "compile_profile",
+    "load_profile_definition",
     "stage_graph",
     "run_build",
 ]

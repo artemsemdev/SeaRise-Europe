@@ -1,0 +1,26 @@
+{
+  "$schema": "./profile.schema.json",
+  "schemaVersion": 1,
+  "profile": "regional",
+  "availability": "controlled-input-required",
+  "dataVersion": "1.0.0",
+  "dataProvenanceClass": "real-source",
+  "inputRootPath": "build-inputs/offline-release/regional",
+  "schemaDirectory": "contracts/release/v1",
+  "environment": { "platform": "linux", "architecture": "x86_64", "pythonVersion": "3.11.15", "lockPath": "src/pipeline/requirements-release.lock" },
+  "tools": [
+    {
+      "name": "searise-pipeline",
+      "version": "0.1.0",
+      "identityPaths": [
+        "src/pipeline/searise_pipeline/offline_release/__init__.py",
+        "src/pipeline/searise_pipeline/offline_release/engine.py",
+        "src/pipeline/searise_pipeline/offline_release/model.py",
+        "src/pipeline/searise_pipeline/offline_release/profiles.py"
+      ]
+    }
+  ],
+  "sourceReceiptPaths": ["build-inputs/offline-release/regional/receipts/sources.json"],
+  "parameters": { "locale": "C.UTF-8", "numericTypes": "schema-pinned", "ordering": "utf8-bytewise", "timestampPolicy": "explicit-plan", "compression": "artifact-profile-pinned", "crsTransforms": "always-xy" },
+  "stageGraph": ["verify-sources", "inspect", "normalize", "derive", "package", "validate", "assemble-release"]
+}
