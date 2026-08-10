@@ -125,6 +125,17 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["docker_frontend"])
         self.assertFalse(outputs["docker_api"])
 
+    def test_public_release_contract_routes_python_and_frontend_only(self) -> None:
+        outputs = classify_paths(["contracts/release/v1/manifest.schema.json"])
+
+        self.assertTrue(outputs["frontend"])
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["api"])
+        self.assertFalse(outputs["release"])
+        self.assertFalse(outputs["docker_frontend"])
+        self.assertFalse(outputs["docker_api"])
+        self.assertFalse(outputs["compose"])
+
     def test_ci_router_change_exercises_every_route(self) -> None:
         outputs = classify_paths(["scripts/ci/changed_components.py"])
 
