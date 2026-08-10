@@ -9,7 +9,9 @@
     "lint": "next lint",
     "lint:content": "node --import tsx scripts/lint-prohibited-language.ts",
     "lint:i18n": "node --import tsx scripts/lint-i18n-externalization.ts",
-    "type-check": "tsc --noEmit",
+    "contracts:generate": "node scripts/generate-public-contract-types.mjs",
+    "contracts:check": "node scripts/generate-public-contract-types.mjs --check",
+    "type-check": "npm run contracts:check && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "measure:ar6-release": "node scripts/measure-ar6-release.mjs"
@@ -39,6 +41,7 @@
     "eslint-config-next": "14.2.29",
     "geotiff": "^3.0.5",
     "jsdom": "^29.0.1",
+    "json-schema-to-typescript": "15.0.4",
     "playwright": "^1.62.1",
     "tsx": "^4.19.0",
     "typescript": "^5.8.3",

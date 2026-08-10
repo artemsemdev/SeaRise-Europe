@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
   paths, roles, sizes, or hashes.
 - Added shared-fixture validation in TypeScript and path-aware CI routing so every
   public contract change runs both browser and Python contract suites.
+- Added deterministic browser-facing TypeScript types generated from the
+  authoritative public JSON Schema, with CI-enforced drift detection.
 - Added the accepted static-first, offline geospatial architecture and its
   phased migration roadmap.
 - Added checksum-first source acquisition, an audited source registry, and
