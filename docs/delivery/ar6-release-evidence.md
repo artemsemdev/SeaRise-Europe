@@ -86,8 +86,18 @@ canonical `Content-Range`, `Content-Length`, and `Accept-Ranges: bytes` headers.
 Beginning, middle, end, and TIFF-directory ranges derived by the reader are
 compared byte-for-byte with the trusted artifact.
 
-The ordinary suite uses the checked-in release fixture and an in-process range
-transport. Its result is labelled `fixture-validation-only`: it proves the
-validator and reviewed byte identities without making a network, CDN,
-publication, latency, or production-readiness claim. Public-host validation
-must run separately against the same immutable identities before activation.
+The ordinary unit suite keeps a deterministic in-process transport for mutation
+coverage. Pipeline CI additionally serves the checked-in release fixture from
+an ephemeral loopback HTTP origin and retains an immutable
+`cog-range-evidence.json` artifact for 14 days. That report binds the served
+manifest, all nine COG hashes and byte sizes, the approved Phase 0R candidate
+binding, every one of the 54 successful request/response records, monotonic
+runner-local latency measurements, and explicit malformed, ignored, truncated,
+substituted, and corrupt-response rejection controls.
+
+The retained report is labelled
+`candidate-bound-loopback-http-validation-only`. Its latency values are raw
+process-local observations, not a delivery budget. It makes no public-origin,
+CDN, cache, CORS, TLS, publication, or production-readiness claim. Public-host
+validation must still run separately against the same immutable identities
+before activation.

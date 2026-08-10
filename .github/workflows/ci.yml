@@ -211,6 +211,23 @@ jobs:
       - name: Unit tests
         run: pytest tests/ -v
 
+      - name: Capture candidate-bound loopback COG Range evidence
+        run: |
+          mkdir -p "${RUNNER_TEMP}/phase1-cog-range-evidence"
+          python -m searise_pipeline.offline_release.cog_range_evidence \
+            --bundle-root ../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09 \
+            --repository-root ../.. \
+            --output "${RUNNER_TEMP}/phase1-cog-range-evidence/cog-range-evidence.json" \
+            --execution-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${GITHUB_JOB}"
+
+      - name: Retain candidate-bound loopback COG Range evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phase1-cog-range-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/phase1-cog-range-evidence/cog-range-evidence.json
+          if-no-files-found: error
+          retention-days: 14
+
   offline-release-fixture:
     name: Offline release fixture (clean, resume)
     needs: changes
