@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "package": "duckdb",
+    "version": "1.5.4",
+    "pythonVersion": "3.11",
+    "pythonRequires": ">=3.10"
+  },
+  "extension": {
+    "name": "spatial",
+    "version": "v1.5.4"
+  },
+  "platforms": {
+    "linux-x86_64": {
+      "duckdbPlatform": "linux_amd64",
+      "pythonWheel": {
+        "url": "https://files.pythonhosted.org/packages/08/ff/a5d48de4771e2403a8ef26a20dc7457b1c8f7e398ff0caf9c0cad8805f89/duckdb-1.5.4-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+        "byteSize": 21451698,
+        "sha256": "ccc7f2694d02b4763fee61021d45e12f7bc5743993686563957df0cef799fbae"
+      },
+      "extensionArchive": {
+        "url": "https://extensions.duckdb.org/v1.5.4/linux_amd64/spatial.duckdb_extension.gz",
+        "relativePath": "duckdb/v1.5.4/linux_amd64/spatial.duckdb_extension.gz",
+        "byteSize": 28969348,
+        "sha256": "be5c95a1921d5bf66dbcee450272927a93a2839cff7c1e9c2ee815e5461616ac"
+      },
+      "extension": {
+        "relativePath": "duckdb/v1.5.4/linux_amd64/spatial.duckdb_extension",
+        "byteSize": 80848518,
+        "sha256": "819a0fa94d2e8257371bb4d97f32c47586b42c85e24bab1bcbf8712a88b8ccfa"
+      }
+    },
+    "macos-arm64": {
+      "duckdbPlatform": "osx_arm64",
+      "pythonWheel": {
+        "url": "https://files.pythonhosted.org/packages/0e/b2/a02c1ee43fd7e8cf1fc2e3d377f3dcf9d4a3e58a4549557516e1866ff0da/duckdb-1.5.4-cp311-cp311-macosx_11_0_arm64.whl",
+        "byteSize": 15470820,
+        "sha256": "9d9e6817fcbc09d2605a2c8c041ac7824d738d917c35a4d427e977647e1d7944"
+      },
+      "extensionArchive": {
+        "url": "https://extensions.duckdb.org/v1.5.4/osx_arm64/spatial.duckdb_extension.gz",
+        "relativePath": "duckdb/v1.5.4/osx_arm64/spatial.duckdb_extension.gz",
+        "byteSize": 20182452,
+        "sha256": "212717639dd3e42a2c196d0e656e1934da6cb4b8c2db23ee702ff0aa87f73cf1"
+      },
+      "extension": {
+        "relativePath": "duckdb/v1.5.4/osx_arm64/spatial.duckdb_extension",
+        "byteSize": 59546318,
+        "sha256": "575c609c1eb0b45be5d4000792528579746233c5d57d3fa83aa825d11740a1ec"
+      }
+    }
+  }
+}

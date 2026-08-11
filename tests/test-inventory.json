@@ -93,6 +93,12 @@
       "reference": "src/pipeline/tests/settlements/fixtures/geonames/alternate-full-scan-report.json",
       "environment": "macOS arm64; Python 3.9; 19,037,112 alternate-name and 7,929 ISO-language rows parsed from the exact ignored cache with zero unexplained failures in 204.463 seconds; no publication claim"
     },
+    "local-2026-08-11-settlement-spatial-toolchain": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T13:20:00+02:00",
+      "reference": "src/pipeline/tests/settlements/test_spatial_toolchain.py",
+      "environment": "macOS arm64; Python 3.10.9; 13 deterministic manifest, lock, cache, version, runtime, and load-path mutation tests passed without importing DuckDB or using a network"
+    },
     "local-2026-08-10-release-gate-contract": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T22:00:00+02:00",
@@ -412,6 +418,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-geonames-alternate-normalization", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "CI uses fixed hash-bound excerpts and an immutable full-scan report; the optional full archive command is offline, checksum-bound, and separately measured." }
+    },
+    {
+      "id": "pipeline-settlement-spatial-toolchain",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep the Python 3.11 DuckDB Spatial wheel/lock parity, derived native-extension identities, checksum-first cache admission, and two-platform network-free load preflight fail-closed.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/spatial_toolchain.py", "src/pipeline/tests/settlements/test_spatial_toolchain.py"],
+      "changedPaths": [".github/workflows/ci.yml", "docs/operations/settlement-spatial-toolchain.md", "src/pipeline/requirements-settlements-spatial-*.lock", "src/pipeline/searise_pipeline/settlements/spatial_toolchain.py", "src/pipeline/tests/settlements/test_spatial_toolchain.py", "src/pipeline/toolchain/duckdb-spatial-extensions.json"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent immutable native-extension identity, cache, version, lock, and two-platform live spatial-load gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_spatial_toolchain.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-spatial-toolchain", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Unit coverage uses generated fixed gzip bytes and a non-network fake DuckDB module; CI separately runs live Linux and macOS preflights from official pinned bytes." }
     },
     {
       "id": "pipeline-release-gate-contract",
@@ -929,6 +949,7 @@
     { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_report.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_validator.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_parser.py", "suite": "pipeline-geonames-place-parser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_toolchain.py", "suite": "pipeline-settlement-spatial-toolchain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
