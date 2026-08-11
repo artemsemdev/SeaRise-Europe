@@ -123,6 +123,12 @@
       "reference": "src/pipeline/tests/release/test_gate_report.py",
       "environment": "macOS arm64; Python and Node 20-compatible Vitest; fixed JSON Schema fixtures and deterministic Markdown golden"
     },
+    "local-2026-08-11-supply-chain-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T13:44:45+02:00",
+      "reference": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py",
+      "environment": "macOS arm64; Python 3.9.6; deterministic offline schema, hash-binding, identity, SBOM, and exception-expiry tests over synthetic fixtures"
+    },
     "local-2026-08-10-cog-range-contract": {
       "kind": "local-measurement",
       "observedAt": "2026-08-11T01:20:00+02:00",
@@ -506,6 +512,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-release-gate-contract", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Fixed local schema, JSON fixtures, and Markdown golden use no clock, random input, network, or source archive." }
+    },
+    {
+      "id": "pipeline-supply-chain-contract",
+      "layer": "security",
+      "owner": "security",
+      "purpose": "Keep signed-candidate evidence roles, signing identity, subject hashes, CycloneDX identity, and dependency exceptions fail-closed.",
+      "sourcePaths": ["contracts/supply-chain/**", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py"],
+      "changedPaths": ["contracts/supply-chain/**", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent signed-subject, pinned-identity, SBOM, exception-expiry, and cryptographic-verification boundary." },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/supply_chain/test_supply_chain_contracts.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-supply-chain-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "security", "issue": null, "expiresAt": null, "evidence": "Fixed local schemas and synthetic fixtures use an explicit validation instant and no clock, random input, network, credentials, or signing event." }
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
@@ -1016,6 +1036,7 @@
     { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/tdd/test_result_state_characterization.py", "suite": "pipeline-five-state-characterization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_cogify.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_compute_exposure.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },

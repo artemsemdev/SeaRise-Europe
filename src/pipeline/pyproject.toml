@@ -47,6 +47,7 @@ packages = [
     "searise_pipeline.science",
     "searise_pipeline.settlements",
     "searise_pipeline.sources",
+    "searise_pipeline.supply_chain",
 ]
 
 [tool.setuptools.package-dir]
