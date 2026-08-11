@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
+import time
 from collections.abc import Mapping as RuntimeMapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Mapping, NoReturn, Protocol
+from typing import Any, Callable, Literal, Mapping, NoReturn, Protocol
 
-from ..release.evidence import safe_candidate_path, sha256
+from ..release.evidence import binding_sha256, safe_candidate_path, sha256
 from ..science import ScienceContractError
 from .projection_bundle import load_reviewed_projection_evidence
 
@@ -92,36 +95,21 @@ def validate_reviewed_cog_range_access(
     *,
     repository_root: Path,
     transport: RangeTransport,
+    clock_ns: Callable[[], int] = time.perf_counter_ns,
 ) -> dict[str, Any]:
     """Validate canonical and TIFF-reader-driven range paths for all nine COGs."""
+    evidence = load_reviewed_projection_evidence(repository_root)
     identities = load_reviewed_cog_identities(repository_root)
     artifact_reports: list[dict[str, Any]] = []
     for artifact in identities:
         trusted_path = _trusted_artifact(bundle_root, artifact)
         trusted_bytes = trusted_path.read_bytes()
-        access = _ValidatedRangeAccess(artifact, trusted_bytes, transport)
-        middle_start = artifact.byte_size // 2 - _PROBE_BYTES // 2
-        probes = (
-            ("beginning", 0),
-            ("middle", middle_start),
-            ("end", artifact.byte_size - _PROBE_BYTES),
-        )
+        access = _ValidatedRangeAccess(artifact, trusted_bytes, transport, clock_ns)
+        probes = _canonical_probes(artifact)
         for label, start in probes:
             access.read(start, _PROBE_BYTES, label=label)
         _validate_tiff_reader_path(access)
-        expected = (
-            ("beginning", 0, 63, 63),
-            ("middle", middle_start, middle_start + 63, middle_start + 63),
-            (
-                "end",
-                artifact.byte_size - 64,
-                artifact.byte_size - 1,
-                artifact.byte_size - 1,
-            ),
-            ("reader-browser", 0, 65535, artifact.byte_size - 1),
-            ("reader-ifd-count", 192, 193, 193),
-            ("reader-ifd-payload", 194, 449, 449),
-        )
+        expected = _expected_request_coordinates(artifact)
         observed = tuple(
             (item.label, item.start, item.requested_end, item.actual_end)
             for item in access.requests
@@ -137,10 +125,20 @@ def validate_reviewed_cog_range_access(
                 "readerRangeRequests": 3,
                 "rangeRequests": access.request_count,
                 "requestCoordinates": [list(item) for item in observed],
+                "requests": [item.as_evidence() for item in access.requests],
             }
         )
+    binding = evidence.binding
     return {
-        "releaseId": "phase-0r-ar6-v1",
+        "schemaVersion": 1,
+        "evidenceType": "reviewed-cog-range-access",
+        "reviewedProjectionCandidate": {
+            "releaseId": binding["releaseId"],
+            "releaseContractId": binding["releaseContractId"],
+            "manifestSha256": binding["manifestSha256"],
+            "candidateBindingSha256": binding_sha256(binding),
+            "sourceRevision": binding["sourceRevision"],
+        },
         "artifactCount": len(artifact_reports),
         "rangeRequestCount": sum(item["rangeRequests"] for item in artifact_reports),
         "artifacts": artifact_reports,
@@ -154,10 +152,12 @@ class _ValidatedRangeAccess:
         artifact: CogArtifactIdentity,
         trusted_bytes: bytes,
         transport: RangeTransport,
+        clock_ns: Callable[[], int] = time.perf_counter_ns,
     ) -> None:
         self.artifact = artifact
         self._trusted = trusted_bytes
         self._transport = transport
+        self._clock_ns = clock_ns
         self.request_count = 0
         self.reader_request_count = 0
         self.requests: list[_RequestRecord] = []
@@ -169,12 +169,21 @@ class _ValidatedRangeAccess:
             _fail(f"COG range begins beyond the artifact: {self.artifact.path}")
         requested_end = start + length - 1
         actual_end = min(requested_end, self.artifact.byte_size - 1)
+        started_ns = self._clock_ns()
         response = self._transport.get_range(
             self.artifact,
             start=start,
             end=requested_end,
         )
-        body = _validate_range_response(
+        completed_ns = self._clock_ns()
+        if (
+            type(started_ns) is not int
+            or type(completed_ns) is not int
+            or started_ns < 0
+            or completed_ns < started_ns
+        ):
+            _fail(f"COG range latency clock is invalid for {self.artifact.path}")
+        body, headers = _validate_range_response(
             self.artifact,
             response,
             start=start,
@@ -182,7 +191,21 @@ class _ValidatedRangeAccess:
             trusted=self._trusted,
         )
         self.request_count += 1
-        self.requests.append(_RequestRecord(label, start, requested_end, actual_end))
+        self.requests.append(
+            _RequestRecord(
+                label=label,
+                start=start,
+                requested_end=requested_end,
+                actual_end=actual_end,
+                status=response.status,
+                content_range=headers["content-range"],
+                content_length=headers["content-length"],
+                accept_ranges=headers["accept-ranges"],
+                response_bytes=len(body),
+                response_sha256=hashlib.sha256(body).hexdigest(),
+                latency_nanoseconds=completed_ns - started_ns,
+            )
+        )
         if label.startswith("reader-"):
             self.reader_request_count += 1
         return body
@@ -194,6 +217,26 @@ class _RequestRecord:
     start: int
     requested_end: int
     actual_end: int
+    status: int
+    content_range: str
+    content_length: str
+    accept_ranges: str
+    response_bytes: int
+    response_sha256: str
+    latency_nanoseconds: int
+
+    def as_evidence(self) -> dict[str, Any]:
+        return {
+            "label": self.label,
+            "requestedRange": f"bytes={self.start}-{self.requested_end}",
+            "status": self.status,
+            "contentRange": self.content_range,
+            "contentLength": self.content_length,
+            "acceptRanges": self.accept_ranges,
+            "responseBytes": self.response_bytes,
+            "responseSha256": self.response_sha256,
+            "latencyNanoseconds": self.latency_nanoseconds,
+        }
 
 
 def _validate_range_response(
@@ -203,7 +246,7 @@ def _validate_range_response(
     start: int,
     actual_end: int,
     trusted: bytes,
-) -> bytes:
+) -> tuple[bytes, Mapping[str, str]]:
     if type(response) is not RangeResponse:
         _fail(f"COG transport returned an invalid response object: {artifact.path}")
     if type(response.status) is not int or response.status != 206:
@@ -233,7 +276,37 @@ def _validate_range_response(
         _fail(f"COG range body is truncated or substituted for {artifact.path}")
     if response.body != trusted[start : actual_end + 1]:
         _fail(f"COG range body differs from the reviewed artifact: {artifact.path}")
-    return response.body
+    return response.body, headers
+
+
+def _canonical_probes(
+    artifact: CogArtifactIdentity,
+) -> tuple[tuple[str, int], ...]:
+    middle_start = artifact.byte_size // 2 - _PROBE_BYTES // 2
+    return (
+        ("beginning", 0),
+        ("middle", middle_start),
+        ("end", artifact.byte_size - _PROBE_BYTES),
+    )
+
+
+def _expected_request_coordinates(
+    artifact: CogArtifactIdentity,
+) -> tuple[tuple[str, int, int, int], ...]:
+    middle_start = artifact.byte_size // 2 - _PROBE_BYTES // 2
+    return (
+        ("beginning", 0, 63, 63),
+        ("middle", middle_start, middle_start + 63, middle_start + 63),
+        (
+            "end",
+            artifact.byte_size - 64,
+            artifact.byte_size - 1,
+            artifact.byte_size - 1,
+        ),
+        ("reader-browser", 0, 65535, artifact.byte_size - 1),
+        ("reader-ifd-count", 192, 193, 193),
+        ("reader-ifd-payload", 194, 449, 449),
+    )
 
 
 def _validate_tiff_reader_path(access: _ValidatedRangeAccess) -> int:
@@ -286,6 +359,66 @@ def _validate_tiff_reader_path(access: _ValidatedRangeAccess) -> int:
     ):
         _fail(f"reviewed COG TIFF reader ranges overlap: {access.artifact.path}")
     return access.reader_request_count - before
+
+
+def load_served_cog_candidate_identity(
+    bundle_root: Path,
+    identities: tuple[CogArtifactIdentity, ...],
+) -> dict[str, Any]:
+    """Bind the served public candidate manifest to the reviewed COG matrix."""
+    manifest_path = bundle_root / "manifest.json"
+    if bundle_root.is_symlink() or not manifest_path.is_file() or manifest_path.is_symlink():
+        _fail("served COG candidate manifest is absent or unsafe")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError("Cannot read served COG candidate manifest") from exc
+    if not isinstance(manifest, dict):
+        _fail("served COG candidate manifest must be an object")
+    data_release_id = manifest.get("dataReleaseId")
+    code_revision = manifest.get("codeRevision")
+    provenance_class = manifest.get("dataProvenanceClass")
+    artifacts = manifest.get("artifacts")
+    if (
+        type(data_release_id) is not str
+        or not data_release_id
+        or type(code_revision) is not str
+        or re.fullmatch(r"[0-9a-f]{40}", code_revision) is None
+        or type(provenance_class) is not str
+        or provenance_class not in {"synthetic-fixture", "real-source"}
+        or not isinstance(artifacts, list)
+    ):
+        _fail("served COG candidate identity is malformed")
+    cog_records = [
+        item
+        for item in artifacts
+        if isinstance(item, dict) and _COG_PATH.fullmatch(str(item.get("path")))
+    ]
+    records = {item.get("path"): item for item in cog_records}
+    expected_paths = {identity.path for identity in identities}
+    if len(cog_records) != 9 or len(records) != 9 or set(records) != expected_paths:
+        _fail("served COG candidate does not declare the exact 3 x 3 matrix")
+    artifact_set: dict[str, dict[str, Any]] = {}
+    for identity in identities:
+        record = records[identity.path]
+        if (
+            record.get("sha256") != identity.sha256
+            or record.get("byteSize") != identity.byte_size
+            or record.get("role") != "projection-analysis-cog"
+            or record.get("scientificUse") != "exact-lookup"
+        ):
+            _fail(f"served COG manifest identity differs from review: {identity.path}")
+        artifact_set[identity.path] = {
+            "byteSize": identity.byte_size,
+            "sha256": identity.sha256,
+        }
+    return {
+        "dataReleaseId": data_release_id,
+        "codeRevision": code_revision,
+        "dataProvenanceClass": provenance_class,
+        "manifestSha256": sha256(manifest_path),
+        "projectionArtifactSetSha256": binding_sha256(artifact_set),
+    }
 
 
 def _trusted_artifact(bundle_root: Path, artifact: CogArtifactIdentity) -> Path:

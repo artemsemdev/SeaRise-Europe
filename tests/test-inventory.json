@@ -89,9 +89,9 @@
     },
     "local-2026-08-10-cog-range-contract": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-10T23:00:00+02:00",
-      "reference": "src/pipeline/tests/offline_release/test_cog_range.py",
-      "environment": "macOS arm64; Python 3.11; exact checked-in reviewed COG bytes and deterministic in-process range transport"
+      "observedAt": "2026-08-11T01:20:00+02:00",
+      "reference": "src/pipeline/tests/offline_release/test_cog_range_evidence.py",
+      "environment": "macOS arm64; Python 3.9; exact checked-in reviewed COG bytes, loopback HTTP measurements, immutable evidence validation, and deterministic response mutations"
     },
     "local-2026-08-11-phase1-pmtiles-render": {
       "kind": "local-measurement",
@@ -447,15 +447,15 @@
       "id": "pipeline-reviewed-cog-range-access",
       "layer": "contract",
       "owner": "data",
-      "purpose": "Bind all nine reviewed COG identities and reject malformed, ignored, truncated, substituted, or corrupt byte-range responses before scientific reading.",
-      "sourcePaths": ["src/pipeline/tests/offline_release/test_cog_range.py"],
-      "changedPaths": ["src/pipeline/searise_pipeline/offline_release/cog_range.py", "src/pipeline/searise_pipeline/offline_release/projection_bundle.py", "src/pipeline/tests/offline_release/test_cog_range.py"],
+      "purpose": "Bind all nine reviewed COG identities and the exact workflow producer, then persist candidate-bound loopback HTTP evidence for the 54-request map, raw latency, and malformed, ignored, truncated, substituted, or corrupt response rejection.",
+      "sourcePaths": ["src/pipeline/tests/offline_release/test_cog_range.py", "src/pipeline/tests/offline_release/test_cog_range_evidence.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/offline_release/cog_range.py", "src/pipeline/searise_pipeline/offline_release/cog_range_evidence.py", "src/pipeline/searise_pipeline/offline_release/projection_bundle.py", "src/pipeline/tests/offline_release/test_cog_range.py", "src/pipeline/tests/offline_release/test_cog_range_evidence.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-identity, canonical-range, byte-parity, and reader-driven transport gate for every analysis COG." },
-      "commands": { "focused": "python -m pytest src/pipeline/tests/offline_release/test_cog_range.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/offline_release/test_cog_range.py src/pipeline/tests/offline_release/test_cog_range_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-cog-range-contract", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in COG bytes and pure in-process transport mutations use no clock, random input, credentials, external binary, or network." }
+      "cost": { "estimatedSeconds": 4, "class": "fast", "evidenceRef": "local-2026-08-10-cog-range-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in COG bytes, process-local HTTP, monotonic raw timing, and deterministic response mutations use no credentials, external binary, or public network." }
     },
     {
       "id": "pipeline-boundary-geoparquet",
@@ -833,6 +833,7 @@
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_cog_range_evidence.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cli.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_controlled_inputs.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_engine.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
