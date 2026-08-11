@@ -319,8 +319,7 @@ def _actions(
             and PurePosixPath(path).name in {"action.yml", "action.yaml"}
         )
     )
-    local_descriptors = [path for path in descriptors if path.startswith(".github/actions/")]
-    if local_descriptors:
+    if local_descriptors := [path for path in descriptors if path.startswith(".github/actions/")]:
         raise SupplyChainContractError(
             f"local composite Actions are not covered: {local_descriptors}"
         )
@@ -644,12 +643,11 @@ def _observable_components(
     authority: dict[str, bytes],
     input_refs: dict[str, str],
 ) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
-    changed = [
+    if changed := [
         path
         for path, expected in _REVIEWED_AUTHORITY_SHA256.items()
         if _sha256(authority[path]) != expected
-    ]
-    if changed:
+    ]:
         raise SupplyChainContractError(f"reviewed build-plane authority bytes changed: {changed}")
     components: list[dict[str, Any]] = []
     edges: dict[str, set[str]] = {}
