@@ -247,6 +247,29 @@ def test_offline_validator_returns_candidate_metadata_without_reading_artifacts(
     assert summary.artifact_count == 53
 
 
+def test_semantic_validation_never_indexes_schema_malformed_artifact_fields() -> None:
+    candidate = _read(FIXTURE)
+    del candidate["artifacts"][0]["sha256"]
+
+    with pytest.raises(CandidateContractError) as error:
+        validate_candidate_document(candidate)
+
+    assert error.value.code == "candidate-schema"
+    assert "sha256" in str(error.value)
+
+
+def test_count_semantics_do_not_suppress_an_unrelated_schema_error() -> None:
+    candidate = _read(FIXTURE)
+    candidate["artifacts"].pop()
+    candidate["publicationClaim"] = True
+
+    with pytest.raises(CandidateContractError) as error:
+        validate_candidate_document(candidate)
+
+    assert error.value.code == "candidate-schema"
+    assert "publicationClaim" in str(error.value)
+
+
 def test_strict_candidate_loader_rejects_duplicate_and_nonstandard_json(tmp_path: Path) -> None:
     duplicate = tmp_path / "duplicate.json"
     duplicate.write_text('{"candidateId":"one","candidateId":"two"}\n', encoding="utf-8")

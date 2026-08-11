@@ -62,6 +62,13 @@ class CandidateSummary:
     artifact_count: int
 
 
+@dataclass(frozen=True)
+class _SchemaIssue:
+    location: str
+    validator: str
+    message: str
+
+
 class _DuplicateKeyError(ValueError):
     pass
 
@@ -158,22 +165,39 @@ def _validate_inventory(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return artifacts
 
 
-def _schema_error(candidate: Mapping[str, Any], contract_root: Path) -> str | None:
+def _schema_errors(candidate: Mapping[str, Any], contract_root: Path) -> list[_SchemaIssue]:
     errors = sorted(
         _validator(contract_root).iter_errors(candidate),
-        key=lambda error: list(error.absolute_path),
+        key=lambda error: (
+            tuple((type(part).__name__, str(part)) for part in error.absolute_path),
+            str(error.validator),
+            error.message,
+        ),
     )
-    if not errors:
-        return None
-    error = errors[0]
-    location = ".".join(str(part) for part in error.absolute_path) or "$"
-    return f"{location}: {error.message}"
+    return [
+        _SchemaIssue(
+            location=".".join(str(part) for part in error.absolute_path) or "$",
+            validator=str(error.validator),
+            message=error.message,
+        )
+        for error in errors
+    ]
 
 
-def _is_count_only_schema_error(message: str) -> bool:
-    return (message.startswith("artifacts:") and "is too short" in message) or (
-        message.startswith("checksumInventory.subjects:") and "is too short" in message
+def _is_matching_count_error(error: _SchemaIssue, semantic_code: str | None) -> bool:
+    expected_location = {
+        "artifact-inventory": "artifacts",
+        "checksum-coverage": "checksumInventory.subjects",
+    }.get(semantic_code)
+    return (
+        expected_location is not None
+        and error.location == expected_location
+        and error.validator == "minItems"
     )
+
+
+def _are_matching_count_errors(errors: list[_SchemaIssue], semantic_code: str | None) -> bool:
+    return bool(errors) and all(_is_matching_count_error(error, semantic_code) for error in errors)
 
 
 def _artifact_signature(artifact: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -228,7 +252,7 @@ def _semantic_code(candidate: Mapping[str, Any], required: list[Mapping[str, Any
         return "manifest-order"
     expected_subjects = sorted(
         (
-            {"path": item["path"], "sha256": item["sha256"]}
+            {"path": item.get("path"), "sha256": item.get("sha256")}
             for item in artifacts
             if isinstance(item, Mapping) and item.get("role") != "checksums"
         ),
@@ -263,15 +287,22 @@ def validate_candidate_document(
 ) -> CandidateSummary:
     """Validate one candidate and its local inventory without opening artifact paths."""
     required = _validate_inventory(_load_json(contract_root / "required-artifacts.json"))
-    schema_error = _schema_error(candidate, contract_root)
+    schema_errors = _schema_errors(candidate, contract_root)
     semantic_code = _semantic_code(candidate, required)
-    if schema_error is not None and not (
-        semantic_code in {"artifact-inventory", "checksum-coverage"}
-        and _is_count_only_schema_error(schema_error)
+    if semantic_code is not None and (
+        not schema_errors or _are_matching_count_errors(schema_errors, semantic_code)
     ):
-        _fail("candidate-schema", schema_error)
-    if semantic_code is not None:
         _fail(semantic_code, "candidate contradicts the exact v1 inventory")
+    if schema_errors:
+        error = next(
+            (
+                issue
+                for issue in schema_errors
+                if not _is_matching_count_error(issue, semantic_code)
+            ),
+            schema_errors[0],
+        )
+        _fail("candidate-schema", f"{error.location}: {error.message}")
     if candidate.get("manifest") != {
         "path": "manifest.json",
         "artifactCount": _ARTIFACT_COUNT,
