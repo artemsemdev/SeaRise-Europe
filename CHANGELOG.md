@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a Phase 1 engineering candidate completeness contract with an exact
+  44-artifact inventory, acyclic gate/checksum/manifest sealing order, and
+  shared Python/TypeScript fail-closed vectors for completeness, integrity,
+  rights, grid, STAC, cross-release, and runtime-parity drift.
 - Added lossless typed GeoNames `allCountries` and `admin1CodesASCII` row parsers
   with pinned source identity, exact lineage, explicit raw anomaly flags, and
   hash-bound real-format fixtures.

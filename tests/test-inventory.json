@@ -105,6 +105,12 @@
       "reference": "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
       "environment": "macOS arm64; Node 20.20.1; 3 deterministic 512px PMTiles renders checked in under 1 second from fixed local bytes"
     },
+    "local-2026-08-11-candidate-completeness": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T10:37:43+02:00",
+      "reference": "contracts/candidate-completeness/v1/fixtures/vectors/negative-vectors.json",
+      "environment": "macOS arm64; Python 3.9 and Node 20-compatible Vitest; 22 Python and 22 TypeScript schema/shared-vector tests passed from fixed local JSON"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -238,6 +244,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-phase1-contracts", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "AJV 2020 validates only fixed local schemas and fixtures; no clock, random input, or network is used." }
+    },
+    {
+      "id": "phase1-candidate-completeness",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep the exact Phase 1 engineering artifact inventory, rights, cross-release references, runtime parity, checksum coverage, and manifest-last seal fail-closed in Python and TypeScript.",
+      "sourcePaths": ["contracts/candidate-completeness/**", "src/frontend/src/lib/contracts/candidate-completeness*", "src/pipeline/searise_pipeline/release/candidate_completeness.py", "src/pipeline/tests/release/test_candidate_completeness.py"],
+      "changedPaths": ["contracts/candidate-completeness/**", "src/frontend/src/lib/contracts/candidate-completeness*", "src/pipeline/searise_pipeline/release/candidate_completeness.py", "src/pipeline/tests/release/test_candidate_completeness.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent cross-runtime exact-inventory, integrity, rights, STAC, parity, checksum-coverage, and manifest-last gate." },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/release/test_candidate_completeness.py -q && cd src/frontend && npm test -- src/lib/contracts/candidate-completeness.test.ts", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q && cd src/frontend && npm test" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": null, "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-11-candidate-completeness", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Both runtimes consume the same fixed local schema, inventory, valid golden, and JSON Patch negative vectors without clock, random input, or network." }
     },
     {
       "id": "api-domain-legacy",
@@ -849,6 +869,7 @@
     { "path": "src/frontend/src/__tests__/stores/uiStore.test.ts", "suite": "frontend-stores", "status": "active", "removalGate": 70, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/ar6/projection-lookup.golden.test.ts", "suite": "frontend-ar6-lookup-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/ar6/projection-lookup.test.ts", "suite": "frontend-ar6-lookup-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/lib/contracts/candidate-completeness.test.ts", "suite": "phase1-candidate-completeness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/contracts/public-contract-parity.test.ts", "suite": "frontend-public-contract-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -871,6 +892,7 @@
     { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_delivery.py", "suite": "pipeline-ar6-release-delivery", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_candidate_completeness.py", "suite": "phase1-candidate-completeness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_gate_report.py", "suite": "pipeline-release-gate-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
