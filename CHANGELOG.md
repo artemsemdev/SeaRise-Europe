@@ -23,6 +23,9 @@ All notable changes to this project will be documented in this file.
   policy with deterministic selected-record lineage.
 - Added an offline, checksum-bound full-snapshot validation report for the
   pinned GeoNames alternate-name and ISO-language members.
+- Added an immutable v1 pure settlement catalogue policy/domain with
+  source-derived IDs, explicit rejections, audited admin1 context, selected
+  lineage, and stable ordering.
 - Added the first versioned Phase 1 public release contracts, locking the exact
   scenario/horizon matrix, defaults, discriminated four-state result payloads,
   grid-only 100 km lookup semantics, source identity, owner authority, and

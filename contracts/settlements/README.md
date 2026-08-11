@@ -25,6 +25,25 @@ ISO-language rows with zero unexplained parser or language-policy failures. It
 is local engineering evidence, not a finished settlement catalogue,
 GeoParquet/search-shard build, performance result, or publication approval.
 
+The immutable `catalogue-policy-v1.json` references the reviewed
+`settlement-normalization-v2` name policy without changing its bytes. The pure
+catalogue domain admits only feature class `P` and its exact populated-place
+code allowlist; historic, abandoned, and destroyed codes such as `PPLH`,
+`PPLQ`, and `PPLW` remain excluded. Canonical names containing C0, DEL, or C1
+controls are rejected. IDs are derived only as `geonames:<geonameId>`,
+coordinates preserve the finite WGS84 source values without rounding, and
+output and rejection-ledger order is numeric GeoNames ID.
+Admin1 is joined by `(countryCode, admin1Code)`: a provider-missing code yields
+null code/name, while an unresolved nonempty code is preserved with a null name
+and an explicit context notice/count. Duplicate place IDs or admin join keys,
+wrong alternate-name bindings, and buckets without a corresponding place fail
+the whole normalization. Lineage order is the place row, matched admin1 row,
+then selected alternate-name rows.
+
+This domain intentionally has no Europe/coastal spatial classification,
+DuckDB/toolchain binding, GeoParquet/search-shard serialization, or performance
+claim. Those remain later slices.
+
 Consumers support exact `schemaVersion`, artifact `formatVersion`, and search
 engine serialization identities. An unknown value is an unsupported artifact;
 consumers must not coerce it into a known format.
