@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Added immutable, project- and target-specific NuGet CycloneDX inventories for
+  deployable API and library projects, with exact artifact/project/lock
+  authority, explicit test-project exclusion, and no production claim.
 - Included reviewed real Python graph annotations in exact dependency-input
   discovery and SHA-bound inventory validation while excluding synthetic test
   fixtures.
