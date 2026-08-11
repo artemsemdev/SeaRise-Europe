@@ -43,7 +43,7 @@ def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -
         FIXTURE_ROOT,
         repository_root=REPOSITORY_ROOT,
         output_path=output,
-        execution_id="pytest-loopback-1",
+        execution_id="github-123456789-2-pipeline",
         **PRODUCER_INPUTS,
     )
 
@@ -87,6 +87,9 @@ def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -
     accepted_control = deepcopy(report)
     accepted_control["rejectionControls"][0]["outcome"] = "accepted"
     mutations.append(accepted_control)
+    forged_execution = deepcopy(report)
+    forged_execution["executionId"] = "forged-valid-execution"
+    mutations.append(forged_execution)
     for field, forged_value in (
         ("sourceRevision", "3" * 40),
         ("testedRevision", "4" * 40),

@@ -144,6 +144,8 @@ def capture_loopback_cog_range_evidence(
         workflow_run_attempt=workflow_run_attempt,
         workflow_job=workflow_job,
     )
+    if execution_id != _canonical_execution_id(producer):
+        _fail("COG range evidence execution identity changed")
     resolved_output = ensure_outside_candidate(
         bundle_root,
         output_path,
@@ -268,6 +270,8 @@ def _validate_evidence_document(
     _validate_producer(document["producer"])
     if document["producer"] != expected_producer:
         _fail("COG range evidence producer identity changed")
+    if execution_id != _canonical_execution_id(document["producer"]):
+        _fail("COG range evidence execution identity changed")
     identities = load_reviewed_cog_identities(repository_root)
     if document["servedCandidate"] != load_served_cog_candidate_identity(bundle_root, identities):
         _fail("COG range evidence served candidate binding changed")
@@ -353,6 +357,13 @@ def _producer_identity(
     }
     _validate_producer(producer)
     return producer
+
+
+def _canonical_execution_id(producer: Mapping[str, Any]) -> str:
+    return (
+        f"github-{producer['workflowRunId']}-"
+        f"{producer['workflowRunAttempt']}-{producer['workflowJob']}"
+    )
 
 
 def _validate_artifact_reports(
