@@ -231,6 +231,10 @@ jobs:
         run: |
           python -m searise_pipeline.sources validate
           python -m searise_pipeline.sources publication-check
+          python -m searise_pipeline.sources validate \
+            --lock sources/source-lock.phase-1-settlement-coastline.json
+          python -m searise_pipeline.sources publication-check \
+            --lock sources/source-lock.phase-1-settlement-coastline.json
           git -C ../.. check-ignore -q data/raw/sources/example.bin
           git -C ../.. check-ignore -q artifacts/acquisition-receipts/example.json
 

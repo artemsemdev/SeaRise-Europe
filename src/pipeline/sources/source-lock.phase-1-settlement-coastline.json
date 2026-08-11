@@ -1,0 +1,213 @@
+{
+  "$schema": "./source-lock.schema.json",
+  "schemaVersion": 2,
+  "sources": [
+    {
+      "id": "natural-earth-10m",
+      "selectionStatus": "selected",
+      "publisher": "Natural Earth",
+      "canonicalRecord": "https://www.naturalearthdata.com/downloads/10m-physical-vectors/",
+      "version": "5.1.1",
+      "snapshotDate": "2022-05-13",
+      "licence": {
+        "name": "Natural Earth public domain dedication",
+        "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+        "spdx": "LicenseRef-Natural-Earth-Public-Domain",
+        "attribution": "Made with Natural Earth.",
+        "redistributionStatus": "approved",
+        "reviewer": "SeaRise Europe maintainers",
+        "reviewedAt": "2026-08-04",
+        "requiredAcknowledgements": [],
+        "notes": "Attribution is not required by the terms, but SeaRise Europe retains the recommended short credit. The registry release remains 5.1.1 while each archive records its older native version from the bundled VERSION member."
+      },
+      "assets": [
+        {
+          "id": "coastline",
+          "kind": "file",
+          "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_coastline.zip",
+          "resolvedUrl": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_coastline.zip",
+          "resolvedVersion": "5.1.1",
+          "nativeVersion": "5.0.0-pre9",
+          "mediaType": "application/zip",
+          "byteSize": 3069451,
+          "sha256": "bfa04cdbcbef07ef90dfca1dabb48062eca29900a113df0f389303e255484017",
+          "cachePath": "ne_10m_coastline.zip",
+          "availability": "locked",
+          "roles": [
+            "settlement-distance-to-coast"
+          ],
+          "members": [
+            {
+              "id": "readme",
+              "path": "ne_10m_coastline.README.html",
+              "role": "source-documentation",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 37038,
+              "compressedByteSize": 8268,
+              "crc32": "67f709e8",
+              "sha256": "0cfb26be07cf31250743ba848194796a9f0ca567feb6999b681280afa2c99086"
+            },
+            {
+              "id": "version",
+              "path": "ne_10m_coastline.VERSION.txt",
+              "role": "native-version-declaration",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 12,
+              "compressedByteSize": 12,
+              "crc32": "d0db0391",
+              "sha256": "68ccb2a7210ff8601fb6e8f50cfea6c25a403bb8f2bd7cecbc2063afc7ed1f95"
+            },
+            {
+              "id": "cpg",
+              "path": "ne_10m_coastline.cpg",
+              "role": "character-encoding",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 5,
+              "compressedByteSize": 5,
+              "crc32": "0e813c50",
+              "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824"
+            },
+            {
+              "id": "dbf",
+              "path": "ne_10m_coastline.dbf",
+              "role": "feature-attributes",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 392765,
+              "compressedByteSize": 5042,
+              "crc32": "20d1e97c",
+              "sha256": "9ccc214342fe400bf8c7d91d7a5b276b0457b0ada03e8d4be16ac5ba13037f3b"
+            },
+            {
+              "id": "prj",
+              "path": "ne_10m_coastline.prj",
+              "role": "coordinate-reference-system",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 145,
+              "compressedByteSize": 121,
+              "crc32": "af437f55",
+              "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4"
+            },
+            {
+              "id": "shp",
+              "path": "ne_10m_coastline.shp",
+              "role": "direct-shoreline-linework",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 6806860,
+              "compressedByteSize": 3036654,
+              "crc32": "c3a4a439",
+              "sha256": "459a4a97c09db19aadf5244026612de9d43748be27f83a360242b99f7fabb3c1"
+            },
+            {
+              "id": "shx",
+              "path": "ne_10m_coastline.shx",
+              "role": "shapefile-index",
+              "nativeVersion": "5.0.0-pre9",
+              "byteSize": 33164,
+              "compressedByteSize": 18119,
+              "crc32": "3affd75a",
+              "sha256": "f873afee7f56779ce52253f740ec251c2f12244aea911dc40f0a85d75de8d5f2"
+            }
+          ]
+        },
+        {
+          "id": "minor-islands-coastline",
+          "kind": "file",
+          "url": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_minor_islands_coastline.zip",
+          "resolvedUrl": "https://naturalearth.s3.amazonaws.com/10m_physical/ne_10m_minor_islands_coastline.zip",
+          "resolvedVersion": "5.1.1",
+          "nativeVersion": "4.1.0",
+          "mediaType": "application/zip",
+          "byteSize": 310455,
+          "sha256": "fa1d68b486b3a3ea2f625517d54b36d7544880b388170891b53a065e826ebd3e",
+          "cachePath": "ne_10m_minor_islands_coastline.zip",
+          "availability": "locked",
+          "roles": [
+            "settlement-distance-to-coast"
+          ],
+          "members": [
+            {
+              "id": "readme",
+              "path": "ne_10m_minor_islands_coastline.README.html",
+              "role": "source-documentation",
+              "nativeVersion": "4.1.0",
+              "byteSize": 24176,
+              "compressedByteSize": 6530,
+              "crc32": "db8281d4",
+              "sha256": "afb419225d9f70f24901103d8431622d94127cfb9f35b32e724de9ff13c5cb27"
+            },
+            {
+              "id": "version",
+              "path": "ne_10m_minor_islands_coastline.VERSION.txt",
+              "role": "native-version-declaration",
+              "nativeVersion": "4.1.0",
+              "byteSize": 7,
+              "compressedByteSize": 7,
+              "crc32": "515a0181",
+              "sha256": "0874a8fe36effb87780f431845b5a7d85be657f2bd998ce8eeace717860d3b78"
+            },
+            {
+              "id": "cpg",
+              "path": "ne_10m_minor_islands_coastline.cpg",
+              "role": "character-encoding",
+              "nativeVersion": "4.1.0",
+              "byteSize": 5,
+              "compressedByteSize": 5,
+              "crc32": "0e813c50",
+              "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824"
+            },
+            {
+              "id": "dbf",
+              "path": "ne_10m_minor_islands_coastline.dbf",
+              "role": "feature-attributes",
+              "nativeVersion": "4.1.0",
+              "byteSize": 134438,
+              "compressedByteSize": 1447,
+              "crc32": "334010a6",
+              "sha256": "1640a8a63feb5ee7e1fb55da8cde82b3a7cfd10fa6d3fbd5a7ae8d0dfd254468"
+            },
+            {
+              "id": "prj",
+              "path": "ne_10m_minor_islands_coastline.prj",
+              "role": "coordinate-reference-system",
+              "nativeVersion": "4.1.0",
+              "byteSize": 145,
+              "compressedByteSize": 121,
+              "crc32": "af437f55",
+              "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4"
+            },
+            {
+              "id": "shp",
+              "path": "ne_10m_minor_islands_coastline.shp",
+              "role": "direct-shoreline-linework",
+              "nativeVersion": "4.1.0",
+              "byteSize": 714268,
+              "compressedByteSize": 290705,
+              "crc32": "11ea5f82",
+              "sha256": "2f910fdba9a338d4c9872938ee6dafe13f2ef2fd9062c619179aa6ca91bf9815"
+            },
+            {
+              "id": "shx",
+              "path": "ne_10m_minor_islands_coastline.shx",
+              "role": "shapefile-index",
+              "nativeVersion": "4.1.0",
+              "byteSize": 22028,
+              "compressedByteSize": 10214,
+              "crc32": "ff7d88b4",
+              "sha256": "b971cfc61fa1e0c5e1fbf49299745a2e1674a2238800b4496e3389fd68c43cf8"
+            }
+          ]
+        }
+      ],
+      "coverage": [
+        {
+          "region": "global-grid",
+          "status": "global",
+          "roles": [
+            "settlement-distance-to-coast"
+          ],
+          "reason": "The two official 10m physical-vector archives provide direct main and minor-island shoreline linework; the settlement recipe selects whole source features that intersect an explicit Europe build bounding box without clipping them."
+        }
+      ]
+    }
+  ]
+}
