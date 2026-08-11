@@ -10,6 +10,7 @@ import stat
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
+from packaging.markers import UndefinedComparison, UndefinedEnvironmentName
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
@@ -27,18 +28,22 @@ _PLATFORMS = {
 }
 
 
+def _read_descriptor(descriptor: int, *, label: str, path: object) -> bytes:
+    if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+        raise SupplyChainContractError(f"{label} must be a regular file: {path}")
+    chunks = []
+    while chunk := os.read(descriptor, 131_072):
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def _read_regular_bytes(path: Path, *, label: str) -> bytes:
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     flags |= getattr(os, "O_NONBLOCK", 0)
     try:
         descriptor = os.open(path, flags)
         try:
-            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-                raise SupplyChainContractError(f"{label} must be a regular file: {path}")
-            chunks = []
-            while chunk := os.read(descriptor, 131_072):
-                chunks.append(chunk)
-            return b"".join(chunks)
+            return _read_descriptor(descriptor, label=label, path=path)
         finally:
             os.close(descriptor)
     except OSError as exc:
@@ -76,7 +81,7 @@ def _load_annotation(path: Path) -> dict[str, Any]:
     return document
 
 
-def _safe_lock_path(repository_root: Path, value: str) -> Path:
+def _logical_lock_path(value: str) -> PurePosixPath:
     logical = PurePosixPath(value)
     if (
         not value
@@ -86,22 +91,37 @@ def _safe_lock_path(repository_root: Path, value: str) -> Path:
         or any(part in {"", ".", ".."} for part in logical.parts)
     ):
         raise SupplyChainContractError(f"unsafe Python lock path: {value}")
-    root = repository_root.resolve()
-    candidate = repository_root.joinpath(*logical.parts)
-    cursor = repository_root
-    for part in logical.parts:
-        cursor /= part
-        if cursor.is_symlink():
-            raise SupplyChainContractError(f"Python lock path must not use symlinks: {value}")
+    return logical
+
+
+def _read_repository_file(root_descriptor: int, logical: PurePosixPath) -> bytes:
+    directory = root_descriptor
+    owned_directory = False
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
-        candidate.resolve().relative_to(root)
-    except (OSError, ValueError) as exc:
-        raise SupplyChainContractError(f"Python lock is outside or missing: {value}") from exc
-    return candidate
+        for part in logical.parts[:-1]:
+            child = os.open(part, flags | os.O_DIRECTORY, dir_fd=directory)
+            if owned_directory:
+                os.close(directory)
+            directory, owned_directory = child, True
+        file_flags = flags | getattr(os, "O_NONBLOCK", 0)
+        descriptor = os.open(logical.name, file_flags, dir_fd=directory)
+        try:
+            return _read_descriptor(descriptor, label="Python lock", path=logical)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise SupplyChainContractError(
+            f"Python lock path must exist beneath the repository without symlinks: {logical}"
+        ) from exc
+    finally:
+        if owned_directory:
+            os.close(directory)
 
 
-def _parse_lock(path: Path, expected_sha256: str) -> dict[str, tuple[str, str]]:
-    data = _read_regular_bytes(path, label="Python lock")
+def _parse_lock(
+    data: bytes, path: PurePosixPath, expected_sha256: str
+) -> dict[str, tuple[str, str]]:
     if hashlib.sha256(data).hexdigest() != expected_sha256:
         raise SupplyChainContractError(f"Python lock SHA-256 mismatch: {path}")
     if b"\r" in data:
@@ -142,6 +162,8 @@ def _parse_lock(path: Path, expected_sha256: str) -> dict[str, tuple[str, str]]:
 
 
 def _validate_environment(environment: Mapping[str, str], target_id: str) -> None:
+    if environment["platform_python_implementation"] != "CPython":
+        raise SupplyChainContractError(f"Python implementation identity mismatch: {target_id}")
     if environment["implementation_version"] != environment["python_full_version"]:
         raise SupplyChainContractError(f"Python version identity mismatch: {target_id}")
     expected = _PLATFORMS[environment["sys_platform"]]
@@ -158,11 +180,17 @@ def _requirement_active(
     if requirement.marker is None:
         return
     results = []
-    for environment in environments:
-        contexts = ["", *sorted(source_extras)]
-        results.append(
-            any(requirement.marker.evaluate({**environment, "extra": extra}) for extra in contexts)
-        )
+    try:
+        for environment in environments:
+            contexts = ["", *sorted(source_extras)]
+            results.append(
+                any(
+                    requirement.marker.evaluate({**environment, "extra": extra})
+                    for extra in contexts
+                )
+            )
+    except (UndefinedComparison, UndefinedEnvironmentName) as exc:
+        raise SupplyChainContractError("unsupported Python requirement marker") from exc
     if len(set(results)) != 1:
         raise SupplyChainContractError("Python requirement marker diverges across targets")
     if not results[0]:
@@ -206,13 +234,23 @@ def validate_python_lock_graph(
         raise SupplyChainContractError("Python graph target lock paths must be unique")
     environments = []
     target_packages = []
-    for target in targets:
-        environment = target["markerEnvironment"]
-        _validate_environment(environment, target["id"])
-        environments.append(environment)
-        lock = target["lock"]
-        lock_path = _safe_lock_path(repository_root, lock["path"])
-        target_packages.append(_parse_lock(lock_path, lock["sha256"]))
+    root_flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
+    root_flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        root_descriptor = os.open(repository_root.resolve(strict=True), root_flags)
+    except OSError as exc:
+        raise SupplyChainContractError("Python graph repository root could not be opened") from exc
+    try:
+        for target in targets:
+            environment = target["markerEnvironment"]
+            _validate_environment(environment, target["id"])
+            environments.append(environment)
+            lock = target["lock"]
+            logical = _logical_lock_path(lock["path"])
+            data = _read_repository_file(root_descriptor, logical)
+            target_packages.append(_parse_lock(data, logical, lock["sha256"]))
+    finally:
+        os.close(root_descriptor)
     identities = [{name: value[0] for name, value in items.items()} for items in target_packages]
     if any(identity != identities[0] for identity in identities[1:]):
         raise SupplyChainContractError("Python targets must have an identical package/version set")

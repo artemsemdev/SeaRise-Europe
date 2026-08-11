@@ -4,79 +4,28 @@
   "annotationKind": "python-lock-graph",
   "annotationId": "python-lock-graph-synthetic-v1",
   "graphScope": "target-active-runtime-dependencies",
-  "review": {
-    "status": "synthetic",
-    "productionClaim": false,
-    "note": "Synthetic graph metadata for contract tests only."
-  },
+  "review": { "status": "synthetic", "productionClaim": false, "note": "Synthetic graph metadata for contract tests only." },
   "targets": [
     {
       "id": "linux-x86-64-cp311",
-      "lock": {
-        "path": "contracts/supply-chain/v1/fixtures/python-graph/target-linux.lock",
-        "sha256": "0e9d30bb9bb37b614531ec4144c977ca8621163bf10d1dad064c82ad92ee43c9"
-      },
-      "markerEnvironment": {
-        "implementation_name": "cpython",
-        "implementation_version": "3.11.15",
-        "os_name": "posix",
-        "platform_machine": "x86_64",
-        "platform_release": "synthetic-linux",
-        "platform_system": "Linux",
-        "platform_version": "synthetic-linux",
-        "python_full_version": "3.11.15",
-        "python_version": "3.11",
-        "sys_platform": "linux"
-      }
+      "lock": { "path": "contracts/supply-chain/v1/fixtures/python-graph/target-linux.lock", "sha256": "0e9d30bb9bb37b614531ec4144c977ca8621163bf10d1dad064c82ad92ee43c9" },
+      "markerEnvironment": { "implementation_name": "cpython", "implementation_version": "3.11.15", "os_name": "posix", "platform_machine": "x86_64", "platform_python_implementation": "CPython", "platform_release": "synthetic-linux", "platform_system": "Linux", "platform_version": "synthetic-linux", "python_full_version": "3.11.15", "python_version": "3.11", "sys_platform": "linux" }
     },
     {
       "id": "macos-arm64-cp311",
-      "lock": {
-        "path": "contracts/supply-chain/v1/fixtures/python-graph/target-macos.lock",
-        "sha256": "b0d1cb7fc806582a5de254274d8052114c6ab6e046c3d60657890bd8fc11102c"
-      },
-      "markerEnvironment": {
-        "implementation_name": "cpython",
-        "implementation_version": "3.11.9",
-        "os_name": "posix",
-        "platform_machine": "arm64",
-        "platform_release": "synthetic-macos",
-        "platform_system": "Darwin",
-        "platform_version": "synthetic-macos",
-        "python_full_version": "3.11.9",
-        "python_version": "3.11",
-        "sys_platform": "darwin"
-      }
+      "lock": { "path": "contracts/supply-chain/v1/fixtures/python-graph/target-macos.lock", "sha256": "b0d1cb7fc806582a5de254274d8052114c6ab6e046c3d60657890bd8fc11102c" },
+      "markerEnvironment": { "implementation_name": "cpython", "implementation_version": "3.11.9", "os_name": "posix", "platform_machine": "arm64", "platform_python_implementation": "CPython", "platform_release": "synthetic-macos", "platform_system": "Darwin", "platform_version": "synthetic-macos", "python_full_version": "3.11.9", "python_version": "3.11", "sys_platform": "darwin" }
     }
   ],
   "packages": [
     {
-      "name": "alpha",
-      "version": "1.0.0",
-      "root": true,
-      "selectedExtras": [],
-      "dependencies": [
-        {
-          "name": "bravo",
-          "requirement": "bravo[fast]>=2.0; python_version == '3.11'"
-        }
-      ]
+      "name": "alpha", "version": "1.0.0", "root": true, "selectedExtras": [],
+      "dependencies": [{ "name": "bravo", "requirement": "bravo[fast]>=2.0; python_version == '3.11'" }]
     },
     {
-      "name": "bravo",
-      "version": "2.0.0",
-      "root": false,
-      "selectedExtras": ["fast"],
-      "dependencies": [
-        { "name": "charlie", "requirement": "charlie==3.0.0; extra == 'fast'" }
-      ]
+      "name": "bravo", "version": "2.0.0", "root": false, "selectedExtras": ["fast"],
+      "dependencies": [{ "name": "charlie", "requirement": "charlie==3.0.0; extra == 'fast'" }]
     },
-    {
-      "name": "charlie",
-      "version": "3.0.0",
-      "root": false,
-      "selectedExtras": [],
-      "dependencies": []
-    }
+    { "name": "charlie", "version": "3.0.0", "root": false, "selectedExtras": [], "dependencies": [] }
   ]
 }

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from packaging import markers as packaging_markers
 
 import searise_pipeline.supply_chain.python_graph as python_graph_module
 from searise_pipeline.supply_chain import (
@@ -153,9 +154,9 @@ def test_lock_read_keeps_the_open_descriptor_identity(
     moved = lock.with_suffix(".opened")
     real_open = python_graph_module.os.open
 
-    def swap_after_open(path: Path, flags: int) -> int:
-        descriptor = real_open(path, flags)
-        if Path(path) == lock:
+    def swap_after_open(path: object, flags: int, **kwargs: int) -> int:
+        descriptor = real_open(path, flags, **kwargs)
+        if path == lock.name and kwargs.get("dir_fd") is not None:
             lock.rename(moved)
             lock.write_bytes(original + b"# replacement\n")
         return descriptor
@@ -163,6 +164,37 @@ def test_lock_read_keeps_the_open_descriptor_identity(
     monkeypatch.setattr(python_graph_module.os, "open", swap_after_open)
     validate_python_lock_graph(annotation, repository_root=tmp_path)
     assert lock.read_bytes() != moved.read_bytes()
+
+
+def test_lock_parent_swap_keeps_open_directory_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    annotation = _copy_fixture(repository)
+    document = json.loads(annotation.read_bytes())
+    document["targets"] = document["targets"][:1]
+    _write(annotation, document)
+    parent = _lock_path(repository, document).parent
+    moved, outside = parent.with_name("python-graph-opened"), tmp_path / "outside"
+    outside.mkdir()
+    real_open, swapped = python_graph_module.os.open, False
+
+    def swap_parent(path: object, flags: int, **kwargs: int) -> int:
+        nonlocal swapped
+        descriptor = real_open(path, flags, **kwargs)
+        if path == parent.name and not swapped:
+            parent.rename(moved)
+            parent.symlink_to(outside, target_is_directory=True)
+            swapped = True
+        return descriptor
+
+    monkeypatch.setattr(python_graph_module.os, "open", swap_parent)
+    validate_python_lock_graph(annotation, repository_root=repository)
+    assert parent.is_symlink()
+    _write(tmp_path / "annotation.json", document)
+    with pytest.raises(SupplyChainContractError, match="without symlinks"):
+        validate_python_lock_graph(tmp_path / "annotation.json", repository_root=repository)
 
 
 @pytest.mark.parametrize(
@@ -254,6 +286,9 @@ def test_graph_structure_fails_closed(
         ("bravo>=2.0; sys_platform == 'win32'", "inactive|diverges"),
         ("bravo>=2.0; sys_platform == 'linux'", "diverges"),
         ("bravo[other]>=2.0", "selected extras"),
+        ("bravo>=2.0; dependency_groups == 'runtime'", "unsupported"),
+        ("bravo>=2.0; python_version ~= 'wat'", "unsupported"),
+        ("bravo>=2.0; unknown_marker == 'x'", "invalid reviewed"),
     ],
 )
 def test_requirement_semantics_fail_closed(
@@ -267,6 +302,14 @@ def test_requirement_semantics_fail_closed(
     _write(annotation, document)
     with pytest.raises(SupplyChainContractError, match=message):
         validate_python_lock_graph(annotation, repository_root=REPOSITORY_ROOT)
+
+
+def test_marker_evaluation_does_not_inherit_host_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hostile = {key: "host-value" for key in _document()["targets"][0]["markerEnvironment"]}
+    monkeypatch.setattr(packaging_markers, "default_environment", lambda: hostile)
+    validate_python_lock_graph(VALID, repository_root=REPOSITORY_ROOT)
 
 
 def test_unjustified_extra_and_unsafe_path_fail_closed(tmp_path: Path) -> None:
