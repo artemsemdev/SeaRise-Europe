@@ -1,0 +1,19 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/dependency-exception.schema.json",
+  "schemaVersion": "1.0.0",
+  "contractId": "phase-1-dependency-exception-v1",
+  "exceptionId": "dep-exception-expired-synthetic-example",
+  "findingId": "SYNTHETIC-ONLY-0002",
+  "ecosystem": "npm",
+  "component": {
+    "name": "synthetic-example",
+    "version": "0.9.0",
+    "purl": "pkg:npm/synthetic-example@0.9.0"
+  },
+  "owner": "artemsemdev",
+  "scope": ["synthetic-fixture"],
+  "rationale": "Synthetic expired fixture used only to prove fail-closed validation.",
+  "approvedAt": "2026-08-01T10:00:00Z",
+  "expiresAt": "2026-08-10T10:00:00Z",
+  "fixtureOnly": true
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/identity-policy.schema.json",
+  "schemaVersion": "1.0.0",
+  "contractId": "phase-1-production-signing-identity-v1",
+  "repository": "artemsemdev/SeaRise-Europe",
+  "workflowPath": ".github/workflows/untrusted-release.yml",
+  "workflowRef": "refs/heads/master",
+  "certificateIdentity": "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/untrusted-release.yml@refs/heads/master",
+  "oidcIssuer": "https://token.actions.githubusercontent.com",
+  "protectedEnvironment": "phase-1-production-signing",
+  "bundleMediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3"
+}
