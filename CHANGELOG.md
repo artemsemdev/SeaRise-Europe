@@ -225,6 +225,8 @@ All notable changes to this project will be documented in this file.
 
 - Corrected the immutable full-source contract to match the official
   `alternateNamesV2.zip` member order while retaining path-based member staging.
+- Hardened normalized-catalogue validation with exact source replay, reconciled
+  rejection counts, and bounded DuckDB sorting and alternate-name grouping.
 - Pinned the single writer-owned GeoParquet Arrow schema FlatBuffer and
   canonicalized Tippecanoe gzip platform markers so the Linux and macOS ARM64
   release profiles produce identical analytical and visual artifact bytes
