@@ -72,12 +72,6 @@ This is an inventory of dependency-defining inputs, not a package graph or
 SBOM. It does not claim transitive-package completeness, vulnerability status,
 artifact signing, cryptographic verification, or production readiness.
 
-`v1/sboms/build-plane.cdx.json` preserves ten reviewed build-plane file
-authorities and deterministically derives 29 observable components from only
-those bytes: pinned Actions, platform-specific native binaries, DuckDB/Spatial
-artifacts, OCI bases, and exact Linux native package versions. See
-`docs/operations/build-plane-sbom.md` for its validation and nonclaims.
-
 ## Dependency exceptions
 
 An exception must identify its finding, exact component, owner, affected scope,

@@ -36,6 +36,25 @@ _MACOS_RECEIPT = "src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.j
 _RELEASE_DOCKERFILE = "src/pipeline/offline_release/Dockerfile"
 _TIPPECANOE_VERSION = "2.79.0"
 _DUCKDB_VERSION = "1.5.4"
+_REVIEWED_AUTHORITY_SHA256 = {
+    _DUCKDB_LOCK: "77c7ea3422e67be2f8d23f0dcef2d5d36236f01b8856f76289ed1e0532359ca6",
+    _LINUX_RECIPE: "8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5",
+    _MACOS_RECIPE: "143cfd23ca2f051c60cc1221122236d4cb4305a554ca6fe44d66bec164432bc9",
+}
+_LINUX_PACKAGE_ROLES = {
+    "packages": {
+        "build-essential": "12.10ubuntu1",
+        "ca-certificates": "20260601~24.04.1",
+        "libsqlite3-dev": "3.45.1-1ubuntu2.7",
+        "zlib1g-dev": "1:1.3.dfsg-3.1ubuntu2.1",
+    },
+    "runtimeLibraries": {
+        "libc6": "2.39-0ubuntu8.8",
+        "libsqlite3-0": "3.45.1-1ubuntu2.7",
+        "libstdc++6": "14.2.0-4ubuntu2~24.04.1",
+        "zlib1g": "1:1.3.dfsg-3.1ubuntu2.1",
+    },
+}
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _ACTION = re.compile(
     r"^\s*(?:-\s*)?uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+)@([0-9a-f]{40})"
@@ -288,11 +307,24 @@ def _docker_base(value: bytes, label: str) -> tuple[str, str | None, str]:
 
 def _actions(
     authority: dict[str, bytes],
-    input_refs: dict[str, str],
+    _input_refs: dict[str, str],
 ) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
     observed: dict[str, tuple[str, str, set[str]]] = {}
-    edges: dict[str, set[str]] = {}
-    for path in sorted(p for p in authority if p.startswith(".github/workflows/")):
+    descriptors = sorted(
+        path
+        for path in authority
+        if path.startswith(".github/workflows/")
+        or (
+            path.startswith(".github/actions/")
+            and PurePosixPath(path).name in {"action.yml", "action.yaml"}
+        )
+    )
+    local_descriptors = [path for path in descriptors if path.startswith(".github/actions/")]
+    if local_descriptors:
+        raise SupplyChainContractError(
+            f"local composite Actions are not covered: {local_descriptors}"
+        )
+    for path in descriptors:
         try:
             lines = authority[path].decode("utf-8").splitlines()
         except UnicodeDecodeError as exc:
@@ -301,7 +333,7 @@ def _actions(
             if "uses:" not in line:
                 continue
             if re.match(r"^\s*(?:-\s*)?uses:\s*\./", line):
-                continue
+                raise SupplyChainContractError(f"local composite Action use is not covered: {path}")
             match = _ACTION.fullmatch(line)
             if not match:
                 raise SupplyChainContractError(
@@ -314,26 +346,28 @@ def _actions(
             current[2].add(path)
     components: list[dict[str, Any]] = []
     for name, (revision, version, paths) in sorted(observed.items()):
-        component, reference = _observable_component(
+        component, _ = _observable_component(
             kind="github-action",
             name=name,
-            version=version,
+            version=revision,
             platform="github-actions",
             authority_paths=sorted(paths),
             authority=authority,
             digest=("SHA-1", revision),
-            extra=(("action.revision", revision), ("action.uses", f"{name}@{revision}")),
+            extra=(
+                ("action.comment-version", version),
+                ("action.comment-version-authoritative", False),
+                ("action.revision", revision),
+                ("action.uses", f"{name}@{revision}"),
+            ),
         )
         components.append(component)
-        edges[reference] = set()
-        for path in paths:
-            edges.setdefault(input_refs[path], set()).add(reference)
-    return components, edges
+    return components, {}
 
 
 def _native_components(
     authority: dict[str, bytes],
-    input_refs: dict[str, str],
+    _input_refs: dict[str, str],
 ) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
     components: list[dict[str, Any]] = []
     edges: dict[str, set[str]] = {}
@@ -381,6 +415,16 @@ def _native_components(
         environment = _expect_keys(
             environment, expected_environment, f"{platform} build environment"
         )
+        if platform == "macos-arm64" and environment != {
+            "architecture": "arm64",
+            "buildRecipePath": _MACOS_RECIPE,
+            "buildRecipeSha256": _REVIEWED_AUTHORITY_SHA256[_MACOS_RECIPE],
+            "compiler": "Apple clang version 15.0.0 (clang-1500.3.9.4)",
+            "sdkVersion": "14.5",
+            "xcodeBuild": "15F31d",
+            "xcodeVersion": "15.4",
+        }:
+            raise SupplyChainContractError("macos-arm64 toolchain semantics changed")
         if (
             receipt["schemaVersion"] != 1
             or receipt["platform"] != receipt_platform
@@ -400,7 +444,7 @@ def _native_components(
             ("tippecanoe-decode", "decodeBinarySha256"),
         ):
             digest = _exact_sha256(receipt[key], f"{platform} {name} SHA-256")
-            component, reference = _observable_component(
+            component, _ = _observable_component(
                 kind="native-binary",
                 name=name,
                 version=_TIPPECANOE_VERSION,
@@ -415,8 +459,6 @@ def _native_components(
                 ),
             )
             components.append(component)
-            edges[reference] = set()
-            edges.setdefault(input_refs[path], set()).add(reference)
     if any(
         receipts[p][1][key] != receipts["linux-x86_64"][1][key]
         for p in receipts
@@ -447,28 +489,12 @@ def _native_components(
         extra=(("oci.reference", image),),
     )
     components.append(base)
-    edges[base_ref] = set()
-    edges.setdefault(input_refs[_LINUX_RECIPE], set()).add(base_ref)
 
-    packages: dict[str, str] = {}
     package_refs: dict[str, str] = {}
-    for role in ("packages", "runtimeLibraries"):
-        values = linux_environment[role]
-        if (
-            not isinstance(values, dict)
-            or not values
-            or any(
-                not isinstance(k, str) or not isinstance(v, str) or not k or not v
-                for k, v in values.items()
-            )
-        ):
-            raise SupplyChainContractError(
-                f"Linux receipt {role} must contain exact package versions"
-            )
+    for role, values in _LINUX_PACKAGE_ROLES.items():
+        if linux_environment[role] != values:
+            raise SupplyChainContractError(f"Linux receipt {role} changed")
         for name, version in sorted(values.items()):
-            if name in packages:
-                raise SupplyChainContractError(f"duplicate Linux native package: {name}")
-            packages[name] = version
             package, reference = _observable_component(
                 kind="native-package",
                 name=name,
@@ -487,32 +513,20 @@ def _native_components(
             )
             components.append(package)
             package_refs[name] = reference
-            edges[reference] = set()
-            edges.setdefault(input_refs[_LINUX_RECEIPT], set()).add(reference)
-    recipe_packages = dict(
-        re.findall(
-            r"^\s{8}([a-z0-9+.-]+)=([^\\\s]+)\s+\\$",
-            authority[_LINUX_RECIPE].decode("utf-8"),
-            re.MULTILINE,
-        )
-    )
-    if recipe_packages != linux_environment["packages"]:
-        raise SupplyChainContractError("Linux recipe packages differ from the native receipt")
-    edges[input_refs[_LINUX_RECIPE]].update(package_refs[name] for name in recipe_packages)
-    runtime_refs = {package_refs[name] for name in linux_environment["runtimeLibraries"]}
+    runtime_refs = {package_refs[name] for name in _LINUX_PACKAGE_ROLES["runtimeLibraries"]}
     for component in components:
         if (
             component["name"] in {"tippecanoe", "tippecanoe-decode"}
             and _properties_dict(component)["platform"] == "linux-x86_64"
         ):
-            edges[component["bom-ref"]].update(runtime_refs | {base_ref})
+            edges.setdefault(component["bom-ref"], set()).update(runtime_refs | {base_ref})
 
     release_name, release_tag, release_digest = _docker_base(
         authority[_RELEASE_DOCKERFILE], "controlled-release Dockerfile"
     )
     if release_tag is None:
         raise SupplyChainContractError("controlled-release base image must retain an exact tag")
-    release, release_ref = _observable_component(
+    release, _ = _observable_component(
         kind="oci-base",
         name=release_name,
         version=release_tag,
@@ -523,8 +537,6 @@ def _native_components(
         extra=(("oci.reference", f"{release_name}:{release_tag}@sha256:{release_digest}"),),
     )
     components.append(release)
-    edges[release_ref] = set()
-    edges.setdefault(input_refs[_RELEASE_DOCKERFILE], set()).add(release_ref)
     return components, edges
 
 
@@ -565,10 +577,6 @@ def _duckdb_components(
     components: list[dict[str, Any]] = []
     edges: dict[str, set[str]] = {}
     expected_platforms = {"linux-x86_64": "linux_amd64", "macos-arm64": "osx_arm64"}
-    wheel_suffixes = {
-        "linux-x86_64": "duckdb-1.5.4-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
-        "macos-arm64": "duckdb-1.5.4-cp311-cp311-macosx_11_0_arm64.whl",
-    }
     for platform, duckdb_platform in expected_platforms.items():
         record = _expect_keys(
             platforms[platform],
@@ -595,19 +603,11 @@ def _duckdb_components(
                 raise SupplyChainContractError(f"{platform} {key} byteSize must be positive")
             extra: list[tuple[str, object]] = [
                 ("artifact.byte-size", size),
+                ("artifact.claim", "lock-recorded"),
                 ("duckdb.platform", duckdb_platform),
             ]
             if "url" in item:
                 url = _exact_string(item["url"], f"{platform} {key} URL")
-                expected_url = (
-                    f"https://extensions.duckdb.org/v{_DUCKDB_VERSION}/{duckdb_platform}/spatial.duckdb_extension.gz"
-                    if key == "extensionArchive"
-                    else f"https://files.pythonhosted.org/packages/{url.split('/packages/', 1)[-1]}"
-                )
-                if url != expected_url or (
-                    key == "pythonWheel" and not url.endswith(wheel_suffixes[platform])
-                ):
-                    raise SupplyChainContractError(f"{platform} {key} URL is not version locked")
                 extra.append(("artifact.url", url))
             if "relativePath" in item:
                 relative_path = _logical_path(
@@ -636,9 +636,7 @@ def _duckdb_components(
             )
             components.append(component)
             references[key] = reference
-            edges[reference] = set()
-            edges.setdefault(input_refs[_DUCKDB_LOCK], set()).add(reference)
-        edges[references["extension"]].add(references["extensionArchive"])
+        edges.setdefault(references["extension"], set()).add(references["extensionArchive"])
     return components, edges
 
 
@@ -646,6 +644,13 @@ def _observable_components(
     authority: dict[str, bytes],
     input_refs: dict[str, str],
 ) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
+    changed = [
+        path
+        for path, expected in _REVIEWED_AUTHORITY_SHA256.items()
+        if _sha256(authority[path]) != expected
+    ]
+    if changed:
+        raise SupplyChainContractError(f"reviewed build-plane authority bytes changed: {changed}")
     components: list[dict[str, Any]] = []
     edges: dict[str, set[str]] = {}
     for builder in (_actions, _native_components, _duckdb_components):

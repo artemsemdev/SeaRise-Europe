@@ -6,12 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
-- Added a deterministic CycloneDX 1.7 build-plane inventory that preserves ten
-  exact workflow, container-recipe, and native-toolchain file authorities and
-  derives platform-qualified native binaries, DuckDB/Spatial artifacts, OCI
-  bases, pinned Actions, and exact Linux package versions from only those
-  reviewed bytes, with explicit completeness, signing, approval, and
-  production-readiness nonclaims.
+- Added a deterministic CycloneDX 1.7 build-plane inventory with ten file
+  authorities, full-revision Actions, native binaries/packages, lock-recorded
+  DuckDB/Spatial artifacts, OCI bases, and explicit production nonclaims.
 - Added immutable, project- and target-specific NuGet CycloneDX inventories for
   deployable API and library projects, with exact artifact/project/lock
   authority, explicit test-project exclusion, and no production claim.

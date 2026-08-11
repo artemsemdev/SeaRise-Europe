@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             destination = args.sbom
         print(
-            f"{args.command}d {len(document['components'])} build-plane components: "
+            f"{args.command}d {len(document['components'])} build-plane inputs: "
             f"{destination}"
         )
     except (OSError, json.JSONDecodeError, SupplyChainContractError) as exc:
