@@ -138,8 +138,8 @@
     "local-2026-08-11-candidate-completeness-contract": {
       "kind": "local-measurement",
       "observedAt": "2026-08-11T19:26:49+02:00",
-      "reference": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py",
-      "environment": "macOS arm64; Python 3.9; ten deterministic strict-JSON, schema, total semantic-validation, exact-inventory, checksum, STAC, CLI-scope, supply-chain-boundary, and negative-vector tests"
+      "reference": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py and test_provenance_statement.py",
+      "environment": "macOS arm64; Python 3.11; deterministic candidate contract and unsigned in-toto/SLSA provenance tests"
     },
     "local-2026-08-11-supply-chain-contract": {
       "kind": "local-measurement",
@@ -570,11 +570,11 @@
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the Phase 1 pre-sign candidate exact, immutable, manifest-last, rights-bound, and subject to a mandatory non-recursive supply-chain evidence gate.",
-      "sourcePaths": ["contracts/candidate-completeness/**", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py"],
-      "changedPaths": ["contracts/candidate-completeness/**", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py"],
+      "sourcePaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
+      "changedPaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-inventory, checksum-coverage, STAC-binding, terminal-order, geometry-nonclaim, and supply-chain-boundary gate." },
-      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/contracts/test_candidate_completeness_contract.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/contracts/test_candidate_completeness_contract.py src/pipeline/tests/contracts/test_provenance_statement.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-candidate-completeness-contract", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed checked-in schemas, inventory, fixtures, and vectors use no clock, random input, network, credentials, or external binaries." }
@@ -1060,6 +1060,7 @@
     { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_gate_report.py", "suite": "pipeline-release-gate-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_provenance_statement.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py", "suite": "pipeline-boundary-pmtiles-structure", "status": "active", "removalGate": null, "replacementEvidence": null },
