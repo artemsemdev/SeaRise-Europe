@@ -37,17 +37,35 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         fast_suites = fast_local_suites(suites)
 
         self.assertTrue(fast_suites)
-        self.assertTrue(all(not suite["execution"]["requiresDocker"] for suite in fast_suites))
-        self.assertNotIn("container-frontend-build", {suite["id"] for suite in fast_suites})
+        self.assertTrue(
+            all(not suite["execution"]["requiresDocker"] for suite in fast_suites)
+        )
+        self.assertNotIn(
+            "container-frontend-build", {suite["id"] for suite in fast_suites}
+        )
 
     def test_globs_normalize_windows_separators(self) -> None:
-        self.assertTrue(path_matches("src\\frontend\\src\\app\\page.tsx", "src/frontend/**"))
+        self.assertTrue(
+            path_matches("src\\frontend\\src\\app\\page.tsx", "src/frontend/**")
+        )
 
     def test_selection_order_is_deterministic(self) -> None:
-        suites = select_suites(self.inventory, ["src/frontend/src/lib/store/appStore.ts"])
+        suites = select_suites(
+            self.inventory, ["src/frontend/src/lib/store/appStore.ts"]
+        )
         ids = [suite["id"] for suite in suites]
 
         self.assertEqual(ids, sorted(ids))
+
+    def test_build_plane_validator_routes_supply_chain_contract(self) -> None:
+        suites = select_suites(
+            self.inventory,
+            ["scripts/release/validate_build_plane_sbom.py"],
+        )
+
+        self.assertIn(
+            "pipeline-supply-chain-contract", {suite["id"] for suite in suites}
+        )
 
 
 if __name__ == "__main__":
