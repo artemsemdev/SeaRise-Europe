@@ -26,6 +26,7 @@ dependencies = [
 
 [project.scripts]
 searise-release = "searise_pipeline.offline_release.cli:cli"
+searise-candidate-contract = "searise_pipeline.candidate_completeness.cli:cli"
 searise-sources = "searise_pipeline.sources.cli:cli"
 searise-settlement-spatial-toolchain = "searise_pipeline.settlements.spatial_toolchain:main"
 
@@ -40,6 +41,7 @@ dev = [
 packages = [
     "pipeline",
     "searise_pipeline",
+    "searise_pipeline.candidate_completeness",
     "searise_pipeline.domain",
     "searise_pipeline.offline_release",
     "searise_pipeline.regional_fixture",
