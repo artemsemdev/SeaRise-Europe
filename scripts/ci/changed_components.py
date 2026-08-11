@@ -36,6 +36,9 @@ FORCE_ALL = (
 
 FRONTEND = (
     "src/frontend/**",
+    "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
+    "src/pipeline/evidence/ar6-regional-release/**",
+    "src/pipeline/fixtures/ar6-regional-release/**",
     "contracts/**",
     "tests/fixtures/tdd/**",
 )
