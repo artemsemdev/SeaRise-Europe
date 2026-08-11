@@ -11,7 +11,13 @@ from .contracts import (
 )
 from .python_graph import validate_python_lock_graph
 from .python_sbom import generate_python_sbom, publish_python_sbom, validate_python_sbom
-from .sbom import canonical_sbom_bytes, generate_npm_sbom, write_new_sbom
+from .sbom import (
+    canonical_sbom_bytes,
+    generate_npm_sbom,
+    publish_npm_sbom,
+    validate_npm_sbom,
+    write_new_sbom,
+)
 
 __all__ = [
     "SupplyChainContractError",
@@ -21,10 +27,12 @@ __all__ = [
     "generate_python_sbom",
     "load_json",
     "parse_timestamp",
+    "publish_npm_sbom",
     "publish_python_sbom",
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_evidence_files",
+    "validate_npm_sbom",
     "validate_python_lock_graph",
     "validate_python_sbom",
     "write_new_sbom",

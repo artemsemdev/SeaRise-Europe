@@ -6,6 +6,7 @@ import base64
 import copy
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,8 @@ from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     canonical_sbom_bytes,
     generate_npm_sbom,
+    publish_npm_sbom,
+    validate_npm_sbom,
     write_new_sbom,
 )
 
@@ -30,6 +33,10 @@ FIXTURE = (
     / "npm-lock.synthetic.json"
 )
 REAL_LOCK = REPOSITORY_ROOT / "src" / "frontend" / "package-lock.json"
+REAL_ARTIFACT = (
+    REPOSITORY_ROOT / "contracts" / "supply-chain" / "v1" / "sboms" / "frontend-npm.cdx.json"
+)
+REAL_LOGICAL_PATH = "src/frontend/package-lock.json"
 LOGICAL_PATH = "contracts/supply-chain/v1/fixtures/sbom/npm-lock.synthetic.json"
 
 
@@ -148,7 +155,7 @@ def test_canonical_rendering_rejects_non_json_numbers() -> None:
 def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
     document = generate_npm_sbom(
         REAL_LOCK,
-        logical_path="src/frontend/package-lock.json",
+        logical_path=REAL_LOGICAL_PATH,
     )
     components = document["components"]
     graph = _dependencies(document)
@@ -196,6 +203,136 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
         by_path["node_modules/eslint"]["bom-ref"]
         not in graph[by_path["node_modules/eslint-module-utils"]["bom-ref"]]
     )
+
+
+def test_checked_in_real_frontend_artifact_matches_exact_lock_authority() -> None:
+    raw = REAL_ARTIFACT.read_bytes()
+    document = validate_npm_sbom(
+        REAL_ARTIFACT,
+        REAL_LOCK,
+        repository_root=REPOSITORY_ROOT,
+        logical_path=REAL_LOGICAL_PATH,
+    )
+    root_properties = _properties(document["metadata"]["component"])
+
+    assert raw == canonical_sbom_bytes(document)
+    assert len(document["components"]) == 597
+    assert root_properties["org.searise.sbom.input.path"] == REAL_LOGICAL_PATH
+    assert (
+        root_properties["org.searise.sbom.input.sha256"]
+        == hashlib.sha256(REAL_LOCK.read_bytes()).hexdigest()
+    )
+    assert root_properties["org.searise.sbom.production-claim"] == "false"
+    assert root_properties["org.searise.sbom.scope"] == "frontend-npm-lock-only"
+
+
+def test_public_api_publishes_the_exact_real_frontend_artifact_once(tmp_path: Path) -> None:
+    output = tmp_path / "frontend-npm.cdx.json"
+    document = publish_npm_sbom(
+        output,
+        REAL_LOCK,
+        repository_root=REPOSITORY_ROOT,
+        logical_path=REAL_LOGICAL_PATH,
+    )
+
+    assert output.read_bytes() == REAL_ARTIFACT.read_bytes() == canonical_sbom_bytes(document)
+    with pytest.raises(SupplyChainContractError, match="already exists"):
+        publish_npm_sbom(
+            output,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path=REAL_LOGICAL_PATH,
+        )
+
+
+def test_real_artifact_mutation_and_noncanonical_bytes_fail_closed(tmp_path: Path) -> None:
+    mutated = json.loads(REAL_ARTIFACT.read_bytes())
+    mutated["components"].pop()
+    artifact = tmp_path / "mutated.cdx.json"
+    artifact.write_bytes(canonical_sbom_bytes(mutated))
+    with pytest.raises(SupplyChainContractError, match="lock authority"):
+        validate_npm_sbom(
+            artifact,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path=REAL_LOGICAL_PATH,
+        )
+
+    artifact.write_text(
+        json.dumps(json.loads(REAL_ARTIFACT.read_bytes()), indent=2), encoding="utf-8"
+    )
+    with pytest.raises(SupplyChainContractError, match="not canonical"):
+        validate_npm_sbom(
+            artifact,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path=REAL_LOGICAL_PATH,
+        )
+
+
+def test_real_validation_rejects_unsafe_or_mismatched_lock_paths(tmp_path: Path) -> None:
+    with pytest.raises(SupplyChainContractError, match="logical path"):
+        validate_npm_sbom(
+            REAL_ARTIFACT,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path="src/frontend/other-lock.json",
+        )
+    with pytest.raises(SupplyChainContractError, match="unsafe SBOM input path"):
+        validate_npm_sbom(
+            REAL_ARTIFACT,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path="../package-lock.json",
+        )
+    outside = tmp_path / "package-lock.json"
+    shutil.copyfile(REAL_LOCK, outside)
+    with pytest.raises(SupplyChainContractError, match="beneath"):
+        validate_npm_sbom(
+            REAL_ARTIFACT,
+            outside,
+            repository_root=REPOSITORY_ROOT,
+            logical_path=REAL_LOGICAL_PATH,
+        )
+
+
+def test_real_validation_rejects_symlinked_lock_or_artifact_ancestry(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    real_parent = repository / "real"
+    real_parent.mkdir(parents=True)
+    shutil.copyfile(REAL_LOCK, real_parent / "package-lock.json")
+    linked_parent = repository / "frontend"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(SupplyChainContractError, match="without symlinks"):
+        validate_npm_sbom(
+            REAL_ARTIFACT,
+            linked_parent / "package-lock.json",
+            repository_root=repository,
+            logical_path="frontend/package-lock.json",
+        )
+
+    real_artifact_parent = tmp_path / "real-artifact"
+    real_artifact_parent.mkdir()
+    shutil.copyfile(REAL_ARTIFACT, real_artifact_parent / REAL_ARTIFACT.name)
+    linked_artifact_parent = tmp_path / "linked-artifact"
+    linked_artifact_parent.symlink_to(real_artifact_parent, target_is_directory=True)
+    with pytest.raises(SupplyChainContractError, match="must not be a symlink"):
+        validate_npm_sbom(
+            linked_artifact_parent / REAL_ARTIFACT.name,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path=REAL_LOGICAL_PATH,
+        )
+
+    artifact_link = tmp_path / "frontend.cdx.json"
+    artifact_link.symlink_to(REAL_ARTIFACT)
+    with pytest.raises(SupplyChainContractError, match="without symlinks"):
+        validate_npm_sbom(
+            artifact_link,
+            REAL_LOCK,
+            repository_root=REPOSITORY_ROOT,
+            logical_path=REAL_LOGICAL_PATH,
+        )
 
 
 @pytest.mark.parametrize(

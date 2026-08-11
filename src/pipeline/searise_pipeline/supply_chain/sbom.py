@@ -10,12 +10,14 @@ import os
 import re
 import secrets
 import stat
+import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 from urllib.parse import quote, unquote, urlsplit
 
 from .contracts import SupplyChainContractError, _validate_cyclonedx
+from .python_graph import _read_descriptor
 
 _NPM_PATH = re.compile(
     r"^node_modules/(?:@[^/\s]+/)?[^/\s]+"
@@ -562,8 +564,7 @@ def _assert_graph_reachable(
         raise SupplyChainContractError(f"unreachable npm package entries: {', '.join(unreachable)}")
 
 
-def generate_npm_sbom(lock_path: Path, *, logical_path: str) -> dict[str, Any]:
-    """Generate a deterministic CycloneDX 1.7 graph from package-lock v3."""
+def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, Any]:
     input_bytes, lock = _load_lock_bytes(lock_path)
     if lock.get("lockfileVersion") != 3 or lock.get("requires") is not True:
         raise SupplyChainContractError("npm SBOM generation requires package-lock v3")
@@ -660,4 +661,156 @@ def generate_npm_sbom(lock_path: Path, *, logical_path: str) -> dict[str, Any]:
         "dependencies": relationships,
     }
     _validate_cyclonedx(document)
+    return document
+
+
+def _repository_lock_bytes(
+    lock_path: Path,
+    *,
+    repository_root: Path,
+    logical_path: str,
+) -> bytes:
+    logical = PurePosixPath(_logical_path(logical_path))
+    root = repository_root.absolute()
+    try:
+        if root != repository_root.resolve(strict=True):
+            raise SupplyChainContractError("npm repository root must not be a symlink")
+        candidate = lock_path if lock_path.is_absolute() else root / lock_path
+        relative = PurePosixPath(candidate.absolute().relative_to(root).as_posix())
+    except (OSError, ValueError) as exc:
+        raise SupplyChainContractError("npm lock path must be beneath the repository") from exc
+    if relative != logical:
+        raise SupplyChainContractError("npm lock path differs from its logical path")
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    root_descriptor = parent_descriptor = file_descriptor = -1
+    try:
+        root_descriptor = os.open(root, flags | os.O_DIRECTORY)
+        parent_descriptor = _open_directory(root_descriptor, tuple(logical.parts[:-1]))
+        file_descriptor = os.open(
+            logical.name,
+            flags | getattr(os, "O_NONBLOCK", 0),
+            dir_fd=parent_descriptor,
+        )
+        return _read_descriptor(file_descriptor, label="npm lock", path=logical)
+    except OSError as exc:
+        raise SupplyChainContractError(
+            f"npm lock must exist beneath the repository without symlinks: {logical}"
+        ) from exc
+    finally:
+        for descriptor in (file_descriptor, parent_descriptor, root_descriptor):
+            if descriptor >= 0:
+                os.close(descriptor)
+
+
+def generate_npm_sbom(
+    lock_path: Path,
+    *,
+    logical_path: str,
+    repository_root: Path | None = None,
+) -> dict[str, Any]:
+    """Generate a deterministic CycloneDX 1.7 graph from package-lock v3."""
+    if repository_root is None:
+        return _generate_npm_sbom_file(lock_path, logical_path=logical_path)
+    authority = _repository_lock_bytes(
+        lock_path,
+        repository_root=repository_root,
+        logical_path=logical_path,
+    )
+    with tempfile.TemporaryDirectory(prefix="searise-npm-sbom-") as temporary:
+        snapshot = Path(temporary) / "package-lock.json"
+        snapshot.write_bytes(authority)
+        document = _generate_npm_sbom_file(snapshot, logical_path=logical_path)
+    if authority != _repository_lock_bytes(
+        lock_path,
+        repository_root=repository_root,
+        logical_path=logical_path,
+    ):
+        raise SupplyChainContractError("npm lock changed during SBOM generation")
+    return document
+
+
+def _read_canonical_npm_sbom(path: Path) -> tuple[bytes, dict[str, Any]]:
+    anchor, parent, _parent_parts, name = _open_output_parent(path)
+    descriptor = -1
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(name, flags | getattr(os, "O_NONBLOCK", 0), dir_fd=parent)
+        raw = _read_descriptor(descriptor, label="npm SBOM", path=path)
+    except OSError as exc:
+        raise SupplyChainContractError(
+            f"npm SBOM must be a regular file without symlinks: {path}"
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent)
+        os.close(anchor)
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        document: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in document:
+                raise SupplyChainContractError(f"duplicate npm SBOM key: {key}")
+            document[key] = value
+        return document
+
+    def reject_constant(value: str) -> None:
+        raise SupplyChainContractError(f"invalid npm SBOM numeric constant: {value}")
+
+    try:
+        parsed = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=reject_duplicates,
+            parse_constant=reject_constant,
+        )
+    except UnicodeDecodeError as exc:
+        raise SupplyChainContractError("npm SBOM must be UTF-8") from exc
+    except json.JSONDecodeError as exc:
+        raise SupplyChainContractError("npm SBOM JSON is malformed") from exc
+    if not isinstance(parsed, dict):
+        raise SupplyChainContractError("npm SBOM root must be an object")
+    try:
+        canonical = canonical_sbom_bytes(parsed)
+    except (TypeError, ValueError) as exc:
+        raise SupplyChainContractError("npm SBOM contains a noncanonical value") from exc
+    if canonical != raw:
+        raise SupplyChainContractError("npm SBOM JSON is not canonical")
+    _validate_cyclonedx(parsed)
+    return raw, parsed
+
+
+def validate_npm_sbom(
+    sbom_path: Path,
+    lock_path: Path,
+    *,
+    repository_root: Path,
+    logical_path: str,
+) -> dict[str, Any]:
+    """Validate exact canonical BOM bytes against the current npm lock authority."""
+    raw, document = _read_canonical_npm_sbom(sbom_path)
+    expected = generate_npm_sbom(
+        lock_path,
+        repository_root=repository_root,
+        logical_path=logical_path,
+    )
+    if raw != canonical_sbom_bytes(expected):
+        raise SupplyChainContractError("npm SBOM differs from its lock authority")
+    return document
+
+
+def publish_npm_sbom(
+    output_path: Path,
+    lock_path: Path,
+    *,
+    repository_root: Path,
+    logical_path: str,
+) -> dict[str, Any]:
+    """Generate and durably publish one immutable npm SBOM."""
+    document = generate_npm_sbom(
+        lock_path,
+        repository_root=repository_root,
+        logical_path=logical_path,
+    )
+    write_new_sbom(output_path, canonical_sbom_bytes(document))
     return document
