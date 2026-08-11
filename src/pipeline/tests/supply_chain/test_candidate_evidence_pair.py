@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import json
 import runpy
 import shutil
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any
 
 import pytest
 
@@ -29,38 +30,8 @@ BUILD = ROOT / "contracts/release/v1/fixtures/valid/build-receipt.json"
 SOURCE = ROOT / "contracts/release/v1/fixtures/valid/source-receipt.json"
 ENVELOPE = ROOT / "contracts/supply-chain/v1/fixtures/valid/evidence-envelope.json"
 POLICY = ROOT / "contracts/supply-chain/v1/identity-policy.json"
-SBOMS = {
-    "sbom/build-plane.cdx.json": "contracts/supply-chain/v1/sboms/build-plane.cdx.json",
-    "sbom/frontend-npm.cdx.json": "contracts/supply-chain/v1/sboms/frontend-npm.cdx.json",
-    "sbom/nuget/searise-api-net8.0.cdx.json": (
-        "contracts/supply-chain/v1/sboms/nuget/searise-api-net8.0.cdx.json"
-    ),
-    "sbom/nuget/searise-application-net8.0.cdx.json": (
-        "contracts/supply-chain/v1/sboms/nuget/searise-application-net8.0.cdx.json"
-    ),
-    "sbom/nuget/searise-domain-net8.0.cdx.json": (
-        "contracts/supply-chain/v1/sboms/nuget/searise-domain-net8.0.cdx.json"
-    ),
-    "sbom/nuget/searise-infrastructure-net8.0.cdx.json": (
-        "contracts/supply-chain/v1/sboms/nuget/searise-infrastructure-net8.0.cdx.json"
-    ),
-    "sbom/python-release-linux-x86-64-cp311.cdx.json": (
-        "contracts/supply-chain/v1/sboms/python-release-linux-x86-64-cp311.cdx.json"
-    ),
-    "sbom/python-release-macos-arm64-cp311.cdx.json": (
-        "contracts/supply-chain/v1/sboms/python-release-macos-arm64-cp311.cdx.json"
-    ),
-    "sbom/python-settlement-spatial-linux-x86-64-cp311.cdx.json": (
-        "contracts/supply-chain/v1/sboms/python-settlement-spatial-linux-x86-64-cp311.cdx.json"
-    ),
-    "sbom/python-settlement-spatial-macos-arm64-cp311.cdx.json": (
-        "contracts/supply-chain/v1/sboms/python-settlement-spatial-macos-arm64-cp311.cdx.json"
-    ),
-}
-main = cast(
-    Callable[..., int],
-    runpy.run_path(str(ROOT / "scripts/release/validate_supply_chain_contract.py"))["main"],
-)
+SBOM_ROOT = ROOT / "contracts/supply-chain/v1/sboms"
+main = runpy.run_path(str(ROOT / "scripts/release/validate_supply_chain_contract.py"))["main"]
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -76,6 +47,10 @@ def _write(path: Path, document: dict[str, Any], *, canonical: bool = False) -> 
     )
     path.write_bytes(raw)
     return raw
+
+
+def _b64(value: bytes) -> str:
+    return base64.b64encode(value).decode()
 
 
 def _pair(tmp_path: Path) -> tuple[Path, Path]:
@@ -119,16 +94,10 @@ def _pair(tmp_path: Path) -> tuple[Path, Path]:
         artifacts[item["path"]].update(sha256=item["sha256"], byteSize=len(raw))
         checksums[item["path"]]["sha256"] = item["sha256"]
     build_raw = _write(candidate_root / "receipts/build.json", build)
-    build_artifact = next(
-        item for item in candidate["artifacts"] if item["role"] == "build-receipt"
-    )
+    build_artifact = artifacts["receipts/build.json"]
     build_artifact["byteSize"] = len(build_raw)
     build_artifact["sha256"] = hashlib.sha256(build_raw).hexdigest()
-    next(
-        item
-        for item in candidate["checksumInventory"]["subjects"]
-        if item["path"] == build_artifact["path"]
-    )["sha256"] = build_artifact["sha256"]
+    checksums[build_artifact["path"]]["sha256"] = build_artifact["sha256"]
     manifest_raw = _write(candidate_root / "manifest.json", candidate)
 
     statement = generate_provenance_statement(
@@ -141,10 +110,11 @@ def _pair(tmp_path: Path) -> tuple[Path, Path]:
     (evidence_root / "provenance.intoto.jsonl").write_bytes(provenance_raw)
 
     descriptors = []
-    for logical_path, repository_path in sorted(SBOMS.items()):
+    for repository_path in sorted(SBOM_ROOT.rglob("*.cdx.json")):
+        logical_path = f"sbom/{repository_path.relative_to(SBOM_ROOT).as_posix()}"
         target = evidence_root / logical_path
         target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / repository_path, target)
+        shutil.copy2(repository_path, target)
         descriptors.append(
             {
                 "role": "software-bill-of-materials",
@@ -156,27 +126,32 @@ def _pair(tmp_path: Path) -> tuple[Path, Path]:
             }
         )
     envelope = _load(ENVELOPE)
-    envelope.update(
-        {
-            field: candidate[field]
-            for field in ("candidateId", "dataReleaseId", "dataProvenanceClass")
-        }
-    )
+    for field in ("candidateId", "dataReleaseId", "dataProvenanceClass"):
+        envelope[field] = candidate[field]
     envelope["identityPolicy"]["sha256"] = hashlib.sha256(POLICY.read_bytes()).hexdigest()
     envelope["candidateManifest"]["sha256"] = hashlib.sha256(manifest_raw).hexdigest()
+    envelope["candidateManifest"]["byteSize"] = len(manifest_raw)
     envelope["provenance"]["sha256"] = hashlib.sha256(provenance_raw).hexdigest()
+    envelope["provenance"]["byteSize"] = len(provenance_raw)
     envelope["softwareBillsOfMaterials"] = descriptors
     for signature, subject in zip(
         envelope["signatures"], (envelope["candidateManifest"], envelope["provenance"])
     ):
         signature["subjectPath"] = subject["path"]
         signature["subjectSha256"] = subject["sha256"]
+        subject_raw = manifest_raw if subject["path"] == "manifest.json" else provenance_raw
+        bundle = _load(ENVELOPE.parent / signature["path"])
+        bundle["messageSignature"]["messageDigest"]["digest"] = _b64(
+            hashlib.sha256(subject_raw).digest()
+        )
+        bundle_raw = _write(evidence_root / signature["path"], bundle, canonical=True)
+        signature.update(sha256=hashlib.sha256(bundle_raw).hexdigest(), byteSize=len(bundle_raw))
     _write(evidence_root / "evidence-envelope.json", envelope)
     return candidate_root, evidence_root
 
 
-def _validate(candidate: Path, evidence: Path) -> None:
-    validate_candidate_evidence_pair(
+def _validate(candidate: Path, evidence: Path) -> Any:
+    return validate_candidate_evidence_pair(
         candidate,
         evidence,
         repository_root=ROOT,
@@ -188,34 +163,23 @@ def test_valid_pair_preserves_nonclaims_and_cli_reports_them(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     candidate, evidence = _pair(tmp_path)
-
-    summary = validate_candidate_evidence_pair(
-        candidate, evidence, repository_root=ROOT, trusted_invocation_uri=INVOCATION
-    )
-
+    summary = _validate(candidate, evidence)
     assert summary.sbom_count == 10
     assert summary.data_provenance_class == "synthetic-fixture"
-    assert (
-        not summary.cryptographic_verification
-        and not summary.production
-        and not summary.publication
+    assert (summary.cryptographic_verification, summary.production, summary.publication) == (
+        False,
+        False,
+        False,
     )
-    assert (
-        main(
-            [
-                "candidate-evidence-pair",
-                "--candidate-root",
-                str(candidate),
-                "--evidence-root",
-                str(evidence),
-                "--repository-root",
-                str(ROOT),
-                "--trusted-invocation-uri",
-                INVOCATION,
-            ]
-        )
-        == 0
-    )
+    args = ["candidate-evidence-pair"]
+    for flag, value in (
+        ("candidate-root", candidate),
+        ("evidence-root", evidence),
+        ("repository-root", ROOT),
+        ("trusted-invocation-uri", INVOCATION),
+    ):
+        args.extend((f"--{flag}", str(value)))
+    assert main(args) == 0
     assert (
         "10 SBOMs; cryptographic verification, production, and publication not claimed"
         in capsys.readouterr().out
@@ -223,31 +187,27 @@ def test_valid_pair_preserves_nonclaims_and_cli_reports_them(
 
 
 @pytest.mark.parametrize(
-    ("field", "value"),
+    ("section", "field", "value"),
     [
-        ("candidateId", "candidate-drift"),
-        ("dataReleaseId", "searise-europe-v1.0.0-20260811-deadbeefcafe"),
-        ("dataProvenanceClass", "real-source"),
+        (None, "candidateId", "candidate-drift"),
+        (None, "dataReleaseId", "searise-europe-v1.0.0-20260811-deadbeefcafe"),
+        (None, "dataProvenanceClass", "real-source"),
+        ("candidateManifest", "byteSize", 1),
+        ("provenance", "byteSize", 1),
     ],
 )
-def test_pair_identity_mismatch_fails(tmp_path: Path, field: str, value: str) -> None:
+def test_pair_descriptor_mismatch_fails(
+    tmp_path: Path, section: str | None, field: str, value: str | int
+) -> None:
     candidate, evidence = _pair(tmp_path)
     envelope_path = evidence / "evidence-envelope.json"
     envelope = _load(envelope_path)
-    envelope[field] = value
+    if section:
+        envelope[section][field] += value
+    else:
+        envelope[field] = value
     _write(envelope_path, envelope)
-
-    with pytest.raises(SupplyChainContractError, match=field):
-        _validate(candidate, evidence)
-
-
-@pytest.mark.parametrize("relative", ["manifest.json", "provenance.intoto.jsonl"])
-def test_actual_pair_byte_tampering_fails(tmp_path: Path, relative: str) -> None:
-    candidate, evidence = _pair(tmp_path)
-    target = candidate / relative if relative == "manifest.json" else evidence / relative
-    target.write_bytes(target.read_bytes() + b" ")
-
-    with pytest.raises(SupplyChainContractError, match="manifest|provenance"):
+    with pytest.raises(SupplyChainContractError, match=field if section is None else "descriptor"):
         _validate(candidate, evidence)
 
 
@@ -265,7 +225,6 @@ def test_sbom_descriptor_set_and_order_are_exact(tmp_path: Path, mutation: str) 
     else:
         envelope["softwareBillsOfMaterials"].reverse()
     _write(envelope_path, envelope)
-
     with pytest.raises(SupplyChainContractError, match="exact sorted ten"):
         _validate(candidate, evidence)
 
@@ -277,10 +236,8 @@ def test_sbom_actual_hash_and_regeneration_are_both_required(tmp_path: Path) -> 
     document = _load(sbom_path)
     document["version"] = 2
     changed = _write(sbom_path, document, canonical=True)
-
     with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch"):
         _validate(candidate, evidence)
-
     envelope_path = evidence / "evidence-envelope.json"
     envelope = _load(envelope_path)
     next(item for item in envelope["softwareBillsOfMaterials"] if item["path"] == logical)[
@@ -291,7 +248,10 @@ def test_sbom_actual_hash_and_regeneration_are_both_required(tmp_path: Path) -> 
         _validate(candidate, evidence)
 
 
-@pytest.mark.parametrize("mutation", ["extra", "duplicate", "wrong-target"])
+@pytest.mark.parametrize(
+    "mutation",
+    "extra duplicate wrong-target missing directory malformed hash size symlink digest".split(),
+)
 def test_exactly_two_unique_signature_descriptors_are_required(
     tmp_path: Path, mutation: str
 ) -> None:
@@ -304,15 +264,39 @@ def test_exactly_two_unique_signature_descriptors_are_required(
         envelope["signatures"].append(extra)
     elif mutation == "duplicate":
         envelope["signatures"].append(copy.deepcopy(envelope["signatures"][0]))
-    else:
+    elif mutation == "wrong-target":
         envelope["signatures"][0]["subjectPath"] = "other.json"
+    else:
+        descriptor = envelope["signatures"][0]
+        bundle_path = evidence / descriptor["path"]
+        if mutation == "missing":
+            bundle_path.unlink()
+        elif mutation == "directory":
+            bundle_path.unlink()
+            bundle_path.mkdir()
+        elif mutation == "hash":
+            descriptor["sha256"] = "0" * 64
+        elif mutation == "size":
+            descriptor["byteSize"] += 1
+        elif mutation == "symlink":
+            outside = tmp_path / "signature-copy.json"
+            shutil.copy2(bundle_path, outside)
+            bundle_path.unlink()
+            bundle_path.symlink_to(outside)
+        else:
+            bundle = _load(bundle_path)
+            if mutation == "digest":
+                bundle["messageSignature"]["messageDigest"]["digest"] = _b64(b"0" * 32)
+            else:
+                bundle["messageSignature"]["signature"] = "!"
+            raw = _write(bundle_path, bundle, canonical=True)
+            descriptor.update(sha256=hashlib.sha256(raw).hexdigest(), byteSize=len(raw))
     _write(envelope_path, envelope)
-
-    with pytest.raises(SupplyChainContractError, match="signature|signed subject"):
+    with pytest.raises(SupplyChainContractError, match="signature|signed subject|symlinks"):
         _validate(candidate, evidence)
 
 
-@pytest.mark.parametrize("invalid", ["duplicate", "nan"])
+@pytest.mark.parametrize("invalid", ["duplicate", "nan", "surrogate", "deep"])
 def test_envelope_requires_strict_json(tmp_path: Path, invalid: str) -> None:
     candidate, evidence = _pair(tmp_path)
     envelope_path = evidence / "evidence-envelope.json"
@@ -321,10 +305,13 @@ def test_envelope_requires_strict_json(tmp_path: Path, invalid: str) -> None:
         raw = raw.replace(
             b'{\n  "$schema"', b'{\n  "candidateId": "candidate-duplicate",\n  "$schema"'
         )
-    else:
+    elif invalid == "nan":
         raw = raw.replace(b'"fixtureOnly": true', b'"fixtureOnly": NaN')
+    elif invalid == "surrogate":
+        raw = raw.replace(b'"reason": "', b'"reason": "\\ud800')
+    else:
+        raw = b'{"nested":' + (b"[" * 2000) + b"0" + (b"]" * 2000) + b"}"
     envelope_path.write_bytes(raw)
-
     with pytest.raises(SupplyChainContractError, match="strict UTF-8 JSON"):
         _validate(candidate, evidence)
 
@@ -342,6 +329,5 @@ def test_candidate_and_evidence_paths_reject_symlinks(tmp_path: Path, target: st
         shutil.copy2(provenance, outside)
         provenance.unlink()
         provenance.symlink_to(outside)
-
     with pytest.raises(SupplyChainContractError, match="without symlinks"):
         _validate(candidate, evidence)

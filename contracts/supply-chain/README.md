@@ -25,26 +25,11 @@ cryptographically verify a bundle.
 
 ## Candidate/evidence pair validation
 
-The offline pair validator opens candidate and evidence roots without following
-symlinks and validates immutable byte snapshots. It binds the exact candidate,
-build receipt, canonical provenance, identity policy, and ten real checked-in
-SBOM classes. Every SBOM path and SHA-256 must match the envelope, and its bytes
-must regenerate from the reviewed npm, NuGet, Python, or build-plane authority.
-Exactly two signature descriptors must target the manifest and provenance.
-
-```bash
-PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
-  candidate-evidence-pair \
-  --candidate-root /path/to/candidate \
-  --evidence-root /path/to/evidence \
-  --repository-root . \
-  --trusted-invocation-uri \
-  https://github.com/artemsemdev/SeaRise-Europe/actions/runs/123456789/attempts/1
-```
-
-Success preserves the candidate's pending pair marker. It does not verify the
-signature bundle bytes and makes no cryptographic-verification, production, or
-publication claim; those decisions belong to the separate signing workflow.
+`candidate-evidence-pair` opens both roots without following symlinks and binds
+immutable candidate, receipt, provenance, policy, signature-bundle, and exact
+ten-SBOM snapshots. Bundles are structurally checked and SBOMs regenerated from
+reviewed authority. Success preserves the pending marker and makes no
+cryptographic-verification, production, or publication claim.
 
 ## Production identity policy
 

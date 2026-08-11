@@ -1,7 +1,7 @@
-"""Validate one offline synthetic candidate/evidence pair without signing claims."""
-
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -25,66 +25,33 @@ from .python_sbom import validate_python_sbom
 from .sbom import validate_npm_sbom
 
 _MANIFEST = PurePosixPath("manifest.json")
+_RECEIPT = PurePosixPath("receipts/build.json")
 _ENVELOPE = PurePosixPath("evidence-envelope.json")
 _PROVENANCE = PurePosixPath("provenance.intoto.jsonl")
 _POLICY = Path("contracts/supply-chain/v1/identity-policy.json")
+_TEMP_ROOT = Path(tempfile.gettempdir()).resolve()
 
 
-@dataclass(frozen=True)
-class _SbomAuthority:
-    logical_path: str
-    ecosystem: str
-    authority_path: str
-    target: str = ""
-
-
-_SBOMS = (
-    _SbomAuthority(
-        "sbom/build-plane.cdx.json",
-        "build-plane",
-        "contracts/supply-chain/v1/dependency-inventory.json",
-    ),
-    _SbomAuthority(
-        "sbom/frontend-npm.cdx.json",
-        "npm",
-        "src/frontend/package-lock.json",
-        "src/frontend/package-lock.json",
+_PYTHON_TARGETS = ("linux-x86-64-cp311", "macos-arm64-cp311")
+_SBOM_PATHS = (
+    "sbom/build-plane.cdx.json",
+    "sbom/frontend-npm.cdx.json",
+    *(
+        f"sbom/nuget/searise-{name}-net8.0.cdx.json"
+        for name in ("api", "application", "domain", "infrastructure")
     ),
     *(
-        _SbomAuthority(
-            f"sbom/nuget/searise-{name.lower()}-net8.0.cdx.json",
-            "nuget",
-            f"src/api/SeaRise.{name}/SeaRise.{name}.csproj",
-            f"src/api/SeaRise.{name}/packages.lock.json",
-        )
-        for name in ("Api", "Application", "Domain", "Infrastructure")
-    ),
-    *(
-        _SbomAuthority(
-            f"sbom/python-{graph}-{target}.cdx.json",
-            "python",
-            f"contracts/supply-chain/v1/python-graphs/{annotation}.json",
-            target,
-        )
-        for graph, annotation in (
-            ("release", "release-runtime"),
-            ("settlement-spatial", "settlement-spatial-runtime"),
-        )
-        for target in ("linux-x86-64-cp311", "macos-arm64-cp311")
+        f"sbom/python-{graph}-{target}.cdx.json"
+        for graph in ("release", "settlement-spatial")
+        for target in _PYTHON_TARGETS
     ),
 )
-_SBOM_PATHS = tuple(sorted(item.logical_path for item in _SBOMS))
 
 
 @dataclass(frozen=True)
 class CandidateEvidenceSummary:
-    """Stable nonclaim result for one validated synthetic pair."""
-
     candidate_id: str
-    data_release_id: str
     data_provenance_class: str
-    manifest_sha256: str
-    provenance_sha256: str
     sbom_count: int
     cryptographic_verification: bool = False
     production: bool = False
@@ -115,14 +82,15 @@ def _strict_json(raw: bytes, label: str) -> dict[str, Any]:
             object_pairs_hook=_strict_object,
             parse_constant=_reject_constant,
         )
-    except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        json.dumps(document, ensure_ascii=False).encode("utf-8")
+    except (RecursionError, UnicodeDecodeError, UnicodeEncodeError, ValueError) as exc:
         _fail(f"{label} must be one strict UTF-8 JSON object: {exc}")
     if not isinstance(document, dict):
         _fail(f"{label} JSON root must be an object")
     return document
 
 
-def _open_root(path: Path, label: str) -> tuple[Path, int]:
+def _open_root(path: Path, label: str) -> int:
     if ".." in path.parts:
         _fail(f"{label} root must not contain parent traversal")
     absolute = path.absolute()
@@ -140,7 +108,7 @@ def _open_root(path: Path, label: str) -> tuple[Path, int]:
         raise SupplyChainContractError(
             f"{label} root must be an existing directory without symlinks: {path}"
         ) from exc
-    return absolute, descriptor
+    return descriptor
 
 
 def _same_file(left: os.stat_result, right: os.stat_result) -> bool:
@@ -195,45 +163,91 @@ def _snapshot(root: Path, logical: PurePosixPath, raw: bytes) -> Path:
     return target
 
 
-def _sha256(raw: bytes) -> str:
-    return hashlib.sha256(raw).hexdigest()
+def _decoded(value: object, label: str) -> bytes:
+    try:
+        if not isinstance(value, str) or not value:
+            raise ValueError("empty or non-string value")
+        decoded = base64.b64decode(value, validate=True)
+        if not decoded:
+            raise ValueError("empty decoded value")
+        return decoded
+    except (binascii.Error, ValueError) as exc:
+        raise SupplyChainContractError(f"{label} must be nonempty base64") from exc
 
 
-def _build_receipt_path(candidate: Mapping[str, Any]) -> PurePosixPath:
-    paths = [
-        item.get("path") for item in candidate["artifacts"] if item.get("role") == "build-receipt"
-    ]
-    if len(paths) != 1 or paths[0] != "receipts/build.json":
-        _fail("candidate must declare the exact build receipt path")
-    return PurePosixPath(paths[0])
+def _validate_bundle(bundle: Mapping[str, Any], subject: bytes, label: str) -> None:
+    try:
+        material = bundle["verificationMaterial"]
+        signature = bundle["messageSignature"]
+        entries = material["tlogEntries"]
+        if (
+            set(bundle) != {"mediaType", "verificationMaterial", "messageSignature"}
+            or bundle["mediaType"] != "application/vnd.dev.sigstore.bundle.v0.3+json"
+            or set(material) != {"certificate", "tlogEntries"}
+            or set(material["certificate"]) != {"rawBytes"}
+            or set(signature) != {"messageDigest", "signature"}
+            or set(signature["messageDigest"]) != {"algorithm", "digest"}
+            or signature["messageDigest"]["algorithm"] != "SHA2_256"
+            or not isinstance(entries, list)
+            or not entries
+        ):
+            _fail(f"{label} is not the exact supported Sigstore sign-blob subset")
+        _decoded(material["certificate"]["rawBytes"], f"{label} certificate")
+        _decoded(signature["signature"], f"{label} signature")
+        for entry in entries:
+            expected = set(
+                "canonicalizedBody inclusionPromise integratedTime "
+                "kindVersion logId logIndex".split()
+            )
+            if set(entry) != expected:
+                _fail(f"{label} transparency-log entry fields differ")
+            _decoded(entry["canonicalizedBody"], f"{label} log body")
+            _decoded(entry["inclusionPromise"]["signedEntryTimestamp"], f"{label} log promise")
+            _decoded(entry["logId"]["keyId"], f"{label} log ID")
+        digest = _decoded(signature["messageDigest"]["digest"], f"{label} message digest")
+    except (KeyError, TypeError) as exc:
+        raise SupplyChainContractError(f"{label} structure is malformed") from exc
+    if digest != hashlib.sha256(subject).digest():
+        _fail(f"{label} message digest does not bind its exact declared subject bytes")
 
 
-def _validate_sbom_authority(spec: _SbomAuthority, path: Path, repository_root: Path) -> None:
-    authority = repository_root / spec.authority_path
-    if spec.ecosystem == "build-plane":
-        validate_build_plane_sbom(path, authority, repository_root=repository_root)
-    elif spec.ecosystem == "npm":
+def _bind_bytes(
+    descriptor: Mapping[str, Any], raw: bytes, label: str, *, require_size: bool = False
+) -> None:
+    size = descriptor.get("byteSize")
+    if (
+        descriptor.get("sha256") != hashlib.sha256(raw).hexdigest()
+        or (require_size and not isinstance(size, int))
+        or (size is not None and size != len(raw))
+    ):
+        _fail(f"{label} descriptor does not bind its exact bytes")
+
+
+def _validate_sbom_authority(logical: str, path: Path, root: Path) -> None:
+    if logical == _SBOM_PATHS[0]:
+        inventory = root / "contracts/supply-chain/v1/dependency-inventory.json"
+        validate_build_plane_sbom(path, inventory, repository_root=root)
+    elif logical == _SBOM_PATHS[1]:
+        lock = root / "src/frontend/package-lock.json"
         validate_npm_sbom(
-            path,
-            authority,
-            repository_root=repository_root,
-            logical_path=spec.target,
+            path, lock, repository_root=root, logical_path="src/frontend/package-lock.json"
         )
-    elif spec.ecosystem == "nuget":
+    elif logical.startswith("sbom/nuget/"):
+        component = logical.split("searise-", 1)[1].split("-net8.0", 1)[0].title()
+        project = root / f"src/api/SeaRise.{component}"
         validate_nuget_sbom(
             path,
-            authority,
-            repository_root / spec.target,
-            repository_root=repository_root,
+            project / f"SeaRise.{component}.csproj",
+            project / "packages.lock.json",
+            repository_root=root,
             target_framework="net8.0",
         )
     else:
-        validate_python_sbom(
-            path,
-            authority,
-            repository_root=repository_root,
-            target_id=spec.target,
-        )
+        stem = logical.removeprefix("sbom/python-").removesuffix(".cdx.json")
+        target = next(item for item in _PYTHON_TARGETS if stem.endswith(item))
+        graph = stem.removesuffix(f"-{target}")
+        annotation = root / f"contracts/supply-chain/v1/python-graphs/{graph}-runtime.json"
+        validate_python_sbom(path, annotation, repository_root=root, target_id=target)
 
 
 def validate_candidate_evidence_pair(
@@ -243,10 +257,9 @@ def validate_candidate_evidence_pair(
     repository_root: Path = REPOSITORY_ROOT,
     trusted_invocation_uri: str,
 ) -> CandidateEvidenceSummary:
-    """Validate exact offline pair bytes while preserving the pending signing gate."""
-    _, candidate_descriptor = _open_root(candidate_root, "candidate")
+    candidate_descriptor = _open_root(candidate_root, "candidate")
     try:
-        _, evidence_descriptor = _open_root(evidence_root, "evidence")
+        evidence_descriptor = _open_root(evidence_root, "evidence")
     except Exception:
         os.close(candidate_descriptor)
         raise
@@ -257,8 +270,7 @@ def validate_candidate_evidence_pair(
             validate_candidate_document(candidate)
         except CandidateContractError as exc:
             raise SupplyChainContractError(str(exc)) from exc
-        receipt_logical = _build_receipt_path(candidate)
-        receipt_raw = _read_root_file(candidate_descriptor, receipt_logical, "build receipt")
+        receipt_raw = _read_root_file(candidate_descriptor, _RECEIPT, "build receipt")
         _strict_json(receipt_raw, "build receipt")
         source_raw = {
             PurePosixPath(item["path"]): _read_root_file(
@@ -283,13 +295,31 @@ def validate_candidate_evidence_pair(
 
         provenance_raw = _read_root_file(evidence_descriptor, _PROVENANCE, "provenance")
         provenance = _strict_json(provenance_raw, "provenance")
+        signatures = envelope.get("signatures")
+        if not isinstance(signatures, list) or not all(
+            isinstance(item, dict) for item in signatures
+        ):
+            _fail("evidence envelope signature descriptors must be objects")
+        signature_paths = [item.get("path") for item in signatures]
+        if tuple(signature_paths) != (
+            "manifest.sigstore.json",
+            "provenance.sigstore.json",
+        ):
+            _fail("evidence envelope must declare the exact two signature bundle paths")
+        signature_raw = {
+            path: _read_root_file(evidence_descriptor, PurePosixPath(path), f"signature {path}")
+            for path in signature_paths
+        }
+        signature_documents = {
+            path: _strict_json(raw, f"signature {path}") for path, raw in signature_raw.items()
+        }
         sbom_raw = {
-            spec.logical_path: _read_root_file(
+            logical: _read_root_file(
                 evidence_descriptor,
-                PurePosixPath(spec.logical_path),
-                f"SBOM {spec.logical_path}",
+                PurePosixPath(logical),
+                f"SBOM {logical}",
             )
-            for spec in _SBOMS
+            for logical in _SBOM_PATHS
         }
         for logical_path, raw in sbom_raw.items():
             _strict_json(raw, f"SBOM {logical_path}")
@@ -303,15 +333,12 @@ def validate_candidate_evidence_pair(
     except OSError as exc:
         raise SupplyChainContractError(f"cannot read identity policy: {policy_path}") from exc
     _strict_json(policy_raw, "identity policy")
-    manifest_sha256 = _sha256(manifest_raw)
-    provenance_sha256 = _sha256(provenance_raw)
+    manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
 
-    with tempfile.TemporaryDirectory(
-        prefix="searise-pair-", dir=Path(tempfile.gettempdir()).resolve()
-    ) as temporary:
+    with tempfile.TemporaryDirectory(prefix="searise-pair-", dir=_TEMP_ROOT) as temporary:
         snapshot_root = Path(temporary)
         manifest_path = _snapshot(snapshot_root / "candidate", _MANIFEST, manifest_raw)
-        receipt_path = _snapshot(snapshot_root / "candidate", receipt_logical, receipt_raw)
+        receipt_path = _snapshot(snapshot_root / "candidate", _RECEIPT, receipt_raw)
         for source_logical, raw in source_raw.items():
             _snapshot(snapshot_root / "candidate", source_logical, raw)
         envelope_path = _snapshot(snapshot_root / "evidence", _ENVELOPE, envelope_raw)
@@ -338,15 +365,18 @@ def validate_candidate_evidence_pair(
         for field in identities:
             if candidate[field] != validated_envelope[field] or candidate[field] != external[field]:
                 _fail(f"candidate, evidence, and provenance identity differ: {field}")
-        if validated_envelope["candidateManifest"]["sha256"] != manifest_sha256:
-            _fail("evidence envelope does not bind the actual candidate manifest bytes")
-        if validated_envelope["provenance"]["sha256"] != provenance_sha256:
-            _fail("evidence envelope does not bind the actual provenance bytes")
+        _bind_bytes(validated_envelope["candidateManifest"], manifest_raw, "candidate manifest")
+        _bind_bytes(validated_envelope["provenance"], provenance_raw, "provenance")
         if external["actualManifestSha256"] != manifest_sha256:
             _fail("provenance does not bind the actual candidate manifest bytes")
         signatures = validated_envelope["signatures"]
-        if len(signatures) != 2:
-            _fail("evidence envelope must declare exactly two signature descriptors")
+        subjects = {"manifest.json": manifest_raw, "provenance.intoto.jsonl": provenance_raw}
+        for descriptor in signatures:
+            path = descriptor["path"]
+            _bind_bytes(descriptor, signature_raw[path], f"signature {path}", require_size=True)
+            _validate_bundle(
+                signature_documents[path], subjects[descriptor["subjectPath"]], f"signature {path}"
+            )
         verification = validated_envelope["verification"]
         claims = provenance["predicate"]["buildDefinition"]["internalParameters"]["claims"]
         if any(
@@ -360,16 +390,11 @@ def validate_candidate_evidence_pair(
             )
         ):
             _fail("offline pair validation must not claim signing, production, or publication")
-        for spec in _SBOMS:
-            _validate_sbom_authority(
-                spec, sbom_paths[spec.logical_path], repository_root.absolute()
-            )
+        for logical in _SBOM_PATHS:
+            _validate_sbom_authority(logical, sbom_paths[logical], repository_root.absolute())
 
     return CandidateEvidenceSummary(
         candidate_id=str(candidate["candidateId"]),
-        data_release_id=str(candidate["dataReleaseId"]),
         data_provenance_class=str(candidate["dataProvenanceClass"]),
-        manifest_sha256=manifest_sha256,
-        provenance_sha256=provenance_sha256,
-        sbom_count=len(_SBOMS),
+        sbom_count=len(_SBOM_PATHS),
     )

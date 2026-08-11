@@ -7,8 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Security
 
 - Added descriptor-safe offline pairing for synthetic candidate, provenance,
-  evidence, and the exact ten regenerated SBOMs while preserving explicit
-  cryptographic-verification, production, and publication nonclaims.
+  structurally checked Sigstore bundle bytes, and the exact ten regenerated
+  SBOMs while preserving verification, production, and publication nonclaims.
 - Added deterministic unsigned in-toto/SLSA provenance for validated synthetic
   candidates, binding scientific outputs, source payloads, receipts, and the controlled run.
 - Added a deterministic CycloneDX 1.7 file-input authority foundation for

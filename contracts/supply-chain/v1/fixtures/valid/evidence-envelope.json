@@ -25,7 +25,8 @@
     {
       "role": "signature",
       "path": "manifest.sigstore.json",
-      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "sha256": "2ae9f013bd24559e7b8d7cad2d05335ce389a473446030daa399cd2fb0c33c4a",
+      "byteSize": 503,
       "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3",
       "subjectPath": "manifest.json",
       "subjectSha256": "1111111111111111111111111111111111111111111111111111111111111111"
@@ -33,7 +34,8 @@
     {
       "role": "signature",
       "path": "provenance.sigstore.json",
-      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "sha256": "67067f61240c66e97079c19e09292a10215320dc73f7f66af3ce746f2c0d718d",
+      "byteSize": 503,
       "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3",
       "subjectPath": "provenance.intoto.jsonl",
       "subjectSha256": "2222222222222222222222222222222222222222222222222222222222222222"
