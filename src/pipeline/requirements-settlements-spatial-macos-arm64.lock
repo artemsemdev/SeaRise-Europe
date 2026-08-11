@@ -1,0 +1,3 @@
+# Immutable Python 3.11 / macOS arm64 settlement spatial build plane.
+# Acquire wheels into an audited wheelhouse before the network-isolated run.
+duckdb==1.5.4 --hash=sha256:9d9e6817fcbc09d2605a2c8c041ac7824d738d917c35a4d427e977647e1d7944
