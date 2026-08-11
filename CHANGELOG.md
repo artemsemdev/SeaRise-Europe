@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Added reviewed, hash-bound Python runtime graphs for the paired release and
+  settlement-spatial locks, with explicit roots, complete target environments,
+  and identical cross-platform active dependencies without a production claim.
 - Added a versioned, lock-SHA-bound Python dependency graph annotation contract
   so reviewed roots and edges remain explicit instead of being inferred from
   flat release locks, with synthetic-only fail-closed validation fixtures.
