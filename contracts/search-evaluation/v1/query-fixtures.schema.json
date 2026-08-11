@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/search-evaluation/v1/query-fixtures.schema.json",
+  "title": "SeaRise settlement search evaluation queries v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "dataClass", "knownGaps", "cases"],
+  "properties": {
+    "$schema": { "const": "../query-fixtures.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "dataClass": { "enum": ["synthetic-fixture", "production-corpus"] },
+    "knownGaps": {
+      "type": "array", "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "description"],
+        "properties": { "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" }, "description": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "categories", "query", "phase", "expected", "knownGapId", "rationale"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+          "categories": {
+            "type": "array", "minItems": 1, "uniqueItems": true,
+            "items": { "enum": ["canonical", "alternate", "diacritic", "transliteration", "duplicate-name", "country-disambiguation", "admin-disambiguation", "inland", "coastal-village", "zero-population", "island", "transcontinental", "negative"] }
+          },
+          "query": { "type": "string" },
+          "phase": { "enum": ["core-ready", "all-ready"] },
+          "expected": {
+            "type": "object", "additionalProperties": false,
+            "required": ["top1PlaceId", "top5Contains", "exactOrder", "absentPlaceIds", "resultCount"],
+            "properties": {
+              "top1PlaceId": { "type": ["string", "null"] },
+              "top5Contains": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+              "exactOrder": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+              "absentPlaceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+              "resultCount": { "type": ["integer", "null"], "minimum": 0 }
+            }
+          },
+          "knownGapId": { "type": ["string", "null"] },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

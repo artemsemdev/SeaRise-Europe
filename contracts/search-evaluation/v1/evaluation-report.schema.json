@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/search-evaluation/v1/evaluation-report.schema.json",
+  "title": "SeaRise settlement search engine evaluation report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "dataClass", "queryFixtureSha256", "selection", "corpus", "engines", "knownGaps"],
+  "properties": {
+    "$schema": { "const": "../evaluation-report.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "dataClass": { "enum": ["synthetic-fixture", "production-corpus"] },
+    "queryFixtureSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "selection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "selectedEngineId"],
+      "properties": {
+        "status": { "const": "deferred" },
+        "selectedEngineId": { "type": "null" }
+      }
+    },
+    "corpus": {
+      "type": "object", "additionalProperties": false,
+      "required": ["coreRecords", "coastalRecords", "overlapRecords", "uniqueRecords"],
+      "properties": {
+        "coreRecords": { "type": "integer", "minimum": 0 },
+        "coastalRecords": { "type": "integer", "minimum": 0 },
+        "overlapRecords": { "type": "integer", "minimum": 0 },
+        "uniqueRecords": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "engines": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/engineResult" },
+            { "type": "object", "properties": { "engineId": { "const": "minisearch" }, "packageVersion": { "const": "7.2.0" }, "serializationVersion": { "const": "minisearch-json-v1" } } }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/engineResult" },
+            { "type": "object", "properties": { "engineId": { "const": "flexsearch" }, "packageVersion": { "const": "0.8.212" }, "serializationVersion": { "const": "flexsearch-export-v1" } } }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "knownGaps": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" } }
+  },
+  "$defs": {
+    "engineResult": {
+        "type": "object", "additionalProperties": false,
+        "required": ["engineId", "packageVersion", "serializationVersion", "deterministicBuild", "adapterEvidence", "quality", "measurements"],
+        "properties": {
+          "engineId": { "enum": ["minisearch", "flexsearch"] },
+          "packageVersion": { "type": "string", "minLength": 1 },
+          "serializationVersion": { "type": "string", "minLength": 1 },
+          "deterministicBuild": { "type": "boolean" },
+          "adapterEvidence": {
+            "type": "object", "additionalProperties": false,
+            "required": ["status", "command", "sourceSha256"],
+            "properties": {
+              "status": { "enum": ["passed", "failed"] },
+              "command": { "const": "npm test -- src/search/evaluation" },
+              "sourceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          "quality": {
+            "type": "object", "additionalProperties": false,
+            "required": ["top1Accuracy", "intendedTop5Rate", "exactOrderRate", "knownGapIds"],
+            "properties": {
+              "top1Accuracy": { "type": "number", "minimum": 0, "maximum": 1 },
+              "intendedTop5Rate": { "type": "number", "minimum": 0, "maximum": 1 },
+              "exactOrderRate": { "type": "number", "minimum": 0, "maximum": 1 },
+              "knownGapIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }
+            }
+          },
+          "measurements": {
+            "type": "object", "additionalProperties": false,
+            "required": ["status", "rawDocumentBytes", "serializedIndexBytes", "compressedIndexBytes", "buildTimeMs", "initP50Ms", "initP95Ms", "initP99Ms", "queryP50Ms", "queryP95Ms", "queryP99Ms", "peakWorkerMemoryBytes"],
+            "properties": {
+              "status": { "enum": ["not-measured", "measured"] },
+              "rawDocumentBytes": { "type": ["integer", "null"], "minimum": 0 },
+              "serializedIndexBytes": { "type": ["integer", "null"], "minimum": 0 },
+              "compressedIndexBytes": { "type": ["integer", "null"], "minimum": 0 },
+              "buildTimeMs": { "type": ["number", "null"], "minimum": 0 },
+              "initP50Ms": { "type": ["number", "null"], "minimum": 0 },
+              "initP95Ms": { "type": ["number", "null"], "minimum": 0 },
+              "initP99Ms": { "type": ["number", "null"], "minimum": 0 },
+              "queryP50Ms": { "type": ["number", "null"], "minimum": 0 },
+              "queryP95Ms": { "type": ["number", "null"], "minimum": 0 },
+              "queryP99Ms": { "type": ["number", "null"], "minimum": 0 },
+              "peakWorkerMemoryBytes": { "type": ["integer", "null"], "minimum": 0 }
+            }
+          }
+        },
+        "allOf": [
+          { "if": { "properties": { "deterministicBuild": { "const": true } }, "required": ["deterministicBuild"] }, "then": { "properties": { "adapterEvidence": { "type": "object", "properties": { "status": { "const": "passed" } }, "required": ["status"] } } } }
+        ]
+      }
+    }
+}
