@@ -57,6 +57,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added deterministic non-publishing settlement GeoParquet serialization bound to the exact spatial database, receipt identity, v3 Arrow schema, and false approval claims.
 - Added fail-closed offline validation for the exact pre-sign candidate inventory,
   checksum subjects, STAC matrix, and required pending evidence-pair gate without
   reading artifacts, signing, or making a publication decision.

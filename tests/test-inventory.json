@@ -1103,6 +1103,7 @@
     { "path": "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_classification.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_geoparquet.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_stage_runner.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_coastline_contract.py", "suite": "pipeline-settlement-shoreline-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_coastline_source.py", "suite": "pipeline-settlement-shoreline-build", "status": "active", "removalGate": null, "replacementEvidence": null },
