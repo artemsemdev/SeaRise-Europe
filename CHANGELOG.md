@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Added identity-bound Cosign verification for exact manifest and provenance
+  bytes with immutable non-publication receipts and independently reviewed tool locks.
 - Added descriptor-safe offline pairing with strict Sigstore bundles and regenerated SBOMs.
 - Added deterministic unsigned in-toto/SLSA provenance for validated synthetic
   candidates, binding scientific outputs, source payloads, receipts, and the controlled run.
