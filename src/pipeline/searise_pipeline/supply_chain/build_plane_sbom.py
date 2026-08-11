@@ -36,6 +36,9 @@ _MACOS_RECEIPT = "src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.j
 _RELEASE_DOCKERFILE = "src/pipeline/offline_release/Dockerfile"
 _TIPPECANOE_VERSION = "2.79.0"
 _DUCKDB_VERSION = "1.5.4"
+_LINUX_BASE_DIGEST = "561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea"
+_LINUX_BASE_IMAGE = f"ubuntu:24.04@sha256:{_LINUX_BASE_DIGEST}"
+_LINUX_COMPILER = "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
 _REVIEWED_AUTHORITY_SHA256 = {
     _DUCKDB_LOCK: "77c7ea3422e67be2f8d23f0dcef2d5d36236f01b8856f76289ed1e0532359ca6",
     _LINUX_RECIPE: "8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5",
@@ -352,7 +355,7 @@ def _actions(
             platform="github-actions",
             authority_paths=sorted(paths),
             authority=authority,
-            digest=("SHA-1", revision),
+            digest=None,
             extra=(
                 ("action.comment-version", version),
                 ("action.comment-version-authoritative", False),
@@ -424,6 +427,8 @@ def _native_components(
             "xcodeVersion": "15.4",
         }:
             raise SupplyChainContractError("macos-arm64 toolchain semantics changed")
+        if platform == "linux-x86_64" and environment["compiler"] != _LINUX_COMPILER:
+            raise SupplyChainContractError("linux-x86_64 compiler semantics changed")
         if (
             receipt["schemaVersion"] != 1
             or receipt["platform"] != receipt_platform
@@ -470,21 +475,21 @@ def _native_components(
     linux = receipts["linux-x86_64"][1]
     linux_environment = linux["buildEnvironment"]
     image = _exact_string(linux_environment["baseImage"], "Linux receipt base image")
-    image_match = re.fullmatch(r"([a-z0-9./_-]+):([A-Za-z0-9._-]+)@sha256:([0-9a-f]{64})", image)
     recipe_name, recipe_tag, recipe_digest = _docker_base(authority[_LINUX_RECIPE], "Linux recipe")
-    if not image_match or (image_match.group(1), image_match.group(3)) != (
-        recipe_name,
-        recipe_digest,
+    if image != _LINUX_BASE_IMAGE or (recipe_name, recipe_tag, recipe_digest) != (
+        "ubuntu",
+        None,
+        _LINUX_BASE_DIGEST,
     ):
         raise SupplyChainContractError("Linux receipt and recipe base images differ")
     base, base_ref = _observable_component(
         kind="oci-base",
-        name=image_match.group(1),
-        version=image_match.group(2),
+        name="ubuntu",
+        version="24.04",
         platform="linux-x86_64",
         authority_paths=[_LINUX_RECEIPT, _LINUX_RECIPE],
         authority=authority,
-        digest=("SHA-256", image_match.group(3)),
+        digest=("SHA-256", _LINUX_BASE_DIGEST),
         extra=(("oci.reference", image),),
     )
     components.append(base)

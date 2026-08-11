@@ -167,6 +167,8 @@ def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs() -> None
         )
         assert properties["digest"]
         if properties["kind"] == "github-action":
+            assert "hashes" not in component
+            assert properties["digest"].startswith("authority-sha256:")
             assert component["version"] == properties["action.revision"]
             assert properties["action.comment-version-authoritative"] == "false"
 
@@ -359,6 +361,15 @@ def test_unpinned_action_and_native_semantic_mutations_fail_closed(tmp_path: Pat
     )
     with pytest.raises(SupplyChainContractError, match="toolchain semantics changed"):
         generate_build_plane_sbom(inventory, repository_root=repository)
+
+    linux_receipt = "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json"
+    for message, old, new in (
+        ("compiler semantics", b'13.3.0"', b'fabricated"'),
+        ("base images", b"ubuntu:24.04@", b"ubuntu:fake@"),
+    ):
+        repository, inventory = _mutate(tmp_path, message, linux_receipt, old, new)
+        with pytest.raises(SupplyChainContractError, match=message):
+            generate_build_plane_sbom(inventory, repository_root=repository)
 
 
 def test_local_composite_action_descriptor_fails_closed() -> None:
