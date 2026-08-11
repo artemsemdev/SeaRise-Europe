@@ -73,26 +73,38 @@ def test_generation_metadata_binds_every_material_writer_step(tmp_path: Path) ->
     )
     assert metadata["searise"]["generation"] == {
         "angular_error_model": {
-            "comparison": "symmetric-hausdorff-plus-per-axis-envelope",
-            "coordinate_error_degrees": 360 / 2**20,
-            "geometry_tolerance_degrees": 2**0.5 * 360 / 2**20,
+            "comparison": (
+                "symmetric-vertex-to-boundary-discrete-distance-"
+                "plus-per-axis-envelope"
+            ),
+            "coordinate_error_degrees": 360 / 2**23,
+            "geometry_tolerance_degrees": 2**0.5 * 360 / 2**23,
             "maximum_rounding_stages": 2,
             "model": "web-mercator-mvt-quantization-plus-tile-clipping",
-            "per_stage_coordinate_error_degrees": 180 / 2**20,
-            "quantization_step_degrees": 360 / 2**20,
+            "per_stage_coordinate_error_degrees": 180 / 2**23,
+            "quantization_step_degrees": 360 / 2**23,
         },
         "gzip_canonicalization": {
             "method": "tippecanoe-tile-member-os-byte-rewrite",
             "operating_system_byte": 255,
         },
         "pmtiles_metadata_edit": "canonical-json-replacement",
+        "visual_intermediary": {
+            "canonical_source_modified": False,
+            "coordinate_space": "EPSG:4326-degrees",
+            "maximum_segment_length_degrees": 0.10,
+            "method": "shapely-segmentize",
+            "purpose": "bound-nonlinear-web-mercator-chord-error",
+            "source": "boundaries/coastal-analysis-zone.parquet",
+            "topology_required": "identical-polygon-and-interior-ring-counts",
+        },
         "tippecanoe_options": [
             "--force",
             "--layer=coastal_boundary",
             "--projection=EPSG:4326",
             "--minimum-zoom=0",
             "--maximum-zoom=6",
-            "--full-detail=14",
+            "--full-detail=17",
             "--buffer=0",
             "--no-feature-limit",
             "--no-tile-size-limit",

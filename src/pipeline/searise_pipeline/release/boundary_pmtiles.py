@@ -24,8 +24,10 @@ from .pmtiles import (
 
 _MINIMUM_ZOOM = 0
 _MAXIMUM_ZOOM = 6
-_FULL_DETAIL = 14
+_FULL_DETAIL = 17
 _BUFFER = 0
+_VISUAL_SEGMENT_LENGTH_DEGREES = 0.10
+_VISUAL_EQUIVALENCE_LIMIT_DEGREES = 1e-12
 _STATUS = "selected-scope-approximation"
 _PURPOSE = "product-eligibility-only"
 _SHAPELY_VERSION = "2.0.7"
@@ -107,6 +109,8 @@ class BoundaryPmtilesEvidence:
     source_geoparquet_byte_size: int
     source_geoparquet_sha256: str
     decoded_fragment_count: int
+    geometry_parity: Mapping[str, Any]
+    visual_intermediary: Mapping[str, Any]
     header: Mapping[str, Any]
     metadata: Mapping[str, Any]
     toolchain: VectorToolchainEvidence
@@ -279,11 +283,12 @@ def _expected_decoded_properties(source: _BoundarySource) -> dict[str, object]:
     }
 
 
-def _write_ndjson(path: Path, source: _BoundarySource) -> None:
+def _write_ndjson(path: Path, source: _BoundarySource) -> Mapping[str, Any]:
     from shapely.geometry import mapping
 
+    geometry, evidence = _visual_geometry(source.geometry)
     feature = {
-        "geometry": mapping(source.geometry),
+        "geometry": mapping(geometry),
         "id": source.specification.feature_id,
         "properties": _writer_feature_properties(source),
         "type": "Feature",
@@ -292,6 +297,7 @@ def _write_ndjson(path: Path, source: _BoundarySource) -> None:
         json.dumps(feature, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="utf-8",
     )
+    return evidence
 
 
 def _tippecanoe_options(source: _BoundarySource) -> list[str]:
@@ -315,7 +321,9 @@ def _tippecanoe_options(source: _BoundarySource) -> list[str]:
 def _generation_parameters(source: _BoundarySource) -> dict[str, object]:
     return {
         "angular_error_model": {
-            "comparison": "symmetric-hausdorff-plus-per-axis-envelope",
+            "comparison": (
+                "symmetric-vertex-to-boundary-discrete-distance-plus-per-axis-envelope"
+            ),
             "coordinate_error_degrees": _COORDINATE_ERROR_DEGREES,
             "geometry_tolerance_degrees": _GEOMETRY_TOLERANCE_DEGREES,
             "maximum_rounding_stages": 2,
@@ -328,6 +336,15 @@ def _generation_parameters(source: _BoundarySource) -> dict[str, object]:
             "operating_system_byte": 255,
         },
         "pmtiles_metadata_edit": "canonical-json-replacement",
+        "visual_intermediary": {
+            "canonical_source_modified": False,
+            "coordinate_space": "EPSG:4326-degrees",
+            "maximum_segment_length_degrees": _VISUAL_SEGMENT_LENGTH_DEGREES,
+            "method": "shapely-segmentize",
+            "purpose": "bound-nonlinear-web-mercator-chord-error",
+            "source": source.specification.source_path,
+            "topology_required": "identical-polygon-and-interior-ring-counts",
+        },
         "tippecanoe_options": _tippecanoe_options(source),
     }
 
@@ -514,7 +531,153 @@ def _polygon_topology(geometry: Any) -> tuple[int, int]:
     return len(polygons), sum(len(polygon.interiors) for polygon in polygons)
 
 
-def _validate_decoded_document(document: object, source: _BoundarySource) -> int:
+def _polygon_rings(geometry: Any) -> list[Any]:
+    if geometry.geom_type == "Polygon":
+        polygons = [geometry]
+    elif geometry.geom_type == "MultiPolygon":
+        polygons = list(geometry.geoms)
+    else:
+        return []
+    return [
+        ring
+        for polygon in polygons
+        for ring in (polygon.exterior, *polygon.interiors)
+    ]
+
+
+def _boundary_vertices_and_segments(geometry: Any) -> tuple[list[tuple[float, float]], list[Any]]:
+    try:
+        from shapely.geometry import LineString
+    except ImportError as exc:
+        raise ScienceContractError("Boundary parity requires Shapely") from exc
+    vertices: list[tuple[float, float]] = []
+    segments: list[Any] = []
+    for ring in _polygon_rings(geometry):
+        coordinates = [(float(x), float(y)) for x, y, *_ in ring.coords]
+        vertices.extend(coordinates)
+        segments.extend(
+            LineString((start, end))
+            for start, end in zip(coordinates, coordinates[1:])
+            if start != end
+        )
+    if not vertices or not segments:
+        raise ScienceContractError("Boundary parity requires polygon boundary segments")
+    return vertices, segments
+
+
+def _indexed_directed_vertex_boundary_distance(first: Any, second: Any) -> tuple[float, int]:
+    """Return exact vertex-to-segment distances using an independent spatial index."""
+    try:
+        from shapely import STRtree, distance, points
+    except ImportError as exc:
+        raise ScienceContractError("Boundary parity requires Shapely") from exc
+    vertices, _ = _boundary_vertices_and_segments(first)
+    _, segments = _boundary_vertices_and_segments(second)
+    query_points = points(vertices)
+    tree = STRtree(segments)
+    nearest = tree.nearest(query_points)
+    distances = distance(query_points, tree.geometries.take(nearest))
+    return max(float(value) for value in distances), len(vertices)
+
+
+def _symmetric_vertex_boundary_distances(first: Any, second: Any) -> Mapping[str, Any]:
+    first_to_second, first_vertices = _indexed_directed_vertex_boundary_distance(
+        first, second
+    )
+    second_to_first, second_vertices = _indexed_directed_vertex_boundary_distance(
+        second, first
+    )
+    return {
+        "comparison": "symmetric-vertex-to-boundary-discrete-distance",
+        "firstToSecondMaximumDegrees": first_to_second,
+        "firstVertexCount": first_vertices,
+        "secondToFirstMaximumDegrees": second_to_first,
+        "secondVertexCount": second_vertices,
+        "symmetricMaximumDegrees": max(first_to_second, second_to_first),
+    }
+
+
+def _topology_evidence(geometry: Any) -> Mapping[str, int]:
+    polygon_count, interior_ring_count = _polygon_topology(geometry)
+    return {
+        "interiorRingCount": interior_ring_count,
+        "polygonCount": polygon_count,
+    }
+
+
+def _visual_geometry(geometry: Any) -> tuple[Any, Mapping[str, Any]]:
+    """Densify only the visual intermediary and prove source-equivalent topology."""
+    shapely = _require_shapely()
+    visual = shapely.segmentize(
+        geometry,
+        max_segment_length=_VISUAL_SEGMENT_LENGTH_DEGREES,
+    )
+    source_topology = _polygon_topology(geometry)
+    visual_topology = _polygon_topology(visual)
+    if (
+        not visual.is_valid
+        or visual.is_empty
+        or source_topology != visual_topology
+    ):
+        raise ScienceContractError("Visual boundary segmentization changed topology")
+    distances = _symmetric_vertex_boundary_distances(geometry, visual)
+    envelope_differences = [
+        abs(observed - expected)
+        for observed, expected in zip(visual.bounds, geometry.bounds)
+    ]
+    if (
+        distances["symmetricMaximumDegrees"]
+        > _VISUAL_EQUIVALENCE_LIMIT_DEGREES
+        or max(envelope_differences) > _VISUAL_EQUIVALENCE_LIMIT_DEGREES
+    ):
+        raise ScienceContractError("Visual boundary segmentization changed geometry")
+    return visual, {
+        "canonicalSourceModified": False,
+        "coordinateSpace": "EPSG:4326-degrees",
+        "maximumSegmentLengthDegrees": _VISUAL_SEGMENT_LENGTH_DEGREES,
+        "method": "shapely-segmentize",
+        "sourceTopology": _topology_evidence(geometry),
+        "visualTopology": _topology_evidence(visual),
+        "equivalenceLimitDegrees": _VISUAL_EQUIVALENCE_LIMIT_DEGREES,
+        "envelopeAxisDifferencesDegrees": envelope_differences,
+        "distance": distances,
+    }
+
+
+def _decoded_geometry_parity(source: Any, decoded: Any) -> Mapping[str, Any]:
+    if (
+        not decoded.is_valid
+        or decoded.is_empty
+        or _polygon_topology(decoded) != _polygon_topology(source)
+    ):
+        raise ScienceContractError("Decoded boundary PMTiles geometry parity differs")
+    distances = _symmetric_vertex_boundary_distances(source, decoded)
+    envelope_differences = [
+        abs(observed - expected)
+        for observed, expected in zip(decoded.bounds, source.bounds)
+    ]
+    if (
+        max(envelope_differences) > _COORDINATE_COMPARISON_LIMIT_DEGREES
+        or distances["symmetricMaximumDegrees"]
+        > _GEOMETRY_COMPARISON_LIMIT_DEGREES
+    ):
+        raise ScienceContractError("Decoded boundary PMTiles geometry parity differs")
+    return {
+        "comparison": (
+            "symmetric-vertex-to-boundary-discrete-distance-plus-per-axis-envelope"
+        ),
+        "coordinateLimitDegrees": _COORDINATE_ERROR_DEGREES,
+        "distance": distances,
+        "envelopeAxisDifferencesDegrees": envelope_differences,
+        "geometryLimitDegrees": _GEOMETRY_TOLERANCE_DEGREES,
+        "sourceTopology": _topology_evidence(source),
+        "decodedTopology": _topology_evidence(decoded),
+    }
+
+
+def _validate_decoded_document(
+    document: object, source: _BoundarySource
+) -> tuple[int, Mapping[str, Any]]:
     _require_shapely()
     try:
         from shapely import union_all
@@ -556,19 +719,8 @@ def _validate_decoded_document(document: object, source: _BoundarySource) -> int
     if not fragments:
         raise ScienceContractError("Decoded boundary PMTiles contains no boundary fragments")
     merged = union_all(fragments)
-    if (
-        not merged.is_valid
-        or merged.is_empty
-        or _polygon_topology(merged) != _polygon_topology(source.geometry)
-        or any(
-            abs(observed - expected) > _COORDINATE_COMPARISON_LIMIT_DEGREES
-            for observed, expected in zip(merged.bounds, source.geometry.bounds)
-        )
-        or source.geometry.hausdorff_distance(merged)
-        > _GEOMETRY_COMPARISON_LIMIT_DEGREES
-    ):
-        raise ScienceContractError("Decoded boundary PMTiles geometry parity differs")
-    return len(fragments)
+    parity = _decoded_geometry_parity(source.geometry, merged)
+    return len(fragments), parity
 
 
 def validate_boundary_pmtiles(
@@ -611,7 +763,8 @@ def validate_boundary_pmtiles(
         )
     except json.JSONDecodeError as exc:
         raise ScienceContractError("Decoded boundary PMTiles JSON is malformed") from exc
-    fragments = _validate_decoded_document(decoded, source)
+    fragments, geometry_parity = _validate_decoded_document(decoded, source)
+    _, visual_intermediary = _visual_geometry(source.geometry)
     return BoundaryPmtilesEvidence(
         path=source.specification.output_path,
         byte_size=path.stat().st_size,
@@ -619,6 +772,8 @@ def validate_boundary_pmtiles(
         source_geoparquet_byte_size=source.specification.source_byte_size,
         source_geoparquet_sha256=source.specification.source_sha256,
         decoded_fragment_count=fragments,
+        geometry_parity=geometry_parity,
+        visual_intermediary=visual_intermediary,
         header=header,
         metadata=validated_metadata,
         toolchain=evidence,

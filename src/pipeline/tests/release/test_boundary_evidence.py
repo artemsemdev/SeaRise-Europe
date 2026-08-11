@@ -124,6 +124,17 @@ def _arrange(
             source_geoparquet_byte_size=source.stat().st_size,
             source_geoparquet_sha256=boundary_evidence.sha256(source),
             decoded_fragment_count=7,
+            geometry_parity={
+                "comparison": (
+                    "symmetric-vertex-to-boundary-discrete-distance-"
+                    "plus-per-axis-envelope"
+                ),
+                "distance": {"symmetricMaximumDegrees": 0.00001},
+            },
+            visual_intermediary={
+                "canonicalSourceModified": False,
+                "maximumSegmentLengthDegrees": 0.10,
+            },
             header={"spec_version": 3, "minzoom": 0, "maxzoom": 6},
             metadata={"searise": {"status": "selected-scope-approximation"}},
             toolchain=_vector_evidence(),

@@ -104,12 +104,15 @@ def _build_once(
                     "decodedFragmentCount": pmtiles.decoded_fragment_count,
                     "decodedZoom": 6,
                     "geometryParity": (
-                        "symmetric-hausdorff-plus-per-axis-envelope"
+                        "symmetric-vertex-to-boundary-discrete-distance-"
+                        "plus-per-axis-envelope"
                     ),
+                    "geometryParityMetrics": pmtiles.geometry_parity,
                     "header": pmtiles.header,
                     "metadataSha256": _json_sha256(pmtiles.metadata),
                     "officialPmtilesVerify": "passed",
                     "safeMetadata": "passed",
+                    "visualIntermediary": pmtiles.visual_intermediary,
                 },
             }
         )
