@@ -18,7 +18,7 @@ STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
 PREDICATE_TYPE = "https://slsa.dev/provenance/v1"
 BUILD_TYPE = (
     "https://github.com/artemsemdev/SeaRise-Europe/blob/master/"
-    "contracts/supply-chain/v1/build-types/offline-release-v1.md"
+    "contracts/supply-chain/v1/build-types/offline-release-v1.json"
 )
 BUILDER_ID = (
     "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/"

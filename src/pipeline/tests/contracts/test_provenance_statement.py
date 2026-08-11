@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from searise_pipeline.candidate_completeness.provenance import (
     BUILD_TYPE,
@@ -26,7 +27,7 @@ CANDIDATE_FIXTURE = (
 )
 BUILD_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/build-receipt.json"
 SOURCE_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/source-receipt.json"
-BUILD_TYPE_SPEC = ROOT / "contracts/supply-chain/v1/build-types/offline-release-v1.md"
+BUILD_TYPE_SPEC = ROOT / "contracts/supply-chain/v1/build-types/offline-release-v1.json"
 INVOCATION = "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/77777777777/attempts/1"
 OUTPUT_ROLES = {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
 
@@ -137,16 +138,35 @@ def test_statement_and_build_type_are_exact_and_deterministic(tmp_path: Path) ->
     assert first == _statement(manifest, build)
     assert first["_type"] == STATEMENT_TYPE == "https://in-toto.io/Statement/v1"
     assert first["predicateType"] == PREDICATE_TYPE == "https://slsa.dev/provenance/v1"
-    spec = BUILD_TYPE_SPEC.read_text(encoding="utf-8")
-    assert BUILD_TYPE == (
-        "https://github.com/artemsemdev/SeaRise-Europe/blob/master/"
-        + BUILD_TYPE_SPEC.relative_to(ROOT).as_posix()
-    )
-    sections = (
-        "Build semantics|Parameter schemas|Invocation procedure|"
-        "Subjects, dependencies, and byproduct|Example"
-    )
-    assert all(f"## {section}" in spec for section in sections.split("|"))
+    # fmt: off
+    raw_contract = BUILD_TYPE_SPEC.read_bytes()
+    assert hashlib.sha256(raw_contract).hexdigest() == "fb44c02a62d47856b4dcd77b5beb7e49f882088d914ae4e2d3b2a86af267551f"  # noqa: E501
+    contract = json.loads(raw_contract)
+    expected_uri = "https://github.com/artemsemdev/SeaRise-Europe/blob/master/" + BUILD_TYPE_SPEC.relative_to(ROOT).as_posix()  # noqa: E501
+    assert contract["buildType"] == BUILD_TYPE == expected_uri
+    assert contract["statement"] == {"_type": STATEMENT_TYPE, "predicateType": PREDICATE_TYPE, "serialization": "sorted-compact-utf8-json-with-terminal-newline", "signed": False, "supportedClass": "synthetic-fixture"}  # noqa: E501
+    external_schema, internal_schema = (contract["parameterSchemas"][key] for key in ("externalParameters", "internalParameters"))  # noqa: E501
+    assert external_schema == json.loads('{"type":"object","additionalProperties":false,"required":["candidateId","dataReleaseId","dataProvenanceClass","actualManifestSha256"],"properties":{"candidateId":{"type":"string"},"dataReleaseId":{"type":"string"},"dataProvenanceClass":{"type":"string","const":"synthetic-fixture"},"actualManifestSha256":{"type":"string","pattern":"^[a-f0-9]{64}$"}}}')  # noqa: E501
+    assert internal_schema == json.loads('{"type":"object","additionalProperties":false,"required":["buildId","buildMode","networkAccess","parametersSha256","environment","claims","policyIdentity"],"properties":{"buildId":{"type":"string"},"buildMode":{"type":"string","const":"offline"},"networkAccess":{"type":"string","const":"disabled"},"parametersSha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},"environment":{"type":"object"},"claims":{"type":"object","additionalProperties":false,"required":["cryptographicVerification","production","publication","scientific","signing","syntheticFixture"],"properties":{"cryptographicVerification":{"type":"boolean","const":false},"production":{"type":"boolean","const":false},"publication":{"type":"boolean","const":false},"scientific":{"type":"boolean","const":false},"signing":{"type":"boolean","const":false},"syntheticFixture":{"type":"boolean","const":true}}},"policyIdentity":{"type":"string","const":"phase-1-pre-sign-synthetic-provenance-v1"}}}')  # noqa: E501
+    invocation = contract["invocationProcedure"]
+    assert invocation == json.loads('{"trigger":"workflow_dispatch","workflow":"https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/offline-release-controlled.yml@refs/heads/master","mapping":{"predicate.buildDefinition":"derive from the validated candidate and receipts/build.json using parameterSchemas","predicate.runDetails.builder.id":"invocationProcedure.workflow","predicate.runDetails.metadata.invocationId":"https://github.com/artemsemdev/SeaRise-Europe/actions/runs/{run_id}/attempts/1","predicate.runDetails.metadata.startedOn":"receipts/build.json.startedAt","predicate.runDetails.metadata.finishedOn":"receipts/build.json.completedAt"}}')  # noqa: E501
+    assert contract["subjects"] == json.loads('{"order":"name-ascending","requiredArtifactRoles":["projection-analysis-cog","projection-geoparquet","projection-visual-pmtiles"],"includeManifest":true}')  # noqa: E501
+    assert contract["dependencies"] == json.loads('{"order":"uri-ascending","requiredClasses":["code-revision","environment-lock","source-receipt","source-url-payload","build-input","build-tool"]}')  # noqa: E501
+    assert contract["byproduct"] == json.loads('{"sole":true,"name":"receipts/build.json","digestAlgorithm":"sha256","byteSizeField":"annotations.byteSize"}')  # noqa: E501
+    example = contract["example"]
+    example_definition = example["predicate"]["buildDefinition"]
+    example_run = example["predicate"]["runDetails"]
+    Draft202012Validator(external_schema).validate(example_definition["externalParameters"])
+    Draft202012Validator(internal_schema).validate(example_definition["internalParameters"])
+    assert set(example) == {"_type", "subject", "predicateType", "predicate"}
+    assert example["_type"] == STATEMENT_TYPE and example["predicateType"] == PREDICATE_TYPE
+    assert set(example["predicate"]) == {"buildDefinition", "runDetails"}
+    assert set(example_definition) == {"buildType", "externalParameters", "internalParameters", "resolvedDependencies"}  # noqa: E501
+    assert set(example_run) == {"builder", "metadata", "byproducts"}
+    assert set(example_run["metadata"]) == {"invocationId", "startedOn", "finishedOn"}
+    assert example_definition["buildType"] == BUILD_TYPE and example_run["builder"]["id"] == BUILDER_ID  # noqa: E501
+    assert len(example["subject"]) == 2 and len(example_definition["resolvedDependencies"]) == 6 and len(example_run["byproducts"]) == 1 and [item["uri"] for item in example_definition["resolvedDependencies"]] == sorted(item["uri"] for item in example_definition["resolvedDependencies"])  # noqa: E501
+    # fmt: on
     subjects = first["subject"]
     assert [item["name"] for item in subjects] == sorted(item["name"] for item in subjects)
     expected_outputs = [
