@@ -227,7 +227,7 @@ def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
     )
     opentofu = _dependency_component(document, "deployment-opentofu")
 
-    assert len(discovered) == 41
+    assert len(discovered) == 43
     assert discovered == tuple(sorted(set(discovered)))
     assert set(recorded) == set(discovered)
     assert document["inventoryKind"] == "dependency-defining-inputs"
@@ -237,6 +237,56 @@ def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
         "not-present",
         [],
     )
+
+
+def test_dependency_discovery_binds_real_python_graphs_but_not_synthetic_fixtures() -> None:
+    discovered = set(discover_dependency_inputs())
+    document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
+    recorded = {
+        item["path"]: item["sha256"]
+        for component in document["components"]
+        for item in component["inputs"]
+    }
+    expected = {
+        "contracts/supply-chain/v1/python-graphs/release-runtime.json": (
+            "86fc6d1a7446d338b607cff07c3403f46a38941b524337786fd6dc5c59a0150e"
+        ),
+        "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json": (
+            "64d00b72ce9226e639f506e359242beff4fbbeb45feaa22569ec1c180d0fff80"
+        ),
+    }
+
+    assert expected.keys() <= discovered
+    assert {path: recorded[path] for path in expected} == expected
+    assert "contracts/supply-chain/v1/fixtures/python-graph/valid.json" not in discovered
+
+
+def test_dependency_inventory_rejects_changed_or_missing_real_python_graph(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "changed"
+    _copy_dependency_inputs(repository)
+    graph = repository / "contracts/supply-chain/v1/python-graphs/release-runtime.json"
+    graph.write_bytes(graph.read_bytes() + b"\n")
+    with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+    repository = tmp_path / "missing"
+    _copy_dependency_inputs(repository)
+    graph = repository / "contracts/supply-chain/v1/python-graphs/release-runtime.json"
+    graph.unlink()
+    with pytest.raises(SupplyChainContractError, match="outside or missing"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_dependency_inventory_rejects_uninventoried_real_python_graph(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    graph = repository / "contracts/supply-chain/v1/python-graphs/new-runtime.json"
+    graph.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(SupplyChainContractError, match=r"unclassified=.*new-runtime.json"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
 
 
 def test_dependency_inventory_rejects_stale_recorded_hash(tmp_path: Path) -> None:
