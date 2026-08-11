@@ -49,6 +49,38 @@ The real artifact inventories the candidate build lock but does not claim
 bundle inclusion, license or vulnerability completeness, signing, or release
 approval.
 
+## NuGet SBOM generation
+
+Generate and validate one explicit project and target-framework inventory:
+
+```shell
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  nuget-sbom \
+  --project src/api/SeaRise.Api/SeaRise.Api.csproj \
+  --lock src/api/SeaRise.Api/packages.lock.json \
+  --target-framework net8.0 \
+  --output artifacts/sbom/searise-api-net8.0.cdx.json
+
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  nuget-sbom-validate \
+  --sbom artifacts/sbom/searise-api-net8.0.cdx.json \
+  --project src/api/SeaRise.Api/SeaRise.Api.csproj \
+  --lock src/api/SeaRise.Api/packages.lock.json \
+  --target-framework net8.0
+```
+
+The same immutable, no-overwrite publisher used by the Python and npm flows
+writes NuGet output. Checked-in canonical artifacts under `sboms/nuget` cover
+the `net8.0` API, Application, Domain, and Infrastructure projects. Their
+manifest binds every artifact to exact artifact, project, and lock hashes. The
+API test project is recorded with exact authority hashes only in
+`excludedTargets`; it is not a candidate production attachment.
+
+The manifest status is `not-attached`, and every SBOM retains explicit false or
+unclaimed production, candidate-inclusion, vulnerability-completeness, and
+license-completeness properties. These inventories do not assert that any
+candidate contains the listed projects or packages.
+
 ## Python graph annotations
 
 Hash-locked Python requirement files identify exact packages and wheel hashes,

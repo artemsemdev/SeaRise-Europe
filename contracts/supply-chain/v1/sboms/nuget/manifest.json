@@ -1,0 +1,67 @@
+{
+  "artifacts": [
+    {
+      "artifactPath": "contracts/supply-chain/v1/sboms/nuget/searise-api-net8.0.cdx.json",
+      "artifactSha256": "f5e160e872ae627b1654f67d56cb4100d4ae71444f83d526d17d43f168d247a6",
+      "componentCount": 48,
+      "id": "searise-api-net8.0",
+      "lockPath": "src/api/SeaRise.Api/packages.lock.json",
+      "lockSha256": "243059c5ffba8bda96e93ca60d54f0649fecb2270d3d35989846c9ea1c6a752b",
+      "projectKind": "production-api",
+      "projectPath": "src/api/SeaRise.Api/SeaRise.Api.csproj",
+      "projectSha256": "39914508eb014772e6ef5ba1537a4a79e77ecb45cd3e9c244fc652a180877795",
+      "targetFramework": "net8.0"
+    },
+    {
+      "artifactPath": "contracts/supply-chain/v1/sboms/nuget/searise-application-net8.0.cdx.json",
+      "artifactSha256": "275f131688a7e26a3da14a6cf1a6726ca67c7b9b3e7e7cb8951fcd0f7b020ac2",
+      "componentCount": 3,
+      "id": "searise-application-net8.0",
+      "lockPath": "src/api/SeaRise.Application/packages.lock.json",
+      "lockSha256": "476ff64bdf32f8cb691a75d4040d5cb6bd755e66b24de5227ccf638eab59ff58",
+      "projectKind": "library",
+      "projectPath": "src/api/SeaRise.Application/SeaRise.Application.csproj",
+      "projectSha256": "3ea36e3969ed950d9a32a3ebf8fb36c1983da31a13ec17ec8b11f4559765178e",
+      "targetFramework": "net8.0"
+    },
+    {
+      "artifactPath": "contracts/supply-chain/v1/sboms/nuget/searise-domain-net8.0.cdx.json",
+      "artifactSha256": "23dc59517698c60b75d6ce2d4bcbf652ebcdb3c28c0e7865f0a81d2b4e074de2",
+      "componentCount": 0,
+      "id": "searise-domain-net8.0",
+      "lockPath": "src/api/SeaRise.Domain/packages.lock.json",
+      "lockSha256": "22308ad23ccd417b5d96020fb92e203b85fad8c3788b3feadb2ca403d8ad596c",
+      "projectKind": "library",
+      "projectPath": "src/api/SeaRise.Domain/SeaRise.Domain.csproj",
+      "projectSha256": "f517d02432706989b264224f3212ca15cdc27a49293120fc52137540fcd99abd",
+      "targetFramework": "net8.0"
+    },
+    {
+      "artifactPath": "contracts/supply-chain/v1/sboms/nuget/searise-infrastructure-net8.0.cdx.json",
+      "artifactSha256": "88a20a65801a01a76e9de6fa1a319db666ad80c37a064152f69c8170dada8d99",
+      "componentCount": 17,
+      "id": "searise-infrastructure-net8.0",
+      "lockPath": "src/api/SeaRise.Infrastructure/packages.lock.json",
+      "lockSha256": "dadcef6cfed81d780b7377421c748f7d54b661e6876c3f73370c4f3f8a0fb86a",
+      "projectKind": "library",
+      "projectPath": "src/api/SeaRise.Infrastructure/SeaRise.Infrastructure.csproj",
+      "projectSha256": "bd14bbd29b08f1a54cd6195e5c31300924b61b697d0126e903dfcefa40a9b2bf",
+      "targetFramework": "net8.0"
+    }
+  ],
+  "candidateAttachmentStatus": "not-attached",
+  "excludedTargets": [
+    {
+      "lockPath": "src/api/SeaRise.Api.Tests/packages.lock.json",
+      "lockSha256": "6d5a6c24a9a68b8bd203cbd6560a983d63e544f086ea1a4b80775feee800d15e",
+      "projectKind": "test",
+      "projectPath": "src/api/SeaRise.Api.Tests/SeaRise.Api.Tests.csproj",
+      "projectSha256": "713c3a8fdbb7a5e2ad76d275ce554b7a0363472a161215d65649ab00cd1d550c",
+      "reason": "Test project excluded from candidate production attachment.",
+      "targetFramework": "net8.0"
+    }
+  ],
+  "manifestId": "searise-nuget-sbom-artifacts-v1",
+  "productionClaim": false,
+  "schemaVersion": "1.0.0"
+}

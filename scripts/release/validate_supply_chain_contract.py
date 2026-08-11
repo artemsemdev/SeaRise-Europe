@@ -12,11 +12,13 @@ from searise_pipeline.supply_chain import (
     load_json,
     parse_timestamp,
     publish_npm_sbom,
+    publish_nuget_sbom,
     publish_python_sbom,
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
     validate_npm_sbom,
+    validate_nuget_sbom,
     validate_python_sbom,
 )
 
@@ -51,6 +53,18 @@ def _parser() -> argparse.ArgumentParser:
     npm_validate.add_argument("--lock", type=Path, required=True)
     npm_validate.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_validate.add_argument("--logical-path", required=True)
+    nuget_sbom = commands.add_parser("nuget-sbom")
+    nuget_sbom.add_argument("--project", type=Path, required=True)
+    nuget_sbom.add_argument("--lock", type=Path, required=True)
+    nuget_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
+    nuget_sbom.add_argument("--target-framework", required=True)
+    nuget_sbom.add_argument("--output", type=Path, required=True)
+    nuget_validate = commands.add_parser("nuget-sbom-validate")
+    nuget_validate.add_argument("--sbom", type=Path, required=True)
+    nuget_validate.add_argument("--project", type=Path, required=True)
+    nuget_validate.add_argument("--lock", type=Path, required=True)
+    nuget_validate.add_argument("--repository-root", type=Path, default=Path.cwd())
+    nuget_validate.add_argument("--target-framework", required=True)
     python_sbom = commands.add_parser("python-sbom")
     python_sbom.add_argument("--annotation", type=Path, required=True)
     python_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
@@ -104,6 +118,30 @@ def main(argv: list[str] | None = None) -> int:
                 logical_path=args.logical_path,
             )
             print(f"validated {len(document['components'])} npm components: {args.sbom}")
+        elif args.command == "nuget-sbom":
+            document = publish_nuget_sbom(
+                args.output,
+                args.project,
+                args.lock,
+                repository_root=args.repository_root.absolute(),
+                target_framework=args.target_framework,
+            )
+            print(
+                f"generated {len(document['components'])} NuGet components "
+                f"for {args.target_framework}: {args.output}"
+            )
+        elif args.command == "nuget-sbom-validate":
+            document = validate_nuget_sbom(
+                args.sbom,
+                args.project,
+                args.lock,
+                repository_root=args.repository_root.absolute(),
+                target_framework=args.target_framework,
+            )
+            print(
+                f"validated {len(document['components'])} NuGet components "
+                f"for {args.target_framework}: {args.sbom}"
+            )
         elif args.command == "python-sbom":
             document = publish_python_sbom(
                 args.output,

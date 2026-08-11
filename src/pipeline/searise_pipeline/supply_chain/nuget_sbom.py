@@ -16,7 +16,7 @@ from urllib.parse import quote
 
 from .contracts import SupplyChainContractError, _validate_cyclonedx
 from .python_graph import _read_descriptor, _read_repository_file
-from .sbom import canonical_sbom_bytes
+from .sbom import canonical_sbom_bytes, write_new_sbom
 
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _TARGET = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$")
@@ -442,4 +442,23 @@ def validate_nuget_sbom(
     )
     if raw != canonical_sbom_bytes(expected):
         raise SupplyChainContractError("NuGet SBOM differs from its project/lock authority")
+    return document
+
+
+def publish_nuget_sbom(
+    output_path: Path,
+    project_path: Path,
+    lock_path: Path,
+    *,
+    repository_root: Path,
+    target_framework: str,
+) -> dict[str, Any]:
+    """Generate and durably publish one immutable project/TFM SBOM."""
+    document = generate_nuget_sbom(
+        project_path,
+        lock_path,
+        repository_root=repository_root,
+        target_framework=target_framework,
+    )
+    write_new_sbom(output_path, canonical_sbom_bytes(document))
     return document

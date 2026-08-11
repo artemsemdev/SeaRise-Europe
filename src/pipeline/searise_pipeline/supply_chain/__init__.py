@@ -9,6 +9,7 @@ from .contracts import (
     validate_dependency_inventory,
     validate_evidence_files,
 )
+from .nuget_sbom import generate_nuget_sbom, publish_nuget_sbom, validate_nuget_sbom
 from .python_graph import validate_python_lock_graph
 from .python_sbom import generate_python_sbom, publish_python_sbom, validate_python_sbom
 from .sbom import (
@@ -24,15 +25,18 @@ __all__ = [
     "canonical_sbom_bytes",
     "discover_dependency_inputs",
     "generate_npm_sbom",
+    "generate_nuget_sbom",
     "generate_python_sbom",
     "load_json",
     "parse_timestamp",
     "publish_npm_sbom",
+    "publish_nuget_sbom",
     "publish_python_sbom",
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_evidence_files",
     "validate_npm_sbom",
+    "validate_nuget_sbom",
     "validate_python_lock_graph",
     "validate_python_sbom",
     "write_new_sbom",

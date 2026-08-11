@@ -5,21 +5,41 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import runpy
 import shutil
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import pytest
 
-from searise_pipeline.supply_chain import SupplyChainContractError
-from searise_pipeline.supply_chain.nuget_sbom import generate_nuget_sbom, validate_nuget_sbom
+from searise_pipeline import supply_chain
+from searise_pipeline.supply_chain import (
+    SupplyChainContractError,
+    publish_nuget_sbom,
+)
+from searise_pipeline.supply_chain.nuget_sbom import (
+    generate_nuget_sbom,
+    validate_nuget_sbom,
+)
 from searise_pipeline.supply_chain.sbom import canonical_sbom_bytes
 
 ROOT = Path(__file__).resolve().parents[4]
+main = cast(
+    Callable[..., int],
+    runpy.run_path(str(ROOT / "scripts/release/validate_supply_chain_contract.py"))["main"],
+)
 FIXTURE = ROOT / "contracts/supply-chain/v1/fixtures/nuget"
 PROJECT = FIXTURE / "Fixture.App.xml"
 LOCK = FIXTURE / "packages-lock.synthetic.json"
 TARGET = "net8.0"
+ARTIFACT_ROOT = ROOT / "contracts/supply-chain/v1/sboms/nuget"
+MANIFEST = ARTIFACT_ROOT / "manifest.json"
+REAL_TARGETS = {
+    "searise-api-net8.0": ("SeaRise.Api", "production-api", 48),
+    "searise-application-net8.0": ("SeaRise.Application", "library", 3),
+    "searise-domain-net8.0": ("SeaRise.Domain", "library", 0),
+    "searise-infrastructure-net8.0": ("SeaRise.Infrastructure", "library", 17),
+}
 
 
 def _generate(
@@ -334,4 +354,173 @@ def test_outside_non_sibling_and_symlinked_sbom_paths_fail_closed(tmp_path: Path
             LOCK,
             repository_root=ROOT,
             target_framework=TARGET,
+        )
+
+
+def test_real_artifact_manifest_binds_exact_authorities_and_non_claims() -> None:
+    manifest = json.loads(MANIFEST.read_bytes())
+    assert set(manifest) == {
+        "artifacts",
+        "candidateAttachmentStatus",
+        "excludedTargets",
+        "manifestId",
+        "productionClaim",
+        "schemaVersion",
+    }
+    assert manifest["schemaVersion"] == "1.0.0"
+    assert manifest["manifestId"] == "searise-nuget-sbom-artifacts-v1"
+    assert manifest["candidateAttachmentStatus"] == "not-attached"
+    assert manifest["productionClaim"] is False
+
+    artifacts = {entry["id"]: entry for entry in manifest["artifacts"]}
+    assert set(artifacts) == set(REAL_TARGETS)
+    for identifier, (directory, kind, component_count) in REAL_TARGETS.items():
+        entry = artifacts[identifier]
+        assert set(entry) == {
+            "artifactPath",
+            "artifactSha256",
+            "componentCount",
+            "id",
+            "lockPath",
+            "lockSha256",
+            "projectKind",
+            "projectPath",
+            "projectSha256",
+            "targetFramework",
+        }
+        project = ROOT / entry["projectPath"]
+        lock = ROOT / entry["lockPath"]
+        artifact = ROOT / entry["artifactPath"]
+        assert project == ROOT / f"src/api/{directory}/{directory}.csproj"
+        assert lock == ROOT / f"src/api/{directory}/packages.lock.json"
+        assert artifact == ARTIFACT_ROOT / f"{identifier}.cdx.json"
+        assert hashlib.sha256(project.read_bytes()).hexdigest() == entry["projectSha256"]
+        assert hashlib.sha256(lock.read_bytes()).hexdigest() == entry["lockSha256"]
+        assert hashlib.sha256(artifact.read_bytes()).hexdigest() == entry["artifactSha256"]
+        assert entry["targetFramework"] == TARGET
+        assert entry["projectKind"] == kind
+        assert entry["componentCount"] == component_count
+
+        document = validate_nuget_sbom(
+            artifact,
+            project,
+            lock,
+            repository_root=ROOT,
+            target_framework=TARGET,
+        )
+        properties = _properties(document["metadata"]["component"])
+        assert len(document["components"]) == component_count
+        assert artifact.read_bytes() == canonical_sbom_bytes(document)
+        assert properties["org.searise.sbom.nuget.project.kind"] == kind
+        assert properties["org.searise.sbom.production-claim"] == "false"
+        assert properties["org.searise.sbom.candidate-inclusion"] == "unclaimed"
+        assert properties["org.searise.sbom.vulnerability-completeness"] == "unclaimed"
+        assert properties["org.searise.sbom.license-completeness"] == "unclaimed"
+
+
+def test_test_project_is_exactly_recorded_but_not_published() -> None:
+    excluded = json.loads(MANIFEST.read_bytes())["excludedTargets"]
+    assert len(excluded) == 1
+    entry = excluded[0]
+    assert set(entry) == {
+        "lockPath",
+        "lockSha256",
+        "projectKind",
+        "projectPath",
+        "projectSha256",
+        "reason",
+        "targetFramework",
+    }
+    assert entry["projectPath"] == "src/api/SeaRise.Api.Tests/SeaRise.Api.Tests.csproj"
+    assert entry["lockPath"] == "src/api/SeaRise.Api.Tests/packages.lock.json"
+    assert entry["projectKind"] == "test" and entry["targetFramework"] == TARGET
+    assert entry["reason"] == "Test project excluded from candidate production attachment."
+    assert (
+        hashlib.sha256((ROOT / entry["projectPath"]).read_bytes()).hexdigest()
+        == entry["projectSha256"]
+    )
+    assert (
+        hashlib.sha256((ROOT / entry["lockPath"]).read_bytes()).hexdigest() == entry["lockSha256"]
+    )
+    assert not (ARTIFACT_ROOT / "searise-api-tests-net8.0.cdx.json").exists()
+
+
+def test_public_api_publishes_exact_real_target_once(tmp_path: Path) -> None:
+    directory = "SeaRise.Domain"
+    project = ROOT / f"src/api/{directory}/{directory}.csproj"
+    lock = ROOT / f"src/api/{directory}/packages.lock.json"
+    output = tmp_path / "domain.cdx.json"
+    document = publish_nuget_sbom(
+        output,
+        project,
+        lock,
+        repository_root=ROOT,
+        target_framework=TARGET,
+    )
+
+    assert output.read_bytes() == (ARTIFACT_ROOT / "searise-domain-net8.0.cdx.json").read_bytes()
+    assert output.read_bytes() == canonical_sbom_bytes(document)
+    assert supply_chain.generate_nuget_sbom
+    assert supply_chain.publish_nuget_sbom
+    assert supply_chain.validate_nuget_sbom
+    with pytest.raises(SupplyChainContractError, match="already exists"):
+        publish_nuget_sbom(
+            output,
+            project,
+            lock,
+            repository_root=ROOT,
+            target_framework=TARGET,
+        )
+
+
+def test_cli_generates_and_validates_one_explicit_real_target(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = "SeaRise.Domain"
+    output = tmp_path / "domain.cdx.json"
+    common = [
+        "--project",
+        str(ROOT / f"src/api/{directory}/{directory}.csproj"),
+        "--lock",
+        str(ROOT / f"src/api/{directory}/packages.lock.json"),
+        "--repository-root",
+        str(ROOT),
+        "--target-framework",
+        TARGET,
+    ]
+    assert main(["nuget-sbom", *common, "--output", str(output)]) == 0
+    assert f"generated 0 NuGet components for {TARGET}" in capsys.readouterr().out
+    assert output.read_bytes() == (ARTIFACT_ROOT / "searise-domain-net8.0.cdx.json").read_bytes()
+    assert main(["nuget-sbom-validate", *common, "--sbom", str(output)]) == 0
+    assert f"validated 0 NuGet components for {TARGET}" in capsys.readouterr().out
+
+
+def test_missing_mutated_and_symlinked_real_artifacts_fail_closed(tmp_path: Path) -> None:
+    directory = "SeaRise.Application"
+    project = ROOT / f"src/api/{directory}/{directory}.csproj"
+    lock = ROOT / f"src/api/{directory}/packages.lock.json"
+    arguments = {
+        "repository_root": ROOT,
+        "target_framework": TARGET,
+    }
+    with pytest.raises(SupplyChainContractError):
+        validate_nuget_sbom(tmp_path / "missing.json", project, lock, **arguments)
+
+    document = json.loads((ARTIFACT_ROOT / "searise-application-net8.0.cdx.json").read_bytes())
+    _forge_claim(document)
+    mutated = tmp_path / "mutated.json"
+    _write_sbom(mutated, document)
+    with pytest.raises(SupplyChainContractError, match="authority"):
+        validate_nuget_sbom(mutated, project, lock, **arguments)
+
+    real_parent = tmp_path / "real"
+    real_parent.mkdir()
+    alias_parent = tmp_path / "alias"
+    alias_parent.symlink_to(real_parent, target_is_directory=True)
+    with pytest.raises(SupplyChainContractError, match="must not be a symlink"):
+        publish_nuget_sbom(
+            alias_parent / "sbom.json",
+            project,
+            lock,
+            **arguments,
         )
