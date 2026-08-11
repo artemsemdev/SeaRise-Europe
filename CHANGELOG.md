@@ -220,6 +220,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Corrected the immutable full-source contract to match the official
+  `alternateNamesV2.zip` member order while retaining path-based member staging.
 - Pinned the single writer-owned GeoParquet Arrow schema FlatBuffer and
   canonicalized Tippecanoe gzip platform markers so the Linux and macOS ARM64
   release profiles produce identical analytical and visual artifact bytes

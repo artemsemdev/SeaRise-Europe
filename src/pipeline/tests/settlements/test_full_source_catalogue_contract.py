@@ -52,17 +52,27 @@ def _archive_asset(path: Path, counts: dict[str, int]) -> LockedAsset:
     return LockedAsset(_sha(path), path.stat().st_size, members)
 
 
+def _replace_member(asset: LockedAsset, path: str, **changes: object) -> LockedAsset:
+    return replace(
+        asset,
+        members=tuple(
+            replace(member, **changes) if member.path == path else member
+            for member in asset.members
+        ),
+    )
+
+
 def _fixture(tmp_path: Path) -> tuple[FullSourceStageInputs, FullSourceStageContract]:
     places = tmp_path / "allCountries.zip"
     with zipfile.ZipFile(places, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("allCountries.txt", b"place-row-one\nplace-row-two\n")
     alternates = tmp_path / "alternateNamesV2.zip"
     with zipfile.ZipFile(alternates, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("alternateNamesV2.txt", b"alternate-row-one\nalternate-row-two\n")
         archive.writestr(
             "iso-languagecodes.txt",
             ISO_LANGUAGE_HEADER + b"\r\nlanguage-row-one\nlanguage-row-two\n",
         )
+        archive.writestr("alternateNamesV2.txt", b"alternate-row-one\nalternate-row-two\n")
     admin = tmp_path / "admin1CodesASCII.txt"
     admin.write_bytes(b"admin-row-one\nadmin-row-two\n")
     readme = tmp_path / "readme.txt"
@@ -112,8 +122,15 @@ def test_production_contract_binds_exact_reviewed_identities_and_counts() -> Non
     )
     bindings = full_source_bindings()
     assert bindings["assets"]["allCountries"]["members"][0]["rowCount"] == 13455006
-    assert bindings["assets"]["alternateNames"]["members"][0]["rowCount"] == 19037112
-    assert bindings["assets"]["alternateNames"]["members"][1]["rowCount"] == 7929
+    alternate_members = bindings["assets"]["alternateNames"]["members"]
+    assert tuple(item["path"] for item in alternate_members) == (
+        "iso-languagecodes.txt",
+        "alternateNamesV2.txt",
+    )
+    assert {item["path"]: item["rowCount"] for item in alternate_members} == {
+        "iso-languagecodes.txt": 7929,
+        "alternateNamesV2.txt": 19037112,
+    }
     assert bindings["assets"]["admin1"]["rowCount"] == 3865
     assert bindings["minimumFreeBytes"] == 20 * 1024**3
     assert bindings["policies"] == {
@@ -141,6 +158,42 @@ def test_fixture_verification_returns_stable_canonical_bindings(tmp_path: Path) 
     assert canonical.endswith(b"\n")
 
 
+def test_alternate_archive_requires_official_member_order(tmp_path: Path) -> None:
+    inputs, contract = _fixture(tmp_path)
+    assert verify_full_source_inputs(inputs, contract=contract) == full_source_bindings(contract)
+
+    with zipfile.ZipFile(inputs.alternate_names_zip) as archive:
+        assert tuple(item.filename for item in archive.infolist()) == (
+            "iso-languagecodes.txt",
+            "alternateNamesV2.txt",
+        )
+        iso_languages = archive.read("iso-languagecodes.txt")
+        alternate_names = archive.read("alternateNamesV2.txt")
+
+    reversed_archive = tmp_path / "alternateNamesV2-reversed.zip"
+    with zipfile.ZipFile(reversed_archive, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("alternateNamesV2.txt", alternate_names)
+        archive.writestr("iso-languagecodes.txt", iso_languages)
+    reversed_asset = replace(
+        contract.alternate_names,
+        sha256=_sha(reversed_archive),
+        byte_size=reversed_archive.stat().st_size,
+    )
+    with pytest.raises(FullSourceContractError, match="member inventory"):
+        verify_full_source_inputs(
+            replace(inputs, alternate_names_zip=reversed_archive),
+            contract=replace(contract, alternate_names=reversed_asset),
+        )
+    with pytest.raises(FullSourceContractError, match="contract is malformed"):
+        replace(
+            contract,
+            alternate_names=replace(
+                contract.alternate_names,
+                members=tuple(reversed(contract.alternate_names.members)),
+            ),
+        )
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
@@ -160,18 +213,18 @@ def test_input_and_contract_mutations_fail_closed(
     if mutation == "asset":
         inputs.all_countries_zip.write_bytes(b"drift")
     elif mutation.startswith("member_"):
-        member = contract.alternate_names.members[1]
+        member = next(
+            item for item in contract.alternate_names.members if item.path == "alternateNamesV2.txt"
+        )
         changes = {
             "member_crc": {"crc32": "00000000"},
             "member_sha": {"sha256": "0" * 64},
             "member_rows": {"row_count": member.row_count + 1},
         }[mutation]
-        member = replace(member, **changes)
         contract = replace(
             contract,
-            alternate_names=replace(
-                contract.alternate_names,
-                members=(contract.alternate_names.members[0], member),
+            alternate_names=_replace_member(
+                contract.alternate_names, "alternateNamesV2.txt", **changes
             ),
         )
     elif mutation == "admin_rows":
@@ -200,14 +253,18 @@ def test_archive_inventory_and_contract_construction_fail_closed(tmp_path: Path)
     with pytest.raises(FullSourceContractError, match="locked ZIP member identity"):
         replace(contract.all_countries.members[0], path="../unsafe")
     with pytest.raises(FullSourceContractError, match="locked ZIP member identity"):
-        replace(contract.alternate_names.members[1], header=b"unsafe\rheader")
-    wrong_header = replace(contract.alternate_names.members[1], header=b"wrong header")
+        _replace_member(
+            contract.alternate_names,
+            "iso-languagecodes.txt",
+            header=b"unsafe\rheader",
+        )
     with pytest.raises(FullSourceContractError, match="contract is malformed"):
         replace(
             contract,
-            alternate_names=replace(
+            alternate_names=_replace_member(
                 contract.alternate_names,
-                members=(contract.alternate_names.members[0], wrong_header),
+                "iso-languagecodes.txt",
+                header=b"wrong header",
             ),
         )
     with pytest.raises(FullSourceContractError, match="canonical JSON"):

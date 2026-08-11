@@ -110,9 +110,9 @@ class FullSourceStageContract:
             or self.all_countries.members[0].path != "allCountries.txt"
             or self.all_countries.members[0].header is not None
             or tuple(item.path for item in self.alternate_names.members)
-            != ("alternateNamesV2.txt", "iso-languagecodes.txt")
-            or self.alternate_names.members[0].header is not None
-            or self.alternate_names.members[1].header != ISO_LANGUAGE_HEADER
+            != ("iso-languagecodes.txt", "alternateNamesV2.txt")
+            or self.alternate_names.members[0].header != ISO_LANGUAGE_HEADER
+            or self.alternate_names.members[1].header is not None
             or self.admin1.members
             or self.admin1.row_count < 1
             or self.readme.members
@@ -155,14 +155,6 @@ PRODUCTION_CONTRACT = FullSourceStageContract(
         202510374,
         (
             LockedMember(
-                "alternateNamesV2.txt",
-                "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612",
-                777625687,
-                202448178,
-                "e311a5a6",
-                19037112,
-            ),
-            LockedMember(
                 "iso-languagecodes.txt",
                 "cb0d34f492775deec8ec5713da6efa4463dad99b5e7ba2172bd094cfdcb76571",
                 137908,
@@ -170,6 +162,14 @@ PRODUCTION_CONTRACT = FullSourceStageContract(
                 "4e1f14da",
                 7929,
                 ISO_LANGUAGE_HEADER,
+            ),
+            LockedMember(
+                "alternateNamesV2.txt",
+                "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612",
+                777625687,
+                202448178,
+                "e311a5a6",
+                19037112,
             ),
         ),
     ),

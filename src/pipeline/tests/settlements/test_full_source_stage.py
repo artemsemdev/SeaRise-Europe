@@ -101,11 +101,11 @@ def _fixture(
     language_rows = (FIXTURES / "iso-languagecodes.rows.txt").read_bytes().splitlines()
     alternate_names = tmp_path / "alternateNamesV2.zip"
     with zipfile.ZipFile(alternate_names, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("alternateNamesV2.txt", b"\n".join(alternate_rows) + b"\n")
         archive.writestr(
             "iso-languagecodes.txt",
             ISO_LANGUAGE_HEADER + b"\r\n" + b"\n".join(language_rows) + b"\n",
         )
+        archive.writestr("alternateNamesV2.txt", b"\n".join(alternate_rows) + b"\n")
 
     admin = tmp_path / "admin1CodesASCII.txt"
     admin_rows = (FIXTURES / "catalogue-admin1CodesASCII.rows.txt").read_bytes()

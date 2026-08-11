@@ -59,11 +59,11 @@ def _fixture_archive(path: Path, *, extra: bool = False) -> Path:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr("alternateNamesV2.txt", alternate)
             archive.writestr(
                 "iso-languagecodes.txt",
                 b"ISO 639-3\tISO 639-2\tISO 639-1\tLanguage Name\r\n" + languages,
             )
+            archive.writestr("alternateNamesV2.txt", alternate)
             if extra:
                 archive.writestr("extra.txt", b"unexpected\n")
     return path
