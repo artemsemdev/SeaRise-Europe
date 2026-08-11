@@ -9,11 +9,13 @@ from pathlib import Path
 
 import pytest
 
+from searise_pipeline.settlements import spatial_toolchain
 from searise_pipeline.settlements.spatial_toolchain import (
     SpatialToolchainError,
     acquire_spatial_extension,
     load_spatial_manifest,
     stage_spatial_archive,
+    validate_spatial_locks,
     verify_spatial_toolchain,
 )
 
@@ -60,7 +62,7 @@ def _test_manifest(tmp_path: Path) -> tuple[Path, Path, Path]:
     platform = {
         "duckdbPlatform": "linux_amd64",
         "pythonWheel": {
-            "url": "https://files.pythonhosted.org/packages/test/duckdb.whl",
+            "url": "https://files.pythonhosted.org/packages/test/duckdb-1.5.4-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
             "byteSize": 1,
             "sha256": "0" * 64,
         },
@@ -78,8 +80,14 @@ def _test_manifest(tmp_path: Path) -> tuple[Path, Path, Path]:
     }
     macos = json.loads(json.dumps(platform))
     macos["duckdbPlatform"] = "osx_arm64"
+    macos["pythonWheel"]["url"] = (
+        "https://files.pythonhosted.org/packages/test/duckdb-1.5.4-cp311-cp311-macosx_11_0_arm64.whl"
+    )
     macos["extensionArchive"]["relativePath"] = (
         "duckdb/v1.5.4/osx_arm64/spatial.duckdb_extension.gz"
+    )
+    macos["extensionArchive"]["url"] = (
+        "https://extensions.duckdb.org/v1.5.4/osx_arm64/spatial.duckdb_extension.gz"
     )
     macos["extension"]["relativePath"] = "duckdb/v1.5.4/osx_arm64/spatial.duckdb_extension"
     raw = {
@@ -118,6 +126,41 @@ def test_checked_in_manifest_pins_both_official_platform_identities() -> None:
     assert manifest.platforms["macos-arm64"].extension.sha256 == (
         "575c609c1eb0b45be5d4000792528579746233c5d57d3fa83aa825d11740a1ec"
     )
+    validate_spatial_locks(manifest, REPO_ROOT / "src/pipeline")
+
+
+@pytest.mark.parametrize("mutation", ("platform", "wheel", "archive", "cache"))
+def test_manifest_rejects_platform_semantic_mutations(tmp_path: Path, mutation: str) -> None:
+    manifest_path, _, _ = _test_manifest(tmp_path)
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    pin = raw["platforms"]["linux-x86_64"]
+    if mutation == "platform":
+        pin["duckdbPlatform"] = "osx_arm64"
+    elif mutation == "wheel":
+        pin["pythonWheel"]["url"] = pin["pythonWheel"]["url"].replace("cp311", "cp312", 1)
+    elif mutation == "archive":
+        pin["extensionArchive"]["url"] = "https://extensions.duckdb.org/v1.5.4/elsewhere/x.gz"
+    else:
+        pin["extension"]["relativePath"] = "duckdb/unsafe path/spatial.duckdb_extension"
+    manifest_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(SpatialToolchainError):
+        load_spatial_manifest(manifest_path)
+
+
+def test_lock_parity_rejects_a_manifest_version_mismatch(tmp_path: Path) -> None:
+    manifest = load_spatial_manifest(MANIFEST_PATH)
+    pipeline_root = tmp_path / "pipeline"
+    pipeline_root.mkdir()
+    for key in manifest.platforms:
+        name = f"requirements-settlements-spatial-{key}.lock"
+        source = REPO_ROOT / "src/pipeline" / name
+        (pipeline_root / name).write_bytes(source.read_bytes())
+    lock = pipeline_root / "requirements-settlements-spatial-linux-x86_64.lock"
+    lock.write_text(lock.read_text(encoding="utf-8").replace("1.5.4", "1.5.3"), encoding="utf-8")
+
+    with pytest.raises(SpatialToolchainError, match="lock differs from manifest"):
+        validate_spatial_locks(manifest, pipeline_root)
 
 
 def test_cache_acquisition_is_checksum_first_and_live_verifier_only_loads_by_path(
@@ -184,3 +227,29 @@ def test_verifier_rejects_a_duckdb_version_mutation_before_load(tmp_path: Path) 
         )
 
     assert duckdb.connection.commands == []
+
+
+def test_default_live_verifier_requires_python_311_before_duckdb_import(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest, cache_root = _prepared_cache(tmp_path)
+    monkeypatch.setattr(spatial_toolchain.sys, "version_info", (3, 10, 9))
+
+    with pytest.raises(SpatialToolchainError, match="requires Python 3.11"):
+        verify_spatial_toolchain(cache_root, manifest, platform_key="linux-x86_64")
+
+
+def test_verifier_rejects_a_symlinked_cache_component(tmp_path: Path) -> None:
+    manifest, cache_root = _prepared_cache(tmp_path)
+    original = cache_root / "duckdb"
+    relocated = cache_root / "reviewed-duckdb"
+    original.rename(relocated)
+    original.symlink_to(relocated, target_is_directory=True)
+
+    with pytest.raises(SpatialToolchainError, match="symbolic link"):
+        verify_spatial_toolchain(
+            cache_root,
+            manifest,
+            platform_key="linux-x86_64",
+            duckdb_module=_DuckDB("1.5.4"),
+        )

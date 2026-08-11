@@ -9,8 +9,10 @@ import importlib
 import json
 import os
 import platform
+import re
 import shutil
 import stat
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -19,6 +21,13 @@ from typing import Any, Mapping, Optional, Sequence
 
 class SpatialToolchainError(ValueError):
     """Raised when a settlement spatial build-plane identity is not exact."""
+
+
+_PLATFORM_SEMANTICS = {
+    "linux-x86_64": ("linux_amd64", "manylinux_2_26_x86_64.manylinux_2_28_x86_64"),
+    "macos-arm64": ("osx_arm64", "macosx_11_0_arm64"),
+}
+_PORTABLE_PATH = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
 @dataclass(frozen=True)
@@ -98,7 +107,12 @@ def _file_identity(value: Mapping[str, Any], *, needs_path: bool) -> FileIdentit
     relative_path = str(value.get("relativePath", ""))
     if needs_path:
         path = PurePosixPath(relative_path)
-        if not relative_path or path.is_absolute() or ".." in path.parts:
+        if (
+            not relative_path
+            or not _PORTABLE_PATH.fullmatch(relative_path)
+            or path.is_absolute()
+            or ".." in path.parts
+        ):
             raise SpatialToolchainError("manifest cache path is unsafe")
     size = value["byteSize"]
     digest = value["sha256"]
@@ -134,13 +148,18 @@ def load_spatial_manifest(path: Path) -> SpatialManifest:
         "name": "spatial", "version": f"v{tool['version']}"
     }:
         raise SpatialToolchainError("Spatial extension pin is invalid")
-    if raw["schemaVersion"] != 1 or not isinstance(platforms, dict) or set(platforms) != {
-        "linux-x86_64", "macos-arm64"
-    }:
+    if (
+        raw["schemaVersion"] != 1
+        or tool["pythonVersion"] != "3.11"
+        or tool["pythonRequires"] != ">=3.10"
+        or not isinstance(platforms, dict)
+        or set(platforms) != set(_PLATFORM_SEMANTICS)
+    ):
         raise SpatialToolchainError("spatial toolchain platform set is invalid")
 
     parsed: dict[str, SpatialPlatform] = {}
     for key, value in platforms.items():
+        duckdb_platform, wheel_tag = _PLATFORM_SEMANTICS[key]
         if not isinstance(value, dict) or set(value) != {
             "duckdbPlatform", "pythonWheel", "extensionArchive", "extension"
         }:
@@ -152,6 +171,9 @@ def load_spatial_manifest(path: Path) -> SpatialManifest:
             raise SpatialToolchainError("DuckDB wheel pin is malformed")
         if not isinstance(wheel["url"], str) or not wheel["url"].startswith("https://files.pythonhosted.org/"):
             raise SpatialToolchainError("DuckDB wheel URL is not an official immutable URL")
+        wheel_name = f"duckdb-{tool['version']}-cp311-cp311-{wheel_tag}.whl"
+        if wheel["url"].rsplit("/", 1)[-1] != wheel_name:
+            raise SpatialToolchainError("DuckDB wheel filename differs from its platform pin")
         wheel_identity = _file_identity(
             {"byteSize": wheel["byteSize"], "sha256": wheel["sha256"]}, needs_path=False
         )
@@ -163,6 +185,15 @@ def load_spatial_manifest(path: Path) -> SpatialManifest:
             raise SpatialToolchainError("Spatial archive URL is not an official URL")
         if not isinstance(unpacked, dict):
             raise SpatialToolchainError("Spatial extension pin is malformed")
+        archive_path = f"duckdb/v{tool['version']}/{duckdb_platform}/spatial.duckdb_extension.gz"
+        extension_path = archive_path.removesuffix(".gz")
+        if (
+            value["duckdbPlatform"] != duckdb_platform
+            or archive["url"] != f"https://extensions.duckdb.org/v{tool['version']}/{duckdb_platform}/spatial.duckdb_extension.gz"
+            or archive["relativePath"] != archive_path
+            or unpacked.get("relativePath") != extension_path
+        ):
+            raise SpatialToolchainError("Spatial platform paths differ from the tool pin")
         parsed[key] = SpatialPlatform(
             key=key,
             duckdb_platform=value["duckdbPlatform"],
@@ -199,11 +230,15 @@ def current_spatial_platform() -> str:
 
 
 def _cache_path(cache_root: Path, relative_path: str) -> Path:
-    root = cache_root.resolve()
+    root = cache_root.absolute()
+    if root.is_symlink():
+        raise SpatialToolchainError("cache path contains a symbolic link")
     relative = PurePosixPath(relative_path)
-    candidate = root.joinpath(*relative.parts)
-    if root not in candidate.parents:
-        raise SpatialToolchainError("cache path escaped its root")
+    candidate = root
+    for part in relative.parts:
+        candidate /= part
+        if candidate.is_symlink():
+            raise SpatialToolchainError("cache path contains a symbolic link")
     return candidate
 
 
@@ -211,7 +246,7 @@ def _create_cache_parent(path: Path, cache_root: Path) -> None:
     cache_root.mkdir(parents=True, exist_ok=True)
     if cache_root.is_symlink() or not cache_root.is_dir():
         raise SpatialToolchainError("cache directory is unsafe")
-    root = cache_root.resolve()
+    root = cache_root.absolute()
     current = root
     for part in path.parent.relative_to(root).parts:
         current /= part
@@ -306,6 +341,8 @@ def verify_spatial_toolchain(
         platform_pin = manifest.platforms[key]
     except KeyError as exc:
         raise SpatialToolchainError(f"unsupported manifest platform: {key}") from exc
+    if duckdb_module is None and sys.version_info[:2] != (3, 11):
+        raise SpatialToolchainError("live Spatial verification requires Python 3.11")
     archive = _cache_path(cache_root, platform_pin.archive.relative_path)
     extension = _cache_path(cache_root, platform_pin.extension.relative_path)
     _verify_file(archive, platform_pin.archive, "cached Spatial archive")
@@ -338,6 +375,20 @@ def verify_spatial_toolchain(
     )
 
 
+def validate_spatial_locks(manifest: SpatialManifest, pipeline_root: Path) -> None:
+    """Require each platform lock to contain only its manifest-bound DuckDB wheel."""
+    for key, pin in manifest.platforms.items():
+        lock = pipeline_root / f"requirements-settlements-spatial-{key}.lock"
+        try:
+            requirements = [line for line in lock.read_text(encoding="utf-8").splitlines()
+                            if line and not line.startswith("#")]
+        except OSError as exc:
+            raise SpatialToolchainError(f"settlement Spatial lock is unreadable: {key}") from exc
+        expected = f"duckdb=={manifest.duckdb_version} --hash=sha256:{pin.wheel_sha256}"
+        if requirements != [expected]:
+            raise SpatialToolchainError(f"settlement Spatial lock differs from manifest: {key}")
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Run the fail-closed live preflight against an already prepared cache."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -351,6 +402,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     arguments = parser.parse_args(argv)
     manifest = load_spatial_manifest(arguments.manifest)
+    validate_spatial_locks(manifest, arguments.manifest.parent.parent)
     if arguments.archive is not None:
         acquire_spatial_extension(
             arguments.archive,

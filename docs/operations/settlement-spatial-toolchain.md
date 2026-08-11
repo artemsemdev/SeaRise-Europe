@@ -8,8 +8,10 @@ not the historic AR6 release environment: do not change either
 The authoritative identities are in
 `src/pipeline/toolchain/duckdb-spatial-extensions.json`. It binds a Python
 wheel, the compressed official extension archive, and the uncompressed native
-extension for both Linux x86_64 and macOS arm64. The corresponding hash-only
-wheel locks are:
+extension for both Linux x86_64 and macOS arm64. The verifier derives the
+official archive URL, cache paths, wheel filename/tag, and platform name from
+that versioned contract, and rejects a lock that does not contain exactly its
+matching wheel requirement. The corresponding hash-only wheel locks are:
 
 - `requirements-settlements-spatial-linux-x86_64.lock`
 - `requirements-settlements-spatial-macos-arm64.lock`
@@ -50,6 +52,5 @@ point/distance smoke result `(12.5, 41.9, 5.0)`. The runtime never asks DuckDB
 to fetch or install an extension; a missing cache is a hard failure, not a
 fallback to the network.
 
-The standard Linux CI job exercises acquisition and the live load with the
-Linux lock. Run the macOS command on a Python 3.11 arm64 runner before admitting
-a macOS build-plane change.
+CI runs this live preflight on pinned Python 3.11 Linux x86_64 and macOS arm64
+runners. Archive acquisition retries only HTTPS redirects before cache admission.
