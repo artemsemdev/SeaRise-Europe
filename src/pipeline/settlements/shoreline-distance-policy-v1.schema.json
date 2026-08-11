@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:searise-europe:internal:settlement-shoreline-distance-policy:v1",
+  "title": "SeaRise Europe settlement shoreline distance policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "policyVersion",
+    "distanceMethodVersion",
+    "sourceLock",
+    "source",
+    "rights",
+    "purpose",
+    "recipe",
+    "distanceMethod",
+    "distancePersistence",
+    "coastalClassification",
+    "controls",
+    "output",
+    "evidencePath"
+  ],
+  "properties": {
+    "$schema": { "const": "./shoreline-distance-policy-v1.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "policyVersion": { "const": "settlement-shoreline-distance-v1" },
+    "distanceMethodVersion": {
+      "const": "epsg3035-planar-whole-meter-half-even-v1"
+    },
+    "sourceLock": { "$ref": "#/$defs/fileBinding" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "registryVersion", "assets"],
+      "properties": {
+        "sourceId": { "const": "natural-earth-10m" },
+        "registryVersion": { "const": "5.1.1" },
+        "assets": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/sourceAsset" }
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url", "spdx", "attribution", "redistributionStatus"],
+      "properties": {
+        "name": { "const": "Natural Earth public domain dedication" },
+        "url": { "const": "https://www.naturalearthdata.com/about/terms-of-use/" },
+        "spdx": { "const": "LicenseRef-Natural-Earth-Public-Domain" },
+        "attribution": { "const": "Made with Natural Earth." },
+        "redistributionStatus": { "const": "approved" }
+      }
+    },
+    "purpose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "status",
+        "productEligibilityOnly",
+        "hazardExtentClaim",
+        "canonicalCoastlineClaim",
+        "ownerApprovalClaim",
+        "publicationEligible"
+      ],
+      "properties": {
+        "role": { "const": "settlement-distance-to-coast-only" },
+        "status": { "const": "selected-scope-approximation" },
+        "productEligibilityOnly": { "const": true },
+        "hazardExtentClaim": { "const": false },
+        "canonicalCoastlineClaim": { "const": false },
+        "ownerApprovalClaim": { "const": false },
+        "publicationEligible": { "const": false }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputGeometry",
+        "sourceAssetOrder",
+        "inputCrs",
+        "coordinateOrder",
+        "selectionOperation",
+        "selectionBoundsWgs84",
+        "featureTruncationAllowed",
+        "geometryTransform",
+        "allowedOutputGeometryTypes",
+        "canonicalization",
+        "prohibitedDerivedEdges"
+      ],
+      "properties": {
+        "inputGeometry": { "const": "direct-source-linework" },
+        "sourceAssetOrder": {
+          "const": ["coastline", "minor-islands-coastline"]
+        },
+        "inputCrs": { "const": "EPSG:4326" },
+        "coordinateOrder": { "const": "longitude-latitude-xy" },
+        "selectionOperation": {
+          "const": "select-whole-source-features-intersecting-bbox"
+        },
+        "selectionBoundsWgs84": {
+          "const": [-30, 30, 45, 75]
+        },
+        "featureTruncationAllowed": { "const": false },
+        "geometryTransform": { "const": "none" },
+        "allowedOutputGeometryTypes": { "const": ["LineString"] },
+        "canonicalization": { "const": "normalized-wkb-order-rfc7946-json-v1" },
+        "prohibitedDerivedEdges": {
+          "const": [
+            "bounding-box-edges",
+            "administrative-boundaries",
+            "ocean-polygon-boundaries",
+            "coastal-zone-boundaries"
+          ]
+        }
+      }
+    },
+    "distanceMethod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine",
+        "engineVersion",
+        "inputCrs",
+        "coordinateOrder",
+        "metricCrs",
+        "transformExpression",
+        "distanceExpression",
+        "distanceUnit",
+        "hybridNearestDegreesAllowed",
+        "spheroidDistanceAllowed"
+      ],
+      "properties": {
+        "engine": { "const": "duckdb-spatial" },
+        "engineVersion": { "const": "1.5.4" },
+        "inputCrs": { "const": "EPSG:4326" },
+        "coordinateOrder": { "const": "longitude-latitude-xy" },
+        "metricCrs": { "const": "EPSG:3035" },
+        "transformExpression": {
+          "const": "ST_Transform(geometry, 'EPSG:4326', 'EPSG:3035', true)"
+        },
+        "distanceExpression": { "const": "ST_Distance(place_3035, shoreline_3035)" },
+        "distanceUnit": { "const": "meter" },
+        "hybridNearestDegreesAllowed": { "const": false },
+        "spheroidDistanceAllowed": { "const": false }
+      }
+    },
+    "distancePersistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "inputType",
+        "outputType",
+        "unit",
+        "roundingMode",
+        "expression",
+        "subMeterPrecisionClaim"
+      ],
+      "properties": {
+        "field": { "const": "distance_to_coast_m" },
+        "inputType": { "const": "DOUBLE" },
+        "outputType": { "const": "BIGINT" },
+        "unit": { "const": "whole-meter" },
+        "roundingMode": { "const": "nearest-half-to-even" },
+        "expression": {
+          "const": "CAST(ST_Distance(place_3035, shoreline_3035) AS BIGINT)"
+        },
+        "subMeterPrecisionClaim": { "const": false }
+      }
+    },
+    "coastalClassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["derivedFromShorelineDistance", "geometryVersion", "predicate"],
+      "properties": {
+        "derivedFromShorelineDistance": { "const": false },
+        "geometryVersion": { "const": "natural-earth-5.1.1-25km-scope-v2" },
+        "predicate": { "const": "ST_Covers" }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/control" }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "version",
+        "mediaType",
+        "crs",
+        "byteSize",
+        "sha256",
+        "featureCount",
+        "coordinateCount",
+        "boundsWgs84"
+      ],
+      "properties": {
+        "path": { "const": "data/settlements/europe-settlement-shoreline-v1.geojson" },
+        "version": { "const": "natural-earth-direct-linework-europe-selection-v1" },
+        "mediaType": { "const": "application/geo+json" },
+        "crs": { "const": "OGC:CRS84" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "featureCount": { "type": "integer", "minimum": 1 },
+        "coordinateCount": { "type": "integer", "minimum": 2 },
+        "boundsWgs84": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number" },
+            { "type": "number" },
+            { "type": "number" },
+            { "type": "number" }
+          ],
+          "items": false
+        }
+      }
+    },
+    "evidencePath": {
+      "const": "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json"
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "fileBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "const": "src/pipeline/sources/source-lock.phase-1-settlement-coastline.json"
+        },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sourceAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetId",
+        "registryVersion",
+        "nativeVersion",
+        "archiveByteSize",
+        "archiveSha256",
+        "memberInventorySha256",
+        "memberPaths"
+      ],
+      "properties": {
+        "assetId": { "enum": ["coastline", "minor-islands-coastline"] },
+        "registryVersion": { "const": "5.1.1" },
+        "nativeVersion": { "enum": ["5.0.0-pre9", "4.1.0"] },
+        "archiveByteSize": { "type": "integer", "minimum": 1 },
+        "archiveSha256": { "$ref": "#/$defs/sha256" },
+        "memberInventorySha256": { "$ref": "#/$defs/sha256" },
+        "memberPaths": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "longitude",
+        "latitude",
+        "minimumDistanceMeters",
+        "maximumDistanceMeters",
+        "expectedNearestAssetId"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "kind": { "enum": ["major-island", "minor-island", "port", "inland"] },
+        "name": { "type": "string", "minLength": 1 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "minimumDistanceMeters": { "type": ["number", "null"], "minimum": 0 },
+        "maximumDistanceMeters": { "type": ["number", "null"], "minimum": 0 },
+        "expectedNearestAssetId": {
+          "type": ["string", "null"],
+          "enum": ["coastline", "minor-islands-coastline", null]
+        }
+      }
+    }
+  }
+}

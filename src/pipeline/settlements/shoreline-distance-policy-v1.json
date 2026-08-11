@@ -1,0 +1,179 @@
+{
+  "$schema": "./shoreline-distance-policy-v1.schema.json",
+  "schemaVersion": 1,
+  "policyVersion": "settlement-shoreline-distance-v1",
+  "distanceMethodVersion": "epsg3035-planar-whole-meter-half-even-v1",
+  "sourceLock": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlement-coastline.json",
+    "sha256": "a640da683b1b938715e0661afbdc8c2a8ebb145b7d0b9f5f41a567bcc49b3ccc"
+  },
+  "source": {
+    "sourceId": "natural-earth-10m",
+    "registryVersion": "5.1.1",
+    "assets": [
+      {
+        "assetId": "coastline",
+        "registryVersion": "5.1.1",
+        "nativeVersion": "5.0.0-pre9",
+        "archiveByteSize": 3069451,
+        "archiveSha256": "bfa04cdbcbef07ef90dfca1dabb48062eca29900a113df0f389303e255484017",
+        "memberInventorySha256": "fa1604ad335e47c7b9241ea2b7ab1dfb2338589251d26948be15ba4fe6a9d302",
+        "memberPaths": [
+          "ne_10m_coastline.README.html",
+          "ne_10m_coastline.VERSION.txt",
+          "ne_10m_coastline.cpg",
+          "ne_10m_coastline.dbf",
+          "ne_10m_coastline.prj",
+          "ne_10m_coastline.shp",
+          "ne_10m_coastline.shx"
+        ]
+      },
+      {
+        "assetId": "minor-islands-coastline",
+        "registryVersion": "5.1.1",
+        "nativeVersion": "4.1.0",
+        "archiveByteSize": 310455,
+        "archiveSha256": "fa1d68b486b3a3ea2f625517d54b36d7544880b388170891b53a065e826ebd3e",
+        "memberInventorySha256": "4813e2acc5d7e97d6710275fd28b1cbb29f0bfc79d2055124893d72e73cbcb49",
+        "memberPaths": [
+          "ne_10m_minor_islands_coastline.README.html",
+          "ne_10m_minor_islands_coastline.VERSION.txt",
+          "ne_10m_minor_islands_coastline.cpg",
+          "ne_10m_minor_islands_coastline.dbf",
+          "ne_10m_minor_islands_coastline.prj",
+          "ne_10m_minor_islands_coastline.shp",
+          "ne_10m_minor_islands_coastline.shx"
+        ]
+      }
+    ]
+  },
+  "rights": {
+    "name": "Natural Earth public domain dedication",
+    "url": "https://www.naturalearthdata.com/about/terms-of-use/",
+    "spdx": "LicenseRef-Natural-Earth-Public-Domain",
+    "attribution": "Made with Natural Earth.",
+    "redistributionStatus": "approved"
+  },
+  "purpose": {
+    "role": "settlement-distance-to-coast-only",
+    "status": "selected-scope-approximation",
+    "productEligibilityOnly": true,
+    "hazardExtentClaim": false,
+    "canonicalCoastlineClaim": false,
+    "ownerApprovalClaim": false,
+    "publicationEligible": false
+  },
+  "recipe": {
+    "inputGeometry": "direct-source-linework",
+    "sourceAssetOrder": [
+      "coastline",
+      "minor-islands-coastline"
+    ],
+    "inputCrs": "EPSG:4326",
+    "coordinateOrder": "longitude-latitude-xy",
+    "selectionOperation": "select-whole-source-features-intersecting-bbox",
+    "selectionBoundsWgs84": [
+      -30,
+      30,
+      45,
+      75
+    ],
+    "featureTruncationAllowed": false,
+    "geometryTransform": "none",
+    "allowedOutputGeometryTypes": [
+      "LineString"
+    ],
+    "canonicalization": "normalized-wkb-order-rfc7946-json-v1",
+    "prohibitedDerivedEdges": [
+      "bounding-box-edges",
+      "administrative-boundaries",
+      "ocean-polygon-boundaries",
+      "coastal-zone-boundaries"
+    ]
+  },
+  "distanceMethod": {
+    "engine": "duckdb-spatial",
+    "engineVersion": "1.5.4",
+    "inputCrs": "EPSG:4326",
+    "coordinateOrder": "longitude-latitude-xy",
+    "metricCrs": "EPSG:3035",
+    "transformExpression": "ST_Transform(geometry, 'EPSG:4326', 'EPSG:3035', true)",
+    "distanceExpression": "ST_Distance(place_3035, shoreline_3035)",
+    "distanceUnit": "meter",
+    "hybridNearestDegreesAllowed": false,
+    "spheroidDistanceAllowed": false
+  },
+  "distancePersistence": {
+    "field": "distance_to_coast_m",
+    "inputType": "DOUBLE",
+    "outputType": "BIGINT",
+    "unit": "whole-meter",
+    "roundingMode": "nearest-half-to-even",
+    "expression": "CAST(ST_Distance(place_3035, shoreline_3035) AS BIGINT)",
+    "subMeterPrecisionClaim": false
+  },
+  "coastalClassification": {
+    "derivedFromShorelineDistance": false,
+    "geometryVersion": "natural-earth-5.1.1-25km-scope-v2",
+    "predicate": "ST_Covers"
+  },
+  "controls": [
+    {
+      "id": "major-island-ponta-delgada",
+      "kind": "major-island",
+      "name": "Ponta Delgada",
+      "longitude": -25.6666,
+      "latitude": 37.7412,
+      "minimumDistanceMeters": null,
+      "maximumDistanceMeters": 1000,
+      "expectedNearestAssetId": "coastline"
+    },
+    {
+      "id": "minor-island-capri",
+      "kind": "minor-island",
+      "name": "Capri",
+      "longitude": 14.2426,
+      "latitude": 40.5532,
+      "minimumDistanceMeters": null,
+      "maximumDistanceMeters": 1000,
+      "expectedNearestAssetId": "minor-islands-coastline"
+    },
+    {
+      "id": "port-barcelona",
+      "kind": "port",
+      "name": "Barcelona",
+      "longitude": 2.1734,
+      "latitude": 41.3851,
+      "minimumDistanceMeters": null,
+      "maximumDistanceMeters": 5000,
+      "expectedNearestAssetId": "coastline"
+    },
+    {
+      "id": "inland-prague",
+      "kind": "inland",
+      "name": "Prague",
+      "longitude": 14.4208,
+      "latitude": 50.088,
+      "minimumDistanceMeters": 300000,
+      "maximumDistanceMeters": null,
+      "expectedNearestAssetId": "coastline"
+    }
+  ],
+  "output": {
+    "path": "data/settlements/europe-settlement-shoreline-v1.geojson",
+    "version": "natural-earth-direct-linework-europe-selection-v1",
+    "mediaType": "application/geo+json",
+    "crs": "OGC:CRS84",
+    "byteSize": 3553041,
+    "sha256": "53972730f9af3f541b67ee67a4653fb5a21ac52011d33c4372eb9fa84bc331ac",
+    "featureCount": 1218,
+    "coordinateCount": 87246,
+    "boundsWgs84": [
+      -46.89273027299993,
+      4.34406159100007,
+      63.57943769600007,
+      83.63410065300008
+    ]
+  },
+  "evidencePath": "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json"
+}
