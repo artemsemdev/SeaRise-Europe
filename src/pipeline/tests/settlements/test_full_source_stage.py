@@ -1,4 +1,4 @@
-"""Behavior coverage for the streaming, atomic full-source stage."""
+"""Behavior coverage for the streaming, verified full-source stage."""
 
 from __future__ import annotations
 
@@ -160,7 +160,7 @@ def _build(
     return output, receipt, document
 
 
-def test_stage_is_atomic_ordered_and_deterministic_across_batching(tmp_path: Path) -> None:
+def test_stage_is_ordered_and_deterministic_across_batching(tmp_path: Path) -> None:
     inputs, contract = _fixture(tmp_path)
     first = _build(tmp_path, inputs, contract, "first", batch_size=1)
     second = _build(
@@ -193,6 +193,16 @@ def test_stage_is_atomic_ordered_and_deterministic_across_batching(tmp_path: Pat
         ).fetchall()
     assert [row[0] for row in places] == [1134032, 3128760]
     assert [row[0] for row in alternates] == sorted([1567725, 1567726, 2039069, 2170607])
+    database_only = tmp_path / "database-only.duckdb"
+    receipt_only = tmp_path / "receipt-only.json"
+    shutil.copyfile(first[0], database_only)
+    shutil.copyfile(first[1], receipt_only)
+    with pytest.raises(FullSourceStageError, match="stage receipt"):
+        validate_full_source_stage(
+            database_only, tmp_path / "missing-receipt.json", contract=contract
+        )
+    with pytest.raises(FullSourceStageError, match="stage database"):
+        validate_full_source_stage(tmp_path / "missing.duckdb", receipt_only, contract=contract)
 
 
 @pytest.mark.parametrize(
@@ -240,6 +250,19 @@ def test_identity_parser_receipt_and_database_tampering_fail_closed(tmp_path: Pa
     clean.mkdir()
     clean_inputs, clean_contract = _fixture(clean)
     output, receipt_path, receipt = _build(clean, clean_inputs, clean_contract, "clean")
+    raw = receipt_path.read_bytes()
+    mutations = {
+        "duplicate": b'{"counts":{},"counts":' + raw.removeprefix(b'{"counts":'),
+        "nan": raw.replace(b'"schemaVersion":1', b'"schemaVersion":NaN', 1),
+        "infinity": raw.replace(b'"schemaVersion":1', b'"schemaVersion":Infinity', 1),
+    }
+    for name, payload in mutations.items():
+        changed_receipt = clean / f"{name}.json"
+        changed_receipt.write_bytes(payload)
+        with pytest.raises(FullSourceStageError, match="duplicate key|non-finite JSON"):
+            validate_full_source_stage(output, changed_receipt, contract=clean_contract)
+    with pytest.raises(FullSourceStageError, match="cannot be canonicalized"):
+        canonical_stage_receipt_bytes({"invalid": object()})
     noncanonical = clean / "noncanonical.json"
     noncanonical.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     with pytest.raises(FullSourceStageError, match="not canonical JSON"):
@@ -248,6 +271,12 @@ def test_identity_parser_receipt_and_database_tampering_fail_closed(tmp_path: Pa
     tampered["logicalHashes"]["placeRows"] = "0" * 64
     with pytest.raises(FullSourceStageError, match="counts or logical hashes"):
         validate_full_source_stage(output, tampered, contract=clean_contract)
+    with duckdb.connect(str(output)) as connection:
+        connection.execute(
+            "UPDATE stage_places SET document='{\"value\":NaN}' WHERE geoname_id=1134032"
+        )
+    with pytest.raises(FullSourceStageError, match="non-finite JSON"):
+        validate_full_source_stage(output, receipt_path, contract=clean_contract)
     with duckdb.connect(str(output)) as connection:
         connection.execute("UPDATE stage_places SET document='{}' WHERE geoname_id=1134032")
     with pytest.raises(FullSourceStageError, match="key columns differ"):
@@ -322,3 +351,31 @@ def test_source_mutation_during_streaming_is_rehashed_and_cleaned(
         build_full_source_stage(inputs, output, receipt, work, contract=contract)
     assert not output.exists() and not receipt.exists()
     assert not list(tmp_path.glob(".full-source-*"))
+
+
+def test_receipt_and_database_link_failures_leave_no_requested_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_link = stage.os.link
+    for fail_on in (1, 2):
+        root = tmp_path / f"failure-{fail_on}"
+        inputs, contract = _fixture(root)
+        work = root / "work"
+        work.mkdir()
+        output = root / "stage.duckdb"
+        receipt = root / "stage.receipt.json"
+        calls = 0
+
+        def fail_link(source: Path, target: Path) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == fail_on:
+                raise OSError("injected link failure")
+            real_link(source, target)
+
+        monkeypatch.setattr(stage.os, "link", fail_link)
+        with pytest.raises(FullSourceStageError, match="injected link failure"):
+            build_full_source_stage(inputs, output, receipt, work, contract=contract)
+        monkeypatch.setattr(stage.os, "link", real_link)
+        assert not output.exists() and not receipt.exists()
+        assert not list(root.rglob(".full-source-*"))

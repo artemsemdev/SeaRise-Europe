@@ -147,18 +147,71 @@ def _json_value(value: Any) -> Any:
 
 
 def _canonical_json(value: Any) -> str:
-    return json.dumps(
-        _json_value(value),
-        ensure_ascii=False,
-        allow_nan=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
+    try:
+        return json.dumps(
+            _json_value(value),
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError) as exc:
+        raise FullSourceStageError(f"value cannot be canonicalized as JSON: {exc}") from exc
+
+
+def _strict_json(raw: str | bytes, label: str) -> Any:
+    def reject_constant(value: str) -> None:
+        raise FullSourceStageError(f"{label} contains non-finite JSON value {value}")
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise FullSourceStageError(f"{label} contains duplicate key {key!r}")
+            value[key] = item
+        return value
+
+    try:
+        return json.loads(
+            raw,
+            object_pairs_hook=reject_duplicates,
+            parse_constant=reject_constant,
+        )
+    except FullSourceStageError:
+        raise
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise FullSourceStageError(f"{label} contains invalid JSON: {exc}") from exc
 
 
 def canonical_stage_receipt_bytes(receipt: Mapping[str, Any]) -> bytes:
     """Return deterministic receipt bytes without local paths or observations."""
-    return (_canonical_json(dict(receipt)) + "\n").encode("utf-8")
+    try:
+        value = dict(receipt)
+    except (TypeError, ValueError) as exc:
+        raise FullSourceStageError(f"stage receipt is not a mapping: {exc}") from exc
+    return (_canonical_json(value) + "\n").encode("utf-8")
+
+
+def _fsync_file(path: Path, label: str) -> None:
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise FullSourceStageError(f"cannot fsync {label}: {exc}") from exc
+
+
+def _fsync_directory(path: Path) -> None:
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        raise FullSourceStageError(f"cannot fsync output directory: {exc}") from exc
 
 
 def _load_tools() -> tuple[Any, Any]:
@@ -411,10 +464,9 @@ def _logical_hash(connection: Any, table: str) -> str:
     while rows := cursor.fetchmany(MAX_ARROW_BATCH_ROWS):
         for row in rows:
             document = row[-1]
-            try:
-                value = json.loads(document)
-            except (TypeError, json.JSONDecodeError) as exc:
-                raise FullSourceStageError(f"{table} contains invalid JSON") from exc
+            value = _strict_json(document, f"{table} document")
+            if not isinstance(value, dict):
+                raise FullSourceStageError(f"{table} document must be a JSON object")
             if _canonical_json(value) != document:
                 raise FullSourceStageError(f"{table} contains non-canonical JSON")
             if table == "stage_places":
@@ -496,15 +548,16 @@ def _load_receipt(receipt: Mapping[str, Any] | Path) -> dict[str, Any]:
         _require_regular(receipt, "stage receipt")
         try:
             raw = receipt.read_bytes()
-            value = json.loads(raw)
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except OSError as exc:
             raise FullSourceStageError(f"cannot read stage receipt: {exc}") from exc
+        value = _strict_json(raw, "stage receipt")
         if not isinstance(value, dict):
             raise FullSourceStageError("stage receipt must be a JSON object")
         if raw != canonical_stage_receipt_bytes(value):
             raise FullSourceStageError("stage receipt bytes are not canonical JSON")
     else:
-        value = dict(receipt)
+        raw = canonical_stage_receipt_bytes(receipt)
+        value = _strict_json(raw, "stage receipt")
     return value
 
 
@@ -571,7 +624,7 @@ def build_full_source_stage(
     contract: FullSourceStageContract = PRODUCTION_CONTRACT,
     source_order: Sequence[str] = ("places", "admin1", "alternate_names"),
 ) -> dict[str, Any]:
-    """Build, validate, and atomically promote a local disk-backed stage."""
+    """Build, validate, and promote a no-overwrite local stage pair."""
     if not 1 <= batch_size <= MAX_ARROW_BATCH_ROWS:
         raise FullSourceStageError(f"Arrow batch size must be within 1..{MAX_ARROW_BATCH_ROWS}")
     _require_directory(work_dir, "work directory")
@@ -593,7 +646,7 @@ def build_full_source_stage(
     candidate_root = Path(tempfile.mkdtemp(prefix=".full-source-candidate-", dir=output.parent))
     candidate = candidate_root / output.name
     receipt_candidate = candidate_root / receipt_path.name
-    promoted_receipt = False
+    promoted: list[Path] = []
     try:
         connection = duckdb.connect(str(candidate))
         try:
@@ -609,18 +662,23 @@ def build_full_source_stage(
             receipt = _receipt(connection, contract)
         finally:
             connection.close()
+        _fsync_file(candidate, "candidate database")
         validate_full_source_stage(candidate, receipt, contract=contract)
         with receipt_candidate.open("xb") as stream:
             stream.write(canonical_stage_receipt_bytes(receipt))
             stream.flush()
-            os.fsync(stream.fileno())
-        os.link(receipt_candidate, receipt_path)
-        promoted_receipt = True
+        _fsync_file(receipt_candidate, "candidate receipt")
         try:
+            os.link(receipt_candidate, receipt_path)
+            promoted.append(receipt_path)
             os.link(candidate, output)
+            promoted.append(output)
+            validate_full_source_stage(output, receipt_path, contract=contract)
+            _fsync_directory(output.parent)
         except Exception:
-            receipt_path.unlink(missing_ok=True)
-            promoted_receipt = False
+            for path in reversed(promoted):
+                path.unlink(missing_ok=True)
+            _fsync_directory(output.parent)
             raise
         return receipt
     except FullSourceStageError:
@@ -628,7 +686,5 @@ def build_full_source_stage(
     except Exception as exc:
         raise FullSourceStageError(f"full-source staging failed: {exc}") from exc
     finally:
-        if promoted_receipt and not output.exists():
-            receipt_path.unlink(missing_ok=True)
         shutil.rmtree(candidate_root, ignore_errors=True)
         shutil.rmtree(stage_root, ignore_errors=True)
