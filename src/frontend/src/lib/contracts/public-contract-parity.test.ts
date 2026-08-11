@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
@@ -22,9 +22,10 @@ const contractDirectories = [
   resolve(process.cwd(), "../../contracts/release-gates/v1"),
   resolve(process.cwd(), "../../contracts/settlements/v2"),
   resolve(process.cwd(), "../../contracts/settlements/v3"),
+  resolve(process.cwd(), "../../contracts/candidate-completeness/v1"),
 ];
 const releaseGateContractDirectory = contractDirectories[1];
-const settlementContractDirectories = contractDirectories.slice(2);
+const settlementContractDirectories = contractDirectories.slice(2, 4);
 const settlementV3ContractDirectory = contractDirectories[3];
 
 function readJson(path: string): ContractDocument {
@@ -53,6 +54,7 @@ function lexicographicKeyJson(value: unknown): string {
 function fixturePaths(kind: "valid" | "invalid"): string[] {
   return contractDirectories.flatMap((contractDirectory) => {
     const directory = resolve(contractDirectory, "fixtures", kind);
+    if (!existsSync(directory)) return [];
     return readdirSync(directory)
       .filter((name) => name.endsWith(".json"))
       .sort()
@@ -83,6 +85,7 @@ describe("Python and TypeScript public contract parity", () => {
     const paths = fixturePaths("valid");
 
     expect(paths.length).toBeGreaterThan(0);
+    expect(paths.some((path) => path.includes("candidate-completeness"))).toBe(true);
     for (const path of paths) {
       const document = readJson(path);
       const validate = document.$schema

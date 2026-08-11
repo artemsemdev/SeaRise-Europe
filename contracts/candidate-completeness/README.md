@@ -17,9 +17,10 @@ The deterministic seal order is:
    publication.
 
 Provenance, signature, and SBOM sidecars are mandatory publication evidence,
-not deferred Phase 1 work. They are excluded from the candidate manifest's
-self-hashed inventory only to avoid a recursive manifest/signature dependency.
-The evidence envelope binds the already sealed `manifest.json` subject.
+not deferred Phase 1 work. Pair validation is still pending: a dependent
+validator must bind candidate ID, release ID, provenance class, and the actual
+manifest SHA-256. Sidecars stay outside the candidate inventory to avoid a
+recursive manifest/signature dependency.
 
 The checked-in fixture is synthetic. It records no owner geometry approval,
 canonical boundary, production, hazard-extent, or publication claim. Schema

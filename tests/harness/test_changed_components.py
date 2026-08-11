@@ -164,6 +164,11 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["docker_frontend"])
         self.assertFalse(outputs["docker_api"])
         self.assertFalse(outputs["compose"])
+        candidate = classify_paths(
+            ["contracts/candidate-completeness/v1/candidate.schema.json"]
+        )
+        self.assertTrue(candidate["frontend"])
+        self.assertTrue(candidate["pipeline"])
 
     def test_ci_router_change_exercises_every_route(self) -> None:
         outputs = classify_paths(["scripts/ci/changed_components.py"])

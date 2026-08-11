@@ -36,7 +36,9 @@
         "excludedPaths": {
           "type": "array",
           "prefixItems": [{ "const": "checksums.txt" }, { "const": "manifest.json" }],
-          "items": false
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
         },
         "subjects": {
           "type": "array",
@@ -78,7 +80,9 @@
             { "const": "checksums.txt" },
             { "const": "manifest.json" }
           ],
-          "items": false
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
         }
       }
     },
@@ -98,13 +102,28 @@
       "additionalProperties": false,
       "required": [
         "status", "evidenceEnvelopeContract", "requiredForPublication",
-        "candidateManifestSubject", "excludedSidecarRoles", "exclusionReason"
+        "candidateManifestSubject", "pairValidation", "excludedSidecarRoles", "exclusionReason"
       ],
       "properties": {
-        "status": { "const": "required-after-candidate-seal" },
+        "status": { "const": "required-pending-pair-validation" },
         "evidenceEnvelopeContract": { "const": "contracts/supply-chain/v1/evidence-envelope.schema.json" },
         "requiredForPublication": { "const": true },
         "candidateManifestSubject": { "const": "manifest.json" },
+        "pairValidation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "requiredBindings"],
+          "properties": {
+            "status": { "const": "pending-dependent-validator" },
+            "requiredBindings": {
+              "type": "array",
+              "prefixItems": [{ "const": "candidateId" }, { "const": "dataReleaseId" }, { "const": "dataProvenanceClass" }, { "const": "actualManifestSha256" }],
+              "items": false,
+              "minItems": 4,
+              "maxItems": 4
+            }
+          }
+        },
         "excludedSidecarRoles": {
           "type": "array",
           "prefixItems": [
@@ -112,31 +131,14 @@
             { "const": "signature" },
             { "const": "software-bill-of-materials" }
           ],
-          "items": false
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
         },
         "exclusionReason": { "const": "prevent-recursive-candidate-manifest-hashing" }
       }
     }
   },
-  "allOf": [
-    {
-      "if": { "properties": { "dataProvenanceClass": { "const": "synthetic-fixture" } }, "required": ["dataProvenanceClass"] },
-      "then": {
-        "properties": {
-          "geometryPolicy": {
-            "properties": {
-              "status": { "const": "synthetic-unapproved-approximation" },
-              "ownerApprovalRecorded": { "const": false },
-              "canonical": { "const": false },
-              "production": { "const": false },
-              "publicationEligible": { "const": false },
-              "hazardExtentClaim": { "const": false }
-            }
-          }
-        }
-      }
-    }
-  ],
   "$defs": {
     "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]+$" },
     "fileIdentity": {
@@ -154,7 +156,7 @@
       "required": ["attributionIds", "redistribution"],
       "properties": {
         "attributionIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
-        "redistribution": { "enum": ["allowed", "conditional"] }
+        "redistribution": { "const": "allowed" }
       }
     },
     "artifact": {
@@ -184,12 +186,12 @@
       "additionalProperties": false,
       "required": ["status", "purpose", "ownerApprovalRecorded", "canonical", "production", "publicationEligible", "hazardExtentClaim"],
       "properties": {
-        "status": { "enum": ["synthetic-unapproved-approximation", "approved-product-scope-approximation"] },
+        "status": { "const": "unapproved-product-scope-approximation" },
         "purpose": { "const": "product-eligibility-only" },
-        "ownerApprovalRecorded": { "type": "boolean" },
-        "canonical": { "type": "boolean" },
-        "production": { "type": "boolean" },
-        "publicationEligible": { "type": "boolean" },
+        "ownerApprovalRecorded": { "const": false },
+        "canonical": { "const": false },
+        "production": { "const": false },
+        "publicationEligible": { "const": false },
         "hazardExtentClaim": { "const": false }
       }
     },

@@ -7,7 +7,7 @@
   "dataProvenanceClass": "synthetic-fixture",
   "publicationClaim": false,
   "geometryPolicy": {
-    "status": "synthetic-unapproved-approximation",
+    "status": "unapproved-product-scope-approximation",
     "purpose": "product-eligibility-only",
     "ownerApprovalRecorded": false,
     "canonical": false,
@@ -152,10 +152,11 @@
   },
   "manifest": {"path":"manifest.json","artifactCount":53,"writeSequence":54,"selfHashExcluded":true},
   "supplyChainGate": {
-    "status": "required-after-candidate-seal",
+    "status": "required-pending-pair-validation",
     "evidenceEnvelopeContract": "contracts/supply-chain/v1/evidence-envelope.schema.json",
     "requiredForPublication": true,
     "candidateManifestSubject": "manifest.json",
+    "pairValidation": {"status":"pending-dependent-validator","requiredBindings":["candidateId","dataReleaseId","dataProvenanceClass","actualManifestSha256"]},
     "excludedSidecarRoles": ["provenance", "signature", "software-bill-of-materials"],
     "exclusionReason": "prevent-recursive-candidate-manifest-hashing"
   }

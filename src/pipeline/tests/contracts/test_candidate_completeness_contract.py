@@ -184,10 +184,19 @@ def test_supply_chain_gate_is_required_without_recursive_sidecars() -> None:
     contract = _read(INVENTORY)
 
     assert candidate["supplyChainGate"] == {
-        "status": "required-after-candidate-seal",
+        "status": "required-pending-pair-validation",
         "evidenceEnvelopeContract": contract["requiredEvidenceEnvelopeContract"],
         "requiredForPublication": True,
         "candidateManifestSubject": "manifest.json",
+        "pairValidation": {
+            "status": "pending-dependent-validator",
+            "requiredBindings": [
+                "candidateId",
+                "dataReleaseId",
+                "dataProvenanceClass",
+                "actualManifestSha256",
+            ],
+        },
         "excludedSidecarRoles": contract["evidenceSidecarRolesExcludedFromManifest"],
         "exclusionReason": "prevent-recursive-candidate-manifest-hashing",
     }
