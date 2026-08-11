@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added typed JSON and Markdown release-gate report artifacts to the immutable
+  public release contract.
 - Added an immutable full-source settlement input contract that verifies exact
   archive, decompressed member, row-count, and reviewed-policy identities and
   emits deterministic source bindings without claiming staging or publication.

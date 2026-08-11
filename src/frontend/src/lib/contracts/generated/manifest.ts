@@ -61,6 +61,8 @@ export type SeaRiseEuropeImmutableReleaseArtifactV1 =
       [k: string]: unknown;
     } & {
       [k: string]: unknown;
+    } & {
+      [k: string]: unknown;
     });
 /**
  * @minItems 4
@@ -218,6 +220,7 @@ export interface Common {
     | "projection-visual-pmtiles"
     | "projection-geoparquet"
     | "quality-summary"
+    | "release-gate-report"
     | "architecture-evidence"
     | "stac-catalog"
     | "stac-collection"
@@ -235,6 +238,7 @@ export interface Common {
     | "application/vnd.dev.sigstore.bundle+json;version=0.3"
     | "application/x-ndjson"
     | "image/tiff; application=geotiff; profile=cloud-optimized"
+    | "text/markdown"
     | "text/plain";
   byteSize: number;
   sha256: string;
