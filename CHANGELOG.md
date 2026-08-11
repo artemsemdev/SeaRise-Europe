@@ -22,6 +22,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added an immutable full-source settlement input contract that verifies exact
+  archive, decompressed member, row-count, and reviewed-policy identities and
+  emits deterministic source bindings without claiming staging or publication.
 - Added a neutral, versioned settlement search evaluation foundation with
   deterministic MiniSearch and FlexSearch adapters and synthetic-only evidence.
 - Added settlement v3 public place, GeoParquet, and search-shard contracts as
