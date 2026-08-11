@@ -88,6 +88,17 @@ def test_candidate_golden_seals_the_exact_inventory_before_manifest() -> None:
     assert len({item["artifactId"] for item in descriptors}) == 53
     assert len({item["path"] for item in descriptors}) == 53
     assert [envelope["writeSequence"] for envelope in envelopes] == list(range(1, 54))
+    pre_gate_roles = {envelope["descriptor"]["role"] for envelope in envelopes[:50]}
+    assert pre_gate_roles.isdisjoint({"release-gate-report", "checksums"})
+    terminal_inventory = [
+        (envelope["descriptor"]["artifactId"], envelope["descriptor"]["role"])
+        for envelope in envelopes[50:53]
+    ]
+    assert terminal_inventory == [
+        ("release-gate-report-json", "release-gate-report"),
+        ("release-gate-report-markdown", "release-gate-report"),
+        ("checksums", "checksums"),
+    ]
 
     for envelope in envelopes:
         descriptor = envelope["descriptor"]

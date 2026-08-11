@@ -28,20 +28,8 @@
   },
   "projectionGrid": {
     "crs": "EPSG:4326",
-    "bounds": [
-      -30.5,
-      29.5,
-      45.5,
-      75.5
-    ],
-    "transform": [
-      1,
-      0,
-      -30.5,
-      0,
-      -1,
-      75.5
-    ],
+    "bounds": [-30.5, 29.5, 45.5, 75.5],
+    "transform": [1, 0, -30.5, 0, -1, 75.5],
     "width": 76,
     "height": 46,
     "nativeResolutionDegrees": 1,
