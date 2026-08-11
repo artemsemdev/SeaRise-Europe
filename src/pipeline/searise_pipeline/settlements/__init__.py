@@ -25,6 +25,10 @@ from .catalogue import (
     load_catalogue_policy,
     normalize_catalogue,
 )
+from .contract_semantics import (
+    SettlementContractSemanticError,
+    validate_settlement_search_shard_semantics,
+)
 from .geonames import (
     ADMIN1_SOURCE,
     ALL_COUNTRIES_SOURCE,
@@ -62,6 +66,7 @@ __all__ = [
     "NormalizedCatalogue",
     "RAW_ANOMALY_POLICY_VERSION",
     "SourceIdentity",
+    "SettlementContractSemanticError",
     "alternate_name_rejection",
     "language_codes",
     "load_normalization_policy",
@@ -72,4 +77,5 @@ __all__ = [
     "parse_geoname_row",
     "parse_iso_language_row",
     "select_names",
+    "validate_settlement_search_shard_semantics",
 ]

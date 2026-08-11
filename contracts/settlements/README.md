@@ -1,8 +1,44 @@
 # Settlement artifact contracts
 
-[`v2`](v2/) defines the public record and artifact-envelope contracts for the
-European settlement catalogue. It is separate from `contracts/release/v1` so
+[`v2`](v2/) defines the first public record and artifact-envelope contracts for
+the European settlement catalog. It is separate from `contracts/release/v1` so
 the already published release-v1 validation meaning remains immutable.
+
+[`v3`](v3/) is the compatible successor for spatially classified settlement
+audit records, GeoParquet envelopes, and search-shard envelopes. It preserves
+the v2 meanings of stable GeoNames IDs, source spelling, canonical and
+alternate names, country and admin context, WGS84 coordinates, population,
+feature codes, source update dates, and per-record lineage. The checked-in v2
+files remain byte-for-byte unchanged.
+
+Compatibility is version-aware, not wire-level substitution. A v3 document
+does not validate against a v2 schema, and a v2-only consumer must reject it
+instead of dropping unknown fields. Consumers must dispatch on the exact
+`$schema`, `schemaVersion`, artifact `formatVersion`, and search-engine
+serialization identity. Consumers must apply both JSON Schema validation and
+the matching shared semantic validator; schema validation alone cannot enforce
+cross-field counts. Producers that move to v3 must emit a complete v3 record
+or envelope; they must not mix v2 and v3 fields in one document.
+
+V3 closes the public boundary that v2 intentionally left incomplete:
+
+- `recordRole` distinguishes source-audit records from search-shard records;
+  source-audit records may retain an empty `catalogMembership`, while shard
+  records require at least one membership.
+- Canonical and alternate names carry explicit, noninterchangeable roles.
+- Support, coastal-zone, and shoreline identities bind artifact ID, version,
+  and SHA-256 together with the `covers` predicate and the exact distance
+  method.
+- Coastal distance is a required nonnegative whole-meter integer, and
+  `sourceUpdatedAt` is a required non-null source date.
+- GeoParquet fields carry the same source and spatial identity, while search
+  documents expose the required feature code and coastal distance.
+- The representative search serializer advances to format `2.0.0` and
+  serialization version `2`; it remains fixture-only and does not select the
+  production browser engine.
+- Approximate geometry cannot claim canonical geometry, hazard extent,
+  scientific approval, owner approval, publication eligibility, or any other
+  status that the reviewed source does not grant.
 
 The v2 record adds exact source spelling, per-record lineage, and language and
 script metadata. The committed envelopes are representative synthetic
@@ -22,7 +58,7 @@ normalized search names.
 
 The exact 2026-08-10 offline scan covers 19,037,112 alternate-name and 7,929
 ISO-language rows with zero unexplained parser or language-policy failures. It
-is local engineering evidence, not a finished settlement catalogue,
+is local engineering evidence, not a finished settlement catalog,
 GeoParquet/search-shard build, performance result, or publication approval.
 
 The internal shoreline producer policy is versioned separately as
@@ -42,7 +78,7 @@ publication claim.
 
 The immutable `catalogue-policy-v1.json` references the reviewed
 `settlement-normalization-v2` name policy without changing its bytes. The pure
-catalogue domain admits only feature class `P` and its exact populated-place
+catalog domain admits only feature class `P` and its exact populated-place
 code allowlist; historic, abandoned, and destroyed codes such as `PPLH`,
 `PPLQ`, and `PPLW` remain excluded. Canonical names containing C0, DEL, or C1
 controls are rejected. IDs are derived only as `geonames:<geonameId>`,
@@ -76,11 +112,11 @@ shard: `europe-core` requires population >= 500 or feature code `PPLC`, `PPLA`,
 `PPLA2`, `PPLA3`, `PPLA4`, or `PPLA5`, while `europe-coastal` depends only on
 coastal coverage.
 
-A successor versioned public contract is required because Place v2 requires
+A successor versioned public contract was required because Place v2 requires
 at least one `catalogMembership` item and its mandatory distance cannot bind a
-`shorelineGeometryVersion` or `distanceMethodVersion`. This slice does not
-change that public schema and makes no GeoParquet, search-writer, benchmark,
-full-source, or publication claim.
+`shorelineGeometryVersion` or `distanceMethodVersion`. V3 satisfies that
+boundary without changing v2 and makes no full-source, benchmark, production
+search-engine, or publication claim.
 
 Consumers support exact `schemaVersion`, artifact `formatVersion`, and search
 engine serialization identities. An unknown value is an unsupported artifact;
@@ -94,8 +130,10 @@ a newline. The SHA-256 field hashes those bytes, not an Arrow FlatBuffer.
 
 Search `recordCount` must equal the number of `documents`. A
 `europe-coastal` shard may contain only documents whose `isCoastal` is `true`.
-The JSON Schema enforces the latter; both consumer parity suites enforce the
-cross-field count, which JSON Schema cannot express.
+The JSON Schema enforces the latter. Python consumers must also call
+`validate_settlement_search_shard_semantics`, and TypeScript consumers must
+call `validateSettlementSearchShardSemantics`, to enforce the cross-field
+count that JSON Schema cannot express.
 
 Every artifact envelope carries geography status separately from source
 provenance. The current goldens are explicitly a
