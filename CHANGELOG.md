@@ -46,6 +46,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added fail-closed offline validation for the exact pre-sign candidate inventory,
+  checksum subjects, STAC matrix, and required pending evidence-pair gate without
+  reading artifacts, signing, or making a publication decision.
 - Added the exact 53-artifact pre-sign engineering candidate contract, with
   manifest-last sealing, complete 3 x 3 and settlement inventory, and a
   mandatory non-recursive supply-chain evidence-envelope gate.

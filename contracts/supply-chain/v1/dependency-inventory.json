@@ -110,7 +110,7 @@
       "releaseUse": "development",
       "coverage": "range-constrained",
       "inputs": [
-        { "path": "src/pipeline/pyproject.toml", "role": "manifest", "sha256": "05a3541ba7cf46bd03ffac9778be583d71a42a4b285175a382f6f1b49253317b" },
+        { "path": "src/pipeline/pyproject.toml", "role": "manifest", "sha256": "a9d6419156973ca4e99818ac203ace843a35cd8dde995117c99adef3f3258b6c" },
         { "path": "src/pipeline/requirements-pipeline.txt", "role": "manifest", "sha256": "3b707e10408dee29f3842a089317c9700df14ec2dadf141decce94b165e04bb4" }
       ],
       "note": "Contributor and broad CI installs remain range constrained; they do not define candidate release bytes."

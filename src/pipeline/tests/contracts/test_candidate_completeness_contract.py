@@ -5,8 +5,18 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+from click.testing import CliRunner
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
+
+from searise_pipeline.candidate_completeness import (
+    CandidateContractError,
+    load_candidate,
+    validate_candidate,
+    validate_candidate_document,
+)
+from searise_pipeline.candidate_completeness.cli import cli
 
 ROOT = Path(__file__).resolve().parents[4]
 CONTRACT_ROOT = ROOT / "contracts/candidate-completeness/v1"
@@ -214,3 +224,45 @@ def test_every_negative_vector_fails_with_its_expected_code() -> None:
         for operation in vector["operations"]:
             _apply(candidate, operation)
         assert vector["expectedCode"] in _errors(candidate), vector["id"]
+
+
+def test_offline_validator_rejects_every_negative_vector_with_stable_code() -> None:
+    fixture = _read(FIXTURE)
+    vectors = _read(VECTORS)["vectors"]
+
+    for vector in vectors:
+        candidate = copy.deepcopy(fixture)
+        for operation in vector["operations"]:
+            _apply(candidate, operation)
+        with pytest.raises(CandidateContractError) as error:
+            validate_candidate_document(candidate)
+        assert error.value.code == vector["expectedCode"], vector["id"]
+
+
+def test_offline_validator_returns_candidate_metadata_without_reading_artifacts() -> None:
+    summary = validate_candidate(FIXTURE)
+
+    assert summary.candidate_id == "candidate-phase-1-fixture-20260811-0123456789ab"
+    assert summary.data_release_id == "searise-europe-v1.0.0-20260811-0123456789ab"
+    assert summary.artifact_count == 53
+
+
+def test_strict_candidate_loader_rejects_duplicate_and_nonstandard_json(tmp_path: Path) -> None:
+    duplicate = tmp_path / "duplicate.json"
+    duplicate.write_text('{"candidateId":"one","candidateId":"two"}\n', encoding="utf-8")
+    with pytest.raises(CandidateContractError, match="candidate-json: .*duplicate object key"):
+        load_candidate(duplicate)
+
+    nonstandard = tmp_path / "nonstandard.json"
+    nonstandard.write_text('{"candidateId":NaN}\n', encoding="utf-8")
+    with pytest.raises(CandidateContractError, match="candidate-json: .*non-standard JSON"):
+        load_candidate(nonstandard)
+
+
+def test_candidate_cli_states_its_document_only_scope() -> None:
+    result = CliRunner().invoke(cli, ["--candidate", str(FIXTURE)])
+
+    assert result.exit_code == 0, result.output
+    assert "candidate contract valid:" in result.output
+    assert "does not read or hash candidate artifact bytes" in result.output
+    assert "does not read or hash candidate artifact bytes" in cli.help
