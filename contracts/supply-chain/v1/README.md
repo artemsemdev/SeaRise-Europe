@@ -38,6 +38,27 @@ validator binds every declared target to exact lock bytes and an exact Python
 3.11 marker environment, requires package parity and a complete acyclic graph,
 and rejects implicit extras or target-dependent edges.
 
-The checked-in annotation and locks are synthetic contract fixtures only. They
-do not claim review of the real release wheel metadata and are not an SBOM,
-production artifact, vulnerability scan, license inventory, or signing record.
+The synthetic fixture remains isolated under `fixtures/python-graph`. Two real,
+non-production annotations under `python-graphs` bind the paired release locks
+and paired settlement-spatial locks. Their package versions and active edges
+were reviewed from exact hash-matched Linux and macOS wheel `METADATA`; every
+selected-extra set is empty because neither locked environment installs an
+optional dependency set.
+
+Release roots are the candidate-runtime entries declared by the pipeline
+manifest and used directly by release, scientific, geospatial, contract, or
+command code: Click, Cryptography, GeoPandas, JSON Schema, netCDF4, NumPy,
+Pandas, PyArrow, PyProj, Rasterio, rio-cogeo, Shapely, and Xarray. The exact
+Python 3.11 locks also contain the `importlib-metadata` backport as an installed
+distribution without an active incoming dependency. It therefore remains an
+explicit reviewed inventory root so the complete lock is represented; this is
+not a claim that code importing the standard-library `importlib.metadata` uses
+the backport. DuckDB is the sole explicit root of the isolated
+settlement-spatial environment documented in
+`docs/operations/settlement-spatial-toolchain.md`.
+
+The stored PEP 508 environments use fixed logical runner targets rather than
+the validating host. Both paired targets must resolve to an identical active
+graph. These annotations are dependency evidence, not an SBOM, production
+artifact, vulnerability scan, license inventory, signing record, release
+approval, or scientific approval.

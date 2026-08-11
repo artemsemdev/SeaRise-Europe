@@ -141,6 +141,12 @@
       "reference": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py",
       "environment": "macOS arm64; Python 3.9.6; deterministic offline schema, hash-binding, identity, SBOM, and exception-expiry tests over synthetic fixtures"
     },
+    "local-2026-08-11-real-python-graphs": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T17:50:29+02:00",
+      "reference": "src/pipeline/tests/supply_chain/test_real_python_graph_annotations.py",
+      "environment": "macOS arm64; Python 3.9.6; 115 offline supply-chain tests passed over exact repository locks, reviewed graph annotations, and deterministic mutation controls; wheel review used separate hash-matched Linux and macOS caches"
+    },
     "local-2026-08-10-cog-range-contract": {
       "kind": "local-measurement",
       "observedAt": "2026-08-11T01:20:00+02:00",
@@ -564,8 +570,8 @@
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent signed-subject, pinned-identity, SBOM, exception-expiry, and cryptographic-verification boundary." },
       "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/supply_chain -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-supply-chain-contract", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "security", "issue": null, "expiresAt": null, "evidence": "Fixed local schemas, immutable locks, and synthetic fixtures use an explicit validation instant and no clock, random input, network, credentials, or signing event." }
+      "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-11-real-python-graphs", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "security", "issue": null, "expiresAt": null, "evidence": "Fixed local schemas, immutable locks, reviewed annotations, and synthetic fixtures use an explicit validation instant and no clock, random input, network, credentials, signing event, or external wheel cache during tests." }
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
@@ -1082,6 +1088,7 @@
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_python_graph_contract.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_real_python_graph_annotations.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_sbom_generation.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/tdd/test_result_state_characterization.py", "suite": "pipeline-five-state-characterization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_cogify.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
