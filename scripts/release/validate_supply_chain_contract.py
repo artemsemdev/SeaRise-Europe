@@ -12,6 +12,7 @@ from searise_pipeline.supply_chain import (
     load_json,
     parse_timestamp,
     validate_dependency_exception,
+    validate_dependency_inventory,
     validate_evidence_files,
 )
 
@@ -33,6 +34,9 @@ def _parser() -> argparse.ArgumentParser:
     exception = commands.add_parser("exception")
     exception.add_argument("--document", type=Path, required=True)
     exception.add_argument("--as-of", required=True)
+    inventory = commands.add_parser("inventory")
+    inventory.add_argument("--document", type=Path, required=True)
+    inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
     return parser
 
 
@@ -49,10 +53,19 @@ def main(argv: list[str] | None = None) -> int:
                 sboms,
             )
             print(f"validated synthetic evidence envelope: {envelope['candidateId']}")
-        else:
+        elif args.command == "exception":
             document = load_json(args.document)
             validate_dependency_exception(document, as_of=parse_timestamp(args.as_of))
             print(f"validated dependency exception: {document['exceptionId']}")
+        else:
+            document = validate_dependency_inventory(
+                args.document,
+                repository_root=args.repository_root.resolve(),
+            )
+            input_count = sum(
+                len(component["inputs"]) for component in document["components"]
+            )
+            print(f"validated {input_count} dependency-defining inputs")
     except (OSError, json.JSONDecodeError, SupplyChainContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
