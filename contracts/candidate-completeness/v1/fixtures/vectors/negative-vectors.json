@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "1.0.0",
+  "baseFixture": "../valid/engineering-candidate.json",
+  "vectors": [
+    {
+      "id": "missing-layer",
+      "expectedCode": "artifact-inventory",
+      "operations": [{ "op": "remove", "path": "/artifacts/26" }]
+    },
+    {
+      "id": "bad-hash",
+      "expectedCode": "artifact-integrity",
+      "operations": [{ "op": "replace", "path": "/artifacts/0/observedSha256", "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }]
+    },
+    {
+      "id": "bad-stac-link",
+      "expectedCode": "stac-reference",
+      "operations": [{ "op": "replace", "path": "/stac/items/0/analysisHref", "value": "../../analysis/ssp1-26/2050.tif" }]
+    },
+    {
+      "id": "invalid-rights",
+      "expectedCode": "artifact-rights",
+      "operations": [{ "op": "replace", "path": "/artifacts/4/rights/attributionIds", "value": ["searise-project"] }]
+    },
+    {
+      "id": "rights-superset",
+      "expectedCode": "artifact-rights",
+      "operations": [{ "op": "replace", "path": "/artifacts/4/rights/attributionIds", "value": ["geonames", "natural-earth"] }]
+    },
+    {
+      "id": "grid-drift",
+      "expectedCode": "projection-grid",
+      "operations": [{ "op": "replace", "path": "/projectionGrid/width", "value": 77 }]
+    },
+    {
+      "id": "parity-mismatch",
+      "expectedCode": "cross-runtime-parity",
+      "operations": [{ "op": "replace", "path": "/parity/typescript/storedClassSha256", "value": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" }]
+    },
+    {
+      "id": "duplicate-artifact",
+      "expectedCode": "artifact-duplicate",
+      "operations": [{ "op": "copy", "from": "/artifacts/0", "path": "/artifacts/-" }]
+    },
+    {
+      "id": "extra-artifact",
+      "expectedCode": "artifact-extra",
+      "operations": [
+        {
+          "op": "add",
+          "path": "/artifacts/-",
+          "value": {
+            "artifactId": "unexpected-debug-output",
+            "path": "debug/output.json",
+            "role": "quality-summary",
+            "mediaType": "application/json",
+            "contentEncoding": "identity",
+            "dataReleaseId": "searise-europe-v1.0.0-20260811-0123456789ab",
+            "immutable": true,
+            "byteSize": 1,
+            "observedByteSize": 1,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "observedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "writeSequence": 45,
+            "rights": { "attributionIds": ["searise-project"], "redistribution": "allowed" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "unsafe-reference",
+      "expectedCode": "unsafe-reference",
+      "operations": [{ "op": "replace", "path": "/artifacts/26/path", "value": "../analysis/ssp1-26/2030.tif" }]
+    },
+    {
+      "id": "unsafe-stac-href",
+      "expectedCode": "unsafe-reference",
+      "operations": [{ "op": "replace", "path": "/stac/items/0/analysisHref", "value": "../../analysis//ssp1-26/2030.tif" }]
+    },
+    {
+      "id": "cross-release-reference",
+      "expectedCode": "cross-release-reference",
+      "operations": [{ "op": "replace", "path": "/stac/items/0/dataReleaseId", "value": "searise-europe-v1.0.0-20260811-ffffffffffff" }]
+    },
+    {
+      "id": "manifest-not-last",
+      "expectedCode": "manifest-order",
+      "operations": [{ "op": "replace", "path": "/manifest/writeSequence", "value": 44 }]
+    },
+    {
+      "id": "checksum-missing-subject",
+      "expectedCode": "checksum-coverage",
+      "operations": [{ "op": "remove", "path": "/checksumInventory/subjects/0" }]
+    },
+    {
+      "id": "checksum-hash-mismatch",
+      "expectedCode": "checksum-integrity",
+      "operations": [{ "op": "replace", "path": "/checksumInventory/subjects/0/sha256", "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }]
+    },
+    {
+      "id": "checksums-before-subjects",
+      "expectedCode": "checksum-order",
+      "operations": [{ "op": "replace", "path": "/artifacts/25/writeSequence", "value": 41 }]
+    },
+    {
+      "id": "gate-report-manifest-cycle",
+      "expectedCode": "gate-report-scope",
+      "operations": [{ "op": "replace", "path": "/gateReportSemantics/manifestHashReferenced", "value": true }]
+    },
+    {
+      "id": "premature-signature",
+      "expectedCode": "premature-supply-chain",
+      "operations": [
+        {
+          "op": "add",
+          "path": "/artifacts/-",
+          "value": {
+            "artifactId": "manifest-signature",
+            "path": "manifest.sigstore.json",
+            "role": "signature",
+            "mediaType": "application/json",
+            "contentEncoding": "identity",
+            "dataReleaseId": "searise-europe-v1.0.0-20260811-0123456789ab",
+            "immutable": true,
+            "byteSize": 1,
+            "observedByteSize": 1,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "observedSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "writeSequence": 45,
+            "rights": { "attributionIds": ["searise-project"], "redistribution": "allowed" }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mutable-artifact",
+      "expectedCode": "artifact-immutable",
+      "operations": [{ "op": "replace", "path": "/artifacts/0/immutable", "value": false }]
+    }
+  ]
+}
