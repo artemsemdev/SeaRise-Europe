@@ -103,6 +103,15 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["pipeline"])
         self.assertFalse(outputs["release"])
 
+    def test_settlement_artifact_routes_pipeline_contracts(self) -> None:
+        outputs = classify_paths(
+            ["data/settlements/europe-settlement-shoreline-v1.geojson"]
+        )
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertTrue(outputs["heavy"])
+        self.assertFalse(outputs["release"])
+
     def test_release_contract_routes_release_toolchain(self) -> None:
         outputs = classify_paths(["src/pipeline/science/ar6-regional-release.json"])
 
