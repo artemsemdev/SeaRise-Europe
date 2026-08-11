@@ -16,7 +16,10 @@ from .validator import CandidateContractError, validate_candidate_document
 
 STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
 PREDICATE_TYPE = "https://slsa.dev/provenance/v1"
-BUILD_TYPE = "https://artemsemdev.github.io/SeaRise-Europe/build-types/offline-release/v1"
+BUILD_TYPE = (
+    "https://github.com/artemsemdev/SeaRise-Europe/blob/master/"
+    "contracts/supply-chain/v1/build-types/offline-release-v1.md"
+)
 BUILDER_ID = (
     "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/"
     "offline-release-controlled.yml@refs/heads/master"

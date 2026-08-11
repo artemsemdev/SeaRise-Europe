@@ -26,6 +26,7 @@ CANDIDATE_FIXTURE = (
 )
 BUILD_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/build-receipt.json"
 SOURCE_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/source-receipt.json"
+BUILD_TYPE_SPEC = ROOT / "contracts/supply-chain/v1/build-types/offline-release-v1.md"
 INVOCATION = "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/77777777777/attempts/1"
 OUTPUT_ROLES = {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
 
@@ -122,11 +123,11 @@ def _statement(manifest: Path, build: Path) -> dict[str, Any]:
     )
 
 
-def _write_statement(path: Path, statement: dict[str, Any]) -> None:
-    path.write_bytes(canonical_provenance_bytes(statement))
+def _validate(path: Path, manifest: Path, build: Path) -> dict[str, Any]:
+    return validate_provenance_statement(path, manifest, build, trusted_invocation_uri=INVOCATION)
 
 
-def test_statement_is_exact_slsa_v1_and_deterministic(tmp_path: Path) -> None:
+def test_statement_and_build_type_are_exact_and_deterministic(tmp_path: Path) -> None:
     manifest, build = _valid_pair(tmp_path)
     first = _statement(manifest, build)
     definition = first["predicate"]["buildDefinition"]
@@ -136,6 +137,16 @@ def test_statement_is_exact_slsa_v1_and_deterministic(tmp_path: Path) -> None:
     assert first == _statement(manifest, build)
     assert first["_type"] == STATEMENT_TYPE == "https://in-toto.io/Statement/v1"
     assert first["predicateType"] == PREDICATE_TYPE == "https://slsa.dev/provenance/v1"
+    spec = BUILD_TYPE_SPEC.read_text(encoding="utf-8")
+    assert BUILD_TYPE == (
+        "https://github.com/artemsemdev/SeaRise-Europe/blob/master/"
+        + BUILD_TYPE_SPEC.relative_to(ROOT).as_posix()
+    )
+    sections = (
+        "Build semantics|Parameter schemas|Invocation procedure|"
+        "Subjects, dependencies, and byproduct|Example"
+    )
+    assert all(f"## {section}" in spec for section in sections.split("|"))
     subjects = first["subject"]
     assert [item["name"] for item in subjects] == sorted(item["name"] for item in subjects)
     expected_outputs = [
@@ -199,17 +210,9 @@ def test_canonical_statement_validates_exactly(tmp_path: Path) -> None:
     manifest, build = _valid_pair(tmp_path)
     statement = _statement(manifest, build)
     path = tmp_path / "provenance.intoto.jsonl"
-    _write_statement(path, statement)
+    path.write_bytes(canonical_provenance_bytes(statement))
 
-    assert (
-        validate_provenance_statement(
-            path,
-            manifest,
-            build,
-            trusted_invocation_uri=INVOCATION,
-        )
-        == statement
-    )
+    assert _validate(path, manifest, build) == statement
 
 
 @pytest.mark.parametrize("raw", [b'{"x":1,"x":2}\n', b'{"x":NaN}\n', b"[]\n"])
@@ -219,12 +222,7 @@ def test_nonstandard_statement_json_fails(tmp_path: Path, raw: bytes) -> None:
     path.write_bytes(raw)
 
     with pytest.raises(ProvenanceContractError, match="provenance-json"):
-        validate_provenance_statement(
-            path,
-            manifest,
-            build,
-            trusted_invocation_uri=INVOCATION,
-        )
+        _validate(path, manifest, build)
 
 
 @pytest.mark.parametrize(
@@ -248,12 +246,7 @@ def test_noncanonical_statement_bytes_fail(tmp_path: Path) -> None:
     path.write_text(json.dumps(_statement(manifest, build), indent=2) + "\n", encoding="utf-8")
 
     with pytest.raises(ProvenanceContractError, match="provenance-canonical"):
-        validate_provenance_statement(
-            path,
-            manifest,
-            build,
-            trusted_invocation_uri=INVOCATION,
-        )
+        _validate(path, manifest, build)
 
 
 @pytest.mark.parametrize(
@@ -398,12 +391,7 @@ def test_statement_mutations_fail_closed(
     statement = _statement(manifest, build)
     mutation(statement)
     path = tmp_path / "mutated.intoto.jsonl"
-    _write_statement(path, statement)
+    path.write_bytes(canonical_provenance_bytes(statement))
 
     with pytest.raises(ProvenanceContractError, match=code):
-        validate_provenance_statement(
-            path,
-            manifest,
-            build,
-            trusted_invocation_uri=INVOCATION,
-        )
+        _validate(path, manifest, build)
