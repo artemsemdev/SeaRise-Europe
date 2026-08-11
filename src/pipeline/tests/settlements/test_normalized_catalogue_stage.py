@@ -7,7 +7,7 @@ import importlib.util
 import json
 import shutil
 from contextlib import contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import duckdb
@@ -50,6 +50,21 @@ FIXTURES = Path(__file__).with_name("fixtures") / "geonames"
 HEX = "a" * 64
 
 
+@dataclass(frozen=True)
+class _DecodeChild:
+    value: str
+
+
+@dataclass(frozen=True)
+class _DecodeFirst:
+    child: _DecodeChild
+
+
+@dataclass(frozen=True)
+class _DecodeSecond:
+    child: _DecodeChild
+
+
 def _line(path: str, prefix: bytes | None = None) -> bytes:
     rows = (FIXTURES / path).read_bytes().splitlines()
     return rows[0] if prefix is None else next(row for row in rows if row.startswith(prefix))
@@ -59,6 +74,44 @@ def _work(tmp_path: Path, name: str) -> Path:
     path = tmp_path / f"{name}-work"
     path.mkdir(exist_ok=True)
     return path
+
+
+def test_document_decode_caches_nested_dataclass_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = catalogue_stage.get_type_hints
+    resolved: list[type[object]] = []
+
+    def count(annotation: type[object]) -> dict[str, object]:
+        resolved.append(annotation)
+        return original(annotation)
+
+    catalogue_stage._dataclass_metadata.cache_clear()
+    monkeypatch.setattr(catalogue_stage, "get_type_hints", count)
+    raw = '{"child":{"value":"cached"}}'
+
+    assert catalogue_stage._document(_DecodeFirst, raw, "first") == _DecodeFirst(
+        _DecodeChild("cached")
+    )
+    assert catalogue_stage._document(_DecodeFirst, raw, "first") == _DecodeFirst(
+        _DecodeChild("cached")
+    )
+    assert resolved == [_DecodeFirst, _DecodeChild]
+
+
+def test_document_decode_cache_isolated_by_dataclass_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = catalogue_stage.get_type_hints
+    resolved: list[type[object]] = []
+
+    def count(annotation: type[object]) -> dict[str, object]:
+        resolved.append(annotation)
+        return original(annotation)
+
+    catalogue_stage._dataclass_metadata.cache_clear()
+    monkeypatch.setattr(catalogue_stage, "get_type_hints", count)
+    raw = '{"child":{"value":"isolated"}}'
+
+    assert type(catalogue_stage._document(_DecodeFirst, raw, "first")) is _DecodeFirst
+    assert type(catalogue_stage._document(_DecodeSecond, raw, "second")) is _DecodeSecond
+    assert resolved == [_DecodeFirst, _DecodeChild, _DecodeSecond]
 
 
 def _contract(

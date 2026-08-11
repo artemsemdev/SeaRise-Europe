@@ -18,6 +18,7 @@ from collections import Counter
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import date, datetime, timezone
+from functools import cache
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Union, get_args, get_origin, get_type_hints
 
@@ -83,6 +84,13 @@ class CatalogueStageError(ValueError):
     """An opened source or normalized-catalogue candidate is invalid."""
 
 
+@cache
+def _dataclass_metadata(annotation: type[Any]) -> tuple[tuple[str, Any], ...]:
+    """Return immutable resolved field metadata for one dataclass contract type."""
+    hints = get_type_hints(annotation)
+    return tuple((item.name, hints[item.name]) for item in fields(annotation))
+
+
 def _decode(annotation: Any, value: Any, label: str) -> Any:
     origin = get_origin(annotation)
     if origin in (Union, getattr(types, "UnionType", ())):
@@ -108,14 +116,14 @@ def _decode(annotation: Any, value: Any, label: str) -> Any:
             raise CatalogueStageError(f"{label} tuple must be a JSON array")
         return tuple(_decode(get_args(annotation)[0], item, label) for item in value)
     if is_dataclass(annotation):
-        names = {item.name for item in fields(annotation)}
+        metadata = _dataclass_metadata(annotation)
+        names = {name for name, _ in metadata}
         if type(value) is not dict or set(value) != names:
             raise CatalogueStageError(f"{label} fields differ from the staged contract")
-        hints = get_type_hints(annotation)
         return annotation(
             **{
-                item.name: _decode(hints[item.name], value[item.name], f"{label}.{item.name}")
-                for item in fields(annotation)
+                name: _decode(field_type, value[name], f"{label}.{name}")
+                for name, field_type in metadata
             }
         )
     if type(value) is not annotation:
