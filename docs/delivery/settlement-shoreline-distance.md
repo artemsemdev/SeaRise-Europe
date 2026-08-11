@@ -73,7 +73,9 @@ The named-place controls are regression evidence for source completeness and
 distance behavior. They are not a scientific validation of a hazard model or
 an authorization to publish the settlement catalog.
 
-This source slice intentionally does not remove the classifier's
-`shoreline-geometry-unavailable` production blocker. A separate dependent
-wiring change must bind this exact policy and artifact before production
-classification can run.
+The classifier now exposes a fail-closed production binding for this exact
+policy and artifact plus the reviewed support and coastal geometries. The
+binding remains `selected-scope-approximation` and
+`publication_eligible=False`. Full catalog classification and artifact evidence
+remain pending; the binding makes no owner, scientific, hazard,
+canonical-coastline, or publication approval claim.

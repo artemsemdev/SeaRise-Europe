@@ -23,7 +23,6 @@ from searise_pipeline.settlements.geonames import Lineage
 from searise_pipeline.settlements.spatial_classification import (
     CORE_CAPITAL_FEATURE_CODES,
     SPATIAL_FIXTURE_SHA256,
-    ProductionSpatialBlocker,
     SpatialClassificationError,
     SpatialResultRow,
     classification_sql,
@@ -41,6 +40,14 @@ from searise_pipeline.settlements.spatial_toolchain import (
 ROOT = Path(__file__).parents[4]
 FIXTURE = ROOT / "src/pipeline/tests/settlements/fixtures/spatial/fixture-manifest.json"
 TOOLCHAIN = ROOT / "src/pipeline/toolchain/duckdb-spatial-extensions.json"
+PRODUCTION_GEOMETRY_FILES = (
+    "src/pipeline/science/geography-rules.json",
+    "src/pipeline/settlements/shoreline-distance-policy-v1.json",
+    "src/pipeline/sources/source-lock.phase-1-settlement-coastline.json",
+    "data/geometry/europe.geojson",
+    "data/geometry/coastal_analysis_zone.geojson",
+    "data/settlements/europe-settlement-shoreline-v1.geojson",
+)
 
 
 def _fixture():
@@ -126,6 +133,14 @@ def _row(case) -> SpatialResultRow:
         case.coastal_covers,
         case.distance_to_shoreline_meters,
     )
+
+
+def _linked_production_root(tmp_path: Path) -> Path:
+    for relative_path in PRODUCTION_GEOMETRY_FILES:
+        path = tmp_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.symlink_to(ROOT / relative_path)
+    return tmp_path
 
 
 def _classify(*, places=None, rows=None, fixture=None, evidence=None, geometry=None):
@@ -436,6 +451,129 @@ def test_toolchain_identity_mismatch_fails_before_classification() -> None:
         _classify(evidence=evidence)
 
 
-def test_production_build_is_explicitly_blocked_without_real_shoreline() -> None:
-    with pytest.raises(ProductionSpatialBlocker, match="shoreline-geometry-unavailable"):
-        production_geometry_bindings(ROOT)
+def test_production_geometry_binds_exact_reviewed_real_source_inputs() -> None:
+    geometry = production_geometry_bindings(ROOT)
+
+    assert geometry.data_provenance_class == "real-source"
+    assert geometry.geometry_status == "selected-scope-approximation"
+    assert geometry.publication_eligible is False
+    assert geometry.contract_sha256 == (
+        "357b20709c3f9b28ef0a15c651313ac97ea1b2dc3f118e0412afdc3d58059058"
+    )
+    assert [
+        (item.role, item.id, item.version, item.path, item.sha256, item.predicate)
+        for item in geometry.items
+    ] == [
+        (
+            "support",
+            "europe-support",
+            "natural-earth-5.1.1-explicit-scope-v2",
+            "data/geometry/europe.geojson",
+            "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
+            "ST_Covers",
+        ),
+        (
+            "coastal",
+            "coastal-analysis-zone",
+            "natural-earth-5.1.1-25km-scope-v2",
+            "data/geometry/coastal_analysis_zone.geojson",
+            "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
+            "ST_Covers",
+        ),
+        (
+            "shoreline",
+            "europe-settlement-shoreline-v1",
+            "natural-earth-direct-linework-europe-selection-v1",
+            "data/settlements/europe-settlement-shoreline-v1.geojson",
+            "53972730f9af3f541b67ee67a4653fb5a21ac52011d33c4372eb9fa84bc331ac",
+            "ST_Transform(EPSG:4326,EPSG:3035,always_xy=true)"
+            "+CAST(ST_Distance AS BIGINT-half-even)",
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("target", "expected_error"),
+    [
+        ("geography-rules", "production geography rules differ"),
+        ("support-artifact", "production support geometry differs"),
+        ("coastal-artifact", "production coastal geometry differs"),
+        ("shoreline-policy", "production shoreline policy differs"),
+        ("source-lock", "production shoreline source lock differs"),
+        ("artifact", "production shoreline artifact differs"),
+    ],
+)
+def test_production_geometry_input_drift_fails_closed(
+    tmp_path: Path, target: str, expected_error: str
+) -> None:
+    repository_root = _linked_production_root(tmp_path)
+    artifact_paths = {
+        "support-artifact": PRODUCTION_GEOMETRY_FILES[3],
+        "coastal-artifact": PRODUCTION_GEOMETRY_FILES[4],
+        "artifact": PRODUCTION_GEOMETRY_FILES[5],
+    }
+    if target in artifact_paths:
+        relative_path = artifact_paths[target]
+        path = repository_root / relative_path
+        path.unlink()
+        path.write_bytes((ROOT / relative_path).read_bytes() + b"\n")
+    else:
+        paths = {
+            "geography-rules": PRODUCTION_GEOMETRY_FILES[0],
+            "shoreline-policy": PRODUCTION_GEOMETRY_FILES[1],
+            "source-lock": PRODUCTION_GEOMETRY_FILES[2],
+        }
+        relative_path = paths[target]
+        document = json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+        if target == "geography-rules":
+            document["predicate"] = "contains"
+        elif target == "shoreline-policy":
+            document["purpose"]["publicationEligible"] = True
+        else:
+            document["sources"][0]["assets"][0]["sha256"] = "0" * 64
+        path = repository_root / relative_path
+        path.unlink()
+        path.write_text(json.dumps(document, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(SpatialClassificationError, match=expected_error):
+        production_geometry_bindings(repository_root)
+
+
+@pytest.mark.parametrize("mutation", ["role", "predicate", "order", "publication"])
+def test_production_binding_mutations_fail_before_classification(mutation: str) -> None:
+    geometry = production_geometry_bindings(ROOT)
+    if mutation == "role":
+        geometry = replace(geometry, support=replace(geometry.support, role="coastal"))
+    elif mutation == "predicate":
+        geometry = replace(geometry, shoreline=replace(geometry.shoreline, predicate="ST_Covers"))
+    elif mutation == "order":
+        geometry = replace(geometry, support=geometry.coastal, coastal=geometry.support)
+    else:
+        geometry = replace(geometry, publication_eligible=True)
+
+    with pytest.raises(SpatialClassificationError):
+        _classify(geometry=geometry)
+
+
+def test_arbitrary_self_hashed_real_source_identity_fails_closed() -> None:
+    geometry = production_geometry_bindings(ROOT)
+    geometry = replace(
+        geometry,
+        shoreline=replace(geometry.shoreline, id="unreviewed-shoreline"),
+        contract_sha256="",
+    )
+    payload = {
+        "dataProvenanceClass": geometry.data_provenance_class,
+        "geometryStatus": geometry.geometry_status,
+        "publicationEligible": geometry.publication_eligible,
+        "geometries": [item.__dict__ for item in geometry.items],
+    }
+    geometry = replace(
+        geometry,
+        contract_sha256=hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()
+        ).hexdigest(),
+    )
+
+    with pytest.raises(SpatialClassificationError, match="production geometry identity differs"):
+        _classify(geometry=geometry)

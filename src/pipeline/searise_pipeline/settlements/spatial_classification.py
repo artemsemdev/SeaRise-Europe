@@ -10,6 +10,11 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable, Optional
 
 from .catalogue import CataloguePlace
+from .coastline_contract import (
+    CoastlineContractError,
+    load_coastline_policy,
+    validate_coastline_sources,
+)
 from .geonames import Lineage
 from .spatial_toolchain import (
     SpatialToolchainEvidence,
@@ -18,6 +23,9 @@ from .spatial_toolchain import (
 
 SPATIAL_FIXTURE_SHA256 = "207430931e25c4a3cd1f14c88e4caf719d730f380fbd2904dcac9f5962538a58"
 GEOGRAPHY_RULES_SHA256 = "195b7128ba5483a633e8e35187541b0b884ed8644ac40ae8191c9db9935becf5"
+SHORELINE_POLICY_SHA256 = "8ee0077687b10f46c3267ccb887e0b2910d7fae5352edf1ea1cdfd6f87c8f547"
+SHORELINE_SOURCE_LOCK_SHA256 = "a640da683b1b938715e0661afbdc8c2a8ebb145b7d0b9f5f41a567bcc49b3ccc"
+SHORELINE_ARTIFACT_SHA256 = "53972730f9af3f541b67ee67a4653fb5a21ac52011d33c4372eb9fa84bc331ac"
 SPATIAL_TOOLCHAIN_MANIFEST_SHA256 = (
     "77c7ea3422e67be2f8d23f0dcef2d5d36236f01b8856f76289ed1e0532359ca6"
 )
@@ -47,14 +55,36 @@ CORE_CAPITAL_FEATURE_CODES = frozenset({"PPLC", "PPLA", "PPLA2", "PPLA3", "PPLA4
 _SHORELINE_PREDICATE = (
     "ST_Transform(EPSG:4326,EPSG:3035,always_xy=true)+CAST(ST_Distance AS BIGINT-half-even)"
 )
+_PRODUCTION_GEOMETRY_IDENTITIES = (
+    (
+        "support",
+        "europe-support",
+        "natural-earth-5.1.1-explicit-scope-v2",
+        "data/geometry/europe.geojson",
+        "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
+        "ST_Covers",
+    ),
+    (
+        "coastal",
+        "coastal-analysis-zone",
+        "natural-earth-5.1.1-25km-scope-v2",
+        "data/geometry/coastal_analysis_zone.geojson",
+        "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
+        "ST_Covers",
+    ),
+    (
+        "shoreline",
+        "europe-settlement-shoreline-v1",
+        "natural-earth-direct-linework-europe-selection-v1",
+        "data/settlements/europe-settlement-shoreline-v1.geojson",
+        SHORELINE_ARTIFACT_SHA256,
+        _SHORELINE_PREDICATE,
+    ),
+)
 
 
 class SpatialClassificationError(ValueError):
     """An input cannot produce one trustworthy spatial classification."""
-
-
-class ProductionSpatialBlocker(SpatialClassificationError):
-    """The full-source spatial build lacks a required reviewed input."""
 
 
 @dataclass(frozen=True)
@@ -147,19 +177,32 @@ def _binding_sha256(geometry: GeometryBindings) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def _validate_geometry(geometry: GeometryBindings) -> None:
+def _validate_geometry(
+    geometry: GeometryBindings, *, expected_provenance: str | None = None
+) -> None:
     if geometry.geometry_status != "selected-scope-approximation":
         raise SpatialClassificationError("geometry must remain selected-scope-approximation")
-    if geometry.data_provenance_class != "synthetic-fixture":
-        raise SpatialClassificationError("classification evidence must remain synthetic-fixture")
+    if expected_provenance is not None and geometry.data_provenance_class != expected_provenance:
+        raise SpatialClassificationError("geometry provenance differs")
+    if geometry.data_provenance_class not in {"real-source", "synthetic-fixture"}:
+        raise SpatialClassificationError("geometry provenance is unsupported")
     if geometry.publication_eligible:
-        raise SpatialClassificationError("fixture geometry cannot be publication eligible")
+        raise SpatialClassificationError("geometry cannot be publication eligible")
     if tuple(item.role for item in geometry.items) != ("support", "coastal", "shoreline"):
         raise SpatialClassificationError("geometry role order differs")
     if geometry.support.predicate != "ST_Covers" or geometry.coastal.predicate != "ST_Covers":
         raise SpatialClassificationError("geometry binding predicate differs")
     if geometry.shoreline.predicate != _SHORELINE_PREDICATE:
         raise SpatialClassificationError("geometry binding predicate differs")
+    if (
+        geometry.data_provenance_class == "real-source"
+        and tuple(
+            (item.role, item.id, item.version, item.path, item.sha256, item.predicate)
+            for item in geometry.items
+        )
+        != _PRODUCTION_GEOMETRY_IDENTITIES
+    ):
+        raise SpatialClassificationError("production geometry identity differs")
     if (
         len({item.path for item in geometry.items}) != 3
         or len({item.sha256 for item in geometry.items}) != 3
@@ -174,7 +217,7 @@ def _validate_geometry(geometry: GeometryBindings) -> None:
         ):
             raise SpatialClassificationError("geometry binding identity is invalid")
     if _binding_sha256(geometry) != geometry.contract_sha256:
-        raise SpatialClassificationError("geometry binding differs from its fixture contract")
+        raise SpatialClassificationError("geometry binding differs from its contract")
 
 
 def load_fixture_geometry_bindings(path: Path, *, repository_root: Path) -> GeometryBindings:
@@ -218,7 +261,7 @@ def load_fixture_geometry_bindings(path: Path, *, repository_root: Path) -> Geom
     geometry = GeometryBindings(
         **{**geometry.__dict__, "contract_sha256": _binding_sha256(geometry)}
     )
-    _validate_geometry(geometry)
+    _validate_geometry(geometry, expected_provenance="synthetic-fixture")
     return geometry
 
 
@@ -311,34 +354,123 @@ def classify_spatial_rows(
 
 
 def production_geometry_bindings(repository_root: Path) -> GeometryBindings:
-    """Validate current support/coastal pins, then expose the real shoreline blocker."""
+    """Bind reviewed real-source geometries without granting publication approval."""
     rules_path = repository_root / "src/pipeline/science/geography-rules.json"
-    if _sha256(rules_path) != GEOGRAPHY_RULES_SHA256:
+    if not rules_path.is_file() or _sha256(rules_path) != GEOGRAPHY_RULES_SHA256:
         raise SpatialClassificationError("production geography rules differ")
     rules = json.loads(rules_path.read_text(encoding="utf-8"))
     expected = {
-        "support": (
-            "natural-earth-5.1.1-explicit-scope-v2",
-            "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
-        ),
-        "coastal": (
-            "natural-earth-5.1.1-25km-scope-v2",
-            "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
-        ),
+        "support": {
+            "id": "europe-support",
+            "version": "natural-earth-5.1.1-explicit-scope-v2",
+            "status": "selected-scope-approximation",
+            "path": "data/geometry/europe.geojson",
+            "sha256": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
+        },
+        "coastal": {
+            "id": "coastal-analysis-zone",
+            "version": "natural-earth-5.1.1-25km-scope-v2",
+            "status": "selected-scope-approximation",
+            "path": "data/geometry/coastal_analysis_zone.geojson",
+            "sha256": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
+        },
     }
-    for role, (version, digest) in expected.items():
+    bindings = {}
+    for role, identity in expected.items():
         value = rules.get(role, {})
-        path = repository_root / str(value.get("path", ""))
+        path = repository_root / identity["path"]
         if (
-            value.get("version") != version
-            or value.get("status") != "selected-scope-approximation"
-            or value.get("sha256") != digest
+            {key: value.get(key) for key in identity} != identity
             or not path.is_file()
-            or _sha256(path) != digest
+            or _sha256(path) != identity["sha256"]
         ):
             raise SpatialClassificationError(f"production {role} geometry differs")
-    if rules.get("predicate") != "covers":
+        bindings[role] = GeometryBinding(
+            role=role,
+            id=identity["id"],
+            version=identity["version"],
+            path=identity["path"],
+            sha256=identity["sha256"],
+            predicate="ST_Covers",
+        )
+    if (
+        rules.get("predicate") != "covers"
+        or rules.get("coastal", {}).get("hazardExtentClaim") is not False
+        or rules.get("publicationGate", {}).get("status") != "blocked"
+    ):
         raise SpatialClassificationError("production geometry predicate differs")
-    raise ProductionSpatialBlocker(
-        "shoreline-geometry-unavailable: support/coastal boundaries are prohibited substitutes"
+
+    policy_path = repository_root / "src/pipeline/settlements/shoreline-distance-policy-v1.json"
+    if not policy_path.is_file() or _sha256(policy_path) != SHORELINE_POLICY_SHA256:
+        raise SpatialClassificationError("production shoreline policy differs")
+    try:
+        policy = load_coastline_policy(policy_path)
+        source_lock = policy["sourceLock"]
+        if source_lock != {
+            "path": "src/pipeline/sources/source-lock.phase-1-settlement-coastline.json",
+            "sha256": SHORELINE_SOURCE_LOCK_SHA256,
+        }:
+            raise SpatialClassificationError("production shoreline source binding differs")
+        source_lock_path = repository_root / source_lock["path"]
+        if (
+            not source_lock_path.is_file()
+            or _sha256(source_lock_path) != SHORELINE_SOURCE_LOCK_SHA256
+        ):
+            raise SpatialClassificationError("production shoreline source lock differs")
+        validate_coastline_sources(source_lock_path, policy)
+    except CoastlineContractError as exc:
+        raise SpatialClassificationError("production shoreline contract differs") from exc
+
+    if policy.get("purpose") != {
+        "role": "settlement-distance-to-coast-only",
+        "status": "selected-scope-approximation",
+        "productEligibilityOnly": True,
+        "hazardExtentClaim": False,
+        "canonicalCoastlineClaim": False,
+        "ownerApprovalClaim": False,
+        "publicationEligible": False,
+    }:
+        raise SpatialClassificationError("production shoreline purpose differs")
+    if policy.get("coastalClassification") != {
+        "derivedFromShorelineDistance": False,
+        "geometryVersion": bindings["coastal"].version,
+        "predicate": "ST_Covers",
+    }:
+        raise SpatialClassificationError("production shoreline coastal binding differs")
+    output = policy.get("output", {})
+    shoreline_identity = {
+        "path": "data/settlements/europe-settlement-shoreline-v1.geojson",
+        "version": "natural-earth-direct-linework-europe-selection-v1",
+        "sha256": SHORELINE_ARTIFACT_SHA256,
+        "byteSize": 3553041,
+    }
+    artifact_path = repository_root / shoreline_identity["path"]
+    if (
+        {key: output.get(key) for key in shoreline_identity} != shoreline_identity
+        or not artifact_path.is_file()
+        or artifact_path.stat().st_size != shoreline_identity["byteSize"]
+        or _sha256(artifact_path) != SHORELINE_ARTIFACT_SHA256
+    ):
+        raise SpatialClassificationError("production shoreline artifact differs")
+    shoreline = GeometryBinding(
+        role="shoreline",
+        id="europe-settlement-shoreline-v1",
+        version=shoreline_identity["version"],
+        path=shoreline_identity["path"],
+        sha256=shoreline_identity["sha256"],
+        predicate=_SHORELINE_PREDICATE,
     )
+    geometry = GeometryBindings(
+        data_provenance_class="real-source",
+        geometry_status="selected-scope-approximation",
+        publication_eligible=False,
+        support=bindings["support"],
+        coastal=bindings["coastal"],
+        shoreline=shoreline,
+        contract_sha256="",
+    )
+    geometry = GeometryBindings(
+        **{**geometry.__dict__, "contract_sha256": _binding_sha256(geometry)}
+    )
+    _validate_geometry(geometry, expected_provenance="real-source")
+    return geometry
