@@ -50,8 +50,10 @@ official Draft 7 schema. The vendored schemas are Apache-2.0 licensed.
 
 ## Dependency-defining input inventory
 
-`v1/dependency-inventory.json` binds the exact bytes of all 41 currently
-discovered dependency-defining repository inputs. Coverage includes npm,
+`v1/dependency-inventory.json` binds the exact bytes of all 43 inputs discovered
+at this reviewed revision. The inventory validation command below derives and
+reports the current validated count, avoiding a separate operational count.
+Coverage includes npm,
 Python release and contributor environments, all five NuGet projects and
 locks, GitHub workflows, container recipes and manifests, the native
 geospatial toolchain, and the vendored CycloneDX 1.7 schema bundle with its
