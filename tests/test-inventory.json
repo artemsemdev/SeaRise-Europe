@@ -1,7 +1,7 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-11",
+  "updatedAt": "2026-08-12",
   "evidence": {
     "ci-30949490661": {
       "kind": "github-actions",
@@ -513,14 +513,14 @@
       "id": "pipeline-settlement-spatial-classification",
       "layer": "contract",
       "owner": "data",
-      "purpose": "Keep descriptor-bound spatial assets, receipt-bound normalized-catalogue staging, support/coastal coverage, whole-meter metric shoreline distance, shard policy, accepted-audit output, and outside-support rejection deterministic and fail-closed.",
-      "sourcePaths": ["scripts/release/build_settlement_spatial_stage.py", "src/pipeline/searise_pipeline/settlements/spatial_asset_authority.py", "src/pipeline/searise_pipeline/settlements/spatial_classification.py", "src/pipeline/searise_pipeline/settlements/spatial_classification_stage.py", "src/pipeline/searise_pipeline/settlements/spatial_stage_runner.py", "src/pipeline/tests/settlements/fixtures/spatial/**", "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "src/pipeline/tests/settlements/test_spatial_classification.py", "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "src/pipeline/tests/settlements/test_spatial_stage_runner.py"],
-      "changedPaths": [".github/workflows/ci.yml", "contracts/settlements/README.md", "docs/operations/settlement-spatial-*.md", "scripts/release/build_settlement_spatial_stage.py", "src/pipeline/searise_pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/spatial/**", "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "src/pipeline/tests/settlements/test_spatial_classification.py", "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "src/pipeline/tests/settlements/test_spatial_stage_runner.py"],
+      "purpose": "Keep descriptor-bound spatial assets, receipt-bound normalized-catalogue staging, support/coastal coverage, whole-meter metric shoreline distance, shard policy, immutable search projection, accepted-audit output, and outside-support rejection deterministic and fail-closed.",
+      "sourcePaths": ["scripts/release/build_settlement_spatial_stage.py", "src/pipeline/searise_pipeline/settlements/search_projection.py", "src/pipeline/searise_pipeline/settlements/spatial_asset_authority.py", "src/pipeline/searise_pipeline/settlements/spatial_classification.py", "src/pipeline/searise_pipeline/settlements/spatial_classification_stage.py", "src/pipeline/searise_pipeline/settlements/spatial_stage_runner.py", "src/pipeline/tests/settlements/fixtures/spatial/**", "src/pipeline/tests/settlements/test_search_projection.py", "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "src/pipeline/tests/settlements/test_spatial_classification.py", "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "src/pipeline/tests/settlements/test_spatial_stage_runner.py"],
+      "changedPaths": [".github/workflows/ci.yml", "contracts/settlements/README.md", "docs/operations/settlement-search-projection.md", "docs/operations/settlement-spatial-*.md", "scripts/release/build_settlement_spatial_stage.py", "src/pipeline/searise_pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/spatial/**", "src/pipeline/tests/settlements/test_search_projection.py", "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "src/pipeline/tests/settlements/test_spatial_classification.py", "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "src/pipeline/tests/settlements/test_spatial_stage_runner.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent geometry-identity, ST_Covers, EPSG:3035 whole-meter half-even distance, shard-policy, ordering, rejection, and pinned live-engine gate." },
-      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_spatial_asset_authority.py src/pipeline/tests/settlements/test_spatial_classification.py src/pipeline/tests/settlements/test_spatial_classification_stage.py src/pipeline/tests/settlements/test_spatial_stage_runner.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_search_projection.py src/pipeline/tests/settlements/test_spatial_asset_authority.py src/pipeline/tests/settlements/test_spatial_classification.py src/pipeline/tests/settlements/test_spatial_classification_stage.py src/pipeline/tests/settlements/test_spatial_stage_runner.py -q", "full": "python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-spatial-classification", "scope": "focused-suite" },
+      "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-spatial-classification", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed hash-bound European synthetic geometry and rows use no clock, random input, or test-time network; CI requires the exact preflighted DuckDB Spatial cache." }
     },
     {
@@ -1102,6 +1102,7 @@
     { "path": "src/pipeline/tests/settlements/test_catalogue_domain.py", "suite": "pipeline-settlement-catalogue-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_classification.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_search_projection.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_geoparquet.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_geoparquet_publication.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
