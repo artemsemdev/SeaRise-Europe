@@ -27,3 +27,18 @@ canonical boundary, production, hazard-extent, or publication claim. Schema
 validation proves document shape; the executable inventory tests additionally
 prove exact artifact identity, rights, counts, 3 x 3 STAC bindings, checksum
 coverage, terminal ordering, and the non-recursive supply-chain boundary.
+
+The provenance core closes the supported synthetic pair as one canonical
+single-line in-toto Statement v1 with a SLSA provenance v1 predicate. Its sole
+subject is the SHA-256 of the actual `manifest.json` bytes. Four external
+parameters bind candidate ID, release ID, provenance class, and that manifest
+digest. The approved `offline-release-controlled.yml` workflow on `master` is
+the builder; its trusted first-attempt run URI is recorded separately as the
+invocation. Code, environment lock, every source receipt, input, and tool are
+sorted resolved dependencies, while the exact build receipt is bound under
+internal parameters.
+
+This core supports only `synthetic-fixture`. It validates no signature or
+cryptographic verification and makes no production, publication, scientific,
+or owner-approval claim. Signing, evidence-envelope pairing, and publication
+remain separate future gates.
