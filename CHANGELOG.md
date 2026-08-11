@@ -72,6 +72,8 @@ All notable changes to this project will be documented in this file.
 - Added a hash-bound internal settlement spatial classifier with deterministic
   support/coastal membership, whole-meter EPSG:3035 shoreline distance,
   rejection-ledger semantics, and exact pinned DuckDB Spatial CI evidence.
+- Added a receipt-bound spatial-classification stage with exact identities and
+  an expiring opaque capability for authority-snapshotted `LOAD` and `ST_Read`.
 - Added a scoped, hash-locked Natural Earth settlement shoreline recipe using
   direct main and minor-island source lines, deterministic whole-feature
   selection, an explicit EPSG:3035 distance method, and independent named-place
