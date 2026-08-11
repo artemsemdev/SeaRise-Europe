@@ -105,6 +105,12 @@
       "reference": "src/pipeline/tests/settlements/test_coastline_contract.py",
       "environment": "macOS arm64; Python 3.9.6; closed JSON Schema, exact source-lock identities, half-even quantization controls, and deterministic mutations without source archives or network"
     },
+    "local-2026-08-11-settlement-shoreline-build": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T18:00:00+02:00",
+      "reference": "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json",
+      "environment": "macOS arm64; Python 3.9.6; GeoPandas 1.0.1, Pyogrio 0.11.1, GDAL 3.10.3, Shapely 2.0.7, PyProj 3.6.1, PROJ 9.3.0, and GEOS 3.11.4; exact locked Natural Earth archive rebuild and deterministic mutation controls"
+    },
     "local-2026-08-11-settlement-catalogue-domain": {
       "kind": "local-measurement",
       "observedAt": "2026-08-11T12:00:00+02:00",
@@ -498,6 +504,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-shoreline-contract", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Closed local policy, schema, and source-lock documents use no source archive, network, clock, random input, or spatial engine." }
+    },
+    {
+      "id": "pipeline-settlement-shoreline-build",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the direct Natural Earth settlement shoreline, whole-feature selection, named controls, and checked artifact deterministic and fail-closed.",
+      "sourcePaths": ["data/settlements/europe-settlement-shoreline-v1.geojson", "scripts/release/build_settlement_shoreline.py", "src/pipeline/searise_pipeline/settlements/coastline.py", "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json", "src/pipeline/tests/settlements/test_coastline_source.py"],
+      "changedPaths": [".github/workflows/ci.yml", "data/settlements/europe-settlement-shoreline-v1.geojson", "scripts/release/build_settlement_shoreline.py", "src/pipeline/searise_pipeline/settlements/coastline.py", "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json", "src/pipeline/tests/settlements/test_coastline_source.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-source, whole-line geometry, named-control, and byte-reproducibility gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_coastline_source.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 8, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-shoreline-build", "scope": "ci-job" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Offline contract and mutation controls are deterministic; CI separately fetches the exact public hash-locked archives and requires the rebuild test to execute rather than skip." }
     },
     {
       "id": "pipeline-release-gate-contract",
@@ -1033,6 +1053,7 @@
     { "path": "src/pipeline/tests/settlements/test_catalogue_domain.py", "suite": "pipeline-settlement-catalogue-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_classification.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_coastline_contract.py", "suite": "pipeline-settlement-shoreline-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_coastline_source.py", "suite": "pipeline-settlement-shoreline-build", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

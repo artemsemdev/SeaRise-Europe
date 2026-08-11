@@ -61,6 +61,7 @@ PIPELINE = (
     ".env.pipeline.example",
     ".gitignore",
     "data/geometry/**",
+    "data/settlements/**",
     "scripts/tests/**",
     "contracts/**",
     "tests/**",
