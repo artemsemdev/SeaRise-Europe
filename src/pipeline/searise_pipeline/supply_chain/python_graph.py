@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import stat
 from pathlib import Path, PurePosixPath
@@ -27,15 +28,23 @@ _PLATFORMS = {
 
 
 def _read_regular_bytes(path: Path, *, label: str) -> bytes:
-    if path.is_symlink():
-        raise SupplyChainContractError(f"{label} must not be a symlink: {path}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_NONBLOCK", 0)
     try:
-        mode = path.stat().st_mode
-    except FileNotFoundError as exc:
-        raise SupplyChainContractError(f"{label} is missing: {path}") from exc
-    if not stat.S_ISREG(mode):
-        raise SupplyChainContractError(f"{label} must be a regular file: {path}")
-    return path.read_bytes()
+        descriptor = os.open(path, flags)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise SupplyChainContractError(f"{label} must be a regular file: {path}")
+            chunks = []
+            while chunk := os.read(descriptor, 131_072):
+                chunks.append(chunk)
+            return b"".join(chunks)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        if path.is_symlink():
+            raise SupplyChainContractError(f"{label} must not be a symlink: {path}") from exc
+        raise SupplyChainContractError(f"{label} could not be read: {path}") from exc
 
 
 def _load_annotation(path: Path) -> dict[str, Any]:
@@ -60,6 +69,8 @@ def _load_annotation(path: Path) -> dict[str, Any]:
         )
     except UnicodeDecodeError as exc:
         raise SupplyChainContractError("Python graph annotation must be UTF-8") from exc
+    except json.JSONDecodeError as exc:
+        raise SupplyChainContractError("Python graph annotation JSON is malformed") from exc
     if not isinstance(document, dict):
         raise SupplyChainContractError("Python graph annotation root must be an object")
     return document
@@ -84,7 +95,7 @@ def _safe_lock_path(repository_root: Path, value: str) -> Path:
             raise SupplyChainContractError(f"Python lock path must not use symlinks: {value}")
     try:
         candidate.resolve().relative_to(root)
-    except (FileNotFoundError, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         raise SupplyChainContractError(f"Python lock is outside or missing: {value}") from exc
     return candidate
 

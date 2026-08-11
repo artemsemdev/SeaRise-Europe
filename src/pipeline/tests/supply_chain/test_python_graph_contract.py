@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 import pytest
 
+import searise_pipeline.supply_chain.python_graph as python_graph_module
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     validate_python_lock_graph,
@@ -89,6 +90,17 @@ def test_synthetic_multi_target_graph_is_the_reviewed_authority() -> None:
     ]
 
 
+@pytest.mark.parametrize("content", [b'{"schemaVersion":', b'{"value": tru}', b"["])
+def test_malformed_annotation_json_is_a_contract_error(
+    tmp_path: Path,
+    content: bytes,
+) -> None:
+    annotation = tmp_path / "annotation.json"
+    annotation.write_bytes(content)
+    with pytest.raises(SupplyChainContractError, match="JSON is malformed"):
+        validate_python_lock_graph(annotation, repository_root=REPOSITORY_ROOT)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
@@ -123,6 +135,34 @@ def test_lock_hash_tamper_and_symlink_fail_closed(tmp_path: Path) -> None:
     lock.symlink_to(target)
     with pytest.raises(SupplyChainContractError, match="symlink"):
         validate_python_lock_graph(annotation, repository_root=tmp_path)
+
+    lock.unlink()
+    lock.mkdir()
+    with pytest.raises(SupplyChainContractError, match="regular file"):
+        validate_python_lock_graph(annotation, repository_root=tmp_path)
+
+
+def test_lock_read_keeps_the_open_descriptor_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    annotation = _copy_fixture(tmp_path)
+    document = json.loads(annotation.read_bytes())
+    lock = _lock_path(tmp_path, document)
+    original = lock.read_bytes()
+    moved = lock.with_suffix(".opened")
+    real_open = python_graph_module.os.open
+
+    def swap_after_open(path: Path, flags: int) -> int:
+        descriptor = real_open(path, flags)
+        if Path(path) == lock:
+            lock.rename(moved)
+            lock.write_bytes(original + b"# replacement\n")
+        return descriptor
+
+    monkeypatch.setattr(python_graph_module.os, "open", swap_after_open)
+    validate_python_lock_graph(annotation, repository_root=tmp_path)
+    assert lock.read_bytes() != moved.read_bytes()
 
 
 @pytest.mark.parametrize(
