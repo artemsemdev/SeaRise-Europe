@@ -25,7 +25,7 @@ export const strings = {
     headlinePrefix: "What will happen to",
     headlineAccent: "your coast",
     headlineSuffix: "in the future?",
-    body: "Enter a European address, city, or location to see how it appears in scenario-based sea-level projections. Choose a scenario and time horizon to compare different outlooks.",
+    body: "Enter a European city, town, or village to see how it appears in scenario-based sea-level projections. Choose a scenario and time horizon to compare different outlooks.",
     subtext:
       "Results are model-based estimates, not engineering assessments. See methodology for details.",
   },
@@ -99,11 +99,11 @@ export const strings = {
   noResults: {
     heading: "No locations found",
     body: (query: string) =>
-      `We could not find a match for \u201c${query}\u201d. Try a more specific address, a city name, or a well-known landmark.`,
+      `We could not find a match for \u201c${query}\u201d. Check the spelling or try a nearby city, town, or village.`,
   },
 
   search: {
-    placeholder: "Search for a European location",
+    placeholder: "Find a city, town, or village",
     submitLabel: "Search",
     clearLabel: "Clear search",
   },

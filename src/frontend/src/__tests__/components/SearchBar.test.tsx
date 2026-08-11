@@ -58,4 +58,19 @@ describe("SearchBar", () => {
     const input = screen.getByPlaceholderText(strings.search.placeholder);
     expect(input).toHaveAttribute("maxLength", "200");
   });
+
+  it("keeps user-facing search guidance settlement-only", () => {
+    const searchScopeCopy = [
+      strings.emptyState.body,
+      strings.noResults.body("Fixture place"),
+      strings.search.placeholder,
+    ];
+
+    for (const copy of searchScopeCopy) {
+      expect(copy).toMatch(/\bcity\b/i);
+      expect(copy).toMatch(/\btown\b/i);
+      expect(copy).toMatch(/\bvillage\b/i);
+      expect(copy).not.toMatch(/\b(?:street\s+)?addresses?\b|\bpostcodes?\b|\blandmarks?\b/i);
+    }
+  });
 });
