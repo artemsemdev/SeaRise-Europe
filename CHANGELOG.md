@@ -9,9 +9,8 @@ All notable changes to this project will be documented in this file.
 - Added a deterministic CycloneDX 1.7 file-input authority foundation for
   candidate build-plane workflow, container-recipe, and native-toolchain files,
   with exact repository paths, SHA-256 authority, and explicit OpenTofu
-  absence. It does not claim native binary, DuckDB or Spatial artifact, OCI
-  base-image, pinned Action implementation, signing, or production
-  completeness.
+  absence, plus full-revision Actions, native binaries/packages, lock-recorded
+  DuckDB/Spatial artifacts, OCI bases, and explicit production nonclaims.
 - Added immutable, project- and target-specific NuGet CycloneDX inventories for
   deployable API and library projects, with exact artifact/project/lock
   authority, explicit test-project exclusion, and no production claim.
