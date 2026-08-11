@@ -7,7 +7,8 @@
   "dataProvenanceClass": "synthetic-fixture",
   "candidateManifest": {
     "path": "manifest.json",
-    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "byteSize": 1
   },
   "identityPolicy": {
     "path": "contracts/supply-chain/v1/identity-policy.json",
@@ -17,6 +18,7 @@
     "role": "provenance",
     "path": "provenance.intoto.jsonl",
     "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "byteSize": 1,
     "mediaType": "application/vnd.in-toto+json",
     "statementType": "https://in-toto.io/Statement/v1",
     "predicateType": "https://slsa.dev/provenance/v1"

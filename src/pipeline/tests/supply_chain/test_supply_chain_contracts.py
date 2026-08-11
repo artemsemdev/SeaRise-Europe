@@ -80,6 +80,10 @@ def test_synthetic_evidence_fixture_binds_policy_subjects_and_sbom() -> None:
         envelope["softwareBillsOfMaterials"][0]["sha256"]
         == hashlib.sha256(SBOM.read_bytes()).hexdigest()
     )
+    for descriptor in envelope["signatures"]:
+        bundle = VALID_ROOT / descriptor["path"]
+        assert descriptor["sha256"] == hashlib.sha256(bundle.read_bytes()).hexdigest()
+        assert descriptor["byteSize"] == bundle.stat().st_size
     assert {
         envelope["provenance"]["role"],
         *(item["role"] for item in envelope["signatures"]),

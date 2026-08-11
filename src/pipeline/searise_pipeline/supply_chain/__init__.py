@@ -1,5 +1,6 @@
 """Fail-closed validation for versioned supply-chain contracts."""
 
+from .candidate_evidence import CandidateEvidenceSummary, validate_candidate_evidence_pair
 from .contracts import (
     SupplyChainContractError,
     discover_dependency_inputs,
@@ -21,6 +22,7 @@ from .sbom import (
 )
 
 __all__ = [
+    "CandidateEvidenceSummary",
     "SupplyChainContractError",
     "canonical_sbom_bytes",
     "discover_dependency_inputs",
@@ -34,6 +36,7 @@ __all__ = [
     "publish_python_sbom",
     "validate_dependency_exception",
     "validate_dependency_inventory",
+    "validate_candidate_evidence_pair",
     "validate_evidence_files",
     "validate_npm_sbom",
     "validate_nuget_sbom",

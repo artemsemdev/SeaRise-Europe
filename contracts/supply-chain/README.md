@@ -23,6 +23,11 @@ which avoids a self-referential hash. The evidence envelope is a verification
 index over the subjects and sidecars; this contract slice does not create or
 cryptographically verify a bundle.
 
+## Candidate/evidence pair validation
+
+`candidate-evidence-pair` descriptor-safely binds candidate, receipt, provenance, policy, bundles,
+and ten SBOMs, structurally checks bundles, and regenerates SBOMs without verification claims.
+
 ## Production identity policy
 
 `v1/identity-policy.json` pins the only acceptable production identity:
