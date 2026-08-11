@@ -1,0 +1,165 @@
+{
+  "$schema": "./dependency-inventory.schema.json",
+  "schemaVersion": "1.0.0",
+  "inventoryKind": "dependency-defining-inputs",
+  "productionClaim": false,
+  "components": [
+    {
+      "id": "api-nuget",
+      "ecosystem": "nuget",
+      "releaseUse": "legacy",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/api/Directory.Build.props", "role": "manifest", "sha256": "717d954476e1780a4a0886350e0fdecacb88024bb60c15c3040e14725d97113f" },
+        { "path": "src/api/SeaRise.Api.Tests/SeaRise.Api.Tests.csproj", "role": "manifest", "sha256": "713c3a8fdbb7a5e2ad76d275ce554b7a0363472a161215d65649ab00cd1d550c" },
+        { "path": "src/api/SeaRise.Api.Tests/packages.lock.json", "role": "lock", "sha256": "6d5a6c24a9a68b8bd203cbd6560a983d63e544f086ea1a4b80775feee800d15e" },
+        { "path": "src/api/SeaRise.Api/SeaRise.Api.csproj", "role": "manifest", "sha256": "39914508eb014772e6ef5ba1537a4a79e77ecb45cd3e9c244fc652a180877795" },
+        { "path": "src/api/SeaRise.Api/packages.lock.json", "role": "lock", "sha256": "243059c5ffba8bda96e93ca60d54f0649fecb2270d3d35989846c9ea1c6a752b" },
+        { "path": "src/api/SeaRise.Application/SeaRise.Application.csproj", "role": "manifest", "sha256": "3ea36e3969ed950d9a32a3ebf8fb36c1983da31a13ec17ec8b11f4559765178e" },
+        { "path": "src/api/SeaRise.Application/packages.lock.json", "role": "lock", "sha256": "476ff64bdf32f8cb691a75d4040d5cb6bd755e66b24de5227ccf638eab59ff58" },
+        { "path": "src/api/SeaRise.Domain/SeaRise.Domain.csproj", "role": "manifest", "sha256": "f517d02432706989b264224f3212ca15cdc27a49293120fc52137540fcd99abd" },
+        { "path": "src/api/SeaRise.Domain/packages.lock.json", "role": "lock", "sha256": "22308ad23ccd417b5d96020fb92e203b85fad8c3788b3feadb2ca403d8ad596c" },
+        { "path": "src/api/SeaRise.Infrastructure/SeaRise.Infrastructure.csproj", "role": "manifest", "sha256": "bd14bbd29b08f1a54cd6195e5c31300924b61b697d0126e903dfcefa40a9b2bf" },
+        { "path": "src/api/SeaRise.Infrastructure/packages.lock.json", "role": "lock", "sha256": "dadcef6cfed81d780b7377421c748f7d54b661e6876c3f73370c4f3f8a0fb86a" }
+      ],
+      "note": "Every solution project has a NuGet lock and restore is locked by default."
+    },
+    {
+      "id": "blob-seed-python",
+      "ecosystem": "python",
+      "releaseUse": "legacy",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "infra/blob-seed/requirements.lock", "role": "lock", "sha256": "3036e018ad93878685b6db105addc7c3b78f43fe734a741fc9b7538df007c8ad" },
+        { "path": "infra/blob-seed/requirements.txt", "role": "manifest", "sha256": "df70e3f7f076b34692880ca68ade82297d09ecc18fb6c4ae5701873eda8a8837" }
+      ],
+      "note": "The legacy local seed uses an exact transitive Python 3.11 lock with published artifact hashes."
+    },
+    {
+      "id": "deployment-opentofu",
+      "ecosystem": "opentofu",
+      "releaseUse": "not-present",
+      "coverage": "not-present",
+      "inputs": [],
+      "note": "No OpenTofu or Terraform configuration exists; discovery fails if one appears unclassified."
+    },
+    {
+      "id": "frontend-npm",
+      "ecosystem": "npm",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "783eec30ac7cca6cc1973533023458ed509db999e3922f82b8c87a0fd6046f3d" },
+        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "794ab8957b01deb7e088e15895967439f3e25edb5cc7b09ba247f81f5b2dea9f" }
+      ],
+      "note": "npm ci consumes lockfileVersion 3 with registry integrity values."
+    },
+    {
+      "id": "github-actions",
+      "ecosystem": "github-actions",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "2d05d689f2ea079179f59a5f7d221d19ce9e5fbb9593def3ba2a6d588a53c213" },
+        { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
+        { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
+        { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" }
+      ],
+      "note": "All external actions are pinned to full commit SHAs."
+    },
+    {
+      "id": "legacy-container-images",
+      "ecosystem": "container",
+      "releaseUse": "legacy",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "docker-compose.yml", "role": "manifest", "sha256": "674a5df0e30a83d1c7ddc0540f78a566cb36b302ac4b33d6f33ee751be77d593" },
+        { "path": "infra/blob-seed/Dockerfile", "role": "recipe", "sha256": "8b2612118fb728324a983f4c837a60d5cb22b6f0efc4bd7693da8068f2717434" },
+        { "path": "src/api/Dockerfile", "role": "recipe", "sha256": "299bf50c0a27e1c8c8f953cf06dcefb9466ec4d8cbbc16d042f5a60902062cea" },
+        { "path": "src/frontend/Dockerfile", "role": "recipe", "sha256": "14ce8c9552fa128378dd2f7a0ea1274304d9e39da50f09bee7f8d32ea9f10db4" }
+      ],
+      "note": "Legacy Dockerfile and compose image references are digest pinned."
+    },
+    {
+      "id": "native-geospatial-toolchain",
+      "ecosystem": "native",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64", "role": "recipe", "sha256": "8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5" },
+        { "path": "src/pipeline/toolchain/build_macos_tippecanoe.sh", "role": "recipe", "sha256": "143cfd23ca2f051c60cc1221122236d4cb4305a554ca6fe44d66bec164432bc9" },
+        { "path": "src/pipeline/toolchain/duckdb-spatial-extensions.json", "role": "lock", "sha256": "77c7ea3422e67be2f8d23f0dcef2d5d36236f01b8856f76289ed1e0532359ca6" },
+        { "path": "src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json", "role": "receipt", "sha256": "7935c9cce2ffa7c07ce64fdae11554555756d4ec5beb5fe089a227ad23400074" },
+        { "path": "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json", "role": "receipt", "sha256": "f6c05ca78c5b02a7db921b5b5246396b9da8a2e8c7ab358b08a1b1c714eaa51a" }
+      ],
+      "note": "Native source, build recipes, packages, extensions, and resulting binaries are content addressed."
+    },
+    {
+      "id": "pipeline-geoid-evaluator",
+      "ecosystem": "python",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/science/geoid-evaluator-requirements.txt", "role": "lock", "sha256": "6ee06b8167c30dd83a31251e1dfe800168a5d35e4aa55294d0f5b15e9bd10821" }
+      ],
+      "note": "The no-dependencies evaluator input pins exact wheel hashes."
+    },
+    {
+      "id": "pipeline-python-contributor",
+      "ecosystem": "python",
+      "releaseUse": "development",
+      "coverage": "range-constrained",
+      "inputs": [
+        { "path": "src/pipeline/pyproject.toml", "role": "manifest", "sha256": "05a3541ba7cf46bd03ffac9778be583d71a42a4b285175a382f6f1b49253317b" },
+        { "path": "src/pipeline/requirements-pipeline.txt", "role": "manifest", "sha256": "3b707e10408dee29f3842a089317c9700df14ec2dadf141decce94b165e04bb4" }
+      ],
+      "note": "Contributor and broad CI installs remain range constrained; they do not define candidate release bytes."
+    },
+    {
+      "id": "pipeline-python-release",
+      "ecosystem": "python",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/requirements-release-macos-arm64.lock", "role": "lock", "sha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75" },
+        { "path": "src/pipeline/requirements-release.lock", "role": "lock", "sha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f" }
+      ],
+      "note": "Candidate release environments use exact platform locks and wheel hashes."
+    },
+    {
+      "id": "release-container-image",
+      "ecosystem": "container",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "d4c8b746d987cf97229e2ce34ab6768781431d31d84451ba6cedd9de00d09bb0" }
+      ],
+      "note": "The controlled release container uses a digest-pinned base and the release hash lock."
+    },
+    {
+      "id": "settlement-spatial-python",
+      "ecosystem": "python",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/requirements-settlements-spatial-linux-x86_64.lock", "role": "lock", "sha256": "52b9b9081a9f84cac3c3067ca2f68622b4515f2ef8929183f0ae57c6df3db497" },
+        { "path": "src/pipeline/requirements-settlements-spatial-macos-arm64.lock", "role": "lock", "sha256": "1c992360d57158a51053536ca8d70d6d718b7caa96f60af1b5615a0c8535e33e" }
+      ],
+      "note": "Settlement spatial wheels are exact and platform specific."
+    },
+    {
+      "id": "vendored-standard-schemas",
+      "ecosystem": "standard-schema",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/vendor/bom-1.7.schema.json", "role": "schema", "sha256": "5532388d3cfd200e5261bd27da58e8882b27930497d61f905ca5d992ee69bdc2" },
+        { "path": "contracts/supply-chain/v1/vendor/cryptography-defs.schema.json", "role": "schema", "sha256": "78e4b1df3150c38893234a12c7048f2709fc170559a5a3db222128165f5e096c" },
+        { "path": "contracts/supply-chain/v1/vendor/jsf-0.82.schema.json", "role": "schema", "sha256": "a8a19aefb25c8b868326e44fe40d1923d5b5c72c1975f31dd1e4d11b08732105" },
+        { "path": "contracts/supply-chain/v1/vendor/manifest.json", "role": "lock", "sha256": "74759373034cf21298cbd7dd77041740287513bfcd51bd55ff776612d4db3d66" },
+        { "path": "contracts/supply-chain/v1/vendor/spdx.schema.json", "role": "schema", "sha256": "9688c076891e4147cfe978d5fa3196c740b1ff79b25b146d94178a3db6066180" }
+      ],
+      "note": "The vendored CycloneDX bundle, including its SPDX schema reference, is manifest and hash bound."
+    }
+  ]
+}
