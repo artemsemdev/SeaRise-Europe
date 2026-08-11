@@ -49,8 +49,8 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "783eec30ac7cca6cc1973533023458ed509db999e3922f82b8c87a0fd6046f3d" },
-        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "794ab8957b01deb7e088e15895967439f3e25edb5cc7b09ba247f81f5b2dea9f" }
+        { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "e6f473609bab3adf9040390ba78d2a8a83109e49f88f64b17c291c6d931a247d" },
+        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "c3d95c56f309309284fdfef6c902d2f7b6eab5e504ad79013a9d41443aebdc95" }
       ],
       "note": "npm ci consumes lockfileVersion 3 with registry integrity values."
     },
