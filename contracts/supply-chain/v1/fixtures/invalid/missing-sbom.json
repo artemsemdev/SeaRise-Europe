@@ -1,0 +1,53 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/evidence-envelope.schema.json",
+  "schemaVersion": "1.0.0",
+  "contractId": "phase-1-signed-candidate-evidence-v1",
+  "candidateId": "candidate-synthetic-missing-sbom",
+  "dataReleaseId": "searise-europe-v1.0.0-20260811-0123456789ab",
+  "dataProvenanceClass": "synthetic-fixture",
+  "candidateManifest": {
+    "path": "manifest.json",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "identityPolicy": {
+    "path": "contracts/supply-chain/v1/identity-policy.json",
+    "sha256": "3dee2a4dd5e400ae060fb7c68f654ea6270c03e2740690417128b9fa9878738c"
+  },
+  "provenance": {
+    "role": "provenance",
+    "path": "provenance.intoto.jsonl",
+    "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "mediaType": "application/vnd.in-toto+json",
+    "statementType": "https://in-toto.io/Statement/v1",
+    "predicateType": "https://slsa.dev/provenance/v1"
+  },
+  "signatures": [
+    {
+      "role": "signature",
+      "path": "manifest.sigstore.json",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3",
+      "subjectPath": "manifest.json",
+      "subjectSha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "signature",
+      "path": "provenance.sigstore.json",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3",
+      "subjectPath": "provenance.intoto.jsonl",
+      "subjectSha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "softwareBillsOfMaterials": [],
+  "verification": {
+    "status": "synthetic-unverified",
+    "fixtureOnly": true,
+    "verified": false,
+    "policySatisfied": false,
+    "productionClaim": false,
+    "certificateIdentity": "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master",
+    "oidcIssuer": "https://token.actions.githubusercontent.com",
+    "reason": "Negative fixture omits its mandatory SBOM."
+  }
+}

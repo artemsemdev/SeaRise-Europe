@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Defined immutable signed-candidate evidence and dependency-exception
+  contracts with a pinned production identity, complete offline validation
+  against hash-pinned official CycloneDX 1.7 schemas, and synthetic-only
+  fixtures that make no real signing or verification claim.
 - Pinned every third-party GitHub Action and build/release container image to
   its reviewed commit SHA or manifest digest, with a fail-closed repository
   validator that rejects mutable references.

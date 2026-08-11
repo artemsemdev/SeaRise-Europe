@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0.0",
+  "standard": "CycloneDX",
+  "specVersion": "1.7",
+  "retrievedAt": "2026-08-11",
+  "license": "Apache-2.0",
+  "schemas": [
+    {
+      "path": "bom-1.7.schema.json",
+      "sourceUrl": "https://cyclonedx.org/schema/bom-1.7.schema.json",
+      "sha256": "5532388d3cfd200e5261bd27da58e8882b27930497d61f905ca5d992ee69bdc2"
+    },
+    {
+      "path": "cryptography-defs.schema.json",
+      "sourceUrl": "https://cyclonedx.org/schema/cryptography-defs.schema.json",
+      "sha256": "78e4b1df3150c38893234a12c7048f2709fc170559a5a3db222128165f5e096c"
+    },
+    {
+      "path": "jsf-0.82.schema.json",
+      "sourceUrl": "https://cyclonedx.org/schema/jsf-0.82.schema.json",
+      "sha256": "a8a19aefb25c8b868326e44fe40d1923d5b5c72c1975f31dd1e4d11b08732105"
+    },
+    {
+      "path": "spdx.schema.json",
+      "sourceUrl": "https://cyclonedx.org/schema/spdx.schema.json",
+      "sha256": "9688c076891e4147cfe978d5fa3196c740b1ff79b25b146d94178a3db6066180"
+    }
+  ]
+}
