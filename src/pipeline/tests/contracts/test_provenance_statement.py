@@ -14,6 +14,8 @@ from searise_pipeline.candidate_completeness.provenance import (
     BUILDER_ID,
     POLICY_IDENTITY,
     PREDICATE_TYPE,
+    REAL_SOURCE_BUILD_TYPE,
+    REAL_SOURCE_POLICY_IDENTITY,
     STATEMENT_TYPE,
     ProvenanceContractError,
     canonical_provenance_bytes,
@@ -28,6 +30,9 @@ CANDIDATE_FIXTURE = (
 BUILD_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/build-receipt.json"
 SOURCE_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/source-receipt.json"
 BUILD_TYPE_SPEC = ROOT / "contracts/supply-chain/v1/build-types/offline-release-v1.json"
+REAL_SOURCE_BUILD_TYPE_SPEC = (
+    ROOT / "contracts/supply-chain/v1/build-types/offline-release-real-source-v1.json"
+)
 INVOCATION = "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/77777777777/attempts/1"
 OUTPUT_ROLES = {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
 
@@ -336,14 +341,73 @@ def test_source_receipt_bytes_and_schema_are_authoritative(
         _statement(manifest, build)
 
 
-def test_real_source_and_untrusted_invocation_are_unsupported(tmp_path: Path) -> None:
+def test_real_source_pre_sign_statement_is_exact_and_makes_no_claims(tmp_path: Path) -> None:
     candidate, build = _documents()
     candidate["dataProvenanceClass"] = build["dataProvenanceClass"] = "real-source"
     for artifact in candidate["artifacts"]:
         artifact["dataProvenanceClass"] = "real-source"
     manifest, build_path = _write_pair(tmp_path / "claim", candidate, build)
-    with pytest.raises(ProvenanceContractError, match="unsupported-claim"):
-        _statement(manifest, build_path)
+    statement = _statement(manifest, build_path)
+    definition = statement["predicate"]["buildDefinition"]
+    contract = _read(REAL_SOURCE_BUILD_TYPE_SPEC)
+    assert definition["buildType"] == REAL_SOURCE_BUILD_TYPE
+    assert contract["buildType"] == REAL_SOURCE_BUILD_TYPE
+    assert contract["statement"]["supportedClass"] == "real-source"
+    assert contract["nonClaims"] == [
+        "cryptographic-verification",
+        "production",
+        "publication",
+        "scientific-approval",
+        "signing",
+        "protected-environment-verification",
+    ]
+    for key in ("externalParameters", "internalParameters"):
+        Draft202012Validator(contract["parameterSchemas"][key]).validate(definition[key])
+    assert definition["internalParameters"]["policyIdentity"] == REAL_SOURCE_POLICY_IDENTITY
+    assert definition["internalParameters"]["claims"] == {
+        "cryptographicVerification": False,
+        "production": False,
+        "publication": False,
+        "scientific": False,
+        "signing": False,
+        "syntheticFixture": False,
+    }
+    path = tmp_path / "claim" / "provenance.intoto.jsonl"
+    path.write_bytes(canonical_provenance_bytes(statement))
+    assert _validate(path, manifest, build_path) == statement
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("buildType", BUILD_TYPE),
+        ("policyIdentity", POLICY_IDENTITY),
+        ("syntheticFixture", True),
+    ],
+)
+def test_real_source_pre_sign_contract_tampering_fails(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    candidate, build = _documents()
+    candidate["dataProvenanceClass"] = build["dataProvenanceClass"] = "real-source"
+    for artifact in candidate["artifacts"]:
+        artifact["dataProvenanceClass"] = "real-source"
+    manifest, build_path = _write_pair(tmp_path, candidate, build)
+    statement = _statement(manifest, build_path)
+    definition = statement["predicate"]["buildDefinition"]
+    if field == "buildType":
+        definition[field] = value
+    elif field == "policyIdentity":
+        definition["internalParameters"][field] = value
+    else:
+        definition["internalParameters"]["claims"][field] = value
+    path = tmp_path / "provenance.intoto.jsonl"
+    path.write_bytes(canonical_provenance_bytes(statement))
+    with pytest.raises(ProvenanceContractError, match="provenance-identity"):
+        _validate(path, manifest, build_path)
+
+
+def test_untrusted_invocation_is_unsupported(tmp_path: Path) -> None:
 
     manifest, build_path = _valid_pair(tmp_path / "invocation")
     with pytest.raises(ProvenanceContractError, match="trusted-invocation"):
