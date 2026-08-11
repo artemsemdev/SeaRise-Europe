@@ -86,7 +86,13 @@ def _identity(value: os.stat_result) -> tuple[int, int, int, int, int, int]:
     )
 
 
-def _read(path: Path, label: str) -> bytes:
+def _read(
+    path: Path,
+    label: str,
+    *,
+    expected_byte_size: int | None = None,
+    maximum_byte_size: int | None = None,
+) -> bytes:
     if ".." in path.parts:
         _fail(f"{label} path must not contain parent traversal")
     absolute = path.absolute()
@@ -106,9 +112,18 @@ def _read(path: Path, label: str) -> bytes:
             linked = os.stat(absolute.name, dir_fd=directory, follow_symlinks=False)
             if not stat.S_ISREG(before.st_mode) or _identity(before) != _identity(linked):
                 _fail(f"{label} must be one regular file without symlinks")
+            if expected_byte_size is not None and before.st_size != expected_byte_size:
+                _fail(f"{label} byte size differs from the reviewed release asset")
+            if maximum_byte_size is not None and before.st_size > maximum_byte_size:
+                _fail(f"{label} exceeds its bounded contract size")
             chunks: list[bytes] = []
-            while chunk := os.read(descriptor, 1024 * 1024):
+            remaining = before.st_size
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    _fail(f"{label} changed while it was read")
                 chunks.append(chunk)
+                remaining -= len(chunk)
             after = os.fstat(descriptor)
             linked = os.stat(absolute.name, dir_fd=directory, follow_symlinks=False)
             raw = b"".join(chunks)
@@ -167,15 +182,18 @@ def validate_cosign_tool_lock(
         _fail("trusted Cosign tool-lock SHA-256 must be one lowercase digest")
     if (executable_path is None) != (checksum_path is None):
         _fail("Cosign executable and checksum evidence must be validated together")
-    lock_raw = _read(lock_path, "Cosign tool lock")
+    lock_raw = _read(lock_path, "Cosign tool lock", maximum_byte_size=16_384)
     if _sha256(lock_raw) != trusted_lock_sha256:
         _fail("Cosign tool lock does not match the independently reviewed SHA-256")
     lock = parse_cosign_tool_lock(lock_raw)
     executable = lock["executable"]
     if executable_path is not None and checksum_path is not None:
-        executable_raw = _read(executable_path, "Cosign executable")
-        checksum_raw = _read(checksum_path, "Cosign checksum evidence")
         checksums = lock["checksumEvidence"]
+        checksum_raw = _read(
+            checksum_path,
+            "Cosign checksum evidence",
+            expected_byte_size=int(checksums["byteSize"]),
+        )
         if (_sha256(checksum_raw), len(checksum_raw)) != (
             checksums["sha256"],
             checksums["byteSize"],
@@ -187,6 +205,11 @@ def validate_cosign_tool_lock(
             raise SupplyChainContractError("Cosign checksum evidence must be UTF-8") from exc
         if lines.count(checksums["entry"]) != 1:
             _fail("Cosign checksum evidence must contain its exact executable entry once")
+        executable_raw = _read(
+            executable_path,
+            "Cosign executable",
+            expected_byte_size=int(executable["byteSize"]),
+        )
         if (_sha256(executable_raw), len(executable_raw)) != (
             executable["sha256"],
             executable["byteSize"],

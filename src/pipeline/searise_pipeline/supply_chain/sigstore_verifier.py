@@ -121,7 +121,7 @@ def _require_root_generation(path: Path, expected: os.stat_result, label: str) -
         os.close(current)
 
 
-def _executable_bytes(path: Path) -> bytes:
+def _executable_bytes(path: Path, *, expected_byte_size: int) -> bytes:
     if not path.is_absolute() or ".." in path.parts:
         _fail("Cosign executable path must be absolute and canonical")
     parent = _open_root(path.parent, "Cosign executable parent")
@@ -139,9 +139,16 @@ def _executable_bytes(path: Path) -> bytes:
                 or identity != linked_identity
             ):
                 _fail("Cosign executable must be one executable regular file without symlinks")
+            if before.st_size != expected_byte_size:
+                _fail("Cosign executable byte size differs from the reviewed tool lock")
             chunks: list[bytes] = []
-            while chunk := os.read(descriptor, 1024 * 1024):
+            remaining = expected_byte_size
+            while remaining:
+                chunk = os.read(descriptor, min(1024 * 1024, remaining))
+                if not chunk:
+                    _fail("Cosign executable changed while it was read")
                 chunks.append(chunk)
+                remaining -= len(chunk)
             after = os.fstat(descriptor)
             linked = os.stat(path.name, dir_fd=parent, follow_symlinks=False)
             raw = b"".join(chunks)
@@ -331,8 +338,11 @@ def verify_candidate_evidence_cryptographically(
             if _sha256(lock_raw) != trusted_cosign_tool_lock_sha256:
                 _fail("Cosign tool lock does not match the independently reviewed SHA-256")
             lock = parse_cosign_tool_lock(lock_raw)
-            executable_raw = _executable_bytes(cosign_executable)
             executable = lock["executable"]
+            executable_raw = _executable_bytes(
+                cosign_executable,
+                expected_byte_size=int(executable["byteSize"]),
+            )
             if executable["sha256"] != _sha256(executable_raw) or executable["byteSize"] != len(
                 executable_raw
             ):

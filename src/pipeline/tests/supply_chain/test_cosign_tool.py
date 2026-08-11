@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+import searise_pipeline.supply_chain.cosign_tool as cosign_tool
 from searise_pipeline.supply_chain import SupplyChainContractError, validate_cosign_tool_lock
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -111,3 +112,36 @@ def test_assets_cannot_be_partially_validated_or_reached_through_symlink(tmp_pat
             executable_path=executable,
             checksum_path=link,
         )
+
+
+@pytest.mark.parametrize("target_name", ["executable", "checksums"])
+def test_sparse_oversize_asset_is_rejected_before_its_payload_is_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    target_name: str,
+) -> None:
+    lock, executable, checksums = _fixture(tmp_path)
+    trusted = hashlib.sha256(lock.read_bytes()).hexdigest()
+    target = {"executable": executable, "checksums": checksums}[target_name]
+    with target.open("r+b") as stream:
+        stream.truncate(target.stat().st_size + 1024 * 1024 * 1024)
+    target_inode = target.stat().st_ino
+    target_reads = 0
+    real_read = cosign_tool.os.read
+
+    def guarded_read(descriptor: int, count: int) -> bytes:
+        nonlocal target_reads
+        if cosign_tool.os.fstat(descriptor).st_ino == target_inode:
+            target_reads += 1
+            return b""
+        return real_read(descriptor, count)
+
+    monkeypatch.setattr(cosign_tool.os, "read", guarded_read)
+    with pytest.raises(SupplyChainContractError, match="byte size differs"):
+        validate_cosign_tool_lock(
+            lock,
+            trusted_lock_sha256=trusted,
+            executable_path=executable,
+            checksum_path=checksums,
+        )
+    assert target_reads == 0

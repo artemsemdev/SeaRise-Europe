@@ -273,3 +273,29 @@ def test_cosign_symlink_and_read_swap_fail_closed(
     monkeypatch.setattr(verifier.os, "read", swap)
     with pytest.raises(SupplyChainContractError, match="changed while it was read"):
         _verify(candidate, evidence, tool, lock)
+
+
+def test_sparse_oversize_cosign_is_rejected_before_payload_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "cosign"
+    executable.write_bytes(b"reviewed")
+    executable.chmod(0o700)
+    expected_byte_size = executable.stat().st_size
+    with executable.open("r+b") as stream:
+        stream.truncate(expected_byte_size + 1024 * 1024 * 1024)
+    executable_inode = executable.stat().st_ino
+    executable_reads = 0
+    real_read = verifier.os.read
+
+    def guarded_read(descriptor: int, count: int) -> bytes:
+        nonlocal executable_reads
+        if verifier.os.fstat(descriptor).st_ino == executable_inode:
+            executable_reads += 1
+            return b""
+        return real_read(descriptor, count)
+
+    monkeypatch.setattr(verifier.os, "read", guarded_read)
+    with pytest.raises(SupplyChainContractError, match="byte size differs"):
+        verifier._executable_bytes(executable, expected_byte_size=expected_byte_size)
+    assert executable_reads == 0
