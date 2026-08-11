@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "local-offline-source-validation",
+  "publicationClaim": false,
+  "snapshotDate": "2026-08-10",
+  "sourceLock": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlements.json",
+    "sha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee"
+  },
+  "command": "PYTHONPATH=src/pipeline python scripts/release/validate_geonames_alternate_snapshot.py --source-lock src/pipeline/sources/source-lock.phase-1-settlements.json --alternate-names-zip <local-verified-cache>/alternateNamesV2.zip --expected-report src/pipeline/tests/settlements/fixtures/geonames/alternate-full-scan-report.json",
+  "observation": {
+    "environment": "macOS arm64; Python 3.9; ignored local source cache",
+    "elapsedSeconds": 204.463
+  },
+  "result": {
+    "policyVersion": "settlement-normalization-v2",
+    "sourceLockSha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee",
+    "archive": {
+      "assetSha256": "eaea640b50b7081f7270d9563720b66d6b345af81522a6eb8ee55873507b17fe",
+      "assetByteSize": 202510374
+    },
+    "members": {
+      "alternateNamesV2.txt": {
+        "sha256": "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612",
+        "byteSize": 777625687,
+        "compressedByteSize": 202448178,
+        "crc32": "e311a5a6"
+      },
+      "iso-languagecodes.txt": {
+        "sha256": "cb0d34f492775deec8ec5713da6efa4463dad99b5e7ba2172bd094cfdcb76571",
+        "byteSize": 137908,
+        "compressedByteSize": 61908,
+        "crc32": "4e1f14da"
+      }
+    },
+    "counts": {
+      "alternateNameRows": 19037112,
+      "alternateNamesParsedRows": 19037112,
+      "colloquialRows": 5145,
+      "datedRows": 13021,
+      "delC1NameRows": 34,
+      "emptyNameRows": 6,
+      "historicRows": 43474,
+      "iso639ThreeOnlyRows": 7446,
+      "isoLanguageRows": 7929,
+      "isoLanguageRowsParsed": 7929,
+      "languageNameRows": 9489422,
+      "nonLanguageNamespaceRows": 2225412,
+      "normalizationEligibleRows": 16770563,
+      "normalizationRejectedEmptySourceNameRows": 6,
+      "normalizationRejectedExpiredNameRows": 373,
+      "normalizationRejectedHistoricNameRows": 40701,
+      "normalizationRejectedNonLanguageNamespaceRows": 2225412,
+      "normalizationRejectedNotYetValidRows": 1,
+      "normalizationRejectedRows": 2266549,
+      "normalizationRejectedUnparseablePeriodRows": 22,
+      "normalizationRejectedUnsafeSourceNameRows": 34,
+      "preferredRows": 557386,
+      "shortRows": 129805,
+      "unlabelledNameRows": 7322278,
+      "unparseableFromPeriodRows": 46,
+      "unparseableToPeriodRows": 62
+    },
+    "failures": {
+      "count": 0,
+      "overflowCount": 0,
+      "signatures": {}
+    }
+  }
+}

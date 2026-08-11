@@ -95,6 +95,15 @@ validator compares outer/member hashes, sizes, CRC, row counts, nullable-field
 counts, and the exact reviewed anomaly counts. Its report is local engineering
 evidence and makes no publication or scientific-validation claim.
 
+Validate both locked `alternateNamesV2.zip` members with the separate command
+recorded in
+`src/pipeline/tests/settlements/fixtures/geonames/alternate-full-scan-report.json`.
+That validator checks the ZIP and member identities before streaming all
+alternate-name and ISO-language rows. It fails on an unknown language tag or
+namespace and records raw provider anomalies separately from the deterministic
+normalization rejection counts. The raw archive remains ignored; only the
+small hash-bound excerpts and report are committed.
+
 ## Cache cleanup
 
 List the exact source/version directory first. Remove or move only that

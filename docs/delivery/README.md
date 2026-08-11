@@ -141,8 +141,9 @@ response are documented in the
   architecture evidence, STAC, and release pointer.
 - [x] Add a deterministic receipt-driven release-directory builder with
   identity-safe resume, pinned offline execution, and atomic candidates.
-- [x] Add strict typed parsing for the pinned GeoNames place and admin1 rows,
-  preserving provider-native values, explicit anomaly flags, and exact lineage.
+- [x] Add strict typed parsing for the pinned GeoNames place, admin1,
+  alternate-name, and ISO-language rows, preserving provider-native values,
+  explicit anomaly flags, exact lineage, and deterministic name selection.
 - [ ] Use DuckDB Spatial for GeoNames normalization, support/coastal joins,
   duplicate checks, and GeoParquet output.
 - [ ] Produce `europe-core` and `europe-coastal` search shards from a pinned

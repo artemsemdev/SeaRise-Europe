@@ -20,6 +20,11 @@ namespaces, historic or inactive names, empty values, unparseable periods, and
 unsafe provider controls are retained in raw scan counts but excluded from
 normalized search names.
 
+The exact 2026-08-10 offline scan covers 19,037,112 alternate-name and 7,929
+ISO-language rows with zero unexplained parser or language-policy failures. It
+is local engineering evidence, not a finished settlement catalogue,
+GeoParquet/search-shard build, performance result, or publication approval.
+
 Consumers support exact `schemaVersion`, artifact `formatVersion`, and search
 engine serialization identities. An unknown value is an unsupported artifact;
 consumers must not coerce it into a known format.

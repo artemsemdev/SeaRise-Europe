@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 - Added hash-bound `alternateNamesV2` and ISO-language parsing plus a versioned
   settlement inclusion, canonical-name, temporal filtering, and deduplication
   policy with deterministic selected-record lineage.
+- Added an offline, checksum-bound full-snapshot validation report for the
+  pinned GeoNames alternate-name and ISO-language members.
 - Added the first versioned Phase 1 public release contracts, locking the exact
   scenario/horizon matrix, defaults, discriminated four-state result payloads,
   grid-only 100 km lookup semantics, source identity, owner authority, and
