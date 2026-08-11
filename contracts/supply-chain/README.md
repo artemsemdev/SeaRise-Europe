@@ -48,6 +48,28 @@ pins every source URL and file SHA-256. The validator checks those hashes first,
 blocks remote schema retrieval, and then validates the complete SBOM with the
 official Draft 7 schema. The vendored schemas are Apache-2.0 licensed.
 
+## Dependency-defining input inventory
+
+`v1/dependency-inventory.json` binds the exact bytes of all 41 currently
+discovered dependency-defining repository inputs. Coverage includes npm,
+Python release and contributor environments, all five NuGet projects and
+locks, GitHub workflows, container recipes and manifests, the native
+geospatial toolchain, and the vendored CycloneDX 1.7 schema bundle with its
+SPDX reference schema. The OpenTofu component is explicitly `not-present`;
+adding OpenTofu or Terraform configuration without a provider lock fails
+validation.
+
+Discovery is exact, sorted, and duplicate-free. Each recorded input must be a
+safe repository-relative regular file, may not traverse a symlink, and is
+bound to its SHA-256. New dependency manifests, locks, container recipes,
+workflows, or local `.github/actions/**/action.yml` definitions fail closed
+until they are deliberately classified and inventoried. Generated dependency
+trees, build outputs, and tool caches are excluded from discovery.
+
+This is an inventory of dependency-defining inputs, not a package graph or
+SBOM. It does not claim transitive-package completeness, vulnerability status,
+artifact signing, cryptographic verification, or production readiness.
+
 ## Dependency exceptions
 
 An exception must identify its finding, exact component, owner, affected scope,
@@ -71,6 +93,10 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
 PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py exception \
   --document contracts/supply-chain/v1/fixtures/valid/dependency-exception.json \
   --as-of 2026-08-11T12:00:00Z
+
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py inventory \
+  --document contracts/supply-chain/v1/dependency-inventory.json \
+  --repository-root .
 ```
 
 These commands validate contract structure and deterministic bindings only.

@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Added a versioned, hash-bound inventory of dependency-defining repository
+  inputs with exact fail-closed discovery, safe-path enforcement, and explicit
+  non-production and OpenTofu-absence claims.
 - Defined immutable signed-candidate evidence and dependency-exception
   contracts with a pinned production identity, complete offline validation
   against hash-pinned official CycloneDX 1.7 schemas, and synthetic-only
