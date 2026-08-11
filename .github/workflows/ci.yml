@@ -210,6 +210,10 @@ jobs:
             --cache-root "${RUNNER_TEMP}/settlement-spatial-cache" \
             --platform linux-x86_64 \
             --archive "${archive}"
+          echo "SEARISE_SPATIAL_CACHE_ROOT=${RUNNER_TEMP}/settlement-spatial-cache" >> "${GITHUB_ENV}"
+
+      - name: Execute pinned settlement spatial classification fixture
+        run: pytest tests/settlements/test_spatial_classification.py -q -k live_pinned
 
       - name: Validate test migration contracts
         run: |
