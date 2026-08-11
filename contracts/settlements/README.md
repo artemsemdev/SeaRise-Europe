@@ -10,6 +10,16 @@ goldens: they define deterministic GeoParquet and search-shard boundaries but
 are not production-scale evidence and do not select the final browser search
 engine.
 
+The internal producer policy is versioned as
+`src/pipeline/settlements/normalization-policy-v2.json`. The provider
+`allCountries.name` remains canonical; current language names are NFC-preserved,
+ISO-validated, script-tagged, and deduplicated by NFC casefold. Selected
+alternate records retain their exact source line and `alternateNameId` so the
+eventual `Place.lineage` can bind every contributing name. Non-language
+namespaces, historic or inactive names, empty values, unparseable periods, and
+unsafe provider controls are retained in raw scan counts but excluded from
+normalized search names.
+
 Consumers support exact `schemaVersion`, artifact `formatVersion`, and search
 engine serialization identities. An unknown value is an unsupported artifact;
 consumers must not coerce it into a known format.

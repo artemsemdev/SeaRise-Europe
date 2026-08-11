@@ -1,0 +1,8 @@
+ara	ara	ar	Arabic
+bul	bul	bg	Bulgarian
+cat	cat	ca	Catalan
+eng	eng	en	English
+fra	fra / fre* 	fr	French
+por	por	pt	Portuguese
+spa	spa	es	Spanish
+zho	zho / chi* 	zh	Chinese

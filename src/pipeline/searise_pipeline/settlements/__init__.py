@@ -1,5 +1,21 @@
 """Strict parsing contracts for pinned settlement sources."""
 
+from .alternate_names import (
+    ALTERNATE_NAMES_SOURCE,
+    ISO_LANGUAGE_SOURCE,
+    NON_LANGUAGE_NAMESPACES,
+    NORMALIZATION_POLICY_VERSION,
+    AlternateNameRecord,
+    IsoLanguageRecord,
+    NameSelection,
+    NameVariant,
+    alternate_name_rejection,
+    language_codes,
+    load_normalization_policy,
+    parse_alternate_name_row,
+    parse_iso_language_row,
+    select_names,
+)
 from .geonames import (
     ADMIN1_SOURCE,
     ALL_COUNTRIES_SOURCE,
@@ -16,14 +32,28 @@ from .geonames import (
 
 __all__ = [
     "ADMIN1_SOURCE",
+    "ALTERNATE_NAMES_SOURCE",
     "ALL_COUNTRIES_SOURCE",
+    "ISO_LANGUAGE_SOURCE",
+    "NORMALIZATION_POLICY_VERSION",
+    "NON_LANGUAGE_NAMESPACES",
+    "AlternateNameRecord",
     "Admin1Record",
     "FieldAnomaly",
     "GeoNameRecord",
     "GeoNamesParseError",
+    "IsoLanguageRecord",
     "Lineage",
+    "NameSelection",
+    "NameVariant",
     "RAW_ANOMALY_POLICY_VERSION",
     "SourceIdentity",
+    "alternate_name_rejection",
+    "language_codes",
+    "load_normalization_policy",
+    "parse_alternate_name_row",
     "parse_admin1_row",
     "parse_geoname_row",
+    "parse_iso_language_row",
+    "select_names",
 ]
