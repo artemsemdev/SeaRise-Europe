@@ -144,8 +144,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Aligned user-facing search copy with the settlement-only catalogue boundary,
-  without promising address, postcode, or landmark lookup.
+- Replaced the settlement classifier's missing-shoreline blocker with
+  fail-closed real-source bindings for the exact reviewed support, coastal, and
+  shoreline artifacts while retaining selected-scope and non-publication
+  status.
+- Aligned user-facing search copy with the settlement-only catalog boundary,
+  without promising address, postal code, or landmark lookup.
 - Published the public-contract compatibility, deprecation, and rollback policy,
   and aligned active architecture/delivery status with the approved Phase 0R gate.
 - Aligned active architecture, runtime, product, and delivery documentation on
