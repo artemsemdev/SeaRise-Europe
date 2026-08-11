@@ -147,6 +147,8 @@ def _validated(value, items, validate):  # type: ignore[no-untyped-def]
             for item in items:
                 validate(item)
         except BaseException as secondary:
+            if isinstance(primary, GeneratorExit):
+                raise secondary
             _note_cleanup(primary, secondary)
         raise
     for item in items:

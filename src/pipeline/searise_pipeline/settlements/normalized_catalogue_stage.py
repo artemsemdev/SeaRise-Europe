@@ -13,12 +13,12 @@ import secrets
 import stat
 import sys
 import time
+import types
 from collections import Counter
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from types import UnionType
 from typing import Any, Iterator, Mapping, Union, get_args, get_origin, get_type_hints
 
 from . import full_source_stage as source_stage
@@ -85,7 +85,7 @@ class CatalogueStageError(ValueError):
 
 def _decode(annotation: Any, value: Any, label: str) -> Any:
     origin = get_origin(annotation)
-    if origin in (Union, UnionType):
+    if origin in (Union, getattr(types, "UnionType", ())):
         for candidate in get_args(annotation):
             try:
                 return _decode(candidate, value, label)
