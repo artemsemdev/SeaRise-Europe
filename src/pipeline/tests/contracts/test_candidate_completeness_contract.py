@@ -8,7 +8,6 @@ from typing import Any
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
-
 ROOT = Path(__file__).resolve().parents[4]
 CONTRACT_ROOT = ROOT / "contracts/candidate-completeness/v1"
 CANDIDATE_SCHEMA = CONTRACT_ROOT / "candidate.schema.json"
