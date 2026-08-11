@@ -7,7 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Security
 
 - Added deterministic unsigned in-toto/SLSA provenance for validated synthetic
-  candidate/build pairs, with exact manifest, workflow, invocation, and dependency binding.
+  candidates, binding scientific outputs, source payloads, receipts, and the controlled run.
 - Added a deterministic CycloneDX 1.7 file-input authority foundation for
   candidate build-plane workflow, container-recipe, and native-toolchain files,
   with exact repository paths, SHA-256 authority, and explicit OpenTofu

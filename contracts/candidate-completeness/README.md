@@ -28,17 +28,13 @@ validation proves document shape; the executable inventory tests additionally
 prove exact artifact identity, rights, counts, 3 x 3 STAC bindings, checksum
 coverage, terminal ordering, and the non-recursive supply-chain boundary.
 
-The provenance core closes the supported synthetic pair as one canonical
-single-line in-toto Statement v1 with a SLSA provenance v1 predicate. Its sole
-subject is the SHA-256 of the actual `manifest.json` bytes. Four external
-parameters bind candidate ID, release ID, provenance class, and that manifest
-digest. The approved `offline-release-controlled.yml` workflow on `master` is
-the builder; its trusted first-attempt run URI is recorded separately as the
-invocation. Code, environment lock, every source receipt, input, and tool are
-sorted resolved dependencies, while the exact build receipt is bound under
-internal parameters.
+The provenance core closes the synthetic pair as one canonical in-toto Statement v1 with a
+SLSA provenance v1 predicate. Sorted subjects bind every scientific COG, GeoParquet, PMTiles,
+and the actual `manifest.json` bytes. The controlled workflow on `master` is the builder and
+the trusted first-attempt run URI is the invocation. Sorted dependencies bind code, lock,
+receipt files, verified source URL/payload digests, inputs, and tools. The exact build receipt
+is a run byproduct with its digest and byte size.
 
-This core supports only `synthetic-fixture`. It validates no signature or
-cryptographic verification and makes no production, publication, scientific,
-or owner-approval claim. Signing, evidence-envelope pairing, and publication
-remain separate future gates.
+Receipts are strict-schema validated beneath the candidate root and must match candidate hash,
+size, release, provenance, and attribution bindings. Only `synthetic-fixture` is supported; no
+signature, production, publication, scientific, or owner-approval claim is made.

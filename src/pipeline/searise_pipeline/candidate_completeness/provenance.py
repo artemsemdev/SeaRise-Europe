@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, NoReturn
 from urllib.parse import quote
 
@@ -22,6 +22,9 @@ BUILDER_ID = (
     "offline-release-controlled.yml@refs/heads/master"
 )
 POLICY_IDENTITY = "phase-1-pre-sign-synthetic-provenance-v1"
+_SCIENTIFIC_OUTPUT_ROLES = frozenset(
+    {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
+)
 
 _ROOT = Path(__file__).resolve().parents[4]
 _RELEASE_CONTRACT_ROOT = _ROOT / "contracts/release/v1"
@@ -81,12 +84,12 @@ def canonical_provenance_bytes(document: Mapping[str, Any]) -> bytes:
             separators=(",", ":"),
             sort_keys=True,
         )
-    except (TypeError, ValueError) as exc:
+        return (rendered + "\n").encode("utf-8")
+    except (TypeError, UnicodeEncodeError, ValueError) as exc:
         _fail("provenance-json", f"statement is not standard JSON: {exc}")
-    return (rendered + "\n").encode("utf-8")
 
 
-def _validate_build_receipt(document: Mapping[str, Any]) -> None:
+def _validate_release_document(document: Mapping[str, Any], schema_name: str) -> None:
     try:
         schemas = {
             path.name: json.loads(path.read_text(encoding="utf-8"))
@@ -96,7 +99,7 @@ def _validate_build_receipt(document: Mapping[str, Any]) -> None:
             (schema["$id"], Resource.from_contents(schema)) for schema in schemas.values()
         )
         validator = Draft202012Validator(
-            schemas["build-receipt.schema.json"],
+            schemas[schema_name],
             registry=registry,
             format_checker=FormatChecker(),
         )
@@ -107,11 +110,13 @@ def _validate_build_receipt(document: Mapping[str, Any]) -> None:
             ),
         )
     except (KeyError, OSError, ValueError, json.JSONDecodeError) as exc:
-        _fail("build-receipt-contract", f"cannot load the local build receipt contract: {exc}")
+        _fail("release-contract", f"cannot load the local release contract: {exc}")
     if errors:
         error = errors[0]
         location = ".".join(str(part) for part in error.absolute_path) or "$"
-        _fail("build-receipt-contract", f"{location}: {error.message}")
+        _fail(
+            schema_name.removesuffix(".schema.json") + "-contract", f"{location}: {error.message}"
+        )
 
 
 def _candidate_artifacts(candidate: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
@@ -131,6 +136,7 @@ def _validate_pair(
     if (
         len(build_artifacts) != 1
         or build_artifacts[0]["sha256"] != hashlib.sha256(build_bytes).hexdigest()
+        or build_artifacts[0]["byteSize"] != len(build_bytes)
     ):
         _fail("candidate-build-identity", "candidate does not bind the exact build receipt bytes")
     expected_sources = sorted(
@@ -143,23 +149,59 @@ def _validate_pair(
     )
     if sorted(build["sourceReceipts"], key=lambda item: item["path"]) != expected_sources:
         _fail("candidate-build-sources", "candidate and build source receipts differ")
-    output_paths = [item["path"] for item in build["outputs"]]
-    if len(output_paths) != len(set(output_paths)):
-        _fail("candidate-build-outputs", "build output paths must be unique")
-    for output in build["outputs"]:
-        candidate_output = artifacts.get(output["path"])
-        fields = ("role", "mediaType", "byteSize", "sha256")
-        if candidate_output is None or tuple(output[key] for key in fields) != tuple(
-            candidate_output[key] for key in fields
-        ):
-            _fail("candidate-build-outputs", f"build output differs: {output['path']}")
+    fields = ("path", "role", "mediaType", "byteSize", "sha256")
+    expected_outputs = sorted(
+        (
+            {key: item[key] for key in fields}
+            for item in artifacts.values()
+            if item["role"] in _SCIENTIFIC_OUTPUT_ROLES
+        ),
+        key=lambda item: item["path"],
+    )
+    if sorted(build["outputs"], key=lambda item: item["path"]) != expected_outputs:
+        _fail("candidate-build-outputs", "build outputs are not the exact scientific output set")
+
+
+def _source_dependencies(
+    root: Path, candidate: Mapping[str, Any], build: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    artifacts = _candidate_artifacts(candidate)
+    dependencies: list[dict[str, Any]] = []
+    for item in build["sourceReceipts"]:
+        relative = PurePosixPath(item["path"])
+        if relative.is_absolute() or ".." in relative.parts or "\\" in item["path"]:
+            _fail("source-receipt-path", f"unsafe candidate-relative path: {item['path']}")
+        path = root
+        for part in relative.parts:
+            path /= part
+            if path.is_symlink():
+                _fail("source-receipt-path", f"symlink is not an immutable receipt: {item['path']}")
+        receipt, raw = _load_strict(path, "source-receipt")
+        _validate_release_document(receipt, "source-receipt.schema.json")
+        artifact = artifacts[item["path"]]
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != item["sha256"] or len(raw) != artifact["byteSize"]:
+            _fail(
+                "source-receipt-identity",
+                f"candidate does not bind exact receipt bytes: {item['path']}",
+            )
+        if any(receipt[key] != candidate[key] for key in ("dataReleaseId", "dataProvenanceClass")):
+            _fail("source-receipt-identity", f"receipt release identity differs: {item['path']}")
+        if receipt["attributionId"] not in artifact["rights"]["attributionIds"]:
+            _fail("source-receipt-identity", f"receipt attribution differs: {item['path']}")
+        if receipt["cache"]["key"] != f"sha256/{receipt['sha256']}":
+            _fail("source-receipt-identity", f"receipt cache identity differs: {item['path']}")
+        dependencies.append(_dependency(receipt["sourceUrl"], "sha256", receipt["sha256"]))
+    return dependencies
 
 
 def _dependency(uri: str, algorithm: str, digest: str) -> dict[str, Any]:
     return {"uri": uri, "digest": {algorithm: digest}}
 
 
-def _dependencies(build: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _dependencies(
+    build: Mapping[str, Any], source_dependencies: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     revision = build["codeRevision"]
     values = [
         _dependency(
@@ -190,6 +232,7 @@ def _dependencies(build: Mapping[str, Any]) -> list[dict[str, Any]]:
         )
         for tool in build["tools"]
     )
+    values.extend(source_dependencies)
     values.sort(key=lambda item: item["uri"])
     uris = [item["uri"] for item in values]
     if len(uris) != len(set(uris)):
@@ -218,12 +261,21 @@ def generate_provenance_statement(
     except CandidateContractError as exc:
         _fail("candidate-contract", str(exc))
     build, build_bytes = _load_strict(build_receipt_path, "build-receipt")
-    _validate_build_receipt(build)
+    _validate_release_document(build, "build-receipt.schema.json")
     _validate_pair(candidate, build, build_bytes)
+    source_dependencies = _source_dependencies(manifest_path.parent, candidate, build)
     manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+    artifacts = _candidate_artifacts(candidate)
+    subjects = [
+        {"name": item["path"], "digest": {"sha256": item["sha256"]}}
+        for item in artifacts.values()
+        if item["role"] in _SCIENTIFIC_OUTPUT_ROLES
+    ]
+    subjects.append({"name": "manifest.json", "digest": {"sha256": manifest_sha256}})
+    subjects.sort(key=lambda item: item["name"])
     return {
         "_type": STATEMENT_TYPE,
-        "subject": [{"name": "manifest.json", "digest": {"sha256": manifest_sha256}}],
+        "subject": subjects,
         "predicateType": PREDICATE_TYPE,
         "predicate": {
             "buildDefinition": {
@@ -235,14 +287,11 @@ def generate_provenance_statement(
                     "actualManifestSha256": manifest_sha256,
                 },
                 "internalParameters": {
-                    "buildReceipt": {
-                        "sha256": hashlib.sha256(build_bytes).hexdigest(),
-                        "buildId": build["buildId"],
-                        "buildMode": build["buildMode"],
-                        "networkAccess": build["networkAccess"],
-                        "parametersSha256": build["parametersSha256"],
-                        "environment": build["environment"],
-                    },
+                    "buildId": build["buildId"],
+                    "buildMode": build["buildMode"],
+                    "networkAccess": build["networkAccess"],
+                    "parametersSha256": build["parametersSha256"],
+                    "environment": build["environment"],
                     "claims": {
                         "cryptographicVerification": False,
                         "production": False,
@@ -253,7 +302,7 @@ def generate_provenance_statement(
                     },
                     "policyIdentity": POLICY_IDENTITY,
                 },
-                "resolvedDependencies": _dependencies(build),
+                "resolvedDependencies": _dependencies(build, source_dependencies),
             },
             "runDetails": {
                 "builder": {"id": BUILDER_ID},
@@ -262,6 +311,13 @@ def generate_provenance_statement(
                     "startedOn": build["startedAt"],
                     "finishedOn": build["completedAt"],
                 },
+                "byproducts": [
+                    {
+                        "name": "receipts/build.json",
+                        "digest": {"sha256": hashlib.sha256(build_bytes).hexdigest()},
+                        "annotations": {"byteSize": len(build_bytes)},
+                    }
+                ],
             },
         },
     }
@@ -284,7 +340,7 @@ def validate_provenance_statement(
         trusted_invocation_uri=trusted_invocation_uri,
     )
     if statement.get("subject") != expected["subject"]:
-        _fail("provenance-subjects", "the sole manifest subject is missing or changed")
+        _fail("provenance-subjects", "scientific output or manifest subjects changed")
     predicate = statement.get("predicate")
     actual_definition = predicate.get("buildDefinition", {}) if isinstance(predicate, dict) else {}
     if not isinstance(actual_definition, dict):

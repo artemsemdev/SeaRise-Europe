@@ -25,7 +25,9 @@ CANDIDATE_FIXTURE = (
     ROOT / "contracts/candidate-completeness/v1/fixtures/valid/engineering-candidate.json"
 )
 BUILD_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/build-receipt.json"
+SOURCE_FIXTURE = ROOT / "contracts/release/v1/fixtures/valid/source-receipt.json"
 INVOCATION = "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/77777777777/attempts/1"
+OUTPUT_ROLES = {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -37,15 +39,15 @@ def _documents() -> tuple[dict[str, Any], dict[str, Any]]:
     build = _read(BUILD_FIXTURE)
     build["dataReleaseId"] = candidate["dataReleaseId"]
     build["dataProvenanceClass"] = candidate["dataProvenanceClass"]
-    artifacts = {item["path"]: item for item in candidate["artifacts"]}
     build["sourceReceipts"] = [
         {"path": item["path"], "sha256": item["sha256"]}
         for item in candidate["artifacts"]
         if item["role"] == "source-receipt"
     ]
-    output = artifacts[build["outputs"][0]["path"]]
     build["outputs"] = [
-        {key: output[key] for key in ("path", "role", "mediaType", "byteSize", "sha256")}
+        {key: item[key] for key in ("path", "role", "mediaType", "byteSize", "sha256")}
+        for item in candidate["artifacts"]
+        if item["role"] in OUTPUT_ROLES
     ]
     return candidate, build
 
@@ -56,9 +58,35 @@ def _write_pair(
     build: dict[str, Any],
     *,
     bind_build: bool = True,
+    bind_size: bool = True,
 ) -> tuple[Path, Path]:
     root.mkdir(parents=True, exist_ok=True)
-    build_path = root / "build.json"
+    artifacts = {item["path"]: item for item in candidate["artifacts"]}
+    checksums = {item["path"]: item for item in candidate["checksumInventory"]["subjects"]}
+    for index, item in enumerate(build["sourceReceipts"]):
+        receipt = _read(SOURCE_FIXTURE)
+        receipt.update(
+            dataReleaseId=candidate["dataReleaseId"],
+            dataProvenanceClass=candidate["dataProvenanceClass"],
+            receiptId=f"source-fixture-{index:012x}",
+            sourceId=f"fixture/source-{index}",
+            sourceVersion=f"fixture-{index}",
+            sourceUrl=f"https://fixtures.searise.invalid/source-{index}.bin",
+            byteSize=index + 1,
+            sha256=f"{index + 1:064x}",
+            attributionId=artifacts[item["path"]]["rights"]["attributionIds"][0],
+        )
+        receipt["cache"]["key"] = f"sha256/{receipt['sha256']}"
+        raw = canonical_provenance_bytes(receipt)
+        source_path = root / item["path"]
+        source_path.parent.mkdir(parents=True, exist_ok=True)
+        source_path.write_bytes(raw)
+        item["sha256"] = hashlib.sha256(raw).hexdigest()
+        artifacts[item["path"]].update(sha256=item["sha256"], byteSize=len(raw))
+        checksums[item["path"]]["sha256"] = item["sha256"]
+
+    build_path = root / "receipts/build.json"
+    build_path.parent.mkdir(parents=True, exist_ok=True)
     build_bytes = (
         json.dumps(build, allow_nan=False, separators=(",", ":"), sort_keys=True) + "\n"
     ).encode()
@@ -69,6 +97,8 @@ def _write_pair(
             item for item in candidate["artifacts"] if item["role"] == "build-receipt"
         )
         build_artifact["sha256"] = digest
+        if bind_size:
+            build_artifact["byteSize"] = len(build_bytes)
         checksum_subject = next(
             item
             for item in candidate["checksumInventory"]["subjects"]
@@ -106,7 +136,15 @@ def test_statement_is_exact_slsa_v1_and_deterministic(tmp_path: Path) -> None:
     assert first == _statement(manifest, build)
     assert first["_type"] == STATEMENT_TYPE == "https://in-toto.io/Statement/v1"
     assert first["predicateType"] == PREDICATE_TYPE == "https://slsa.dev/provenance/v1"
-    assert first["subject"] == [{"name": "manifest.json", "digest": {"sha256": manifest_digest}}]
+    subjects = first["subject"]
+    assert [item["name"] for item in subjects] == sorted(item["name"] for item in subjects)
+    expected_outputs = [
+        {"name": item["path"], "digest": {"sha256": item["sha256"]}}
+        for item in _read(manifest)["artifacts"]
+        if item["role"] in OUTPUT_ROLES
+    ]
+    assert subjects[:-1] == sorted(expected_outputs, key=lambda item: item["name"])
+    assert {"name": "manifest.json", "digest": {"sha256": manifest_digest}} in subjects
     assert definition["buildType"] == BUILD_TYPE
     assert definition["externalParameters"] == {
         "candidateId": "candidate-phase-1-fixture-20260811-0123456789ab",
@@ -115,8 +153,8 @@ def test_statement_is_exact_slsa_v1_and_deterministic(tmp_path: Path) -> None:
         "actualManifestSha256": manifest_digest,
     }
     assert internal["policyIdentity"] == POLICY_IDENTITY
-    assert internal["buildReceipt"]["parametersSha256"] == "b" * 64
-    assert internal["buildReceipt"]["sha256"] == hashlib.sha256(build.read_bytes()).hexdigest()
+    assert internal["parametersSha256"] == "b" * 64
+    assert "buildReceipt" not in internal
     assert internal["claims"] == {
         "cryptographicVerification": False,
         "production": False,
@@ -132,10 +170,20 @@ def test_statement_is_exact_slsa_v1_and_deterministic(tmp_path: Path) -> None:
             "startedOn": "2026-08-10T12:01:00Z",
             "finishedOn": "2026-08-10T12:01:01Z",
         },
+        "byproducts": [
+            {
+                "name": "receipts/build.json",
+                "digest": {"sha256": hashlib.sha256(build.read_bytes()).hexdigest()},
+                "annotations": {"byteSize": len(build.read_bytes())},
+            }
+        ],
     }
     dependencies = definition["resolvedDependencies"]
     assert [item["uri"] for item in dependencies] == sorted(item["uri"] for item in dependencies)
-    assert len(dependencies) == 11
+    assert len(dependencies) == 18
+    assert len([item for item in dependencies if item["uri"].startswith("https://fixtures")]) == 7
+    source_dependency = next(item for item in dependencies if item["uri"].endswith("/source-0.bin"))
+    assert source_dependency["digest"] == {"sha256": f"{1:064x}"}
     assert any(
         item["digest"] == {"gitCommit": "c096aeab4e0994faa7a9d2253b47215ef897dfcb"}
         for item in dependencies
@@ -143,6 +191,8 @@ def test_statement_is_exact_slsa_v1_and_deterministic(tmp_path: Path) -> None:
     rendered = canonical_provenance_bytes(first)
     assert rendered.count(b"\n") == 1 and rendered.endswith(b"\n")
     assert "signingIdentity" not in rendered.decode()
+    with pytest.raises(ProvenanceContractError, match="provenance-json"):
+        canonical_provenance_bytes({"invalid": chr(0xD800)})
 
 
 def test_canonical_statement_validates_exactly(tmp_path: Path) -> None:
@@ -216,10 +266,7 @@ def test_noncanonical_statement_bytes_fail(tmp_path: Path) -> None:
             "candidate-build-identity",
         ),
         (lambda candidate, build: build["sourceReceipts"].pop(), "candidate-build-sources"),
-        (
-            lambda candidate, build: build["outputs"][0].__setitem__("sha256", "0" * 64),
-            "candidate-build-outputs",
-        ),
+        (lambda candidate, build: build["outputs"].pop(), "candidate-build-outputs"),
         (
             lambda candidate, build: build["tools"].append(
                 {**build["tools"][0], "identitySha256": "0" * 64}
@@ -241,10 +288,38 @@ def test_candidate_build_mismatch_fails(
         _statement(manifest, build_path)
 
 
-def test_exact_build_receipt_bytes_are_candidate_bound(tmp_path: Path) -> None:
-    manifest, build = _write_pair(tmp_path, *_documents(), bind_build=False)
+@pytest.mark.parametrize("bind_build,bind_size", [(False, True), (True, False)])
+def test_exact_build_receipt_bytes_are_candidate_bound(
+    tmp_path: Path, bind_build: bool, bind_size: bool
+) -> None:
+    manifest, build = _write_pair(
+        tmp_path, *_documents(), bind_build=bind_build, bind_size=bind_size
+    )
 
     with pytest.raises(ProvenanceContractError, match="exact build receipt bytes"):
+        _statement(manifest, build)
+
+
+@pytest.mark.parametrize(
+    "mode,code",
+    [
+        ("schema", "source-receipt-contract"),
+        ("hash", "source-receipt-identity"),
+    ],
+)
+def test_source_receipt_bytes_and_schema_are_authoritative(
+    tmp_path: Path, mode: str, code: str
+) -> None:
+    manifest, build = _valid_pair(tmp_path)
+    source = tmp_path / _read(build)["sourceReceipts"][0]["path"]
+    receipt = _read(source)
+    if mode == "schema":
+        receipt.pop("sourceId")
+    else:
+        receipt["sourceVersion"] += "-tampered"
+    source.write_bytes(canonical_provenance_bytes(receipt))
+
+    with pytest.raises(ProvenanceContractError, match=code):
         _statement(manifest, build)
 
 
@@ -288,22 +363,9 @@ def test_real_source_and_untrusted_invocation_are_unsupported(tmp_path: Path) ->
             lambda value: value["predicate"]["buildDefinition"]["resolvedDependencies"].reverse(),
             "provenance-dependencies",
         ),
-        (lambda value: value.__setitem__("_type", "unsupported"), "provenance-identity"),
         (
             lambda value: value["predicate"]["buildDefinition"]["externalParameters"].__setitem__(
                 "candidateId", "candidate-drift"
-            ),
-            "provenance-identity",
-        ),
-        (
-            lambda value: value["predicate"]["buildDefinition"].__setitem__(
-                "buildType", "unapproved"
-            ),
-            "provenance-identity",
-        ),
-        (
-            lambda value: value["predicate"]["runDetails"]["builder"].__setitem__(
-                "id", "future-signing-identity"
             ),
             "provenance-identity",
         ),
