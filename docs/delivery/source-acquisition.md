@@ -11,6 +11,12 @@ with or substituted by the historical GeoNames `cities15000` entry. The legacy
 `src/pipeline/download.py` remains comparison infrastructure and cannot feed a
 publishable release.
 
+Settlement distance-to-coast inputs use a second isolated lock,
+`src/pipeline/sources/source-lock.phase-1-settlement-coastline.json`. It binds
+the official Natural Earth main and minor-island coastline archives and does
+not replace either the historical Phase 0R lock or the GeoNames settlement
+lock.
+
 ## Commands
 
 Run commands from `src/pipeline` after installing the project with its `dev`
@@ -31,6 +37,15 @@ python -m searise_pipeline.sources validate --lock sources/source-lock.phase-1-s
 python -m searise_pipeline.sources publication-check --lock sources/source-lock.phase-1-settlements.json
 python -m searise_pipeline.sources fetch --lock sources/source-lock.phase-1-settlements.json
 python -m searise_pipeline.sources verify --lock sources/source-lock.phase-1-settlements.json
+```
+
+Use the coastline lock independently when rebuilding the settlement shoreline:
+
+```bash
+python -m searise_pipeline.sources validate --lock sources/source-lock.phase-1-settlement-coastline.json
+python -m searise_pipeline.sources publication-check --lock sources/source-lock.phase-1-settlement-coastline.json
+python -m searise_pipeline.sources fetch --lock sources/source-lock.phase-1-settlement-coastline.json
+python -m searise_pipeline.sources verify --lock sources/source-lock.phase-1-settlement-coastline.json
 ```
 
 Without `--target`, `fetch` and `verify` process every source whose
@@ -54,6 +69,7 @@ builder introduced by #49 must use an allow-list of validated derivatives.
 | GeoNames complete settlement snapshot | Selected in scoped Phase 1 lock | `2026-08-10` | Approved, CC BY 4.0 | SeaRise Europe maintainers, 2026-08-04 | Four official assets with exact sizes/SHA-256 and archive-member hashes |
 | GeoNames `cities15000` | Selected in historical global lock | `2026-08-04` | Approved, CC BY 4.0 | SeaRise Europe maintainers, 2026-08-04 | Legacy Phase 0 controls only; prohibited as the Phase 1 production input |
 | Natural Earth 10m | Selected | `5.1.1` | Approved, public domain | SeaRise Europe maintainers, 2026-08-04 | Admin 0 and ocean ZIPs with exact sizes/SHA-256 |
+| Natural Earth 10m settlement shoreline | Selected in scoped Phase 1 lock | Registry `5.1.1`; archive-native `5.0.0-pre9` and `4.1.0` | Approved, public domain | SeaRise Europe maintainers, 2026-08-04 | Direct coastline and minor-island coastline ZIPs with exact archive/member sizes, CRC32, SHA-256, and bundled native versions |
 | Copernicus DEM GLO-30 | Candidate | `2021_1` | Approved with mandatory notices | SeaRise Europe maintainers, 2026-08-04 | N52/E004 sample tile, 17,037,271 bytes, SHA-256 `edb30766…851f1` |
 | Copernicus Coastal Zones 2018 | Candidate | `V1-2018` | Review required | Unassigned | Metadata only; authenticated asset identity and publication rights remain blocked |
 

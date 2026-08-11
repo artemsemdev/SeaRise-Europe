@@ -25,6 +25,21 @@ ISO-language rows with zero unexplained parser or language-policy failures. It
 is local engineering evidence, not a finished settlement catalogue,
 GeoParquet/search-shard build, performance result, or publication approval.
 
+The internal shoreline producer policy is versioned separately as
+`src/pipeline/settlements/shoreline-distance-policy-v1.json`. It selects whole
+Natural Earth source `LineString` features intersecting the Europe build bounds
+from the exact main and minor-island archives; it never clips lines or derives
+shoreline from administrative, ocean-polygon, coastal-zone, or bounding-box
+edges. Settlement distance uses longitude-latitude input transformed to
+EPSG:3035 by pinned DuckDB Spatial before planar `ST_Distance` in meters. The
+computed `DOUBLE` is persisted as whole-meter `BIGINT` with DuckDB's
+nearest-half-to-even cast; generalized Natural Earth linework carries no false
+sub-meter precision. `isCoastal` remains a separate `ST_Covers` classification
+against the versioned 25 km zone and is not inferred from that distance. The
+checked-in linework and QA evidence are product-eligibility engineering inputs
+only: they carry no hazard-extent, canonical-coastline, owner-approval, or
+publication claim.
+
 The immutable `catalogue-policy-v1.json` references the reviewed
 `settlement-normalization-v2` name policy without changing its bytes. The pure
 catalogue domain admits only feature class `P` and its exact populated-place
@@ -52,7 +67,8 @@ its role, version, hash, path, and predicate, while the executable evidence
 remains a hash-bound European synthetic fixture,
 `selected-scope-approximation`, non-publication, and without an owner-approval
 claim. Production classification fails with `shoreline-geometry-unavailable`
-until a reviewed shoreline is pinned.
+until a separate reviewed wiring change binds the pinned shoreline policy and
+artifact to the classifier.
 
 This classified output is an internal audit model, not a Place v2 producer.
 Support-covered records are retained even when they belong to no browser
