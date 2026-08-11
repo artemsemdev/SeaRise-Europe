@@ -28,6 +28,7 @@ EXPECTED_FILE_COMPONENTS = {
     "github-actions": 4,
     "native-geospatial-toolchain": 5,
     "release-container-image": 1,
+    "release-signing-toolchain": 1,
 }
 EXPECTED_ACTIONS = dict(
     item.split("@")
@@ -52,6 +53,7 @@ EXPECTED_OBSERVABLES = {
     ("native-binary", "tippecanoe", "2.79.0", "linux-x86_64"),
     ("native-binary", "tippecanoe-decode", "2.79.0", "macos-arm64"),
     ("native-binary", "tippecanoe-decode", "2.79.0", "linux-x86_64"),
+    ("native-binary", "cosign", "3.0.6", "linux-amd64"),
     ("native-package", "build-essential", "12.10ubuntu1", "linux-x86_64"),
     ("native-package", "ca-certificates", "20260601~24.04.1", "linux-x86_64"),
     ("native-package", "libc6", "2.39-0ubuntu8.8", "linux-x86_64"),
@@ -135,8 +137,8 @@ def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs() -> None
     assert raw == canonical_sbom_bytes(document)
     files = [component for component in document["components"] if component["type"] == "file"]
     observables = [component for component in document["components"] if component["type"] != "file"]
-    assert len(document["components"]) == 39
-    assert len(files) == sum(EXPECTED_FILE_COMPONENTS.values()) == 10
+    assert len(document["components"]) == 41
+    assert len(files) == sum(EXPECTED_FILE_COMPONENTS.values()) == 11
     assert {component["name"] for component in files} == set(recorded)
     for component in files:
         source_id, item = recorded[component["name"]]

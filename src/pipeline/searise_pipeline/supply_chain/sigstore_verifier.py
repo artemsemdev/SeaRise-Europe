@@ -25,6 +25,7 @@ from .candidate_evidence import (
     _validate_candidate_evidence_pair,
 )
 from .contracts import REPOSITORY_ROOT, SupplyChainContractError, _validate_schema
+from .cosign_tool import parse_cosign_tool_lock
 from .sbom import write_new_sbom
 
 _IDENTITY = (
@@ -40,7 +41,6 @@ _PROVENANCE = PurePosixPath("provenance.intoto.jsonl")
 _DEPENDENCY_INVENTORY = PurePosixPath("contracts/supply-chain/v1/dependency-inventory.json")
 _RUN_ID = re.compile(r"[1-9][0-9]*")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
-_TOOL_KEYS = {"$schema", "schemaVersion", "contractId", "tool", "sha256", "byteSize"}
 _TEMP_ROOT = Path(tempfile.gettempdir()).resolve()
 
 
@@ -119,26 +119,6 @@ def _require_root_generation(path: Path, expected: os.stat_result, label: str) -
             _fail(f"{label} root generation changed during verification")
     finally:
         os.close(current)
-
-
-def _tool_lock(raw: bytes) -> Mapping[str, Any]:
-    lock = _strict_json(raw, "Cosign tool lock")
-    if set(lock) != _TOOL_KEYS:
-        _fail("Cosign tool lock must contain only the exact verifier fields")
-    if (
-        lock["$schema"]
-        != "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/"
-        "cosign-verifier-tool.schema.json"
-        or lock["schemaVersion"] != "1.0.0"
-        or lock["contractId"] != "phase-1-cosign-verifier-tool-v1"
-        or lock["tool"] != "cosign"
-        or not isinstance(lock["sha256"], str)
-        or _SHA256.fullmatch(lock["sha256"]) is None
-        or type(lock["byteSize"]) is not int
-        or lock["byteSize"] < 1
-    ):
-        _fail("Cosign tool lock is not the exact supported contract")
-    return lock
 
 
 def _executable_bytes(path: Path) -> bytes:
@@ -350,8 +330,12 @@ def verify_candidate_evidence_cryptographically(
             lock_raw = _read(cosign_tool_lock, "Cosign tool lock")
             if _sha256(lock_raw) != trusted_cosign_tool_lock_sha256:
                 _fail("Cosign tool lock does not match the independently reviewed SHA-256")
-            lock, executable_raw = _tool_lock(lock_raw), _executable_bytes(cosign_executable)
-            if lock["sha256"] != _sha256(executable_raw) or lock["byteSize"] != len(executable_raw):
+            lock = parse_cosign_tool_lock(lock_raw)
+            executable_raw = _executable_bytes(cosign_executable)
+            executable = lock["executable"]
+            if executable["sha256"] != _sha256(executable_raw) or executable["byteSize"] != len(
+                executable_raw
+            ):
                 _fail("Cosign executable does not match the reviewed tool lock")
             tool = _snapshot(root / "bin/cosign", executable_raw, executable=True)
             subjects = {

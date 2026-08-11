@@ -15,6 +15,7 @@ from searise_pipeline.supply_chain import (
     publish_nuget_sbom,
     publish_python_sbom,
     validate_candidate_evidence_pair,
+    validate_cosign_tool_lock,
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
@@ -53,6 +54,11 @@ def _parser() -> argparse.ArgumentParser:
     crypto.add_argument("--cosign-tool-lock", type=Path, required=True)
     crypto.add_argument("--trusted-cosign-tool-lock-sha256", required=True)
     crypto.add_argument("--receipt", type=Path, required=True)
+    cosign_tool = commands.add_parser("cosign-tool-lock")
+    cosign_tool.add_argument("--lock", type=Path, required=True)
+    cosign_tool.add_argument("--trusted-lock-sha256", required=True)
+    cosign_tool.add_argument("--executable", type=Path)
+    cosign_tool.add_argument("--checksums", type=Path)
     exception = commands.add_parser("exception")
     exception.add_argument("--document", type=Path, required=True)
     exception.add_argument("--as-of", required=True)
@@ -124,6 +130,17 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "verified Sigstore identity and subject digests; "
                 "production, publication, and scientific approval not claimed"
+            )
+        elif args.command == "cosign-tool-lock":
+            summary = validate_cosign_tool_lock(
+                args.lock,
+                trusted_lock_sha256=args.trusted_lock_sha256,
+                executable_path=args.executable,
+                checksum_path=args.checksums,
+            )
+            print(
+                f"validated Cosign {summary.version} for {summary.platform}; "
+                "signing and production not claimed"
             )
         elif args.command == "evidence":
             sboms = dict(args.sbom)

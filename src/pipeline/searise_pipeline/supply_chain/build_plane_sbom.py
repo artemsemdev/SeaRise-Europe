@@ -17,6 +17,7 @@ from .contracts import (
     _validate_cyclonedx,
     validate_dependency_inventory,
 )
+from .cosign_tool import parse_cosign_tool_lock
 from .python_graph import _read_descriptor
 from .sbom import canonical_sbom_bytes, write_new_sbom
 
@@ -25,10 +26,12 @@ _INCLUDED_COMPONENTS = (
     "github-actions",
     "native-geospatial-toolchain",
     "release-container-image",
+    "release-signing-toolchain",
 )
 _OPENTOFU_COMPONENT = "deployment-opentofu"
 _PROPERTY_PREFIX = "org.searise.sbom.build-plane"
 _DUCKDB_LOCK = "src/pipeline/toolchain/duckdb-spatial-extensions.json"
+_COSIGN_LOCK = "contracts/supply-chain/v1/tools/cosign-linux-amd64.json"
 _LINUX_RECIPE = "src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64"
 _MACOS_RECIPE = "src/pipeline/toolchain/build_macos_tippecanoe.sh"
 _LINUX_RECEIPT = "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json"
@@ -544,6 +547,31 @@ def _native_components(
     return components, edges
 
 
+def _cosign_components(
+    authority: dict[str, bytes],
+    _input_refs: dict[str, str],
+) -> tuple[list[dict[str, Any]], dict[str, set[str]]]:
+    lock = parse_cosign_tool_lock(authority[_COSIGN_LOCK])
+    executable, checksums = lock["executable"], lock["checksumEvidence"]
+    component, _ = _observable_component(
+        kind="native-binary",
+        name="cosign",
+        version=str(lock["version"]),
+        platform="linux-amd64",
+        authority_paths=[_COSIGN_LOCK],
+        authority=authority,
+        digest=("SHA-256", str(executable["sha256"])),
+        extra=(
+            ("artifact.byte-size", executable["byteSize"]),
+            ("artifact.url", executable["url"]),
+            ("checksum-evidence.byte-size", checksums["byteSize"]),
+            ("checksum-evidence.sha256", checksums["sha256"]),
+            ("checksum-evidence.url", checksums["url"]),
+        ),
+    )
+    return [component], {}
+
+
 def _properties_dict(component: dict[str, Any]) -> dict[str, str]:
     return {
         item["name"].removeprefix(f"{_PROPERTY_PREFIX}."): item["value"]
@@ -656,7 +684,7 @@ def _observable_components(
         raise SupplyChainContractError(f"reviewed build-plane authority bytes changed: {changed}")
     components: list[dict[str, Any]] = []
     edges: dict[str, set[str]] = {}
-    for builder in (_actions, _native_components, _duckdb_components):
+    for builder in (_actions, _native_components, _duckdb_components, _cosign_components):
         next_components, next_edges = builder(authority, input_refs)
         components.extend(next_components)
         for reference, dependencies in next_edges.items():

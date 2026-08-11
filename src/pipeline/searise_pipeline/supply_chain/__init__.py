@@ -10,6 +10,7 @@ from .contracts import (
     validate_dependency_inventory,
     validate_evidence_files,
 )
+from .cosign_tool import CosignToolSummary, validate_cosign_tool_lock
 from .nuget_sbom import generate_nuget_sbom, publish_nuget_sbom, validate_nuget_sbom
 from .python_graph import validate_python_lock_graph
 from .python_sbom import generate_python_sbom, publish_python_sbom, validate_python_sbom
@@ -26,6 +27,7 @@ from .sigstore_verifier import (
 
 __all__ = [
     "CandidateEvidenceSummary",
+    "CosignToolSummary",
     "SupplyChainContractError",
     "canonical_sbom_bytes",
     "discover_dependency_inputs",
@@ -40,6 +42,7 @@ __all__ = [
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_candidate_evidence_pair",
+    "validate_cosign_tool_lock",
     "validate_evidence_files",
     "validate_npm_sbom",
     "validate_nuget_sbom",

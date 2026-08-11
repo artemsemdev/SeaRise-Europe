@@ -51,12 +51,26 @@ if sys.argv[1:] != expected:
     lock.write_text(
         json.dumps(
             {
-                "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cosign-verifier-tool.schema.json",
+                "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cosign-tool-lock.schema.json",
                 "schemaVersion": "1.0.0",
-                "contractId": "phase-1-cosign-verifier-tool-v1",
+                "contractId": "phase-1-cosign-linux-amd64-v1",
                 "tool": "cosign",
-                "sha256": hashlib.sha256(script).hexdigest(),
-                "byteSize": len(script),
+                "version": "3.0.6",
+                "platform": "linux-amd64",
+                "releaseUrl": "https://github.com/sigstore/cosign/releases/tag/v3.0.6",
+                "executable": {
+                    "name": "cosign-linux-amd64",
+                    "url": "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64",
+                    "sha256": hashlib.sha256(script).hexdigest(),
+                    "byteSize": len(script),
+                },
+                "checksumEvidence": {
+                    "name": "cosign_checksums.txt",
+                    "url": "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign_checksums.txt",
+                    "sha256": "0" * 64,
+                    "byteSize": 1,
+                    "entry": f"{hashlib.sha256(script).hexdigest()}  cosign-linux-amd64",
+                },
             },
             separators=(",", ":"),
             sort_keys=True,
