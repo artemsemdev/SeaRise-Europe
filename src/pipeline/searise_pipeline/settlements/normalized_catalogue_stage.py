@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import errno
+import fcntl
 import hashlib
+import math
+import os
+import re
+import secrets
+import stat
 import sys
 from collections import Counter
-from dataclasses import fields, is_dataclass
-from datetime import date
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass, fields, is_dataclass
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import UnionType
 from typing import Any, Iterator, Mapping, Union, get_args, get_origin, get_type_hints
@@ -35,6 +43,7 @@ CATALOGUE_STAGE_SCHEMA_VERSION = "normalized-catalogue-stage-v1"
 LOGICAL_HASH_VERSION = "canonical-jsonl-v1"
 MAX_BATCH_ROWS = source_stage.MAX_ARROW_BATCH_ROWS
 MAX_ALTERNATE_ROWS_PER_PLACE = MAX_BATCH_ROWS
+_UTC_SECONDS = re.compile(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 
 _DOCUMENT_TABLES = {
     "catalogue_places": "normalizedPlaces",
@@ -568,3 +577,510 @@ def materialize_catalogue_candidate(
         raise
     except (CatalogueNormalizationError, FullSourceStageError, OSError, ValueError) as exc:
         raise CatalogueStageError(f"catalogue candidate materialization failed: {exc}") from exc
+
+
+def _receipt_payload(identity: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "schemaVersion": 1,
+        "materializationPerformed": True,
+        "candidate": identity,
+        "toolchain": {
+            "python": "3.11",
+            "duckdb": source_stage.DUCKDB_VERSION,
+            "pyarrow": source_stage.PYARROW_VERSION,
+            "threads": 1,
+            "memoryLimit": source_stage.MEMORY_LIMIT,
+            "maxBatchRows": MAX_BATCH_ROWS,
+        },
+    }
+
+
+def _receipt_identity(payload: Mapping[str, Any]) -> str:
+    raw = (source_stage._canonical_json(payload) + "\n").encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def canonical_catalogue_receipt_bytes(receipt: Mapping[str, Any]) -> bytes:
+    """Return canonical receipt bytes with observations outside deterministic identity."""
+    try:
+        value = dict(receipt)
+        return (source_stage._canonical_json(value) + "\n").encode("utf-8")
+    except (TypeError, ValueError, UnicodeEncodeError) as exc:
+        raise CatalogueStageError(f"catalogue receipt cannot be encoded: {exc}") from exc
+
+
+def _load_catalogue_receipt_bytes(raw: bytes) -> dict[str, Any]:
+    try:
+        value = source_stage._strict_json(raw, "catalogue receipt")
+    except FullSourceStageError as exc:
+        raise CatalogueStageError(str(exc)) from exc
+    if type(value) is not dict or raw != canonical_catalogue_receipt_bytes(value):
+        raise CatalogueStageError("catalogue receipt is not canonical JSON")
+    return value
+
+
+def _validate_observations(value: Any) -> None:
+    if type(value) is not dict or set(value) != {
+        "completedAtUtc",
+        "buildDurationSeconds",
+        "peakRssBytes",
+        "deterministicIdentityExcluded",
+    }:
+        raise CatalogueStageError("catalogue receipt observations differ from the schema")
+    timestamp = value["completedAtUtc"]
+    try:
+        parsed = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError) as exc:
+        raise CatalogueStageError("catalogue build timestamp is invalid") from exc
+    if (
+        type(timestamp) is not str
+        or _UTC_SECONDS.fullmatch(timestamp) is None
+        or parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != timestamp
+        or type(value["buildDurationSeconds"]) is not float
+        or not math.isfinite(value["buildDurationSeconds"])
+        or value["buildDurationSeconds"] < 0
+        or type(value["peakRssBytes"]) is not int
+        or value["peakRssBytes"] < 1
+        or value["deterministicIdentityExcluded"] is not True
+    ):
+        raise CatalogueStageError("catalogue receipt observations are invalid")
+
+
+def _validate_receipt(identity: Mapping[str, Any], document: Mapping[str, Any]) -> None:
+    payload = _receipt_payload(identity)
+    if set(document) != {*payload, "deterministicIdentity", "observations"} or any(
+        not source_stage._exact_json_equal(document.get(key), value)
+        for key, value in payload.items()
+    ):
+        raise CatalogueStageError("catalogue receipt differs from the exact candidate")
+    if document["deterministicIdentity"] != _receipt_identity(payload):
+        raise CatalogueStageError("catalogue receipt deterministic identity differs")
+    _validate_observations(document["observations"])
+
+
+@dataclass(frozen=True)
+class _OpenedRegular:
+    descriptor: int
+    label: str
+    device: int
+    inode: int
+    size: int
+    sha256: str | None
+
+
+@dataclass(frozen=True)
+class _OpenedDirectory:
+    descriptor: int
+    path: Path
+    label: str
+    device: int
+    inode: int
+
+
+def _regular_identity(metadata: os.stat_result) -> tuple[int, int, int]:
+    return metadata.st_dev, metadata.st_ino, metadata.st_size
+
+
+def _opened_identity(opened: _OpenedRegular) -> tuple[int, int, int]:
+    return opened.device, opened.inode, opened.size
+
+
+def _sha256_descriptor(descriptor: int, size: int) -> str:
+    digest = hashlib.sha256()
+    offset = 0
+    while offset < size:
+        chunk = os.pread(descriptor, min(1024 * 1024, size - offset), offset)
+        if not chunk:
+            raise CatalogueStageError("opened file ended before its recorded size")
+        digest.update(chunk)
+        offset += len(chunk)
+    return digest.hexdigest()
+
+
+def _opened_regular(descriptor: int, label: str, *, hash_bytes: bool) -> _OpenedRegular:
+    metadata = os.fstat(descriptor)
+    if not stat.S_ISREG(metadata.st_mode):
+        raise CatalogueStageError(f"{label} must be a regular non-symlink file")
+    digest = _sha256_descriptor(descriptor, metadata.st_size) if hash_bytes else None
+    if _regular_identity(os.fstat(descriptor)) != _regular_identity(metadata):
+        raise CatalogueStageError(f"{label} identity changed while it was opened")
+    return _OpenedRegular(
+        descriptor,
+        label,
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_size,
+        digest,
+    )
+
+
+@contextmanager
+def _open_regular(path: Path, label: str, *, hash_bytes: bool = False) -> Iterator[_OpenedRegular]:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0),
+        )
+        yield _opened_regular(descriptor, label, hash_bytes=hash_bytes)
+    except CatalogueStageError:
+        raise
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise CatalogueStageError(f"{label} must be a regular non-symlink file") from exc
+        raise CatalogueStageError(f"cannot open {label}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+@contextmanager
+def _open_relative_regular(
+    directory: _OpenedDirectory,
+    name: str,
+    label: str,
+    *,
+    hash_bytes: bool = False,
+) -> Iterator[_OpenedRegular]:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            name,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0),
+            dir_fd=directory.descriptor,
+        )
+        yield _opened_regular(descriptor, label, hash_bytes=hash_bytes)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _assert_opened(opened: _OpenedRegular) -> None:
+    if _regular_identity(os.fstat(opened.descriptor)) != _opened_identity(opened):
+        raise CatalogueStageError(f"{opened.label} identity changed while in use")
+    if opened.sha256 is not None and (
+        _sha256_descriptor(opened.descriptor, opened.size) != opened.sha256
+    ):
+        raise CatalogueStageError(f"{opened.label} exact bytes changed while in use")
+
+
+def _read_opened(opened: _OpenedRegular) -> bytes:
+    _assert_opened(opened)
+    raw = os.pread(opened.descriptor, opened.size, 0)
+    if len(raw) != opened.size:
+        raise CatalogueStageError(f"{opened.label} ended before its recorded size")
+    _assert_opened(opened)
+    return raw
+
+
+def _descriptor_path(descriptor: int, label: str) -> Path:
+    try:
+        if sys.platform == "darwin":
+            raw = fcntl.fcntl(descriptor, 50, b"\0" * 1024)
+            path = Path(os.fsdecode(raw.split(b"\0", 1)[0]))
+        else:
+            path = Path(os.readlink(f"/proc/self/fd/{descriptor}"))
+        metadata = path.lstat()
+        opened = os.fstat(descriptor)
+    except OSError as exc:
+        raise CatalogueStageError(f"cannot resolve opened {label}: {exc}") from exc
+    if (metadata.st_dev, metadata.st_ino) != (opened.st_dev, opened.st_ino):
+        raise CatalogueStageError(f"opened {label} path no longer names its inode")
+    return path
+
+
+@contextmanager
+def _open_directory(path: Path, label: str) -> Iterator[_OpenedDirectory]:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise CatalogueStageError(f"{label} must be a directory, not a symlink")
+        yield _OpenedDirectory(descriptor, path, label, metadata.st_dev, metadata.st_ino)
+    except CatalogueStageError:
+        raise
+    except OSError as exc:
+        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
+            raise CatalogueStageError(f"{label} must be a directory, not a symlink") from exc
+        raise CatalogueStageError(f"cannot open {label}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _assert_directory_path(directory: _OpenedDirectory) -> None:
+    try:
+        metadata = directory.path.lstat()
+    except OSError as exc:
+        raise CatalogueStageError(f"{directory.label} path identity changed: {exc}") from exc
+    if (metadata.st_dev, metadata.st_ino) != (directory.device, directory.inode):
+        raise CatalogueStageError(f"{directory.label} path identity changed")
+
+
+def _assert_path_binding(path: Path, opened: _OpenedRegular) -> None:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise CatalogueStageError(f"{opened.label} path identity changed: {exc}") from exc
+    if not stat.S_ISREG(metadata.st_mode) or _regular_identity(metadata) != _opened_identity(
+        opened
+    ):
+        raise CatalogueStageError(f"{opened.label} path identity changed")
+    _assert_opened(opened)
+
+
+def _create_private_directory(
+    parent: _OpenedDirectory, prefix: str, label: str
+) -> tuple[str, _OpenedDirectory]:
+    for _ in range(128):
+        name = f"{prefix}{secrets.token_hex(12)}"
+        try:
+            os.mkdir(name, mode=0o700, dir_fd=parent.descriptor)
+        except FileExistsError:
+            continue
+        created = os.stat(name, dir_fd=parent.descriptor, follow_symlinks=False)
+        created_identity = created.st_dev, created.st_ino
+        if not stat.S_ISDIR(created.st_mode):
+            raise CatalogueStageError(f"created {label} entry is not a directory")
+        descriptor = -1
+        try:
+            descriptor = os.open(
+                name,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent.descriptor,
+            )
+            metadata = os.fstat(descriptor)
+            if (metadata.st_dev, metadata.st_ino) != created_identity:
+                raise CatalogueStageError(f"created {label} entry was replaced before open")
+            return name, _OpenedDirectory(
+                descriptor,
+                _descriptor_path(descriptor, label),
+                label,
+                metadata.st_dev,
+                metadata.st_ino,
+            )
+        except Exception as exc:
+            if descriptor >= 0:
+                os.close(descriptor)
+            try:
+                current = os.stat(name, dir_fd=parent.descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                raise exc
+            if (current.st_dev, current.st_ino) != created_identity:
+                raise CatalogueStageError(
+                    f"created {label} entry was replaced; cleanup refused"
+                ) from exc
+            os.rmdir(name, dir_fd=parent.descriptor)
+            raise exc
+    raise CatalogueStageError(f"cannot allocate a private {label}")
+
+
+def _clear_directory(descriptor: int) -> None:
+    for name in os.listdir(descriptor):
+        metadata = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+        if stat.S_ISDIR(metadata.st_mode):
+            child = os.open(
+                name,
+                os.O_RDONLY
+                | getattr(os, "O_CLOEXEC", 0)
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=descriptor,
+            )
+            try:
+                _clear_directory(child)
+            finally:
+                os.close(child)
+            os.rmdir(name, dir_fd=descriptor)
+        else:
+            os.unlink(name, dir_fd=descriptor)
+
+
+def _remove_private_directory(parent: _OpenedDirectory, name: str, child: _OpenedDirectory) -> None:
+    try:
+        _clear_directory(child.descriptor)
+    finally:
+        os.close(child.descriptor)
+    try:
+        metadata = os.stat(name, dir_fd=parent.descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if (metadata.st_dev, metadata.st_ino) != (child.device, child.inode):
+        raise CatalogueStageError(f"{child.label} parent entry was replaced; cleanup refused")
+    os.rmdir(name, dir_fd=parent.descriptor)
+
+
+def _copy_snapshot(source: _OpenedRegular, directory: _OpenedDirectory, name: str) -> None:
+    destination = -1
+    try:
+        destination = os.open(
+            name,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=directory.descriptor,
+        )
+        digest = hashlib.sha256()
+        offset = 0
+        while offset < source.size:
+            chunk = os.pread(source.descriptor, min(1024 * 1024, source.size - offset), offset)
+            if not chunk:
+                raise CatalogueStageError(
+                    f"{source.label} ended while creating its private snapshot"
+                )
+            digest.update(chunk)
+            written = 0
+            while written < len(chunk):
+                count = os.write(destination, chunk[written:])
+                if count < 1:
+                    raise CatalogueStageError("private snapshot produced a zero-byte write")
+                written += count
+            offset += len(chunk)
+        os.fsync(destination)
+        _assert_opened(source)
+        if _sha256_descriptor(source.descriptor, source.size) != digest.hexdigest():
+            raise CatalogueStageError(f"{source.label} changed while its snapshot was copied")
+    finally:
+        if destination >= 0:
+            os.close(destination)
+
+
+@contextmanager
+def _private_snapshot(
+    source_path: Path,
+    source: _OpenedRegular,
+    directory: _OpenedDirectory,
+    name: str,
+) -> Iterator[_OpenedRegular]:
+    copied = False
+    try:
+        os.link(
+            source_path,
+            name,
+            dst_dir_fd=directory.descriptor,
+            follow_symlinks=False,
+        )
+    except OSError as exc:
+        fallback_errors = {errno.EXDEV, errno.EPERM}
+        if hasattr(errno, "EOPNOTSUPP"):
+            fallback_errors.add(errno.EOPNOTSUPP)
+        if exc.errno not in fallback_errors:
+            raise
+        _copy_snapshot(source, directory, name)
+        copied = True
+    with _open_relative_regular(
+        directory,
+        name,
+        f"{source.label} private snapshot",
+        hash_bytes=copied,
+    ) as snapshot:
+        if copied:
+            if snapshot.size != source.size or snapshot.sha256 != _sha256_descriptor(
+                source.descriptor, source.size
+            ):
+                raise CatalogueStageError(f"{source.label} copy differs from its private snapshot")
+        elif _opened_identity(snapshot) != _opened_identity(source):
+            raise CatalogueStageError(
+                f"{source.label} changed before its private snapshot was bound"
+            )
+        yield snapshot
+
+
+def _source_receipt_document(opened: _OpenedRegular) -> dict[str, Any]:
+    try:
+        raw = _read_opened(opened)
+        value = source_stage._strict_json(raw, "source stage receipt")
+        if type(value) is not dict or raw != source_stage.canonical_stage_receipt_bytes(value):
+            raise CatalogueStageError("source stage receipt is not canonical JSON")
+        return value
+    except FullSourceStageError as exc:
+        raise CatalogueStageError(f"source stage validation failed: {exc}") from exc
+
+
+def validate_normalized_catalogue_stage(
+    database: Path,
+    receipt: Path,
+    source_database: Path,
+    source_receipt: Path,
+    *,
+    work_dir: Path,
+    batch_size: int = MAX_BATCH_ROWS,
+    contract: FullSourceStageContract = PRODUCTION_CONTRACT,
+) -> None:
+    """Validate one catalogue and receipt against inode-bound private snapshots."""
+    private: tuple[str, _OpenedDirectory] | None = None
+    with ExitStack() as stack:
+        work = stack.enter_context(_open_directory(work_dir, "catalogue work directory"))
+        opened_source = stack.enter_context(_open_regular(source_database, "source stage database"))
+        opened_database = stack.enter_context(_open_regular(database, "catalogue database"))
+        opened_source_receipt = stack.enter_context(
+            _open_regular(source_receipt, "source stage receipt", hash_bytes=True)
+        )
+        opened_receipt = stack.enter_context(
+            _open_regular(receipt, "catalogue receipt", hash_bytes=True)
+        )
+        source_document = _source_receipt_document(opened_source_receipt)
+        document = _load_catalogue_receipt_bytes(_read_opened(opened_receipt))
+        private = _create_private_directory(
+            work, ".catalogue-validate-", "catalogue validation directory"
+        )
+        _, private_directory = private
+        try:
+            with _private_snapshot(
+                source_database, opened_source, private_directory, "source.duckdb"
+            ) as source_snapshot:
+                with _private_snapshot(
+                    database, opened_database, private_directory, "catalogue.duckdb"
+                ) as database_snapshot:
+                    duckdb, _ = source_stage._load_tools()
+                    root = _descriptor_path(private_directory.descriptor, private_directory.label)
+                    with duckdb.connect(str(root / "source.duckdb"), read_only=True) as source:
+                        with duckdb.connect(
+                            str(root / "catalogue.duckdb"), read_only=True
+                        ) as candidate:
+                            identity = validate_catalogue_candidate(
+                                source,
+                                candidate,
+                                source_document,
+                                work_dir=root,
+                                batch_size=batch_size,
+                                contract=contract,
+                            )
+                    for opened in (
+                        opened_source,
+                        opened_database,
+                        source_snapshot,
+                        database_snapshot,
+                    ):
+                        _assert_opened(opened)
+            _validate_receipt(identity, document)
+            _assert_path_binding(source_database, opened_source)
+            _assert_path_binding(database, opened_database)
+            _assert_path_binding(source_receipt, opened_source_receipt)
+            _assert_path_binding(receipt, opened_receipt)
+            _assert_directory_path(work)
+        except CatalogueStageError:
+            raise
+        except (FullSourceStageError, OSError, ValueError) as exc:
+            raise CatalogueStageError(f"catalogue stage validation failed: {exc}") from exc
+        finally:
+            _remove_private_directory(work, private[0], private_directory)
