@@ -7,7 +7,8 @@ production-release claim.
 
 ## npm SBOM generation
 
-Generate a canonical CycloneDX 1.7 document from the frontend npm lock:
+`sboms/frontend-npm.cdx.json` is the canonical CycloneDX 1.7 inventory generated
+from the real frontend candidate lock. Regenerate it to a new review path with:
 
 ```shell
 PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
@@ -22,12 +23,31 @@ command never replaces an existing path. It writes and synchronizes a unique
 same-directory partial file, promotes it without overwrite, and removes the
 partial file if publication fails.
 
+Validate the checked-in public bytes against the exact repository lock:
+
+```shell
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  npm-sbom-validate \
+  --repository-root . \
+  --lock src/frontend/package-lock.json \
+  --logical-path src/frontend/package-lock.json \
+  --sbom contracts/supply-chain/v1/sboms/frontend-npm.cdx.json
+```
+
+Validation rejects non-canonical JSON, schema or graph drift, a different lock
+hash or logical path, and symlinked lock or SBOM ancestry. Replace a reviewed
+artifact only through a new commit; the publication command itself never
+overwrites an existing path.
+
 The generator currently supports package-lock v3 registry packages only. It
 rejects links, workspaces, invalid names or aliases, non-registry tarballs,
 invalid integrity hashes, unresolved required edges, unreachable package
 entries, symlink inputs, and non-regular lock paths. The document binds the
 exact input SHA-256, each lock-entry SHA-256, npm SHA-512 integrity, root
 dependency groups, and path-qualified dependency relationships.
+The real artifact inventories the candidate build lock but does not claim
+bundle inclusion, license or vulnerability completeness, signing, or release
+approval.
 
 ## Python graph annotations
 

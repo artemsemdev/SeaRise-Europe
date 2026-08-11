@@ -9,16 +9,15 @@ from pathlib import Path
 
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
-    canonical_sbom_bytes,
-    generate_npm_sbom,
     load_json,
     parse_timestamp,
+    publish_npm_sbom,
     publish_python_sbom,
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    validate_npm_sbom,
     validate_python_sbom,
-    write_new_sbom,
 )
 
 
@@ -44,8 +43,14 @@ def _parser() -> argparse.ArgumentParser:
     inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_sbom = commands.add_parser("npm-sbom")
     npm_sbom.add_argument("--lock", type=Path, required=True)
+    npm_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_sbom.add_argument("--logical-path", required=True)
     npm_sbom.add_argument("--output", type=Path, required=True)
+    npm_validate = commands.add_parser("npm-sbom-validate")
+    npm_validate.add_argument("--sbom", type=Path, required=True)
+    npm_validate.add_argument("--lock", type=Path, required=True)
+    npm_validate.add_argument("--repository-root", type=Path, default=Path.cwd())
+    npm_validate.add_argument("--logical-path", required=True)
     python_sbom = commands.add_parser("python-sbom")
     python_sbom.add_argument("--annotation", type=Path, required=True)
     python_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
@@ -84,10 +89,21 @@ def main(argv: list[str] | None = None) -> int:
             input_count = sum(len(component["inputs"]) for component in document["components"])
             print(f"validated {input_count} dependency-defining inputs")
         elif args.command == "npm-sbom":
-            document = generate_npm_sbom(args.lock, logical_path=args.logical_path)
-            output = canonical_sbom_bytes(document)
-            write_new_sbom(args.output, output)
+            document = publish_npm_sbom(
+                args.output,
+                args.lock,
+                repository_root=args.repository_root.absolute(),
+                logical_path=args.logical_path,
+            )
             print(f"generated {len(document['components'])} npm components: {args.output}")
+        elif args.command == "npm-sbom-validate":
+            document = validate_npm_sbom(
+                args.sbom,
+                args.lock,
+                repository_root=args.repository_root.absolute(),
+                logical_path=args.logical_path,
+            )
+            print(f"validated {len(document['components'])} npm components: {args.sbom}")
         elif args.command == "python-sbom":
             document = publish_python_sbom(
                 args.output,

@@ -20,7 +20,8 @@ All notable changes to this project will be documented in this file.
   flat release locks, with synthetic-only fail-closed validation fixtures.
 - Added deterministic CycloneDX 1.7 generation for the frontend npm lock with
   exact input and component hashes, path-qualified dependency relationships,
-  offline schema validation, and fail-closed unsupported-input handling.
+  offline schema validation, immutable publication, canonical validation, and a
+  checked-in artifact bound to the real candidate lock.
 - Added a versioned, hash-bound inventory of dependency-defining repository
   inputs with exact fail-closed discovery, safe-path enforcement, and explicit
   non-production and OpenTofu-absence claims.
