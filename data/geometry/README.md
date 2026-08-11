@@ -98,12 +98,30 @@ false publication/canonical/production/hazard claims, and prohibited analytical
 lookup. Pinned tools are mandatory, decoded parity is checked against GeoParquet,
 and publishable hashes remain pending an exact pinned build.
 
-The visual error bound comes only from MVT Web Mercator quantization. At zoom 6
-and extent 16,384, the maximum angular grid step is
-`360 / (2^6 × 16,384)` degrees. MVT coordinate quantization and clipped-fragment
+The visual writer inserts collinear vertices at a maximum interval of 0.10
+degrees only in its derived WGS84 NDJSON intermediary so nonlinear Web Mercator
+projection does not turn long source chords into an unbounded visual error. It
+checks that this step preserves validity, polygon/interior-ring topology, bounds,
+and source-equivalent geometry; canonical GeoJSON and GeoParquet bytes are never
+modified.
+
+The remaining visual error bound comes from MVT Web Mercator quantization. At
+zoom 6 and extent 131,072, the maximum angular grid step is
+`360 / (2^6 × 131,072)` degrees. MVT coordinate quantization and clipped-fragment
 quantization each permit at most half a step per axis, so the composed bound is
-one step per axis. Decoded geometry must have a symmetric Hausdorff distance of
-at most `sqrt(2)` steps from the canonical geometry, and every decoded envelope
-coordinate must remain within one step of its canonical value. This tolerance
-authorizes visual quantization only; it does not permit analytical lookup or any
-scientific/geographic accuracy claim.
+one step per axis. Every source and decoded vertex is checked against the other
+boundary with an independent indexed symmetric discrete distance; its maximum
+must be at most `sqrt(2)` steps, and every decoded envelope coordinate must
+remain within one step of its canonical value. Exact polygon and interior-ring
+counts are also required. This discrete oracle is not a continuous Hausdorff
+claim. The tolerance authorizes visual quantization only; it does not permit
+analytical lookup or any scientific/geographic accuracy claim.
+
+The controlled macOS ARM64 release-toolchain job builds both boundary roles
+twice from the exact GeoParquet bytes. It accepts only the pinned Python,
+Tippecanoe, decoder, and go-pmtiles identities, runs the official PMTiles
+integrity check plus decoded parity inspection, and uploads an immutable package
+containing the four artifacts, candidate-bound build receipt, the evaluated
+detail-14/detail-17 segmentization profile matrix, z0/z3/z6 Chromium and MapLibre
+decode/render evidence, validation report, and checksums. The boundary status
+remains engineering-only even when every automated check passes.

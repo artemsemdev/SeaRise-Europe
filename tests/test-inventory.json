@@ -63,6 +63,12 @@
       "reference": "src/pipeline/tests/release/test_boundary_pmtiles.py",
       "environment": "macOS arm64; Python 3.9.6; 3 writer contract tests passed in 1.78s; 2 exact-pinned real-build tests skipped because official pinned assets were unavailable"
     },
+    "local-2026-08-11-boundary-pmtiles-evidence": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T01:30:00+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_evidence.py",
+      "environment": "macOS arm64; Python 3.11; deterministic candidate orchestration fixtures; real exact-pinned build delegated to the macOS ARM64 release-toolchain CI job"
+    },
     "local-2026-08-10-settlement-contracts": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T21:00:00+02:00",
@@ -514,6 +520,20 @@
       "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Three contract/mutation tests are unconditional; two real-build determinism tests require exact pinned local assets and remain skipped when unavailable." }
     },
     {
+      "id": "pipeline-boundary-pmtiles-evidence",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, compare visual profiles, exercise z0/z3/z6 in Chromium and MapLibre, emit candidate-bound evidence, and fail closed on any drift.",
+      "sourcePaths": ["src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "changedPaths": [".github/workflows/ci.yml", "scripts/release/build_boundary_pmtiles_evidence.py", "src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-pinned dual-build, profile-selection, z0/z3/z6 browser render, receipt, checksum, structure, and decoded-parity evidence gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "release-toolchain-macos", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 600, "class": "slow", "evidenceRef": "local-2026-08-11-boundary-pmtiles-evidence", "scope": "ci-job" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fast orchestration mutation tests are unconditional; the controlled job downloads hash-pinned public assets and package-lock-owned Chromium and requires the exact macOS ARM64 release runner." }
+    },
+    {
       "id": "frontend-pmtiles-render-evidence",
       "layer": "integration",
       "owner": "science",
@@ -857,6 +877,7 @@
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py", "suite": "pipeline-boundary-pmtiles-structure", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py", "suite": "pipeline-boundary-pmtiles-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_boundary_pmtiles.py", "suite": "pipeline-boundary-pmtiles-writer", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_evidence.py", "suite": "pipeline-boundary-pmtiles-evidence", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_owner_promotion.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_promotion_cli.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
