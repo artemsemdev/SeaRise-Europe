@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Added fail-closed, descriptor-bound finalization for exact pre-verification
+  candidate evidence, with complete source authority and durable publication.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
