@@ -53,9 +53,12 @@ def _b64(value: bytes) -> str:
     return base64.b64encode(value).decode()
 
 
-def _pair(tmp_path: Path) -> tuple[Path, Path]:
+def _pair(tmp_path: Path, *, data_provenance_class: str = "synthetic-fixture") -> tuple[Path, Path]:
     candidate_root, evidence_root = tmp_path / "candidate", tmp_path / "evidence"
     candidate, build = _documents()
+    candidate["dataProvenanceClass"] = build["dataProvenanceClass"] = data_provenance_class
+    for artifact in candidate["artifacts"]:
+        artifact["dataProvenanceClass"] = data_provenance_class
     manifest_path, build_path = _write_pair(candidate_root, candidate, build)
     manifest_raw = manifest_path.read_bytes()
 
