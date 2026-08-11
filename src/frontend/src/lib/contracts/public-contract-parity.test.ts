@@ -8,6 +8,8 @@ import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import { validateGateReportSemantics } from "./gate-report-semantics";
 import type { GateReportDocument } from "./gate-report-semantics";
+import { validateSettlementSearchShardSemantics } from "./settlement-semantics";
+import type { SettlementSearchShardDocument } from "./settlement-semantics";
 
 interface ContractDocument {
   $id?: string;
@@ -19,9 +21,11 @@ const contractDirectories = [
   resolve(process.cwd(), "../../contracts/release/v1"),
   resolve(process.cwd(), "../../contracts/release-gates/v1"),
   resolve(process.cwd(), "../../contracts/settlements/v2"),
+  resolve(process.cwd(), "../../contracts/settlements/v3"),
 ];
 const releaseGateContractDirectory = contractDirectories[1];
-const settlementContractDirectory = contractDirectories[2];
+const settlementContractDirectories = contractDirectories.slice(2);
+const settlementV3ContractDirectory = contractDirectories[3];
 
 function readJson(path: string): ContractDocument {
   return JSON.parse(readFileSync(path, "utf8")) as ContractDocument;
@@ -35,19 +39,15 @@ function lexicographicKeyJson(value: unknown): string {
     const record = value as Record<string, unknown>;
     return `{${Object.keys(record)
       .sort()
-      .map((key) => `${JSON.stringify(key)}:${lexicographicKeyJson(record[key])}`)
+      .map(
+        (key) => `${JSON.stringify(key)}:${lexicographicKeyJson(record[key])}`,
+      )
       .join(",")}}`;
   }
   const encoded = JSON.stringify(value);
-  if (encoded === undefined) throw new TypeError("value is not JSON serializable");
+  if (encoded === undefined)
+    throw new TypeError("value is not JSON serializable");
   return encoded;
-}
-
-function assertSearchSemantics(document: ContractDocument): void {
-  const records = document.documents;
-  if (!Array.isArray(records) || document.recordCount !== records.length) {
-    throw new TypeError("search shard recordCount differs from documents length");
-  }
 }
 
 function fixturePaths(kind: "valid" | "invalid"): string[] {
@@ -130,20 +130,20 @@ describe("Python and TypeScript public contract parity", () => {
       );
       expect(validate?.(document), JSON.stringify(validate?.errors)).toBe(true);
       expect(() =>
-        validateGateReportSemantics(
-          document as unknown as GateReportDocument,
-        ),
+        validateGateReportSemantics(document as unknown as GateReportDocument),
       ).not.toThrow();
     }
     for (const name of invalidPaths) {
       const document = readJson(
-        resolve(releaseGateContractDirectory, "fixtures/semantic-invalid", name),
+        resolve(
+          releaseGateContractDirectory,
+          "fixtures/semantic-invalid",
+          name,
+        ),
       );
       expect(validate?.(document), JSON.stringify(validate?.errors)).toBe(true);
       expect(() =>
-        validateGateReportSemantics(
-          document as unknown as GateReportDocument,
-        ),
+        validateGateReportSemantics(document as unknown as GateReportDocument),
       ).toThrow();
     }
     for (const name of [
@@ -157,38 +157,68 @@ describe("Python and TypeScript public contract parity", () => {
       );
       expect(validate?.(document), name).toBe(false);
       expect(() =>
-        validateGateReportSemantics(
-          document as unknown as GateReportDocument,
-        ),
+        validateGateReportSemantics(document as unknown as GateReportDocument),
       ).toThrow();
     }
   });
 
-  it("shares Arrow-field JSON identity and search-count semantics with Python", () => {
-    const geoparquet = readJson(
+  it("shares Arrow-field JSON identity with Python", () => {
+    for (const settlementContractDirectory of settlementContractDirectories) {
+      const geoparquet = readJson(
+        resolve(
+          settlementContractDirectory,
+          "fixtures/valid/settlement-geoparquet.json",
+        ),
+      );
+      const search = readJson(
+        resolve(
+          settlementContractDirectory,
+          "fixtures/valid/settlement-search-shard.json",
+        ),
+      );
+      const preimage = lexicographicKeyJson(geoparquet.arrowFields);
+
+      expect(geoparquet.arrowFieldsCanonicalization).toBe(
+        "lexicographic-key-json-v1",
+      );
+      expect(createHash("sha256").update(preimage, "utf8").digest("hex")).toBe(
+        geoparquet.arrowFieldsJsonSha256,
+      );
+      expect(() =>
+        validateSettlementSearchShardSemantics(
+          search as unknown as SettlementSearchShardDocument,
+        ),
+      ).not.toThrow();
+    }
+  });
+
+  it("shares settlement v3 semantic valid and invalid vectors with Python", () => {
+    const ajv = contractValidator();
+    const valid = readJson(
       resolve(
-        settlementContractDirectory,
-        "fixtures/valid/settlement-geoparquet.json",
-      ),
-    );
-    const search = readJson(
-      resolve(
-        settlementContractDirectory,
+        settlementV3ContractDirectory,
         "fixtures/valid/settlement-search-shard.json",
       ),
     );
-    const preimage = lexicographicKeyJson(geoparquet.arrowFields);
-
-    expect(geoparquet.arrowFieldsCanonicalization).toBe(
-      "lexicographic-key-json-v1",
+    const mismatch = readJson(
+      resolve(
+        settlementV3ContractDirectory,
+        "fixtures/semantic-invalid/record-count-mismatch.json",
+      ),
     );
-    expect(createHash("sha256").update(preimage, "utf8").digest("hex")).toBe(
-      geoparquet.arrowFieldsJsonSha256,
-    );
-    expect(() => assertSearchSemantics(search)).not.toThrow();
+    const validate = ajv.getSchema(valid.$schema as string);
 
+    expect(validate?.(valid), JSON.stringify(validate?.errors)).toBe(true);
+    expect(validate?.(mismatch), JSON.stringify(validate?.errors)).toBe(true);
     expect(() =>
-      assertSearchSemantics({ ...search, recordCount: Number(search.recordCount) + 1 }),
+      validateSettlementSearchShardSemantics(
+        valid as unknown as SettlementSearchShardDocument,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateSettlementSearchShardSemantics(
+        mismatch as unknown as SettlementSearchShardDocument,
+      ),
     ).toThrow(/recordCount/);
   });
 });

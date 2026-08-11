@@ -16,6 +16,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added settlement v3 public place, GeoParquet, and search-shard contracts as
+  the version-aware successor to v2, preserving stable source, identity, name,
+  location, population, feature, and lineage meanings while binding exact
+  spatial identities, record and name roles, whole-meter coastal distance,
+  search projections, shared cross-runtime count semantics, and fail-closed
+  approval claims. The v2 contract bytes remain unchanged for existing
+  consumers.
 - Added a hash-bound internal settlement spatial classifier with deterministic
   support/coastal membership, whole-meter EPSG:3035 shoreline distance,
   rejection-ledger semantics, and exact pinned DuckDB Spatial CI evidence.
