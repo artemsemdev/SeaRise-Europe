@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 
@@ -28,8 +30,10 @@ from searise_pipeline.settlements.full_source_catalogue import (
 from searise_pipeline.settlements.geonames import parse_admin1_row, parse_geoname_row
 from searise_pipeline.settlements.normalized_catalogue_stage import (
     CatalogueStageError,
+    canonical_catalogue_receipt_bytes,
     materialize_catalogue_candidate,
     validate_catalogue_candidate,
+    validate_normalized_catalogue_stage,
 )
 
 FIXTURES = Path(__file__).with_name("fixtures") / "geonames"
@@ -397,3 +401,218 @@ def test_source_missing_orphan_and_duplicates_fail_before_materialization(
                     work_dir=_work(tmp_path, "failed-materialization"),
                     contract=source[1],
                 )
+
+
+def _published_candidate(
+    tmp_path: Path,
+) -> tuple[
+    tuple[Path, FullSourceStageContract, dict[str, object]],
+    Path,
+    Path,
+    Path,
+    dict[str, object],
+]:
+    source = _source(tmp_path, "published-source")
+    database, identity = _materialize(tmp_path, "published", source, 2)
+    source_receipt = tmp_path / "source.receipt.json"
+    source_receipt.write_bytes(
+        source_stage.canonical_stage_receipt_bytes(source[2]["receipt"])  # type: ignore[arg-type]
+    )
+    payload = catalogue_stage._receipt_payload(identity)
+    document = {
+        **payload,
+        "deterministicIdentity": catalogue_stage._receipt_identity(payload),
+        "observations": {
+            "completedAtUtc": "2026-08-11T12:34:56Z",
+            "buildDurationSeconds": 1.25,
+            "peakRssBytes": 1024,
+            "deterministicIdentityExcluded": True,
+        },
+    }
+    receipt = tmp_path / "catalogue.receipt.json"
+    receipt.write_bytes(canonical_catalogue_receipt_bytes(document))
+    return source, source_receipt, database, receipt, document
+
+
+def test_public_validator_binds_canonical_receipt_and_private_database_snapshots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, source_receipt, database, receipt, document = _published_candidate(tmp_path)
+    work = _work(tmp_path, "public-validation")
+    real_duckdb, pa = source_stage._load_tools()
+    opened_paths: list[Path] = []
+
+    class DuckDbProxy:
+        @staticmethod
+        def connect(path: str, **kwargs: object) -> object:
+            opened_paths.append(Path(path))
+            return real_duckdb.connect(path, **kwargs)
+
+    monkeypatch.setattr(source_stage, "_load_tools", lambda: (DuckDbProxy, pa))
+    validate_normalized_catalogue_stage(
+        database,
+        receipt,
+        source[0],
+        source_receipt,
+        work_dir=work,
+        contract=source[1],
+        batch_size=1,
+    )
+    assert len(opened_paths) == 2
+    assert all(path.parent.parent == work for path in opened_paths)
+    assert all(path.parent.name.startswith(".catalogue-validate-") for path in opened_paths)
+    assert receipt.read_bytes() == canonical_catalogue_receipt_bytes(document)
+    assert not list(work.glob(".catalogue-validate-*"))
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-08-11T12:34:56+00:00",
+        "2026-08-11T12:34:56.000Z",
+        "2026-08-11T12:34:56z",
+        "2026-8-11T12:34:56Z",
+        "2026-02-30T12:34:56Z",
+    ],
+)
+def test_receipt_observations_require_exact_utc_seconds(timestamp: str) -> None:
+    with pytest.raises(CatalogueStageError, match="timestamp|observations"):
+        catalogue_stage._validate_observations(
+            {
+                "completedAtUtc": timestamp,
+                "buildDurationSeconds": 0.0,
+                "peakRssBytes": 1,
+                "deterministicIdentityExcluded": True,
+            }
+        )
+
+
+def test_same_size_receipt_mutation_during_validation_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, source_receipt, database, receipt, _ = _published_candidate(tmp_path)
+    original = catalogue_stage.validate_catalogue_candidate
+
+    def mutate(*args: object, **kwargs: object) -> dict[str, object]:
+        identity = original(*args, **kwargs)
+        raw = receipt.read_bytes()
+        changed = raw.replace(b'"completedAtUtc":"2', b'"completedAtUtc":"3', 1)
+        assert len(changed) == len(raw) and changed != raw
+        receipt.write_bytes(changed)
+        return identity
+
+    monkeypatch.setattr(catalogue_stage, "validate_catalogue_candidate", mutate)
+    with pytest.raises(CatalogueStageError, match="receipt exact bytes changed"):
+        validate_normalized_catalogue_stage(
+            database,
+            receipt,
+            source[0],
+            source_receipt,
+            work_dir=_work(tmp_path, "mutated-validation"),
+            contract=source[1],
+        )
+
+
+def test_private_cleanup_does_not_remove_racing_parent_entry(tmp_path: Path) -> None:
+    work = _work(tmp_path, "cleanup")
+    with catalogue_stage._open_directory(work, "work directory") as parent:
+        name, child = catalogue_stage._create_private_directory(
+            parent, ".catalogue-validate-", "validation directory"
+        )
+        opened_path = work / name
+        moved_path = work / "opened-private-directory"
+        opened_path.rename(moved_path)
+        opened_path.mkdir()
+        (opened_path / "replacement.txt").write_bytes(b"preserve")
+        with pytest.raises(CatalogueStageError, match="replaced; cleanup refused"):
+            catalogue_stage._remove_private_directory(parent, name, child)
+    assert (opened_path / "replacement.txt").read_bytes() == b"preserve"
+    assert list(moved_path.iterdir()) == []
+    shutil.rmtree(opened_path)
+    moved_path.rmdir()
+
+
+def test_private_creation_failure_does_not_remove_racing_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    work = _work(tmp_path, "create-cleanup")
+    with catalogue_stage._open_directory(work, "work directory") as parent:
+        real_open = catalogue_stage.os.open
+        moved_path = work / "created-private-directory"
+        replacement_path: Path | None = None
+
+        def replace_before_open(path: object, *args: object, **kwargs: object) -> int:
+            nonlocal replacement_path
+            if (
+                type(path) is str
+                and path.startswith(".catalogue-validate-")
+                and kwargs.get("dir_fd") == parent.descriptor
+            ):
+                replacement_path = work / path
+                replacement_path.rename(moved_path)
+                replacement_path.mkdir()
+                (replacement_path / "replacement.txt").write_bytes(b"preserve")
+                raise OSError("injected private-directory open failure")
+            return real_open(path, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(catalogue_stage.os, "open", replace_before_open)
+        with pytest.raises(CatalogueStageError, match="replaced; cleanup refused"):
+            catalogue_stage._create_private_directory(
+                parent, ".catalogue-validate-", "validation directory"
+            )
+    assert replacement_path is not None
+    assert (replacement_path / "replacement.txt").read_bytes() == b"preserve"
+    shutil.rmtree(replacement_path)
+    moved_path.rmdir()
+
+
+def test_public_validation_copies_descriptor_bound_snapshots_across_filesystems(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, source_receipt, database, receipt, _ = _published_candidate(tmp_path)
+
+    def cross_device(*args: object, **kwargs: object) -> None:
+        raise OSError(catalogue_stage.errno.EXDEV, "injected cross-device link")
+
+    monkeypatch.setattr(catalogue_stage.os, "link", cross_device)
+    work = _work(tmp_path, "copied-validation")
+    validate_normalized_catalogue_stage(
+        database,
+        receipt,
+        source[0],
+        source_receipt,
+        work_dir=work,
+        contract=source[1],
+    )
+    assert not list(work.glob(".catalogue-validate-*"))
+
+
+def test_public_validation_rejects_database_path_swap_after_snapshot_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, source_receipt, database, receipt, _ = _published_candidate(tmp_path)
+    moved = tmp_path / "opened-catalogue.duckdb"
+    original = catalogue_stage._private_snapshot
+
+    @contextmanager
+    def swap_after_binding(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        with original(*args, **kwargs) as snapshot:
+            if kwargs.get("name") == "catalogue.duckdb" or args[-1] == "catalogue.duckdb":
+                database.rename(moved)
+                shutil.copyfile(moved, database)
+            yield snapshot
+
+    monkeypatch.setattr(catalogue_stage, "_private_snapshot", swap_after_binding)
+    try:
+        with pytest.raises(CatalogueStageError, match="path identity changed"):
+            validate_normalized_catalogue_stage(
+                database,
+                receipt,
+                source[0],
+                source_receipt,
+                work_dir=_work(tmp_path, "swapped-validation"),
+                contract=source[1],
+            )
+    finally:
+        database.unlink(missing_ok=True)
+        moved.rename(database)
