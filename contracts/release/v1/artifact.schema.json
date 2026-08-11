@@ -425,6 +425,17 @@
         },
         {
           "if": {
+            "properties": { "role": { "const": "release-gate-report" } },
+            "required": ["role"]
+          },
+          "then": {
+            "properties": {
+              "mediaType": { "enum": ["application/json", "text/markdown"] }
+            }
+          }
+        },
+        {
+          "if": {
             "properties": { "role": { "const": "checksums" } },
             "required": ["role"]
           },

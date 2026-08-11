@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a versioned 47-artifact Phase 1 candidate completeness contract that
+  composes the full release artifact descriptor, binds immutable source rights,
+  seals checksums before a manifest-last envelope, and explicitly defers the
+  provenance, signature, and SBOM artifacts to the supply-chain phase.
 - Added lossless typed GeoNames `allCountries` and `admin1CodesASCII` row parsers
   with pinned source identity, exact lineage, explicit raw anomaly flags, and
   hash-bound real-format fixtures.

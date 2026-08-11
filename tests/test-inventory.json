@@ -99,6 +99,12 @@
       "reference": "src/pipeline/tests/release/test_gate_report.py",
       "environment": "macOS arm64; Python and Node 20-compatible Vitest; fixed JSON Schema fixtures and deterministic Markdown golden"
     },
+    "local-2026-08-11-candidate-completeness-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T12:00:00+02:00",
+      "reference": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py",
+      "environment": "macOS arm64; Python 3.11; fixed full-descriptor JSON Schema golden and deterministic inventory assertions"
+    },
     "local-2026-08-10-cog-range-contract": {
       "kind": "local-measurement",
       "observedAt": "2026-08-11T01:20:00+02:00",
@@ -426,6 +432,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-release-gate-contract", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Fixed local schema, JSON fixtures, and Markdown golden use no clock, random input, network, or source archive." }
+    },
+    {
+      "id": "pipeline-candidate-completeness-contract",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the Phase 1 candidate inventory compatible with full release artifact descriptors, exact immutable rights, sealing order, and manifest-last semantics.",
+      "sourcePaths": ["src/pipeline/tests/contracts/test_candidate_completeness_contract.py"],
+      "changedPaths": ["contracts/candidate-completeness/**", "contracts/release/v1/artifact.schema.json", "contracts/release/v1/defs.schema.json", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent schema-composition, exact-inventory, checksum-envelope, immutable-rights, and manifest-last gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/contracts/test_candidate_completeness_contract.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-candidate-completeness-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed checked-in JSON schemas and golden bytes use no clock, random input, network, credentials, or external binaries." }
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
@@ -906,6 +926,7 @@
     { "path": "src/pipeline/tests/release/test_source_fixture.py", "suite": "pipeline-ar6-release-source-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_source_grid.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_toolchain.py", "suite": "pipeline-ar6-release-toolchain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_ar6_lookup_goldens.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

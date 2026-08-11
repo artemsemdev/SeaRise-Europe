@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v1/candidate.schema.json",
+  "title": "SeaRise Europe Phase 1 engineering candidate completeness v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "candidateId",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "publicationClaim",
+    "manifest",
+    "supplyChainBoundary",
+    "attributionRegistry",
+    "geometryPolicy",
+    "projectionGrid",
+    "artifacts",
+    "checksumInventory",
+    "gateReportSemantics",
+    "stac",
+    "parity"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v1/candidate.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "phase-1-engineering-candidate-completeness-v1" },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^candidate-[a-z0-9][a-z0-9-]+$"
+    },
+    "dataReleaseId": { "$ref": "#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "enum": ["synthetic-fixture", "real-source"] },
+    "publicationClaim": { "const": false },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "artifactCount", "writeSequence"],
+      "properties": {
+        "path": { "const": "manifest.json" },
+        "artifactCount": { "type": "integer", "minimum": 1 },
+        "writeSequence": { "type": "integer", "minimum": 2 }
+      }
+    },
+    "supplyChainBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "issue", "roles", "includedInArtifactInventory"],
+      "properties": {
+        "status": { "const": "deferred" },
+        "issue": { "const": 53 },
+        "roles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "provenance" },
+            { "const": "signature" },
+            { "const": "software-bill-of-materials" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "includedInArtifactInventory": { "const": false }
+      }
+    },
+    "attributionRegistry": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "geometryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "purpose",
+        "canonical",
+        "production",
+        "publicationEligible",
+        "hazardExtentClaim"
+      ],
+      "properties": {
+        "status": { "const": "selected-scope-approximation" },
+        "purpose": { "const": "product-eligibility-only" },
+        "canonical": { "const": false },
+        "production": { "const": false },
+        "publicationEligible": { "const": false },
+        "hazardExtentClaim": { "const": false }
+      }
+    },
+    "projectionGrid": { "$ref": "#/$defs/grid" },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/artifactEnvelope" }
+    },
+    "checksumInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "algorithm", "subjects"],
+      "properties": {
+        "path": { "const": "checksums.txt" },
+        "algorithm": { "const": "sha256" },
+        "subjects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "sha256"],
+            "properties": {
+              "path": { "$ref": "#/$defs/path" },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
+      }
+    },
+    "gateReportSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateState",
+        "validatedScope",
+        "validatedArtifactCount",
+        "excludedPaths",
+        "manifestHashReferenced"
+      ],
+      "properties": {
+        "candidateState": { "const": "pre-manifest-snapshot" },
+        "validatedScope": {
+          "const": "required-artifacts-except-gate-reports-checksums-and-manifest"
+        },
+        "validatedArtifactCount": { "type": "integer", "minimum": 1 },
+        "excludedPaths": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "checksums.txt" },
+            { "const": "evidence/gate-report.json" },
+            { "const": "evidence/gate-report.md" },
+            { "const": "manifest.json" }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "manifestHashReferenced": { "const": false }
+      }
+    },
+    "stac": { "$ref": "#/$defs/stac" },
+    "parity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "python", "typescript"],
+      "properties": {
+        "status": { "const": "passed" },
+        "python": { "$ref": "#/$defs/parityEvidence" },
+        "typescript": { "$ref": "#/$defs/parityEvidence" }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]+$"
+    },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "href": {
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z][A-Za-z0-9+.-]*:)[A-Za-z0-9._/-]+$"
+    },
+    "artifactEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "descriptor",
+        "contentEncoding",
+        "observedByteSize",
+        "observedSha256",
+        "writeSequence"
+      ],
+      "properties": {
+        "descriptor": { "$ref": "../../release/v1/artifact.schema.json" },
+        "contentEncoding": { "enum": ["identity", "br"] },
+        "observedByteSize": { "type": "integer", "minimum": 1 },
+        "observedSha256": { "$ref": "#/$defs/sha256" },
+        "writeSequence": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "crs",
+        "bounds",
+        "transform",
+        "width",
+        "height",
+        "nativeResolutionDegrees",
+        "nodata"
+      ],
+      "properties": {
+        "crs": { "const": "EPSG:4326" },
+        "bounds": {
+          "type": "array",
+          "prefixItems": [
+            { "const": -30.5 },
+            { "const": 29.5 },
+            { "const": 45.5 },
+            { "const": 75.5 }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        },
+        "transform": {
+          "type": "array",
+          "prefixItems": [
+            { "const": 1 },
+            { "const": 0 },
+            { "const": -30.5 },
+            { "const": 0 },
+            { "const": -1 },
+            { "const": 75.5 }
+          ],
+          "items": false,
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "width": { "const": 76 },
+        "height": { "const": 46 },
+        "nativeResolutionDegrees": { "const": 1 },
+        "nodata": { "const": -32768 }
+      }
+    },
+    "stac": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog", "collection", "items"],
+      "properties": {
+        "catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "collectionHref"],
+          "properties": {
+            "path": { "$ref": "#/$defs/path" },
+            "collectionHref": { "$ref": "#/$defs/href" }
+          }
+        },
+        "collection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "itemHrefs"],
+          "properties": {
+            "path": { "$ref": "#/$defs/path" },
+            "itemHrefs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/href" }
+            }
+          }
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stacItem" }
+        }
+      }
+    },
+    "stacItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "dataReleaseId",
+        "scenario",
+        "horizon",
+        "analysisHref",
+        "visualHref",
+        "tableHref"
+      ],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "dataReleaseId": { "$ref": "#/$defs/dataReleaseId" },
+        "scenario": { "enum": ["ssp1-26", "ssp2-45", "ssp5-85"] },
+        "horizon": { "enum": [2030, 2050, 2100] },
+        "analysisHref": { "$ref": "#/$defs/href" },
+        "visualHref": { "$ref": "#/$defs/href" },
+        "tableHref": { "$ref": "#/$defs/href" }
+      }
+    },
+    "parityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rowColumnSha256", "storedClassSha256", "nodataSha256", "finalStateSha256"],
+      "properties": {
+        "rowColumnSha256": { "$ref": "#/$defs/sha256" },
+        "storedClassSha256": { "$ref": "#/$defs/sha256" },
+        "nodataSha256": { "$ref": "#/$defs/sha256" },
+        "finalStateSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}
