@@ -270,8 +270,9 @@ def test_staged_path_replacement_is_not_adopted(
         calls += 1
         if calls == 1:
             path = module.authority._descriptor_path(directory) / name
-            path.unlink()
-            path.write_bytes(PAYLOAD)
+            replacement = path.with_name(f"{name}.alien")
+            replacement.write_bytes(PAYLOAD)
+            os.replace(replacement, path)
         return evidence
 
     monkeypatch.setattr(module, "_serialize_owned", replace)
