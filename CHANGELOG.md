@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
+- Added a distinct immutable real-source pre-verification evidence envelope
+  that binds exact candidate bytes while rejecting signing, identity,
+  environment, production, publication, and scientific-approval claims.
 - Added identity-bound Cosign verification for exact manifest and provenance
   bytes with immutable non-publication receipts and independently reviewed tool locks.
 - Added descriptor-safe offline pairing with strict Sigstore bundles and regenerated SBOMs.
