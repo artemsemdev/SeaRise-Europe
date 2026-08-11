@@ -70,7 +70,7 @@ services:
   # TiTiler (Tile Server)
   # ---------------------------------------------------------------------------
   tiler:
-    image: ghcr.io/developmentseed/titiler:2.0.0
+    image: ghcr.io/developmentseed/titiler:2.0.0@sha256:a69eb592c057dbbefd491bde28c0963a5e2134cafff841066a1185b1afce7fa6 # 2.0.0
     ports:
       - "8000:80"
     environment:
@@ -95,7 +95,7 @@ services:
   # PostgreSQL + PostGIS
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5 # 16-3.4
     ports:
       - "5432:5432"
     environment:
@@ -136,7 +136,7 @@ services:
   # Azurite (Azure Blob Storage emulator)
   # ---------------------------------------------------------------------------
   azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0@sha256:2628ee10a72833cc344b9d194cd8b245543892b307d16cf26a2cf55a15b816af # 3.33.0
     ports:
       - "10000:10000"
       - "10001:10001"

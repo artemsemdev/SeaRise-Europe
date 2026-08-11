@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Pinned every third-party GitHub Action and build/release container image to
+  its reviewed commit SHA or manifest digest, with a fail-closed repository
+  validator that rejects mutable references.
+
 ### Added
 
 - Added lossless typed GeoNames `allCountries` and `admin1CodesASCII` row parsers
