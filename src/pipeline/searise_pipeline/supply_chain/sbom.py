@@ -6,8 +6,10 @@ import base64
 import binascii
 import hashlib
 import json
+import os
 import re
 import stat
+import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
@@ -43,6 +45,60 @@ def canonical_sbom_bytes(document: Mapping[str, Any]) -> bytes:
         )
         + "\n"
     ).encode("utf-8")
+
+
+def write_new_sbom(output_path: Path, content: bytes) -> None:
+    """Durably publish new SBOM bytes without overwriting any existing path."""
+    if not output_path.name or os.path.lexists(output_path):
+        raise SupplyChainContractError(f"SBOM output path already exists: {output_path}")
+    parent = output_path.parent
+    if parent.is_symlink():
+        raise SupplyChainContractError(f"SBOM output parent must not be a symlink: {parent}")
+    try:
+        parent_mode = parent.stat().st_mode
+    except FileNotFoundError as exc:
+        raise SupplyChainContractError(f"SBOM output parent must already exist: {parent}") from exc
+    if not stat.S_ISDIR(parent_mode):
+        raise SupplyChainContractError(f"SBOM output parent must be a directory: {parent}")
+
+    descriptor = -1
+    partial_path: Path | None = None
+    promoted = False
+    try:
+        descriptor, partial_name = tempfile.mkstemp(
+            dir=parent,
+            prefix=f".{output_path.name}.",
+            suffix=".partial",
+        )
+        partial_path = Path(partial_name)
+        with os.fdopen(descriptor, "wb") as stream:
+            descriptor = -1
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(partial_path, output_path)
+        except FileExistsError as exc:
+            raise SupplyChainContractError(
+                f"SBOM output path already exists: {output_path}"
+            ) from exc
+        promoted = True
+        partial_path.unlink()
+        partial_path = None
+        directory_descriptor = os.open(parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+    except Exception:
+        if promoted:
+            output_path.unlink(missing_ok=True)
+        raise
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        if partial_path is not None:
+            partial_path.unlink(missing_ok=True)
 
 
 def _sha256_bytes(value: bytes) -> str:

@@ -9,7 +9,7 @@ from .contracts import (
     validate_dependency_inventory,
     validate_evidence_files,
 )
-from .sbom import canonical_sbom_bytes, generate_npm_sbom
+from .sbom import canonical_sbom_bytes, generate_npm_sbom, write_new_sbom
 
 __all__ = [
     "SupplyChainContractError",
@@ -21,4 +21,5 @@ __all__ = [
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_evidence_files",
+    "write_new_sbom",
 ]

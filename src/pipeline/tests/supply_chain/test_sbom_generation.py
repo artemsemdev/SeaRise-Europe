@@ -11,10 +11,12 @@ from typing import Any
 
 import pytest
 
+import searise_pipeline.supply_chain.sbom as sbom_module
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     canonical_sbom_bytes,
     generate_npm_sbom,
+    write_new_sbom,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -319,3 +321,53 @@ def test_non_json_numeric_constants_fail_closed(tmp_path: Path, constant: str) -
     invalid.write_text('{"value":' + constant + "}\n", encoding="utf-8")
     with pytest.raises(SupplyChainContractError, match="non-JSON numeric constant"):
         _generate(invalid)
+
+
+def test_atomic_output_refuses_overwrite_input_alias_and_symlinks(
+    tmp_path: Path,
+) -> None:
+    original = FIXTURE.read_bytes()
+    with pytest.raises(SupplyChainContractError, match="already exists"):
+        write_new_sbom(FIXTURE, b"replacement")
+    assert FIXTURE.read_bytes() == original
+
+    target = tmp_path / "target.json"
+    target.write_bytes(b"existing")
+    symlink = tmp_path / "output.json"
+    symlink.symlink_to(target)
+    with pytest.raises(SupplyChainContractError, match="already exists"):
+        write_new_sbom(symlink, b"replacement")
+    assert target.read_bytes() == b"existing"
+
+
+def test_atomic_output_requires_existing_non_symlink_parent(tmp_path: Path) -> None:
+    with pytest.raises(SupplyChainContractError, match="already exist"):
+        write_new_sbom(tmp_path / "missing" / "output.json", b"content")
+
+    actual_parent = tmp_path / "actual"
+    actual_parent.mkdir()
+    linked_parent = tmp_path / "linked"
+    linked_parent.symlink_to(actual_parent, target_is_directory=True)
+    with pytest.raises(SupplyChainContractError, match="must not be a symlink"):
+        write_new_sbom(linked_parent / "output.json", b"content")
+
+
+def test_atomic_output_promotes_complete_bytes_and_cleans_partial(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = tmp_path / "sbom.json"
+    write_new_sbom(output, b"complete\n")
+    assert output.read_bytes() == b"complete\n"
+    assert not list(tmp_path.glob("*.partial"))
+
+    failed_output = tmp_path / "failed.json"
+
+    def fail_link(_source: Path, _target: Path) -> None:
+        raise OSError("injected link failure")
+
+    monkeypatch.setattr(sbom_module.os, "link", fail_link)
+    with pytest.raises(OSError, match="injected link failure"):
+        write_new_sbom(failed_output, b"partial")
+    assert not failed_output.exists()
+    assert not list(tmp_path.glob("*.partial"))
