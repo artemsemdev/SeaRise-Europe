@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
@@ -15,7 +16,11 @@ from typing import Any, Mapping
 from searise_pipeline.science.contracts import ScienceContractError
 
 from .boundary_geoparquet import write_boundary_geoparquet
-from .boundary_pmtiles import BoundaryVectorToolPaths, write_boundary_pmtiles
+from .boundary_pmtiles import (
+    BoundaryVectorToolPaths,
+    evaluate_boundary_profile_matrix,
+    write_boundary_pmtiles,
+)
 from .evidence import sha256, write_new_json_record
 from .toolchain import validate_python_toolchain
 
@@ -135,6 +140,83 @@ def _compare_attempts(first: Path, second: Path) -> None:
             )
 
 
+def _run_browser_harness(
+    output: Path,
+    *,
+    candidate: Path,
+    node_path: Path,
+    browser_harness_path: Path,
+    frontend_directory: Path,
+) -> Mapping[str, Any]:
+    for label, path in (
+        ("Node executable", node_path),
+        ("browser harness", browser_harness_path),
+    ):
+        if not path.is_file() or path.is_symlink():
+            raise ScienceContractError(f"Boundary {label} is absent or unsafe")
+    if not frontend_directory.is_dir() or frontend_directory.is_symlink():
+        raise ScienceContractError("Boundary browser environment is absent or unsafe")
+    try:
+        subprocess.run(
+            [
+                str(node_path),
+                str(browser_harness_path),
+                str(candidate),
+                str(output),
+            ],
+            cwd=frontend_directory,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        report = json.loads(output.read_text(encoding="utf-8"))
+    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Boundary browser harness failed: {exc}") from exc
+    expected_inputs = {
+        path.relative_to(candidate).as_posix(): {
+            "byteSize": path.stat().st_size,
+            "sha256": sha256(path),
+        }
+        for path in _candidate_files(candidate)
+        if path.suffix == ".pmtiles"
+    }
+    observed_inputs = {
+        item.get("path"): {
+            "byteSize": item.get("byteSize"),
+            "sha256": item.get("sha256"),
+        }
+        for item in report.get("inputs", [])
+        if isinstance(item, dict)
+    }
+    if (
+        report.get("status") != "passed"
+        or observed_inputs != expected_inputs
+        or report.get("assertions")
+        != {
+            "zooms": [0, 3, 6],
+            "roles": ["coastal-boundary", "support-boundary"],
+            "everySampleDecodedAndRendered": True,
+            "safeVisualPropertiesPreserved": True,
+            "httpRangeUsedForEveryArtifact": True,
+        }
+        or len(report.get("samples", [])) != 6
+        or report.get("limitation")
+        != {
+            "visualOnly": True,
+            "engineeringUse": "engineering-only",
+            "canonical": False,
+            "production": False,
+            "publicationEligible": False,
+        }
+    ):
+        raise ScienceContractError("Boundary browser report differs from its candidate")
+    return {
+        "path": output.name,
+        "byteSize": output.stat().st_size,
+        "sha256": sha256(output),
+    }
+
+
 def build_boundary_evidence_package(
     output: Path,
     *,
@@ -144,6 +226,9 @@ def build_boundary_evidence_package(
     release_contract_path: Path,
     python_lock_path: Path,
     tools: BoundaryVectorToolPaths,
+    node_path: Path,
+    browser_harness_path: Path,
+    frontend_directory: Path,
 ) -> Path:
     """Build both boundaries twice and atomically publish their evidence package."""
     if _HEX40.fullmatch(source_revision) is None:
@@ -191,6 +276,53 @@ def build_boundary_evidence_package(
         if artifacts != rebuilt_artifacts:
             raise ScienceContractError("Boundary rebuild inspection evidence differs")
 
+        profile_roles = []
+        for role in sorted(_ROLES):
+            paths = _ROLES[role]
+            profile_roles.append(
+                {
+                    "role": role,
+                    "profiles": evaluate_boundary_profile_matrix(
+                        candidate / paths["geoparquet"],
+                        repository / paths["source"],
+                        role=role,
+                        contract=contract,
+                        tools=tools,
+                    ),
+                }
+            )
+        profile_selection = {
+            "schemaVersion": 1,
+            "issue": 51,
+            "candidateId": candidate_id,
+            "sourceRevision": source_revision,
+            "status": "passed",
+            "evaluatedProfiles": {
+                "fullDetail": [14, 17],
+                "visualSegmentizationDegrees": [None, 0.10],
+            },
+            "selection": {
+                "fullDetail": 17,
+                "mvtExtent": 131072,
+                "visualSegmentizationDegrees": 0.10,
+                "canonicalSourceModified": False,
+            },
+            "roles": profile_roles,
+        }
+        write_new_json_record(package / "profile-selection.json", profile_selection)
+        profile_selection_record = {
+            "path": "profile-selection.json",
+            "byteSize": (package / "profile-selection.json").stat().st_size,
+            "sha256": sha256(package / "profile-selection.json"),
+        }
+        browser_report_record = _run_browser_harness(
+            package / "browser-consumer-report.json",
+            candidate=candidate,
+            node_path=node_path,
+            browser_harness_path=browser_harness_path,
+            frontend_directory=frontend_directory,
+        )
+
         output_records = [
             {
                 "path": path.relative_to(candidate).as_posix(),
@@ -232,6 +364,14 @@ def build_boundary_evidence_package(
                 "artifactBytesIdentical": True,
                 "inspectionEvidenceIdentical": True,
             },
+            "profileSelection": profile_selection_record,
+            "browserHarness": {
+                **_input_record(
+                    repository,
+                    browser_harness_path.relative_to(repository).as_posix(),
+                ),
+                "report": browser_report_record,
+            },
         }
         validation_report = {
             "schemaVersion": 1,
@@ -250,7 +390,11 @@ def build_boundary_evidence_package(
                 "officialPmtilesIntegrity": "passed",
                 "decodedIdentityPropertiesGeometryParity": "passed",
                 "byteDeterministicRebuild": "passed",
+                "minimumVisualProfileSelection": "passed",
+                "browserDecodeRenderZ0Z3Z6": "passed",
             },
+            "profileSelection": profile_selection_record,
+            "browserConsumer": browser_report_record,
             "artifacts": artifacts,
             "limitation": {
                 "status": "selected-scope-approximation",
@@ -269,6 +413,8 @@ def build_boundary_evidence_package(
         checksum_paths = [
             *[path.relative_to(package) for path in _candidate_files(candidate)],
             Path("build-receipt.json"),
+            Path("browser-consumer-report.json"),
+            Path("profile-selection.json"),
             Path("validation-report.json"),
         ]
         (package / "checksums.txt").write_text(

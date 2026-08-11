@@ -67,6 +67,9 @@ def _arrange(
     receipt = repository / "src/pipeline/toolchain/tippecanoe-receipt.json"
     receipt.parent.mkdir(parents=True, exist_ok=True)
     receipt.write_text('{"schemaVersion":1}\n', encoding="utf-8")
+    browser_harness = repository / "src/frontend/scripts/browser.mjs"
+    browser_harness.parent.mkdir(parents=True, exist_ok=True)
+    browser_harness.write_text("// fixture\n", encoding="utf-8")
     tool = tmp_path / "tool"
     tool.write_bytes(b"tool")
     tools = BoundaryVectorToolPaths(
@@ -142,6 +145,30 @@ def _arrange(
 
     monkeypatch.setattr(boundary_evidence, "write_boundary_geoparquet", write_geoparquet)
     monkeypatch.setattr(boundary_evidence, "write_boundary_pmtiles", write_pmtiles)
+    monkeypatch.setattr(
+        boundary_evidence,
+        "evaluate_boundary_profile_matrix",
+        lambda *_args, **_kwargs: [
+            {
+                "fullDetail": detail,
+                "passed": detail == 17,
+                "profileId": f"detail-{detail}-{segmentization}",
+                "visualIntermediary": {"method": segmentization},
+            }
+            for detail in (14, 17)
+            for segmentization in ("none", "shapely-segmentize")
+        ],
+    )
+
+    def browser_report(output: Path, **_kwargs: object) -> dict[str, object]:
+        output.write_text('{"status":"passed"}\n', encoding="utf-8")
+        return {
+            "path": output.name,
+            "byteSize": output.stat().st_size,
+            "sha256": boundary_evidence.sha256(output),
+        }
+
+    monkeypatch.setattr(boundary_evidence, "_run_browser_harness", browser_report)
     return repository, lock, tools
 
 
@@ -160,6 +187,9 @@ def test_build_boundary_evidence_publishes_complete_candidate_atomically(
         ),
         python_lock_path=lock,
         tools=tools,
+        node_path=tools.tippecanoe,
+        browser_harness_path=repository / "src/frontend/scripts/browser.mjs",
+        frontend_directory=repository / "src/frontend",
     )
 
     assert result == output
@@ -178,7 +208,19 @@ def test_build_boundary_evidence_publishes_complete_candidate_atomically(
         "inspectionEvidenceIdentical": True,
     }
     assert len(receipt["outputs"]) == 4
-    assert len((output / "checksums.txt").read_text().splitlines()) == 6
+    assert receipt["profileSelection"]["path"] == "profile-selection.json"
+    profile_selection = json.loads((output / "profile-selection.json").read_text())
+    assert profile_selection["selection"] == {
+        "fullDetail": 17,
+        "mvtExtent": 131072,
+        "visualSegmentizationDegrees": 0.10,
+        "canonicalSourceModified": False,
+    }
+    assert len(profile_selection["roles"]) == 2
+    assert receipt["browserHarness"]["report"]["path"] == (
+        "browser-consumer-report.json"
+    )
+    assert len((output / "checksums.txt").read_text().splitlines()) == 8
     with pytest.raises(ScienceContractError, match="already exists"):
         boundary_evidence.build_boundary_evidence_package(
             output,
@@ -190,6 +232,9 @@ def test_build_boundary_evidence_publishes_complete_candidate_atomically(
             ),
             python_lock_path=lock,
             tools=tools,
+            node_path=tools.tippecanoe,
+            browser_harness_path=repository / "src/frontend/scripts/browser.mjs",
+            frontend_directory=repository / "src/frontend",
         )
 
 
@@ -211,5 +256,88 @@ def test_build_boundary_evidence_rejects_non_deterministic_bytes_without_output(
             ),
             python_lock_path=lock,
             tools=tools,
+            node_path=tools.tippecanoe,
+            browser_harness_path=repository / "src/frontend/scripts/browser.mjs",
+            frontend_directory=repository / "src/frontend",
         )
     assert not output.exists()
+
+
+@pytest.mark.parametrize("unsafe", [False, True])
+def test_browser_harness_binds_candidate_and_safe_limitations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    unsafe: bool,
+) -> None:
+    candidate = tmp_path / "candidate"
+    artifacts = {
+        "boundaries/coastal-analysis-zone.pmtiles": b"coastal",
+        "boundaries/europe.pmtiles": b"support",
+    }
+    for relative, payload in artifacts.items():
+        path = candidate / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    node = tmp_path / "node"
+    harness = tmp_path / "browser.mjs"
+    frontend = tmp_path / "frontend"
+    node.write_bytes(b"node")
+    harness.write_text("// fixture\n", encoding="utf-8")
+    frontend.mkdir()
+    output = tmp_path / "browser-report.json"
+
+    def run(command: list[str], **_kwargs: object) -> None:
+        report_path = Path(command[-1])
+        report_path.write_text(
+            json.dumps(
+                {
+                    "status": "passed",
+                    "inputs": [
+                        {
+                            "path": relative,
+                            "byteSize": len(payload),
+                            "sha256": boundary_evidence.sha256(candidate / relative),
+                        }
+                        for relative, payload in artifacts.items()
+                    ],
+                    "assertions": {
+                        "zooms": [0, 3, 6],
+                        "roles": ["coastal-boundary", "support-boundary"],
+                        "everySampleDecodedAndRendered": True,
+                        "safeVisualPropertiesPreserved": True,
+                        "httpRangeUsedForEveryArtifact": True,
+                    },
+                    "samples": [{} for _ in range(6)],
+                    "limitation": {
+                        "visualOnly": True,
+                        "engineeringUse": "engineering-only",
+                        "canonical": unsafe,
+                        "production": False,
+                        "publicationEligible": False,
+                    },
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(boundary_evidence.subprocess, "run", run)
+    if unsafe:
+        with pytest.raises(ScienceContractError, match="browser report differs"):
+            boundary_evidence._run_browser_harness(
+                output,
+                candidate=candidate,
+                node_path=node,
+                browser_harness_path=harness,
+                frontend_directory=frontend,
+            )
+    else:
+        record = boundary_evidence._run_browser_harness(
+            output,
+            candidate=candidate,
+            node_path=node,
+            browser_harness_path=harness,
+            frontend_directory=frontend,
+        )
+        assert record["path"] == "browser-report.json"
+        assert record["sha256"] == boundary_evidence.sha256(output)

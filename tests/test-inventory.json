@@ -523,15 +523,15 @@
       "id": "pipeline-boundary-pmtiles-evidence",
       "layer": "contract",
       "owner": "data",
-      "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, emit candidate-bound hashes and receipts, and fail closed on any byte or inspection drift.",
-      "sourcePaths": ["src/pipeline/tests/release/test_boundary_evidence.py"],
-      "changedPaths": [".github/workflows/ci.yml", "scripts/release/build_boundary_pmtiles_evidence.py", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, compare visual profiles, exercise z0/z3/z6 in Chromium and MapLibre, emit candidate-bound evidence, and fail closed on any drift.",
+      "sourcePaths": ["src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "changedPaths": [".github/workflows/ci.yml", "scripts/release/build_boundary_pmtiles_evidence.py", "src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
       "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-pinned dual-build candidate, receipt, checksum, structure, and decoded-parity evidence gate." },
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-pinned dual-build, profile-selection, z0/z3/z6 browser render, receipt, checksum, structure, and decoded-parity evidence gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "release-toolchain-macos", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 300, "class": "slow", "evidenceRef": "local-2026-08-11-boundary-pmtiles-evidence", "scope": "ci-job" },
-      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fast orchestration mutation tests are unconditional; the controlled job downloads hash-pinned public assets and requires the exact macOS ARM64 release runner." }
+      "cost": { "estimatedSeconds": 600, "class": "slow", "evidenceRef": "local-2026-08-11-boundary-pmtiles-evidence", "scope": "ci-job" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fast orchestration mutation tests are unconditional; the controlled job downloads hash-pinned public assets and package-lock-owned Chromium and requires the exact macOS ARM64 release runner." }
     },
     {
       "id": "frontend-pmtiles-render-evidence",

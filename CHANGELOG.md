@@ -101,12 +101,13 @@ All notable changes to this project will be documented in this file.
   Phase 0R bytes, with lower/median/upper value-bin coverage and exact
   source-nodata transparency probes.
 - Added an independent decoded boundary-PMTiles parity oracle with exact IDs
-  and properties, zoom-6 quantization bounds, symmetric geometry checks, and
-  topology-loss rejection.
+  and properties, zoom-6 extent-131072 quantization bounds, independent indexed
+  symmetric vertex-to-boundary checks, and compensated topology-loss rejection.
 - Added a controlled exact-pinned boundary build that produces support and
   coastal GeoParquet/PMTiles candidates twice, rejects byte or inspection
-  drift, and retains candidate-bound receipts, checksums, structure, and
-  decoded-parity evidence.
+  drift, compares detail/segmentization profiles, exercises z0/z3/z6 through
+  Chromium and MapLibre, and retains candidate-bound receipts, checksums,
+  structure, decoded-parity, and browser evidence.
 
 ### Changed
 

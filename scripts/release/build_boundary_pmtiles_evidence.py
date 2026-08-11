@@ -42,6 +42,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--pmtiles-distribution-asset", type=Path, required=True)
     parser.add_argument("--pmtiles-distribution-platform", required=True)
     parser.add_argument("--build-run-id", required=True)
+    parser.add_argument("--node", type=Path, required=True)
+    parser.add_argument("--browser-harness", type=Path, required=True)
+    parser.add_argument("--frontend-directory", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
@@ -78,6 +81,9 @@ def main() -> None:
             ),
             platform=args.pmtiles_distribution_platform,
         ),
+        node_path=repository_path(args.node),
+        browser_harness_path=repository_path(args.browser_harness),
+        frontend_directory=repository_path(args.frontend_directory),
     )
     print(result)
 

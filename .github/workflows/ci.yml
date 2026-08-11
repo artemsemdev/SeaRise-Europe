@@ -402,6 +402,18 @@ jobs:
           unzip -p "${asset}" pmtiles > "${RUNNER_TEMP}/pmtiles"
           chmod 0755 "${RUNNER_TEMP}/pmtiles"
 
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install locked boundary browser environment
+        working-directory: src/frontend
+        run: |
+          npm ci
+          ./node_modules/.bin/playwright install chromium
+
       - name: Build and inspect exact boundary candidates twice
         env:
           PYTHONPATH: src/pipeline
@@ -417,6 +429,9 @@ jobs:
             --pmtiles-distribution-asset "${RUNNER_TEMP}/go-pmtiles-1.31.2_Darwin_arm64.zip" \
             --pmtiles-distribution-platform darwin-arm64 \
             --build-run-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-darwin-arm64" \
+            --node "$(command -v node)" \
+            --browser-harness src/frontend/scripts/verify-boundary-pmtiles-browser.mjs \
+            --frontend-directory src/frontend \
             --output "${RUNNER_TEMP}/boundary-pmtiles-evidence"
 
       - name: Validate boundary evidence package
@@ -428,7 +443,9 @@ jobs:
             .blockingChecks == [] and
             (.candidate.artifacts | length) == 4 and
             (.artifacts | length) == 2 and
-            ([.artifacts[].inspection.officialPmtilesVerify] | all(. == "passed"))
+            ([.artifacts[].inspection.officialPmtilesVerify] | all(. == "passed")) and
+            .checks.minimumVisualProfileSelection == "passed" and
+            .checks.browserDecodeRenderZ0Z3Z6 == "passed"
           ' validation-report.json
 
       - name: Upload boundary artifacts and immutable evidence
