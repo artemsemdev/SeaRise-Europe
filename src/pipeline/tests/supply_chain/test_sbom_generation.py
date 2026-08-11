@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import copy
 import hashlib
 import json
@@ -96,8 +97,10 @@ def test_synthetic_lock_generates_complete_path_qualified_graph() -> None:
 def test_lock_and_component_bytes_are_bound_by_sha256() -> None:
     document = _generate()
     root_properties = _properties(document["metadata"]["component"])
-    alpha = _components_by_path(document)["node_modules/alpha"]
-    expected_entry = _fixture()["packages"]["node_modules/alpha"]
+    components = _components_by_path(document)
+    packages = _fixture()["packages"]
+    alpha = components["node_modules/alpha"]
+    expected_entry = packages["node_modules/alpha"]
     expected_entry_bytes = canonical_sbom_bytes(expected_entry)
 
     assert root_properties["org.searise.sbom.input.path"] == LOGICAL_PATH
@@ -111,7 +114,14 @@ def test_lock_and_component_bytes_are_bound_by_sha256() -> None:
     assert _properties(alpha)["org.searise.sbom.npm.lock-entry-sha256"] == (
         hashlib.sha256(expected_entry_bytes).hexdigest()
     )
-    assert alpha["hashes"] == [{"alg": "SHA-512", "content": hashlib.sha512(b"").hexdigest()}]
+    expected_integrities = set()
+    for path, component in components.items():
+        integrity = packages[path]["integrity"].removeprefix("sha512-")
+        expected_integrities.add(integrity)
+        assert component["hashes"] == [
+            {"alg": "SHA-512", "content": base64.b64decode(integrity).hex()}
+        ]
+    assert len(expected_integrities) == len(components)
 
 
 def test_generation_is_byte_stable_and_input_tamper_changes_identity(
