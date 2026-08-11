@@ -99,6 +99,12 @@
       "reference": "src/pipeline/tests/settlements/test_spatial_toolchain.py",
       "environment": "macOS arm64; Python 3.10.9; 13 deterministic manifest, lock, cache, version, runtime, and load-path mutation tests passed without importing DuckDB or using a network"
     },
+    "local-2026-08-11-settlement-catalogue-domain": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T12:00:00+02:00",
+      "reference": "src/pipeline/tests/settlements/fixtures/geonames/catalogue-fixture-manifest.json",
+      "environment": "Pure Python 3.9 domain tests over hash-bound exact-format GeoNames excerpts; no spatial classification, artifact, performance, or publication claim"
+    },
     "local-2026-08-10-release-gate-contract": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T22:00:00+02:00",
@@ -432,6 +438,20 @@
       "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-spatial-toolchain", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Unit coverage uses generated fixed gzip bytes and a non-network fake DuckDB module; CI separately runs live Linux and macOS preflights from official pinned bytes." }
+    },
+    {
+      "id": "pipeline-settlement-catalogue-domain",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep pure settlement inclusion, stable IDs, admin1 context, selected lineage, notices, rejections, and output ordering deterministic and fail-closed.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/catalogue.py", "src/pipeline/settlements/catalogue-policy-v1.json", "src/pipeline/tests/settlements/fixtures/geonames/catalogue-fixture-manifest.json", "src/pipeline/tests/settlements/test_catalogue_domain.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/settlements/**", "src/pipeline/settlements/catalogue-policy-v1.json", "src/pipeline/tests/settlements/fixtures/geonames/catalogue-*", "src/pipeline/tests/settlements/test_catalogue_domain.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent deterministic normalized-catalogue domain and rejection/context ledger contract." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_catalogue_domain.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-catalogue-domain", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Hash-bound fixed excerpts and pure in-memory transforms use no clock, random input, network, spatial engine, or artifact writer." }
     },
     {
       "id": "pipeline-release-gate-contract",
@@ -950,6 +970,7 @@
     { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_validator.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_parser.py", "suite": "pipeline-geonames-place-parser", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_spatial_toolchain.py", "suite": "pipeline-settlement-spatial-toolchain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_catalogue_domain.py", "suite": "pipeline-settlement-catalogue-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

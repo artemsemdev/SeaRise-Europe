@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "snapshotDate": "2026-08-10",
+  "fixtureClass": "hash-verified-real-format-catalogue-excerpt",
+  "productionInput": false,
+  "cataloguePolicy": {
+    "path": "src/pipeline/settlements/catalogue-policy-v1.json",
+    "version": "settlement-catalogue-v1",
+    "sha256": "cd850f85c6eac4627c8995f3d4497456a5d7975d1d3cf308604c604608fd3e8f"
+  },
+  "nameNormalizationPolicyVersion": "settlement-normalization-v2",
+  "sourceLock": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlements.json",
+    "sha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee"
+  },
+  "sources": [
+    {
+      "fixtureFile": "catalogue-allCountries.rows.txt",
+      "fixtureSha256": "04f5a0244f52cbcc0f92dfa994a1171e136443472d047318819b58c4adb380e8",
+      "assetId": "all-countries",
+      "sourceFile": "allCountries.txt",
+      "sourceAssetSha256": "06f423eaf760d28101cd11a9744ade90f65c618d073ac2168501c388e1bd4afa",
+      "sourceAssetByteSize": 419923777,
+      "sourceSha256": "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8",
+      "sourceByteSize": 1782635669,
+      "sourceCompressedByteSize": 419923631,
+      "sourceCrc32": "27133946",
+      "rows": [
+        { "fixtureLine": 1, "sourceLine": 3277115, "sourceRecordId": 3128760 }
+      ]
+    },
+    {
+      "fixtureFile": "catalogue-admin1CodesASCII.rows.txt",
+      "fixtureSha256": "47a92d89d6d31f6bb60f6cdca393020fd3a42dbbcfd3fad87e87d55e26365a6b",
+      "assetId": "admin1-codes-ascii",
+      "sourceFile": "admin1CodesASCII.txt",
+      "sourceAssetSha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+      "sourceAssetByteSize": 151572,
+      "sourceSha256": "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+      "sourceByteSize": 151572,
+      "sourceCompressedByteSize": null,
+      "sourceCrc32": null,
+      "rows": [
+        { "fixtureLine": 1, "sourceLine": 959, "sourceRecordId": 3336901 }
+      ]
+    }
+  ]
+}

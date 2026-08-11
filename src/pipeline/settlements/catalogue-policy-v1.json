@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "settlement-catalogue-v1",
+  "sourceSnapshot": "2026-08-10",
+  "nameNormalizationPolicyVersion": "settlement-normalization-v2",
+  "identity": { "source": "allCountries.geonameId", "format": "geonames:<geonameId>" },
+  "inclusion": {
+    "featureClass": "P",
+    "featureCodes": ["PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF", "PPLG", "PPLL", "PPLR"],
+    "explicitlyExcludedFeatureCodes": ["PPLH", "PPLQ", "PPLW"],
+    "countryCodeRequired": true,
+    "population": { "minimum": 0, "nullAllowed": true, "zeroAllowed": true },
+    "unsafeCanonicalName": "reject-place",
+    "rejectionPrecedence": ["feature-class-not-populated-place", "feature-code-not-included", "country-code-missing", "invalid-coordinate", "negative-population", "unsafe-canonical-name"]
+  },
+  "coordinateContext": {
+    "source": "allCountries.latitude-longitude",
+    "crs": "WGS84",
+    "fieldOrder": ["latitude", "longitude"],
+    "finiteAndInRange": true,
+    "rounding": "none"
+  },
+  "admin1Context": {
+    "joinKey": "countryCode.admin1Code",
+    "nameSource": "admin1CodesASCII.name",
+    "missingCode": "include-null-code-and-name",
+    "unmatchedCode": "include-code-null-name",
+    "unmatchedLedgerReason": "admin1-code-unresolved",
+    "duplicateJoinKey": "fail-closed"
+  },
+  "output": {
+    "placeOrder": "geonames-id-numeric-ascending",
+    "rejectionLedger": "one-reason-per-place-by-precedence",
+    "contextLedgerOrder": "geonames-id-numeric-ascending",
+    "lineageOrder": ["allCountries", "matched-admin1", "selected-alternate-names"]
+  },
+  "publicationEligible": false,
+  "excludedCapabilities": ["spatial-classification", "duckdb-toolchain", "geoparquet", "search-shards", "performance-claim"]
+}
