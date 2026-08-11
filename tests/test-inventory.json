@@ -90,8 +90,8 @@
     "local-2026-08-11-geonames-alternate-normalization": {
       "kind": "local-measurement",
       "observedAt": "2026-08-11T10:45:00+02:00",
-      "reference": "src/pipeline/tests/settlements/fixtures/geonames/alternate-fixture-manifest.json",
-      "environment": "Hash-bound exact-format excerpts from the pinned 2026-08-10 GeoNames alternateNamesV2.zip members; parser and normalization contract tests pass locally; no publication claim"
+      "reference": "src/pipeline/tests/settlements/fixtures/geonames/alternate-full-scan-report.json",
+      "environment": "macOS arm64; Python 3.9; 19,037,112 alternate-name and 7,929 ISO-language rows parsed from the exact ignored cache with zero unexplained failures in 204.463 seconds; no publication claim"
     },
     "local-2026-08-10-release-gate-contract": {
       "kind": "local-measurement",
@@ -403,15 +403,15 @@
       "id": "pipeline-geonames-alternate-normalization",
       "layer": "contract",
       "owner": "data",
-      "purpose": "Keep the exact GeoNames alternate/ISO parsers, versioned normalization policy, deterministic selection, and selected-name lineage fail-closed.",
-      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/alternate_names.py", "src/pipeline/settlements/normalization-policy-v2.json", "src/pipeline/tests/settlements/test_geonames_alternate_names.py"],
-      "changedPaths": ["src/pipeline/searise_pipeline/settlements/**", "src/pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/geonames/alternate-*", "src/pipeline/tests/settlements/fixtures/geonames/alternateNamesV2.rows.txt", "src/pipeline/tests/settlements/fixtures/geonames/iso-languagecodes.rows.txt", "src/pipeline/tests/settlements/test_geonames_alternate_names.py"],
+      "purpose": "Keep the exact GeoNames alternate/ISO parsers, source-level normalization policy, selected-name lineage, archive scan, and provider-anomaly evidence fail-closed.",
+      "sourcePaths": ["scripts/release/validate_geonames_alternate_snapshot.py", "src/pipeline/searise_pipeline/settlements/alternate_names.py", "src/pipeline/settlements/normalization-policy-v2.json", "src/pipeline/tests/settlements/test_geonames_alternate_names.py", "src/pipeline/tests/settlements/test_geonames_alternate_scan.py"],
+      "changedPaths": ["scripts/release/validate_geonames_alternate_snapshot.py", "src/pipeline/searise_pipeline/settlements/**", "src/pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/geonames/**", "src/pipeline/tests/settlements/test_geonames_alternate_*.py"],
       "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-format alternate-name parsing, policy, deduplication, and selected-record lineage gate." },
-      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_geonames_alternate_names.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-asset alternate-name parsing, policy, dedupe, lineage, anomaly, and full-snapshot validation gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_geonames_alternate_names.py src/pipeline/tests/settlements/test_geonames_alternate_scan.py -q", "full": "python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-geonames-alternate-normalization", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "CI uses fixed excerpts whose asset and member identities are bound to the immutable source lock." }
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "CI uses fixed hash-bound excerpts and an immutable full-scan report; the optional full archive command is offline, checksum-bound, and separately measured." }
     },
     {
       "id": "pipeline-release-gate-contract",
@@ -925,6 +925,7 @@
     { "path": "src/pipeline/tests/science/test_vertical.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical_source_evidence.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_alternate_names.py", "suite": "pipeline-geonames-alternate-normalization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_geonames_alternate_scan.py", "suite": "pipeline-geonames-alternate-normalization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_report.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_validator.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_geonames_parser.py", "suite": "pipeline-geonames-place-parser", "status": "active", "removalGate": null, "replacementEvidence": null },
