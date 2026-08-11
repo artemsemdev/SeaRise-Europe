@@ -16,6 +16,7 @@ from searise_pipeline.supply_chain import (
     publish_python_sbom,
     validate_dependency_exception,
     validate_dependency_inventory,
+    validate_candidate_evidence_pair,
     validate_evidence_files,
     validate_npm_sbom,
     validate_nuget_sbom,
@@ -37,6 +38,11 @@ def _parser() -> argparse.ArgumentParser:
     evidence.add_argument("--envelope", type=Path, required=True)
     evidence.add_argument("--identity-policy", type=Path, required=True)
     evidence.add_argument("--sbom", type=_sbom, action="append", required=True)
+    pair = commands.add_parser("candidate-evidence-pair")
+    pair.add_argument("--candidate-root", type=Path, required=True)
+    pair.add_argument("--evidence-root", type=Path, required=True)
+    pair.add_argument("--repository-root", type=Path, default=Path.cwd())
+    pair.add_argument("--trusted-invocation-uri", required=True)
     exception = commands.add_parser("exception")
     exception.add_argument("--document", type=Path, required=True)
     exception.add_argument("--as-of", required=True)
@@ -81,7 +87,19 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.command == "evidence":
+        if args.command == "candidate-evidence-pair":
+            summary = validate_candidate_evidence_pair(
+                args.candidate_root,
+                args.evidence_root,
+                repository_root=args.repository_root,
+                trusted_invocation_uri=args.trusted_invocation_uri,
+            )
+            print(
+                f"validated synthetic candidate/evidence pair: {summary.candidate_id} "
+                f"({summary.sbom_count} SBOMs; cryptographic verification, production, "
+                "and publication not claimed)"
+            )
+        elif args.command == "evidence":
             sboms = dict(args.sbom)
             if len(sboms) != len(args.sbom):
                 raise SupplyChainContractError("duplicate SBOM logical path")
@@ -100,7 +118,9 @@ def main(argv: list[str] | None = None) -> int:
                 args.document,
                 repository_root=args.repository_root.resolve(),
             )
-            input_count = sum(len(component["inputs"]) for component in document["components"])
+            input_count = sum(
+                len(component["inputs"]) for component in document["components"]
+            )
             print(f"validated {input_count} dependency-defining inputs")
         elif args.command == "npm-sbom":
             document = publish_npm_sbom(
@@ -109,7 +129,9 @@ def main(argv: list[str] | None = None) -> int:
                 repository_root=args.repository_root.absolute(),
                 logical_path=args.logical_path,
             )
-            print(f"generated {len(document['components'])} npm components: {args.output}")
+            print(
+                f"generated {len(document['components'])} npm components: {args.output}"
+            )
         elif args.command == "npm-sbom-validate":
             document = validate_npm_sbom(
                 args.sbom,
@@ -117,7 +139,9 @@ def main(argv: list[str] | None = None) -> int:
                 repository_root=args.repository_root.absolute(),
                 logical_path=args.logical_path,
             )
-            print(f"validated {len(document['components'])} npm components: {args.sbom}")
+            print(
+                f"validated {len(document['components'])} npm components: {args.sbom}"
+            )
         elif args.command == "nuget-sbom":
             document = publish_nuget_sbom(
                 args.output,
