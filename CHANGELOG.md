@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Added immutable, project- and target-specific NuGet CycloneDX inventories for
   deployable API and library projects, with exact artifact/project/lock
   authority, explicit test-project exclusion, and no production claim.
+- Added owner-controlled, no-follow private snapshots for settlement spatial inputs, with inode-tracked cleanup and inspectable fail-closed residue when descriptor identity is unavailable.
 - Included reviewed real Python graph annotations in exact dependency-input
   discovery and SHA-bound inventory validation while excluding synthetic test
   fixtures.
