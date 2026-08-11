@@ -43,6 +43,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the exact 53-artifact pre-sign engineering candidate contract, with
+  manifest-last sealing, complete 3 x 3 and settlement inventory, and a
+  mandatory non-recursive supply-chain evidence-envelope gate.
 - Added typed JSON and Markdown release-gate report artifacts to the immutable
   public release contract.
 - Added an immutable full-source settlement input contract that verifies exact
