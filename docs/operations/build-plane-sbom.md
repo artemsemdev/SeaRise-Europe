@@ -4,9 +4,10 @@
 CycloneDX 1.7 file-input authority foundation for reviewed candidate
 build-plane files that are not npm, Python, or NuGet package locks. It binds
 four GitHub Actions workflows, five native geospatial toolchain locks, recipes,
-and receipts, and the controlled release container recipe. It expands those
-files into 29 Action, native, DuckDB/Spatial, and OCI components; Action `v*`
-comments are non-authoritative.
+and receipts, the controlled release container recipe, and the reviewed Cosign
+Linux AMD64 tool lock. It expands those files into 30 Action, native,
+DuckDB/Spatial, signing, and OCI components; Action `v*` comments are
+non-authoritative.
 
 OpenTofu is recorded only as `not-present`, matching the reviewed dependency
 inventory. No provider or package is invented for an absent ecosystem.

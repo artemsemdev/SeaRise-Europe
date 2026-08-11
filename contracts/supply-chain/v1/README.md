@@ -17,6 +17,10 @@ identity policy records intended verifier inputs; it does not claim that its
 identity or protected environment was observed. The public structural evidence
 validator remains limited to the synthetic contract.
 
+The reviewed Cosign Linux AMD64 source lock is documented in
+`docs/operations/phase-1-signing-tool.md`. It is a prerequisite for a future
+protected signing workflow, not evidence that signing occurred.
+
 ## npm SBOM generation
 
 `sboms/frontend-npm.cdx.json` is the canonical CycloneDX 1.7 inventory generated

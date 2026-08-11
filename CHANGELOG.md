@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added an immutable Cosign Linux AMD64 tool lock backed by the official
+  versioned release checksum asset, with fail-closed local validation and
+  build-plane SBOM coverage. Signing remains blocked on the reviewed evidence
+  finalizer and protected workflow.
+
 ### Security
 
 - Added deterministic pre-sign provenance for validated real-source controlled
