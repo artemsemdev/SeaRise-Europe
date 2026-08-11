@@ -103,6 +103,12 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["pipeline"])
         self.assertFalse(outputs["release"])
 
+    def test_supply_chain_validator_routes_pipeline_contracts(self) -> None:
+        outputs = classify_paths(["scripts/release/validate_supply_chain_contract.py"])
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
     def test_settlement_artifact_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths(
             ["data/settlements/europe-settlement-shoreline-v1.geojson"]
