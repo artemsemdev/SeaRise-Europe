@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v1/candidate.schema.json",
+  "title": "SeaRise Europe pre-sign engineering candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "contractId", "candidateId", "dataReleaseId",
+    "dataProvenanceClass", "publicationClaim", "geometryPolicy", "artifacts",
+    "checksumInventory", "stacBindings", "gateSnapshot", "manifest", "supplyChainGate"
+  ],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v1/candidate.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "phase-1-pre-sign-candidate-completeness-v1" },
+    "candidateId": { "type": "string", "pattern": "^candidate-[a-z0-9][a-z0-9-]*-[0-9]{8}-[a-f0-9]{12}$" },
+    "dataReleaseId": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataProvenanceClass" },
+    "publicationClaim": { "const": false },
+    "geometryPolicy": { "$ref": "#/$defs/geometryPolicy" },
+    "artifacts": {
+      "type": "array",
+      "minItems": 53,
+      "maxItems": 53,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "checksumInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "algorithm", "subjectCount", "excludedPaths", "subjects"],
+      "properties": {
+        "path": { "const": "checksums.txt" },
+        "algorithm": { "const": "sha256" },
+        "subjectCount": { "const": 52 },
+        "excludedPaths": {
+          "type": "array",
+          "prefixItems": [{ "const": "checksums.txt" }, { "const": "manifest.json" }],
+          "items": false
+        },
+        "subjects": {
+          "type": "array",
+          "minItems": 52,
+          "maxItems": 52,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/fileIdentity" }
+        }
+      }
+    },
+    "stacBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalogArtifactId", "collectionArtifactId", "items"],
+      "properties": {
+        "catalogArtifactId": { "const": "stac-catalog" },
+        "collectionArtifactId": { "const": "stac-collection" },
+        "items": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/stacBinding" }
+        }
+      }
+    },
+    "gateSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "validatedArtifactCount", "excludedPaths"],
+      "properties": {
+        "state": { "const": "pre-terminal-seal" },
+        "validatedArtifactCount": { "const": 50 },
+        "excludedPaths": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "evidence/gate-report.json" },
+            { "const": "evidence/gate-report.md" },
+            { "const": "checksums.txt" },
+            { "const": "manifest.json" }
+          ],
+          "items": false
+        }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "artifactCount", "writeSequence", "selfHashExcluded"],
+      "properties": {
+        "path": { "const": "manifest.json" },
+        "artifactCount": { "const": 53 },
+        "writeSequence": { "const": 54 },
+        "selfHashExcluded": { "const": true }
+      }
+    },
+    "supplyChainGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status", "evidenceEnvelopeContract", "requiredForPublication",
+        "candidateManifestSubject", "excludedSidecarRoles", "exclusionReason"
+      ],
+      "properties": {
+        "status": { "const": "required-after-candidate-seal" },
+        "evidenceEnvelopeContract": { "const": "contracts/supply-chain/v1/evidence-envelope.schema.json" },
+        "requiredForPublication": { "const": true },
+        "candidateManifestSubject": { "const": "manifest.json" },
+        "excludedSidecarRoles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "provenance" },
+            { "const": "signature" },
+            { "const": "software-bill-of-materials" }
+          ],
+          "items": false
+        },
+        "exclusionReason": { "const": "prevent-recursive-candidate-manifest-hashing" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "dataProvenanceClass": { "const": "synthetic-fixture" } }, "required": ["dataProvenanceClass"] },
+      "then": {
+        "properties": {
+          "geometryPolicy": {
+            "properties": {
+              "status": { "const": "synthetic-unapproved-approximation" },
+              "ownerApprovalRecorded": { "const": false },
+              "canonical": { "const": false },
+              "production": { "const": false },
+              "publicationEligible": { "const": false },
+              "hazardExtentClaim": { "const": false }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]+$" },
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "../../release/v1/defs.schema.json#/$defs/releaseRelativePath" },
+        "sha256": { "$ref": "../../release/v1/defs.schema.json#/$defs/sha256" }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attributionIds", "redistribution"],
+      "properties": {
+        "attributionIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/identifier" } },
+        "redistribution": { "enum": ["allowed", "conditional"] }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId", "path", "role", "mediaType", "contentEncoding", "dataReleaseId",
+        "dataProvenanceClass", "immutable", "byteSize", "sha256", "writeSequence", "rights"
+      ],
+      "properties": {
+        "artifactId": { "$ref": "#/$defs/identifier" },
+        "path": { "$ref": "../../release/v1/defs.schema.json#/$defs/releaseRelativePath" },
+        "role": { "$ref": "../../release/v1/defs.schema.json#/$defs/artifactRole" },
+        "mediaType": { "$ref": "../../release/v1/defs.schema.json#/$defs/mediaType" },
+        "contentEncoding": { "enum": ["identity", "br"] },
+        "dataReleaseId": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataReleaseId" },
+        "dataProvenanceClass": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataProvenanceClass" },
+        "immutable": { "const": true },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "../../release/v1/defs.schema.json#/$defs/sha256" },
+        "writeSequence": { "type": "integer", "minimum": 1, "maximum": 53 },
+        "rights": { "$ref": "#/$defs/rights" }
+      }
+    },
+    "geometryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "purpose", "ownerApprovalRecorded", "canonical", "production", "publicationEligible", "hazardExtentClaim"],
+      "properties": {
+        "status": { "enum": ["synthetic-unapproved-approximation", "approved-product-scope-approximation"] },
+        "purpose": { "const": "product-eligibility-only" },
+        "ownerApprovalRecorded": { "type": "boolean" },
+        "canonical": { "type": "boolean" },
+        "production": { "type": "boolean" },
+        "publicationEligible": { "type": "boolean" },
+        "hazardExtentClaim": { "const": false }
+      }
+    },
+    "stacBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemArtifactId", "scenario", "horizon", "analysisArtifactId", "visualArtifactId", "tableArtifactId"],
+      "properties": {
+        "itemArtifactId": { "$ref": "#/$defs/identifier" },
+        "scenario": { "$ref": "../../release/v1/defs.schema.json#/$defs/scenarioId" },
+        "horizon": { "$ref": "../../release/v1/defs.schema.json#/$defs/horizonYear" },
+        "analysisArtifactId": { "$ref": "#/$defs/identifier" },
+        "visualArtifactId": { "$ref": "#/$defs/identifier" },
+        "tableArtifactId": { "const": "projection-matrix-geoparquet" }
+      }
+    }
+  }
+}
