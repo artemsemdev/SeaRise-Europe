@@ -9,6 +9,7 @@ from .contracts import (
     validate_dependency_inventory,
     validate_evidence_files,
 )
+from .python_graph import validate_python_lock_graph
 from .sbom import canonical_sbom_bytes, generate_npm_sbom, write_new_sbom
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_evidence_files",
+    "validate_python_lock_graph",
     "write_new_sbom",
 ]

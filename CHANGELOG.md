@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Added a versioned, lock-SHA-bound Python dependency graph annotation contract
+  so reviewed roots and edges remain explicit instead of being inferred from
+  flat release locks, with synthetic-only fail-closed validation fixtures.
 - Added deterministic CycloneDX 1.7 generation for the frontend npm lock with
   exact input and component hashes, path-qualified dependency relationships,
   offline schema validation, and fail-closed unsupported-input handling.
