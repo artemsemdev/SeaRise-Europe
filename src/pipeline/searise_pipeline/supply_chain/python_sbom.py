@@ -19,7 +19,7 @@ from .python_graph import (
     _read_repository_file,
     validate_python_lock_graph,
 )
-from .sbom import canonical_sbom_bytes
+from .sbom import canonical_sbom_bytes, write_new_sbom
 
 _PROPERTY_PREFIX = "org.searise.sbom"
 
@@ -290,4 +290,21 @@ def validate_python_sbom(
     )
     if raw != canonical_sbom_bytes(expected):
         raise SupplyChainContractError("Python SBOM differs from its graph target authority")
+    return document
+
+
+def publish_python_sbom(
+    output_path: Path,
+    annotation_path: Path,
+    *,
+    repository_root: Path,
+    target_id: str,
+) -> dict[str, Any]:
+    """Generate and durably publish one immutable target-specific SBOM."""
+    document = generate_python_sbom(
+        annotation_path,
+        repository_root=repository_root,
+        target_id=target_id,
+    )
+    write_new_sbom(output_path, canonical_sbom_bytes(document))
     return document

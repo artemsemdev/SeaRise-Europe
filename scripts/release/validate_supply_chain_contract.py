@@ -13,9 +13,11 @@ from searise_pipeline.supply_chain import (
     generate_npm_sbom,
     load_json,
     parse_timestamp,
+    publish_python_sbom,
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    validate_python_sbom,
     write_new_sbom,
 )
 
@@ -44,6 +46,16 @@ def _parser() -> argparse.ArgumentParser:
     npm_sbom.add_argument("--lock", type=Path, required=True)
     npm_sbom.add_argument("--logical-path", required=True)
     npm_sbom.add_argument("--output", type=Path, required=True)
+    python_sbom = commands.add_parser("python-sbom")
+    python_sbom.add_argument("--annotation", type=Path, required=True)
+    python_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
+    python_sbom.add_argument("--target", required=True)
+    python_sbom.add_argument("--output", type=Path, required=True)
+    python_validate = commands.add_parser("python-sbom-validate")
+    python_validate.add_argument("--sbom", type=Path, required=True)
+    python_validate.add_argument("--annotation", type=Path, required=True)
+    python_validate.add_argument("--repository-root", type=Path, default=Path.cwd())
+    python_validate.add_argument("--target", required=True)
     return parser
 
 
@@ -69,16 +81,34 @@ def main(argv: list[str] | None = None) -> int:
                 args.document,
                 repository_root=args.repository_root.resolve(),
             )
-            input_count = sum(
-                len(component["inputs"]) for component in document["components"]
-            )
+            input_count = sum(len(component["inputs"]) for component in document["components"])
             print(f"validated {input_count} dependency-defining inputs")
-        else:
+        elif args.command == "npm-sbom":
             document = generate_npm_sbom(args.lock, logical_path=args.logical_path)
             output = canonical_sbom_bytes(document)
             write_new_sbom(args.output, output)
+            print(f"generated {len(document['components'])} npm components: {args.output}")
+        elif args.command == "python-sbom":
+            document = publish_python_sbom(
+                args.output,
+                args.annotation,
+                repository_root=args.repository_root.absolute(),
+                target_id=args.target,
+            )
             print(
-                f"generated {len(document['components'])} npm components: {args.output}"
+                f"generated {len(document['components'])} Python components "
+                f"for {args.target}: {args.output}"
+            )
+        else:
+            document = validate_python_sbom(
+                args.sbom,
+                args.annotation,
+                repository_root=args.repository_root.absolute(),
+                target_id=args.target,
+            )
+            print(
+                f"validated {len(document['components'])} Python components "
+                f"for {args.target}: {args.sbom}"
             )
     except (OSError, json.JSONDecodeError, SupplyChainContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

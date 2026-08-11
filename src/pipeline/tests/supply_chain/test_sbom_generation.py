@@ -363,7 +363,7 @@ def test_atomic_output_promotes_complete_bytes_and_cleans_partial(
 
     failed_output = tmp_path / "failed.json"
 
-    def fail_link(_source: Path, _target: Path) -> None:
+    def fail_link(_source: str, _target: str, **_kwargs: object) -> None:
         raise OSError("injected link failure")
 
     monkeypatch.setattr(sbom_module.os, "link", fail_link)

@@ -8,8 +8,8 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import stat
-import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
@@ -47,58 +47,215 @@ def canonical_sbom_bytes(document: Mapping[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
-def write_new_sbom(output_path: Path, content: bytes) -> None:
-    """Durably publish new SBOM bytes without overwriting any existing path."""
-    if not output_path.name or os.path.lexists(output_path):
-        raise SupplyChainContractError(f"SBOM output path already exists: {output_path}")
-    parent = output_path.parent
-    if parent.is_symlink():
-        raise SupplyChainContractError(f"SBOM output parent must not be a symlink: {parent}")
-    try:
-        parent_mode = parent.stat().st_mode
-    except FileNotFoundError as exc:
-        raise SupplyChainContractError(f"SBOM output parent must already exist: {parent}") from exc
-    if not stat.S_ISDIR(parent_mode):
-        raise SupplyChainContractError(f"SBOM output parent must be a directory: {parent}")
+_Inode = tuple[int, int]
 
-    descriptor = -1
-    partial_path: Path | None = None
-    promoted = False
+
+def _output_parts(output_path: Path) -> tuple[str, tuple[str, ...], str]:
+    rendered = os.fspath(output_path)
+    parts = output_path.parts
+    absolute = output_path.is_absolute()
+    if (
+        not rendered
+        or "\0" in rendered
+        or "\\" in rendered
+        or not parts
+        or (absolute and parts[0] != "/")
+        or any(part in {"", ".", ".."} for part in parts[1 if absolute else 0 :])
+    ):
+        raise SupplyChainContractError(f"unsafe SBOM output path: {output_path}")
+    relative = parts[1:] if absolute else parts
+    if not relative:
+        raise SupplyChainContractError(f"unsafe SBOM output path: {output_path}")
+    return ("/" if absolute else ".", tuple(relative[:-1]), relative[-1])
+
+
+def _open_directory(anchor: int, parts: tuple[str, ...]) -> int:
+    descriptor = os.dup(anchor)
+    flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
     try:
-        descriptor, partial_name = tempfile.mkstemp(
-            dir=parent,
-            prefix=f".{output_path.name}.",
-            suffix=".partial",
+        for part in parts:
+            child = os.open(part, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def _open_output_parent(output_path: Path) -> tuple[int, int, tuple[str, ...], str]:
+    anchor_path, parent_parts, output_name = _output_parts(output_path)
+    flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    anchor = -1
+    try:
+        anchor = os.open(anchor_path, flags)
+        parent = _open_directory(anchor, parent_parts)
+    except OSError as exc:
+        if anchor >= 0:
+            os.close(anchor)
+        raise SupplyChainContractError(
+            "SBOM output parent must not be a symlink and must already exist "
+            f"as a directory: {output_path.parent}"
+        ) from exc
+    return anchor, parent, parent_parts, output_name
+
+
+def _inode(value: os.stat_result) -> _Inode:
+    return value.st_dev, value.st_ino
+
+
+def _path_inode(parent: int, name: str) -> _Inode | None:
+    try:
+        return _inode(os.stat(name, dir_fd=parent, follow_symlinks=False))
+    except FileNotFoundError:
+        return None
+
+
+def _parent_path_matches(anchor: int, parts: tuple[str, ...], expected: _Inode) -> bool:
+    try:
+        current = _open_directory(anchor, parts)
+    except OSError:
+        return False
+    try:
+        return _inode(os.fstat(current)) == expected
+    finally:
+        os.close(current)
+
+
+def _unlink_if_owned(parent: int, name: str, expected: _Inode) -> bool:
+    quarantine = f".searise-sbom-rollback-{secrets.token_hex(16)}"
+    try:
+        os.rename(name, quarantine, src_dir_fd=parent, dst_dir_fd=parent)
+    except FileNotFoundError:
+        return False
+    if _path_inode(parent, quarantine) == expected:
+        os.unlink(quarantine, dir_fd=parent)
+        return True
+    try:
+        os.link(
+            quarantine,
+            name,
+            src_dir_fd=parent,
+            dst_dir_fd=parent,
+            follow_symlinks=False,
         )
-        partial_path = Path(partial_name)
-        with os.fdopen(descriptor, "wb") as stream:
-            descriptor = -1
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
+    except OSError:
+        return False
+    os.unlink(quarantine, dir_fd=parent)
+    return False
+
+
+def _create_partial(parent: int) -> tuple[int, str]:
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    for _ in range(32):
+        name = f".searise-sbom-{secrets.token_hex(16)}.partial"
         try:
-            os.link(partial_path, output_path)
+            return os.open(name, flags, 0o600, dir_fd=parent), name
+        except FileExistsError:
+            continue
+    raise SupplyChainContractError("could not allocate a unique SBOM partial file")
+
+
+def _write_all(descriptor: int, content: bytes) -> None:
+    remaining = memoryview(content)
+    while remaining:
+        written = os.write(descriptor, remaining)
+        if written <= 0:
+            raise OSError("SBOM partial write made no progress")
+        remaining = remaining[written:]
+
+
+def _descriptor_has_exact_bytes(descriptor: int, content: bytes) -> bool:
+    if os.fstat(descriptor).st_size != len(content):
+        return False
+    offset = 0
+    while offset < len(content):
+        expected = content[offset : offset + 131_072]
+        actual = os.pread(descriptor, len(expected), offset)
+        if actual != expected:
+            return False
+        offset += len(actual)
+    return os.pread(descriptor, 1, len(content)) == b""
+
+
+def write_new_sbom(output_path: Path, content: bytes) -> None:
+    """Durably publish exact new SBOM bytes without following or overwriting paths."""
+    if type(content) is not bytes:
+        raise SupplyChainContractError("SBOM output content must be exact bytes")
+    anchor, parent, parent_parts, output_name = _open_output_parent(output_path)
+    parent_inode = _inode(os.fstat(parent))
+    partial_descriptor = -1
+    partial_name: str | None = None
+    owned_inode: _Inode | None = None
+    promoted = False
+    directory_changed = False
+    try:
+        if _path_inode(parent, output_name) is not None:
+            raise SupplyChainContractError(f"SBOM output path already exists: {output_path}")
+        partial_descriptor, partial_name = _create_partial(parent)
+        partial_stat = os.fstat(partial_descriptor)
+        if not stat.S_ISREG(partial_stat.st_mode):
+            raise SupplyChainContractError("SBOM partial must remain a regular file")
+        owned_inode = _inode(partial_stat)
+        _write_all(partial_descriptor, content)
+        os.fsync(partial_descriptor)
+        if _inode(os.fstat(partial_descriptor)) != owned_inode:
+            raise SupplyChainContractError("SBOM partial ownership changed during publication")
+        if not _descriptor_has_exact_bytes(partial_descriptor, content):
+            raise SupplyChainContractError("SBOM partial bytes changed during publication")
+
+        if not _parent_path_matches(anchor, parent_parts, parent_inode):
+            raise SupplyChainContractError("SBOM output parent changed during publication")
+        if _path_inode(parent, partial_name) != owned_inode:
+            raise SupplyChainContractError("SBOM partial ownership changed before promotion")
+        try:
+            os.link(
+                partial_name,
+                output_name,
+                src_dir_fd=parent,
+                dst_dir_fd=parent,
+                follow_symlinks=False,
+            )
         except FileExistsError as exc:
             raise SupplyChainContractError(
                 f"SBOM output path already exists: {output_path}"
             ) from exc
+        if _path_inode(parent, output_name) != owned_inode:
+            raise SupplyChainContractError("SBOM promotion ownership changed")
         promoted = True
-        partial_path.unlink()
-        partial_path = None
-        directory_descriptor = os.open(parent, os.O_RDONLY)
-        try:
-            os.fsync(directory_descriptor)
-        finally:
-            os.close(directory_descriptor)
+        if not _unlink_if_owned(parent, partial_name, owned_inode):
+            raise SupplyChainContractError("SBOM partial ownership changed after promotion")
+        partial_name = None
+        directory_changed = True
+        os.fsync(parent)
+        directory_changed = False
+        if not _parent_path_matches(anchor, parent_parts, parent_inode):
+            raise SupplyChainContractError("SBOM output parent changed during publication")
+        if _path_inode(parent, output_name) != owned_inode:
+            raise SupplyChainContractError("SBOM output ownership changed during publication")
+        if not _descriptor_has_exact_bytes(partial_descriptor, content):
+            raise SupplyChainContractError("SBOM output bytes changed during publication")
     except Exception:
-        if promoted:
-            output_path.unlink(missing_ok=True)
+        if promoted and owned_inode is not None:
+            directory_changed = _unlink_if_owned(parent, output_name, owned_inode)
+        if partial_name is not None and owned_inode is not None:
+            directory_changed = (
+                _unlink_if_owned(parent, partial_name, owned_inode) or directory_changed
+            )
+        if directory_changed:
+            try:
+                os.fsync(parent)
+            except OSError:
+                pass
         raise
     finally:
-        if descriptor >= 0:
-            os.close(descriptor)
-        if partial_path is not None:
-            partial_path.unlink(missing_ok=True)
+        if partial_descriptor >= 0:
+            os.close(partial_descriptor)
+        os.close(parent)
+        os.close(anchor)
 
 
 def _sha256_bytes(value: bytes) -> str:
