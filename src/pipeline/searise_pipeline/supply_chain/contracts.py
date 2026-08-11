@@ -156,6 +156,10 @@ def _is_dependency_input(path: PurePosixPath) -> bool:
     ) or name.endswith("requirements.txt")
     toolchain = path.parts[:3] == ("src", "pipeline", "toolchain") and not name.startswith(".")
     vendored_schema = path.parts[:4] == ("contracts", "supply-chain", "v1", "vendor")
+    reviewed_python_graph = (
+        path.parts[:4] == ("contracts", "supply-chain", "v1", "python-graphs")
+        and path.suffix == ".json"
+    )
     return (
         workflow
         or local_action
@@ -166,6 +170,7 @@ def _is_dependency_input(path: PurePosixPath) -> bool:
         or _is_opentofu_input(path)
         or toolchain
         or vendored_schema
+        or reviewed_python_graph
     )
 
 
@@ -204,6 +209,11 @@ def _component_for_input(path: PurePosixPath) -> str:
         return "native-geospatial-toolchain"
     if path.parts[:4] == ("contracts", "supply-chain", "v1", "vendor"):
         return "vendored-standard-schemas"
+    if path.parts[:4] == ("contracts", "supply-chain", "v1", "python-graphs"):
+        if value == "contracts/supply-chain/v1/python-graphs/release-runtime.json":
+            return "pipeline-python-release"
+        if value == "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json":
+            return "settlement-spatial-python"
     if path.parts[:2] == ("src", "api"):
         return "api-nuget"
     if path.parts[:2] == ("src", "frontend") and path.name in _NODE_INPUTS:
@@ -232,6 +242,8 @@ def _role_for_input(path: PurePosixPath) -> str:
         return "receipt"
     if path.parts[:4] == ("contracts", "supply-chain", "v1", "vendor"):
         return "lock" if path.name == "manifest.json" else "schema"
+    if path.parts[:4] == ("contracts", "supply-chain", "v1", "python-graphs"):
+        return "manifest"
     if (
         path.name in {"package-lock.json", "packages.lock.json", ".terraform.lock.hcl"}
         or path.suffix == ".lock"

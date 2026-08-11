@@ -121,10 +121,11 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
+        { "path": "contracts/supply-chain/v1/python-graphs/release-runtime.json", "role": "manifest", "sha256": "86fc6d1a7446d338b607cff07c3403f46a38941b524337786fd6dc5c59a0150e" },
         { "path": "src/pipeline/requirements-release-macos-arm64.lock", "role": "lock", "sha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75" },
         { "path": "src/pipeline/requirements-release.lock", "role": "lock", "sha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f" }
       ],
-      "note": "Candidate release environments use exact platform locks and wheel hashes."
+      "note": "Candidate release environments use exact platform locks and wheel hashes with a reviewed root-and-edge graph annotation."
     },
     {
       "id": "release-container-image",
@@ -142,10 +143,11 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
+        { "path": "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json", "role": "manifest", "sha256": "64d00b72ce9226e639f506e359242beff4fbbeb45feaa22569ec1c180d0fff80" },
         { "path": "src/pipeline/requirements-settlements-spatial-linux-x86_64.lock", "role": "lock", "sha256": "52b9b9081a9f84cac3c3067ca2f68622b4515f2ef8929183f0ae57c6df3db497" },
         { "path": "src/pipeline/requirements-settlements-spatial-macos-arm64.lock", "role": "lock", "sha256": "1c992360d57158a51053536ca8d70d6d718b7caa96f60af1b5615a0c8535e33e" }
       ],
-      "note": "Settlement spatial wheels are exact and platform specific."
+      "note": "Settlement spatial wheels are exact and platform specific, with a reviewed root-and-edge graph annotation."
     },
     {
       "id": "vendored-standard-schemas",

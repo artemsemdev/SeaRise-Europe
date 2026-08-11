@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Included reviewed real Python graph annotations in exact dependency-input
+  discovery and SHA-bound inventory validation while excluding synthetic test
+  fixtures.
 - Added reviewed, hash-bound Python runtime graphs for the paired release and
   settlement-spatial locks, with explicit roots, complete target environments,
   and identical cross-platform active dependencies without a production claim.
