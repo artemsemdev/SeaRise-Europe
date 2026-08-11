@@ -65,7 +65,7 @@ official Draft 7 schema. The vendored schemas are Apache-2.0 licensed.
 
 ## Dependency-defining input inventory
 
-`v1/dependency-inventory.json` binds the exact bytes of all 43 inputs discovered
+`v1/dependency-inventory.json` binds the exact bytes of all 45 inputs discovered
 at this reviewed revision. The inventory validation command below derives and
 reports the current validated count, avoiding a separate operational count.
 Coverage includes npm,

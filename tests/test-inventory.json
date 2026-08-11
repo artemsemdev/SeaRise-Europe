@@ -1128,6 +1128,7 @@
     { "path": "src/pipeline/tests/supply_chain/test_protected_workflow_artifacts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_python_graph_contract.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_python_sbom.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_protected_signing_workflow.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_real_python_graph_annotations.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_real_source_unverified_evidence.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_sbom_generation.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },

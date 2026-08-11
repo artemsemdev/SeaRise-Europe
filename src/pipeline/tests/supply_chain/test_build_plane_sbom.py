@@ -25,7 +25,7 @@ ARTIFACT = REPOSITORY_ROOT / "contracts/supply-chain/v1/sboms/build-plane.cdx.js
 INVENTORY_LOGICAL = Path("contracts/supply-chain/v1/dependency-inventory.json")
 PROPERTY_PREFIX = "org.searise.sbom.build-plane."
 EXPECTED_FILE_COMPONENTS = {
-    "github-actions": 4,
+    "github-actions": 5,
     "native-geospatial-toolchain": 5,
     "release-container-image": 1,
     "release-signing-toolchain": 1,
@@ -137,8 +137,8 @@ def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs() -> None
     assert raw == canonical_sbom_bytes(document)
     files = [component for component in document["components"] if component["type"] == "file"]
     observables = [component for component in document["components"] if component["type"] != "file"]
-    assert len(document["components"]) == 41
-    assert len(files) == sum(EXPECTED_FILE_COMPONENTS.values()) == 11
+    assert len(document["components"]) == 42
+    assert len(files) == sum(EXPECTED_FILE_COMPONENTS.values()) == 12
     assert {component["name"] for component in files} == set(recorded)
     for component in files:
         source_id, item = recorded[component["name"]]

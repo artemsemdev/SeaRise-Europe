@@ -39,6 +39,11 @@ All notable changes to this project will be documented in this file.
   through a private same-directory partial and atomic no-overwrite promotion,
   and safely streams distinct candidate and evidence ZIP inventories without
   following links or making production, publication, or scientific claims.
+- Added a manual protected-environment workflow for keyless Cosign signing of
+  exact controlled-candidate bytes, with job-scoped OIDC, fork and pull-request
+  refusal, and separate no-OIDC verification of freshly downloaded immutable
+  artifacts. It makes no production, publication, scientific-approval,
+  protected-environment-execution, or public-readback claim.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
