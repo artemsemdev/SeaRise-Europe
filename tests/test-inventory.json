@@ -920,7 +920,8 @@
     { "path": "src/pipeline/tests/test_upload.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_validate.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "tests/harness/test_changed_suites.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
-    { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
+    { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/harness/test_immutable_dependencies.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
   ],
   "knownGaps": [
     {
