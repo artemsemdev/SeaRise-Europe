@@ -20,10 +20,12 @@ from .catalogue import (
     CatalogueContextNotice,
     CatalogueNormalizationError,
     CataloguePlace,
+    CatalogueRecordNormalization,
     CatalogueRejection,
     NormalizedCatalogue,
     load_catalogue_policy,
     normalize_catalogue,
+    normalize_catalogue_record,
 )
 from .contract_semantics import (
     SettlementContractSemanticError,
@@ -55,6 +57,7 @@ __all__ = [
     "CatalogueContextNotice",
     "CatalogueNormalizationError",
     "CataloguePlace",
+    "CatalogueRecordNormalization",
     "CatalogueRejection",
     "FieldAnomaly",
     "GeoNameRecord",
@@ -72,6 +75,7 @@ __all__ = [
     "load_normalization_policy",
     "load_catalogue_policy",
     "normalize_catalogue",
+    "normalize_catalogue_record",
     "parse_alternate_name_row",
     "parse_admin1_row",
     "parse_geoname_row",

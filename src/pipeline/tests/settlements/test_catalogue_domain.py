@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from dataclasses import fields, replace
 from pathlib import Path
 
@@ -22,8 +23,10 @@ from searise_pipeline.settlements.catalogue import (
     INCLUDED_FEATURE_CODES,
     REJECTION_PRECEDENCE,
     CatalogueNormalizationError,
+    CatalogueRecordNormalization,
     load_catalogue_policy,
     normalize_catalogue,
+    normalize_catalogue_record,
 )
 from searise_pipeline.settlements.geonames import (
     ADMIN1_SOURCE,
@@ -180,6 +183,182 @@ def test_exact_rows_build_joined_places_with_stable_ids_and_complete_lineage() -
         ("alternateNamesV2.txt", 5109028, 2039069),
     ]
     assert catalogue.name_rejection_counts == (("duplicate-name", 2),)
+
+
+def test_record_normalization_matches_batch_for_every_outcome() -> None:
+    places, admins = _places(), _admins()
+    barcelona = _catalogue_place()
+    rejected = _synthetic(places[3039322], 900000010, feature_code="PPLH")
+    rejected_alternate = replace(
+        next(item for item in _alternates() if item.language_tag == "post"),
+        geoname_id=rejected.geoname_id,
+    )
+    records = [rejected, barcelona, places[1482375], places[3039322]]
+    admins_by_key = {**admins, "ES.56": _catalogue_admin()}
+    alternates_by_id = {
+        barcelona.geoname_id: [
+            item for item in _alternates() if item.geoname_id == barcelona.geoname_id
+        ],
+        rejected.geoname_id: [rejected_alternate],
+    }
+    languages = _languages()
+
+    batch = normalize_catalogue(
+        records,
+        admins_by_key.values(),
+        alternates_by_id,
+        known_language_codes=languages,
+    )
+    results = {
+        record.geoname_id: normalize_catalogue_record(
+            record,
+            admins_by_key=admins_by_key,
+            alternate_records=alternates_by_id.get(record.geoname_id, ()),
+            known_language_codes=languages,
+        )
+        for record in sorted(records, key=lambda item: item.geoname_id)
+    }
+    ordered = tuple(results.values())
+    assert all(isinstance(item, CatalogueRecordNormalization) for item in ordered)
+    assert all((item.place is None) != (item.rejection is None) for item in ordered)
+    assert tuple(item.place for item in ordered if item.place is not None) == batch.places
+    assert tuple(item.rejection for item in ordered if item.rejection is not None) == (
+        batch.rejections
+    )
+    assert (
+        tuple(item.context_notice for item in ordered if item.context_notice is not None)
+        == batch.context_notices
+    )
+    counts: Counter[str] = Counter()
+    for item in ordered:
+        assert item.name_rejection_counts == tuple(sorted(item.name_rejection_counts))
+        counts.update(dict(item.name_rejection_counts))
+    assert tuple(sorted(counts.items())) == batch.name_rejection_counts
+
+    assert results[barcelona.geoname_id].name_rejection_counts == (("duplicate-name", 2),)
+    assert results[places[3039322].geoname_id].place is not None
+    unresolved = results[places[1482375].geoname_id]
+    assert unresolved.context_notice is not None
+    assert unresolved.context_notice.observed_value == "PK.03"
+    excluded = results[rejected.geoname_id]
+    assert excluded.rejection is not None
+    assert excluded.rejection.reason == "feature-code-not-included"
+    assert excluded.name_rejection_counts == ()
+
+
+def test_record_normalization_rejects_invalid_lookup_inputs_exactly() -> None:
+    place = _places()[3039322]
+    languages = _languages()
+    invalid_place = replace(
+        place,
+        lineage=replace(place.lineage, source_record_id=1),
+    )
+    with pytest.raises(CatalogueNormalizationError) as error:
+        normalize_catalogue_record(
+            invalid_place,
+            admins_by_key={},
+            alternate_records=(),
+            known_language_codes=languages,
+        )
+    assert str(error.value) == "place lineage differs from the pinned source"
+
+    wrong_alternate = _alternates()[0]
+    with pytest.raises(CatalogueNormalizationError) as error:
+        normalize_catalogue_record(
+            place,
+            admins_by_key={},
+            alternate_records=[wrong_alternate],
+            known_language_codes=languages,
+        )
+    assert str(error.value) == "alternate-name bucket 3039322 contains place 3039162"
+
+    barcelona = _catalogue_place()
+    alternate = next(item for item in _alternates() if item.geoname_id == barcelona.geoname_id)
+    with pytest.raises(CatalogueNormalizationError) as error:
+        normalize_catalogue_record(
+            barcelona,
+            admins_by_key={},
+            alternate_records=[alternate, alternate],
+            known_language_codes=languages,
+        )
+    assert str(error.value) == f"duplicate alternateNameId {alternate.alternate_name_id}"
+
+    wrong_admin = _admins()["AD.05"]
+    with pytest.raises(CatalogueNormalizationError) as error:
+        normalize_catalogue_record(
+            place,
+            admins_by_key={"AD.08": wrong_admin},
+            alternate_records=(),
+            known_language_codes=languages,
+        )
+    assert str(error.value) == "admin1 lookup key AD.08 contains AD.05"
+
+
+def test_record_normalization_result_rejects_impossible_states_exactly() -> None:
+    places = _places()
+    languages = _languages()
+    accepted = normalize_catalogue_record(
+        places[3039322],
+        admins_by_key=_admins(),
+        alternate_records=(),
+        known_language_codes=languages,
+    )
+    rejected = normalize_catalogue_record(
+        _synthetic(places[3039322], 900000011, feature_code="PPLH"),
+        admins_by_key={},
+        alternate_records=(),
+        known_language_codes=languages,
+    )
+    unresolved = normalize_catalogue_record(
+        places[1482375],
+        admins_by_key={},
+        alternate_records=(),
+        known_language_codes=languages,
+    )
+    assert rejected.rejection is not None
+    assert unresolved.context_notice is not None
+
+    invalid_states = (
+        (
+            accepted,
+            {"place": None},
+            "record normalization must contain exactly one place or rejection",
+        ),
+        (
+            accepted,
+            {"rejection": rejected.rejection},
+            "record normalization must contain exactly one place or rejection",
+        ),
+        (
+            rejected,
+            {"context_notice": unresolved.context_notice},
+            "rejected record normalization cannot contain context or name rejection details",
+        ),
+        (
+            rejected,
+            {"name_rejection_counts": (("duplicate-name", 1),)},
+            "rejected record normalization cannot contain context or name rejection details",
+        ),
+        (
+            accepted,
+            {"name_rejection_counts": (("z-reason", 1), ("a-reason", 1))},
+            "record name rejection counts must be sorted, unique, and positive",
+        ),
+        (
+            accepted,
+            {"name_rejection_counts": (("a-reason", 1), ("a-reason", 2))},
+            "record name rejection counts must be sorted, unique, and positive",
+        ),
+        (
+            accepted,
+            {"name_rejection_counts": (("a-reason", 0),)},
+            "record name rejection counts must be sorted, unique, and positive",
+        ),
+    )
+    for result, changes, message in invalid_states:
+        with pytest.raises(CatalogueNormalizationError) as error:
+            replace(result, **changes)
+        assert str(error.value) == message
 
 
 def test_inclusion_rejections_are_explicit_precedence_bound_and_order_independent() -> None:
