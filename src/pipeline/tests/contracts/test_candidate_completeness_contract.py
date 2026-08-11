@@ -84,10 +84,10 @@ def test_candidate_golden_seals_the_exact_inventory_before_manifest() -> None:
         for artifact in contract["requiredArtifacts"]
     }
 
-    assert contract["artifactCount"] == 47 == len(envelopes)
-    assert len({item["artifactId"] for item in descriptors}) == 47
-    assert len({item["path"] for item in descriptors}) == 47
-    assert [envelope["writeSequence"] for envelope in envelopes] == list(range(1, 48))
+    assert contract["artifactCount"] == 53 == len(envelopes)
+    assert len({item["artifactId"] for item in descriptors}) == 53
+    assert len({item["path"] for item in descriptors}) == 53
+    assert [envelope["writeSequence"] for envelope in envelopes] == list(range(1, 54))
 
     for envelope in envelopes:
         descriptor = envelope["descriptor"]
@@ -119,14 +119,25 @@ def test_candidate_golden_seals_the_exact_inventory_before_manifest() -> None:
         ),
         key=lambda subject: subject["path"],
     )
-    assert len(checksum_subjects) == contract["checksumSubjectCount"] == 46
+    assert len(checksum_subjects) == contract["checksumSubjectCount"] == 52
     assert checksum_subjects == expected_subjects
 
-    assert candidate["gateReportSemantics"]["validatedArtifactCount"] == 44
+    receipt_descriptors = [item for item in descriptors if item["role"] == "source-receipt"]
+    receipt_attributions = sorted(
+        item["rights"]["attributionIds"][0] for item in receipt_descriptors
+    )
+    assert receipt_attributions == contract["attributionRegistry"][:-1]
+    build_receipt = next(item for item in descriptors if item["role"] == "build-receipt")
+    assert build_receipt["lineage"] == [
+        {"path": item["path"], "sha256": item["sha256"]}
+        for item in receipt_descriptors
+    ]
+
+    assert candidate["gateReportSemantics"]["validatedArtifactCount"] == 50
     assert candidate["manifest"] == {
         "path": "manifest.json",
-        "artifactCount": 47,
-        "writeSequence": 48,
+        "artifactCount": 53,
+        "writeSequence": 54,
     }
     assert candidate["supplyChainBoundary"] == {
         "status": "deferred",

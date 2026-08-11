@@ -55,11 +55,7 @@
         "issue": { "const": 53 },
         "roles": {
           "type": "array",
-          "prefixItems": [
-            { "const": "provenance" },
-            { "const": "signature" },
-            { "const": "software-bill-of-materials" }
-          ],
+          "prefixItems": [{ "const": "provenance" }, { "const": "signature" }, { "const": "software-bill-of-materials" }],
           "items": false,
           "minItems": 3,
           "maxItems": 3
@@ -140,12 +136,7 @@
         "validatedArtifactCount": { "type": "integer", "minimum": 1 },
         "excludedPaths": {
           "type": "array",
-          "prefixItems": [
-            { "const": "checksums.txt" },
-            { "const": "evidence/gate-report.json" },
-            { "const": "evidence/gate-report.md" },
-            { "const": "manifest.json" }
-          ],
+          "prefixItems": [{ "const": "checksums.txt" }, { "const": "evidence/gate-report.json" }, { "const": "evidence/gate-report.md" }, { "const": "manifest.json" }],
           "items": false,
           "minItems": 4,
           "maxItems": 4
@@ -217,26 +208,14 @@
         "crs": { "const": "EPSG:4326" },
         "bounds": {
           "type": "array",
-          "prefixItems": [
-            { "const": -30.5 },
-            { "const": 29.5 },
-            { "const": 45.5 },
-            { "const": 75.5 }
-          ],
+          "prefixItems": [{ "const": -30.5 }, { "const": 29.5 }, { "const": 45.5 }, { "const": 75.5 }],
           "items": false,
           "minItems": 4,
           "maxItems": 4
         },
         "transform": {
           "type": "array",
-          "prefixItems": [
-            { "const": 1 },
-            { "const": 0 },
-            { "const": -30.5 },
-            { "const": 0 },
-            { "const": -1 },
-            { "const": 75.5 }
-          ],
+          "prefixItems": [{ "const": 1 }, { "const": 0 }, { "const": -30.5 }, { "const": 0 }, { "const": -1 }, { "const": 75.5 }],
           "items": false,
           "minItems": 6,
           "maxItems": 6
