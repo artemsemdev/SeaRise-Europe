@@ -670,6 +670,36 @@ def test_stac_item_artifacts_use_geojson_media_type() -> None:
     assert list(validator.iter_errors(artifact))
 
 
+def test_release_gate_report_artifacts_accept_only_public_media_types() -> None:
+    template = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR
+            / "fixtures"
+            / "valid"
+            / "artifact-search-index.json"
+        ).read_text(encoding="utf-8")
+    )
+    validator = _public_contract_validator("artifact.schema.json")
+
+    for artifact_id, path, media_type in (
+        ("release-gate-report-json", "evidence/gate-report.json", "application/json"),
+        ("release-gate-report-markdown", "evidence/gate-report.md", "text/markdown"),
+    ):
+        artifact = copy.deepcopy(template)
+        artifact.update(
+            {
+                "artifactId": artifact_id,
+                "path": path,
+                "role": "release-gate-report",
+                "mediaType": media_type,
+            }
+        )
+        validator.validate(artifact)
+
+        artifact["mediaType"] = "text/plain"
+        assert list(validator.iter_errors(artifact))
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

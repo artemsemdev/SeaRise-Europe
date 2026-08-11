@@ -54,6 +54,7 @@
         "projection-visual-pmtiles",
         "projection-geoparquet",
         "quality-summary",
+        "release-gate-report",
         "architecture-evidence",
         "stac-catalog",
         "stac-collection",
@@ -74,6 +75,7 @@
         "application/vnd.dev.sigstore.bundle+json;version=0.3",
         "application/x-ndjson",
         "image/tiff; application=geotiff; profile=cloud-optimized",
+        "text/markdown",
         "text/plain"
       ]
     },
