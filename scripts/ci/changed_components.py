@@ -55,6 +55,7 @@ PIPELINE = (
     ".github/workflows/phase-0r-owner-promotion.yml",
     "docs/evidence/fixtures/offline-release-execution-receipt.example.json",
     "scripts/release/prepare_controlled_offline_inputs.py",
+    "scripts/release/validate_supply_chain_contract.py",
     "scripts/science/promote_phase_0r_release.py",
     "scripts/science/validate_ar6_delivery_trace.py",
     "src/pipeline/**",

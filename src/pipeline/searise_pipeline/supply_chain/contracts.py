@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 from jsonschema import Draft7Validator, Draft202012Validator, FormatChecker
@@ -13,6 +14,77 @@ from referencing import Registry, Resource
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 CONTRACT_ROOT = REPOSITORY_ROOT / "contracts" / "supply-chain" / "v1"
+
+_IGNORED_DEPENDENCY_PARTS = frozenset(
+    {
+        ".git",
+        ".mypy_cache",
+        ".next",
+        ".nox",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".terraform",
+        ".tox",
+        ".venv",
+        "__pycache__",
+        "bin",
+        "build",
+        "coverage",
+        "dist",
+        "node_modules",
+        "obj",
+        "target",
+    }
+)
+_COMPOSE_FILES = frozenset(
+    {"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"}
+)
+_NODE_INPUTS = frozenset(
+    {"npm-shrinkwrap.json", "package-lock.json", "package.json", "pnpm-lock.yaml", "yarn.lock"}
+)
+_PYTHON_INPUTS = frozenset({"Pipfile", "Pipfile.lock", "poetry.lock", "pyproject.toml", "uv.lock"})
+_DOTNET_INPUTS = frozenset(
+    {
+        "Directory.Build.props",
+        "Directory.Packages.props",
+        "NuGet.config",
+        "global.json",
+        "packages.lock.json",
+    }
+)
+_EXPECTED_COMPONENTS = {
+    "api-nuget": ("nuget", "legacy", "locked"),
+    "blob-seed-python": ("python", "legacy", "locked"),
+    "deployment-opentofu": ("opentofu", "not-present", "not-present"),
+    "frontend-npm": ("npm", "candidate", "locked"),
+    "github-actions": ("github-actions", "candidate", "locked"),
+    "legacy-container-images": ("container", "legacy", "locked"),
+    "native-geospatial-toolchain": ("native", "candidate", "locked"),
+    "pipeline-geoid-evaluator": ("python", "candidate", "locked"),
+    "pipeline-python-contributor": ("python", "development", "range-constrained"),
+    "pipeline-python-release": ("python", "candidate", "locked"),
+    "release-container-image": ("container", "candidate", "locked"),
+    "settlement-spatial-python": ("python", "candidate", "locked"),
+    "vendored-standard-schemas": ("standard-schema", "candidate", "locked"),
+}
+_ALLOWED_STATUS_COMBINATIONS = frozenset(
+    {
+        ("candidate", "locked"),
+        ("development", "range-constrained"),
+        ("legacy", "locked"),
+        ("not-present", "not-present"),
+    }
+)
+_ALLOWED_ROLES = {
+    "container": frozenset({"manifest", "recipe"}),
+    "github-actions": frozenset({"workflow"}),
+    "native": frozenset({"lock", "receipt", "recipe"}),
+    "npm": frozenset({"lock", "manifest"}),
+    "nuget": frozenset({"lock", "manifest"}),
+    "opentofu": frozenset({"lock", "manifest"}),
+    "python": frozenset({"lock", "manifest"}),
+    "standard-schema": frozenset({"lock", "schema"}),
+}
 
 
 class SupplyChainContractError(ValueError):
@@ -56,6 +128,266 @@ def _validate_schema(document: Mapping[str, Any], schema_name: str) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _is_opentofu_input(path: PurePosixPath) -> bool:
+    return (
+        path.suffix == ".tf"
+        or path.name.endswith(".tf.json")
+        or path.name in {".terraform.lock.hcl", ".tofu.lock.hcl"}
+    )
+
+
+def _is_dependency_input(path: PurePosixPath) -> bool:
+    name = path.name
+    workflow = (
+        len(path.parts) >= 3
+        and path.parts[:2] == (".github", "workflows")
+        and path.suffix in {".yaml", ".yml"}
+    )
+    local_action = (
+        len(path.parts) >= 4
+        and path.parts[:2] == (".github", "actions")
+        and name in {"action.yaml", "action.yml"}
+    )
+    dockerfile = name.startswith("Dockerfile") and name != "Dockerfile.dockerignore"
+    python_requirement = (
+        name.startswith("requirements") and path.suffix in {".in", ".lock", ".txt"}
+    ) or name.endswith("requirements.txt")
+    toolchain = path.parts[:3] == ("src", "pipeline", "toolchain") and not name.startswith(".")
+    vendored_schema = path.parts[:4] == ("contracts", "supply-chain", "v1", "vendor")
+    return (
+        workflow
+        or local_action
+        or dockerfile
+        or name in _COMPOSE_FILES | _NODE_INPUTS | _PYTHON_INPUTS | _DOTNET_INPUTS
+        or python_requirement
+        or path.suffix == ".csproj"
+        or _is_opentofu_input(path)
+        or toolchain
+        or vendored_schema
+    )
+
+
+def discover_dependency_inputs(repository_root: Path = REPOSITORY_ROOT) -> tuple[str, ...]:
+    """Discover every dependency-defining repository input in stable order."""
+    root = repository_root.resolve()
+    discovered = []
+    for candidate in root.rglob("*"):
+        relative = candidate.relative_to(root)
+        if any(part in _IGNORED_DEPENDENCY_PARTS for part in relative.parts):
+            continue
+        logical_path = PurePosixPath(relative.as_posix())
+        if candidate.is_file() and _is_dependency_input(logical_path):
+            discovered.append(logical_path.as_posix())
+    return tuple(sorted(discovered))
+
+
+def _component_for_input(path: PurePosixPath) -> str:
+    value = path.as_posix()
+    if path.parts[:2] in {(".github", "actions"), (".github", "workflows")}:
+        return "github-actions"
+    if path.name in _COMPOSE_FILES:
+        return "legacy-container-images"
+    if path.name.startswith("Dockerfile"):
+        if value == "src/pipeline/offline_release/Dockerfile":
+            return "release-container-image"
+        if path.parts[:3] == ("src", "pipeline", "toolchain"):
+            return "native-geospatial-toolchain"
+        if value in {
+            "infra/blob-seed/Dockerfile",
+            "src/api/Dockerfile",
+            "src/frontend/Dockerfile",
+        }:
+            return "legacy-container-images"
+    if path.parts[:3] == ("src", "pipeline", "toolchain"):
+        return "native-geospatial-toolchain"
+    if path.parts[:4] == ("contracts", "supply-chain", "v1", "vendor"):
+        return "vendored-standard-schemas"
+    if path.parts[:2] == ("src", "api"):
+        return "api-nuget"
+    if path.parts[:2] == ("src", "frontend") and path.name in _NODE_INPUTS:
+        return "frontend-npm"
+    if path.parts[:2] == ("infra", "blob-seed"):
+        return "blob-seed-python"
+    if value == "src/pipeline/science/geoid-evaluator-requirements.txt":
+        return "pipeline-geoid-evaluator"
+    if value in {"src/pipeline/pyproject.toml", "src/pipeline/requirements-pipeline.txt"}:
+        return "pipeline-python-contributor"
+    if path.name.startswith("requirements-release"):
+        return "pipeline-python-release"
+    if path.name.startswith("requirements-settlements-spatial"):
+        return "settlement-spatial-python"
+    if _is_opentofu_input(path):
+        return "deployment-opentofu"
+    raise SupplyChainContractError(f"unclassified dependency input: {value}")
+
+
+def _role_for_input(path: PurePosixPath) -> str:
+    if path.parts[:2] in {(".github", "actions"), (".github", "workflows")}:
+        return "workflow"
+    if path.name.startswith("Dockerfile") or path.suffix == ".sh":
+        return "recipe"
+    if path.name.endswith("build-receipt.json"):
+        return "receipt"
+    if path.parts[:4] == ("contracts", "supply-chain", "v1", "vendor"):
+        return "lock" if path.name == "manifest.json" else "schema"
+    if (
+        path.name in {"package-lock.json", "packages.lock.json", ".terraform.lock.hcl"}
+        or path.suffix == ".lock"
+        or path.name == "geoid-evaluator-requirements.txt"
+        or path.name == "duckdb-spatial-extensions.json"
+    ):
+        return "lock"
+    return "manifest"
+
+
+def _safe_inventory_path(repository_root: Path, value: str) -> Path:
+    logical_path = PurePosixPath(value)
+    if (
+        not value
+        or "\\" in value
+        or logical_path.is_absolute()
+        or value != logical_path.as_posix()
+        or any(part in {"", ".", ".."} for part in logical_path.parts)
+    ):
+        raise SupplyChainContractError(f"unsafe dependency input path: {value}")
+
+    root = repository_root.resolve()
+    candidate = repository_root.joinpath(*logical_path.parts)
+    cursor = repository_root
+    for part in logical_path.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            raise SupplyChainContractError(f"dependency input path must not use symlinks: {value}")
+    try:
+        mode = candidate.stat().st_mode
+        candidate.resolve().relative_to(root)
+    except (FileNotFoundError, ValueError) as exc:
+        raise SupplyChainContractError(f"dependency input is outside or missing: {value}") from exc
+    if not stat.S_ISREG(mode):
+        raise SupplyChainContractError(f"dependency input must be a regular file: {value}")
+    return candidate
+
+
+def validate_dependency_inventory(
+    inventory_path: Path,
+    *,
+    repository_root: Path = REPOSITORY_ROOT,
+) -> dict[str, Any]:
+    """Validate exact dependency-input discovery and immutable byte bindings."""
+    document = load_json(inventory_path)
+    _validate_schema(document, "dependency-inventory.schema.json")
+    components = document["components"]
+    component_ids = [component["id"] for component in components]
+    if len(component_ids) != len(set(component_ids)):
+        raise SupplyChainContractError("dependency component identifiers must be unique")
+    if component_ids != sorted(component_ids):
+        raise SupplyChainContractError("dependency components must use stable sorted order")
+    if component_ids != sorted(_EXPECTED_COMPONENTS):
+        missing = sorted(set(_EXPECTED_COMPONENTS) - set(component_ids))
+        extra = sorted(set(component_ids) - set(_EXPECTED_COMPONENTS))
+        raise SupplyChainContractError(
+            f"dependency component set mismatch; missing={missing}, extra={extra}"
+        )
+
+    recorded: dict[str, tuple[dict[str, Any], Path]] = {}
+    for component in components:
+        component_id = component["id"]
+        status = (component["releaseUse"], component["coverage"])
+        if status not in _ALLOWED_STATUS_COMBINATIONS:
+            raise SupplyChainContractError(
+                f"invalid dependency status combination for {component_id}: {status}"
+            )
+        actual_contract = (component["ecosystem"], *status)
+        if actual_contract != _EXPECTED_COMPONENTS[component_id]:
+            raise SupplyChainContractError(f"dependency component contract drift: {component_id}")
+        inputs = component["inputs"]
+        if (component["coverage"] == "not-present") != (not inputs):
+            raise SupplyChainContractError(
+                f"not-present dependency component must have no inputs: {component_id}"
+            )
+        paths = [item["path"] for item in inputs]
+        if len(paths) != len(set(paths)):
+            raise SupplyChainContractError(f"duplicate dependency input in {component_id}")
+        if paths != sorted(paths):
+            raise SupplyChainContractError(
+                f"dependency inputs must use stable sorted order: {component_id}"
+            )
+        for item in inputs:
+            value = item["path"]
+            if value in recorded:
+                raise SupplyChainContractError(
+                    f"duplicate dependency input across components: {value}"
+                )
+            input_path = _safe_inventory_path(repository_root, value)
+            logical_path = PurePosixPath(value)
+            if item["role"] not in _ALLOWED_ROLES[component["ecosystem"]]:
+                raise SupplyChainContractError(f"invalid dependency input role: {value}")
+            if _component_for_input(logical_path) != component_id:
+                raise SupplyChainContractError(f"dependency input component mismatch: {value}")
+            if _role_for_input(logical_path) != item["role"]:
+                raise SupplyChainContractError(f"dependency input role mismatch: {value}")
+            recorded[value] = (item, input_path)
+
+    discovered = set(discover_dependency_inputs(repository_root))
+    recorded_paths = set(recorded)
+    if discovered != recorded_paths:
+        missing = sorted(discovered - recorded_paths)
+        extra = sorted(recorded_paths - discovered)
+        raise SupplyChainContractError(
+            f"dependency discovery mismatch; unclassified={missing}, extra={extra}"
+        )
+    for value, (item, path) in recorded.items():
+        if _sha256(path) != item["sha256"]:
+            raise SupplyChainContractError(f"dependency input SHA-256 mismatch: {value}")
+
+    projects = {Path(path).parent for path in discovered if path.endswith(".csproj")}
+    project_locks = {
+        Path(path).parent for path in discovered if path.endswith("/packages.lock.json")
+    }
+    if projects != project_locks:
+        raise SupplyChainContractError(
+            "every NuGet project must have one sibling packages.lock.json"
+        )
+    npm_manifests = {Path(path).parent for path in discovered if path.endswith("/package.json")}
+    npm_locks = {Path(path).parent for path in discovered if path.endswith("/package-lock.json")}
+    if npm_manifests != npm_locks:
+        raise SupplyChainContractError("every npm manifest must have one sibling package-lock.json")
+    tofu_inputs = [
+        PurePosixPath(path) for path in discovered if _is_opentofu_input(PurePosixPath(path))
+    ]
+    if tofu_inputs and not any(path.name == ".terraform.lock.hcl" for path in tofu_inputs):
+        raise SupplyChainContractError("OpenTofu inputs require a provider lock file")
+
+    vendor_root = repository_root / "contracts" / "supply-chain" / "v1" / "vendor"
+    vendor_manifest = load_json(vendor_root / "manifest.json")
+    if (vendor_manifest.get("standard"), vendor_manifest.get("specVersion")) != (
+        "CycloneDX",
+        "1.7",
+    ):
+        raise SupplyChainContractError("vendored schema manifest must identify CycloneDX 1.7")
+    schema_records = vendor_manifest.get("schemas", [])
+    schema_names = [record.get("path") for record in schema_records]
+    if len(schema_names) != len(set(schema_names)) or schema_names != sorted(schema_names):
+        raise SupplyChainContractError("vendored schema manifest paths must be unique and sorted")
+    discovered_schemas = {
+        PurePosixPath(path).name
+        for path in discovered
+        if path.startswith("contracts/supply-chain/v1/vendor/")
+        and not path.endswith("/manifest.json")
+    }
+    if set(schema_names) != discovered_schemas:
+        raise SupplyChainContractError("vendored schema manifest discovery mismatch")
+    for record in schema_records:
+        relative_path = PurePosixPath(record["path"])
+        if len(relative_path.parts) != 1:
+            raise SupplyChainContractError("vendored schema path must be one file name")
+        if _sha256(vendor_root / relative_path.name) != record.get("sha256"):
+            raise SupplyChainContractError(
+                f"vendored schema SHA-256 mismatch: {relative_path.name}"
+            )
+    return document
 
 
 def _reject_remote_schema(uri: str) -> Resource:

@@ -16,9 +16,11 @@ from jsonschema import Draft202012Validator
 import searise_pipeline.supply_chain.contracts as supply_chain_contracts
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
+    discover_dependency_inputs,
     load_json,
     parse_timestamp,
     validate_dependency_exception,
+    validate_dependency_inventory,
     validate_evidence_files,
 )
 
@@ -30,6 +32,7 @@ ENVELOPE = VALID_ROOT / "evidence-envelope.json"
 POLICY = CONTRACT_ROOT / "identity-policy.json"
 SBOM = VALID_ROOT / "frontend.cdx.json"
 SBOM_LOGICAL_PATH = "sbom/frontend.cdx.json"
+DEPENDENCY_INVENTORY = CONTRACT_ROOT / "dependency-inventory.json"
 
 
 def _write_json(path: Path, document: dict[str, Any]) -> Path:
@@ -42,6 +45,24 @@ def _validate(envelope: Path = ENVELOPE, policy: Path = POLICY, sbom: Path = SBO
         envelope,
         policy,
         {SBOM_LOGICAL_PATH: sbom},
+    )
+
+
+def _dependency_document() -> dict[str, Any]:
+    return copy.deepcopy(load_json(DEPENDENCY_INVENTORY))
+
+
+def _copy_dependency_inputs(destination: Path) -> None:
+    for component in _dependency_document()["components"]:
+        for item in component["inputs"]:
+            target = destination / item["path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPOSITORY_ROOT / item["path"], target)
+
+
+def _dependency_component(document: dict[str, Any], component_id: str) -> dict[str, Any]:
+    return next(
+        component for component in document["components"] if component["id"] == component_id
     )
 
 
@@ -196,3 +217,221 @@ def test_expired_dependency_exception_fails_closed() -> None:
             exception,
             as_of=parse_timestamp("2026-08-11T12:00:00Z"),
         )
+
+
+def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
+    document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
+    discovered = discover_dependency_inputs()
+    recorded = tuple(
+        item["path"] for component in document["components"] for item in component["inputs"]
+    )
+    opentofu = _dependency_component(document, "deployment-opentofu")
+
+    assert len(discovered) == 41
+    assert discovered == tuple(sorted(set(discovered)))
+    assert set(recorded) == set(discovered)
+    assert document["inventoryKind"] == "dependency-defining-inputs"
+    assert document["productionClaim"] is False
+    assert (opentofu["releaseUse"], opentofu["coverage"], opentofu["inputs"]) == (
+        "not-present",
+        "not-present",
+        [],
+    )
+
+
+def test_dependency_inventory_rejects_stale_recorded_hash(tmp_path: Path) -> None:
+    document = _dependency_document()
+    document["components"][0]["inputs"][0]["sha256"] = "f" * 64
+
+    with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+def test_dependency_inventory_rejects_changed_input_bytes(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    changed = repository / "src" / "frontend" / "package.json"
+    changed.write_bytes(changed.read_bytes() + b"\n")
+
+    with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_dependency_inventory_rejects_missing_record(tmp_path: Path) -> None:
+    document = _dependency_document()
+    document["components"][0]["inputs"].pop(0)
+
+    with pytest.raises(SupplyChainContractError, match="discovery mismatch"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+def test_dependency_inventory_rejects_extra_record(tmp_path: Path) -> None:
+    document = _dependency_document()
+    component = _dependency_component(document, "pipeline-python-contributor")
+    extra_path = "scripts/release/validate_supply_chain_contract.py"
+    component["inputs"].append(
+        {
+            "path": extra_path,
+            "role": "manifest",
+            "sha256": hashlib.sha256((REPOSITORY_ROOT / extra_path).read_bytes()).hexdigest(),
+        }
+    )
+    component["inputs"].sort(key=lambda item: item["path"])
+
+    with pytest.raises(SupplyChainContractError, match="unclassified dependency input"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+def test_dependency_inventory_rejects_duplicate_input(tmp_path: Path) -> None:
+    document = _dependency_document()
+    component = document["components"][0]
+    duplicate = copy.deepcopy(component["inputs"][0])
+    duplicate["sha256"] = "f" * 64
+    component["inputs"].insert(1, duplicate)
+
+    with pytest.raises(SupplyChainContractError, match="duplicate dependency input"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra", "duplicate"])
+def test_dependency_inventory_rejects_component_set_drift(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    document = _dependency_document()
+    if mutation == "missing":
+        document["components"].pop(0)
+    elif mutation == "extra":
+        document["components"].append(
+            {
+                "id": "unexpected-component",
+                "ecosystem": "opentofu",
+                "releaseUse": "not-present",
+                "coverage": "not-present",
+                "inputs": [],
+                "note": "Unexpected test component.",
+            }
+        )
+        document["components"].sort(key=lambda component: component["id"])
+    else:
+        duplicate = copy.deepcopy(document["components"][0])
+        duplicate["note"] = "Duplicate identifier with distinct content."
+        document["components"].append(duplicate)
+        document["components"].sort(key=lambda component: component["id"])
+
+    with pytest.raises(
+        SupplyChainContractError,
+        match="component set mismatch|identifiers must be unique",
+    ):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+def test_dependency_inventory_rejects_path_escape(tmp_path: Path) -> None:
+    document = _dependency_document()
+    document["components"][0]["inputs"][0]["path"] = "../outside"
+
+    with pytest.raises(SupplyChainContractError, match="unsafe dependency input path"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+def test_dependency_inventory_rejects_symlinked_input(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    path = repository / "src" / "api" / "Directory.Build.props"
+    outside = tmp_path / "outside"
+    outside.write_bytes(path.read_bytes())
+    path.unlink()
+    path.symlink_to(outside)
+
+    with pytest.raises(SupplyChainContractError, match="must not use symlinks"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_dependency_inventory_rejects_nonregular_input(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    path = repository / "src" / "api" / "Directory.Build.props"
+    path.unlink()
+    path.mkdir()
+
+    with pytest.raises(SupplyChainContractError, match="must be a regular file"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_dependency_inventory_rejects_invalid_status_combination(tmp_path: Path) -> None:
+    document = _dependency_document()
+    document["components"][0]["coverage"] = "range-constrained"
+
+    with pytest.raises(SupplyChainContractError, match="invalid dependency status combination"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+@pytest.mark.parametrize("level", ["component", "input"])
+def test_dependency_inventory_rejects_unstable_order(tmp_path: Path, level: str) -> None:
+    document = _dependency_document()
+    if level == "component":
+        document["components"].reverse()
+    else:
+        document["components"][0]["inputs"].reverse()
+
+    with pytest.raises(SupplyChainContractError, match="stable sorted order"):
+        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+
+
+def test_dependency_discovery_rejects_new_unclassified_input(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    unclassified = repository / "tools" / "package.json"
+    unclassified.parent.mkdir(parents=True)
+    unclassified.write_text('{"private": true}\n', encoding="utf-8")
+
+    with pytest.raises(SupplyChainContractError, match=r"unclassified=.*tools/package.json"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_dependency_discovery_includes_local_composite_actions(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    action = repository / ".github" / "actions" / "local" / "action.yml"
+    action.parent.mkdir(parents=True)
+    action.write_text("name: local\nruns:\n  using: composite\n  steps: []\n", encoding="utf-8")
+
+    with pytest.raises(SupplyChainContractError, match=r"unclassified=.*action.yml"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_dependency_discovery_rejects_unmanifested_vendored_schema(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    schema = repository / "contracts" / "supply-chain" / "v1" / "vendor" / "new.schema.json"
+    schema.write_text("{}\n", encoding="utf-8")
+
+    with pytest.raises(SupplyChainContractError, match=r"unclassified=.*new.schema.json"):
+        validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+@pytest.mark.parametrize(
+    "generated_directory",
+    [
+        ".mypy_cache",
+        ".next",
+        ".nox",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        "__pycache__",
+        "build",
+        "coverage",
+        "dist",
+        "target",
+    ],
+)
+def test_dependency_discovery_ignores_generated_package_manifests(
+    tmp_path: Path,
+    generated_directory: str,
+) -> None:
+    generated = tmp_path / generated_directory / "nested" / "package.json"
+    generated.parent.mkdir(parents=True)
+    generated.write_text('{"private": true}\n', encoding="utf-8")
+
+    assert discover_dependency_inputs(tmp_path) == ()
