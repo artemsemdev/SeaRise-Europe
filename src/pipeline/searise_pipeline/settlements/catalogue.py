@@ -85,6 +85,42 @@ class CatalogueContextNotice:
 
 
 @dataclass(frozen=True)
+class CatalogueRecordNormalization:
+    place: CataloguePlace | None
+    rejection: CatalogueRejection | None
+    context_notice: CatalogueContextNotice | None
+    name_rejection_counts: tuple[tuple[str, int], ...]
+
+    def __post_init__(self) -> None:
+        if (self.place is None) == (self.rejection is None):
+            raise CatalogueNormalizationError(
+                "record normalization must contain exactly one place or rejection"
+            )
+        if self.rejection is not None and (
+            self.context_notice is not None or self.name_rejection_counts
+        ):
+            raise CatalogueNormalizationError(
+                "rejected record normalization cannot contain context or name rejection details"
+            )
+        invalid_counts = any(
+            not isinstance(reason, str)
+            or not reason
+            or not isinstance(count, int)
+            or isinstance(count, bool)
+            or count < 1
+            for reason, count in self.name_rejection_counts
+        )
+        if (
+            invalid_counts
+            or len(dict(self.name_rejection_counts)) != len(self.name_rejection_counts)
+            or self.name_rejection_counts != tuple(sorted(self.name_rejection_counts))
+        ):
+            raise CatalogueNormalizationError(
+                "record name rejection counts must be sorted, unique, and positive"
+            )
+
+
+@dataclass(frozen=True)
 class NormalizedCatalogue:
     snapshot_date: date
     catalogue_policy_version: str
@@ -241,6 +277,84 @@ def _validate_lineage(
         raise CatalogueNormalizationError(f"{label} lineage differs from the pinned source")
 
 
+def normalize_catalogue_record(
+    record: GeoNameRecord,
+    *,
+    admins_by_key: Mapping[str, Admin1Record],
+    alternate_records: Iterable[AlternateNameRecord],
+    known_language_codes: frozenset[str],
+) -> CatalogueRecordNormalization:
+    """Normalize one source record into exactly one immutable outcome."""
+    _validate_lineage("place", record.geoname_id, record.lineage, ALL_COUNTRIES_SOURCE)
+    alternates = _alternate_index({record.geoname_id: alternate_records})[record.geoname_id]
+    identifier = settlement_id(record.geoname_id)
+    rejected = _place_rejection(record)
+    if rejected is not None:
+        field, reason, value = rejected
+        return CatalogueRecordNormalization(
+            place=None,
+            rejection=CatalogueRejection(identifier, field, reason, value, record.lineage),
+            context_notice=None,
+            name_rejection_counts=(),
+        )
+
+    admin = None
+    notice = None
+    if record.admin1_code is not None:
+        admin_key = f"{record.country_code}.{record.admin1_code}"
+        admin = admins_by_key.get(admin_key)
+        if admin is None:
+            notice = CatalogueContextNotice(
+                identifier,
+                "admin1Code",
+                "admin1-code-unresolved",
+                admin_key,
+                record.lineage,
+            )
+        else:
+            if admin.key != admin_key:
+                raise CatalogueNormalizationError(
+                    f"admin1 lookup key {admin_key} contains {admin.key}"
+                )
+            _validate_lineage("admin1", admin.geoname_id, admin.lineage, ADMIN1_SOURCE)
+
+    selection = select_names(
+        geoname_id=record.geoname_id,
+        source_name=record.name,
+        records=alternates,
+        known_language_codes=known_language_codes,
+        as_of=CATALOGUE_SNAPSHOT_DATE,
+    )
+    lineage = [record.lineage]
+    if admin is not None:
+        lineage.append(admin.lineage)
+    lineage.extend(item.lineage for item in selection.selected_records)
+    if len(lineage) != len(set(lineage)):
+        raise CatalogueNormalizationError(f"duplicate lineage for {identifier}")
+    assert record.country_code is not None and record.feature_code is not None
+    return CatalogueRecordNormalization(
+        place=CataloguePlace(
+            id=identifier,
+            source_spelling=record.name,
+            canonical_name=selection.canonical,
+            ascii_name=record.ascii_name,
+            alternate_names=selection.alternates,
+            country_code=record.country_code,
+            admin1_code=record.admin1_code,
+            admin1_name=admin.name if admin else None,
+            latitude=record.latitude,
+            longitude=record.longitude,
+            population=record.population,
+            feature_code=record.feature_code,
+            source_updated_at=record.modification_date,
+            lineage=tuple(lineage),
+        ),
+        rejection=None,
+        context_notice=notice,
+        name_rejection_counts=selection.rejections,
+    )
+
+
 def normalize_catalogue(
     place_records: Iterable[GeoNameRecord],
     admin1_records: Iterable[Admin1Record],
@@ -261,60 +375,20 @@ def normalize_catalogue(
     name_rejections: Counter[str] = Counter()
 
     for geoname_id, record in sorted(places_by_id.items()):
-        identifier = settlement_id(geoname_id)
-        rejected = _place_rejection(record)
-        if rejected is not None:
-            field, reason, value = rejected
-            rejections.append(CatalogueRejection(identifier, field, reason, value, record.lineage))
-            continue
-
-        admin = None
-        if record.admin1_code is not None:
-            admin_key = f"{record.country_code}.{record.admin1_code}"
-            admin = admins_by_key.get(admin_key)
-            if admin is None:
-                notices.append(
-                    CatalogueContextNotice(
-                        identifier,
-                        "admin1Code",
-                        "admin1-code-unresolved",
-                        admin_key,
-                        record.lineage,
-                    )
-                )
-        selection = select_names(
-            geoname_id=geoname_id,
-            source_name=record.name,
-            records=alternates_by_id.get(geoname_id, ()),
+        result = normalize_catalogue_record(
+            record,
+            admins_by_key=admins_by_key,
+            alternate_records=alternates_by_id.get(geoname_id, ()),
             known_language_codes=known_language_codes,
-            as_of=CATALOGUE_SNAPSHOT_DATE,
         )
-        name_rejections.update(dict(selection.rejections))
-        lineage = [record.lineage]
-        if admin is not None:
-            lineage.append(admin.lineage)
-        lineage.extend(item.lineage for item in selection.selected_records)
-        if len(lineage) != len(set(lineage)):
-            raise CatalogueNormalizationError(f"duplicate lineage for {identifier}")
-        assert record.country_code is not None and record.feature_code is not None
-        places.append(
-            CataloguePlace(
-                id=identifier,
-                source_spelling=record.name,
-                canonical_name=selection.canonical,
-                ascii_name=record.ascii_name,
-                alternate_names=selection.alternates,
-                country_code=record.country_code,
-                admin1_code=record.admin1_code,
-                admin1_name=admin.name if admin else None,
-                latitude=record.latitude,
-                longitude=record.longitude,
-                population=record.population,
-                feature_code=record.feature_code,
-                source_updated_at=record.modification_date,
-                lineage=tuple(lineage),
-            )
-        )
+        if result.place is not None:
+            places.append(result.place)
+        else:
+            assert result.rejection is not None
+            rejections.append(result.rejection)
+        if result.context_notice is not None:
+            notices.append(result.context_notice)
+        name_rejections.update(dict(result.name_rejection_counts))
 
     notice_counts = Counter(item.reason for item in notices)
     return NormalizedCatalogue(
