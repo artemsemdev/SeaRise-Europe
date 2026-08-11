@@ -557,15 +557,15 @@
       "id": "pipeline-supply-chain-contract",
       "layer": "security",
       "owner": "security",
-      "purpose": "Keep signed-candidate evidence roles, signing identity, subject hashes, CycloneDX identity, and dependency exceptions fail-closed.",
-      "sourcePaths": ["contracts/supply-chain/**", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py"],
-      "changedPaths": ["contracts/supply-chain/**", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py"],
+      "purpose": "Keep signed-candidate evidence roles, signing identity, subject hashes, deterministic CycloneDX generation, and dependency exceptions fail-closed.",
+      "sourcePaths": ["contracts/supply-chain/**", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
+      "changedPaths": ["contracts/supply-chain/**", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent signed-subject, pinned-identity, SBOM, exception-expiry, and cryptographic-verification boundary." },
-      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/supply_chain/test_supply_chain_contracts.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/supply_chain -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-supply-chain-contract", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "security", "issue": null, "expiresAt": null, "evidence": "Fixed local schemas and synthetic fixtures use an explicit validation instant and no clock, random input, network, credentials, or signing event." }
+      "flakiness": { "status": "none-observed", "owner": "security", "issue": null, "expiresAt": null, "evidence": "Fixed local schemas, immutable locks, and synthetic fixtures use an explicit validation instant and no clock, random input, network, credentials, or signing event." }
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
@@ -1079,6 +1079,7 @@
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_sbom_generation.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/tdd/test_result_state_characterization.py", "suite": "pipeline-five-state-characterization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_cogify.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_compute_exposure.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },

@@ -1,0 +1,52 @@
+{
+  "name": "synthetic-app",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "synthetic-app",
+      "version": "1.0.0",
+      "dependencies": { "alpha": "1.0.0", "shared": "1.0.0" },
+      "devDependencies": { "tooling": "1.0.0" },
+      "optionalDependencies": { "optional-package": "1.0.0" },
+      "peerDependencies": { "peer-package": "1.0.0" }
+    },
+    "node_modules/alpha": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz",
+      "integrity": "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "dependencies": { "shared": "1.0.0" }
+    },
+    "node_modules/optional-package": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/optional-package/-/optional-package-1.0.0.tgz",
+      "integrity": "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "optional": true
+    },
+    "node_modules/peer-package": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/peer-package/-/peer-package-1.0.0.tgz",
+      "integrity": "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "peer": true
+    },
+    "node_modules/shared": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/shared/-/shared-1.0.0.tgz",
+      "integrity": "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
+    },
+    "node_modules/tooling": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/tooling/-/tooling-1.0.0.tgz",
+      "integrity": "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "dev": true,
+      "dependencies": { "shared": "1.0.0" }
+    },
+    "node_modules/tooling/node_modules/shared": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/shared/-/shared-1.0.0.tgz",
+      "integrity": "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==",
+      "dev": true
+    }
+  }
+}
