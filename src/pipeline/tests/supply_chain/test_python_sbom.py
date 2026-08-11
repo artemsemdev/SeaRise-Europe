@@ -23,6 +23,37 @@ FIXTURE_ROOT = REPOSITORY_ROOT / "contracts" / "supply-chain" / "v1" / "fixtures
 ANNOTATION = FIXTURE_ROOT / "valid.json"
 LINUX = "linux-x86-64-cp311"
 MACOS = "macos-arm64-cp311"
+SBOM_ROOT = REPOSITORY_ROOT / "contracts" / "supply-chain" / "v1" / "sboms"
+REAL_TARGETS = (
+    (
+        "release-linux",
+        REPOSITORY_ROOT / "contracts/supply-chain/v1/python-graphs/release-runtime.json",
+        LINUX,
+        SBOM_ROOT / "python-release-linux-x86-64-cp311.cdx.json",
+        39,
+    ),
+    (
+        "release-macos",
+        REPOSITORY_ROOT / "contracts/supply-chain/v1/python-graphs/release-runtime.json",
+        MACOS,
+        SBOM_ROOT / "python-release-macos-arm64-cp311.cdx.json",
+        39,
+    ),
+    (
+        "settlement-spatial-linux",
+        REPOSITORY_ROOT / "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json",
+        LINUX,
+        SBOM_ROOT / "python-settlement-spatial-linux-x86-64-cp311.cdx.json",
+        1,
+    ),
+    (
+        "settlement-spatial-macos",
+        REPOSITORY_ROOT / "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json",
+        MACOS,
+        SBOM_ROOT / "python-settlement-spatial-macos-arm64-cp311.cdx.json",
+        1,
+    ),
+)
 
 
 def _generate(target_id: str = LINUX, *, repository: Path = REPOSITORY_ROOT) -> dict[str, Any]:
@@ -160,6 +191,102 @@ def test_generation_and_validation_are_byte_stable(tmp_path: Path) -> None:
     with pytest.raises(SupplyChainContractError, match="already exists"):
         write_new_sbom(output, first)
     assert output.read_bytes() == first
+
+
+@pytest.mark.parametrize(
+    ("_name", "annotation", "target_id", "artifact", "component_count"),
+    REAL_TARGETS,
+)
+def test_checked_in_real_artifacts_match_exact_reviewed_target_authority(
+    _name: str,
+    annotation: Path,
+    target_id: str,
+    artifact: Path,
+    component_count: int,
+) -> None:
+    document = validate_python_sbom(
+        artifact,
+        annotation,
+        repository_root=REPOSITORY_ROOT,
+        target_id=target_id,
+    )
+    properties = _properties(document["metadata"]["component"])
+    annotation_document = json.loads(annotation.read_bytes())
+    target = next(item for item in annotation_document["targets"] if item["id"] == target_id)
+
+    assert artifact.read_bytes() == canonical_sbom_bytes(document)
+    assert len(document["components"]) == component_count
+    assert properties["org.searise.sbom.annotation.id"] == annotation_document["annotationId"]
+    assert properties["org.searise.sbom.python.target.id"] == target_id
+    assert properties["org.searise.sbom.python.lock.path"] == target["lock"]["path"]
+    assert properties["org.searise.sbom.python.lock.sha256"] == target["lock"]["sha256"]
+    assert properties["org.searise.sbom.data-provenance-class"] == "real-source"
+    assert properties["org.searise.sbom.production-claim"] == "false"
+
+
+@pytest.mark.parametrize(
+    ("_name", "annotation", "target_id", "artifact", "_component_count"),
+    REAL_TARGETS,
+)
+def test_real_artifact_mutation_and_wrong_target_fail_closed(
+    _name: str,
+    annotation: Path,
+    target_id: str,
+    artifact: Path,
+    _component_count: int,
+    tmp_path: Path,
+) -> None:
+    mutated = json.loads(artifact.read_bytes())
+    mutated["components"].pop()
+    candidate = tmp_path / artifact.name
+    _write_sbom(candidate, mutated)
+
+    with pytest.raises(SupplyChainContractError, match="graph target authority"):
+        validate_python_sbom(
+            candidate,
+            annotation,
+            repository_root=REPOSITORY_ROOT,
+            target_id=target_id,
+        )
+
+    other_target = MACOS if target_id == LINUX else LINUX
+    with pytest.raises(SupplyChainContractError, match="graph target authority"):
+        validate_python_sbom(
+            artifact,
+            annotation,
+            repository_root=REPOSITORY_ROOT,
+            target_id=other_target,
+        )
+
+
+@pytest.mark.parametrize(("_name", "annotation", "_target_id", "artifact", "_count"), REAL_TARGETS)
+def test_real_annotations_reject_missing_target_before_artifact_validation(
+    _name: str,
+    annotation: Path,
+    _target_id: str,
+    artifact: Path,
+    _count: int,
+    tmp_path: Path,
+) -> None:
+    document = json.loads(annotation.read_bytes())
+    repository = tmp_path / "repository"
+    for target in document["targets"]:
+        lock = REPOSITORY_ROOT / target["lock"]["path"]
+        copied_lock = repository / target["lock"]["path"]
+        copied_lock.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(lock, copied_lock)
+    document["targets"] = []
+    missing_target_annotation = repository / annotation.relative_to(REPOSITORY_ROOT)
+    missing_target_annotation.parent.mkdir(parents=True, exist_ok=True)
+    _write_annotation(missing_target_annotation, document)
+
+    with pytest.raises(SupplyChainContractError, match="non-empty"):
+        validate_python_sbom(
+            artifact,
+            missing_target_annotation,
+            repository_root=repository,
+            target_id=LINUX,
+        )
 
 
 @pytest.mark.parametrize("target_id", ["missing-target", "", True, 1])
