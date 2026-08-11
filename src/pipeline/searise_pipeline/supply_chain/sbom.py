@@ -189,10 +189,6 @@ def _resolved_edges(
                 owner = parent_path or "<root>"
                 raise SupplyChainContractError(f"unresolved npm dependency {name!r} from {owner}")
             edges.append(refs[resolved])
-    for name in sorted(set(peer_meta) - set(groups["peerDependencies"])):
-        resolved = _resolve_npm_dependency(parent_path, name, packages)
-        if resolved is not None:
-            edges.append(refs[resolved])
     return tuple(sorted(set(edges)))
 
 
@@ -237,8 +233,8 @@ def _validate_registry_tarball(resolved: object, *, name: str, version: str, pat
         raise SupplyChainContractError(f"npm resolved URL is missing: {path}")
     parsed = urlsplit(resolved)
     decoded_path = unquote(parsed.path)
-    expected_prefix = f"/{name}/-/"
     leaf = name.rsplit("/", 1)[-1]
+    expected_path = f"/{name}/-/{leaf}-{version}.tgz"
     if (
         parsed.scheme != "https"
         or parsed.hostname != "registry.npmjs.org"
@@ -247,8 +243,7 @@ def _validate_registry_tarball(resolved: object, *, name: str, version: str, pat
         or parsed.port is not None
         or parsed.query
         or parsed.fragment
-        or not decoded_path.startswith(expected_prefix)
-        or PurePosixPath(decoded_path).name != f"{leaf}-{version}.tgz"
+        or decoded_path != expected_path
     ):
         raise SupplyChainContractError(f"unsupported npm resolved tarball: {path}")
     return resolved
@@ -272,9 +267,10 @@ def _npm_component(
     if not isinstance(version, str) or not version:
         raise SupplyChainContractError(f"npm package version is missing: {path}")
     _validate_registry_tarball(entry.get("resolved"), name=name, version=version, path=path)
-    for flag in ("dev", "optional", "peer"):
+    for flag in ("dev", "devOptional", "optional", "peer"):
         if flag in entry and not isinstance(entry[flag], bool):
             raise SupplyChainContractError(f"npm {flag} flag must be boolean: {path}")
+    optional_scope = entry.get("optional", False) or entry.get("devOptional", False)
 
     component: dict[str, Any] = {
         "type": "library",
@@ -282,8 +278,10 @@ def _npm_component(
         "name": name,
         "version": version,
         "purl": _npm_purl(name, version),
+        "scope": "optional" if optional_scope else "required",
         "properties": _properties(
             ("npm.dev", entry.get("dev", False)),
+            ("npm.devOptional", entry.get("devOptional", False)),
             ("npm.install-name", install_name),
             ("npm.lock-entry-sha256", _sha256_bytes(canonical_sbom_bytes(entry))),
             ("npm.lock-path", path),
@@ -319,7 +317,14 @@ def _load_lock_bytes(lock_path: Path) -> tuple[bytes, dict[str, Any]]:
             result[key] = value
         return result
 
-    lock = json.loads(input_bytes, object_pairs_hook=reject_duplicates)
+    def reject_constant(value: str) -> None:
+        raise SupplyChainContractError(f"invalid non-JSON numeric constant: {value}")
+
+    lock = json.loads(
+        input_bytes,
+        object_pairs_hook=reject_duplicates,
+        parse_constant=reject_constant,
+    )
     if not isinstance(lock, dict):
         raise SupplyChainContractError("package-lock root must be an object")
     return input_bytes, lock

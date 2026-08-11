@@ -84,6 +84,7 @@ def test_synthetic_lock_generates_complete_path_qualified_graph() -> None:
     assert graph[components["node_modules/tooling"]["bom-ref"]] == [
         components["node_modules/tooling/node_modules/shared"]["bom-ref"]
     ]
+    assert components["node_modules/optional-package"]["scope"] == "optional"
 
     duplicate_shared = [
         component for component in components.values() if component["name"] == "shared"
@@ -127,6 +128,11 @@ def test_generation_is_byte_stable_and_input_tamper_changes_identity(
     assert json.loads(changed)["serialNumber"] != json.loads(first)["serialNumber"]
 
 
+def test_canonical_rendering_rejects_non_json_numbers() -> None:
+    with pytest.raises(ValueError, match="Out of range float"):
+        canonical_sbom_bytes({"invalid": float("nan")})
+
+
 def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
     document = generate_npm_sbom(
         REAL_LOCK,
@@ -142,8 +148,8 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
                 reachable.add(reference)
                 pending.append(reference)
 
-    assert len(components) == 595
-    assert len(reachable) == 596
+    assert len(components) == 597
+    assert len(reachable) == 598
     alias = next(
         component
         for component in components
@@ -152,6 +158,31 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
     assert (alias["name"], alias["purl"]) == (
         "string-width",
         "pkg:npm/string-width@4.2.3",
+    )
+    by_path = _components_by_path(document)
+    assert {
+        path
+        for path, component in by_path.items()
+        if _properties(component)["org.searise.sbom.npm.devOptional"] == "true"
+    } == {
+        "node_modules/@types/prop-types",
+        "node_modules/@types/react",
+        "node_modules/csstype",
+    }
+    for path in (
+        "node_modules/@types/prop-types",
+        "node_modules/@types/react",
+        "node_modules/csstype",
+    ):
+        assert by_path[path]["scope"] == "optional"
+
+    assert (
+        by_path["node_modules/supports-color"]["bom-ref"]
+        not in graph[by_path["node_modules/debug"]["bom-ref"]]
+    )
+    assert (
+        by_path["node_modules/eslint"]["bom-ref"]
+        not in graph[by_path["node_modules/eslint-module-utils"]["bom-ref"]]
     )
 
 
@@ -172,8 +203,24 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
             "tarball",
         ),
         (
+            lambda lock: lock["packages"]["node_modules/alpha"].update(
+                resolved=("https://registry.npmjs.org/alpha/-/extra/alpha-1.0.0.tgz")
+            ),
+            "tarball",
+        ),
+        (
+            lambda lock: lock["packages"]["node_modules/alpha"].update(
+                resolved=("https://registry.npmjs.org/alpha/-/../-/alpha-1.0.0.tgz")
+            ),
+            "tarball",
+        ),
+        (
             lambda lock: lock["packages"]["node_modules/alpha"].update(name="different"),
             "name/path mismatch",
+        ),
+        (
+            lambda lock: lock["packages"]["node_modules/alpha"].update(devOptional="yes"),
+            "devOptional flag",
         ),
     ],
 )
@@ -254,3 +301,11 @@ def test_symlink_directory_and_duplicate_keys_fail_closed(tmp_path: Path) -> Non
     duplicate.write_text('{"name":"one","name":"two"}\n', encoding="utf-8")
     with pytest.raises(SupplyChainContractError, match="duplicate npm lock key"):
         _generate(duplicate)
+
+
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+def test_non_json_numeric_constants_fail_closed(tmp_path: Path, constant: str) -> None:
+    invalid = tmp_path / "package-lock.json"
+    invalid.write_text('{"value":' + constant + "}\n", encoding="utf-8")
+    with pytest.raises(SupplyChainContractError, match="non-JSON numeric constant"):
+        _generate(invalid)
