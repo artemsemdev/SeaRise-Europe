@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import json
 import stat
@@ -85,6 +87,25 @@ _ALLOWED_ROLES = {
     "python": frozenset({"lock", "manifest"}),
     "standard-schema": frozenset({"lock", "schema"}),
 }
+_REAL_SOURCE_EVIDENCE_SIGNATURE_PATHS = (
+    "manifest.sigstore.json",
+    "provenance.sigstore.json",
+)
+_SIGSTORE_TLOG_FIELDS = (
+    "canonicalizedBody inclusionPromise integratedTime kindVersion logId logIndex"
+)
+_REAL_SOURCE_EVIDENCE_SBOM_PATHS = (
+    "sbom/build-plane.cdx.json",
+    "sbom/frontend-npm.cdx.json",
+    "sbom/nuget/searise-api-net8.0.cdx.json",
+    "sbom/nuget/searise-application-net8.0.cdx.json",
+    "sbom/nuget/searise-domain-net8.0.cdx.json",
+    "sbom/nuget/searise-infrastructure-net8.0.cdx.json",
+    "sbom/python-release-linux-x86-64-cp311.cdx.json",
+    "sbom/python-release-macos-arm64-cp311.cdx.json",
+    "sbom/python-settlement-spatial-linux-x86-64-cp311.cdx.json",
+    "sbom/python-settlement-spatial-macos-arm64-cp311.cdx.json",
+)
 
 
 class SupplyChainContractError(ValueError):
@@ -97,6 +118,95 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise SupplyChainContractError(f"{path}: JSON root must be an object")
     return document
+
+
+def _strict_json_bytes(raw: bytes, label: str) -> dict[str, Any]:
+    def strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result = dict(pairs)
+        if len(result) != len(pairs):
+            raise ValueError("duplicate object key")
+        return result
+
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON constant: {value}")
+
+    try:
+        document = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=strict_object,
+            parse_constant=reject_constant,
+        )
+        json.dumps(document, ensure_ascii=False).encode("utf-8")
+    except (RecursionError, UnicodeDecodeError, UnicodeEncodeError, ValueError) as exc:
+        raise SupplyChainContractError(
+            f"{label} must be one strict UTF-8 JSON object: {exc}"
+        ) from exc
+    if not isinstance(document, dict):
+        raise SupplyChainContractError(f"{label} JSON root must be an object")
+    return document
+
+
+def _decoded_base64(value: object, label: str) -> bytes:
+    try:
+        if not isinstance(value, str) or not value:
+            raise ValueError("empty or non-string value")
+        decoded = base64.b64decode(value, validate=True)
+        if not decoded:
+            raise ValueError("empty decoded value")
+        return decoded
+    except (binascii.Error, ValueError) as exc:
+        raise SupplyChainContractError(f"{label} must be nonempty base64") from exc
+
+
+def _exact_keys(value: object, keys: str) -> bool:
+    return isinstance(value, dict) and set(value) == set(keys.split())
+
+
+def _validate_sigstore_bundle(bundle: Mapping[str, Any], subject: bytes, label: str) -> None:
+    try:
+        material = bundle["verificationMaterial"]
+        signature = bundle["messageSignature"]
+        entries = material["tlogEntries"]
+        if (
+            not _exact_keys(bundle, "mediaType verificationMaterial messageSignature")
+            or bundle["mediaType"] != "application/vnd.dev.sigstore.bundle.v0.3+json"
+            or not _exact_keys(material, "certificate tlogEntries")
+            or not _exact_keys(material["certificate"], "rawBytes")
+            or not _exact_keys(signature, "messageDigest signature")
+            or not _exact_keys(signature["messageDigest"], "algorithm digest")
+            or signature["messageDigest"]["algorithm"] != "SHA2_256"
+            or not isinstance(entries, list)
+            or not entries
+        ):
+            raise SupplyChainContractError(
+                f"{label} is not the exact supported Sigstore sign-blob subset"
+            )
+        _decoded_base64(material["certificate"]["rawBytes"], f"{label} certificate")
+        _decoded_base64(signature["signature"], f"{label} signature")
+        for entry in entries:
+            times = (entry["integratedTime"], entry["logIndex"])
+            if (
+                not _exact_keys(entry, _SIGSTORE_TLOG_FIELDS)
+                or not _exact_keys(entry["inclusionPromise"], "signedEntryTimestamp")
+                or entry["kindVersion"] != {"kind": "hashedrekord", "version": "0.0.1"}
+                or not _exact_keys(entry["logId"], "keyId")
+                or not all(type(value) is int and value >= 0 for value in times)
+            ):
+                raise SupplyChainContractError(
+                    f"{label} transparency-log entry is not the exact hashedrekord subset"
+                )
+            _decoded_base64(entry["canonicalizedBody"], f"{label} log body")
+            _decoded_base64(
+                entry["inclusionPromise"]["signedEntryTimestamp"], f"{label} log promise"
+            )
+            _decoded_base64(entry["logId"]["keyId"], f"{label} log ID")
+        digest = _decoded_base64(signature["messageDigest"]["digest"], f"{label} message digest")
+    except (KeyError, TypeError) as exc:
+        raise SupplyChainContractError(f"{label} structure is malformed") from exc
+    if digest != hashlib.sha256(subject).digest():
+        raise SupplyChainContractError(
+            f"{label} message digest does not bind its exact declared subject bytes"
+        )
 
 
 def parse_timestamp(value: str) -> datetime:
@@ -516,6 +626,82 @@ def validate_evidence_files(
         sbom_paths,
         allow_production_envelope=False,
     )
+
+
+def _validate_real_source_unverified_evidence(
+    envelope_raw: bytes,
+    candidate_manifest: bytes,
+    provenance: bytes,
+    identity_policy: bytes,
+    signature_bundles: Mapping[str, bytes],
+    sboms: Mapping[str, bytes],
+) -> dict[str, Any]:
+    """Validate immutable pre-verification inputs for the private signing path."""
+    envelope = _strict_json_bytes(envelope_raw, "real-source evidence envelope")
+    policy = _strict_json_bytes(identity_policy, "identity policy")
+    _validate_schema(policy, "identity-policy.schema.json")
+    _validate_schema(envelope, "real-source-unverified-evidence-envelope.schema.json")
+
+    if envelope["identityPolicy"]["sha256"] != hashlib.sha256(identity_policy).hexdigest():
+        raise SupplyChainContractError("identity policy SHA-256 does not match its bytes")
+
+    exact_bytes = (
+        ("candidate manifest", envelope["candidateManifest"], candidate_manifest),
+        ("provenance", envelope["provenance"], provenance),
+    )
+    for label, descriptor, raw in exact_bytes:
+        if descriptor["sha256"] != hashlib.sha256(raw).hexdigest():
+            raise SupplyChainContractError(f"{label} SHA-256 does not match its bytes")
+        if descriptor["byteSize"] != len(raw):
+            raise SupplyChainContractError(f"{label} byte size does not match its bytes")
+
+    signature_descriptors = {item["path"]: item for item in envelope["signatures"]}
+    if tuple(signature_descriptors) != _REAL_SOURCE_EVIDENCE_SIGNATURE_PATHS:
+        raise SupplyChainContractError("signature paths do not match the evidence contract")
+    if set(signature_bundles) != set(_REAL_SOURCE_EVIDENCE_SIGNATURE_PATHS):
+        raise SupplyChainContractError("signature bundle inputs do not match the evidence envelope")
+    subjects = {
+        "manifest.sigstore.json": ("manifest.json", hashlib.sha256(candidate_manifest).hexdigest()),
+        "provenance.sigstore.json": (
+            "provenance.intoto.jsonl",
+            hashlib.sha256(provenance).hexdigest(),
+        ),
+    }
+    for logical_path, descriptor in signature_descriptors.items():
+        raw = signature_bundles[logical_path]
+        if descriptor["sha256"] != hashlib.sha256(raw).hexdigest():
+            raise SupplyChainContractError(f"signature SHA-256 mismatch: {logical_path}")
+        if descriptor["byteSize"] != len(raw):
+            raise SupplyChainContractError(f"signature byte size mismatch: {logical_path}")
+        if (descriptor["subjectPath"], descriptor["subjectSha256"]) != subjects[logical_path]:
+            raise SupplyChainContractError(f"signature subject mismatch: {logical_path}")
+        subject = candidate_manifest if logical_path == "manifest.sigstore.json" else provenance
+        bundle = _strict_json_bytes(raw, f"signature bundle {logical_path}")
+        _validate_sigstore_bundle(bundle, subject, f"signature bundle {logical_path}")
+
+    artifact_paths = [
+        envelope["candidateManifest"]["path"],
+        envelope["provenance"]["path"],
+    ]
+    artifact_paths.extend(signature_descriptors)
+    artifact_paths.extend(item["path"] for item in envelope["softwareBillsOfMaterials"])
+    if len(artifact_paths) != len(set(artifact_paths)):
+        raise SupplyChainContractError("supply-chain artifact paths must be unique")
+
+    descriptors = {item["path"]: item for item in envelope["softwareBillsOfMaterials"]}
+    if tuple(descriptors) != _REAL_SOURCE_EVIDENCE_SBOM_PATHS:
+        raise SupplyChainContractError("SBOM paths are not the exact sorted canonical set")
+    if set(sboms) != set(_REAL_SOURCE_EVIDENCE_SBOM_PATHS):
+        raise SupplyChainContractError("SBOM paths do not match the evidence envelope")
+    for logical_path, descriptor in descriptors.items():
+        raw = sboms[logical_path]
+        if descriptor["sha256"] != hashlib.sha256(raw).hexdigest():
+            raise SupplyChainContractError(f"SBOM SHA-256 mismatch: {logical_path}")
+        if descriptor["byteSize"] != len(raw):
+            raise SupplyChainContractError(f"SBOM byte size mismatch: {logical_path}")
+        sbom = _strict_json_bytes(raw, f"SBOM {logical_path}")
+        _validate_cyclonedx(sbom)
+    return envelope
 
 
 def validate_dependency_exception(

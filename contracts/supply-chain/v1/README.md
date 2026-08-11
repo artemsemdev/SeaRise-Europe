@@ -5,6 +5,18 @@ inventory from supported immutable dependency inputs. They do not sign a
 candidate, scan vulnerabilities, prove license completeness, or make a
 production-release claim.
 
+The separate `real-source-unverified-evidence-envelope.schema.json` contract
+binds the exact manifest, provenance, identity-policy, and SBOM bytes presented
+to the private signing path. It requires the exact two manifest/provenance
+Sigstore bundle descriptors and all ten canonical SBOM descriptors, but keeps
+verification, policy, production, publication, and scientific-approval claims
+false. Bundle presence is structural input evidence, not a signing or
+cryptographic-verification outcome. The private validator consumes immutable
+bytes rather than rereading caller-controlled artifact paths. Binding the
+identity policy records intended verifier inputs; it does not claim that its
+identity or protected environment was observed. The public structural evidence
+validator remains limited to the synthetic contract.
+
 ## npm SBOM generation
 
 `sboms/frontend-npm.cdx.json` is the canonical CycloneDX 1.7 inventory generated

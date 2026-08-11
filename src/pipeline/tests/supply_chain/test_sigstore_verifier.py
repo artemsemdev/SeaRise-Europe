@@ -140,6 +140,25 @@ def test_exact_pair_atomically_publishes_canonical_receipt(tmp_path: Path) -> No
     assert receipt_path.read_bytes() == verification.receipt_bytes
 
 
+def test_real_source_candidate_reaches_cryptographic_verifier(tmp_path: Path) -> None:
+    candidate, evidence = _pair(tmp_path / "pair", data_provenance_class="real-source")
+    _production_envelope(evidence)
+    tool, lock = _tool(tmp_path)
+
+    verification = _verify(candidate, evidence, tool, lock)
+
+    assert verification.receipt["dataProvenanceClass"] == "real-source"
+    assert verification.receipt["claims"] == {
+        "certificateWorkflowIdentityVerified": True,
+        "oidcIssuerVerified": True,
+        "protectedEnvironmentVerified": False,
+        "subjectDigestsVerified": True,
+        "productionClaim": False,
+        "publicationClaim": False,
+        "scientificApproval": False,
+    }
+
+
 @pytest.mark.parametrize("field", ["protectedEnvironment", "bundleMediaType"])
 def test_entire_identity_policy_is_authoritative(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str

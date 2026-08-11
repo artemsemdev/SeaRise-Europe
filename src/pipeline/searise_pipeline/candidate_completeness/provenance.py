@@ -20,11 +20,16 @@ BUILD_TYPE = (
     "https://github.com/artemsemdev/SeaRise-Europe/blob/master/"
     "contracts/supply-chain/v1/build-types/offline-release-v1.json"
 )
+REAL_SOURCE_BUILD_TYPE = (
+    "https://github.com/artemsemdev/SeaRise-Europe/blob/master/"
+    "contracts/supply-chain/v1/build-types/offline-release-real-source-v1.json"
+)
 BUILDER_ID = (
     "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/"
     "offline-release-controlled.yml@refs/heads/master"
 )
 POLICY_IDENTITY = "phase-1-pre-sign-synthetic-provenance-v1"
+REAL_SOURCE_POLICY_IDENTITY = "phase-1-pre-sign-real-source-provenance-v1"
 _SCIENTIFIC_OUTPUT_ROLES = frozenset(
     {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
 )
@@ -129,8 +134,8 @@ def _candidate_artifacts(candidate: Mapping[str, Any]) -> dict[str, Mapping[str,
 def _validate_pair(
     candidate: Mapping[str, Any], build: Mapping[str, Any], build_bytes: bytes
 ) -> None:
-    if candidate["dataProvenanceClass"] != "synthetic-fixture":
-        _fail("unsupported-claim", "only explicit synthetic-fixture provenance is supported")
+    if candidate["dataProvenanceClass"] not in {"synthetic-fixture", "real-source"}:
+        _fail("unsupported-claim", "unsupported data provenance class")
     for field in ("dataReleaseId", "dataProvenanceClass"):
         if build[field] != candidate[field]:
             _fail("candidate-build-identity", f"candidate and build receipt differ: {field}")
@@ -249,6 +254,14 @@ def _invocation(value: str) -> str:
     return value
 
 
+def _pre_sign_contract(data_provenance_class: str) -> tuple[str, str, bool]:
+    if data_provenance_class == "synthetic-fixture":
+        return BUILD_TYPE, POLICY_IDENTITY, True
+    if data_provenance_class == "real-source":
+        return REAL_SOURCE_BUILD_TYPE, REAL_SOURCE_POLICY_IDENTITY, False
+    _fail("unsupported-claim", "unsupported data provenance class")
+
+
 def generate_provenance_statement(
     manifest_path: Path,
     build_receipt_path: Path,
@@ -268,6 +281,9 @@ def generate_provenance_statement(
     _validate_pair(candidate, build, build_bytes)
     source_dependencies = _source_dependencies(manifest_path.parent, candidate, build)
     manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+    build_type, policy_identity, synthetic_fixture = _pre_sign_contract(
+        str(candidate["dataProvenanceClass"])
+    )
     artifacts = _candidate_artifacts(candidate)
     subjects = [
         {"name": item["path"], "digest": {"sha256": item["sha256"]}}
@@ -282,7 +298,7 @@ def generate_provenance_statement(
         "predicateType": PREDICATE_TYPE,
         "predicate": {
             "buildDefinition": {
-                "buildType": BUILD_TYPE,
+                "buildType": build_type,
                 "externalParameters": {
                     "candidateId": candidate["candidateId"],
                     "dataReleaseId": candidate["dataReleaseId"],
@@ -301,9 +317,9 @@ def generate_provenance_statement(
                         "publication": False,
                         "scientific": False,
                         "signing": False,
-                        "syntheticFixture": True,
+                        "syntheticFixture": synthetic_fixture,
                     },
-                    "policyIdentity": POLICY_IDENTITY,
+                    "policyIdentity": policy_identity,
                 },
                 "resolvedDependencies": _dependencies(build, source_dependencies),
             },

@@ -23,6 +23,16 @@ which avoids a self-referential hash. The evidence envelope is a verification
 index over the subjects and sidecars; this contract slice does not create or
 cryptographically verify a bundle.
 
+## Pre-sign provenance classes
+
+`v1/build-types/offline-release-v1.json` remains the immutable
+synthetic-fixture contract. `v1/build-types/offline-release-real-source-v1.json`
+defines the distinct real-source pre-sign contract for controlled offline
+candidates. Both bind the exact candidate, build receipt, source receipts,
+outputs, and first-attempt controlled workflow invocation. Neither contract
+claims cryptographic verification, production, publication, scientific approval,
+signing, or protected-environment approval.
+
 ## Candidate/evidence pair validation
 
 `candidate-evidence-pair` descriptor-safely binds candidate, receipt, provenance, policy, bundles,
