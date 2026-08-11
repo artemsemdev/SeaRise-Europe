@@ -8,9 +8,11 @@ import hashlib
 import math
 import os
 import re
+import resource
 import secrets
 import stat
 import sys
+import time
 from collections import Counter
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, fields, is_dataclass
@@ -1084,3 +1086,380 @@ def validate_normalized_catalogue_stage(
             raise CatalogueStageError(f"catalogue stage validation failed: {exc}") from exc
         finally:
             _remove_private_directory(work, private[0], private_directory)
+
+
+def _observations(started: float) -> dict[str, Any]:
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if sys.platform != "darwin":
+        peak *= 1024
+    return {
+        "completedAtUtc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "buildDurationSeconds": round(time.perf_counter() - started, 6),
+        "peakRssBytes": int(peak),
+        "deterministicIdentityExcluded": True,
+    }
+
+
+def _free_bytes(directory: _OpenedDirectory) -> int:
+    value = os.fstatvfs(directory.descriptor)
+    return value.f_bavail * value.f_frsize
+
+
+def _entry_absent(directory: _OpenedDirectory, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=directory.descriptor, follow_symlinks=False)
+    except FileNotFoundError:
+        return True
+    return False
+
+
+def _write_relative_file(
+    directory: _OpenedDirectory, name: str, content: bytes, label: str
+) -> None:
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            name,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=directory.descriptor,
+        )
+        offset = 0
+        while offset < len(content):
+            written = os.write(descriptor, content[offset:])
+            if written < 1:
+                raise CatalogueStageError(f"cannot write {label}: zero-byte write")
+            offset += written
+        os.fsync(descriptor)
+    except OSError as exc:
+        raise CatalogueStageError(f"cannot write {label}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _fsync_opened(opened: _OpenedRegular) -> None:
+    try:
+        os.fsync(opened.descriptor)
+    except OSError as exc:
+        raise CatalogueStageError(f"cannot fsync {opened.label}: {exc}") from exc
+
+
+def _fsync_directory_fd(directory: _OpenedDirectory) -> None:
+    try:
+        os.fsync(directory.descriptor)
+    except OSError as exc:
+        raise CatalogueStageError(f"cannot fsync {directory.label}: {exc}") from exc
+
+
+def _assert_entry_binding(directory: _OpenedDirectory, name: str, opened: _OpenedRegular) -> None:
+    try:
+        metadata = os.stat(name, dir_fd=directory.descriptor, follow_symlinks=False)
+    except OSError as exc:
+        raise CatalogueStageError(f"{opened.label} entry identity changed: {exc}") from exc
+    if not stat.S_ISREG(metadata.st_mode) or _regular_identity(metadata) != _opened_identity(
+        opened
+    ):
+        raise CatalogueStageError(f"{opened.label} entry identity changed")
+    _assert_opened(opened)
+
+
+def _link_no_overwrite(
+    source_directory: _OpenedDirectory,
+    source_name: str,
+    output_directory: _OpenedDirectory,
+    output_name: str,
+) -> None:
+    os.link(
+        source_name,
+        output_name,
+        src_dir_fd=source_directory.descriptor,
+        dst_dir_fd=output_directory.descriptor,
+        follow_symlinks=False,
+    )
+
+
+@dataclass(frozen=True)
+class _RollbackResult:
+    owned_removed: bool = False
+    foreign_restored: bool = False
+    quarantine_preserved: bool = False
+    error: str | None = None
+
+
+def _rollback_owned_entry(
+    output_directory: _OpenedDirectory,
+    output_name: str,
+    expected: _OpenedRegular,
+    quarantine_directory: _OpenedDirectory,
+) -> _RollbackResult:
+    """Remove only the writer-owned inode and preserve a substituted entry."""
+    quarantine_name = f".rollback-{secrets.token_hex(12)}"
+    try:
+        os.rename(
+            output_name,
+            quarantine_name,
+            src_dir_fd=output_directory.descriptor,
+            dst_dir_fd=quarantine_directory.descriptor,
+        )
+    except FileNotFoundError:
+        return _RollbackResult()
+    except OSError as exc:
+        return _RollbackResult(error=str(exc))
+    try:
+        metadata = os.stat(
+            quarantine_name,
+            dir_fd=quarantine_directory.descriptor,
+            follow_symlinks=False,
+        )
+        if (metadata.st_dev, metadata.st_ino) == (expected.device, expected.inode):
+            os.unlink(quarantine_name, dir_fd=quarantine_directory.descriptor)
+            return _RollbackResult(owned_removed=True)
+        try:
+            os.link(
+                quarantine_name,
+                output_name,
+                src_dir_fd=quarantine_directory.descriptor,
+                dst_dir_fd=output_directory.descriptor,
+                follow_symlinks=False,
+            )
+        except OSError as exc:
+            return _RollbackResult(
+                quarantine_preserved=True,
+                error=f"foreign entry retained as {quarantine_name}: {exc}",
+            )
+        os.unlink(quarantine_name, dir_fd=quarantine_directory.descriptor)
+        return _RollbackResult(foreign_restored=True)
+    except OSError as exc:
+        return _RollbackResult(quarantine_preserved=True, error=str(exc))
+
+
+def _attempt_rollback(
+    output_directory: _OpenedDirectory,
+    output_name: str,
+    expected: _OpenedRegular,
+    quarantine_directory: _OpenedDirectory,
+) -> _RollbackResult:
+    try:
+        return _rollback_owned_entry(output_directory, output_name, expected, quarantine_directory)
+    except Exception as exc:
+        return _RollbackResult(quarantine_preserved=True, error=str(exc))
+
+
+def build_normalized_catalogue_stage(
+    source_database: Path,
+    source_receipt: Path,
+    output: Path,
+    receipt_path: Path,
+    work_dir: Path,
+    *,
+    batch_size: int = MAX_BATCH_ROWS,
+    contract: FullSourceStageContract = PRODUCTION_CONTRACT,
+) -> dict[str, Any]:
+    """Publish the database first and its durable receipt completion marker last."""
+    started = time.perf_counter()
+    try:
+        with ExitStack() as stack:
+            work = stack.enter_context(_open_directory(work_dir, "catalogue work directory"))
+            output_parent = stack.enter_context(
+                _open_directory(output.parent, "catalogue output directory")
+            )
+            receipt_parent = stack.enter_context(
+                _open_directory(receipt_path.parent, "catalogue receipt directory")
+            )
+            if output.name == receipt_path.name or (
+                output_parent.device,
+                output_parent.inode,
+            ) != (receipt_parent.device, receipt_parent.inode):
+                raise CatalogueStageError(
+                    "catalogue database and receipt need distinct paths in one directory"
+                )
+            if not _entry_absent(output_parent, output.name) or not _entry_absent(
+                output_parent, receipt_path.name
+            ):
+                raise CatalogueStageError("catalogue output already exists; overwrite is refused")
+            if (
+                _free_bytes(work) < contract.minimum_free_bytes
+                or _free_bytes(output_parent) < contract.minimum_free_bytes
+            ):
+                raise CatalogueStageError(
+                    "catalogue work or output directory has insufficient free space"
+                )
+            opened_source = stack.enter_context(
+                _open_regular(source_database, "source stage database")
+            )
+            opened_source_receipt = stack.enter_context(
+                _open_regular(source_receipt, "source stage receipt", hash_bytes=True)
+            )
+            source_document = _source_receipt_document(opened_source_receipt)
+            source_stage._validate_receipt_contract(source_document, contract)
+            candidate_name, candidate_root = _create_private_directory(
+                output_parent, ".catalogue-candidate-", "catalogue candidate directory"
+            )
+            try:
+                stage_name, stage_root = _create_private_directory(
+                    work, ".catalogue-stage-", "catalogue stage directory"
+                )
+            except Exception:
+                _remove_private_directory(output_parent, candidate_name, candidate_root)
+                raise
+            preserve_candidate = False
+            try:
+                stage_path = _descriptor_path(stage_root.descriptor, stage_root.label)
+
+                def candidate_artifact_paths() -> tuple[Path, Path]:
+                    root = _descriptor_path(candidate_root.descriptor, candidate_root.label)
+                    database_path = root / output.name
+                    return database_path, database_path.with_name(receipt_path.name)
+
+                with _private_snapshot(
+                    source_database, opened_source, stage_root, "source.duckdb"
+                ) as source_snapshot:
+                    duckdb, _ = source_stage._load_tools()
+                    candidate_path, _ = candidate_artifact_paths()
+                    with duckdb.connect(
+                        str(stage_path / "source.duckdb"), read_only=True
+                    ) as source:
+                        with duckdb.connect(str(candidate_path)) as candidate:
+                            identity = materialize_catalogue_candidate(
+                                source,
+                                candidate,
+                                source_document,
+                                work_dir=stage_path,
+                                batch_size=batch_size,
+                                contract=contract,
+                            )
+                            candidate.execute("CHECKPOINT")
+                    _assert_opened(source_snapshot)
+                _assert_opened(opened_source)
+                _assert_opened(opened_source_receipt)
+                _assert_path_binding(source_database, opened_source)
+                _assert_path_binding(source_receipt, opened_source_receipt)
+                if not _entry_absent(candidate_root, f"{output.name}.wal"):
+                    raise CatalogueStageError("catalogue candidate retained a DuckDB WAL")
+                payload = _receipt_payload(identity)
+                document = {
+                    **payload,
+                    "deterministicIdentity": _receipt_identity(payload),
+                    "observations": _observations(started),
+                }
+                _write_relative_file(
+                    candidate_root,
+                    receipt_path.name,
+                    canonical_catalogue_receipt_bytes(document),
+                    "catalogue candidate receipt",
+                )
+                with ExitStack() as candidates:
+                    candidate_database = candidates.enter_context(
+                        _open_relative_regular(
+                            candidate_root, output.name, "catalogue candidate database"
+                        )
+                    )
+                    candidate_receipt = candidates.enter_context(
+                        _open_relative_regular(
+                            candidate_root,
+                            receipt_path.name,
+                            "catalogue candidate receipt",
+                            hash_bytes=True,
+                        )
+                    )
+                    _fsync_opened(candidate_database)
+                    candidate_path, candidate_receipt_path = candidate_artifact_paths()
+                    validate_normalized_catalogue_stage(
+                        candidate_path,
+                        candidate_receipt_path,
+                        source_database,
+                        source_receipt,
+                        work_dir=stage_path,
+                        batch_size=batch_size,
+                        contract=contract,
+                    )
+                    database_promoted = receipt_promoted = False
+                    try:
+                        _assert_directory_path(output_parent)
+                        _assert_directory_path(receipt_parent)
+                        _link_no_overwrite(candidate_root, output.name, output_parent, output.name)
+                        database_promoted = True
+                        _fsync_directory_fd(output_parent)
+                        _assert_entry_binding(output_parent, output.name, candidate_database)
+                        _assert_opened(opened_source)
+                        _assert_opened(opened_source_receipt)
+                        candidate_path, candidate_receipt_path = candidate_artifact_paths()
+                        validate_normalized_catalogue_stage(
+                            candidate_path,
+                            candidate_receipt_path,
+                            source_database,
+                            source_receipt,
+                            work_dir=stage_path,
+                            batch_size=batch_size,
+                            contract=contract,
+                        )
+                        _assert_entry_binding(output_parent, output.name, candidate_database)
+                        _assert_directory_path(output_parent)
+                        _link_no_overwrite(
+                            candidate_root,
+                            receipt_path.name,
+                            output_parent,
+                            receipt_path.name,
+                        )
+                        receipt_promoted = True
+                        _fsync_directory_fd(output_parent)
+                        _assert_entry_binding(output_parent, receipt_path.name, candidate_receipt)
+                        candidate_path, candidate_receipt_path = candidate_artifact_paths()
+                        validate_normalized_catalogue_stage(
+                            candidate_path,
+                            candidate_receipt_path,
+                            source_database,
+                            source_receipt,
+                            work_dir=stage_path,
+                            batch_size=batch_size,
+                            contract=contract,
+                        )
+                        _assert_entry_binding(output_parent, output.name, candidate_database)
+                        _assert_entry_binding(output_parent, receipt_path.name, candidate_receipt)
+                        _assert_directory_path(output_parent)
+                        _assert_directory_path(receipt_parent)
+                    except Exception as publication_error:
+                        results: list[_RollbackResult] = []
+                        if receipt_promoted:
+                            results.append(
+                                _attempt_rollback(
+                                    output_parent,
+                                    receipt_path.name,
+                                    candidate_receipt,
+                                    candidate_root,
+                                )
+                            )
+                        if database_promoted:
+                            results.append(
+                                _attempt_rollback(
+                                    output_parent,
+                                    output.name,
+                                    candidate_database,
+                                    candidate_root,
+                                )
+                            )
+                        _fsync_directory_fd(output_parent)
+                        preserve_candidate = any(result.quarantine_preserved for result in results)
+                        errors = [result.error for result in results if result.error]
+                        if errors:
+                            raise CatalogueStageError(
+                                "catalogue publication failed and rollback was incomplete: "
+                                + "; ".join(errors)
+                            ) from publication_error
+                        raise
+                return document
+            finally:
+                if preserve_candidate:
+                    os.close(candidate_root.descriptor)
+                else:
+                    _remove_private_directory(output_parent, candidate_name, candidate_root)
+                _remove_private_directory(work, stage_name, stage_root)
+    except CatalogueStageError:
+        raise
+    except (CatalogueNormalizationError, FullSourceStageError, OSError, ValueError) as exc:
+        raise CatalogueStageError(f"catalogue publication failed: {exc}") from exc

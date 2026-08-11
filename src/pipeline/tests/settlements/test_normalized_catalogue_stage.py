@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import shutil
 from contextlib import contextmanager
@@ -30,12 +31,21 @@ from searise_pipeline.settlements.full_source_catalogue import (
 from searise_pipeline.settlements.geonames import parse_admin1_row, parse_geoname_row
 from searise_pipeline.settlements.normalized_catalogue_stage import (
     CatalogueStageError,
+    build_normalized_catalogue_stage,
     canonical_catalogue_receipt_bytes,
     materialize_catalogue_candidate,
     validate_catalogue_candidate,
     validate_normalized_catalogue_stage,
 )
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+_CATALOGUE_CLI_SPEC = importlib.util.spec_from_file_location(
+    "searise_build_settlement_catalogue",
+    REPOSITORY_ROOT / "scripts/release/build_settlement_catalogue.py",
+)
+assert _CATALOGUE_CLI_SPEC is not None and _CATALOGUE_CLI_SPEC.loader is not None
+catalogue_cli = importlib.util.module_from_spec(_CATALOGUE_CLI_SPEC)
+_CATALOGUE_CLI_SPEC.loader.exec_module(catalogue_cli)
 FIXTURES = Path(__file__).with_name("fixtures") / "geonames"
 HEX = "a" * 64
 
@@ -616,3 +626,350 @@ def test_public_validation_rejects_database_path_swap_after_snapshot_binding(
     finally:
         database.unlink(missing_ok=True)
         moved.rename(database)
+
+
+def _publication_source(
+    tmp_path: Path, name: str = "source"
+) -> tuple[Path, Path, FullSourceStageContract, dict[str, object]]:
+    source = _source(tmp_path, name)
+    receipt = tmp_path / f"{name}.receipt.json"
+    receipt.write_bytes(source_stage.canonical_stage_receipt_bytes(source[2]["receipt"]))
+    return source[0], receipt, source[1], source[2]
+
+
+def _publish(
+    tmp_path: Path,
+    name: str,
+    source: tuple[Path, Path, FullSourceStageContract, dict[str, object]],
+    *,
+    batch_size: int = 2,
+) -> tuple[Path, Path, dict[str, object]]:
+    work = _work(tmp_path, name)
+    output = tmp_path / f"{name}.catalogue.duckdb"
+    receipt = tmp_path / f"{name}.catalogue.json"
+    document = build_normalized_catalogue_stage(
+        source[0],
+        source[1],
+        output,
+        receipt,
+        work,
+        contract=source[2],
+        batch_size=batch_size,
+    )
+    return output, receipt, document
+
+
+def test_publication_receipt_is_canonical_deterministic_and_valid(tmp_path: Path) -> None:
+    source = _publication_source(tmp_path)
+    first = _publish(tmp_path, "first", source, batch_size=1)
+    second = _publish(tmp_path, "second", source, batch_size=3)
+    assert first[2]["candidate"] == second[2]["candidate"]
+    assert first[2]["deterministicIdentity"] == second[2]["deterministicIdentity"]
+    assert first[1].read_bytes() == canonical_catalogue_receipt_bytes(first[2])
+    validate_normalized_catalogue_stage(
+        first[0],
+        first[1],
+        source[0],
+        source[1],
+        work_dir=_work(tmp_path, "published-validator"),
+        contract=source[2],
+    )
+
+
+def test_database_is_durable_before_receipt_completion_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _publication_source(tmp_path)
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    original = catalogue_stage._fsync_directory_fd
+    states: list[tuple[bool, bool]] = []
+
+    def observe(directory: object) -> None:
+        states.append((output.exists(), receipt.exists()))
+        original(directory)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(catalogue_stage, "_fsync_directory_fd", observe)
+    build_normalized_catalogue_stage(
+        source[0], source[1], output, receipt, _work(tmp_path, "order"), contract=source[2]
+    )
+    assert states == [(True, False), (True, True)]
+
+
+def test_publication_refuses_overwrite_symlinks_and_insufficient_space(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _publication_source(tmp_path)
+    work = _work(tmp_path, "refuse")
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    output.write_bytes(b"preserve")
+    with pytest.raises(CatalogueStageError, match="overwrite"):
+        build_normalized_catalogue_stage(
+            source[0], source[1], output, receipt, work, contract=source[2]
+        )
+    assert output.read_bytes() == b"preserve"
+    output.unlink()
+    linked_source = tmp_path / "linked-source.db"
+    linked_source.symlink_to(source[0])
+    with pytest.raises(CatalogueStageError, match="non-symlink"):
+        build_normalized_catalogue_stage(
+            linked_source, source[1], output, receipt, work, contract=source[2]
+        )
+    monkeypatch.setattr(catalogue_stage, "_free_bytes", lambda _: 0)
+    with pytest.raises(CatalogueStageError, match="free space"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            work,
+            contract=replace(source[2], minimum_free_bytes=1),
+        )
+
+
+@pytest.mark.parametrize("failure", ["receipt-link", "final-validation"])
+def test_publication_failures_roll_back_owned_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    source = _publication_source(tmp_path)
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    if failure == "receipt-link":
+        original, calls = catalogue_stage._link_no_overwrite, 0
+
+        def fail_second(*args: object, **kwargs: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("injected receipt promotion failure")
+            original(*args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(catalogue_stage, "_link_no_overwrite", fail_second)
+    else:
+        original, calls = catalogue_stage.validate_normalized_catalogue_stage, 0
+
+        def fail_final(*args: object, **kwargs: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 3:
+                raise CatalogueStageError("injected final validation failure")
+            original(*args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(catalogue_stage, "validate_normalized_catalogue_stage", fail_final)
+    with pytest.raises(CatalogueStageError, match="injected"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            _work(tmp_path, failure),
+            contract=source[2],
+        )
+    assert not output.exists() and not receipt.exists()
+    assert not list(tmp_path.glob(".catalogue-*"))
+
+
+def test_same_size_source_receipt_mutation_fails_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _publication_source(tmp_path)
+    original = catalogue_stage.materialize_catalogue_candidate
+
+    def mutate(*args: object, **kwargs: object) -> dict[str, object]:
+        identity = original(*args, **kwargs)
+        raw = source[1].read_bytes()
+        marker = raw.index(b'"logicalHashes":{')
+        digest = raw.index(b"a", marker)
+        source[1].write_bytes(raw[:digest] + b"b" + raw[digest + 1 :])
+        return identity
+
+    monkeypatch.setattr(catalogue_stage, "materialize_catalogue_candidate", mutate)
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    with pytest.raises(CatalogueStageError, match="receipt exact bytes changed"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            _work(tmp_path, "source-mutation"),
+            contract=source[2],
+        )
+    assert not output.exists() and not receipt.exists()
+
+
+def test_same_size_output_receipt_mutation_rolls_back_both_owned_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _publication_source(tmp_path)
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    original, calls = catalogue_stage._fsync_directory_fd, 0
+
+    def mutate_after_receipt_link(directory: object) -> None:
+        nonlocal calls
+        original(directory)  # type: ignore[arg-type]
+        calls += 1
+        if calls == 2:
+            raw = receipt.read_bytes()
+            changed = raw.replace(b'"completedAtUtc":"2', b'"completedAtUtc":"3', 1)
+            assert len(changed) == len(raw) and changed != raw
+            receipt.write_bytes(changed)
+
+    monkeypatch.setattr(catalogue_stage, "_fsync_directory_fd", mutate_after_receipt_link)
+    with pytest.raises(CatalogueStageError, match="receipt exact bytes changed"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            _work(tmp_path, "receipt-mutation"),
+            contract=source[2],
+        )
+    assert not output.exists() and not receipt.exists()
+
+
+def test_output_parent_swap_rolls_back_through_held_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _publication_source(tmp_path)
+    output_parent = tmp_path / "publish"
+    output_parent.mkdir()
+    moved_parent = tmp_path / "publish-opened"
+    output = output_parent / "output.db"
+    receipt = output_parent / "output.json"
+    original, calls = catalogue_stage._link_no_overwrite, 0
+
+    def swap_after_database(*args: object, **kwargs: object) -> None:
+        nonlocal calls
+        original(*args, **kwargs)  # type: ignore[arg-type]
+        calls += 1
+        if calls == 1:
+            output_parent.rename(moved_parent)
+            output_parent.mkdir()
+            (output_parent / "replacement.txt").write_bytes(b"preserve")
+
+    monkeypatch.setattr(catalogue_stage, "_link_no_overwrite", swap_after_database)
+    with pytest.raises(CatalogueStageError, match="directory path identity changed"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            _work(tmp_path, "parent-swap"),
+            contract=source[2],
+        )
+    assert (output_parent / "replacement.txt").read_bytes() == b"preserve"
+    assert not (moved_parent / output.name).exists()
+    assert not (moved_parent / receipt.name).exists()
+    assert not list(moved_parent.glob(".catalogue-*"))
+
+
+@pytest.mark.parametrize("target", ["database", "receipt"])
+def test_rollback_preserves_racing_replacement_and_removes_owned_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str
+) -> None:
+    source = _publication_source(tmp_path)
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    racer = output if target == "database" else receipt
+    original, calls = catalogue_stage._fsync_directory_fd, 0
+    racer_identity: tuple[int, int] | None = None
+
+    def replace_after_fsync(directory: object) -> None:
+        nonlocal calls, racer_identity
+        original(directory)  # type: ignore[arg-type]
+        calls += 1
+        trigger = calls == (1 if target == "database" else 2)
+        if trigger:
+            racer.unlink()
+            racer.write_bytes(f"racing {target}".encode())
+            metadata = racer.stat()
+            racer_identity = metadata.st_dev, metadata.st_ino
+
+    monkeypatch.setattr(catalogue_stage, "_fsync_directory_fd", replace_after_fsync)
+    with pytest.raises(CatalogueStageError, match="entry identity changed"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            _work(tmp_path, f"racing-{target}"),
+            contract=source[2],
+        )
+    metadata = racer.stat()
+    assert racer.read_bytes() == f"racing {target}".encode()
+    assert (metadata.st_dev, metadata.st_ino) == racer_identity
+    if target == "receipt":
+        assert not output.exists()
+    else:
+        assert not receipt.exists()
+    assert not list(tmp_path.glob(".catalogue-*"))
+
+
+def test_database_rollback_is_attempted_when_receipt_rollback_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _publication_source(tmp_path)
+    output, receipt = tmp_path / "output.db", tmp_path / "output.json"
+    original_validate, validation_calls = (
+        catalogue_stage.validate_normalized_catalogue_stage,
+        0,
+    )
+
+    def fail_final_validation(*args: object, **kwargs: object) -> None:
+        nonlocal validation_calls
+        validation_calls += 1
+        if validation_calls == 3:
+            raise CatalogueStageError("injected final validation failure")
+        original_validate(*args, **kwargs)  # type: ignore[arg-type]
+
+    original_rollback = catalogue_stage._rollback_owned_entry
+    attempted: list[str] = []
+
+    def fail_receipt_rollback(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
+        name = args[1]
+        attempted.append(name)
+        if name == receipt.name:
+            raise OSError("injected receipt rollback failure")
+        return original_rollback(*args, **kwargs)
+
+    monkeypatch.setattr(
+        catalogue_stage, "validate_normalized_catalogue_stage", fail_final_validation
+    )
+    monkeypatch.setattr(catalogue_stage, "_rollback_owned_entry", fail_receipt_rollback)
+    with pytest.raises(CatalogueStageError, match="rollback was incomplete"):
+        build_normalized_catalogue_stage(
+            source[0],
+            source[1],
+            output,
+            receipt,
+            _work(tmp_path, "rollback-error"),
+            contract=source[2],
+        )
+    assert attempted == [receipt.name, output.name]
+    assert not output.exists()
+
+
+def test_cli_requires_and_forwards_all_explicit_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    captured = ()
+
+    def fake(*args: object, **kwargs: object) -> dict[str, str]:
+        nonlocal captured
+        captured = args
+        return {"deterministicIdentity": "d" * 64}
+
+    monkeypatch.setattr(catalogue_cli, "build_normalized_catalogue_stage", fake)
+    paths = [tmp_path / name for name in ("source.db", "source.json", "out.db", "out.json", "work")]
+    arguments = [
+        "--source-stage-db",
+        str(paths[0]),
+        "--source-stage-receipt",
+        str(paths[1]),
+        "--output-db",
+        str(paths[2]),
+        "--output-receipt",
+        str(paths[3]),
+        "--work-dir",
+        str(paths[4]),
+    ]
+    assert catalogue_cli.main(arguments) == 0
+    assert captured == tuple(paths)
+    assert capsys.readouterr().out.strip() == "d" * 64
