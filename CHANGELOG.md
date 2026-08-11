@@ -130,6 +130,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Aligned user-facing search copy with the settlement-only catalogue boundary,
+  without promising address, postcode, or landmark lookup.
 - Published the public-contract compatibility, deprecation, and rollback policy,
   and aligned active architecture/delivery status with the approved Phase 0R gate.
 - Aligned active architecture, runtime, product, and delivery documentation on
