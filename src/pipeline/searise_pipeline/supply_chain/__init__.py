@@ -20,6 +20,9 @@ from .sbom import (
     validate_npm_sbom,
     write_new_sbom,
 )
+from .sigstore_verifier import (
+    verify_candidate_evidence_cryptographically,
+)
 
 __all__ = [
     "CandidateEvidenceSummary",
@@ -42,5 +45,6 @@ __all__ = [
     "validate_nuget_sbom",
     "validate_python_lock_graph",
     "validate_python_sbom",
+    "verify_candidate_evidence_cryptographically",
     "write_new_sbom",
 ]

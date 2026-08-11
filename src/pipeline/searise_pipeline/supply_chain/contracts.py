@@ -427,7 +427,7 @@ def _validate_cyclonedx(document: Mapping[str, Any]) -> None:
     bom_schema = next(
         schema for schema in schemas if schema["$id"].endswith("/bom-1.7.schema.json")
     )
-    registry = Registry(retrieve=_reject_remote_schema)
+    registry = Registry(retrieve=_reject_remote_schema)  # type: ignore[call-arg]
     for schema in schemas:
         registry = registry.with_resource(schema["$id"], Resource.from_contents(schema))
     Draft7Validator.check_schema(bom_schema)
@@ -447,10 +447,12 @@ def _validate_cyclonedx(document: Mapping[str, Any]) -> None:
         raise SupplyChainContractError("SBOM specVersion must be '1.7'")
 
 
-def validate_evidence_files(
+def _validate_evidence_files(
     envelope_path: Path,
     identity_policy_path: Path,
     sbom_paths: Mapping[str, Path],
+    *,
+    allow_production_envelope: bool,
 ) -> dict[str, Any]:
     """Validate a candidate envelope and its exact local policy/SBOM bytes."""
     envelope = load_json(envelope_path)
@@ -495,11 +497,25 @@ def validate_evidence_files(
             raise SupplyChainContractError(f"SBOM SHA-256 mismatch: {logical_path}")
         _validate_cyclonedx(load_json(file_path))
 
-    if not verification["fixtureOnly"]:
+    if not verification["fixtureOnly"] and not allow_production_envelope:
         raise SupplyChainContractError(
             "production evidence requires the separate cryptographic verifier"
         )
     return envelope
+
+
+def validate_evidence_files(
+    envelope_path: Path,
+    identity_policy_path: Path,
+    sbom_paths: Mapping[str, Path],
+) -> dict[str, Any]:
+    """Validate synthetic evidence without crossing the cryptographic boundary."""
+    return _validate_evidence_files(
+        envelope_path,
+        identity_policy_path,
+        sbom_paths,
+        allow_production_envelope=False,
+    )
 
 
 def validate_dependency_exception(

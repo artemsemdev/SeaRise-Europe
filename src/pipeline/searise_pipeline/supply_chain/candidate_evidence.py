@@ -19,7 +19,7 @@ from searise_pipeline.candidate_completeness import (
 )
 
 from .build_plane_sbom import validate_build_plane_sbom
-from .contracts import REPOSITORY_ROOT, SupplyChainContractError, validate_evidence_files
+from .contracts import REPOSITORY_ROOT, SupplyChainContractError, _validate_evidence_files
 from .nuget_sbom import validate_nuget_sbom
 from .python_sbom import validate_python_sbom
 from .sbom import validate_npm_sbom
@@ -264,12 +264,13 @@ def _validate_sbom_authority(logical: str, path: Path, root: Path) -> None:
         validate_python_sbom(path, annotation, repository_root=root, target_id=target)
 
 
-def validate_candidate_evidence_pair(
+def _validate_candidate_evidence_pair(
     candidate_root: Path,
     evidence_root: Path,
     *,
     repository_root: Path = REPOSITORY_ROOT,
     trusted_invocation_uri: str,
+    allow_production_envelope: bool,
 ) -> CandidateEvidenceSummary:
     candidate_descriptor = _open_root(candidate_root, "candidate")
     try:
@@ -345,7 +346,12 @@ def validate_candidate_evidence_pair(
             )
         except ProvenanceContractError as exc:
             raise SupplyChainContractError(str(exc)) from exc
-        validated_envelope = validate_evidence_files(envelope_path, policy_snapshot, sbom_paths)
+        validated_envelope = _validate_evidence_files(
+            envelope_path,
+            policy_snapshot,
+            sbom_paths,
+            allow_production_envelope=allow_production_envelope,
+        )
         identities = ("candidateId", "dataReleaseId", "dataProvenanceClass")
         external = provenance["predicate"]["buildDefinition"]["externalParameters"]
         for field in identities:
@@ -367,9 +373,10 @@ def validate_candidate_evidence_pair(
             )
         verification = validated_envelope["verification"]
         claims = provenance["predicate"]["buildDefinition"]["internalParameters"]["claims"]
-        if _claimed(verification, "verified policySatisfied productionClaim") or _claimed(
-            claims, "cryptographicVerification production publication"
-        ):
+        if (
+            not allow_production_envelope
+            and _claimed(verification, "verified policySatisfied productionClaim")
+        ) or _claimed(claims, "cryptographicVerification production publication"):
             _fail("offline pair validation must not claim signing, production, or publication")
         for logical in _SBOM_PATHS:
             _validate_sbom_authority(logical, sbom_paths[logical], repository_root.absolute())
@@ -378,4 +385,20 @@ def validate_candidate_evidence_pair(
         candidate_id=str(candidate["candidateId"]),
         data_provenance_class=str(candidate["dataProvenanceClass"]),
         sbom_count=len(_SBOM_PATHS),
+    )
+
+
+def validate_candidate_evidence_pair(
+    candidate_root: Path,
+    evidence_root: Path,
+    *,
+    repository_root: Path = REPOSITORY_ROOT,
+    trusted_invocation_uri: str,
+) -> CandidateEvidenceSummary:
+    return _validate_candidate_evidence_pair(
+        candidate_root,
+        evidence_root,
+        repository_root=repository_root,
+        trusted_invocation_uri=trusted_invocation_uri,
+        allow_production_envelope=False,
     )

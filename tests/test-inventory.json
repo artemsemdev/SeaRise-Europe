@@ -1113,6 +1113,7 @@
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_build_plane_sbom.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_candidate_evidence_pair.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_sigstore_verifier.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_nuget_sbom.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/supply_chain/test_python_graph_contract.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
