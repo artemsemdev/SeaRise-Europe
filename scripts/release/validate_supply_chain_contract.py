@@ -9,11 +9,14 @@ from pathlib import Path
 
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
+    canonical_sbom_bytes,
+    generate_npm_sbom,
     load_json,
     parse_timestamp,
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    write_new_sbom,
 )
 
 
@@ -37,6 +40,10 @@ def _parser() -> argparse.ArgumentParser:
     inventory = commands.add_parser("inventory")
     inventory.add_argument("--document", type=Path, required=True)
     inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
+    npm_sbom = commands.add_parser("npm-sbom")
+    npm_sbom.add_argument("--lock", type=Path, required=True)
+    npm_sbom.add_argument("--logical-path", required=True)
+    npm_sbom.add_argument("--output", type=Path, required=True)
     return parser
 
 
@@ -57,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             document = load_json(args.document)
             validate_dependency_exception(document, as_of=parse_timestamp(args.as_of))
             print(f"validated dependency exception: {document['exceptionId']}")
-        else:
+        elif args.command == "inventory":
             document = validate_dependency_inventory(
                 args.document,
                 repository_root=args.repository_root.resolve(),
@@ -66,6 +73,13 @@ def main(argv: list[str] | None = None) -> int:
                 len(component["inputs"]) for component in document["components"]
             )
             print(f"validated {input_count} dependency-defining inputs")
+        else:
+            document = generate_npm_sbom(args.lock, logical_path=args.logical_path)
+            output = canonical_sbom_bytes(document)
+            write_new_sbom(args.output, output)
+            print(
+                f"generated {len(document['components'])} npm components: {args.output}"
+            )
     except (OSError, json.JSONDecodeError, SupplyChainContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
