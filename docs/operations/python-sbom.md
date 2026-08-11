@@ -10,6 +10,38 @@ contract fixtures. They exercise the boundary but are not production evidence.
 The generated root component preserves `data-provenance-class` and the
 `production-claim=false` boundary from the annotation review.
 
+## Canonical reviewed-target artifacts
+
+The four canonical SBOMs are checked in under
+`contracts/supply-chain/v1/sboms/`:
+
+- `python-release-linux-x86-64-cp311.cdx.json`
+- `python-release-macos-arm64-cp311.cdx.json`
+- `python-settlement-spatial-linux-x86-64-cp311.cdx.json`
+- `python-settlement-spatial-macos-arm64-cp311.cdx.json`
+
+They bind the two reviewed graph annotations to their respective Linux x86-64
+and macOS arm64 CPython 3.11 locks. They inventory only the exact locked
+environment and reviewed active graph. They do not assert bundle inclusion,
+candidate attachment, license or vulnerability completeness, signing, release
+approval, or production status.
+
+Validate all four artifacts from the repository root:
+
+```bash
+for item in \
+  'release-runtime.json linux-x86-64-cp311 python-release-linux-x86-64-cp311.cdx.json' \
+  'release-runtime.json macos-arm64-cp311 python-release-macos-arm64-cp311.cdx.json' \
+  'settlement-spatial-runtime.json linux-x86-64-cp311 python-settlement-spatial-linux-x86-64-cp311.cdx.json' \
+  'settlement-spatial-runtime.json macos-arm64-cp311 python-settlement-spatial-macos-arm64-cp311.cdx.json'; do
+  set -- $item
+  PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+    python-sbom-validate --repository-root . \
+    --annotation "contracts/supply-chain/v1/python-graphs/$1" \
+    --target "$2" --sbom "contracts/supply-chain/v1/sboms/$3"
+done
+```
+
 ## Generate one target
 
 Run from the repository root with the pipeline package on `PYTHONPATH`:

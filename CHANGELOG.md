@@ -13,8 +13,10 @@ All notable changes to this project will be documented in this file.
   settlement-spatial locks, with explicit roots, complete target environments,
   and identical cross-platform active dependencies without a production claim.
 - Added deterministic target-specific Python CycloneDX 1.7 SBOM generation,
-  exact graph and wheel-hash validation, and inode-verified immutable
-  publication that fails closed on path, symlink, overwrite, and race attacks.
+  exact graph and wheel-hash validation, inode-verified immutable publication,
+  and canonical checked-in SBOMs for the four reviewed release and
+  settlement-spatial CPython 3.11 targets. These remain non-production
+  dependency evidence and are not attached to a candidate.
 - Added a versioned, lock-SHA-bound Python dependency graph annotation contract
   so reviewed roots and edges remain explicit instead of being inferred from
   flat release locks, with synthetic-only fail-closed validation fixtures.
