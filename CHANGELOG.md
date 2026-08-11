@@ -79,6 +79,7 @@ All notable changes to this project will be documented in this file.
   rejection-ledger semantics, and exact pinned DuckDB Spatial CI evidence.
 - Added a receipt-bound spatial-classification stage with exact identities and
   an expiring opaque capability for authority-snapshotted `LOAD` and `ST_Read`.
+- Added an immutable spatial-stage runner that validates descriptor-bound inputs and publishes the database before its canonical receipt without broadening scientific, owner, hazard, geometry, or publication claims.
 - Added a scoped, hash-locked Natural Earth settlement shoreline recipe using
   direct main and minor-island source lines, deterministic whole-feature
   selection, an explicit EPSG:3035 distance method, and independent named-place
