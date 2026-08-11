@@ -231,7 +231,7 @@ def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
     )
     opentofu = _dependency_component(document, "deployment-opentofu")
 
-    assert len(discovered) == 43
+    assert len(discovered) == 44
     assert discovered == tuple(sorted(set(discovered)))
     assert set(recorded) == set(discovered)
     assert document["inventoryKind"] == "dependency-defining-inputs"

@@ -66,6 +66,7 @@ _EXPECTED_COMPONENTS = {
     "pipeline-python-contributor": ("python", "development", "range-constrained"),
     "pipeline-python-release": ("python", "candidate", "locked"),
     "release-container-image": ("container", "candidate", "locked"),
+    "release-signing-toolchain": ("native", "candidate", "locked"),
     "settlement-spatial-python": ("python", "candidate", "locked"),
     "vendored-standard-schemas": ("standard-schema", "candidate", "locked"),
 }
@@ -270,6 +271,9 @@ def _is_dependency_input(path: PurePosixPath) -> bool:
         path.parts[:4] == ("contracts", "supply-chain", "v1", "python-graphs")
         and path.suffix == ".json"
     )
+    reviewed_signing_tool = (
+        path.parts[:4] == ("contracts", "supply-chain", "v1", "tools") and path.suffix == ".json"
+    )
     return (
         workflow
         or local_action
@@ -281,6 +285,7 @@ def _is_dependency_input(path: PurePosixPath) -> bool:
         or toolchain
         or vendored_schema
         or reviewed_python_graph
+        or reviewed_signing_tool
     )
 
 
@@ -324,6 +329,8 @@ def _component_for_input(path: PurePosixPath) -> str:
             return "pipeline-python-release"
         if value == "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json":
             return "settlement-spatial-python"
+    if path.parts[:4] == ("contracts", "supply-chain", "v1", "tools"):
+        return "release-signing-toolchain"
     if path.parts[:2] == ("src", "api"):
         return "api-nuget"
     if path.parts[:2] == ("src", "frontend") and path.name in _NODE_INPUTS:
@@ -354,6 +361,8 @@ def _role_for_input(path: PurePosixPath) -> str:
         return "lock" if path.name == "manifest.json" else "schema"
     if path.parts[:4] == ("contracts", "supply-chain", "v1", "python-graphs"):
         return "manifest"
+    if path.parts[:4] == ("contracts", "supply-chain", "v1", "tools"):
+        return "lock"
     if (
         path.name in {"package-lock.json", "packages.lock.json", ".terraform.lock.hcl"}
         or path.suffix == ".lock"

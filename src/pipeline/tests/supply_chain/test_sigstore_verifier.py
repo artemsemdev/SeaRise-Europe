@@ -51,12 +51,26 @@ if sys.argv[1:] != expected:
     lock.write_text(
         json.dumps(
             {
-                "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cosign-verifier-tool.schema.json",
+                "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cosign-tool-lock.schema.json",
                 "schemaVersion": "1.0.0",
-                "contractId": "phase-1-cosign-verifier-tool-v1",
+                "contractId": "phase-1-cosign-linux-amd64-v1",
                 "tool": "cosign",
-                "sha256": hashlib.sha256(script).hexdigest(),
-                "byteSize": len(script),
+                "version": "3.0.6",
+                "platform": "linux-amd64",
+                "releaseUrl": "https://github.com/sigstore/cosign/releases/tag/v3.0.6",
+                "executable": {
+                    "name": "cosign-linux-amd64",
+                    "url": "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64",
+                    "sha256": hashlib.sha256(script).hexdigest(),
+                    "byteSize": len(script),
+                },
+                "checksumEvidence": {
+                    "name": "cosign_checksums.txt",
+                    "url": "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign_checksums.txt",
+                    "sha256": "0" * 64,
+                    "byteSize": 1,
+                    "entry": f"{hashlib.sha256(script).hexdigest()}  cosign-linux-amd64",
+                },
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -259,3 +273,29 @@ def test_cosign_symlink_and_read_swap_fail_closed(
     monkeypatch.setattr(verifier.os, "read", swap)
     with pytest.raises(SupplyChainContractError, match="changed while it was read"):
         _verify(candidate, evidence, tool, lock)
+
+
+def test_sparse_oversize_cosign_is_rejected_before_payload_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    executable = tmp_path / "cosign"
+    executable.write_bytes(b"reviewed")
+    executable.chmod(0o700)
+    expected_byte_size = executable.stat().st_size
+    with executable.open("r+b") as stream:
+        stream.truncate(expected_byte_size + 1024 * 1024 * 1024)
+    executable_inode = executable.stat().st_ino
+    executable_reads = 0
+    real_read = verifier.os.read
+
+    def guarded_read(descriptor: int, count: int) -> bytes:
+        nonlocal executable_reads
+        if verifier.os.fstat(descriptor).st_ino == executable_inode:
+            executable_reads += 1
+            return b""
+        return real_read(descriptor, count)
+
+    monkeypatch.setattr(verifier.os, "read", guarded_read)
+    with pytest.raises(SupplyChainContractError, match="byte size differs"):
+        verifier._executable_bytes(executable, expected_byte_size=expected_byte_size)
+    assert executable_reads == 0

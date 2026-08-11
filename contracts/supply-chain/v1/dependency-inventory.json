@@ -138,6 +138,16 @@
       "note": "The controlled release container uses a digest-pinned base and the release hash lock."
     },
     {
+      "id": "release-signing-toolchain",
+      "ecosystem": "native",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/tools/cosign-linux-amd64.json", "role": "lock", "sha256": "dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9" }
+      ],
+      "note": "The future protected signing job is constrained to one reviewed official Cosign release binary and checksum asset."
+    },
+    {
       "id": "settlement-spatial-python",
       "ecosystem": "python",
       "releaseUse": "candidate",

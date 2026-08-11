@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cosign-tool-lock.schema.json",
+  "title": "SeaRise Europe reviewed Cosign Linux AMD64 tool lock v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "tool",
+    "version",
+    "platform",
+    "releaseUrl",
+    "executable",
+    "checksumEvidence"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cosign-tool-lock.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "phase-1-cosign-linux-amd64-v1" },
+    "tool": { "const": "cosign" },
+    "version": { "const": "3.0.6" },
+    "platform": { "const": "linux-amd64" },
+    "releaseUrl": {
+      "const": "https://github.com/sigstore/cosign/releases/tag/v3.0.6"
+    },
+    "executable": { "$ref": "#/$defs/asset" },
+    "checksumEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url", "sha256", "byteSize", "entry"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/sigstore/cosign/releases/download/v3\\.0\\.6/" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "entry": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url", "sha256", "byteSize"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/sigstore/cosign/releases/download/v3\\.0\\.6/" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "byteSize": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
