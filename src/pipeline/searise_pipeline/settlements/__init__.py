@@ -31,6 +31,16 @@ from .contract_semantics import (
     SettlementContractSemanticError,
     validate_settlement_search_shard_semantics,
 )
+from .full_source_catalogue import (
+    FullSourceContractError,
+    FullSourceStageContract,
+    FullSourceStageInputs,
+    LockedAsset,
+    LockedMember,
+    canonical_full_source_bindings_bytes,
+    full_source_bindings,
+    verify_full_source_inputs,
+)
 from .geonames import (
     ADMIN1_SOURCE,
     ALL_COUNTRIES_SOURCE,
@@ -60,10 +70,15 @@ __all__ = [
     "CatalogueRecordNormalization",
     "CatalogueRejection",
     "FieldAnomaly",
+    "FullSourceContractError",
+    "FullSourceStageContract",
+    "FullSourceStageInputs",
     "GeoNameRecord",
     "GeoNamesParseError",
     "IsoLanguageRecord",
     "Lineage",
+    "LockedAsset",
+    "LockedMember",
     "NameSelection",
     "NameVariant",
     "NormalizedCatalogue",
@@ -71,6 +86,8 @@ __all__ = [
     "SourceIdentity",
     "SettlementContractSemanticError",
     "alternate_name_rejection",
+    "canonical_full_source_bindings_bytes",
+    "full_source_bindings",
     "language_codes",
     "load_normalization_policy",
     "load_catalogue_policy",
@@ -82,4 +99,5 @@ __all__ = [
     "parse_iso_language_row",
     "select_names",
     "validate_settlement_search_shard_semantics",
+    "verify_full_source_inputs",
 ]
