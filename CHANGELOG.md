@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a hash-bound internal settlement spatial classifier with deterministic
+  support/coastal membership, whole-meter EPSG:3035 shoreline distance,
+  rejection-ledger semantics, and exact pinned DuckDB Spatial CI evidence.
 - Added a separate immutable Python 3.11 DuckDB Spatial build plane for
   settlement processing, with official Linux/macOS extension byte identities,
   checksum-first cache admission, and a network-free live-load preflight.

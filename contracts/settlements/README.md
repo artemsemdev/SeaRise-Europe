@@ -40,9 +40,31 @@ wrong alternate-name bindings, and buckets without a corresponding place fail
 the whole normalization. Lineage order is the place row, matched admin1 row,
 then selected alternate-name rows.
 
-This domain intentionally has no Europe/coastal spatial classification,
-DuckDB/toolchain binding, GeoParquet/search-shard serialization, or performance
-claim. Those remain later slices.
+This internal slice adds deterministic Europe/coastal classification over
+the pure catalog. Support and 25 km coastal membership use `ST_Covers`;
+distance transforms the point and a separately identified shoreline from
+EPSG:4326 to the EPSG:3035 metric plane with explicit XY axis order before
+`ST_Distance`; DuckDB then casts its `DOUBLE` result to `BIGINT`, persisting
+whole meters with nearest-half-to-even semantics under internal method version
+`epsg3035-planar-whole-meter-half-even-v1`. The support boundary and 25 km zone
+boundary are prohibited shoreline substitutes. Every fixture geometry binds
+its role, version, hash, path, and predicate, while the executable evidence
+remains a hash-bound European synthetic fixture,
+`selected-scope-approximation`, non-publication, and without an owner-approval
+claim. Production classification fails with `shoreline-geometry-unavailable`
+until a reviewed shoreline is pinned.
+
+This classified output is an internal audit model, not a Place v2 producer.
+Support-covered records are retained even when they belong to no browser
+shard: `europe-core` requires population >= 500 or feature code `PPLC`, `PPLA`,
+`PPLA2`, `PPLA3`, `PPLA4`, or `PPLA5`, while `europe-coastal` depends only on
+coastal coverage.
+
+A successor versioned public contract is required because Place v2 requires
+at least one `catalogMembership` item and its mandatory distance cannot bind a
+`shorelineGeometryVersion` or `distanceMethodVersion`. This slice does not
+change that public schema and makes no GeoParquet, search-writer, benchmark,
+full-source, or publication claim.
 
 Consumers support exact `schemaVersion`, artifact `formatVersion`, and search
 engine serialization identities. An unknown value is an unsupported artifact;
