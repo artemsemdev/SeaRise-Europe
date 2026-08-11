@@ -3,11 +3,12 @@ WORKDIR /src
 
 # Copy solution and project files for restore
 COPY SeaRise.sln .
-COPY SeaRise.Domain/SeaRise.Domain.csproj SeaRise.Domain/
-COPY SeaRise.Application/SeaRise.Application.csproj SeaRise.Application/
-COPY SeaRise.Infrastructure/SeaRise.Infrastructure.csproj SeaRise.Infrastructure/
-COPY SeaRise.Api/SeaRise.Api.csproj SeaRise.Api/
-RUN dotnet restore SeaRise.Api/SeaRise.Api.csproj
+COPY Directory.Build.props .
+COPY SeaRise.Domain/SeaRise.Domain.csproj SeaRise.Domain/packages.lock.json SeaRise.Domain/
+COPY SeaRise.Application/SeaRise.Application.csproj SeaRise.Application/packages.lock.json SeaRise.Application/
+COPY SeaRise.Infrastructure/SeaRise.Infrastructure.csproj SeaRise.Infrastructure/packages.lock.json SeaRise.Infrastructure/
+COPY SeaRise.Api/SeaRise.Api.csproj SeaRise.Api/packages.lock.json SeaRise.Api/
+RUN dotnet restore SeaRise.Api/SeaRise.Api.csproj --locked-mode
 
 # Copy everything and publish
 COPY . .
