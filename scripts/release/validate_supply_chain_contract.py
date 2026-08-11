@@ -14,13 +14,14 @@ from searise_pipeline.supply_chain import (
     publish_npm_sbom,
     publish_nuget_sbom,
     publish_python_sbom,
+    validate_candidate_evidence_pair,
     validate_dependency_exception,
     validate_dependency_inventory,
-    validate_candidate_evidence_pair,
     validate_evidence_files,
     validate_npm_sbom,
     validate_nuget_sbom,
     validate_python_sbom,
+    verify_candidate_evidence_cryptographically,
 )
 
 
@@ -43,6 +44,15 @@ def _parser() -> argparse.ArgumentParser:
     pair.add_argument("--evidence-root", type=Path, required=True)
     pair.add_argument("--repository-root", type=Path, default=Path.cwd())
     pair.add_argument("--trusted-invocation-uri", required=True)
+    crypto = commands.add_parser("cryptographic-verification")
+    crypto.add_argument("--candidate-root", type=Path, required=True)
+    crypto.add_argument("--evidence-root", type=Path, required=True)
+    crypto.add_argument("--repository-root", type=Path, default=Path.cwd())
+    crypto.add_argument("--controlled-build-run-id", required=True)
+    crypto.add_argument("--cosign-executable", type=Path, required=True)
+    crypto.add_argument("--cosign-tool-lock", type=Path, required=True)
+    crypto.add_argument("--trusted-cosign-tool-lock-sha256", required=True)
+    crypto.add_argument("--receipt", type=Path, required=True)
     exception = commands.add_parser("exception")
     exception.add_argument("--document", type=Path, required=True)
     exception.add_argument("--as-of", required=True)
@@ -99,6 +109,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 f"validated pair: {summary.candidate_id} ({summary.sbom_count} SBOMs; {nonclaims})"
+            )
+        elif args.command == "cryptographic-verification":
+            verify_candidate_evidence_cryptographically(
+                args.candidate_root,
+                args.evidence_root,
+                repository_root=args.repository_root,
+                controlled_build_run_id=args.controlled_build_run_id,
+                cosign_executable=args.cosign_executable,
+                cosign_tool_lock=args.cosign_tool_lock,
+                trusted_cosign_tool_lock_sha256=args.trusted_cosign_tool_lock_sha256,
+                receipt_path=args.receipt,
+            )
+            print(
+                "verified Sigstore identity and subject digests; "
+                "production, publication, and scientific approval not claimed"
             )
         elif args.command == "evidence":
             sboms = dict(args.sbom)
