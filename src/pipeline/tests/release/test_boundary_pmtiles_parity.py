@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -21,7 +22,12 @@ def _loaded_source(tmp_path: Path) -> object:
     )
 
 
-def _decoded(source: object, *, geometry: object | None = None) -> dict[str, object]:
+def _decoded(
+    source: object,
+    *,
+    geometry: object | None = None,
+    extent: int | None = None,
+) -> dict[str, object]:
     feature = {
         "id": source.specification.feature_id,
         "properties": boundary_pmtiles._writer_feature_properties(source),
@@ -29,7 +35,7 @@ def _decoded(source: object, *, geometry: object | None = None) -> dict[str, obj
     }
     layer = {
         "properties": {
-            "extent": boundary_pmtiles._MVT_EXTENT,
+            "extent": extent or boundary_pmtiles._MVT_EXTENT,
             "layer": source.specification.layer_id,
             "version": 2,
         },
@@ -201,6 +207,71 @@ def test_visual_segmentization_preserves_canonical_source(tmp_path: Path) -> Non
     assert evidence["canonicalSourceModified"] is False
     assert evidence["maximumSegmentLengthDegrees"] == 0.10
     assert evidence["distance"]["symmetricMaximumDegrees"] <= 1e-12
+
+
+def test_profile_matrix_compares_detail_14_and_17_with_and_without_segmentization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _loaded_source(tmp_path)
+    outer = box(0, 0, 1, 1)
+    hole = box(0.49, 0.49, 0.51, 0.51)
+    source = replace(
+        source,
+        geometry=Polygon(outer.exterior.coords, [hole.exterior.coords]),
+    )
+    monkeypatch.setattr(boundary_pmtiles, "_load_source", lambda *_a, **_k: source)
+    monkeypatch.setattr(
+        boundary_pmtiles.BoundaryVectorToolPaths,
+        "validate",
+        lambda *_a, **_k: None,
+    )
+
+    def pinned_tool(command: list[str]) -> str:
+        output = next(
+            (value.removeprefix("--output=") for value in command if value.startswith("--output=")),
+            None,
+        )
+        if output is not None:
+            Path(output).write_bytes("\n".join(command).encode())
+            return ""
+        if "verify" in command:
+            return ""
+        archive = Path(command[-1])
+        detail = 14 if "detail-14" in archive.name else 17
+        geometry = outer if detail == 14 else source.geometry
+        return json.dumps(
+            _decoded(source, geometry=mapping(geometry), extent=2**detail)
+        )
+
+    monkeypatch.setattr(boundary_pmtiles, "_run", pinned_tool)
+    tools = boundary_pmtiles.BoundaryVectorToolPaths(
+        tippecanoe=tmp_path / "tippecanoe",
+        decode=tmp_path / "tippecanoe-decode",
+        pmtiles=tmp_path / "pmtiles",
+        tippecanoe_source=tmp_path / "source",
+        tippecanoe_build_receipt=tmp_path / "receipt",
+        pmtiles_distribution_asset=tmp_path / "asset",
+        platform="darwin-arm64",
+    )
+    profiles = boundary_pmtiles.evaluate_boundary_profile_matrix(
+        tmp_path / "source.parquet",
+        tmp_path / "source.geojson",
+        role="support-boundary",
+        contract={},
+        tools=tools,
+    )
+    assert [(profile["fullDetail"], profile["passed"]) for profile in profiles] == [
+        (14, False),
+        (14, False),
+        (17, True),
+        (17, True),
+    ]
+    assert [profile["visualIntermediary"]["method"] for profile in profiles] == [
+        "none",
+        "shapely-segmentize",
+        "none",
+        "shapely-segmentize",
+    ]
 
 
 def test_decoded_oracle_rejects_common_mode_writer_mutation(

@@ -300,14 +300,16 @@ def _write_ndjson(path: Path, source: _BoundarySource) -> Mapping[str, Any]:
     return evidence
 
 
-def _tippecanoe_options(source: _BoundarySource) -> list[str]:
+def _tippecanoe_options(
+    source: _BoundarySource, *, full_detail: int = _FULL_DETAIL
+) -> list[str]:
     return [
         "--force",
         f"--layer={source.specification.layer_id}",
         "--projection=EPSG:4326",
         f"--minimum-zoom={_MINIMUM_ZOOM}",
         f"--maximum-zoom={_MAXIMUM_ZOOM}",
-        f"--full-detail={_FULL_DETAIL}",
+        f"--full-detail={full_detail}",
         f"--buffer={_BUFFER}",
         "--no-feature-limit",
         "--no-tile-size-limit",
@@ -675,12 +677,14 @@ def _decoded_geometry_parity(source: Any, decoded: Any) -> Mapping[str, Any]:
     }
 
 
-def _validate_decoded_document(
-    document: object, source: _BoundarySource
-) -> tuple[int, Mapping[str, Any]]:
+def _decoded_fragments(
+    document: object,
+    source: _BoundarySource,
+    *,
+    extent: int = _MVT_EXTENT,
+) -> list[Any]:
     _require_shapely()
     try:
-        from shapely import union_all
         from shapely.geometry import shape
     except ImportError as exc:
         raise ScienceContractError("Decoded PMTiles parity requires Shapely") from exc
@@ -695,7 +699,7 @@ def _validate_decoded_document(
                 type(layer) is not dict
                 or layer.get("properties")
                 != {
-                    "extent": 2**_FULL_DETAIL,
+                    "extent": extent,
                     "layer": source.specification.layer_id,
                     "version": 2,
                 }
@@ -718,9 +722,159 @@ def _validate_decoded_document(
                     ) from exc
     if not fragments:
         raise ScienceContractError("Decoded boundary PMTiles contains no boundary fragments")
+    return fragments
+
+
+def _validate_decoded_document(
+    document: object, source: _BoundarySource
+) -> tuple[int, Mapping[str, Any]]:
+    try:
+        from shapely import union_all
+    except ImportError as exc:
+        raise ScienceContractError("Decoded PMTiles parity requires Shapely") from exc
+    fragments = _decoded_fragments(document, source)
     merged = union_all(fragments)
     parity = _decoded_geometry_parity(source.geometry, merged)
     return len(fragments), parity
+
+
+def evaluate_boundary_profile_matrix(
+    source_geoparquet_path: Path,
+    source_geojson_path: Path,
+    *,
+    role: str,
+    contract: Mapping[str, Any],
+    tools: BoundaryVectorToolPaths,
+) -> list[Mapping[str, Any]]:
+    """Compare the approved detail/segmentization candidates with pinned tools."""
+    source = _load_source(source_geoparquet_path, source_geojson_path, role=role)
+    tools.validate(contract)
+    try:
+        from shapely import union_all
+        from shapely.geometry import mapping
+    except ImportError as exc:
+        raise ScienceContractError("Boundary profile selection requires Shapely") from exc
+    profiles: list[Mapping[str, Any]] = []
+    with tempfile.TemporaryDirectory(prefix="searise-boundary-profile-") as temp:
+        staging = Path(temp)
+        for full_detail in (14, 17):
+            for segment_length in (None, _VISUAL_SEGMENT_LENGTH_DEGREES):
+                profile_id = (
+                    f"detail-{full_detail}-"
+                    + ("source-vertices" if segment_length is None else "segmentize-0.10")
+                )
+                if segment_length is None:
+                    visual = source.geometry
+                    visual_evidence: Mapping[str, Any] = {
+                        "canonicalSourceModified": False,
+                        "method": "none",
+                        "sourceTopology": _topology_evidence(source.geometry),
+                        "visualTopology": _topology_evidence(source.geometry),
+                    }
+                else:
+                    visual, visual_evidence = _visual_geometry(source.geometry)
+                feature = {
+                    "geometry": mapping(visual),
+                    "id": source.specification.feature_id,
+                    "properties": _writer_feature_properties(source),
+                    "type": "Feature",
+                }
+                ndjson = staging / f"{profile_id}.ndjson"
+                archive = staging / f"{profile_id}.pmtiles"
+                ndjson.write_text(
+                    json.dumps(feature, sort_keys=True, separators=(",", ":"))
+                    + "\n",
+                    encoding="utf-8",
+                )
+                _run(
+                    [
+                        str(tools.tippecanoe),
+                        f"--output={archive}",
+                        *_tippecanoe_options(source, full_detail=full_detail),
+                        str(ndjson),
+                    ]
+                )
+                _run([str(tools.pmtiles), "verify", str(archive)])
+                try:
+                    decoded = json.loads(
+                        _run(
+                            [
+                                str(tools.decode),
+                                f"-Z{_MAXIMUM_ZOOM}",
+                                f"-z{_MAXIMUM_ZOOM}",
+                                str(archive),
+                            ]
+                        )
+                    )
+                except json.JSONDecodeError as exc:
+                    raise ScienceContractError(
+                        "Boundary profile diagnostic cannot decode its PMTiles"
+                    ) from exc
+                fragments = _decoded_fragments(
+                    decoded,
+                    source,
+                    extent=2**full_detail,
+                )
+                merged = union_all(fragments)
+                if not merged.is_valid or merged.is_empty:
+                    raise ScienceContractError(
+                        "Boundary profile diagnostic produced invalid geometry"
+                    )
+                distances = _symmetric_vertex_boundary_distances(
+                    source.geometry, merged
+                )
+                envelope_differences = [
+                    abs(observed - expected)
+                    for observed, expected in zip(
+                        merged.bounds, source.geometry.bounds
+                    )
+                ]
+                coordinate_limit = 360 / (2**_MAXIMUM_ZOOM * 2**full_detail)
+                geometry_limit = math.sqrt(2) * coordinate_limit
+                topology_matches = _polygon_topology(merged) == _polygon_topology(
+                    source.geometry
+                )
+                passed = (
+                    topology_matches
+                    and max(envelope_differences)
+                    <= math.nextafter(coordinate_limit, math.inf)
+                    and distances["symmetricMaximumDegrees"]
+                    <= math.nextafter(geometry_limit, math.inf)
+                )
+                profiles.append(
+                    {
+                        "artifact": {
+                            "byteSize": archive.stat().st_size,
+                            "sha256": _sha256(archive),
+                        },
+                        "decodedFragmentCount": len(fragments),
+                        "decodedTopology": _topology_evidence(merged),
+                        "envelopeAxisDifferencesDegrees": envelope_differences,
+                        "fullDetail": full_detail,
+                        "geometryLimitDegrees": geometry_limit,
+                        "geometryParity": distances,
+                        "mvtExtent": 2**full_detail,
+                        "officialPmtilesVerify": "passed",
+                        "passed": passed,
+                        "profileId": profile_id,
+                        "sourceTopology": _topology_evidence(source.geometry),
+                        "topologyMatches": topology_matches,
+                        "visualIntermediary": visual_evidence,
+                    }
+                )
+    selected = next(
+        profile
+        for profile in profiles
+        if profile["fullDetail"] == _FULL_DETAIL
+        and profile["visualIntermediary"]["method"] == "shapely-segmentize"
+    )
+    if not selected["passed"]:
+        raise ScienceContractError("Selected boundary PMTiles profile did not pass")
+    if any(profile["passed"] for profile in profiles if profile["fullDetail"] == 14):
+        raise ScienceContractError(
+            "A lower-detail boundary PMTiles profile passed; review the selected profile"
+        )
+    return profiles
 
 
 def validate_boundary_pmtiles(
