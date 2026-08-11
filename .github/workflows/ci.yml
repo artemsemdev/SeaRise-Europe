@@ -195,6 +195,21 @@ jobs:
           pip install -e ".[dev]"
           pip install ruff mypy pytest
 
+      - name: Verify immutable DuckDB Spatial settlement build plane
+        run: |
+          python -m pip install \
+            --only-binary=:all: \
+            --require-hashes \
+            --requirement requirements-settlements-spatial-linux-x86_64.lock
+          archive="${RUNNER_TEMP}/spatial.duckdb_extension.gz"
+          url="$(python -c 'import json; print(json.load(open("toolchain/duckdb-spatial-extensions.json"))["platforms"]["linux-x86_64"]["extensionArchive"]["url"])')"
+          curl --fail --location --proto '=https' --tlsv1.2 --output "${archive}" "${url}"
+          python -m searise_pipeline.settlements.spatial_toolchain \
+            --manifest toolchain/duckdb-spatial-extensions.json \
+            --cache-root "${RUNNER_TEMP}/settlement-spatial-cache" \
+            --platform linux-x86_64 \
+            --archive "${archive}"
+
       - name: Validate test migration contracts
         run: |
           PYTHONPATH=../.. python ../../scripts/tests/validate_test_inventory.py

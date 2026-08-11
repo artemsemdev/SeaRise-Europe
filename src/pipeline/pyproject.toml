@@ -27,6 +27,7 @@ dependencies = [
 [project.scripts]
 searise-release = "searise_pipeline.offline_release.cli:cli"
 searise-sources = "searise_pipeline.sources.cli:cli"
+searise-settlement-spatial-toolchain = "searise_pipeline.settlements.spatial_toolchain:main"
 
 [project.optional-dependencies]
 dev = [

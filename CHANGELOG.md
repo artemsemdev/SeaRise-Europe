@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a separate immutable Python 3.11 DuckDB Spatial build plane for
+  settlement processing, with official Linux/macOS extension byte identities,
+  checksum-first cache admission, and a network-free live-load preflight.
 - Added lossless typed GeoNames `allCountries` and `admin1CodesASCII` row parsers
   with pinned source identity, exact lineage, explicit raw anomaly flags, and
   hash-bound real-format fixtures.
