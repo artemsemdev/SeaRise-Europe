@@ -321,15 +321,21 @@ def test_serializer_never_publishes_a_replaced_staged_inode(
     @contextmanager
     def replace_before_open(root, relative: PurePosixPath, label: str) -> Iterator[object]:
         if label == "staged search projection":
-            os.unlink(relative.name, dir_fd=root.descriptor)
+            foreign_name = "foreign-stage.ndjson"
             descriptor = os.open(
-                relative.name,
+                foreign_name,
                 projection.authority._CREATE_FLAGS,
                 0o600,
                 dir_fd=root.descriptor,
             )
             os.write(descriptor, b"foreign\n")
             os.close(descriptor)
+            os.replace(
+                foreign_name,
+                relative.name,
+                src_dir_fd=root.descriptor,
+                dst_dir_fd=root.descriptor,
+            )
         with original(root, relative, label) as asset:
             yield asset
 
@@ -344,13 +350,14 @@ def test_destination_replacement_during_cleanup_fails_and_preserves_foreign_byte
 ) -> None:
     database, receipt, work = _fixture(tmp_path)
     output = tmp_path / "racing-output.ndjson"
+    foreign = tmp_path / "foreign-destination.ndjson"
+    foreign.write_bytes(b"foreign destination\n")
     cleanup = projection.authority._remove_private
 
     def replace_after_cleanup(*args: object) -> None:
         cleanup(*args)
         if args[0].label == "search projection output directory":
-            output.unlink()
-            output.write_bytes(b"foreign destination\n")
+            os.replace(foreign, output)
 
     monkeypatch.setattr(projection.authority, "_remove_private", replace_after_cleanup)
     with pytest.raises(projection.SearchProjectionError, match="identity changed"):
