@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "settlement-normalization-v2",
+  "sourceSnapshot": "2026-08-10",
+  "inclusion": {
+    "featureClass": "P",
+    "featureCodes": ["PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF", "PPLG", "PPLL", "PPLR"],
+    "countryCodeRequired": true,
+    "coordinates": "finite-wgs84",
+    "population": { "minimum": 0, "nullAllowed": true, "zeroAllowed": true },
+    "supportPredicate": "covers",
+    "spatialRule": "versioned-geometry-not-bounding-box",
+    "transcontinentalRule": "support-geometry-only"
+  },
+  "canonicalName": {
+    "source": "allCountries.name",
+    "alternatePromotion": false,
+    "unicodeNormalization": "NFC",
+    "script": "unicode-script-detection-v1"
+  },
+  "alternateNames": {
+    "source": "alternateNamesV2.txt",
+    "languageMetadata": "iso-languagecodes.txt",
+    "iso639ThreeOnlyMetadata": "accept",
+    "excludedNamespaces": ["abbr", "faac", "fr_1793", "geoid", "iata", "icao", "lauc", "link", "nuts", "phon", "piny", "post", "tcid", "uicn", "unlc", "wkdt"],
+    "historic": "exclude",
+    "temporalRule": "snapshot-date-within-inclusive-period",
+    "unparseablePeriod": "exclude",
+    "unknownLanguage": "exclude",
+    "emptySourceName": "exclude",
+    "colloquial": "include-noncanonical",
+    "ordering": ["preferred-desc", "short-desc", "colloquial-asc", "language-asc", "nfc-casefold-name-asc", "alternate-name-id-asc"]
+  },
+  "deduplication": {
+    "placeIdentity": "geonames-id",
+    "nameKey": "unicode-nfc-casefold",
+    "crossPlaceMerge": false,
+    "canonicalWins": true
+  },
+  "geography": {
+    "status": "selected-scope-approximation",
+    "publicationEligible": false
+  }
+}

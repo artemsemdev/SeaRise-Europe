@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "snapshotDate": "2026-08-10",
+  "normalizationPolicyVersion": "settlement-normalization-v2",
+  "fixtureClass": "hash-verified-real-format-excerpt",
+  "productionInput": false,
+  "sourceLock": {
+    "path": "src/pipeline/sources/source-lock.phase-1-settlements.json",
+    "sha256": "3e6d58578f9a9f387804f9cfbc5cada3a39a5d1460a67ac00285e2236f9e2eee"
+  },
+  "asset": {
+    "assetId": "alternate-names-v2",
+    "sha256": "eaea640b50b7081f7270d9563720b66d6b345af81522a6eb8ee55873507b17fe",
+    "byteSize": 202510374
+  },
+  "sources": [
+    {
+      "fixtureFile": "alternateNamesV2.rows.txt",
+      "fixtureSha256": "0e3a594d094ab2e7b3d05737bd587a69fde4662be05162301187936196cc3858",
+      "sourceFile": "alternateNamesV2.txt",
+      "sourceSha256": "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612",
+      "sourceByteSize": 777625687,
+      "sourceCompressedByteSize": 202448178,
+      "sourceCrc32": "e311a5a6",
+      "rows": [
+        { "fixtureLine": 1, "sourceLine": 128, "sourceRecordId": 1297839 },
+        { "fixtureLine": 2, "sourceLine": 129, "sourceRecordId": 1297840 },
+        { "fixtureLine": 3, "sourceLine": 130, "sourceRecordId": 1297841 },
+        { "fixtureLine": 4, "sourceLine": 131, "sourceRecordId": 2170607 },
+        { "fixtureLine": 5, "sourceLine": 136, "sourceRecordId": 11352176 },
+        { "fixtureLine": 6, "sourceLine": 137, "sourceRecordId": 11352177 },
+        { "fixtureLine": 7, "sourceLine": 154, "sourceRecordId": 11352194 },
+        { "fixtureLine": 8, "sourceLine": 425837, "sourceRecordId": 135316 },
+        { "fixtureLine": 9, "sourceLine": 507261, "sourceRecordId": 3926787 },
+        { "fixtureLine": 10, "sourceLine": 5108968, "sourceRecordId": 1567725 },
+        { "fixtureLine": 11, "sourceLine": 5108969, "sourceRecordId": 1567726 },
+        { "fixtureLine": 12, "sourceLine": 5109028, "sourceRecordId": 2039069 }
+      ]
+    },
+    {
+      "fixtureFile": "iso-languagecodes.rows.txt",
+      "fixtureSha256": "77cb201c540ad59a9e6a5a7d391b5c58d3d9ed81a181e5163efc67c63cd4ba33",
+      "sourceFile": "iso-languagecodes.txt",
+      "sourceSha256": "cb0d34f492775deec8ec5713da6efa4463dad99b5e7ba2172bd094cfdcb76571",
+      "sourceByteSize": 137908,
+      "sourceCompressedByteSize": 61908,
+      "sourceCrc32": "4e1f14da",
+      "rows": [
+        { "fixtureLine": 1, "sourceLine": 417, "sourceRecordId": "ara" },
+        { "fixtureLine": 2, "sourceLine": 1083, "sourceRecordId": "bul" },
+        { "fixtureLine": 3, "sourceLine": 1238, "sourceRecordId": "cat" },
+        { "fixtureLine": 4, "sourceLine": 1895, "sourceRecordId": "eng" },
+        { "fixtureLine": 5, "sourceLine": 2014, "sourceRecordId": "fra" },
+        { "fixtureLine": 6, "sourceLine": 5401, "sourceRecordId": "por" },
+        { "fixtureLine": 7, "sourceLine": 6049, "sourceRecordId": "spa" },
+        { "fixtureLine": 8, "sourceLine": 7799, "sourceRecordId": "zho" }
+      ]
+    }
+  ]
+}

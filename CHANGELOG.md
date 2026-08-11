@@ -15,6 +15,9 @@ All notable changes to this project will be documented in this file.
 - Added lossless typed GeoNames `allCountries` and `admin1CodesASCII` row parsers
   with pinned source identity, exact lineage, explicit raw anomaly flags, and
   hash-bound real-format fixtures.
+- Added hash-bound `alternateNamesV2` and ISO-language parsing plus a versioned
+  settlement inclusion, canonical-name, temporal filtering, and deduplication
+  policy with deterministic selected-record lineage.
 - Added the first versioned Phase 1 public release contracts, locking the exact
   scenario/horizon matrix, defaults, discriminated four-state result payloads,
   grid-only 100 km lookup semantics, source identity, owner authority, and

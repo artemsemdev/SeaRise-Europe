@@ -1,0 +1,12 @@
+1297839	3039162	ca	Sant Julià de Lòria	1	1				
+1297840	3039162	en	Sant Julià de Loria		1				
+1297841	3039162	ca	Parròquia de Sant Julià de Lòria	1					
+2170607	3039162	post	AD600						
+11352176	3039162	ar	سانت جوليا دي لوريا						
+11352177	3039162	bg	Сан Джулия де Лория						
+11352194	3039162	zh	圣胡利娅-德洛里亚						
+135316	174703	en	Azizbekov				1	1935	1957
+3926787	145525	pt	Sombo	1				20250101	
+1567725	3128760	es	Barcelona	1	1				
+1567726	3128760	ca	Barcelona	1					
+2039069	3128760	es	la Ciudad Condal			1			
