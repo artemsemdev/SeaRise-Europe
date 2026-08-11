@@ -69,6 +69,9 @@ All notable changes to this project will be documented in this file.
 - Added an immutable v1 pure settlement catalogue policy/domain with
   source-derived IDs, explicit rejections, audited admin1 context, selected
   lineage, and stable ordering.
+- Added durable normalized-catalogue publication with a database-first commit,
+  a receipt completion marker, and inode-owned rollback that preserves racing
+  replacements.
 - Added the first versioned Phase 1 public release contracts, locking the exact
   scenario/horizon matrix, defaults, discriminated four-state result payloads,
   grid-only 100 km lookup semantics, source identity, owner authority, and
