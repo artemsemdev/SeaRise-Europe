@@ -94,10 +94,11 @@ def main(argv: list[str] | None = None) -> int:
                 repository_root=args.repository_root,
                 trusted_invocation_uri=args.trusted_invocation_uri,
             )
+            nonclaims = (
+                "cryptographic verification, production, and publication not claimed"
+            )
             print(
-                f"validated synthetic candidate/evidence pair: {summary.candidate_id} "
-                f"({summary.sbom_count} SBOMs; cryptographic verification, production, "
-                "and publication not claimed)"
+                f"validated pair: {summary.candidate_id} ({summary.sbom_count} SBOMs; {nonclaims})"
             )
         elif args.command == "evidence":
             sboms = dict(args.sbom)
@@ -118,9 +119,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.document,
                 repository_root=args.repository_root.resolve(),
             )
-            input_count = sum(
-                len(component["inputs"]) for component in document["components"]
-            )
+            input_count = sum(len(component["inputs"]) for component in document["components"])  # fmt: skip
             print(f"validated {input_count} dependency-defining inputs")
         elif args.command == "npm-sbom":
             document = publish_npm_sbom(
@@ -129,9 +128,7 @@ def main(argv: list[str] | None = None) -> int:
                 repository_root=args.repository_root.absolute(),
                 logical_path=args.logical_path,
             )
-            print(
-                f"generated {len(document['components'])} npm components: {args.output}"
-            )
+            print(f"generated {len(document['components'])} npm components: {args.output}")  # fmt: skip
         elif args.command == "npm-sbom-validate":
             document = validate_npm_sbom(
                 args.sbom,
@@ -139,9 +136,7 @@ def main(argv: list[str] | None = None) -> int:
                 repository_root=args.repository_root.absolute(),
                 logical_path=args.logical_path,
             )
-            print(
-                f"validated {len(document['components'])} npm components: {args.sbom}"
-            )
+            print(f"validated {len(document['components'])} npm components: {args.sbom}")  # fmt: skip
         elif args.command == "nuget-sbom":
             document = publish_nuget_sbom(
                 args.output,

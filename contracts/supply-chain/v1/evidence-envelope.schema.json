@@ -49,6 +49,7 @@
       "allOf": [
         { "$ref": "#/$defs/artifact" },
         {
+          "required": ["byteSize"],
           "properties": {
             "role": { "const": "provenance" },
             "path": { "const": "provenance.intoto.jsonl" },
@@ -158,7 +159,7 @@
     "subject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256"],
+      "required": ["path", "sha256", "byteSize"],
       "properties": {
         "path": { "$ref": "#/$defs/path" },
         "sha256": { "$ref": "#/$defs/sha256" },

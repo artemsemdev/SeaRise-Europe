@@ -6,6 +6,7 @@ import base64
 import copy
 import hashlib
 import json
+import os
 import runpy
 import shutil
 from pathlib import Path
@@ -13,6 +14,7 @@ from typing import Any
 
 import pytest
 
+import searise_pipeline.supply_chain.candidate_evidence as pair_validation
 from searise_pipeline.candidate_completeness import (
     canonical_provenance_bytes,
     generate_provenance_statement,
@@ -22,12 +24,10 @@ from searise_pipeline.supply_chain import (
     validate_candidate_evidence_pair,
 )
 from searise_pipeline.supply_chain.sbom import canonical_sbom_bytes
+from tests.contracts.test_provenance_statement import _documents, _write_pair
 
 ROOT = Path(__file__).resolve().parents[4]
 INVOCATION = "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/77777777777/attempts/1"
-CANDIDATE = ROOT / "contracts/candidate-completeness/v1/fixtures/valid/engineering-candidate.json"
-BUILD = ROOT / "contracts/release/v1/fixtures/valid/build-receipt.json"
-SOURCE = ROOT / "contracts/release/v1/fixtures/valid/source-receipt.json"
 ENVELOPE = ROOT / "contracts/supply-chain/v1/fixtures/valid/evidence-envelope.json"
 POLICY = ROOT / "contracts/supply-chain/v1/identity-policy.json"
 SBOM_ROOT = ROOT / "contracts/supply-chain/v1/sboms"
@@ -55,54 +55,13 @@ def _b64(value: bytes) -> str:
 
 def _pair(tmp_path: Path) -> tuple[Path, Path]:
     candidate_root, evidence_root = tmp_path / "candidate", tmp_path / "evidence"
-    candidate = _load(CANDIDATE)
-    build = _load(BUILD)
-    build["dataReleaseId"] = candidate["dataReleaseId"]
-    build["dataProvenanceClass"] = candidate["dataProvenanceClass"]
-    build["sourceReceipts"] = [
-        {"path": item["path"], "sha256": item["sha256"]}
-        for item in candidate["artifacts"]
-        if item["role"] == "source-receipt"
-    ]
-    output_roles = {"projection-geoparquet", "projection-analysis-cog", "projection-visual-pmtiles"}
-    build["outputs"] = [
-        {key: item[key] for key in ("path", "role", "mediaType", "byteSize", "sha256")}
-        for item in candidate["artifacts"]
-        if item["role"] in output_roles
-    ]
-    artifacts = {item["path"]: item for item in candidate["artifacts"]}
-    checksums = {item["path"]: item for item in candidate["checksumInventory"]["subjects"]}
-    for index, item in enumerate(build["sourceReceipts"]):
-        receipt = _load(SOURCE)
-        receipt.update(
-            dataReleaseId=candidate["dataReleaseId"],
-            dataProvenanceClass=candidate["dataProvenanceClass"],
-            receiptId=f"source-fixture-{index:012x}",
-            sourceId=f"fixture/source-{index}",
-            sourceVersion=f"fixture-{index}",
-            sourceUrl=f"https://fixtures.searise.invalid/source-{index}.bin",
-            byteSize=index + 1,
-            sha256=f"{index + 1:064x}",
-            attributionId=artifacts[item["path"]]["rights"]["attributionIds"][0],
-        )
-        receipt["cache"]["key"] = f"sha256/{receipt['sha256']}"
-        raw = canonical_provenance_bytes(receipt)
-        source_path = candidate_root / item["path"]
-        source_path.parent.mkdir(parents=True, exist_ok=True)
-        source_path.write_bytes(raw)
-        item["sha256"] = hashlib.sha256(raw).hexdigest()
-        artifacts[item["path"]].update(sha256=item["sha256"], byteSize=len(raw))
-        checksums[item["path"]]["sha256"] = item["sha256"]
-    build_raw = _write(candidate_root / "receipts/build.json", build)
-    build_artifact = artifacts["receipts/build.json"]
-    build_artifact["byteSize"] = len(build_raw)
-    build_artifact["sha256"] = hashlib.sha256(build_raw).hexdigest()
-    checksums[build_artifact["path"]]["sha256"] = build_artifact["sha256"]
-    manifest_raw = _write(candidate_root / "manifest.json", candidate)
+    candidate, build = _documents()
+    manifest_path, build_path = _write_pair(candidate_root, candidate, build)
+    manifest_raw = manifest_path.read_bytes()
 
     statement = generate_provenance_statement(
-        candidate_root / "manifest.json",
-        candidate_root / "receipts/build.json",
+        manifest_path,
+        build_path,
         trusted_invocation_uri=INVOCATION,
     )
     provenance_raw = canonical_provenance_bytes(statement)
@@ -150,11 +109,11 @@ def _pair(tmp_path: Path) -> tuple[Path, Path]:
     return candidate_root, evidence_root
 
 
-def _validate(candidate: Path, evidence: Path) -> Any:
+def _validate(candidate: Path, evidence: Path, repository: Path = ROOT) -> Any:
     return validate_candidate_evidence_pair(
         candidate,
         evidence,
-        repository_root=ROOT,
+        repository_root=repository,
         trusted_invocation_uri=INVOCATION,
     )
 
@@ -187,27 +146,30 @@ def test_valid_pair_preserves_nonclaims_and_cli_reports_them(
 
 
 @pytest.mark.parametrize(
-    ("section", "field", "value"),
+    ("path", "value"),
     [
-        (None, "candidateId", "candidate-drift"),
-        (None, "dataReleaseId", "searise-europe-v1.0.0-20260811-deadbeefcafe"),
-        (None, "dataProvenanceClass", "real-source"),
-        ("candidateManifest", "byteSize", 1),
-        ("provenance", "byteSize", 1),
+        (("candidateId",), "candidate-drift"),
+        (("dataReleaseId",), "searise-europe-v1.0.0-20260811-deadbeefcafe"),
+        (("dataProvenanceClass",), "real-source"),
+        (("candidateManifest", "byteSize"), 1),
+        (("provenance", "byteSize"), 1),
+        (("candidateManifest", "byteSize"), None),
+        (("provenance", "byteSize"), None),
     ],
 )
-def test_pair_descriptor_mismatch_fails(
-    tmp_path: Path, section: str | None, field: str, value: str | int
-) -> None:
+def test_pair_descriptor_mismatch_fails(tmp_path: Path, path: tuple[str, ...], value: Any) -> None:
     candidate, evidence = _pair(tmp_path)
     envelope_path = evidence / "evidence-envelope.json"
     envelope = _load(envelope_path)
-    if section:
-        envelope[section][field] += value
+    target = envelope
+    for field in path[:-1]:
+        target = target[field]
+    if value is None:
+        target.pop(path[-1])
     else:
-        envelope[field] = value
+        target[path[-1]] = value
     _write(envelope_path, envelope)
-    with pytest.raises(SupplyChainContractError, match=field if section is None else "descriptor"):
+    with pytest.raises(SupplyChainContractError):
         _validate(candidate, evidence)
 
 
@@ -296,6 +258,34 @@ def test_exactly_two_unique_signature_descriptors_are_required(
         _validate(candidate, evidence)
 
 
+def test_tlog_entry_is_the_exact_hashedrekord_subset() -> None:
+    cases = [
+        (("kindVersion", "kind"), "rekord"),
+        (("kindVersion", "version"), "1"),
+        (("kindVersion", "extra"), 0),
+        (("inclusionPromise", "extra"), "x"),
+        (("logId", "extra"), "x"),
+        (("inclusionPromise",), []),
+        (("inclusionProof",), {}),
+    ]
+    cases += [
+        ((field,), value)
+        for field in ("integratedTime", "logIndex")
+        for value in (None, True, "1", -1)
+    ]
+    subject = b"subject"
+    bundle = _load(ENVELOPE.parent / "manifest.sigstore.json")
+    bundle["messageSignature"]["messageDigest"]["digest"] = _b64(hashlib.sha256(subject).digest())
+    for path, value in cases:
+        mutated = copy.deepcopy(bundle)
+        target = mutated["verificationMaterial"]["tlogEntries"][0]
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = value
+        with pytest.raises(SupplyChainContractError, match="hashedrekord subset"):
+            pair_validation._validate_bundle(mutated, subject, "signature")
+
+
 @pytest.mark.parametrize("invalid", ["duplicate", "nan", "surrogate", "deep"])
 def test_envelope_requires_strict_json(tmp_path: Path, invalid: str) -> None:
     candidate, evidence = _pair(tmp_path)
@@ -331,3 +321,35 @@ def test_candidate_and_evidence_paths_reject_symlinks(tmp_path: Path, target: st
         provenance.symlink_to(outside)
     with pytest.raises(SupplyChainContractError, match="without symlinks"):
         _validate(candidate, evidence)
+
+
+@pytest.mark.parametrize("mutation", ["symlink", "swap"])
+def test_identity_policy_is_descriptor_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
+) -> None:
+    candidate, evidence = _pair(tmp_path / "pair")
+    repository = tmp_path / "repository"
+    policy = repository / POLICY.relative_to(ROOT)
+    policy.parent.mkdir(parents=True)
+    shutil.copy2(POLICY, policy)
+    replacement = tmp_path / "identity-policy-copy.json"
+    shutil.copy2(POLICY, replacement)
+    if mutation == "symlink":
+        policy.unlink()
+        policy.symlink_to(replacement)
+    else:
+        real_read = os.read
+        inode = policy.stat().st_ino
+        swapped = False
+
+        def swap(descriptor: int, count: int) -> bytes:
+            nonlocal swapped
+            raw = real_read(descriptor, count)
+            if not swapped and os.fstat(descriptor).st_ino == inode:
+                replacement.replace(policy)
+                swapped = True
+            return raw
+
+        monkeypatch.setattr(pair_validation.os, "read", swap)
+    with pytest.raises(SupplyChainContractError, match="identity policy.*(symlinks|changed)"):
+        _validate(candidate, evidence, repository)

@@ -25,11 +25,8 @@ cryptographically verify a bundle.
 
 ## Candidate/evidence pair validation
 
-`candidate-evidence-pair` opens both roots without following symlinks and binds
-immutable candidate, receipt, provenance, policy, signature-bundle, and exact
-ten-SBOM snapshots. Bundles are structurally checked and SBOMs regenerated from
-reviewed authority. Success preserves the pending marker and makes no
-cryptographic-verification, production, or publication claim.
+`candidate-evidence-pair` descriptor-safely binds candidate, receipt, provenance, policy, bundles,
+and ten SBOMs, structurally checks bundles, and regenerates SBOMs without verification claims.
 
 ## Production identity policy
 

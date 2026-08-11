@@ -28,11 +28,11 @@ _MANIFEST = PurePosixPath("manifest.json")
 _RECEIPT = PurePosixPath("receipts/build.json")
 _ENVELOPE = PurePosixPath("evidence-envelope.json")
 _PROVENANCE = PurePosixPath("provenance.intoto.jsonl")
-_POLICY = Path("contracts/supply-chain/v1/identity-policy.json")
+_POLICY = PurePosixPath("contracts/supply-chain/v1/identity-policy.json")
 _TEMP_ROOT = Path(tempfile.gettempdir()).resolve()
-
-
 _PYTHON_TARGETS = ("linux-x86-64-cp311", "macos-arm64-cp311")
+_SIGNATURE_PATHS = ("manifest.sigstore.json", "provenance.sigstore.json")
+_TLOG_FIELDS = "canonicalizedBody inclusionPromise integratedTime kindVersion logId logIndex"
 _SBOM_PATHS = (
     "sbom/build-plane.cdx.json",
     "sbom/frontend-npm.cdx.json",
@@ -63,11 +63,9 @@ def _fail(message: str) -> NoReturn:
 
 
 def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"duplicate object key: {key}")
-        result[key] = value
+    result = dict(pairs)
+    if len(result) != len(pairs):
+        raise ValueError("duplicate object key")
     return result
 
 
@@ -131,7 +129,8 @@ def _read_root_file(root: int, logical: PurePosixPath, label: str) -> bytes:
         )
         try:
             before = os.fstat(descriptor)
-            if not stat.S_ISREG(before.st_mode):
+            linked = os.stat(logical.name, dir_fd=directory, follow_symlinks=False)
+            if not stat.S_ISREG(before.st_mode) or not _same_file(before, linked):
                 _fail(f"{label} must be a regular file")
             chunks: list[bytes] = []
             while chunk := os.read(descriptor, 1024 * 1024):
@@ -175,18 +174,36 @@ def _decoded(value: object, label: str) -> bytes:
         raise SupplyChainContractError(f"{label} must be nonempty base64") from exc
 
 
+def _exact(value: object, keys: str) -> bool:
+    return isinstance(value, dict) and set(value) == set(keys.split())
+
+
+def _claimed(document: Mapping[str, Any], keys: str) -> bool:
+    return any(document[key] for key in keys.split())
+
+
+def _descriptor_paths(value: object, label: str) -> tuple[object, ...]:
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        _fail(f"evidence envelope {label} descriptors must be objects")
+    return tuple(item.get("path") for item in value)
+
+
+def _read_files(root: int, paths: tuple[str, ...], label: str) -> dict[str, bytes]:
+    return {path: _read_root_file(root, PurePosixPath(path), f"{label} {path}") for path in paths}
+
+
 def _validate_bundle(bundle: Mapping[str, Any], subject: bytes, label: str) -> None:
     try:
         material = bundle["verificationMaterial"]
         signature = bundle["messageSignature"]
         entries = material["tlogEntries"]
         if (
-            set(bundle) != {"mediaType", "verificationMaterial", "messageSignature"}
+            not _exact(bundle, "mediaType verificationMaterial messageSignature")
             or bundle["mediaType"] != "application/vnd.dev.sigstore.bundle.v0.3+json"
-            or set(material) != {"certificate", "tlogEntries"}
-            or set(material["certificate"]) != {"rawBytes"}
-            or set(signature) != {"messageDigest", "signature"}
-            or set(signature["messageDigest"]) != {"algorithm", "digest"}
+            or not _exact(material, "certificate tlogEntries")
+            or not _exact(material["certificate"], "rawBytes")
+            or not _exact(signature, "messageDigest signature")
+            or not _exact(signature["messageDigest"], "algorithm digest")
             or signature["messageDigest"]["algorithm"] != "SHA2_256"
             or not isinstance(entries, list)
             or not entries
@@ -195,12 +212,15 @@ def _validate_bundle(bundle: Mapping[str, Any], subject: bytes, label: str) -> N
         _decoded(material["certificate"]["rawBytes"], f"{label} certificate")
         _decoded(signature["signature"], f"{label} signature")
         for entry in entries:
-            expected = set(
-                "canonicalizedBody inclusionPromise integratedTime "
-                "kindVersion logId logIndex".split()
-            )
-            if set(entry) != expected:
-                _fail(f"{label} transparency-log entry fields differ")
+            times = (entry["integratedTime"], entry["logIndex"])
+            if (
+                not _exact(entry, _TLOG_FIELDS)
+                or not _exact(entry["inclusionPromise"], "signedEntryTimestamp")
+                or entry["kindVersion"] != {"kind": "hashedrekord", "version": "0.0.1"}
+                or not _exact(entry["logId"], "keyId")
+                or not all(type(value) is int and value >= 0 for value in times)
+            ):
+                _fail(f"{label} transparency-log entry is not the exact hashedrekord subset")
             _decoded(entry["canonicalizedBody"], f"{label} log body")
             _decoded(entry["inclusionPromise"]["signedEntryTimestamp"], f"{label} log promise")
             _decoded(entry["logId"]["keyId"], f"{label} log ID")
@@ -211,15 +231,9 @@ def _validate_bundle(bundle: Mapping[str, Any], subject: bytes, label: str) -> N
         _fail(f"{label} message digest does not bind its exact declared subject bytes")
 
 
-def _bind_bytes(
-    descriptor: Mapping[str, Any], raw: bytes, label: str, *, require_size: bool = False
-) -> None:
-    size = descriptor.get("byteSize")
-    if (
-        descriptor.get("sha256") != hashlib.sha256(raw).hexdigest()
-        or (require_size and not isinstance(size, int))
-        or (size is not None and size != len(raw))
-    ):
+def _bind_bytes(descriptor: Mapping[str, Any], raw: bytes, label: str) -> None:
+    expected = hashlib.sha256(raw).hexdigest()
+    if descriptor.get("sha256") != expected or descriptor.get("byteSize") != len(raw):
         _fail(f"{label} descriptor does not bind its exact bytes")
 
 
@@ -284,54 +298,26 @@ def validate_candidate_evidence_pair(
 
         envelope_raw = _read_root_file(evidence_descriptor, _ENVELOPE, "evidence envelope")
         envelope = _strict_json(envelope_raw, "evidence envelope")
-        descriptors = envelope.get("softwareBillsOfMaterials")
-        if not isinstance(descriptors, list) or not all(
-            isinstance(item, dict) for item in descriptors
-        ):
-            _fail("evidence envelope SBOM descriptors must be objects")
-        descriptor_paths = [item.get("path") for item in descriptors]
-        if tuple(descriptor_paths) != _SBOM_PATHS:
+        if _descriptor_paths(envelope.get("softwareBillsOfMaterials"), "SBOM") != _SBOM_PATHS:
             _fail("evidence envelope must declare the exact sorted ten canonical SBOM paths")
 
         provenance_raw = _read_root_file(evidence_descriptor, _PROVENANCE, "provenance")
         provenance = _strict_json(provenance_raw, "provenance")
-        signatures = envelope.get("signatures")
-        if not isinstance(signatures, list) or not all(
-            isinstance(item, dict) for item in signatures
-        ):
-            _fail("evidence envelope signature descriptors must be objects")
-        signature_paths = [item.get("path") for item in signatures]
-        if tuple(signature_paths) != (
-            "manifest.sigstore.json",
-            "provenance.sigstore.json",
-        ):
+        if _descriptor_paths(envelope.get("signatures"), "signature") != _SIGNATURE_PATHS:
             _fail("evidence envelope must declare the exact two signature bundle paths")
-        signature_raw = {
-            path: _read_root_file(evidence_descriptor, PurePosixPath(path), f"signature {path}")
-            for path in signature_paths
-        }
-        signature_documents = {
-            path: _strict_json(raw, f"signature {path}") for path, raw in signature_raw.items()
-        }
-        sbom_raw = {
-            logical: _read_root_file(
-                evidence_descriptor,
-                PurePosixPath(logical),
-                f"SBOM {logical}",
-            )
-            for logical in _SBOM_PATHS
-        }
+        signature_raw = _read_files(evidence_descriptor, _SIGNATURE_PATHS, "signature")
+        sbom_raw = _read_files(evidence_descriptor, _SBOM_PATHS, "SBOM")
         for logical_path, raw in sbom_raw.items():
             _strict_json(raw, f"SBOM {logical_path}")
     finally:
         os.close(candidate_descriptor)
         os.close(evidence_descriptor)
 
-    policy_path = repository_root.absolute() / _POLICY
+    repository_descriptor = _open_root(repository_root, "repository")
     try:
-        policy_raw = policy_path.read_bytes()
-    except OSError as exc:
-        raise SupplyChainContractError(f"cannot read identity policy: {policy_path}") from exc
+        policy_raw = _read_root_file(repository_descriptor, _POLICY, "identity policy")
+    finally:
+        os.close(repository_descriptor)
     _strict_json(policy_raw, "identity policy")
     manifest_sha256 = hashlib.sha256(manifest_raw).hexdigest()
 
@@ -373,21 +359,16 @@ def validate_candidate_evidence_pair(
         subjects = {"manifest.json": manifest_raw, "provenance.intoto.jsonl": provenance_raw}
         for descriptor in signatures:
             path = descriptor["path"]
-            _bind_bytes(descriptor, signature_raw[path], f"signature {path}", require_size=True)
+            _bind_bytes(descriptor, signature_raw[path], f"signature {path}")
             _validate_bundle(
-                signature_documents[path], subjects[descriptor["subjectPath"]], f"signature {path}"
+                _strict_json(signature_raw[path], f"signature {path}"),
+                subjects[descriptor["subjectPath"]],
+                f"signature {path}",
             )
         verification = validated_envelope["verification"]
         claims = provenance["predicate"]["buildDefinition"]["internalParameters"]["claims"]
-        if any(
-            (
-                verification["verified"],
-                verification["policySatisfied"],
-                verification["productionClaim"],
-                claims["cryptographicVerification"],
-                claims["production"],
-                claims["publication"],
-            )
+        if _claimed(verification, "verified policySatisfied productionClaim") or _claimed(
+            claims, "cryptographicVerification production publication"
         ):
             _fail("offline pair validation must not claim signing, production, or publication")
         for logical in _SBOM_PATHS:
