@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a neutral, versioned settlement search evaluation foundation with
+  deterministic MiniSearch and FlexSearch adapters and synthetic-only evidence.
 - Added settlement v3 public place, GeoParquet, and search-shard contracts as
   the version-aware successor to v2, preserving stable source, identity, name,
   location, population, feature, and lineage meanings while binding exact
