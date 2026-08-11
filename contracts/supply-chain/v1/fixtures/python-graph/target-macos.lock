@@ -1,0 +1,4 @@
+# Synthetic Python 3.11 / macOS arm64 graph-contract fixture.
+alpha==1.0.0 --hash=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+bravo==2.0.0 --hash=sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+charlie==3.0.0 --hash=sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff

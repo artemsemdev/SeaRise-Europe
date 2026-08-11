@@ -28,3 +28,16 @@ invalid integrity hashes, unresolved required edges, unreachable package
 entries, symlink inputs, and non-regular lock paths. The document binds the
 exact input SHA-256, each lock-entry SHA-256, npm SHA-512 integrity, root
 dependency groups, and path-qualified dependency relationships.
+
+## Python graph annotations
+
+Hash-locked Python requirement files identify exact packages and wheel hashes,
+but they do not identify logical roots or dependency edges. The versioned
+Python lock graph annotation is the sole reviewed authority for that graph. Its
+validator binds every declared target to exact lock bytes and an exact Python
+3.11 marker environment, requires package parity and a complete acyclic graph,
+and rejects implicit extras or target-dependent edges.
+
+The checked-in annotation and locks are synthetic contract fixtures only. They
+do not claim review of the real release wheel metadata and are not an SBOM,
+production artifact, vulnerability scan, license inventory, or signing record.

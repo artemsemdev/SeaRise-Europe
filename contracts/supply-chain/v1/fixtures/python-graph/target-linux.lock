@@ -1,0 +1,4 @@
+# Synthetic Python 3.11 / Linux x86_64 graph-contract fixture.
+alpha==1.0.0 --hash=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+bravo==2.0.0 --hash=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+charlie==3.0.0 --hash=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc

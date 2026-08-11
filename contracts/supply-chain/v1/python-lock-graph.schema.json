@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/python-lock-graph.schema.json",
+  "title": "SeaRise reviewed Python lock graph annotation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "annotationKind", "annotationId", "graphScope", "review", "targets", "packages"],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/python-lock-graph.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "annotationKind": { "const": "python-lock-graph" },
+    "annotationId": { "$ref": "#/$defs/id" },
+    "graphScope": { "const": "target-active-runtime-dependencies" },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "productionClaim", "note"],
+      "properties": {
+        "status": { "enum": ["synthetic", "reviewed-wheel-metadata"] },
+        "productionClaim": { "const": false },
+        "note": { "type": "string", "minLength": 1 }
+      }
+    },
+    "targets": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/target" } },
+    "packages": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/package" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "lock", "markerEnvironment"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "lock": {
+          "type": "object", "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "markerEnvironment": {
+          "type": "object", "additionalProperties": false,
+          "required": ["implementation_name", "implementation_version", "os_name", "platform_machine", "platform_python_implementation", "platform_release", "platform_system", "platform_version", "python_full_version", "python_version", "sys_platform"],
+          "properties": {
+            "implementation_name": { "const": "cpython" },
+            "implementation_version": { "type": "string", "pattern": "^3\\.11\\.[0-9]+$" },
+            "os_name": { "const": "posix" },
+            "platform_machine": { "enum": ["arm64", "x86_64"] },
+            "platform_python_implementation": { "const": "CPython" },
+            "platform_release": { "type": "string", "minLength": 1 },
+            "platform_system": { "enum": ["Darwin", "Linux"] },
+            "platform_version": { "type": "string", "minLength": 1 },
+            "python_full_version": { "type": "string", "pattern": "^3\\.11\\.[0-9]+$" },
+            "python_version": { "const": "3.11" },
+            "sys_platform": { "enum": ["darwin", "linux"] }
+          }
+        }
+      }
+    },
+    "dependency": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "requirement"],
+      "properties": { "name": { "$ref": "#/$defs/id" }, "requirement": { "type": "string", "minLength": 1 } }
+    },
+    "package": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "version", "root", "selectedExtras", "dependencies"],
+      "properties": {
+        "name": { "$ref": "#/$defs/id" },
+        "version": { "type": "string", "minLength": 1 },
+        "root": { "type": "boolean" },
+        "selectedExtras": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "dependencies": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/dependency" } }
+      }
+    }
+  }
+}
