@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -9,10 +10,11 @@ import shutil
 import stat
 import tempfile
 import zipfile
+from contextlib import contextmanager
 from dataclasses import fields, is_dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, BinaryIO, Callable, Iterator, Mapping, Sequence
 
 from .alternate_names import (
     NORMALIZATION_POLICY_VERSION,
@@ -74,23 +76,54 @@ class FullSourceStageError(ValueError):
     """The local full-source stage cannot be verified or promoted."""
 
 
-def _sha256(path: Path) -> tuple[str, int]:
+@contextmanager
+def _open_regular(path: Path, label: str) -> Iterator[BinaryIO]:
+    descriptor = -1
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        mode = os.fstat(descriptor).st_mode
+        if not stat.S_ISREG(mode):
+            raise FullSourceStageError(f"{label} must be a regular non-symlink file")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
+            yield stream
+    except FullSourceStageError:
+        raise
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise FullSourceStageError(f"{label} must be a regular non-symlink file") from exc
+        raise FullSourceStageError(f"cannot open or read {label}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _sha256_stream(stream: BinaryIO) -> tuple[str, int]:
     digest = hashlib.sha256()
     size = 0
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-            size += len(chunk)
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+        size += len(chunk)
     return digest.hexdigest(), size
 
 
-def _require_regular(path: Path, label: str) -> None:
+def _sha256(path: Path, label: str) -> tuple[str, int]:
+    with _open_regular(path, label) as stream:
+        return _sha256_stream(stream)
+
+
+def _regular_identity(path: Path, label: str) -> tuple[int, int, int]:
     try:
-        mode = path.lstat().st_mode
+        metadata = path.lstat()
     except OSError as exc:
         raise FullSourceStageError(f"cannot inspect {label}: {exc}") from exc
-    if path.is_symlink() or not stat.S_ISREG(mode):
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
         raise FullSourceStageError(f"{label} must be a regular non-symlink file")
+    return metadata.st_dev, metadata.st_ino, metadata.st_size
+
+
+def _require_regular(path: Path, label: str) -> None:
+    _regular_identity(path, label)
 
 
 def _require_directory(path: Path, label: str) -> None:
@@ -103,8 +136,7 @@ def _require_directory(path: Path, label: str) -> None:
 
 
 def _verify_file(path: Path, locked: LockedAsset, label: str) -> None:
-    _require_regular(path, label)
-    if _sha256(path) != (locked.sha256, locked.byte_size):
+    if _sha256(path, label) != (locked.sha256, locked.byte_size):
         raise FullSourceStageError(f"{label} bytes differ from the locked identity")
 
 
@@ -126,8 +158,7 @@ def _verify_outer_inputs(
         (inputs.catalogue_policy, contract.catalogue_policy_sha256, "catalogue policy"),
         (inputs.normalization_policy, contract.normalization_policy_sha256, "normalization policy"),
     ):
-        _require_regular(path, label)
-        if _sha256(path)[0] != expected:
+        if _sha256(path, label)[0] != expected:
             raise FullSourceStageError(f"{label} bytes differ from the reviewed identity")
     if validate_policies:
         load_catalogue_policy(inputs.catalogue_policy)
@@ -189,7 +220,10 @@ def canonical_stage_receipt_bytes(receipt: Mapping[str, Any]) -> bytes:
         value = dict(receipt)
     except (TypeError, ValueError) as exc:
         raise FullSourceStageError(f"stage receipt is not a mapping: {exc}") from exc
-    return (_canonical_json(value) + "\n").encode("utf-8")
+    try:
+        return (_canonical_json(value) + "\n").encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise FullSourceStageError(f"stage receipt cannot be encoded as UTF-8: {exc}") from exc
 
 
 def _fsync_file(path: Path, label: str) -> None:
@@ -293,18 +327,35 @@ def _consume_member(
         raise FullSourceStageError(f"{member.path} content or row count differs from the lock")
 
 
+@contextmanager
+def _open_verified_zip(
+    path: Path,
+    locked: LockedAsset,
+    label: str,
+) -> Iterator[zipfile.ZipFile]:
+    with _open_regular(path, label) as stream:
+        if _sha256_stream(stream) != (locked.sha256, locked.byte_size):
+            raise FullSourceStageError(f"{label} bytes differ from the locked identity")
+        stream.seek(0)
+        with zipfile.ZipFile(stream) as archive:
+            yield archive
+
+
 def _consume_plain_rows(
     path: Path,
     locked: LockedAsset,
     consume: Callable[[bytes, int], None],
 ) -> None:
-    count = 0
-    with path.open("rb") as stream:
+    digest = hashlib.sha256()
+    size = count = 0
+    with _open_regular(path, "admin1 input") as stream:
         for line_number, raw in enumerate(stream, 1):
+            digest.update(raw)
+            size += len(raw)
             consume(raw.rstrip(b"\r\n"), line_number)
             count += 1
-    if count != locked.row_count:
-        raise FullSourceStageError(f"{path.name} row count differs from the lock")
+    if (digest.hexdigest(), size, count) != (locked.sha256, locked.byte_size, locked.row_count):
+        raise FullSourceStageError(f"{path.name} content or row count differs from the lock")
 
 
 def _create_schema(connection: Any) -> None:
@@ -324,7 +375,9 @@ def _stage_rows(
     sinks = {name: _ArrowSink(connection, pa, name, batch_size) for name in _TABLES}
 
     def places() -> None:
-        with zipfile.ZipFile(inputs.all_countries_zip) as archive:
+        with _open_verified_zip(
+            inputs.all_countries_zip, contract.all_countries, "allCountries archive"
+        ) as archive:
             member = contract.all_countries.members[0]
             infos = _zip_inventory(archive, contract.all_countries)
 
@@ -355,7 +408,9 @@ def _stage_rows(
         _consume_plain_rows(inputs.admin1, contract.admin1, consume)
 
     def alternate_names() -> None:
-        with zipfile.ZipFile(inputs.alternate_names_zip) as archive:
+        with _open_verified_zip(
+            inputs.alternate_names_zip, contract.alternate_names, "alternateNames archive"
+        ) as archive:
             infos = _zip_inventory(archive, contract.alternate_names)
             by_path = {item.path: item for item in contract.alternate_names.members}
 
@@ -414,8 +469,8 @@ def _reconcile(connection: Any) -> None:
         ),
         (
             "duplicate admin1 key",
-            "SELECT min(geoname_id) FROM stage_admin1 GROUP BY admin_key "
-            "HAVING count(*) > 1 ORDER BY min(geoname_id) LIMIT 1",
+            "SELECT admin_key FROM stage_admin1 GROUP BY admin_key "
+            "HAVING count(*) > 1 ORDER BY admin_key LIMIT 1",
         ),
         (
             "orphan alternate place id",
@@ -512,13 +567,7 @@ def _source_bindings(contract: FullSourceStageContract) -> dict[str, Any]:
     return bindings
 
 
-def _receipt(connection: Any, contract: FullSourceStageContract) -> dict[str, Any]:
-    counts = {
-        key: int(_first_scalar(connection, f"SELECT count(*) FROM {table}"))
-        for table, key in _TABLES.items()
-    }
-    if counts != _expected_counts(contract):
-        raise FullSourceStageError("stage table counts differ from the exact source contract")
+def _receipt_contract(contract: FullSourceStageContract) -> dict[str, Any]:
     return {
         "schemaVersion": 1,
         "stageSchemaVersion": STAGE_SCHEMA_VERSION,
@@ -538,6 +587,56 @@ def _receipt(connection: Any, contract: FullSourceStageContract) -> dict[str, An
             "maxArrowBatchRows": MAX_ARROW_BATCH_ROWS,
         },
         "sourceBindings": _source_bindings(contract),
+    }
+
+
+def _exact_json_equal(actual: Any, expected: Any) -> bool:
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        return set(actual) == set(expected) and all(
+            _exact_json_equal(actual[key], value) for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _exact_json_equal(left, right) for left, right in zip(actual, expected, strict=True)
+        )
+    return bool(actual == expected)
+
+
+def _validate_receipt_contract(
+    document: Mapping[str, Any], contract: FullSourceStageContract
+) -> None:
+    expected = _receipt_contract(contract)
+    if set(document) != {*expected, "counts", "logicalHashes"} or any(
+        not _exact_json_equal(document.get(key), value) for key, value in expected.items()
+    ):
+        raise FullSourceStageError("stage receipt envelope differs from the exact contract")
+    if not _exact_json_equal(document.get("counts"), _expected_counts(contract)):
+        raise FullSourceStageError("stage receipt counts differ from the exact source contract")
+    logical_hashes = document.get("logicalHashes")
+    if (
+        type(logical_hashes) is not dict
+        or set(logical_hashes) != set(_expected_counts(contract))
+        or any(
+            type(value) is not str
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+            for value in logical_hashes.values()
+        )
+    ):
+        raise FullSourceStageError("stage receipt logical hashes differ from the exact contract")
+
+
+def _receipt(connection: Any, contract: FullSourceStageContract) -> dict[str, Any]:
+    counts = {
+        key: int(_first_scalar(connection, f"SELECT count(*) FROM {table}"))
+        for table, key in _TABLES.items()
+    }
+    if counts != _expected_counts(contract):
+        raise FullSourceStageError("stage table counts differ from the exact source contract")
+    return {
+        **_receipt_contract(contract),
         "counts": counts,
         "logicalHashes": {key: _logical_hash(connection, table) for table, key in _TABLES.items()},
     }
@@ -545,11 +644,8 @@ def _receipt(connection: Any, contract: FullSourceStageContract) -> dict[str, An
 
 def _load_receipt(receipt: Mapping[str, Any] | Path) -> dict[str, Any]:
     if isinstance(receipt, Path):
-        _require_regular(receipt, "stage receipt")
-        try:
-            raw = receipt.read_bytes()
-        except OSError as exc:
-            raise FullSourceStageError(f"cannot read stage receipt: {exc}") from exc
+        with _open_regular(receipt, "stage receipt") as stream:
+            raw = stream.read()
         value = _strict_json(raw, "stage receipt")
         if not isinstance(value, dict):
             raise FullSourceStageError("stage receipt must be a JSON object")
@@ -568,50 +664,32 @@ def validate_full_source_stage(
     contract: FullSourceStageContract = PRODUCTION_CONTRACT,
 ) -> None:
     """Reconcile one local stage and its deterministic non-publication receipt."""
-    _require_regular(database, "stage database")
+    database_identity = _regular_identity(database, "stage database")
     duckdb, _ = _load_tools()
     document = _load_receipt(receipt)
-    expected_keys = {
-        "schemaVersion",
-        "stageSchemaVersion",
-        "logicalHashVersion",
-        "stagingPerformed",
-        "publicationClaim",
-        "policyVersions",
-        "toolchain",
-        "sourceBindings",
-        "counts",
-        "logicalHashes",
-    }
-    if (
-        set(document) != expected_keys
-        or document["schemaVersion"] != 1
-        or document["stageSchemaVersion"] != STAGE_SCHEMA_VERSION
-        or document["logicalHashVersion"] != LOGICAL_HASH_VERSION
-        or document["stagingPerformed"] is not True
-        or document["publicationClaim"] is not False
-    ):
-        raise FullSourceStageError("stage receipt envelope differs from the exact contract")
-    if document["sourceBindings"] != _source_bindings(contract):
-        raise FullSourceStageError("stage receipt source bindings differ from the contract")
-    connection = duckdb.connect(str(database), read_only=True)
+    _validate_receipt_contract(document, contract)
     try:
-        tables = {
-            row[0]
-            for row in connection.execute(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
-            ).fetchall()
-        }
-        if tables != set(_TABLES):
-            raise FullSourceStageError("stage database tables differ from the versioned schema")
-        _validate_schema(connection)
-        _reconcile(connection)
-        if document != _receipt(connection, contract):
-            raise FullSourceStageError(
-                "stage receipt counts or logical hashes differ from the database"
-            )
+        connection = duckdb.connect(str(database), read_only=True)
+        try:
+            tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='main'"
+                ).fetchall()
+            }
+            if tables != set(_TABLES):
+                raise FullSourceStageError("stage database tables differ from the versioned schema")
+            _validate_schema(connection)
+            _reconcile(connection)
+            if not _exact_json_equal(document, _receipt(connection, contract)):
+                raise FullSourceStageError(
+                    "stage receipt counts or logical hashes differ from the database"
+                )
+        finally:
+            connection.close()
     finally:
-        connection.close()
+        if _regular_identity(database, "stage database") != database_identity:
+            raise FullSourceStageError("stage database identity changed during validation")
 
 
 def build_full_source_stage(

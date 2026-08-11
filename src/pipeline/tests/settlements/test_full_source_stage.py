@@ -7,8 +7,10 @@ import hashlib
 import json
 import shutil
 import zipfile
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
+from typing import Iterator
 
 import duckdb
 import pytest
@@ -65,6 +67,7 @@ def _fixture(
     *,
     duplicate_place: bool = False,
     duplicate_alternate: bool = False,
+    duplicate_admin: bool = False,
     orphan_alternate: bool = False,
     invalid_place: bool = False,
 ) -> tuple[FullSourceStageInputs, FullSourceStageContract]:
@@ -105,7 +108,10 @@ def _fixture(
         )
 
     admin = tmp_path / "admin1CodesASCII.txt"
-    admin.write_bytes((FIXTURES / "catalogue-admin1CodesASCII.rows.txt").read_bytes())
+    admin_rows = (FIXTURES / "catalogue-admin1CodesASCII.rows.txt").read_bytes()
+    if duplicate_admin:
+        admin_rows += admin_rows
+    admin.write_bytes(admin_rows)
     readme = tmp_path / "readme.txt"
     readme.write_bytes(b"GeoNames fixture readme\n")
     source_lock = tmp_path / "source-lock.json"
@@ -127,7 +133,7 @@ def _fixture(
                 "iso-languagecodes.txt": len(language_rows),
             },
         ),
-        LockedAsset(_sha(admin), admin.stat().st_size, row_count=1),
+        LockedAsset(_sha(admin), admin.stat().st_size, row_count=2 if duplicate_admin else 1),
         LockedAsset(_sha(readme), readme.stat().st_size),
         minimum_free_bytes=0,
     )
@@ -210,6 +216,7 @@ def test_stage_is_ordered_and_deterministic_across_batching(tmp_path: Path) -> N
     [
         ("duplicate_place", "duplicate GeoNames place id 3128760"),
         ("duplicate_alternate", "duplicate alternateNameId 1567725"),
+        ("duplicate_admin", "duplicate admin1 key ES.56"),
         ("orphan_alternate", "orphan alternate place id 1"),
     ],
 )
@@ -263,6 +270,8 @@ def test_identity_parser_receipt_and_database_tampering_fail_closed(tmp_path: Pa
             validate_full_source_stage(output, changed_receipt, contract=clean_contract)
     with pytest.raises(FullSourceStageError, match="cannot be canonicalized"):
         canonical_stage_receipt_bytes({"invalid": object()})
+    with pytest.raises(FullSourceStageError, match="encoded as UTF-8"):
+        canonical_stage_receipt_bytes({"invalid": "\ud800"})
     noncanonical = clean / "noncanonical.json"
     noncanonical.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     with pytest.raises(FullSourceStageError, match="not canonical JSON"):
@@ -271,6 +280,22 @@ def test_identity_parser_receipt_and_database_tampering_fail_closed(tmp_path: Pa
     tampered["logicalHashes"]["placeRows"] = "0" * 64
     with pytest.raises(FullSourceStageError, match="counts or logical hashes"):
         validate_full_source_stage(output, tampered, contract=clean_contract)
+    exact_type_mutations = []
+    for path in (
+        ("schemaVersion",),
+        ("toolchain", "threads"),
+        ("counts", "admin1Rows"),
+        ("sourceBindings", "assets", "admin1", "byteSize"),
+    ):
+        changed = copy.deepcopy(receipt)
+        target = changed
+        for part in path[:-1]:
+            target = target[part]
+        target[path[-1]] = True
+        exact_type_mutations.append(changed)
+    for changed in exact_type_mutations:
+        with pytest.raises(FullSourceStageError, match=r"exact (source )?contract"):
+            validate_full_source_stage(output, changed, contract=clean_contract)
     with duckdb.connect(str(output)) as connection:
         connection.execute(
             "UPDATE stage_places SET document='{\"value\":NaN}' WHERE geoname_id=1134032"
@@ -353,6 +378,133 @@ def test_source_mutation_during_streaming_is_rehashed_and_cleaned(
     assert not list(tmp_path.glob(".full-source-*"))
 
 
+def test_receipt_path_swap_after_open_keeps_parsing_bound_to_opened_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs, contract = _fixture(tmp_path)
+    output, receipt, document = _build(tmp_path, inputs, contract, "receipt-swap")
+    replacement = tmp_path / "replacement.receipt.json"
+    changed = copy.deepcopy(document)
+    changed["schemaVersion"] = True
+    replacement.write_bytes(canonical_stage_receipt_bytes(changed))
+    locked_path = tmp_path / "opened.receipt.json"
+    original_open = stage._open_regular
+
+    @contextmanager
+    def open_with_swap(path: Path, label: str) -> Iterator[object]:
+        with original_open(path, label) as stream:
+            if path != receipt:
+                yield stream
+                return
+            path.rename(locked_path)
+            replacement.rename(path)
+            try:
+                yield stream
+            finally:
+                path.rename(replacement)
+                locked_path.rename(path)
+
+    monkeypatch.setattr(stage, "_open_regular", open_with_swap)
+    validate_full_source_stage(output, receipt, contract=contract)
+
+
+def test_database_path_identity_change_during_validation_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs, contract = _fixture(tmp_path)
+    output, receipt, _ = _build(tmp_path, inputs, contract, "database-swap")
+    original_receipt = stage._receipt
+    opened_path = tmp_path / "opened.duckdb"
+
+    def swap_after_database_read(
+        connection: object, stage_contract: FullSourceStageContract
+    ) -> object:
+        document = original_receipt(connection, stage_contract)
+        output.rename(opened_path)
+        shutil.copyfile(opened_path, output)
+        return document
+
+    monkeypatch.setattr(stage, "_receipt", swap_after_database_read)
+    try:
+        with pytest.raises(FullSourceStageError, match="identity changed"):
+            validate_full_source_stage(output, receipt, contract=contract)
+    finally:
+        output.unlink(missing_ok=True)
+        opened_path.rename(output)
+
+
+def test_consumed_admin1_path_swap_fails_against_opened_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs, contract = _fixture(tmp_path)
+    replacement = tmp_path / "admin1-replacement.txt"
+    replacement.write_bytes(inputs.admin1.read_bytes().replace(b"Catalonia", b"Catalunya"))
+    locked_path = tmp_path / "admin1-locked.txt"
+    original_consume = stage._consume_plain_rows
+
+    def consume_swapped(
+        path: Path,
+        locked: LockedAsset,
+        consume: object,
+    ) -> None:
+        path.rename(locked_path)
+        replacement.rename(path)
+        try:
+            original_consume(path, locked, consume)  # type: ignore[arg-type]
+        finally:
+            path.rename(replacement)
+            locked_path.rename(path)
+
+    monkeypatch.setattr(stage, "_consume_plain_rows", consume_swapped)
+    work = tmp_path / "work"
+    work.mkdir()
+    output = tmp_path / "stage.duckdb"
+    receipt = tmp_path / "stage.receipt.json"
+    with pytest.raises(FullSourceStageError, match="content or row count differs"):
+        build_full_source_stage(inputs, output, receipt, work, contract=contract)
+    assert not output.exists() and not receipt.exists()
+
+
+def test_consumed_zip_path_swap_fails_against_opened_outer_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs, contract = _fixture(tmp_path)
+    replacement = tmp_path / "allCountries-replacement.zip"
+    shutil.copyfile(inputs.all_countries_zip, replacement)
+    with zipfile.ZipFile(replacement, "a") as archive:
+        archive.comment = b"different outer archive, identical member bytes"
+    locked_path = tmp_path / "allCountries-locked.zip"
+    original_open = stage._open_verified_zip
+
+    @contextmanager
+    def open_swapped(
+        path: Path,
+        locked: LockedAsset,
+        label: str,
+    ) -> Iterator[zipfile.ZipFile]:
+        if path != inputs.all_countries_zip:
+            with original_open(path, locked, label) as archive:
+                yield archive
+            return
+        path.rename(locked_path)
+        replacement.rename(path)
+        try:
+            with original_open(path, locked, label) as archive:
+                yield archive
+        finally:
+            path.rename(replacement)
+            locked_path.rename(path)
+
+    monkeypatch.setattr(stage, "_open_verified_zip", open_swapped)
+    work = tmp_path / "work"
+    work.mkdir()
+    output = tmp_path / "stage.duckdb"
+    receipt = tmp_path / "stage.receipt.json"
+    with pytest.raises(FullSourceStageError, match="archive bytes differ"):
+        build_full_source_stage(inputs, output, receipt, work, contract=contract)
+    assert not output.exists() and not receipt.exists()
+
+
 def test_receipt_and_database_link_failures_leave_no_requested_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -379,3 +531,70 @@ def test_receipt_and_database_link_failures_leave_no_requested_path(
         monkeypatch.setattr(stage.os, "link", real_link)
         assert not output.exists() and not receipt.exists()
         assert not list(root.rglob(".full-source-*"))
+
+
+def test_existing_and_identical_requested_paths_fail_without_overwrite(tmp_path: Path) -> None:
+    for existing_name in ("stage.duckdb", "stage.receipt.json"):
+        root = tmp_path / existing_name.replace(".", "-")
+        inputs, contract = _fixture(root)
+        work = root / "work"
+        work.mkdir()
+        output = root / "stage.duckdb"
+        receipt = root / "stage.receipt.json"
+        existing = output if existing_name == output.name else receipt
+        existing.write_bytes(b"preserve me")
+        with pytest.raises(FullSourceStageError, match="overwrite is refused"):
+            build_full_source_stage(inputs, output, receipt, work, contract=contract)
+        assert existing.read_bytes() == b"preserve me"
+        assert not (receipt if existing == output else output).exists()
+
+    root = tmp_path / "identical"
+    inputs, contract = _fixture(root)
+    work = root / "work"
+    work.mkdir()
+    same = root / "stage.duckdb"
+    with pytest.raises(FullSourceStageError, match="distinct paths"):
+        build_full_source_stage(inputs, same, same, work, contract=contract)
+    assert not same.exists()
+
+
+@pytest.mark.parametrize("failure", ["final-validation", "directory-fsync"])
+def test_final_pair_validation_and_fsync_failures_roll_back_requested_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    inputs, contract = _fixture(tmp_path)
+    work = tmp_path / "work"
+    work.mkdir()
+    output = tmp_path / "stage.duckdb"
+    receipt = tmp_path / "stage.receipt.json"
+    if failure == "final-validation":
+        original_validate = stage.validate_full_source_stage
+        calls = 0
+
+        def fail_final(*args: object, **kwargs: object) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise FullSourceStageError("injected final pair validation failure")
+            original_validate(*args, **kwargs)
+
+        monkeypatch.setattr(stage, "validate_full_source_stage", fail_final)
+    else:
+        original_fsync = stage._fsync_directory
+        calls = 0
+
+        def fail_first_fsync(path: Path) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise FullSourceStageError("injected directory fsync failure")
+            original_fsync(path)
+
+        monkeypatch.setattr(stage, "_fsync_directory", fail_first_fsync)
+
+    with pytest.raises(FullSourceStageError, match="injected"):
+        build_full_source_stage(inputs, output, receipt, work, contract=contract)
+    assert not output.exists() and not receipt.exists()
+    assert not list(tmp_path.glob(".full-source-*"))
