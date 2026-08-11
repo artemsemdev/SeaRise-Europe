@@ -17,6 +17,23 @@ FIXTURE_ROOT = (
     REPOSITORY_ROOT / "contracts/release/v1/fixtures/release/"
     "searise-europe-v1.0.0-20260810-c096aeab4e09"
 )
+SOURCE_REVISION = "1" * 40
+TESTED_REVISION = "2" * 40
+PRODUCER_INPUTS = {
+    "source_revision": SOURCE_REVISION,
+    "tested_revision": TESTED_REVISION,
+    "workflow_run_id": 123456789,
+    "workflow_run_attempt": 2,
+    "workflow_job": "pipeline",
+}
+EXPECTED_PRODUCER = {
+    "sourceRevision": SOURCE_REVISION,
+    "testedRevision": TESTED_REVISION,
+    "workflowRunId": 123456789,
+    "workflowRunAttempt": 2,
+    "workflowJob": "pipeline",
+    "clock": "time.perf_counter_ns",
+}
 
 
 def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -> None:
@@ -27,6 +44,7 @@ def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -
         repository_root=REPOSITORY_ROOT,
         output_path=output,
         execution_id="pytest-loopback-1",
+        **PRODUCER_INPUTS,
     )
 
     persisted = json.loads(output.read_text(encoding="utf-8"))
@@ -35,9 +53,11 @@ def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -
             output,
             bundle_root=FIXTURE_ROOT,
             repository_root=REPOSITORY_ROOT,
+            expected_producer=EXPECTED_PRODUCER,
         )
         == persisted
     )
+    assert report["producer"] == EXPECTED_PRODUCER
     assert report["reviewedProjectionCandidate"]["candidateBindingSha256"] == (
         "aff21bf005f37e3aa1e386e15694eca6715e2310373cd4f502a50685b5560cae"
     )
@@ -67,6 +87,29 @@ def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -
     accepted_control = deepcopy(report)
     accepted_control["rejectionControls"][0]["outcome"] = "accepted"
     mutations.append(accepted_control)
+    for field, forged_value in (
+        ("sourceRevision", "3" * 40),
+        ("testedRevision", "4" * 40),
+        ("workflowRunId", 123456790),
+        ("workflowRunAttempt", 3),
+        ("workflowJob", "release"),
+        ("clock", "time.time_ns"),
+    ):
+        forged_producer = deepcopy(report)
+        forged_producer["producer"][field] = forged_value
+        mutations.append(forged_producer)
+    extra_producer_field = deepcopy(report)
+    extra_producer_field["producer"]["actor"] = "untrusted"
+    mutations.append(extra_producer_field)
+    uppercase_revision = deepcopy(report)
+    uppercase_revision["producer"]["sourceRevision"] = "A" * 40
+    mutations.append(uppercase_revision)
+    non_positive_run = deepcopy(report)
+    non_positive_run["producer"]["workflowRunId"] = 0
+    mutations.append(non_positive_run)
+    invalid_job = deepcopy(report)
+    invalid_job["producer"]["workflowJob"] = "Pipeline job"
+    mutations.append(invalid_job)
 
     for index, mutation in enumerate(mutations):
         changed = tmp_path / f"changed-{index}.json"
@@ -76,4 +119,5 @@ def test_persists_exact_candidate_bound_loopback_http_evidence(tmp_path: Path) -
                 changed,
                 bundle_root=FIXTURE_ROOT,
                 repository_root=REPOSITORY_ROOT,
+                expected_producer=EXPECTED_PRODUCER,
             )

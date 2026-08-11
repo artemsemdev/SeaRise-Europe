@@ -93,11 +93,17 @@ an ephemeral loopback HTTP origin and retains an immutable
 manifest, all nine COG hashes and byte sizes, the approved Phase 0R candidate
 binding, every one of the 54 successful request/response records, monotonic
 runner-local latency measurements, and explicit malformed, ignored, truncated,
-substituted, and corrupt-response rejection controls.
+substituted, and corrupt-response rejection controls. Its exact `producer`
+object also binds the pull-request head revision, checked-out revision, workflow
+run ID and attempt, constrained job name, and `time.perf_counter_ns` clock.
+Validation requires the caller's expected producer identity and rejects changed
+or extra producer fields.
 
 The retained report is labelled
 `candidate-bound-loopback-http-validation-only`. Its latency values are raw
 process-local observations, not a delivery budget. It makes no public-origin,
 CDN, cache, CORS, TLS, publication, or production-readiness claim. Public-host
 validation must still run separately against the same immutable identities
-before activation.
+before activation. Because this workflow artifact expires after 14 days, issue
+#51 still requires a durable candidate-bound capture after the final candidate
+is assembled; this report is not that durable release record.

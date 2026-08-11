@@ -35,7 +35,10 @@ from .cog_range import (
 from .projection_bundle import load_reviewed_projection_evidence
 
 _EXECUTION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+_REVISION = re.compile(r"[0-9a-f]{40}")
+_WORKFLOW_JOB = re.compile(r"[a-z][a-z0-9_-]{0,63}")
 _RANGE_HEADER = re.compile(r"bytes=([0-9]+)-([0-9]+)")
+_CLOCK = "time.perf_counter_ns"
 _DISPOSITION = "candidate-bound-loopback-http-validation-only"
 _LIMITATIONS = [
     "Latency is a runner-local loopback measurement and is not a release budget.",
@@ -125,10 +128,22 @@ def capture_loopback_cog_range_evidence(
     repository_root: Path,
     output_path: Path,
     execution_id: str,
+    source_revision: str,
+    tested_revision: str,
+    workflow_run_id: int,
+    workflow_run_attempt: int,
+    workflow_job: str,
 ) -> dict[str, Any]:
     """Run positive and negative HTTP probes and commit one immutable report."""
     if _EXECUTION_ID.fullmatch(execution_id) is None:
         _fail("COG range evidence execution identity is invalid")
+    producer = _producer_identity(
+        source_revision=source_revision,
+        tested_revision=tested_revision,
+        workflow_run_id=workflow_run_id,
+        workflow_run_attempt=workflow_run_attempt,
+        workflow_job=workflow_job,
+    )
     resolved_output = ensure_outside_candidate(
         bundle_root,
         output_path,
@@ -151,6 +166,7 @@ def capture_loopback_cog_range_evidence(
     report = {
         **positive,
         "executionId": execution_id,
+        "producer": producer,
         "servedCandidate": served_candidate,
         "transport": {
             "protocol": "HTTP/1.1",
@@ -165,6 +181,7 @@ def capture_loopback_cog_range_evidence(
         report,
         bundle_root=bundle_root,
         repository_root=repository_root,
+        expected_producer=producer,
     )
     write_new_json_record(resolved_output, report)
     return report
@@ -175,8 +192,10 @@ def validate_reviewed_cog_range_evidence(
     *,
     bundle_root: Path,
     repository_root: Path,
+    expected_producer: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     """Recompute every immutable binding in a persisted Range report."""
+    _validate_producer(expected_producer)
     if evidence_path.is_symlink() or not evidence_path.is_file():
         _fail("COG range evidence is absent or unsafe")
     document, _ = load_json_snapshot(evidence_path)
@@ -184,6 +203,7 @@ def validate_reviewed_cog_range_evidence(
         document,
         bundle_root=bundle_root,
         repository_root=repository_root,
+        expected_producer=expected_producer,
     )
     return document
 
@@ -223,11 +243,13 @@ def _validate_evidence_document(
     *,
     bundle_root: Path,
     repository_root: Path,
+    expected_producer: Mapping[str, Any],
 ) -> None:
     expected_keys = {
         "schemaVersion",
         "evidenceType",
         "executionId",
+        "producer",
         "servedCandidate",
         "reviewedProjectionCandidate",
         "artifactCount",
@@ -243,6 +265,9 @@ def _validate_evidence_document(
     execution_id = document["executionId"]
     if type(execution_id) is not str or _EXECUTION_ID.fullmatch(execution_id) is None:
         _fail("COG range evidence execution identity is invalid")
+    _validate_producer(document["producer"])
+    if document["producer"] != expected_producer:
+        _fail("COG range evidence producer identity changed")
     identities = load_reviewed_cog_identities(repository_root)
     if document["servedCandidate"] != load_served_cog_candidate_identity(bundle_root, identities):
         _fail("COG range evidence served candidate binding changed")
@@ -277,6 +302,57 @@ def _validate_evidence_document(
         bundle_root=bundle_root,
     )
     _validate_rejection_controls(document["rejectionControls"])
+
+
+def _validate_producer(value: Any) -> None:
+    if type(value) is not dict or set(value) != {
+        "sourceRevision",
+        "testedRevision",
+        "workflowRunId",
+        "workflowRunAttempt",
+        "workflowJob",
+        "clock",
+    }:
+        _fail("COG range evidence producer fields differ from the exact contract")
+    source_revision = value["sourceRevision"]
+    tested_revision = value["testedRevision"]
+    run_id = value["workflowRunId"]
+    run_attempt = value["workflowRunAttempt"]
+    workflow_job = value["workflowJob"]
+    if (
+        type(source_revision) is not str
+        or _REVISION.fullmatch(source_revision) is None
+        or type(tested_revision) is not str
+        or _REVISION.fullmatch(tested_revision) is None
+        or type(run_id) is not int
+        or run_id <= 0
+        or type(run_attempt) is not int
+        or run_attempt <= 0
+        or type(workflow_job) is not str
+        or _WORKFLOW_JOB.fullmatch(workflow_job) is None
+        or value["clock"] != _CLOCK
+    ):
+        _fail("COG range evidence producer identity is invalid")
+
+
+def _producer_identity(
+    *,
+    source_revision: str,
+    tested_revision: str,
+    workflow_run_id: int,
+    workflow_run_attempt: int,
+    workflow_job: str,
+) -> dict[str, Any]:
+    producer = {
+        "sourceRevision": source_revision,
+        "testedRevision": tested_revision,
+        "workflowRunId": workflow_run_id,
+        "workflowRunAttempt": workflow_run_attempt,
+        "workflowJob": workflow_job,
+        "clock": _CLOCK,
+    }
+    _validate_producer(producer)
+    return producer
 
 
 def _validate_artifact_reports(
@@ -441,11 +517,21 @@ def _serve_candidate_ranges(
     required=True,
 )
 @click.option("--execution-id", required=True)
+@click.option("--source-revision", required=True)
+@click.option("--tested-revision", required=True)
+@click.option("--workflow-run-id", type=click.IntRange(min=1), required=True)
+@click.option("--workflow-run-attempt", type=click.IntRange(min=1), required=True)
+@click.option("--workflow-job", required=True)
 def cli(
     bundle_root: Path,
     repository_root: Path,
     output_path: Path,
     execution_id: str,
+    source_revision: str,
+    tested_revision: str,
+    workflow_run_id: int,
+    workflow_run_attempt: int,
+    workflow_job: str,
 ) -> None:
     """Capture immutable loopback HTTP evidence without a publication claim."""
     try:
@@ -454,6 +540,11 @@ def cli(
             repository_root=repository_root,
             output_path=output_path,
             execution_id=execution_id,
+            source_revision=source_revision,
+            tested_revision=tested_revision,
+            workflow_run_id=workflow_run_id,
+            workflow_run_attempt=workflow_run_attempt,
+            workflow_job=workflow_job,
         )
     except ScienceContractError as exc:
         raise click.ClickException(str(exc)) from None

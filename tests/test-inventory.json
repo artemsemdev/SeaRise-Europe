@@ -447,7 +447,7 @@
       "id": "pipeline-reviewed-cog-range-access",
       "layer": "contract",
       "owner": "data",
-      "purpose": "Bind all nine reviewed COG identities and persist candidate-bound loopback HTTP evidence for the exact 54-request map, raw latency, and malformed, ignored, truncated, substituted, or corrupt response rejection.",
+      "purpose": "Bind all nine reviewed COG identities and the exact workflow producer, then persist candidate-bound loopback HTTP evidence for the 54-request map, raw latency, and malformed, ignored, truncated, substituted, or corrupt response rejection.",
       "sourcePaths": ["src/pipeline/tests/offline_release/test_cog_range.py", "src/pipeline/tests/offline_release/test_cog_range_evidence.py"],
       "changedPaths": ["src/pipeline/searise_pipeline/offline_release/cog_range.py", "src/pipeline/searise_pipeline/offline_release/cog_range_evidence.py", "src/pipeline/searise_pipeline/offline_release/projection_bundle.py", "src/pipeline/tests/offline_release/test_cog_range.py", "src/pipeline/tests/offline_release/test_cog_range_evidence.py"],
       "disposition": "keep-permanently",
