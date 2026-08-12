@@ -40,6 +40,15 @@ claim. The byte gate requires terminal write sequence 54 in the contract and a
 complete exact tree when `manifest.json` is read; it does not infer historical
 write order from mutable timestamps.
 
+The compact `fixtures/assembly/complete-synthetic.json` receipt drives the
+normal-CI completeness assembler. It binds all 50 pre-gate fixture inputs,
+their grid and pair-parity identities, STAC asset links, redistribution status,
+and false claims. The assembler deterministically generates the two gate
+reports and `checksums.txt`, writes `manifest.json` last, freezes the tree,
+passes the independent byte gate, and uses an OS-level exclusive rename for
+local no-overwrite promotion. Its marker payloads intentionally are not valid
+COG, PMTiles, GeoParquet, or search-index formats.
+
 Provenance, signature, and SBOM sidecars are mandatory publication evidence,
 not deferred Phase 1 work. Pair validation is still pending: a dependent
 validator must bind candidate ID, release ID, provenance class, and the actual

@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a deterministic complete-candidate fixture assembler that verifies 50
+  explicit synthetic inputs, generates the terminal gate reports and checksum
+  inventory, writes the manifest last, runs the independent byte gate, and
+  exclusively promotes a read-only 53-artifact candidate without making
+  production, scientific, format-validity, or publication claims.
 - Added a read-only, descriptor-bound Phase 1 candidate byte gate that requires
   the exact 53-artifact inventory with no extra entries, streams and verifies
   declared sizes and SHA-256 values, reconstructs checksum content, and rejects

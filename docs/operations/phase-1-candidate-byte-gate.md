@@ -8,6 +8,20 @@ PYTHONPATH=src/pipeline python scripts/release/validate_candidate_bytes.py \
   --candidate-root /absolute/path/to/candidate
 ```
 
+Normal CI exercises the complete synthetic assembly path with:
+
+```bash
+PYTHONPATH=src/pipeline python scripts/release/assemble_candidate_fixture.py \
+  --receipt contracts/candidate-completeness/v1/fixtures/assembly/complete-synthetic.json \
+  --output /absolute/new/path/to/candidate
+```
+
+The output path must not exist. The assembler verifies each of the 50 explicit
+fixture inputs, generates both gate reports and the checksum inventory, writes
+the manifest last, validates the complete staged bytes, and promotes the
+read-only directory with a platform-native no-overwrite rename. This is local
+candidate promotion only; it is not public release publication.
+
 The validator fails closed unless the root contains exactly the 53 artifact
 paths declared by the candidate contract plus `manifest.json`. It rejects
 missing or extra entries, symlinks, hard links, special files, unsafe paths,
