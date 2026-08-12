@@ -12,6 +12,18 @@ alternate names, country and admin context, WGS84 coordinates, population,
 feature codes, source update dates, and per-record lineage. The checked-in v2
 files remain byte-for-byte unchanged.
 
+[`v4`](v4/) is the public browser-search successor. It does not change the v3
+representative serializer. V4 instead identifies the exact
+`searise-codepoint-trie` envelope and receipt-last two-shard set, including the
+release ID, spatial/source provenance, geometry identities, runtime, ranking,
+merge, and Brotli semantics consumed by the browser loader. Unknown versions,
+engines, source receipts, release IDs, and set members fail closed. Its checked-
+in examples and implementation retain false production, approval, signing, and
+publication claims.
+The v4 projection-authority receipt can be emitted only after the pinned Python
+validator replays the canonical projection against its exact descriptor-safe
+spatial database and receipt snapshots.
+
 Compatibility is version-aware, not wire-level substitution. A v3 document
 does not validate against a v2 schema, and a v2-only consumer must reject it
 instead of dropping unknown fields. Consumers must dispatch on the exact

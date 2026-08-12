@@ -11,16 +11,8 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
-CONTRACT_ROOT = REPOSITORY_ROOT / "contracts" / "candidate-completeness" / "v1"
-
-_SCHEMA_URL = (
-    "https://artemsemdev.github.io/SeaRise-Europe/contracts/"
-    "candidate-completeness/v1/candidate.schema.json"
-)
-_CONTRACT_ID = "phase-1-pre-sign-candidate-completeness-v1"
-_ARTIFACT_COUNT = 53
-_CHECKSUM_SUBJECT_COUNT = 52
-_MANIFEST_SEQUENCE = 54
+V1_CONTRACT_ROOT = REPOSITORY_ROOT / "contracts" / "candidate-completeness" / "v1"
+CONTRACT_ROOT = REPOSITORY_ROOT / "contracts" / "candidate-completeness" / "v2"
 _TERMINAL_ARTIFACT_IDS = (
     "release-gate-report-json",
     "release-gate-report-markdown",
@@ -67,6 +59,54 @@ class _SchemaIssue:
     location: str
     validator: str
     message: str
+
+
+@dataclass(frozen=True)
+class _ContractProfile:
+    root: Path
+    release_root: Path
+    schema_url: str
+    schema_version: str
+    contract_id: str
+    artifact_count: int
+    pre_gate_artifact_count: int
+    checksum_subject_count: int
+    manifest_sequence: int
+
+
+def _candidate_schema_url(version: str) -> str:
+    return (
+        "https://artemsemdev.github.io/SeaRise-Europe/contracts/"
+        f"candidate-completeness/{version}/candidate.schema.json"
+    )
+
+
+_PROFILE_ROWS = (
+    ("v1", "1.0.0", 53, 50, 52, 54),
+    ("v2", "2.0.0", 54, 51, 53, 55),
+)
+_PROFILES = tuple(
+    _ContractProfile(
+        root=REPOSITORY_ROOT / "contracts" / "candidate-completeness" / version,
+        release_root=REPOSITORY_ROOT / "contracts" / "release" / version,
+        schema_url=_candidate_schema_url(version),
+        schema_version=schema_version,
+        contract_id=f"phase-1-pre-sign-candidate-completeness-{version}",
+        artifact_count=artifact_count,
+        pre_gate_artifact_count=pre_gate_count,
+        checksum_subject_count=checksum_count,
+        manifest_sequence=manifest_sequence,
+    )
+    for (
+        version,
+        schema_version,
+        artifact_count,
+        pre_gate_count,
+        checksum_count,
+        manifest_sequence,
+    ) in _PROFILE_ROWS
+)
+_PROFILE_BY_SCHEMA = {profile.schema_url: profile for profile in _PROFILES}
 
 
 class _DuplicateKeyError(ValueError):
@@ -125,8 +165,22 @@ def load_candidate_bytes(raw: bytes) -> dict[str, Any]:
     return document
 
 
-def _validator(contract_root: Path) -> Draft202012Validator:
-    release_schema = _load_json(contract_root.parents[1] / "release" / "v1" / "defs.schema.json")
+def _contract_profile(
+    candidate: Mapping[str, Any], contract_root: Path | None
+) -> _ContractProfile:
+    if contract_root is None:
+        schema_url = candidate.get("$schema")
+        profile = _PROFILE_BY_SCHEMA.get(schema_url) if isinstance(schema_url, str) else None
+    else:
+        resolved = contract_root.resolve()
+        profile = next((item for item in _PROFILES if item.root.resolve() == resolved), None)
+    if profile is None:
+        _fail("candidate-contract-version", "candidate contract version is unsupported")
+    return profile
+
+
+def _validator(contract_root: Path, profile: _ContractProfile) -> Draft202012Validator:
+    release_schema = _load_json(profile.release_root / "defs.schema.json")
     candidate_schema = _load_json(contract_root / "candidate.schema.json")
     try:
         Draft202012Validator.check_schema(release_schema)
@@ -143,15 +197,17 @@ def _validator(contract_root: Path) -> Draft202012Validator:
     return Draft202012Validator(candidate_schema, registry=registry)
 
 
-def _validate_inventory(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+def _validate_inventory(
+    contract: Mapping[str, Any], profile: _ContractProfile
+) -> list[Mapping[str, Any]]:
     expected = {
-        "schemaVersion": "1.0.0",
-        "contractId": _CONTRACT_ID,
-        "candidateSchema": _SCHEMA_URL,
-        "artifactCount": _ARTIFACT_COUNT,
-        "preGateArtifactCount": 50,
-        "checksumSubjectCount": _CHECKSUM_SUBJECT_COUNT,
-        "manifestWriteSequence": _MANIFEST_SEQUENCE,
+        "schemaVersion": profile.schema_version,
+        "contractId": profile.contract_id,
+        "candidateSchema": profile.schema_url,
+        "artifactCount": profile.artifact_count,
+        "preGateArtifactCount": profile.pre_gate_artifact_count,
+        "checksumSubjectCount": profile.checksum_subject_count,
+        "manifestWriteSequence": profile.manifest_sequence,
         "terminalArtifactIds": list(_TERMINAL_ARTIFACT_IDS),
         "requiredEvidenceEnvelopeContract": _PAIR_GATE["evidenceEnvelopeContract"],
         "evidenceSidecarRolesExcludedFromManifest": _PAIR_GATE["excludedSidecarRoles"],
@@ -162,8 +218,11 @@ def _validate_inventory(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
         if contract.get(field) != value:
             _fail("candidate-contract", f"inventory field differs: {field}")
     artifacts = contract.get("requiredArtifacts")
-    if not isinstance(artifacts, list) or len(artifacts) != _ARTIFACT_COUNT:
-        _fail("candidate-contract", "inventory must declare exactly 53 artifacts")
+    if not isinstance(artifacts, list) or len(artifacts) != profile.artifact_count:
+        _fail(
+            "candidate-contract",
+            f"inventory must declare exactly {profile.artifact_count} artifacts",
+        )
     if not all(isinstance(item, Mapping) for item in artifacts):
         _fail("candidate-contract", "inventory artifacts must be objects")
     identifiers = [item.get("artifactId") for item in artifacts]
@@ -180,9 +239,11 @@ def _validate_inventory(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return artifacts
 
 
-def _schema_errors(candidate: Mapping[str, Any], contract_root: Path) -> list[_SchemaIssue]:
+def _schema_errors(
+    candidate: Mapping[str, Any], contract_root: Path, profile: _ContractProfile
+) -> list[_SchemaIssue]:
     errors = sorted(
-        _validator(contract_root).iter_errors(candidate),
+        _validator(contract_root, profile).iter_errors(candidate),
         key=lambda error: (
             tuple((type(part).__name__, str(part)) for part in error.absolute_path),
             str(error.validator),
@@ -239,7 +300,11 @@ def _required_signature(artifact: Mapping[str, Any]) -> tuple[Any, ...]:
     )
 
 
-def _semantic_code(candidate: Mapping[str, Any], required: list[Mapping[str, Any]]) -> str | None:
+def _semantic_code(
+    candidate: Mapping[str, Any],
+    required: list[Mapping[str, Any]],
+    profile: _ContractProfile,
+) -> str | None:
     artifacts = candidate.get("artifacts")
     if not isinstance(artifacts, list):
         return None
@@ -260,7 +325,7 @@ def _semantic_code(candidate: Mapping[str, Any], required: list[Mapping[str, Any
     ):
         return "release-identity"
     if [item.get("writeSequence") for item in artifacts if isinstance(item, Mapping)] != list(
-        range(1, _ARTIFACT_COUNT + 1)
+        range(1, profile.artifact_count + 1)
     ) or [item.get("artifactId") for item in artifacts[-3:] if isinstance(item, Mapping)] != list(
         _TERMINAL_ARTIFACT_IDS
     ):
@@ -298,16 +363,17 @@ def _semantic_code(candidate: Mapping[str, Any], required: list[Mapping[str, Any
 
 
 def validate_candidate_document(
-    candidate: Mapping[str, Any], *, contract_root: Path = CONTRACT_ROOT
+    candidate: Mapping[str, Any], *, contract_root: Path | None = None
 ) -> CandidateSummary:
     """Validate one candidate and its local inventory without opening artifact paths."""
-    required = _validate_inventory(_load_json(contract_root / "required-artifacts.json"))
-    schema_errors = _schema_errors(candidate, contract_root)
-    semantic_code = _semantic_code(candidate, required)
+    profile = _contract_profile(candidate, contract_root)
+    required = _validate_inventory(_load_json(profile.root / "required-artifacts.json"), profile)
+    schema_errors = _schema_errors(candidate, profile.root, profile)
+    semantic_code = _semantic_code(candidate, required, profile)
     if semantic_code is not None and (
         not schema_errors or _are_matching_count_errors(schema_errors, semantic_code)
     ):
-        _fail(semantic_code, "candidate contradicts the exact v1 inventory")
+        _fail(semantic_code, "candidate contradicts its exact versioned inventory")
     if schema_errors:
         error = next(
             (
@@ -320,11 +386,14 @@ def validate_candidate_document(
         _fail("candidate-schema", f"{error.location}: {error.message}")
     if candidate.get("manifest") != {
         "path": "manifest.json",
-        "artifactCount": _ARTIFACT_COUNT,
-        "writeSequence": _MANIFEST_SEQUENCE,
+        "artifactCount": profile.artifact_count,
+        "writeSequence": profile.manifest_sequence,
         "selfHashExcluded": True,
     }:
-        _fail("manifest-order", "manifest must be the 54th and self-hash-excluded write")
+        _fail(
+            "manifest-order",
+            f"manifest must be write {profile.manifest_sequence} and self-hash-excluded",
+        )
     if candidate.get("supplyChainGate") != _PAIR_GATE:
         _fail("supply-chain-gate", "pending candidate/evidence pair validation is required")
     geometry = candidate.get("geometryPolicy")
@@ -350,6 +419,6 @@ def validate_candidate_document(
     )
 
 
-def validate_candidate(path: Path, *, contract_root: Path = CONTRACT_ROOT) -> CandidateSummary:
+def validate_candidate(path: Path, *, contract_root: Path | None = None) -> CandidateSummary:
     """Load and validate candidate metadata and the checked-in inventory contract."""
     return validate_candidate_document(load_candidate(path), contract_root=contract_root)

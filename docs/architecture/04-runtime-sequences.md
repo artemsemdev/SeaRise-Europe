@@ -49,11 +49,12 @@ sequenceDiagram
 
     U->>UI: Focus search
     UI->>W: initialize(release, core, coastal)
+    W->>C: Read and verify receipt-last completion marker
     W->>C: Read core index
     alt Core index cached
         C-->>W: Compressed core index
     else Core index absent
-        C->>CDN: GET europe-core.index.br
+        C->>CDN: GET europe-core.codepoint-trie.json.br
         CDN-->>C: Immutable index
         C-->>W: Compressed core index
     end

@@ -20,7 +20,7 @@ from searise_pipeline.candidate_completeness import (
 )
 
 ROOT = Path(__file__).resolve().parents[4]
-RECEIPT = ROOT / "contracts/candidate-completeness/v1/fixtures/assembly/complete-synthetic.json"
+RECEIPT = ROOT / "contracts/candidate-completeness/v2/fixtures/assembly/complete-synthetic.json"
 main = runpy.run_path(str(ROOT / "scripts/release/assemble_candidate_fixture.py"))["main"]
 
 
@@ -98,10 +98,10 @@ def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_three_times(
 
     assert writes[-4:] == ["gate-report.json", "gate-report.md", "checksums.txt", "manifest.json"]
     assert len(gates) == 3 and gates[0] == gates[1] == gates[2]
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
     assert summary.manifest_sha256 == _load()["expectedManifestSha256"]
     assert (summary.production, summary.publication) == (False, False)
-    assert len(_bytes(output)) == 54
+    assert len(_bytes(output)) == 55
     assert validate_candidate_root(output).manifest_sha256 == summary.manifest_sha256
     assert all((path.stat().st_mode & 0o222) == 0 for path in output.rglob("*"))
     assert output.stat().st_mode & 0o222 == 0
@@ -375,7 +375,7 @@ def test_predictable_directory_and_file_names_are_never_created_directly(
     monkeypatch.setattr(assembler.os, "mkdir", replace_mkdir)
     monkeypatch.setattr(assembler.os, "open", replace_open)
     summary = assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
     assert predictable_creates == []
 
 
@@ -820,7 +820,7 @@ def test_mkdir_first_stat_hook_cannot_reenter_assembler(
 
     monkeypatch.setattr(assembler, "_entry_identity", inspect)
     summary = assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
     assert reentrant_codes == ["assembly-reentrant"]
 
 
@@ -844,9 +844,9 @@ def test_pre_freeze_writer_hook_must_close_writer_and_cannot_reenter(
 
     monkeypatch.setattr(assembler, "_freeze", pre_freeze)
     summary = assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
     assert reentrant_codes == ["assembly-reentrant"]
-    assert validate_candidate_root(summary.output_directory).artifact_count == 53
+    assert validate_candidate_root(summary.output_directory).artifact_count == 54
 
 
 def test_every_mode_change_is_fsynced_before_the_next_operation(
@@ -981,7 +981,7 @@ def test_success_is_point_in_time_not_a_pathname_lease(
     monkeypatch.setattr(assembler, "_final_publication_gate", move_after_linearization)
     output = tmp_path / "candidate"
     summary = assemble_candidate_fixture(RECEIPT, output)
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
     assert not output.exists()
     assert validate_candidate_root(displaced).manifest_sha256 == summary.manifest_sha256
 

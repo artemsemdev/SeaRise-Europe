@@ -1,0 +1,77 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json",
+  "schemaVersion": "4.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260812-0123456789ab",
+  "dataProvenanceClass": "synthetic-fixture",
+  "artifactType": "settlement-browser-search-shard",
+  "mediaType": "application/vnd.searise.search-index+json",
+  "contentEncoding": "br",
+  "formatVersion": "settlement-browser-search-shard-v2",
+  "placeSchema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json",
+  "shardId": "europe-core",
+  "catalogMembership": "europe-core",
+  "normalizationVersion": "settlement-normalization-v2",
+  "spatialIdentity": {
+    "supportGeometry": {"artifactId": "fixture-support", "version": "v1", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+    "coastalGeometry": {"artifactId": "fixture-coastal", "version": "v1", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+    "shorelineGeometry": {"artifactId": "fixture-shoreline", "version": "v1", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"},
+    "predicate": "covers",
+    "distanceMethodVersion": "epsg3035-planar-whole-meter-half-even-v1"
+  },
+  "geometryStatus": "selected-scope-approximation",
+  "canonicalGeometryClaim": false,
+  "hazardExtentClaim": false,
+  "scientificApprovalClaim": false,
+  "ownerApprovalClaim": false,
+  "productionClaim": false,
+  "publicationClaim": false,
+  "publicationEligible": false,
+  "signingClaim": false,
+  "recordCount": 1,
+  "recordsSha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "records": [{
+    "ordinal": 1,
+    "placeId": "geonames:101",
+    "displayName": "Alpha",
+    "searchNames": ["Alpha", "Alpha Alt"],
+    "countryCode": "XX",
+    "admin1Name": "Example",
+    "population": 1000,
+    "featureCode": "PPL",
+    "distanceToCoastMeters": 20,
+    "isCoastal": false,
+    "latitude": 50.000101,
+    "longitude": 2.000101
+  }],
+  "indexBase64": "e30=",
+  "source": {
+    "projectionDeterministicIdentity": "5555555555555555555555555555555555555555555555555555555555555555",
+    "projectionDocumentsSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "projectionSchemaVersion": "settlement-search-projection-v1",
+    "projectionSha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "spatialCandidateIdentity": "8888888888888888888888888888888888888888888888888888888888888888",
+    "spatialDatabaseSha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "spatialReceiptSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "spatialStageSchemaVersion": "spatial-classification-stage-v1"
+  },
+  "engine": {
+    "engineId": "searise-codepoint-trie",
+    "packageVersion": "1.0.0",
+    "serializationVersion": "codepoint-trie-json-v1"
+  },
+  "compression": {"algorithm": "brotli", "mode": "text", "quality": 11},
+  "runtime": {"brotli": "1.1.0", "icu": "78.2", "node": "20.20.1", "unicode": "17.0", "zlib": "1.3.1-e00f703"},
+  "ranking": {
+    "candidateLimit": 128,
+    "fuzzyDistance": "unicode-codepoint-levenshtein-max-2-v1",
+    "normalizationVersion": "unicode-nfkd-lowercase-v1",
+    "orderingVersion": "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
+    "queryWorkLimit": 250000,
+    "resultLimit": 100
+  },
+  "merge": {
+    "order": ["europe-core", "europe-coastal"],
+    "deduplicateBy": "placeId",
+    "resultOrder": "core-results-then-unseen-coastal-results"
+  }
+}

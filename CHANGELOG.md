@@ -28,13 +28,20 @@ All notable changes to this project will be documented in this file.
   worker initialization/query distributions, and observed worker memory while
   preserving explicit browser, production, owner, scientific, and publication
   nonclaims.
-- Added a deterministic complete-candidate fixture assembler that verifies 50
+- Added the settlement v4 public browser-search envelope and receipt-last set,
+  binding the code-point-trie shards to one explicit data release, exact spatial
+  receipt and geometry identities, source provenance, runtime, ranking, merge,
+  and Brotli semantics while retaining fail-closed nonpublication claims. The
+  build now replays the projection against its exact spatial database and lists
+  the receipt-last completion marker in the candidate v2 inventory while the
+  published candidate v1 and release v1 definition bytes remain unchanged.
+- Added a deterministic complete-candidate fixture assembler that verifies 51
   explicit synthetic inputs, generates the terminal gate reports and checksum
   inventory, writes the manifest last, runs the independent byte gate, and
-  exclusively promotes a read-only 53-artifact candidate without making
+  exclusively promotes a read-only 54-artifact candidate without making
   production, scientific, format-validity, or publication claims.
 - Added a read-only, descriptor-bound Phase 1 candidate byte gate that requires
-  the exact 53-artifact inventory with no extra entries, streams and verifies
+  the exact 54-artifact inventory with no extra entries, streams and verifies
   declared sizes and SHA-256 values, reconstructs checksum content, and rejects
   symlink escapes or identity drift through a final descriptor linearization
   pass. Directory diagnostics and declared byte budgets are bounded; the result
@@ -150,7 +157,7 @@ All notable changes to this project will be documented in this file.
 - Added fail-closed offline validation for the exact pre-sign candidate inventory,
   checksum subjects, STAC matrix, and required pending evidence-pair gate without
   reading artifacts, signing, or making a publication decision.
-- Added the exact 53-artifact pre-sign engineering candidate contract, with
+- Added the exact 54-artifact pre-sign engineering candidate v2 contract, with
   manifest-last sealing, complete 3 x 3 and settlement inventory, and a
   mandatory non-recursive supply-chain evidence-envelope gate.
 - Added typed JSON and Markdown release-gate report artifacts to the immutable

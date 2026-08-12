@@ -26,6 +26,7 @@ from searise_pipeline.settlements.reconciliation import (
 REPO_ROOT = Path(__file__).parents[4]
 CONTRACT_DIR = REPO_ROOT / "contracts" / "settlements" / "v2"
 V3_CONTRACT_DIR = REPO_ROOT / "contracts" / "settlements" / "v3"
+V4_CONTRACT_DIR = REPO_ROOT / "contracts" / "settlements" / "v4"
 RELEASE_V1_DIR = REPO_ROOT / "contracts" / "release" / "v1"
 
 
@@ -503,3 +504,47 @@ def test_v3_representative_engine_is_an_exact_fixture_descriptor() -> None:
         "serializationVersion": "2",
     }
     assert "does not select a production browser search engine" in engine["$comment"]
+
+
+def test_settlement_v4_public_search_schema_and_goldens_are_valid() -> None:
+    schemas = sorted(V4_CONTRACT_DIR.glob("*.schema.json"))
+    assert [path.name for path in schemas] == ["search-artifact.schema.json"]
+    Draft202012Validator.check_schema(_read(schemas[0]))
+
+    paths = sorted((V4_CONTRACT_DIR / "fixtures" / "valid").glob("*.json"))
+    assert [path.name for path in paths] == [
+        "settlement-browser-search-shard-set-receipt.json",
+        "settlement-browser-search-shard.json",
+        "settlement-search-projection-authority.json",
+    ]
+    for path in paths:
+        _fixture_validator(path).validate(_read(path))
+
+
+def test_settlement_v4_search_semantics_and_versions_fail_closed() -> None:
+    path = (
+        V4_CONTRACT_DIR
+        / "fixtures"
+        / "valid"
+        / "settlement-browser-search-shard.json"
+    )
+    document = _read(path)
+    validate_settlement_search_shard_semantics(document)
+
+    mismatch = copy.deepcopy(document)
+    mismatch["recordCount"] = 2
+    _fixture_validator(path).validate(mismatch)
+    with pytest.raises(SettlementContractSemanticError, match="recordCount"):
+        validate_settlement_search_shard_semantics(mismatch)
+
+    for field, value in (
+        ("schemaVersion", "5.0.0"),
+        ("formatVersion", "settlement-browser-search-shard-v3"),
+    ):
+        unsupported = copy.deepcopy(document)
+        unsupported[field] = value
+        assert list(_fixture_validator(path).iter_errors(unsupported))
+
+    unsupported = copy.deepcopy(document)
+    unsupported["engine"]["engineId"] = "representative-json"
+    assert list(_fixture_validator(path).iter_errors(unsupported))

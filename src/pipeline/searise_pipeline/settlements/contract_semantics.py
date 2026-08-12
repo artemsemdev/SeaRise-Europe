@@ -15,7 +15,8 @@ def validate_settlement_search_shard_semantics(
 ) -> None:
     """Validate search-shard rules that JSON Schema cannot express."""
 
-    if document["recordCount"] != len(document["documents"]):
+    records = document.get("documents", document.get("records"))
+    if not isinstance(records, list) or document["recordCount"] != len(records):
         raise SettlementContractSemanticError(
-            "search shard recordCount differs from documents length"
+            "search shard recordCount differs from records length"
         )

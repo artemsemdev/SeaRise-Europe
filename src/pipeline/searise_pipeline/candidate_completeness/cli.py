@@ -11,7 +11,7 @@ from .validator import CandidateContractError, validate_candidate
 
 @click.command(
     help=(
-        "Validate only candidate JSON and its checked-in v1 inventory contract offline. "
+        "Validate only candidate JSON and its supported versioned inventory contract offline. "
         "It does not read or hash candidate artifact bytes, validate a candidate/evidence "
         "pair, sign, or approve production/publication."
     )
@@ -24,7 +24,7 @@ from .validator import CandidateContractError, validate_candidate
     help="Strict JSON candidate document to validate.",
 )
 def cli(candidate_path: Path) -> None:
-    """Validate only candidate JSON and its checked-in v1 inventory contract offline."""
+    """Validate only candidate JSON and its checked-in versioned inventory offline."""
     try:
         summary = validate_candidate(candidate_path)
     except CandidateContractError as exc:
