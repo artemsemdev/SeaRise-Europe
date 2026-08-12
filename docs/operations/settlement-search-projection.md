@@ -64,7 +64,21 @@ Levenshtein-distance-two retrieval shares the ranker's normalization and hands
 at most the globally best 128 candidates under that exact rank order to the
 public helper. Trie cells, edges, and postings share a
 250,000-unit traversal-work limit before any unbounded match map can form, and
-the public search helper returns at most 100 results. Source spelling is checked
+the public search helper returns at most 100 results.
+
+Because every accepted alternate name is indexed, one shard trie spans many
+writing systems. The fuzzy walk therefore prunes each subtree before it opens
+it, using two admissible lower bounds on the remaining edit distance: the
+longest name under the node, and the union of the code points that appear in
+those names, folded into a 64-bucket signature. A subtree is skipped when the
+query is longer than its longest name plus the allowance, or when more query
+positions than the allowance use a code point the subtree never contains. Both
+bounds can only understate the true distance, so pruning never removes a match;
+they cut the query-independent shallow traversal that would otherwise exhaust
+the work limit on the production shards. The walk is also skipped outright once
+the exact, qualified, and prefix passes have filled the candidate set, because
+every fuzzy match ranks below all three. The traversal-work limit itself is
+unchanged and remains part of the receipt-bound shard semantics. Source spelling is checked
 against the producer-emitted NFC
 canonical spelling; producer-emitted script metadata is consumed without a
 second, runtime-divergent Unicode classifier. These are versioned safety bounds,

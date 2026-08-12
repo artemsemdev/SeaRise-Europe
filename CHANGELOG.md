@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed bounded settlement search failing closed on the production europe-core
+  and europe-coastal shards. The fuzzy walk opened every shallow trie subtree
+  regardless of the query, so the multi-script alternate-name index exhausted
+  the traversal-work limit before any result was ranked. Subtrees are now
+  skipped by two admissible edit-distance lower bounds, and the walk is skipped
+  entirely when better-ranked matches already fill the candidate set. Results,
+  ranking, shard bytes, and the 250,000-unit work limit are unchanged.
+
 ### Changed
 
 - Required real-source architecture evidence to expose the exact cryptographic,
