@@ -30,7 +30,9 @@ All notable changes to this project will be documented in this file.
   pass, fail, and not-measured dispositions, and rejects candidate mutation
   during validation before any release eligibility can be reported. The same
   authority now validates the exact 51-artifact pre-terminal snapshot before
-  gate reports, checksums, and the manifest exist.
+  gate reports, checksums, and the manifest exist, then renders deterministic
+  JSON and Markdown checks grouped by authoritative validator and exact evidence
+  hashes without making a publication claim.
 - Added a release-bound settlement Web Worker and Chromium evidence harness
   with core-first loading, monotonic query tokens, bounded search, static-only
   networking, worker-isolate memory telemetry, and accepted production-scale
