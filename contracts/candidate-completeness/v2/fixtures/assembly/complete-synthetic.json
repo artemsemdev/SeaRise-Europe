@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "fixtureId": "phase-1-complete-synthetic-v1",
   "candidateTemplateSha256": "28e115b0c6eae7a838cc9692405200ff22a8f8dd206531253ffaa0ae8a3e43ac",
-  "expectedManifestSha256": "085fd0bfbc50d2ea68fc7c9c112f17c84865294e30a2fe98dd32e8916a984906",
+  "expectedManifestSha256": "62cd3ce3aa0045d304d426719f66581f6b569df30d98348b0e136642f97e3124",
   "gridId": "880db09c10ea43d5132c603946c65ca049630a59da1b495e800a84cee2b47585",
   "claims": {"formatValid": false, "ownerApproval": false, "production": false, "publication": false, "scientific": false, "syntheticFixture": true},
   "rights": {"redistribution": "allowed", "syntheticOnly": true},

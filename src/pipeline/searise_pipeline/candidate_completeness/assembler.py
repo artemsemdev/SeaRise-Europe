@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, NoReturn
 
 from .byte_gate import CandidateByteSummary, validate_candidate_root
+from .qa_report import build_synthetic_fixture_gate_report
 from .validator import CandidateContractError, load_candidate_bytes, validate_candidate_document
 
 CONTRACT_ROOT = Path(__file__).resolve().parents[4] / "contracts/candidate-completeness/v2"
@@ -281,33 +282,11 @@ def _load_inputs(
     return candidate, fixture_id, expected_manifest, payloads
 
 
-def _gate_reports(candidate: Mapping[str, Any], fixture_id: str) -> tuple[bytes, bytes]:
-    report = {
-        "schemaVersion": 1,
-        "candidateId": candidate["candidateId"],
-        "fixtureId": fixture_id,
-        "decision": "synthetic-fixture-pass",
-        "inputCount": _PRE_GATE_COUNT,
-        "claims": _CLAIMS,
-    }
-    json_raw = _canonical(report)
-    markdown = (
-        "# Synthetic Phase 1 gate report\n\n"
-        f"- Candidate: `{candidate['candidateId']}`\n"
-        f"- Fixture: `{fixture_id}`\n"
-        "- Decision: synthetic fixture pass\n"
-        "- Production: false\n"
-        "- Publication: false\n"
-        "- Scientific approval: false\n"
-        "- Format validity: false\n"
-    ).encode("utf-8")
-    return json_raw, markdown
-
-
 def _candidate_bytes(
     candidate: dict[str, Any], fixture_id: str, payloads: dict[str, bytes]
 ) -> tuple[bytes, dict[str, bytes]]:
-    report_json, report_markdown = _gate_reports(candidate, fixture_id)
+    del fixture_id
+    report_json, report_markdown = build_synthetic_fixture_gate_report(candidate)
     payloads = {
         **payloads,
         "release-gate-report-json": report_json,
