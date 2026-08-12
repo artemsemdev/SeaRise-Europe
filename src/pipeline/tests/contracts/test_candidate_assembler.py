@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import runpy
+import stat
 from pathlib import Path
 from typing import Any, Callable
 
@@ -616,6 +617,136 @@ def test_rollback_collision_exhaustion_uses_nonpublic_fallback(
     assert len(list(wrapper.glob(".candidate-failed-*"))) == 2
 
 
+def test_transient_rollback_permission_error_is_retried_without_public_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler.validate_candidate_root
+    real_rename = assembler._rename_no_overwrite
+    gate_calls = rollback_calls = 0
+
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        nonlocal gate_calls
+        gate_calls += 1
+        if gate_calls == 2:
+            raise assembler.CandidateContractError("candidate-changed", "primary failure")
+        return real_gate(root, **kwargs)
+
+    def transient(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal rollback_calls
+        if source == "candidate" and target.startswith(".candidate-rollback-"):
+            rollback_calls += 1
+            if rollback_calls == 1:
+                raise PermissionError("transient rollback denial")
+        real_rename(parent, source, destination, target)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", transient)
+    with pytest.raises(CandidateAssemblyError) as caught:
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert caught.value.code == "foreign-replacement"
+    assert caught.value.cleanup_error is None
+    assert rollback_calls == 2
+    assert not (tmp_path / "candidate").exists()
+
+
+def test_persistent_rollback_failure_preserves_primary_error_and_reports_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler.validate_candidate_root
+    real_rename = assembler._rename_no_overwrite
+    gate_calls = 0
+
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        nonlocal gate_calls
+        gate_calls += 1
+        if gate_calls == 2:
+            raise assembler.CandidateContractError("candidate-changed", "primary failure")
+        return real_gate(root, **kwargs)
+
+    def deny(parent: int, source: str, destination: int, target: str) -> None:
+        if source == "candidate" and (
+            target.startswith(".candidate-rollback-")
+            or target.startswith(".candidate-failed-")
+        ):
+            raise PermissionError("persistent rollback denial")
+        real_rename(parent, source, destination, target)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", deny)
+    with pytest.raises(CandidateAssemblyError) as caught:
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert caught.value.code == "foreign-replacement"
+    assert caught.value.cleanup_error is not None
+    assert caught.value.cleanup_error.startswith("assembly-rollback:")
+    assert "cleanup failure: assembly-rollback:" in str(caught.value)
+    assert (tmp_path / "candidate/manifest.json").is_file()
+
+
+def test_output_requires_absolute_symlink_free_owner_controlled_parent(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(CandidateAssemblyError, match="absolute path"):
+        assemble_candidate_fixture(RECEIPT, Path("relative-candidate"))
+
+    shared = tmp_path / "shared"
+    shared.mkdir(mode=0o700)
+    shared.chmod(0o770)
+    with pytest.raises(CandidateAssemblyError, match="owner-controlled"):
+        assemble_candidate_fixture(RECEIPT, shared / "candidate")
+
+    real = tmp_path / "real"
+    real.mkdir()
+    linked = tmp_path / "linked"
+    linked.symlink_to(real, target_is_directory=True)
+    with pytest.raises(CandidateAssemblyError, match="could not be promoted"):
+        assemble_candidate_fixture(RECEIPT, linked / "candidate")
+    assert stat.S_ISLNK(linked.lstat().st_mode)
+
+
+def test_mkdir_first_stat_hook_cannot_reenter_assembler(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_identity = assembler._entry_identity
+    reentrant_codes: list[str] = []
+
+    def inspect(parent: int, name: str):  # type: ignore[no-untyped-def]
+        if name.startswith(".candidate-assembly-") and not reentrant_codes:
+            with pytest.raises(CandidateAssemblyError) as caught:
+                assemble_candidate_fixture(RECEIPT, tmp_path / "nested")
+            reentrant_codes.append(caught.value.code)
+        return real_identity(parent, name)
+
+    monkeypatch.setattr(assembler, "_entry_identity", inspect)
+    summary = assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert summary.artifact_count == 53
+    assert reentrant_codes == ["assembly-reentrant"]
+
+
+def test_pre_freeze_writer_hook_must_close_writer_and_cannot_reenter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_freeze = assembler._freeze
+    reentrant_codes: list[str] = []
+
+    def pre_freeze(
+        root: int, paths: object, ownership: assembler._StageOwnership
+    ) -> None:
+        writer = os.open("checksums.txt", os.O_RDWR, dir_fd=root)
+        try:
+            with pytest.raises(CandidateAssemblyError) as caught:
+                assemble_candidate_fixture(RECEIPT, tmp_path / "nested")
+            reentrant_codes.append(caught.value.code)
+        finally:
+            os.close(writer)
+        real_freeze(root, paths, ownership)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(assembler, "_freeze", pre_freeze)
+    summary = assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert summary.artifact_count == 53
+    assert reentrant_codes == ["assembly-reentrant"]
+    assert validate_candidate_root(summary.output_directory).artifact_count == 53
+
+
 def test_every_mode_change_is_fsynced_before_the_next_operation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -726,3 +857,28 @@ def test_transient_mutation_during_final_authority_pass_is_detected(
         assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
     assert not (tmp_path / "candidate").exists()
     assert len(_private_wrappers(tmp_path)) == 1
+
+
+def test_success_is_point_in_time_not_a_pathname_lease(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler._final_publication_gate
+    displaced = tmp_path / "candidate-after-linearization"
+
+    def move_after_linearization(
+        parent_path: Path,
+        parent: int,
+        output_name: str,
+        stage: int,
+        expected: assembler.CandidateByteSummary,
+    ) -> assembler.CandidateByteSummary:
+        sealed = real_gate(parent_path, parent, output_name, stage, expected)
+        os.rename(output_name, displaced.name, src_dir_fd=parent, dst_dir_fd=parent)
+        return sealed
+
+    monkeypatch.setattr(assembler, "_final_publication_gate", move_after_linearization)
+    output = tmp_path / "candidate"
+    summary = assemble_candidate_fixture(RECEIPT, output)
+    assert summary.artifact_count == 53
+    assert not output.exists()
+    assert validate_candidate_root(displaced).manifest_sha256 == summary.manifest_sha256

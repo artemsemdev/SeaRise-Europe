@@ -11,6 +11,7 @@ import re
 import secrets
 import stat
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, NoReturn
@@ -33,6 +34,7 @@ _CLAIMS = {
     "syntheticFixture": True,
 }
 _RIGHTS = {"redistribution": "allowed", "syntheticOnly": True}
+_ASSEMBLY_LOCK = threading.Lock()
 
 
 class CandidateAssemblyError(ValueError):
@@ -40,7 +42,13 @@ class CandidateAssemblyError(ValueError):
 
     def __init__(self, code: str, message: str) -> None:
         self.code = code
+        self.cleanup_error: str | None = None
         super().__init__(f"{code}: {message}")
+
+    def preserve_cleanup_error(self, cleanup: "CandidateAssemblyError") -> None:
+        """Keep the primary failure while making an impossible cleanup explicit."""
+        self.cleanup_error = str(cleanup)
+        self.args = (f"{self.args[0]}; cleanup failure: {cleanup}",)
 
 
 @dataclass(frozen=True)
@@ -327,6 +335,31 @@ def _directory_flags() -> int:
 
 def _directory_identity(metadata: os.stat_result) -> tuple[int, int]:
     return metadata.st_dev, metadata.st_ino
+
+
+def _open_trusted_output_parent(output: Path) -> tuple[Path, int]:
+    """Open one absolute, symlink-free parent controlled by the current user."""
+    if not output.is_absolute() or ".." in output.parts:
+        _fail("assembly-publication", "candidate output must be one absolute path")
+    parent = output.parent
+    descriptor = -1
+    try:
+        descriptor = os.open(parent.anchor, _directory_flags())
+        for part in parent.parts[1:]:
+            child = os.open(part, _directory_flags(), dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        metadata = os.fstat(descriptor)
+        if metadata.st_uid != os.geteuid() or stat.S_IMODE(metadata.st_mode) & 0o022:
+            _fail(
+                "assembly-publication",
+                "candidate output parent must be owner-controlled and not group/world writable",
+            )
+        return parent, descriptor
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
 
 
 def _entry_identity(parent: int, name: str) -> tuple[int, int] | None:
@@ -750,13 +783,17 @@ def _rollback_owned_promotion(
     os.fchmod(stage, 0o755)
     os.fsync(stage)
     # A high bound prevents hostile name generation from hanging error cleanup.
+    last_error: OSError | None = None
     for _ in range(1024):
         if not _entry_matches(parent, output_name, stage_identity):
             return None
         rollback_name = f".candidate-rollback-{secrets.token_hex(16)}"
         try:
             _rename_no_overwrite(parent, output_name, temporary, rollback_name)
-        except FileExistsError:
+        except OSError as exc:
+            last_error = exc
+            if not _entry_matches(parent, output_name, stage_identity):
+                return None
             continue
         if not _entry_matches(temporary, rollback_name, stage_identity):
             return None
@@ -765,7 +802,17 @@ def _rollback_owned_promotion(
     # Last resort uses a separate, high-entropy parent quarantine namespace;
     # cleanup occurs only after the exact owned directory is no longer final.
     fallback = f".candidate-failed-{secrets.token_hex(32)}"
-    _rename_no_overwrite(parent, output_name, temporary, fallback)
+    try:
+        _rename_no_overwrite(parent, output_name, temporary, fallback)
+    except OSError as exc:
+        if not _entry_matches(parent, output_name, stage_identity):
+            return None
+        detail = f"; last retry error was {last_error}" if last_error is not None else ""
+        raise CandidateAssemblyError(
+            "assembly-rollback",
+            "owned failed candidate remains at the public output after bounded quarantine "
+            f"attempts{detail}",
+        ) from exc
     _sync_rename_parents(parent, temporary)
     if not _entry_matches(temporary, fallback, stage_identity):
         _fail("assembly-publication", "failed candidate quarantine identity differs")
@@ -820,7 +867,7 @@ def _same_candidate_bytes(left: CandidateByteSummary, right: CandidateByteSummar
     )
 
 
-def assemble_candidate_fixture(
+def _assemble_candidate_fixture_once(
     receipt_path: Path, output_directory: Path
 ) -> CandidateAssemblySummary:
     """Assemble, byte-gate, and exclusively promote one complete synthetic candidate."""
@@ -836,20 +883,9 @@ def assemble_candidate_fixture(
         raise CandidateAssemblyError(
             "assembly-gate", "candidate template or generated metadata failed validation"
         ) from exc
-    output = output_directory.absolute()
+    output = output_directory
     if output.name in {"", ".", ".."}:
         _fail("assembly-publication", "candidate output path is unsafe")
-    try:
-        parent = output.parent.resolve(strict=True)
-    except OSError as exc:
-        raise CandidateAssemblyError(
-            "assembly-publication", "output parent is unavailable"
-        ) from exc
-    if not parent.is_dir() or output.parent.is_symlink():
-        _fail("assembly-publication", "candidate output parent is unsafe")
-    output = parent / output.name
-    if os.path.lexists(output):
-        _fail("assembly-publication", "immutable candidate output already exists")
 
     promoted = False
     complete = False
@@ -860,9 +896,13 @@ def assemble_candidate_fixture(
     ownership: _StageOwnership | None = None
     temporary_name = ""
     stage_name: str | None = "candidate"
+    parent = output.parent
     stage_paths = [*(artifact["path"] for artifact in assembled["artifacts"]), "manifest.json"]
     try:
-        parent_descriptor = os.open(parent, _directory_flags())
+        parent, parent_descriptor = _open_trusted_output_parent(output)
+        output = parent / output.name
+        if _entry_identity(parent_descriptor, output.name) is not None:
+            _fail("assembly-publication", "immutable candidate output already exists")
         temporary_name, temporary_descriptor, temporary_identity = _make_staging(parent_descriptor)
         stage_descriptor, stage_identity = _create_owned_directory(
             temporary_descriptor, "candidate", 0o700
@@ -919,27 +959,40 @@ def assemble_candidate_fixture(
             "assembly-publication", "candidate could not be promoted without overwrite"
         ) from exc
     finally:
+        primary_error = sys.exc_info()[1]
+        cleanup_failure: CandidateAssemblyError | None = None
         try:
-            if promoted and not complete:
-                if ownership is None:
-                    _fail("assembly-publication", "promoted candidate ownership is unavailable")
-                stage_name = _rollback_owned_promotion(
-                    parent_descriptor,
-                    output.name,
-                    temporary_descriptor,
-                    stage_descriptor,
-                    ownership,
+            try:
+                if promoted and not complete:
+                    if ownership is None:
+                        _fail(
+                            "assembly-publication",
+                            "promoted candidate ownership is unavailable",
+                        )
+                    stage_name = _rollback_owned_promotion(
+                        parent_descriptor,
+                        output.name,
+                        temporary_descriptor,
+                        stage_descriptor,
+                        ownership,
+                    )
+                if temporary_descriptor >= 0 and temporary_identity is not None:
+                    _cleanup_staging(
+                        parent_descriptor,
+                        temporary_name,
+                        temporary_descriptor,
+                        temporary_identity,
+                        stage_descriptor,
+                        stage_name,
+                        ownership,
+                    )
+            except CandidateAssemblyError as exc:
+                cleanup_failure = exc
+            except OSError as exc:
+                cleanup_failure = CandidateAssemblyError(
+                    "assembly-cleanup", "candidate cleanup could not complete safely"
                 )
-            if temporary_descriptor >= 0 and temporary_identity is not None:
-                _cleanup_staging(
-                    parent_descriptor,
-                    temporary_name,
-                    temporary_descriptor,
-                    temporary_identity,
-                    stage_descriptor,
-                    stage_name,
-                    ownership,
-                )
+                cleanup_failure.__cause__ = exc
         finally:
             if stage_descriptor >= 0:
                 os.close(stage_descriptor)
@@ -947,3 +1000,20 @@ def assemble_candidate_fixture(
                 os.close(temporary_descriptor)
             if parent_descriptor >= 0:
                 os.close(parent_descriptor)
+        if cleanup_failure is not None:
+            if isinstance(primary_error, CandidateAssemblyError):
+                primary_error.preserve_cleanup_error(cleanup_failure)
+            else:
+                raise cleanup_failure from primary_error
+
+
+def assemble_candidate_fixture(
+    receipt_path: Path, output_directory: Path
+) -> CandidateAssemblySummary:
+    """Run one isolated, non-reentrant complete-candidate assembly."""
+    if not _ASSEMBLY_LOCK.acquire(blocking=False):
+        _fail("assembly-reentrant", "candidate assembly is already active in this process")
+    try:
+        return _assemble_candidate_fixture_once(receipt_path, output_directory)
+    finally:
+        _ASSEMBLY_LOCK.release()

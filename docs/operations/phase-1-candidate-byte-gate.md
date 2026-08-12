@@ -16,7 +16,9 @@ PYTHONPATH=src/pipeline python scripts/release/assemble_candidate_fixture.py \
   --output /absolute/new/path/to/candidate
 ```
 
-The output path must not exist. The assembler verifies each of the 50 explicit
+The output path must be absolute and must not exist. Every pathname component
+must be symlink-free. Its existing parent must be owned by the current user and
+must not be group/world writable. The assembler verifies each of the 50 explicit
 fixture inputs, generates both gate reports and the checksum inventory, writes
 the manifest last, validates the complete staged bytes, and promotes the
 read-only directory with a platform-native no-overwrite rename. This is local
@@ -26,8 +28,19 @@ Staging and rollback use device/inode ownership ledgers and atomically move
 owned entries to high-entropy private names before cleanup. A foreign or
 ambiguous entry is never unlinked. POSIX provides no conditional unlink, so a
 successful or failed run can retain one mode-0700 `.candidate-assembly-*`
-wrapper outside the public output name. Remove that wrapper only after the
-assembler process has exited, or let the ephemeral CI workspace remove it.
+wrapper per invocation outside the public output name. Repeated runs can retain
+multiple wrappers. Remove a wrapper only after the assembler process has exited,
+or let the ephemeral CI workspace remove it. Transient rollback rename failures
+are retried. A persistent kernel refusal preserves the primary validation error,
+adds an explicit `assembly-rollback` cleanup failure, and can leave the exact
+owned failed directory at the public name; isolate that failed workspace before
+operator cleanup.
+
+Run the assembler in one isolated process. It rejects reentrant calls, but its
+portable POSIX boundary cannot defend against malicious hooks in that process,
+a hostile same-user peer, an inherited/open writable staging-file descriptor,
+or an ACL that contradicts the checked mode bits. Those capabilities are outside
+this local assembly contract and must be excluded by the protected runner.
 
 The validator fails closed unless the root contains exactly the 53 artifact
 paths declared by the candidate contract plus `manifest.json`. It rejects

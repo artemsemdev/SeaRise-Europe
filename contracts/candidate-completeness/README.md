@@ -43,19 +43,35 @@ write order from mutable timestamps.
 The compact `fixtures/assembly/complete-synthetic.json` receipt drives the
 normal-CI completeness assembler. It binds all 50 pre-gate fixture inputs,
 their grid and pair-parity identities, STAC asset links, redistribution status,
-and false claims. Darwin and Linux use native no-overwrite directory renames;
+and false claims. Run it as one isolated, non-reentrant process with an absolute,
+symlink-free output path whose existing parent is owned by the current user and
+is not group/world writable. The boundary excludes hostile code or hooks in the
+assembler process, a hostile peer with the same user identity, inherited/open
+writable descriptors to staging files, and ACLs that grant another principal
+write access despite the mode bits. These capabilities can mutate bytes behind
+a held descriptor and cannot be made immutable with portable POSIX path APIs.
+Darwin and Linux use native no-overwrite directory renames;
 all staging writes, mode changes, syncs, validation, and cleanup use held
 directory descriptors. The publication commit point verifies the current
 parent and final directory identities before and after validation. A failed
 post-promotion check durably moves only the held assembler directory away from
 the final name. Publication returns only after a third complete byte/tree pass
-reopens the exact final directory through its held parent authority. Because
+reopens the exact final directory through its held parent authority. This is a
+point-in-time linearization, not a lease: another authorized process can replace
+the pathname after that point. Because
 POSIX has no conditional unlink, cleanup prioritizes foreign preservation and
 retains at most one high-entropy mode-0700 `.candidate-assembly-*` quarantine
-wrapper outside the public candidate name. Operators may remove that private
+wrapper per invocation outside the public candidate name. Repeated invocations
+can therefore retain multiple wrappers. Operators may remove a private
 wrapper only after the assembler process exits; ephemeral CI runners remove it
 with the job workspace. Its marker payloads are not valid COG, PMTiles,
 GeoParquet, or search indexes.
+
+Rollback retries bounded transient rename failures. If the operating system
+rejects every quarantine attempt while the exact owned failed directory is
+still at the output name, the primary validation error is preserved and gains
+an explicit `assembly-rollback` cleanup failure. Treat that workspace as failed
+and isolate it before operator cleanup; no success summary is returned.
 
 Provenance, signature, and SBOM sidecars are mandatory publication evidence,
 not deferred Phase 1 work. Pair validation is still pending: a dependent

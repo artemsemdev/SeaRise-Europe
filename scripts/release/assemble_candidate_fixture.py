@@ -17,7 +17,12 @@ from searise_pipeline.candidate_completeness import (
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--receipt", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="absolute new path below an owner-controlled, symlink-free parent",
+    )
     args = parser.parse_args(argv)
     try:
         summary = assemble_candidate_fixture(args.receipt, args.output)

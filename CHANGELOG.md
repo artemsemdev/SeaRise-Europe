@@ -25,8 +25,9 @@ All notable changes to this project will be documented in this file.
 ### Security
 
 - Hardened complete-candidate assembly with inode-bound private staging,
-  foreign-preserving quarantine rollback, and a coherent final tree-identity
-  pass before success is returned.
+  foreign-preserving bounded quarantine rollback, an owner-controlled isolated
+  runner boundary, and a coherent point-in-time final tree-identity pass before
+  success is returned.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
