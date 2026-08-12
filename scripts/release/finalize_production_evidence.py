@@ -13,7 +13,14 @@ from searise_pipeline.supply_chain.production_evidence import (
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog=(
+            "Run alone and single-threaded on an isolated protected runner. RUNNER_TEMP "
+            "(or TMPDIR) and the output parent must be absolute, symlink-free, "
+            "runner-owned private directories."
+        ),
+    )
     parser.add_argument("--candidate-root", type=Path, required=True)
     parser.add_argument("--repository-root", type=Path, default=Path.cwd())
     parser.add_argument("--controlled-build-run-id", required=True)

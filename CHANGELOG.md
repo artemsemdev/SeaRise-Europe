@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 - Added fail-closed, descriptor-bound finalization for exact pre-verification
   candidate evidence, with complete source authority, a durable pathname
   checkpoint, a stable whole-evidence content identity, and bounded private
-  snapshot residue retained for same-user race safety on ephemeral runners.
+  snapshot residue retained for pathname-race safety on isolated ephemeral runners.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.

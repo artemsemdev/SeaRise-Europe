@@ -33,7 +33,7 @@ POLICY = ROOT / "contracts/supply-chain/v1/identity-policy.json"
 @pytest.fixture(autouse=True)
 def _private_snapshot_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "private-snapshots"
-    root.mkdir()
+    root.mkdir(mode=0o700)
     monkeypatch.setattr(production_evidence, "_TEMP_ROOT", root)
 
 
@@ -42,7 +42,33 @@ def _candidate(root: Path) -> tuple[Path, Path]:
     candidate["dataProvenanceClass"] = build["dataProvenanceClass"] = "real-source"
     for artifact in candidate["artifacts"]:
         artifact["dataProvenanceClass"] = "real-source"
-    return _write_pair(root, candidate, build)
+    checksums = {item["path"]: item for item in candidate["checksumInventory"]["subjects"]}
+    build_outputs = {item["path"]: item for item in build["outputs"]}
+    deferred = {"source-receipt", "build-receipt", "checksums"}
+    for artifact in candidate["artifacts"]:
+        if artifact["role"] in deferred:
+            continue
+        raw = f"production-evidence fixture: {artifact['path']}\n".encode()
+        target = root / artifact["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+        artifact.update(byteSize=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+        checksums[artifact["path"]]["sha256"] = artifact["sha256"]
+        if artifact["path"] in build_outputs:
+            build_outputs[artifact["path"]].update(
+                byteSize=artifact["byteSize"], sha256=artifact["sha256"]
+            )
+    manifest, build_path = _write_pair(root, candidate, build)
+    checksum_raw = "".join(
+        f"{item['sha256']}  {item['path']}\n" for item in candidate["checksumInventory"]["subjects"]
+    ).encode()
+    (root / "checksums.txt").write_bytes(checksum_raw)
+    checksum_artifact = next(item for item in candidate["artifacts"] if item["role"] == "checksums")
+    checksum_artifact.update(
+        byteSize=len(checksum_raw), sha256=hashlib.sha256(checksum_raw).hexdigest()
+    )
+    manifest.write_text(json.dumps(candidate, indent=2) + "\n", encoding="utf-8")
+    return manifest, build_path
 
 
 def _bundle(path: Path, fixture: str, subject: bytes) -> Path:
@@ -229,7 +255,7 @@ def test_output_parent_swap_fails_and_preserves_replacement(
 ) -> None:
     candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
     parent, moved = tmp_path / "output", tmp_path / "moved-output"
-    parent.mkdir()
+    parent.mkdir(mode=0o700)
     original = production_evidence._publish
 
     def swap(*args: object) -> None:
@@ -256,7 +282,7 @@ def test_output_parent_swap_after_publish_fails_and_preserves_foreign_path(
 ) -> None:
     candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
     parent, moved = tmp_path / "output", tmp_path / "moved-output"
-    parent.mkdir()
+    parent.mkdir(mode=0o700)
     output = (parent / "evidence").absolute()
     original = production_evidence._rename_exclusive
 
@@ -860,7 +886,7 @@ def test_quarantine_rename_restores_foreign_racing_replacement(
 ) -> None:
     output = tmp_path / "evidence"
     output.mkdir(mode=0o700)
-    expected = output.stat(follow_symlinks=False)
+    expected = os.stat(output, follow_symlinks=False)
     owned_away = tmp_path / "owned-away"
     foreign = tmp_path / "foreign"
     foreign.mkdir()
@@ -892,7 +918,7 @@ def test_quarantine_restore_never_overwrites_second_foreign_replacement(
 ) -> None:
     output = tmp_path / "evidence"
     output.mkdir(mode=0o700)
-    expected = output.stat(follow_symlinks=False)
+    expected = os.stat(output, follow_symlinks=False)
     owned_away = tmp_path / "owned-away"
     foreign = tmp_path / "foreign"
     foreign.mkdir()
@@ -1233,3 +1259,130 @@ def test_created_directory_inode_is_bound_before_open(
         os.close(parent)
     assert moved.is_dir()
     assert (tmp_path / "child").is_dir()
+
+
+def test_unisolated_temp_parent_is_rejected_before_the_unprovable_mkdir_gap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shared = tmp_path / "shared-temp"
+    shared.mkdir(mode=0o755)
+    shared.chmod(0o755)
+    calls = 0
+    original = os.mkdir
+
+    def track(*args: object, **kwargs: object) -> None:
+        nonlocal calls
+        calls += 1
+        original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(production_evidence, "_TEMP_ROOT", shared.absolute())
+    monkeypatch.setattr(production_evidence.os, "mkdir", track)
+    with pytest.raises(SupplyChainContractError, match="inaccessible to group/other"):
+        production_evidence._new_private_snapshot()
+    assert calls == 0
+
+
+def test_unisolated_output_parent_is_rejected_before_staging(tmp_path: Path) -> None:
+    shared = tmp_path / "shared-output"
+    shared.mkdir(mode=0o755)
+    shared.chmod(0o755)
+    with pytest.raises(SupplyChainContractError, match="inaccessible to group/other"):
+        production_evidence._output_parent(shared / "evidence")
+
+
+def test_finalizer_is_non_reentrant_before_reading_inputs(tmp_path: Path) -> None:
+    assert production_evidence._FINALIZATION_LOCK.acquire(blocking=False)
+    try:
+        with pytest.raises(SupplyChainContractError, match="non-reentrant"):
+            finalize_production_evidence(
+                tmp_path / "missing-candidate",
+                repository_root=ROOT,
+                controlled_build_run_id=RUN_ID,
+                manifest_bundle=tmp_path / "missing-manifest-bundle",
+                provenance_bundle=tmp_path / "missing-provenance-bundle",
+                output_root=(tmp_path / "evidence").absolute(),
+            )
+    finally:
+        production_evidence._FINALIZATION_LOCK.release()
+
+
+def test_exact_candidate_byte_gate_rejects_artifact_mutation(tmp_path: Path) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path)
+    target = candidate / "config/scenarios.json"
+    target.write_bytes(target.read_bytes() + b"mutated")
+    with pytest.raises(SupplyChainContractError, match="artifact byte size differs"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=(tmp_path / "evidence").absolute(),
+        )
+    assert not (tmp_path / "evidence").exists()
+
+
+def test_post_commit_descriptor_close_error_cannot_reverse_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: list[int] = []
+    original_new_stage = production_evidence._new_stage
+    original_close = os.close
+
+    def capture(parent: int) -> tuple[str, int, os.stat_result]:
+        result = original_new_stage(parent)
+        captured.append(result[1])
+        return result
+
+    def fail_stage_close(descriptor: int) -> None:
+        if captured and descriptor == captured[0]:
+            raise OSError("injected post-commit close failure")
+        original_close(descriptor)
+
+    monkeypatch.setattr(production_evidence, "_new_stage", capture)
+    monkeypatch.setattr(production_evidence.os, "close", fail_stage_close)
+    summary = _finalize(tmp_path)
+    assert summary.evidence_root == (tmp_path / "evidence").absolute()
+    assert (tmp_path / "evidence/evidence-envelope.json").is_file()
+    original_close(captured[0])
+
+
+def test_snapshot_descriptors_close_without_masking_primary_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path)
+    captured: list[int] = []
+    close_attempts: list[int] = []
+    original_create = production_evidence._create_directory
+    original_close = os.close
+
+    def capture(parent: int, name: str, label: str) -> int:
+        descriptor = original_create(parent, name, label)
+        captured.append(descriptor)
+        return descriptor
+
+    def fail_snapshot(*args: object, **kwargs: object) -> object:
+        raise SupplyChainContractError("injected snapshot primary failure")
+
+    def close(descriptor: int) -> None:
+        if descriptor in captured:
+            close_attempts.append(descriptor)
+            if len(captured) > 1 and descriptor == captured[1]:
+                raise OSError("injected cleanup failure")
+        original_close(descriptor)
+
+    monkeypatch.setattr(production_evidence, "_create_directory", capture)
+    monkeypatch.setattr(production_evidence, "_candidate_snapshot", fail_snapshot)
+    monkeypatch.setattr(production_evidence.os, "close", close)
+    with pytest.raises(SupplyChainContractError, match="snapshot primary failure"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=(tmp_path / "evidence").absolute(),
+        )
+    assert close_attempts[:2] == captured[1:3]
+    assert set(close_attempts) == set(captured)
+    original_close(captured[1])

@@ -1,10 +1,12 @@
 """Immutable pre-verification evidence finalization for controlled candidates.
 
-Each run retains one bounded, mode-0700, high-entropy private snapshot under the
-system temporary directory. The protected runner reclaims it when the runner is
-destroyed; an operator may remove it only after this process exits. Retention is
-intentional because POSIX has no inode-conditional recursive deletion primitive
-that can preserve every same-UID racing replacement.
+Each run retains one bounded, mode-0700, high-entropy private snapshot containing
+candidate metadata/receipts and repository policy, dependency, and SBOM authority.
+The protected runner reclaims it when the runner is destroyed; an operator may
+remove it only after this process exits. The finalizer requires an isolated,
+single-process, single-threaded runner with private, owner-controlled temporary
+and output parents. It does not claim isolation from malicious code or another
+process running as the same operating-system user.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import re
 import secrets
 import stat
 import sys
+import threading
 from contextlib import contextmanager
 from ctypes import CDLL, c_char_p, c_int, get_errno
 from dataclasses import dataclass
@@ -26,6 +29,7 @@ from searise_pipeline.candidate_completeness import (
     canonical_provenance_bytes,
     generate_provenance_statement,
     validate_candidate_document,
+    validate_candidate_root,
 )
 
 from .candidate_evidence import (
@@ -55,7 +59,8 @@ _ENVELOPE = PurePosixPath("evidence-envelope.json")
 _SBOM_ROOT = PurePosixPath("contracts/supply-chain/v1/sboms")
 _DEPENDENCY_INVENTORY = PurePosixPath("contracts/supply-chain/v1/dependency-inventory.json")
 _RUN_ID = re.compile(r"[1-9][0-9]*")
-_TEMP_ROOT = Path(os.getenv("TMPDIR", "/tmp")).resolve()
+_TEMP_ROOT = Path(os.getenv("RUNNER_TEMP") or os.getenv("TMPDIR") or "/tmp")
+_FINALIZATION_LOCK = threading.Lock()
 _MAX_RUN_ID_BYTES = 20
 _MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 _MAX_RECEIPT_BYTES = 2 * 1024 * 1024
@@ -146,6 +151,29 @@ def _same_file(left: os.stat_result, right: os.stat_result) -> bool:
 def _require_single_link(value: os.stat_result, label: str) -> None:
     if value.st_nlink != 1:
         _fail(f"{label} must have exactly one hard link")
+
+
+def _close_quietly(descriptor: int) -> None:
+    """Best-effort descriptor cleanup that cannot change a committed outcome."""
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+
+
+def _open_private_parent(path: Path, label: str) -> int:
+    if not path.is_absolute() or ".." in path.parts:
+        _fail(f"{label} must be one absolute canonical directory")
+    descriptor = _open_root(path, label)
+    try:
+        identity = os.fstat(descriptor)
+        if identity.st_uid == os.geteuid() and not stat.S_IMODE(identity.st_mode) & 0o077:
+            return descriptor
+    except Exception:
+        _close_quietly(descriptor)
+        raise
+    _close_quietly(descriptor)
+    _fail(f"{label} must be owned by the runner user and inaccessible to group/other users")
 
 
 def _bounded_names(directory: int, *, maximum: int, label: str) -> tuple[str, ...]:
@@ -285,7 +313,7 @@ def _create_directory(parent: int, name: str, label: str) -> int:
 
 
 def _new_private_snapshot() -> tuple[int, str, int, Path, os.stat_result]:
-    parent = _open_root(_TEMP_ROOT, "private snapshot parent")
+    parent = _open_private_parent(_TEMP_ROOT, "private snapshot parent")
     for _ in range(128):
         name = f"searise-production-evidence-{secrets.token_hex(16)}"
         try:
@@ -455,13 +483,15 @@ def _require_current_path(path: Path, held: int, expected: os.stat_result, label
 
 @contextmanager
 def _descriptor_working_directory(descriptor: int) -> Iterator[None]:
+    if not _FINALIZATION_LOCK.locked():
+        _fail("descriptor validators require the exclusive finalization guard")
     previous = os.open(".", os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0))
     try:
         os.fchdir(descriptor)
         yield
     finally:
         os.fchdir(previous)
-        os.close(previous)
+        _close_quietly(previous)
 
 
 def _repository_snapshots(
@@ -683,6 +713,25 @@ def _require_provenance_byte_bindings(
             _fail("generated provenance does not bind descriptor snapshot bytes")
     except (KeyError, TypeError) as exc:
         raise SupplyChainContractError("generated provenance byte bindings are malformed") from exc
+
+
+def _require_candidate_byte_authority(
+    candidate_root: Path,
+    manifest: Mapping[str, Any],
+    manifest_raw: bytes,
+) -> None:
+    """Linearize the exact artifact tree that the snapshotted manifest describes."""
+    try:
+        summary = validate_candidate_root(candidate_root)
+    except CandidateContractError as exc:
+        raise SupplyChainContractError(str(exc)) from exc
+    if (
+        summary.candidate_id != manifest["candidateId"]
+        or summary.data_release_id != manifest["dataReleaseId"]
+        or summary.artifact_count != len(manifest["artifacts"])
+        or summary.manifest_sha256 != _sha256(manifest_raw)
+    ):
+        _fail("candidate byte gate did not validate the snapshotted manifest subjects")
 
 
 def _descriptor(path: str, raw: bytes, **fields: object) -> dict[str, object]:
@@ -1152,7 +1201,7 @@ def _quarantine_failed_publication(parent: int, expected: os.stat_result, output
 def _output_parent(output_root: Path) -> int:
     if not output_root.is_absolute() or ".." in output_root.parts or not output_root.name:
         _fail("output evidence root must be absolute and canonical")
-    return _open_root(output_root.parent, "output evidence parent")
+    return _open_private_parent(output_root.parent, "output evidence parent")
 
 
 def _require_absent(parent: int, name: str) -> None:
@@ -1172,18 +1221,41 @@ def finalize_production_evidence(
     provenance_bundle: Path,
     output_root: Path,
 ) -> ProductionEvidenceSummary:
-    """Commit exact evidence at one durable pathname checkpoint without outcome claims.
+    """Finalize evidence once in an isolated, single-threaded protected runner.
 
-    The returned content digest remains authoritative if a same-user actor later
-    displaces the pathname; consumers must revalidate the path against that digest.
+    The byte gate linearizes the exact candidate tree immediately before the
+    no-overwrite publication attempt. A later pathname displacement cannot change
+    the returned content digest; consumers must revalidate that path and digest.
     """
+    if not _FINALIZATION_LOCK.acquire(blocking=False):
+        _fail("production evidence finalization is non-reentrant")
+    try:
+        return _finalize_production_evidence(
+            candidate_root,
+            repository_root=repository_root,
+            controlled_build_run_id=controlled_build_run_id,
+            manifest_bundle=manifest_bundle,
+            provenance_bundle=provenance_bundle,
+            output_root=output_root,
+        )
+    finally:
+        _FINALIZATION_LOCK.release()
+
+
+def _finalize_production_evidence(
+    candidate_root: Path,
+    *,
+    repository_root: Path = REPOSITORY_ROOT,
+    controlled_build_run_id: str,
+    manifest_bundle: Path,
+    provenance_bundle: Path,
+    output_root: Path,
+) -> ProductionEvidenceSummary:
     if (
         len(controlled_build_run_id.encode("utf-8")) > _MAX_RUN_ID_BYTES
         or _RUN_ID.fullmatch(controlled_build_run_id) is None
     ):
         _fail("controlled build run ID must be one canonical positive integer")
-    if output_root.exists() or output_root.is_symlink():
-        _fail("output evidence root already exists")
     output_parent = _output_parent(output_root)
     try:
         budget = _ReadBudget(_MAX_TOTAL_READ_BYTES)
@@ -1210,7 +1282,7 @@ def finalize_production_evidence(
                     snapshot_descriptor, "repository", "repository snapshot"
                 )
             except Exception:
-                os.close(candidate_descriptor)
+                _close_quietly(candidate_descriptor)
                 raise
             try:
                 _manifest_path, manifest, manifest_raw, candidate_files = _candidate_snapshot(
@@ -1279,8 +1351,8 @@ def finalize_production_evidence(
                     root, snapshot_descriptor, snapshot_identity, "private snapshot"
                 )
             finally:
-                os.close(candidate_descriptor)
-                os.close(repository_descriptor)
+                _close_quietly(candidate_descriptor)
+                _close_quietly(repository_descriptor)
             stage_files = {
                 _PROVENANCE: provenance_raw,
                 **{PurePosixPath(logical): raw for logical, raw in bundle_raw.items()},
@@ -1294,6 +1366,7 @@ def finalize_production_evidence(
                     _snapshot_fd(stage_descriptor, logical, raw)
                 os.fsync(stage_descriptor)
                 stage_baseline = _validate_tree(stage_descriptor, stage_files)
+                _require_candidate_byte_authority(candidate_root, manifest, manifest_raw)
                 _publish(
                     output_parent,
                     output_parent_identity,
@@ -1332,12 +1405,14 @@ def finalize_production_evidence(
                         "published evidence changed before the durable result checkpoint"
                     ) from primary
             finally:
-                os.close(stage_descriptor)
+                # The durable publication checkpoint is the commit. Descriptor
+                # cleanup cannot turn committed evidence into an ambiguous failure.
+                _close_quietly(stage_descriptor)
         finally:
-            os.close(snapshot_descriptor)
-            os.close(snapshot_parent)
+            _close_quietly(snapshot_descriptor)
+            _close_quietly(snapshot_parent)
     finally:
-        os.close(output_parent)
+        _close_quietly(output_parent)
     return ProductionEvidenceSummary(
         candidate_id=str(manifest["candidateId"]),
         evidence_root=output_root,
