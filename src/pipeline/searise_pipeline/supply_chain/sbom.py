@@ -221,6 +221,36 @@ def _descriptor_has_exact_bytes(descriptor: int, content: bytes) -> bool:
     return os.pread(descriptor, 1, len(content)) == b""
 
 
+def _close_quietly(descriptor: int) -> None:
+    """Best-effort cleanup that cannot reverse a durable publication outcome."""
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+
+
+def _has_forbidden_ancestor(directory: int, forbidden: frozenset[_Inode]) -> bool:
+    if not forbidden:
+        return False
+    cursor = os.dup(directory)
+    flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        while True:
+            current = _inode(os.fstat(cursor))
+            if current in forbidden:
+                return True
+            parent = os.open("..", flags, dir_fd=cursor)
+            parent_inode = _inode(os.fstat(parent))
+            if parent_inode == current:
+                _close_quietly(parent)
+                return False
+            _close_quietly(cursor)
+            cursor = parent
+    finally:
+        _close_quietly(cursor)
+
+
 def write_new_immutable_bytes(
     output_path: Path,
     content: bytes,
@@ -228,6 +258,8 @@ def write_new_immutable_bytes(
     label: str,
     mode: int,
     partial_prefix: str,
+    required_parent_inode: _Inode | None = None,
+    forbidden_ancestor_inodes: frozenset[_Inode] = frozenset(),
 ) -> None:
     """Durably publish exact new bytes with ownership-safe no-overwrite promotion."""
     if type(content) is not bytes:
@@ -242,6 +274,10 @@ def write_new_immutable_bytes(
     promoted = False
     directory_changed = False
     try:
+        if required_parent_inode is not None and parent_inode != required_parent_inode:
+            raise SupplyChainContractError(f"{label} parent differs from its reviewed identity")
+        if _has_forbidden_ancestor(parent, forbidden_ancestor_inodes):
+            raise SupplyChainContractError(f"{label} parent overlaps a protected input root")
         if _path_inode(parent, output_name) is not None:
             raise SupplyChainContractError(f"{label} path already exists: {output_path}")
         partial_descriptor, partial_name = _create_partial(parent, partial_prefix)
@@ -265,6 +301,8 @@ def write_new_immutable_bytes(
 
         if not _parent_path_matches(anchor, parent_parts, parent_inode):
             raise SupplyChainContractError(f"{label} output parent changed during publication")
+        if _has_forbidden_ancestor(parent, forbidden_ancestor_inodes):
+            raise SupplyChainContractError(f"{label} parent moved below a protected input root")
         if _path_inode(parent, partial_name) != owned_inode:
             raise SupplyChainContractError(f"{label} partial ownership changed before promotion")
         _exclusive_rename()
@@ -293,6 +331,8 @@ def write_new_immutable_bytes(
         directory_changed = False
         if not _parent_path_matches(anchor, parent_parts, parent_inode):
             raise SupplyChainContractError(f"{label} output parent changed during publication")
+        if _has_forbidden_ancestor(parent, forbidden_ancestor_inodes):
+            raise SupplyChainContractError(f"{label} parent moved below a protected input root")
         if _path_inode(parent, output_name) != owned_inode:
             raise SupplyChainContractError(f"{label} output ownership changed during publication")
         if not _descriptor_has_exact_bytes(partial_descriptor, content):
@@ -321,18 +361,9 @@ def write_new_immutable_bytes(
         raise
     finally:
         if partial_descriptor >= 0:
-            try:
-                os.close(partial_descriptor)
-            except OSError:
-                pass
-        try:
-            os.close(parent)
-        except OSError:
-            pass
-        try:
-            os.close(anchor)
-        except OSError:
-            pass
+            _close_quietly(partial_descriptor)
+        _close_quietly(parent)
+        _close_quietly(anchor)
 
 
 def write_new_sbom(output_path: Path, content: bytes) -> None:

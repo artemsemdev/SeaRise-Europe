@@ -290,6 +290,37 @@ def test_publication_fsyncs_regular_file_before_parent_directory(
     assert sbom_module.stat.S_ISDIR(modes[1])
 
 
+def test_cleanup_close_error_cannot_reverse_durable_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "sbom.json"
+    content = b"exact committed bytes\n"
+    original_exact = sbom_module._descriptor_has_exact_bytes
+    original_close = sbom_module.os.close
+    exact_checks = 0
+    failed_close = False
+
+    def track_exact(descriptor: int, expected: bytes) -> bool:
+        nonlocal exact_checks
+        exact_checks += 1
+        return original_exact(descriptor, expected)
+
+    def fail_first_post_commit_close(descriptor: int) -> None:
+        nonlocal failed_close
+        if exact_checks == 3 and not failed_close:
+            failed_close = True
+            raise OSError("injected cleanup-only close failure")
+        original_close(descriptor)
+
+    monkeypatch.setattr(sbom_module, "_descriptor_has_exact_bytes", track_exact)
+    monkeypatch.setattr(sbom_module.os, "close", fail_first_post_commit_close)
+
+    write_new_sbom(output, content)
+
+    assert failed_close
+    assert output.read_bytes() == content
+
+
 def test_final_name_race_is_never_overwritten_or_removed(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -349,6 +380,31 @@ def test_partial_inode_race_is_detected_without_deleting_racing_bytes(
 
     assert output.read_bytes() == racing
     assert _partials(tmp_path)[0].read_bytes() == racing
+
+
+@pytest.mark.parametrize("constraint", ["parent", "ancestor"])
+def test_generic_publication_enforces_reviewed_parent_and_forbidden_ancestor(
+    tmp_path: Path, constraint: str
+) -> None:
+    parent = tmp_path / "receipt-parent"
+    parent.mkdir()
+    parent_inode = sbom_module._inode(parent.stat())
+    options = (
+        {"required_parent_inode": (parent_inode[0], parent_inode[1] + 1)}
+        if constraint == "parent"
+        else {"forbidden_ancestor_inodes": frozenset({parent_inode})}
+    )
+
+    with pytest.raises(SupplyChainContractError, match="reviewed identity|protected input root"):
+        sbom_module.write_new_immutable_bytes(
+            parent / "receipt.json",
+            b"exact\n",
+            label="test receipt",
+            mode=0o400,
+            partial_prefix=".test-receipt-",
+            **options,
+        )
+    assert list(parent.iterdir()) == []
 
 
 def test_unsafe_or_symlinked_output_ancestry_fails_closed(tmp_path: Path) -> None:
