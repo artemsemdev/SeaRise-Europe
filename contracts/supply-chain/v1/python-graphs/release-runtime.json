@@ -1,0 +1,215 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/python-lock-graph.schema.json",
+  "schemaVersion": "1.0.0",
+  "annotationKind": "python-lock-graph",
+  "annotationId": "release-python-runtime-v1",
+  "graphScope": "target-active-runtime-dependencies",
+  "review": {"status":"reviewed-wheel-metadata","productionClaim":false,"note":"Reviewed from hash-matched Linux and macOS wheel METADATA; this graph is dependency evidence, not release approval."},
+  "targets": [
+    {
+      "id": "linux-x86-64-cp311",
+      "lock": {"path":"src/pipeline/requirements-release.lock","sha256":"2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f"},
+      "markerEnvironment": {"implementation_name":"cpython","implementation_version":"3.11.9","os_name":"posix","platform_machine":"x86_64","platform_python_implementation":"CPython","platform_release":"ubuntu-24.04","platform_system":"Linux","platform_version":"ubuntu-24.04","python_full_version":"3.11.9","python_version":"3.11","sys_platform":"linux"}
+    },
+    {
+      "id": "macos-arm64-cp311",
+      "lock": {"path":"src/pipeline/requirements-release-macos-arm64.lock","sha256":"87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75"},
+      "markerEnvironment": {"implementation_name":"cpython","implementation_version":"3.11.9","os_name":"posix","platform_machine":"arm64","platform_python_implementation":"CPython","platform_release":"macos-14","platform_system":"Darwin","platform_version":"macos-14","python_full_version":"3.11.9","python_version":"3.11","sys_platform":"darwin"}
+    }
+  ],
+  "packages": [
+    {"name":"affine","version":"2.4.0","root":false,"selectedExtras":[],"dependencies":[]},
+    {"name":"annotated-types","version":"0.7.0","root":false,"selectedExtras":[],"dependencies":[]},
+    {"name":"attrs","version":"26.1.0","root":false,"selectedExtras":[],"dependencies":[]},
+    {"name":"certifi","version":"2026.7.22","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "cffi", "version": "2.0.0", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"pycparser","requirement":"pycparser; implementation_name != \"PyPy\""}
+      ]
+    },
+    {
+      "name": "cftime", "version": "1.6.4.post1", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"numpy","requirement":"numpy>1.13.3; python_version < \"3.12.0.rc1\""}
+      ]
+    },
+    {"name":"click","version":"8.1.8","root":true,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "click-plugins", "version": "1.1.1.2", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"click","requirement":"click>=4.0"}
+      ]
+    },
+    {
+      "name": "cligj", "version": "0.7.2", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"click","requirement":"click (>=4.0)"}
+      ]
+    },
+    {
+      "name": "cryptography", "version": "50.0.0", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"cffi","requirement":"cffi>=2.0.0 ; platform_python_implementation != 'PyPy'"}
+      ]
+    },
+    {
+      "name": "geopandas", "version": "1.0.1", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"numpy","requirement":"numpy >=1.22"},
+        {"name":"packaging","requirement":"packaging"},
+        {"name":"pandas","requirement":"pandas >=1.4.0"},
+        {"name":"pyogrio","requirement":"pyogrio >=0.7.2"},
+        {"name":"pyproj","requirement":"pyproj >=3.3.0"},
+        {"name":"shapely","requirement":"shapely >=2.0.0"}
+      ]
+    },
+    {
+      "name": "importlib-metadata", "version": "8.7.1", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"zipp","requirement":"zipp>=3.20"}
+      ]
+    },
+    {
+      "name": "jsonschema", "version": "4.25.1", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"attrs","requirement":"attrs>=22.2.0"},
+        {"name":"jsonschema-specifications","requirement":"jsonschema-specifications>=2023.03.6"},
+        {"name":"referencing","requirement":"referencing>=0.28.4"},
+        {"name":"rpds-py","requirement":"rpds-py>=0.7.1"}
+      ]
+    },
+    {
+      "name": "jsonschema-specifications", "version": "2025.9.1", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"referencing","requirement":"referencing>=0.31.0"}
+      ]
+    },
+    {
+      "name": "morecantile", "version": "6.2.0", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"attrs","requirement":"attrs"},
+        {"name":"pydantic","requirement":"pydantic~=2.0"},
+        {"name":"pyproj","requirement":"pyproj>=3.1,<4.0"}
+      ]
+    },
+    {
+      "name": "netcdf4", "version": "1.7.2", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"certifi","requirement":"certifi"},
+        {"name":"cftime","requirement":"cftime"},
+        {"name":"numpy","requirement":"numpy"}
+      ]
+    },
+    {"name":"numpy","version":"1.26.4","root":true,"selectedExtras":[],"dependencies":[]},
+    {"name":"packaging","version":"26.3","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "pandas", "version": "2.3.2", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"numpy","requirement":"numpy>=1.23.2; python_version == \"3.11\""},
+        {"name":"python-dateutil","requirement":"python-dateutil>=2.8.2"},
+        {"name":"pytz","requirement":"pytz>=2020.1"},
+        {"name":"tzdata","requirement":"tzdata>=2022.7"}
+      ]
+    },
+    {
+      "name": "pyarrow", "version": "16.1.0", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"numpy","requirement":"numpy >=1.16.6"}
+      ]
+    },
+    {"name":"pycparser","version":"2.23","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "pydantic", "version": "2.13.4", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"annotated-types","requirement":"annotated-types>=0.6.0"},
+        {"name":"pydantic-core","requirement":"pydantic-core==2.46.4"},
+        {"name":"typing-extensions","requirement":"typing-extensions>=4.14.1"},
+        {"name":"typing-inspection","requirement":"typing-inspection>=0.4.2"}
+      ]
+    },
+    {
+      "name": "pydantic-core", "version": "2.46.4", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"typing-extensions","requirement":"typing-extensions>=4.14.1"}
+      ]
+    },
+    {
+      "name": "pyogrio", "version": "0.11.1", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"certifi","requirement":"certifi"},
+        {"name":"numpy","requirement":"numpy"},
+        {"name":"packaging","requirement":"packaging"}
+      ]
+    },
+    {"name":"pyparsing","version":"3.3.2","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "pyproj", "version": "3.6.1", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"certifi","requirement":"certifi"}
+      ]
+    },
+    {
+      "name": "python-dateutil", "version": "2.9.0.post0", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"six","requirement":"six >=1.5"}
+      ]
+    },
+    {"name":"pytz","version":"2026.3.post1","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "rasterio", "version": "1.4.3", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"affine","requirement":"affine"},
+        {"name":"attrs","requirement":"attrs"},
+        {"name":"certifi","requirement":"certifi"},
+        {"name":"click","requirement":"click>=4.0"},
+        {"name":"click-plugins","requirement":"click-plugins"},
+        {"name":"cligj","requirement":"cligj>=0.5"},
+        {"name":"numpy","requirement":"numpy>=1.24"},
+        {"name":"pyparsing","requirement":"pyparsing"}
+      ]
+    },
+    {
+      "name": "referencing", "version": "0.36.2", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"attrs","requirement":"attrs>=22.2.0"},
+        {"name":"rpds-py","requirement":"rpds-py>=0.7.0"},
+        {"name":"typing-extensions","requirement":"typing-extensions>=4.4.0; python_version < '3.13'"}
+      ]
+    },
+    {
+      "name": "rio-cogeo", "version": "5.4.2", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"click","requirement":"click>=7.0"},
+        {"name":"morecantile","requirement":"morecantile>=5.0,<7.0"},
+        {"name":"pydantic","requirement":"pydantic~=2.0"},
+        {"name":"rasterio","requirement":"rasterio>=1.3.3"}
+      ]
+    },
+    {"name":"rpds-py","version":"0.27.1","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "shapely", "version": "2.0.7", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"numpy","requirement":"numpy<3,>=1.14"}
+      ]
+    },
+    {"name":"six","version":"1.17.0","root":false,"selectedExtras":[],"dependencies":[]},
+    {"name":"typing-extensions","version":"4.16.0","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "typing-inspection", "version": "0.4.2", "root": false, "selectedExtras": [],
+      "dependencies": [
+        {"name":"typing-extensions","requirement":"typing-extensions>=4.12.0"}
+      ]
+    },
+    {"name":"tzdata","version":"2026.3","root":false,"selectedExtras":[],"dependencies":[]},
+    {
+      "name": "xarray", "version": "2024.7.0", "root": true, "selectedExtras": [],
+      "dependencies": [
+        {"name":"numpy","requirement":"numpy >=1.23"},
+        {"name":"packaging","requirement":"packaging >=23.1"},
+        {"name":"pandas","requirement":"pandas >=2.0"}
+      ]
+    },
+    {"name":"zipp","version":"3.23.1","root":false,"selectedExtras":[],"dependencies":[]}
+  ]
+}

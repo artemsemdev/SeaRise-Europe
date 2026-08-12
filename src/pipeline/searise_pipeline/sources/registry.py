@@ -18,6 +18,101 @@ class RegistryError(ValueError):
     """The source lock is malformed or internally inconsistent."""
 
 
+_GEONAMES_DUMP_ROOT = "https://download.geonames.org/export/dump/"
+_GEONAMES_SETTLEMENT_SOURCE_ID = "geonames-settlement-catalogue"
+_GEONAMES_SETTLEMENT_ASSETS = {
+    "all-countries": (
+        "allCountries.zip",
+        "application/zip",
+        ["settlement-place-records"],
+    ),
+    "alternate-names-v2": (
+        "alternateNamesV2.zip",
+        "application/zip",
+        ["settlement-alternate-names", "settlement-language-metadata"],
+    ),
+    "admin1-codes-ascii": (
+        "admin1CodesASCII.txt",
+        "text/plain",
+        ["settlement-admin1-context"],
+    ),
+    "format-readme": (
+        "readme.txt",
+        "text/plain",
+        ["settlement-format-contract", "source-licence-notice"],
+    ),
+}
+_GEONAMES_LICENCE = {
+    "name": "Creative Commons Attribution 4.0 International",
+    "url": "https://creativecommons.org/licenses/by/4.0/",
+    "spdx": "CC-BY-4.0",
+    "attribution": "GeoNames geographical database, https://www.geonames.org/.",
+    "redistributionStatus": "approved",
+    "reviewer": "SeaRise Europe maintainers",
+    "reviewedAt": "2026-08-04",
+    "requiredAcknowledgements": [
+        "Retain GeoNames attribution and the CC BY 4.0 licence link in derived "
+        "settlement indexes."
+    ],
+    "notes": (
+        "The hash-locked readme binds the tab-delimited UTF-8 formats and licence "
+        "notice. Daily download URLs are mutable; SHA-256 and byte size are the "
+        "only byte-identity authority."
+    ),
+}
+_GEONAMES_INSPECTION = {
+    "inspectedAt": "2026-08-10",
+    "method": (
+        "Official HTTPS download, response metadata capture, complete SHA-256 "
+        "stream, ZIP central-directory inspection, and exact member hashing"
+    ),
+    "evidenceRef": (
+        "src/pipeline/sources/evidence/"
+        "geonames-settlement-snapshot-20260810.json"
+    ),
+    "result": "verified",
+}
+_GEONAMES_ARCHIVE_MEMBERS = {
+    "all-countries": [
+        {
+            "id": "all-countries-records",
+            "path": "allCountries.txt",
+            "role": "settlement-place-records",
+            "byteSize": 1782635669,
+            "compressedByteSize": 419923631,
+            "crc32": "27133946",
+            "sha256": (
+                "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8"
+            ),
+        }
+    ],
+    "alternate-names-v2": [
+        {
+            "id": "alternate-name-records",
+            "path": "alternateNamesV2.txt",
+            "role": "settlement-alternate-names",
+            "byteSize": 777625687,
+            "compressedByteSize": 202448178,
+            "crc32": "e311a5a6",
+            "sha256": (
+                "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612"
+            ),
+        },
+        {
+            "id": "iso-language-codes",
+            "path": "iso-languagecodes.txt",
+            "role": "settlement-language-metadata",
+            "byteSize": 137908,
+            "compressedByteSize": 61908,
+            "crc32": "4e1f14da",
+            "sha256": (
+                "cb0d34f492775deec8ec5713da6efa4463dad99b5e7ba2172bd094cfdcb76571"
+            ),
+        },
+    ],
+}
+
+
 @dataclass(frozen=True)
 class ObjectSet:
     contract: str
@@ -142,6 +237,41 @@ def _schema_path(lock_path: Path) -> Path:
 def _format_error(error: Any) -> str:
     location = ".".join(str(part) for part in error.absolute_path) or "<root>"
     return f"{location}: {error.message}"
+
+
+def _validate_geonames_source_contract(raw_source: dict[str, Any]) -> None:
+    source_id = raw_source["id"]
+    if source_id != _GEONAMES_SETTLEMENT_SOURCE_ID:
+        return
+    if (
+        raw_source["selectionStatus"] != "selected"
+        or raw_source["publisher"] != "GeoNames"
+        or raw_source["canonicalRecord"] != _GEONAMES_DUMP_ROOT
+        or raw_source["version"] != raw_source["snapshotDate"]
+    ):
+        raise RegistryError("GeoNames settlement snapshot identity is incomplete")
+    if raw_source["licence"] != _GEONAMES_LICENCE:
+        raise RegistryError("GeoNames settlement licence identity mismatch")
+    if raw_source.get("inspection") != _GEONAMES_INSPECTION:
+        raise RegistryError("GeoNames settlement inspection identity mismatch")
+    assets = {asset["id"]: asset for asset in raw_source["assets"]}
+    if set(assets) != set(_GEONAMES_SETTLEMENT_ASSETS):
+        raise RegistryError("GeoNames settlement snapshot asset set is incomplete")
+    for asset_id, (filename, media_type, roles) in _GEONAMES_SETTLEMENT_ASSETS.items():
+        asset = assets[asset_id]
+        expected_url = _GEONAMES_DUMP_ROOT + filename
+        if (
+            asset["kind"] != "file"
+            or asset["availability"] != "locked"
+            or asset["url"] != expected_url
+            or asset["resolvedUrl"] != expected_url
+            or asset["mediaType"] != media_type
+            or asset["cachePath"] != filename
+            or asset.get("roles") != roles
+            or asset.get("members", [])
+            != _GEONAMES_ARCHIVE_MEMBERS.get(asset_id, [])
+        ):
+            raise RegistryError(f"GeoNames settlement asset identity mismatch: {asset_id}")
 
 
 def _manifest_path(lock_path: Path, relative_path: str) -> Path:
@@ -305,6 +435,7 @@ def load_registry(lock_path: Path) -> Registry:
         if source_id in seen_sources:
             raise RegistryError(f"Duplicate source id: {source_id}")
         seen_sources.add(source_id)
+        _validate_geonames_source_contract(raw_source)
 
         seen_assets: set[str] = set()
         assets: list[Asset] = []
@@ -396,3 +527,13 @@ def load_registry(lock_path: Path) -> Registry:
             )
         )
     return Registry(tuple(sources))
+
+
+def load_settlement_registry(lock_path: Path) -> Registry:
+    """Return the isolated, complete Phase 1 settlement source registry."""
+    registry = load_registry(lock_path)
+    if [source.id for source in registry.sources] != [_GEONAMES_SETTLEMENT_SOURCE_ID]:
+        raise RegistryError(
+            "GeoNames Phase 1 production input must contain only the full settlement snapshot"
+        )
+    return registry

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/artifact-envelope.schema.json",
+  "schemaVersion": "3.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "artifactType": "settlement-search-shard",
+  "mediaType": "application/vnd.searise.search-index+json",
+  "formatVersion": "2.0.0",
+  "placeSchema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json",
+  "spatialIdentity": {
+    "supportGeometry": { "artifactId": "europe-support", "version": "natural-earth-5.1.1-explicit-scope-v2", "sha256": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385" },
+    "coastalGeometry": { "artifactId": "coastal-analysis-zone", "version": "natural-earth-5.1.1-25km-scope-v2", "sha256": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9" },
+    "shorelineGeometry": { "artifactId": "europe-settlement-shoreline-v1", "version": "natural-earth-direct-linework-europe-selection-v1", "sha256": "53972730f9af3f541b67ee67a4653fb5a21ac52011d33c4372eb9fa84bc331ac" },
+    "predicate": "covers",
+    "distanceMethodVersion": "epsg3035-planar-whole-meter-half-even-v1"
+  },
+  "geometryStatus": "selected-scope-approximation",
+  "canonicalGeometryClaim": false,
+  "hazardExtentClaim": false,
+  "scientificApprovalClaim": false,
+  "ownerApprovalClaim": false,
+  "publicationEligible": false,
+  "shardId": "europe-core-fixture",
+  "catalogMembership": "europe-core",
+  "normalizationVersion": "settlement-normalization-v2",
+  "engine": { "id": "representative-json", "packageVersion": "1.0.0", "serializationVersion": "2" },
+  "recordCount": 1,
+  "documents": [
+    {
+      "placeId": "geonames:900000001",
+      "displayName": "Fixturehafen",
+      "searchNames": ["Fixturehafen", "Fixture Harbour"],
+      "countryCode": "DE",
+      "admin1Name": "Hamburg",
+      "location": { "latitude": 53.55, "longitude": 9.9937 },
+      "population": 1000,
+      "featureCode": "PPL",
+      "distanceToCoastMeters": 250,
+      "isCoastal": true
+    }
+  ]
+}

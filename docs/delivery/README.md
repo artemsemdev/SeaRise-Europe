@@ -1,7 +1,7 @@
 # Static-First Migration Plan
 
-> **Status:** AR6 projection implementation complete; trusted release evidence and Phase 1 locked
-> **Last updated:** 2026-08-06
+> **Status:** Phase 0R approved; Phase 1 artifact-contract work in progress
+> **Last updated:** 2026-08-10
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
 
 ## Purpose
@@ -18,9 +18,8 @@ The repository is currently in a transition state:
   browser-ready artifacts;
 - production migration has not started;
 - the binary Phase 0 investigation ended without a publishable release;
-- ADR-024 accepts a source-native AR6 projection contract and #135 parity is
-  complete, while #110 still requires trusted full-source builds and the
-  owner-controlled regional release disposition;
+- ADR-024, #135 parity, trusted dual-platform #110 evidence, and the protected
+  owner `releaseDisposition=approved` are complete; Phase 1 is unlocked;
 - the current checked-in raster is demonstration data and must not be
   represented as a production scientific release.
 
@@ -57,7 +56,7 @@ Use Conventional Commits and the repository pull-request template.
 | Infrastructure | Terraform for Azure | OpenTofu for static host/object delivery |
 | Provenance | Source notes and tests | Checksums + STAC + SLSA + Cosign |
 
-## Workstream 0 — scientific proof and recovery (`in progress`)
+## Workstream 0 — scientific proof and recovery (`complete`)
 
 This workstream blocks a production data release and destructive removal of the
 legacy assessment path. The v1 binary investigation is terminal, but its
@@ -99,10 +98,11 @@ Recovery follows this dependency order:
 3. [#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110) builds the
    nine regional projection layers and records the recovery gate.
 
-Only a zero-blocker #110 with passing automated evidence and a separate
-project-owner `releaseDisposition=approved` may unlock
-[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48), Workstream 1,
-and Phase 1. Green CI cannot authorize that decision.
+The zero-blocker #110 evidence and separate project-owner
+`releaseDisposition=approved` are now recorded in the immutable
+[`final-gate.json`](../../src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json).
+That decision unlocked [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48),
+Workstream 1, and Phase 1; green CI did not make the owner decision.
 
 The Phase 0R release sequence avoids self-referential evidence:
 
@@ -126,19 +126,24 @@ Recovery exit evidence:
 - [x] offline golden locations covering projection, source nodata, inland, and
   unsupported cases;
 - [x] Python/TypeScript and artifact parity for the exact grid-only contract;
-- [ ] dual-platform trusted full-source evidence with zero blockers;
-- [ ] protected project-owner `releaseDisposition=approved` and immutable
+- [x] dual-platform trusted full-source evidence with zero blockers;
+- [x] protected project-owner `releaseDisposition=approved` and immutable
   decision records.
 
 Source-lock operation, rights status, cache handling, and upstream incident
 response are documented in the
 [source acquisition operator guide](source-acquisition.md).
 
-## Workstream 1 — artifact contracts and pipeline (`locked`)
+## Workstream 1 — artifact contracts and pipeline (`in progress`)
 
-- [ ] Add JSON Schemas for release manifest, scenarios, methodology, source
-  attribution, and search records.
-- [ ] Add a deterministic release-directory builder.
+- [x] Add authoritative JSON Schemas for the release manifest, artifacts,
+  scenarios, results, methodology, attribution, receipts, search, quality,
+  architecture evidence, STAC, and release pointer.
+- [x] Add a deterministic receipt-driven release-directory builder with
+  identity-safe resume, pinned offline execution, and atomic candidates.
+- [x] Add strict typed parsing for the pinned GeoNames place, admin1,
+  alternate-name, and ISO-language rows, preserving provider-native values,
+  explicit anomaly flags, exact lineage, and deterministic name selection.
 - [ ] Use DuckDB Spatial for GeoNames normalization, support/coastal joins,
   duplicate checks, and GeoParquet output.
 - [ ] Produce `europe-core` and `europe-coastal` search shards from a pinned
@@ -151,7 +156,7 @@ response are documented in the
 - [ ] Generate an artifact inventory, SHA-256 checksums, and data-quality
   summary.
 - [ ] Generate SLSA-compatible provenance and sign the manifest with Cosign.
-- [ ] Provide a small committed fixture release; keep large/raw data ignored.
+- [x] Provide a small committed fixture release; keep large/raw data ignored.
 
 Exit evidence:
 

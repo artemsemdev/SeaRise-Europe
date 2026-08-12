@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/scenario-config.schema.json",
+  "title": "SeaRise Europe scenario and projection semantics configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "scenarios",
+    "horizons",
+    "defaults",
+    "layerMatrix",
+    "resultStates",
+    "lookup",
+    "projectionSemantics",
+    "prohibitedClaims"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/scenario-config.schema.json"
+    },
+    "schemaVersion": {
+      "$ref": "defs.schema.json#/$defs/schemaVersion"
+    },
+    "dataReleaseId": {
+      "$ref": "defs.schema.json#/$defs/dataReleaseId"
+    },
+    "dataProvenanceClass": {
+      "$ref": "defs.schema.json#/$defs/dataProvenanceClass"
+    },
+    "scenarios": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "ssp1-26" },
+        { "const": "ssp2-45" },
+        { "const": "ssp5-85" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "horizons": {
+      "type": "array",
+      "prefixItems": [
+        { "const": 2030 },
+        { "const": 2050 },
+        { "const": 2100 }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "horizon"],
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2050 }
+      }
+    },
+    "layerMatrix": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/ssp1262030" },
+        { "$ref": "#/$defs/ssp1262050" },
+        { "$ref": "#/$defs/ssp1262100" },
+        { "$ref": "#/$defs/ssp2452030" },
+        { "$ref": "#/$defs/ssp2452050" },
+        { "$ref": "#/$defs/ssp2452100" },
+        { "$ref": "#/$defs/ssp5852030" },
+        { "$ref": "#/$defs/ssp5852050" },
+        { "$ref": "#/$defs/ssp5852100" }
+      ],
+      "items": false,
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true
+    },
+    "resultStates": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "ProjectionAvailable" },
+        { "const": "DataUnavailable" },
+        { "const": "OutOfScope" },
+        { "const": "UnsupportedGeography" }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "lookup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceLocationFamily",
+        "operator",
+        "maximumDistanceKilometres",
+        "distanceLimitInclusive",
+        "nativeResolutionDegrees",
+        "interpolation",
+        "tideGaugeFallback",
+        "nodataSubstitution",
+        "analysisArtifactRole",
+        "visualArtifactScientificInput"
+      ],
+      "properties": {
+        "sourceLocationFamily": { "const": "grid" },
+        "operator": { "const": "nearest-source-grid-location" },
+        "maximumDistanceKilometres": { "const": 100 },
+        "distanceLimitInclusive": { "const": true },
+        "nativeResolutionDegrees": { "const": 1 },
+        "interpolation": { "const": "none" },
+        "tideGaugeFallback": { "const": "prohibited" },
+        "nodataSubstitution": { "const": "prohibited" },
+        "analysisArtifactRole": { "const": "projection-analysis-cog" },
+        "visualArtifactScientificInput": { "const": false }
+      }
+    },
+    "projectionSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "modeledQuantity",
+        "units",
+        "baseline",
+        "confidence",
+        "quantiles"
+      ],
+      "properties": {
+        "modeledQuantity": {
+          "const": "regional-relative-sea-level-change"
+        },
+        "units": { "const": "m" },
+        "baseline": { "const": "1995-2014 mean" },
+        "confidence": { "const": "medium" },
+        "quantiles": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "median", "upper"],
+          "properties": {
+            "lower": { "const": 0.167 },
+            "median": { "const": 0.5 },
+            "upper": { "const": 0.833 }
+          }
+        }
+      }
+    },
+    "prohibitedClaims": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "flooding" },
+        { "const": "inundation" },
+        { "const": "terrain-exposure" },
+        { "const": "flood-probability" },
+        { "const": "property-risk" }
+      ],
+      "items": false,
+      "minItems": 5,
+      "maxItems": 5
+    }
+  },
+  "$defs": {
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "horizon"],
+      "properties": {
+        "scenario": {
+          "$ref": "defs.schema.json#/$defs/scenarioId"
+        },
+        "horizon": {
+          "$ref": "defs.schema.json#/$defs/horizonYear"
+        }
+      }
+    },
+    "ssp1262030": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp1-26" },
+        "horizon": { "const": 2030 }
+      }
+    },
+    "ssp1262050": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp1-26" },
+        "horizon": { "const": 2050 }
+      }
+    },
+    "ssp1262100": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp1-26" },
+        "horizon": { "const": 2100 }
+      }
+    },
+    "ssp2452030": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2030 }
+      }
+    },
+    "ssp2452050": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2050 }
+      }
+    },
+    "ssp2452100": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2100 }
+      }
+    },
+    "ssp5852030": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp5-85" },
+        "horizon": { "const": 2030 }
+      }
+    },
+    "ssp5852050": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp5-85" },
+        "horizon": { "const": 2050 }
+      }
+    },
+    "ssp5852100": {
+      "$ref": "#/$defs/layer",
+      "properties": {
+        "scenario": { "const": "ssp5-85" },
+        "horizon": { "const": 2100 }
+      }
+    }
+  }
+}

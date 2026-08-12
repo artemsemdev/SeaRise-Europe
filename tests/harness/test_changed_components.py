@@ -73,6 +73,20 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["frontend"])
         self.assertFalse(outputs["docker_frontend"])
 
+    def test_pmtiles_render_authorities_route_frontend_evidence_check(self) -> None:
+        paths = [
+            "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
+            "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
+            "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["frontend"])
+                self.assertTrue(outputs["pipeline"])
+                self.assertFalse(outputs["docker_frontend"])
+
     def test_pipeline_change_does_not_route_runtime_stack(self) -> None:
         outputs = classify_paths(["src/pipeline/searise_pipeline/science/ar6.py"])
 
@@ -87,6 +101,21 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["src/pipeline/searise_pipeline/config.py"])
 
         self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
+    def test_supply_chain_validator_routes_pipeline_contracts(self) -> None:
+        outputs = classify_paths(["scripts/release/validate_supply_chain_contract.py"])
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["release"])
+
+    def test_settlement_artifact_routes_pipeline_contracts(self) -> None:
+        outputs = classify_paths(
+            ["data/settlements/europe-settlement-shoreline-v1.geojson"]
+        )
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertTrue(outputs["heavy"])
         self.assertFalse(outputs["release"])
 
     def test_release_contract_routes_release_toolchain(self) -> None:
@@ -124,6 +153,22 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["pipeline"])
         self.assertFalse(outputs["docker_frontend"])
         self.assertFalse(outputs["docker_api"])
+
+    def test_public_release_contract_routes_python_and_frontend_only(self) -> None:
+        outputs = classify_paths(["contracts/release/v1/manifest.schema.json"])
+
+        self.assertTrue(outputs["frontend"])
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["api"])
+        self.assertFalse(outputs["release"])
+        self.assertFalse(outputs["docker_frontend"])
+        self.assertFalse(outputs["docker_api"])
+        self.assertFalse(outputs["compose"])
+        candidate = classify_paths(
+            ["contracts/candidate-completeness/v1/candidate.schema.json"]
+        )
+        self.assertTrue(candidate["frontend"])
+        self.assertTrue(candidate["pipeline"])
 
     def test_ci_router_change_exercises_every_route(self) -> None:
         outputs = classify_paths(["scripts/ci/changed_components.py"])
@@ -599,6 +644,79 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertIn('REPOSITORY = "artemsemdev/SeaRise-Europe"', verifier)
         self.assertIn('MASTER_REF = "refs/heads/master"', verifier)
+
+    def test_controlled_offline_build_routes_pipeline_and_release_only(self) -> None:
+        for path in (
+            ".github/workflows/offline-release-controlled.yml",
+            "scripts/release/prepare_controlled_offline_inputs.py",
+        ):
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["pipeline"])
+                self.assertTrue(outputs["release"])
+                self.assertTrue(outputs["heavy"])
+                self.assertFalse(outputs["frontend"])
+                self.assertFalse(outputs["api"])
+                self.assertFalse(outputs["infrastructure"])
+                self.assertFalse(outputs["compose"])
+
+    def test_offline_receipt_example_routes_pipeline_validation(self) -> None:
+        outputs = classify_paths(
+            ["docs/evidence/fixtures/offline-release-execution-receipt.example.json"]
+        )
+
+        self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["frontend"])
+        self.assertFalse(outputs["api"])
+        self.assertFalse(outputs["infrastructure"])
+        self.assertFalse(outputs["compose"])
+
+    def test_controlled_offline_build_is_manual_identity_bound_and_offline(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2]
+            / ".github/workflows/offline-release-controlled.yml"
+        ).read_text(encoding="utf-8")
+        dispatch = workflow.split("permissions:", maxsplit=1)[0]
+        first_step = workflow.split("      - uses: actions/checkout", maxsplit=1)[0]
+
+        self.assertIn("  workflow_dispatch:", dispatch)
+        self.assertNotIn("pull_request:", dispatch)
+        self.assertNotIn("push:", dispatch)
+        self.assertIn("actions: read", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertIn("environment: phase-1-controlled-offline-build", workflow)
+        self.assertIn("regional", dispatch)
+        self.assertIn("full-europe", dispatch)
+        self.assertIn('[[ "${SOURCE_REVISION}" == "${GITHUB_SHA}" ]]', first_step)
+        self.assertIn('[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]', first_step)
+        self.assertIn("input_bundle_sha256:", dispatch)
+        self.assertIn("input_run_id:", dispatch)
+        self.assertIn("input_artifact_name:", dispatch)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertEqual(workflow.count("--network none"), 2)
+        self.assertIn('--user "$(id -u):$(id -g)"', workflow)
+        self.assertEqual(workflow.count("--read-only"), 2)
+        self.assertIn(
+            ":/workspace/build-inputs/offline-release/${PROFILE}:ro",
+            workflow,
+        )
+        self.assertIn("publicationAttempted: false", workflow)
+        self.assertIn("activationAttempted: false", workflow)
+        self.assertNotIn("azure", workflow.lower())
+        self.assertNotIn("cloudflare", workflow.lower())
+        self.assertNotIn("database", workflow.lower())
+
+        action_lines = [
+            line.strip() for line in workflow.splitlines() if "uses:" in line
+        ]
+        self.assertTrue(action_lines)
+        self.assertTrue(
+            all(
+                re.search(r"@[0-9a-f]{40}(?:\s+#\s+v\S+)?$", line)
+                for line in action_lines
+            )
+        )
 
     def test_gitignore_change_only_routes_pipeline_contracts(self) -> None:
         outputs = classify_paths([".gitignore"])

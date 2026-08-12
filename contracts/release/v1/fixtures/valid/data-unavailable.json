@@ -1,0 +1,30 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/projection-result.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "methodologyVersion": "ar6-regional-projection-v1",
+  "state": "DataUnavailable",
+  "reasonCode": "source-value-nodata",
+  "selection": {
+    "location": { "latitude": 64.1466, "longitude": -21.9426 },
+    "scenario": "ssp5-85",
+    "horizon": 2100
+  },
+  "releaseAuthority": {
+    "automatedValidation": "pending",
+    "releaseDisposition": "pending-owner",
+    "dataProvenanceClass": "synthetic-fixture",
+    "statusDisclosureRequired": true
+  },
+  "geography": "InEuropeAndCoastalZone",
+  "source": {
+    "sourceRelease": "20210809",
+    "memberSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "locationId": 1000043210,
+    "location": { "latitude": 64, "longitude": -22 },
+    "distanceKilometres": 16.554321,
+    "nativeResolutionDegrees": 1,
+    "locationFamily": "grid",
+    "lookupOperator": "nearest-source-grid-location"
+  }
+}

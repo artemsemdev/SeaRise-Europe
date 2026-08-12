@@ -1,0 +1,59 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/scenario-config.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "scenarios": ["ssp1-26", "ssp2-45", "ssp5-85"],
+  "horizons": [2030, 2050, 2100],
+  "defaults": {
+    "scenario": "ssp2-45",
+    "horizon": 2050
+  },
+  "layerMatrix": [
+    { "scenario": "ssp1-26", "horizon": 2030 },
+    { "scenario": "ssp1-26", "horizon": 2050 },
+    { "scenario": "ssp1-26", "horizon": 2100 },
+    { "scenario": "ssp2-45", "horizon": 2030 },
+    { "scenario": "ssp2-45", "horizon": 2050 },
+    { "scenario": "ssp2-45", "horizon": 2100 },
+    { "scenario": "ssp5-85", "horizon": 2030 },
+    { "scenario": "ssp5-85", "horizon": 2050 },
+    { "scenario": "ssp5-85", "horizon": 2100 }
+  ],
+  "resultStates": [
+    "ProjectionAvailable",
+    "DataUnavailable",
+    "OutOfScope",
+    "UnsupportedGeography"
+  ],
+  "lookup": {
+    "sourceLocationFamily": "grid",
+    "operator": "nearest-source-grid-location",
+    "maximumDistanceKilometres": 100,
+    "distanceLimitInclusive": true,
+    "nativeResolutionDegrees": 1,
+    "interpolation": "none",
+    "tideGaugeFallback": "prohibited",
+    "nodataSubstitution": "prohibited",
+    "analysisArtifactRole": "projection-analysis-cog",
+    "visualArtifactScientificInput": false
+  },
+  "projectionSemantics": {
+    "modeledQuantity": "regional-relative-sea-level-change",
+    "units": "m",
+    "baseline": "1995-2014 mean",
+    "confidence": "medium",
+    "quantiles": {
+      "lower": 0.167,
+      "median": 0.5,
+      "upper": 0.833
+    }
+  },
+  "prohibitedClaims": [
+    "flooding",
+    "inundation",
+    "terrain-exposure",
+    "flood-probability",
+    "property-risk"
+  ]
+}

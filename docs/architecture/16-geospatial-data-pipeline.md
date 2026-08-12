@@ -1,6 +1,6 @@
 # 16 — Offline Geospatial Data Pipeline
 
-> **Status:** Phase 0R artifact path implemented; trusted full-source gate pending
+> **Status:** Phase 0R approved; Phase 1 offline candidate builder implemented
 >
 > **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
 > **Publication warning:** the repository's current `demo.tif` and synthetic tests prove software mechanics only. They are not scientific evidence or a production data release.
@@ -34,19 +34,26 @@ production.
 
 ## 2. Current implementation boundary
 
-The current modules under `src/pipeline/` implement the legacy Azure/PostGIS/
+The legacy modules under `src/pipeline/` still implement the Azure/PostGIS/
 TiTiler flow: they assume an IPCC grid, create COGs, upload to Blob Storage,
 register database rows, and optionally spot-check TiTiler. That code remains a
-migration input, not the target pipeline described here.
+migration input until Phase 3 parity, not the target pipeline described here.
 
-The Phase 0R implementation now includes the SHA-256-locked AR6 reader, exact
+The approved Phase 0R implementation includes the SHA-256-locked AR6 reader, exact
 source-grid lookup, nine COG/GeoParquet/PMTiles triplets, manifest/STAC,
 candidate sealing, cross-artifact parity, and browser budget measurement.
-Publication is still prohibited until #110 produces two trusted full-source
-builds, commits the evidence-only bundle, and records the protected owner
-disposition. Checked-in legacy application output remains synthetic, while
-GeoNames catalogs, supply-chain signatures, R2 publication, and the static
-application remain later roadmap work.
+#110's trusted dual-platform evidence and protected owner disposition are
+complete and opened Phase 1.
+
+The target `searise_pipeline.offline_release` package now compiles checked-in
+fixture/regional/full profiles into one receipt-bound seven-stage graph. It
+verifies identities before cache reuse, validates the complete v1 public
+release, and atomically assembles an immutable candidate in a pinned,
+network-disabled container. The builder cannot publish or activate a release;
+see the [operator runbook](../operations/offline-release-builder.md) and
+[implementation evidence](../evidence/phase-1-offline-release-builder.md).
+GeoNames catalogs, later artifact workstreams, R2 publication, and the static
+application remain roadmap work.
 
 The target pipeline is introduced incrementally. Legacy upload/register steps
 are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
@@ -144,6 +151,21 @@ after comparison with Copernicus Coastal Zones; it is not a hazard extent.
 
 ### 6.3 Build the settlement catalog
 
+Before any join, the typed GeoNames boundary parser binds `allCountries.txt`
+and `admin1CodesASCII.txt` to the scoped 2026-08-10 source identities. It
+requires strict UTF-8, exact 19/4-column rows, canonical IDs and numeric/date
+forms, finite bounded coordinates, and per-row lineage. Provider-native
+Unicode, nullable feature fields, signed raw population, and free-form admin
+values are preserved at this raw boundary; catalog eligibility and join
+semantics are separate fail-closed stages.
+
+The snapshot-bound `geonames-place-raw-anomalies-v1` policy preserves and flags
+DEL/C1 codepoints, edge ASCII spaces in aliases, negative raw populations, and
+the provider's four non-place leading-empty country placeholders. Downstream
+normalization must quarantine flagged rows unless its contract accepts the
+specific class; trailing/interior empty tokens remain invalid. The admin1 asset
+has no accepted anomaly class and fails closed on unexpected controls.
+
 DuckDB Spatial performs the reproducible joins:
 
 1. ingest pinned GeoNames places and alternate names;
@@ -155,7 +177,8 @@ DuckDB Spatial performs the reproducible joins:
 6. create `europe-core` and `europe-coastal` logical sets;
 7. reconcile accepted, duplicate, and rejected counts;
 8. write canonical `settlements.parquet` and deterministic serialized indexes;
-9. Brotli-compress `europe-core.index.br` and `europe-coastal.index.br`.
+9. Brotli-compress `europe-core.codepoint-trie.json.br` and
+   `europe-coastal.codepoint-trie.json.br`.
 
 The core set uses population >= 500 plus national/administrative capitals. The
 coastal set keeps every qualifying active place in the coastal zone, including

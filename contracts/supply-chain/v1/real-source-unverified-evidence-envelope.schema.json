@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json",
+  "title": "SeaRise Europe real-source unverified evidence envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "candidateId",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "candidateManifest",
+    "identityPolicy",
+    "provenance",
+    "signatures",
+    "softwareBillsOfMaterials",
+    "verification"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "phase-1-real-source-unverified-evidence-v1" },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^candidate-[a-z0-9][a-z0-9-]*-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataProvenanceClass": { "const": "real-source" },
+    "candidateManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "byteSize"],
+      "properties": {
+        "path": { "const": "manifest.json" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteSize": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "identityPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "const": "contracts/supply-chain/v1/identity-policy.json" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "path",
+        "sha256",
+        "byteSize",
+        "mediaType",
+        "statementType",
+        "predicateType"
+      ],
+      "properties": {
+        "role": { "const": "provenance" },
+        "path": { "const": "provenance.intoto.jsonl" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "mediaType": { "const": "application/vnd.in-toto+json" },
+        "statementType": { "const": "https://in-toto.io/Statement/v1" },
+        "predicateType": { "const": "https://slsa.dev/provenance/v1" }
+      }
+    },
+    "signatures": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/signature",
+          "properties": {
+            "path": { "const": "manifest.sigstore.json" },
+            "subjectPath": { "const": "manifest.json" }
+          }
+        },
+        {
+          "$ref": "#/$defs/signature",
+          "properties": {
+            "path": { "const": "provenance.sigstore.json" },
+            "subjectPath": { "const": "provenance.intoto.jsonl" }
+          }
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "softwareBillsOfMaterials": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/build-plane.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/frontend-npm.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/nuget/searise-api-net8.0.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/nuget/searise-application-net8.0.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/nuget/searise-domain-net8.0.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/nuget/searise-infrastructure-net8.0.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/python-release-linux-x86-64-cp311.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/python-release-macos-arm64-cp311.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/python-settlement-spatial-linux-x86-64-cp311.cdx.json" } } },
+        { "$ref": "#/$defs/sbom", "properties": { "path": { "const": "sbom/python-settlement-spatial-macos-arm64-cp311.cdx.json" } } }
+      ],
+      "items": false,
+      "minItems": 10,
+      "maxItems": 10
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "fixtureOnly",
+        "verified",
+        "policySatisfied",
+        "productionClaim",
+        "publicationClaim",
+        "scientificApproval",
+        "reason"
+      ],
+      "properties": {
+        "status": { "const": "real-source-unverified" },
+        "fixtureOnly": { "const": false },
+        "verified": { "const": false },
+        "policySatisfied": { "const": false },
+        "productionClaim": { "const": false },
+        "publicationClaim": { "const": false },
+        "scientificApproval": { "const": false },
+        "reason": {
+          "const": "Cryptographic verification has not run; no signing, identity, environment, production, publication, or scientific approval claim is made."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "path",
+        "sha256",
+        "byteSize",
+        "mediaType",
+        "subjectPath",
+        "subjectSha256"
+      ],
+      "properties": {
+        "role": { "const": "signature" },
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "mediaType": {
+          "const": "application/vnd.dev.sigstore.bundle+json;version=0.3"
+        },
+        "subjectPath": { "$ref": "#/$defs/path" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sbom": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "path",
+        "sha256",
+        "byteSize",
+        "mediaType",
+        "bomFormat",
+        "specVersion"
+      ],
+      "properties": {
+        "role": { "const": "software-bill-of-materials" },
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "mediaType": { "const": "application/vnd.cyclonedx+json" },
+        "bomFormat": { "const": "CycloneDX" },
+        "specVersion": { "const": "1.7" }
+      }
+    }
+  }
+}

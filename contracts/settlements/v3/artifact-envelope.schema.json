@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/artifact-envelope.schema.json",
+  "title": "SeaRise Europe settlement artifact envelope v3",
+  "oneOf": [
+    { "$ref": "#/$defs/geoparquet" },
+    { "$ref": "#/$defs/searchShard" }
+  ],
+  "$defs": {
+    "common": {
+      "type": "object",
+      "required": [
+        "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass",
+        "artifactType", "mediaType", "formatVersion", "placeSchema", "spatialIdentity",
+        "geometryStatus", "canonicalGeometryClaim", "hazardExtentClaim",
+        "scientificApprovalClaim", "ownerApprovalClaim", "publicationEligible"
+      ],
+      "properties": {
+        "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/artifact-envelope.schema.json" },
+        "schemaVersion": { "const": "3.0.0" },
+        "dataReleaseId": {
+          "type": "string",
+          "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+        },
+        "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+        "artifactType": { "enum": ["settlement-geoparquet", "settlement-search-shard"] },
+        "mediaType": { "type": "string" },
+        "formatVersion": { "type": "string" },
+        "placeSchema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json" },
+        "spatialIdentity": { "$ref": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json#/$defs/spatialIdentity" },
+        "geometryStatus": { "const": "selected-scope-approximation" },
+        "canonicalGeometryClaim": { "const": false },
+        "hazardExtentClaim": { "const": false },
+        "scientificApprovalClaim": { "const": false },
+        "ownerApprovalClaim": { "const": false },
+        "publicationEligible": { "const": false }
+      }
+    },
+    "arrowField": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "type", "nullable"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["utf8", "int64", "float64", "bool", "binary"] },
+        "nullable": { "type": "boolean" }
+      }
+    },
+    "geoparquet": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "required": ["rowCount", "arrowFieldsCanonicalization", "arrowFieldsJsonSha256", "arrowFields", "geometry"],
+          "properties": {
+            "artifactType": { "const": "settlement-geoparquet" },
+            "mediaType": { "const": "application/vnd.apache.parquet" },
+            "formatVersion": { "const": "1.1.0" },
+            "rowCount": { "type": "integer", "minimum": 1 },
+            "arrowFieldsCanonicalization": { "const": "lexicographic-key-json-v1" },
+            "arrowFieldsJsonSha256": { "const": "4cfac102ca87fb50bbf2df67389ed4cb57546bb850a65c3280ba74f2537b053a" },
+            "arrowFields": {
+              "type": "array",
+              "const": [
+                { "name": "id", "type": "utf8", "nullable": false },
+                { "name": "source_spelling", "type": "utf8", "nullable": false },
+                { "name": "canonical_name", "type": "utf8", "nullable": false },
+                { "name": "canonical_name_role", "type": "utf8", "nullable": false },
+                { "name": "canonical_language", "type": "utf8", "nullable": true },
+                { "name": "canonical_script", "type": "utf8", "nullable": true },
+                { "name": "ascii_name", "type": "utf8", "nullable": false },
+                { "name": "alternate_names_json", "type": "utf8", "nullable": false },
+                { "name": "country_code", "type": "utf8", "nullable": false },
+                { "name": "admin1_code", "type": "utf8", "nullable": true },
+                { "name": "admin1_name", "type": "utf8", "nullable": true },
+                { "name": "longitude", "type": "float64", "nullable": false },
+                { "name": "latitude", "type": "float64", "nullable": false },
+                { "name": "population", "type": "int64", "nullable": true },
+                { "name": "feature_code", "type": "utf8", "nullable": false },
+                { "name": "source_updated_at", "type": "utf8", "nullable": false },
+                { "name": "support_geometry_id", "type": "utf8", "nullable": false },
+                { "name": "support_geometry_version", "type": "utf8", "nullable": false },
+                { "name": "support_geometry_sha256", "type": "utf8", "nullable": false },
+                { "name": "coastal_geometry_id", "type": "utf8", "nullable": false },
+                { "name": "coastal_geometry_version", "type": "utf8", "nullable": false },
+                { "name": "coastal_geometry_sha256", "type": "utf8", "nullable": false },
+                { "name": "shoreline_geometry_id", "type": "utf8", "nullable": false },
+                { "name": "shoreline_geometry_version", "type": "utf8", "nullable": false },
+                { "name": "shoreline_geometry_sha256", "type": "utf8", "nullable": false },
+                { "name": "spatial_predicate", "type": "utf8", "nullable": false },
+                { "name": "distance_method_version", "type": "utf8", "nullable": false },
+                { "name": "distance_to_coast_m", "type": "int64", "nullable": false },
+                { "name": "is_coastal", "type": "bool", "nullable": false },
+                { "name": "catalog_membership_json", "type": "utf8", "nullable": false },
+                { "name": "lineage_json", "type": "utf8", "nullable": false },
+                { "name": "geometry", "type": "binary", "nullable": false }
+              ],
+              "items": { "$ref": "#/$defs/arrowField" }
+            },
+            "geometry": {
+              "type": "object", "additionalProperties": false,
+              "required": ["primaryColumn", "encoding", "crs", "geometryType"],
+              "properties": {
+                "primaryColumn": { "const": "geometry" },
+                "encoding": { "const": "WKB" },
+                "crs": { "const": "OGC:CRS84" },
+                "geometryType": { "const": "Point" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "searchDocument": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "placeId", "displayName", "searchNames", "countryCode", "admin1Name",
+        "location", "population", "featureCode", "distanceToCoastMeters", "isCoastal"
+      ],
+      "properties": {
+        "placeId": { "type": "string", "pattern": "^geonames:[1-9][0-9]*$" },
+        "displayName": { "type": "string", "minLength": 1 },
+        "searchNames": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "admin1Name": { "type": ["string", "null"], "minLength": 1 },
+        "location": { "$ref": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json#/$defs/location" },
+        "population": { "type": ["integer", "null"], "minimum": 0 },
+        "featureCode": { "$ref": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json#/$defs/featureCode" },
+        "distanceToCoastMeters": { "type": "integer", "minimum": 0 },
+        "isCoastal": { "type": "boolean" }
+      }
+    },
+    "searchShard": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "type": "object",
+          "required": ["shardId", "catalogMembership", "normalizationVersion", "engine", "recordCount", "documents"],
+          "properties": {
+            "artifactType": { "const": "settlement-search-shard" },
+            "mediaType": { "const": "application/vnd.searise.search-index+json" },
+            "formatVersion": { "const": "2.0.0" },
+            "shardId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+            "catalogMembership": { "enum": ["europe-core", "europe-coastal"] },
+            "normalizationVersion": { "const": "settlement-normalization-v2" },
+            "engine": {
+              "type": "object", "additionalProperties": false,
+              "$comment": "This exact representative serializer describes deterministic contract fixtures only; it does not select a production browser search engine.",
+              "required": ["id", "packageVersion", "serializationVersion"],
+              "properties": {
+                "id": { "const": "representative-json" },
+                "packageVersion": { "const": "1.0.0" },
+                "serializationVersion": { "const": "2" }
+              }
+            },
+            "recordCount": { "type": "integer", "minimum": 1 },
+            "documents": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/searchDocument" } }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "catalogMembership": { "const": "europe-coastal" } }, "required": ["catalogMembership"] },
+              "then": {
+                "properties": {
+                  "documents": {
+                    "items": {
+                      "properties": { "isCoastal": { "const": true } },
+                      "required": ["isCoastal"]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

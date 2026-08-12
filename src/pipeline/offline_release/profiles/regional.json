@@ -1,0 +1,59 @@
+{
+  "$schema": "./profile.schema.json",
+  "schemaVersion": 1,
+  "profile": "regional",
+  "availability": "controlled-input-required",
+  "dataVersion": "1.0.0",
+  "dataProvenanceClass": "real-source",
+  "inputRootPath": "build-inputs/offline-release/regional",
+  "schemaDirectory": "contracts/release/v1",
+  "environment": { "platform": "linux", "architecture": "x86_64", "pythonVersion": "3.11.15", "lockPath": "src/pipeline/requirements-release.lock" },
+  "tools": [
+    {
+      "name": "offline-release-container",
+      "version": "python-3.11.15-bookworm@sha256:a8f8fbe1a0ed",
+      "identityPaths": [
+        "src/pipeline/offline_release/Dockerfile",
+        "src/pipeline/offline_release/Dockerfile.dockerignore"
+      ]
+    },
+    {
+      "name": "searise-pipeline",
+      "version": "0.1.0",
+      "identityPaths": [
+        "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/build-receipt.json",
+        "src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311/candidate-binding.json",
+        "src/pipeline/evidence/ar6-regional-release/owner-promotion/checksums.txt",
+        "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
+        "src/pipeline/evidence/ar6-regional-release/owner-promotion/integration-merge.json",
+        "src/pipeline/evidence/ar6-regional-release/owner-promotion/owner-attestation.json",
+        "src/pipeline/evidence/ar6-regional-release/owner-promotion/promotion.json",
+        "src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json",
+        "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
+        "src/pipeline/science/ar6-lookup-validation.json",
+        "src/pipeline/science/ar6-regional-release.json",
+        "src/pipeline/science/ar6-regional-release.schema.json",
+        "src/pipeline/science/evidence/ar6-lookup-goldens.json",
+        "src/pipeline/searise_pipeline/offline_release/__init__.py",
+        "src/pipeline/searise_pipeline/offline_release/cli.py",
+        "src/pipeline/searise_pipeline/offline_release/engine.py",
+        "src/pipeline/searise_pipeline/offline_release/handlers.py",
+        "src/pipeline/searise_pipeline/offline_release/model.py",
+        "src/pipeline/searise_pipeline/offline_release/profiles.py",
+        "src/pipeline/searise_pipeline/offline_release/projection_bundle.py",
+        "src/pipeline/searise_pipeline/offline_release/runner.py",
+        "src/pipeline/searise_pipeline/offline_release/schemas/operator-receipt.schema.json",
+        "src/pipeline/searise_pipeline/offline_release/schemas/stage-receipt.schema.json",
+        "src/pipeline/searise_pipeline/release/__init__.py",
+        "src/pipeline/searise_pipeline/release/builder.py",
+        "src/pipeline/searise_pipeline/release/cog.py",
+        "src/pipeline/searise_pipeline/release/evidence.py",
+        "src/pipeline/searise_pipeline/release/geoparquet.py",
+        "src/pipeline/searise_pipeline/release/model.py"
+      ]
+    }
+  ],
+  "sourceReceiptPaths": ["build-inputs/offline-release/regional/receipts/sources.json"],
+  "parameters": { "locale": "C.UTF-8", "numericTypes": "schema-pinned", "ordering": "utf8-bytewise", "timestampPolicy": "explicit-plan", "compression": "artifact-profile-pinned", "crsTransforms": "always-xy" },
+  "stageGraph": ["verify-sources", "inspect", "normalize", "derive", "package", "validate", "assemble-release"]
+}

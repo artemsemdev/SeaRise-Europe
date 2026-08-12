@@ -75,3 +75,35 @@ Artifacts are retained for 14 days and cannot overwrite an artifact from the
 same run. A successful build remains a candidate with a pending scientific
 disposition until the owner-validation workflow verifies both artifacts and
 their cross-environment bindings.
+
+## Phase 1 COG range validation
+
+Phase 1 binds the exact nine analysis COG paths, SHA-256 digests, and byte sizes
+to the approved candidate binding, browser trace, and owner gate before testing
+delivery. Each artifact must first match its reviewed local identity. A
+transport adapter is then required to return exact `206` responses with
+canonical `Content-Range`, `Content-Length`, and `Accept-Ranges: bytes` headers.
+Beginning, middle, end, and TIFF-directory ranges derived by the reader are
+compared byte-for-byte with the trusted artifact.
+
+The ordinary unit suite keeps a deterministic in-process transport for mutation
+coverage. Pipeline CI additionally serves the checked-in release fixture from
+an ephemeral loopback HTTP origin and retains an immutable
+`cog-range-evidence.json` artifact for 14 days. That report binds the served
+manifest, all nine COG hashes and byte sizes, the approved Phase 0R candidate
+binding, every one of the 54 successful request/response records, monotonic
+runner-local latency measurements, and explicit malformed, ignored, truncated,
+substituted, and corrupt-response rejection controls. Its exact `producer`
+object also binds the pull-request head revision, checked-out revision, workflow
+run ID and attempt, constrained job name, and `time.perf_counter_ns` clock.
+Validation requires the caller's expected producer identity and rejects changed
+or extra producer fields.
+
+The retained report is labelled
+`candidate-bound-loopback-http-validation-only`. Its latency values are raw
+process-local observations, not a delivery budget. It makes no public-origin,
+CDN, cache, CORS, TLS, publication, or production-readiness claim. Public-host
+validation must still run separately against the same immutable identities
+before activation. Because this workflow artifact expires after 14 days, issue
+#51 still requires a durable candidate-bound capture after the final candidate
+is assembled; this report is not that durable release record.

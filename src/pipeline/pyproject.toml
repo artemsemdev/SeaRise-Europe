@@ -13,10 +13,11 @@ dependencies = [
     "rio-cogeo>=5.0,<6.0",
     "xarray>=2024.1,<2025.0",
     "netcdf4>=1.6,<2.0",
-    "shapely>=2.0,<3.0",
+    "shapely==2.0.7",
     "geopandas==1.0.1",
     "pandas==2.3.2",
     "pyarrow==16.1.0",
+    "pyproj==3.6.1",
     "psycopg2-binary>=2.9,<3.0",
     "azure-storage-blob>=12.19,<13.0",
     "cryptography>=42,<51",
@@ -24,7 +25,10 @@ dependencies = [
 ]
 
 [project.scripts]
+searise-release = "searise_pipeline.offline_release.cli:cli"
+searise-candidate-contract = "searise_pipeline.candidate_completeness.cli:cli"
 searise-sources = "searise_pipeline.sources.cli:cli"
+searise-settlement-spatial-toolchain = "searise_pipeline.settlements.spatial_toolchain:main"
 
 [project.optional-dependencies]
 dev = [
@@ -37,16 +41,23 @@ dev = [
 packages = [
     "pipeline",
     "searise_pipeline",
+    "searise_pipeline.candidate_completeness",
     "searise_pipeline.domain",
+    "searise_pipeline.offline_release",
     "searise_pipeline.regional_fixture",
     "searise_pipeline.release",
     "searise_pipeline.science",
+    "searise_pipeline.settlements",
     "searise_pipeline.sources",
+    "searise_pipeline.supply_chain",
 ]
 
 [tool.setuptools.package-dir]
 pipeline = "."
 searise_pipeline = "searise_pipeline"
+
+[tool.setuptools.package-data]
+"searise_pipeline.offline_release" = ["schemas/*.schema.json"]
 
 [tool.ruff]
 target-version = "py39"

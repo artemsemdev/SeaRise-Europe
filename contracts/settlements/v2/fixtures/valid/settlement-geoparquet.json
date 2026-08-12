@@ -1,0 +1,42 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v2/artifact-envelope.schema.json",
+  "schemaVersion": "2.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "artifactType": "settlement-geoparquet",
+  "mediaType": "application/vnd.apache.parquet",
+  "formatVersion": "1.1.0",
+  "placeSchema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v2/place.schema.json",
+  "geometryStatus": "selected-scope-approximation",
+  "publicationEligible": false,
+  "rowCount": 1,
+  "arrowFieldsCanonicalization": "lexicographic-key-json-v1",
+  "arrowFieldsJsonSha256": "48aeb7651b8bfd7ba365d92187bd3980b9357dc5396f9309275b6a5774eb42f2",
+  "arrowFields": [
+    { "name": "id", "type": "utf8", "nullable": false },
+    { "name": "source_spelling", "type": "utf8", "nullable": false },
+    { "name": "canonical_name", "type": "utf8", "nullable": false },
+    { "name": "canonical_language", "type": "utf8", "nullable": true },
+    { "name": "canonical_script", "type": "utf8", "nullable": true },
+    { "name": "ascii_name", "type": "utf8", "nullable": false },
+    { "name": "alternate_names_json", "type": "utf8", "nullable": false },
+    { "name": "country_code", "type": "utf8", "nullable": false },
+    { "name": "admin1_code", "type": "utf8", "nullable": true },
+    { "name": "admin1_name", "type": "utf8", "nullable": true },
+    { "name": "longitude", "type": "float64", "nullable": false },
+    { "name": "latitude", "type": "float64", "nullable": false },
+    { "name": "population", "type": "int64", "nullable": true },
+    { "name": "feature_code", "type": "utf8", "nullable": false },
+    { "name": "distance_to_coast_m", "type": "float64", "nullable": false },
+    { "name": "is_coastal", "type": "bool", "nullable": false },
+    { "name": "catalog_membership_json", "type": "utf8", "nullable": false },
+    { "name": "lineage_json", "type": "utf8", "nullable": false },
+    { "name": "geometry", "type": "binary", "nullable": false }
+  ],
+  "geometry": {
+    "primaryColumn": "geometry",
+    "encoding": "WKB",
+    "crs": "OGC:CRS84",
+    "geometryType": "Point"
+  }
+}

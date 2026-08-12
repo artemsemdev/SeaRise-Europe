@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
     <RollForward>LatestMajor</RollForward>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode>true</RestoreLockedMode>
   </PropertyGroup>
 </Project>

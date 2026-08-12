@@ -1,0 +1,8 @@
+{"version": 1,
+  "dependencies": {
+    "net8.0": {
+      "Alpha": {"type":"Direct","requested":"[1.0.0, )","resolved":"1.0.0","contentHash":"YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ==","dependencies":{"Bravo":"[2.0.0, )"}},
+      "Bravo": {"type":"Transitive","resolved":"2.0.0","contentHash":"YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg=="},
+      "fixture.library": {"type":"Project","dependencies":{"Bravo":"[2.0.0, )"}}
+    }
+  }}

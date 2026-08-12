@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/projection-result.schema.json",
+  "title": "SeaRise Europe projection result v1",
+  "oneOf": [
+    { "$ref": "#/$defs/projectionAvailable" },
+    { "$ref": "#/$defs/dataUnavailable" },
+    { "$ref": "#/$defs/outOfScope" },
+    { "$ref": "#/$defs/unsupportedGeography" }
+  ],
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "dataReleaseId",
+        "methodologyVersion",
+        "state",
+        "reasonCode",
+        "selection",
+        "releaseAuthority"
+      ],
+      "properties": {
+        "$schema": {
+          "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/projection-result.schema.json"
+        },
+        "schemaVersion": {
+          "$ref": "defs.schema.json#/$defs/schemaVersion"
+        },
+        "dataReleaseId": {
+          "$ref": "defs.schema.json#/$defs/dataReleaseId"
+        },
+        "methodologyVersion": {
+          "const": "ar6-regional-projection-v1"
+        },
+        "state": {
+          "$ref": "defs.schema.json#/$defs/resultState"
+        },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection": {
+          "$ref": "#/$defs/selection"
+        },
+        "releaseAuthority": {
+          "$ref": "defs.schema.json#/$defs/releaseAuthority"
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "scenario", "horizon"],
+      "properties": {
+        "location": {
+          "$ref": "defs.schema.json#/$defs/coordinates"
+        },
+        "scenario": {
+          "$ref": "defs.schema.json#/$defs/scenarioId"
+        },
+        "horizon": {
+          "$ref": "defs.schema.json#/$defs/horizonYear"
+        }
+      }
+    },
+    "sourceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceRelease",
+        "memberSha256",
+        "locationId",
+        "location",
+        "distanceKilometres",
+        "nativeResolutionDegrees",
+        "locationFamily",
+        "lookupOperator"
+      ],
+      "properties": {
+        "sourceRelease": { "const": "20210809" },
+        "memberSha256": {
+          "$ref": "defs.schema.json#/$defs/sha256"
+        },
+        "locationId": {
+          "type": "integer",
+          "minimum": 1000000000
+        },
+        "location": {
+          "$ref": "defs.schema.json#/$defs/coordinates"
+        },
+        "distanceKilometres": {
+          "type": "number",
+          "minimum": 0
+        },
+        "nativeResolutionDegrees": { "const": 1 },
+        "locationFamily": { "const": "grid" },
+        "lookupOperator": { "const": "nearest-source-grid-location" }
+      }
+    },
+    "selectedSourceIdentity": {
+      "allOf": [
+        { "$ref": "#/$defs/sourceIdentity" },
+        {
+          "properties": {
+            "distanceKilometres": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        }
+      ]
+    },
+    "projection": {
+      "type": "object",
+      "$comment": "The semantic validator additionally requires lowerMillimetres <= medianMillimetres <= upperMillimetres.",
+      "additionalProperties": false,
+      "required": [
+        "lowerMillimetres",
+        "medianMillimetres",
+        "upperMillimetres",
+        "storedUnits",
+        "scaleToMetres",
+        "baseline",
+        "confidence",
+        "quantiles"
+      ],
+      "properties": {
+        "lowerMillimetres": { "type": "integer", "minimum": -32767, "maximum": 32767 },
+        "medianMillimetres": { "type": "integer", "minimum": -32767, "maximum": 32767 },
+        "upperMillimetres": { "type": "integer", "minimum": -32767, "maximum": 32767 },
+        "storedUnits": { "const": "mm" },
+        "scaleToMetres": { "const": 0.001 },
+        "baseline": { "const": "1995-2014 mean" },
+        "confidence": { "const": "medium" },
+        "quantiles": {
+          "type": "array",
+          "prefixItems": [
+            { "const": 0.167 },
+            { "const": 0.5 },
+            { "const": 0.833 }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "projectionAvailable": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["geography", "projection", "source"],
+          "properties": {
+            "state": { "const": "ProjectionAvailable" },
+            "reasonCode": { "const": "projection-available" },
+            "geography": { "const": "InEuropeAndCoastalZone" },
+            "projection": { "$ref": "#/$defs/projection" },
+            "source": { "$ref": "#/$defs/selectedSourceIdentity" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "dataUnavailable": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["geography", "source"],
+          "properties": {
+            "state": { "const": "DataUnavailable" },
+            "reasonCode": {
+              "enum": ["source-location-too-distant", "source-value-nodata"]
+            },
+            "geography": { "const": "InEuropeAndCoastalZone" },
+            "source": { "$ref": "#/$defs/sourceIdentity" }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "reasonCode": { "const": "source-location-too-distant" }
+                },
+                "required": ["reasonCode"]
+              },
+              "then": {
+                "properties": {
+                  "source": {
+                    "properties": {
+                      "distanceKilometres": {
+                        "type": "number",
+                        "exclusiveMinimum": 100
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "reasonCode": { "const": "source-value-nodata" }
+                },
+                "required": ["reasonCode"]
+              },
+              "then": {
+                "properties": {
+                  "source": { "$ref": "#/$defs/selectedSourceIdentity" }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "outOfScope": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["geography", "source"],
+          "properties": {
+            "state": { "const": "OutOfScope" },
+            "reasonCode": { "const": "outside-coastal-scope" },
+            "geography": { "const": "InEuropeOutsideCoastalZone" },
+            "source": { "type": "null" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "unsupportedGeography": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["geography", "source"],
+          "properties": {
+            "state": { "const": "UnsupportedGeography" },
+            "reasonCode": { "const": "outside-europe-support" },
+            "geography": { "const": "OutsideEurope" },
+            "source": { "type": "null" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

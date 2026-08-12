@@ -1,0 +1,20 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/search-record.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "dataProvenanceClass": "synthetic-fixture",
+  "id": 123456,
+  "canonicalName": "Harbor Fixture",
+  "asciiName": "Harbor Fixture",
+  "alternateNames": ["Fixture Harbour"],
+  "countryCode": "DE",
+  "admin1Code": "HH",
+  "admin1Name": "Hamburg",
+  "location": { "latitude": 53.55, "longitude": 9.9937 },
+  "population": 1000,
+  "featureCode": "PPL",
+  "distanceToCoastMeters": 250,
+  "isCoastal": true,
+  "catalogMembership": ["europe-core", "europe-coastal"],
+  "sourceUpdatedAt": "2026-01-01"
+}

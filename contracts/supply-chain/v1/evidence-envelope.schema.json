@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/evidence-envelope.schema.json",
+  "title": "SeaRise Europe signed candidate evidence envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "candidateId",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "candidateManifest",
+    "identityPolicy",
+    "provenance",
+    "signatures",
+    "softwareBillsOfMaterials",
+    "verification"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/evidence-envelope.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "phase-1-signed-candidate-evidence-v1" },
+    "candidateId": { "type": "string", "pattern": "^candidate-[a-z0-9][a-z0-9-]+$" },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataProvenanceClass": { "enum": ["synthetic-fixture", "real-source"] },
+    "candidateManifest": {
+      "allOf": [
+        { "$ref": "#/$defs/subject" },
+        { "properties": { "path": { "const": "manifest.json" } } }
+      ]
+    },
+    "identityPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "const": "contracts/supply-chain/v1/identity-policy.json" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "provenance": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        {
+          "required": ["byteSize"],
+          "properties": {
+            "role": { "const": "provenance" },
+            "path": { "const": "provenance.intoto.jsonl" },
+            "mediaType": { "const": "application/vnd.in-toto+json" },
+            "statementType": { "const": "https://in-toto.io/Statement/v1" },
+            "predicateType": { "const": "https://slsa.dev/provenance/v1" }
+          }
+        }
+      ]
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "allOf": [
+          { "$ref": "#/$defs/artifact" },
+          {
+            "required": ["subjectPath", "subjectSha256"],
+            "properties": {
+              "role": { "const": "signature" },
+              "mediaType": {
+                "const": "application/vnd.dev.sigstore.bundle+json;version=0.3"
+              },
+              "subjectPath": { "$ref": "#/$defs/path" },
+              "subjectSha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        ]
+      }
+    },
+    "softwareBillsOfMaterials": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "allOf": [
+          { "$ref": "#/$defs/artifact" },
+          {
+            "properties": {
+              "role": { "const": "software-bill-of-materials" },
+              "mediaType": { "const": "application/vnd.cyclonedx+json" },
+              "bomFormat": { "const": "CycloneDX" },
+              "specVersion": { "const": "1.7" }
+            }
+          }
+        ]
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "fixtureOnly",
+        "verified",
+        "policySatisfied",
+        "productionClaim",
+        "certificateIdentity",
+        "oidcIssuer",
+        "reason"
+      ],
+      "properties": {
+        "status": { "enum": ["synthetic-unverified", "verified-production"] },
+        "fixtureOnly": { "type": "boolean" },
+        "verified": { "type": "boolean" },
+        "policySatisfied": { "type": "boolean" },
+        "productionClaim": { "type": "boolean" },
+        "certificateIdentity": { "type": "string", "minLength": 1 },
+        "oidcIssuer": { "type": "string", "format": "uri" },
+        "reason": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "fixtureOnly": { "const": true } } },
+          "then": {
+            "properties": {
+              "status": { "const": "synthetic-unverified" },
+              "verified": { "const": false },
+              "policySatisfied": { "const": false },
+              "productionClaim": { "const": false },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "fixtureOnly": { "const": false } } },
+          "then": {
+            "properties": {
+              "status": { "const": "verified-production" },
+              "verified": { "const": true },
+              "policySatisfied": { "const": true },
+              "productionClaim": { "const": true },
+              "reason": { "type": "null" }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "byteSize"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteSize": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path", "sha256", "mediaType"],
+      "properties": {
+        "role": {
+          "enum": ["provenance", "signature", "software-bill-of-materials"]
+        },
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "mediaType": { "type": "string", "minLength": 1 },
+        "statementType": { "type": "string", "format": "uri" },
+        "predicateType": { "type": "string", "format": "uri" },
+        "subjectPath": { "$ref": "#/$defs/path" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "bomFormat": { "type": "string", "minLength": 1 },
+        "specVersion": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

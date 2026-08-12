@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/methodology.schema.json",
+  "title": "SeaRise Europe public methodology v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "methodologyVersion",
+    "decision",
+    "configuration",
+    "modeledQuantity",
+    "publishedUnits",
+    "baseline",
+    "likelyRange",
+    "lookup",
+    "resultStates",
+    "prohibitedClaims",
+    "limitations"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/methodology.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "methodologyVersion": { "const": "ar6-regional-projection-v1" },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "href"],
+      "properties": {
+        "id": { "const": "ADR-024" },
+        "status": { "const": "accepted" },
+        "href": {
+          "const": "https://github.com/artemsemdev/SeaRise-Europe/blob/c096aeab4e0994faa7a9d2253b47215ef897dfcb/docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md"
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "const": "config/scenarios.json" },
+        "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+      }
+    },
+    "modeledQuantity": { "const": "regional-relative-sea-level-change" },
+    "publishedUnits": { "const": "m" },
+    "baseline": { "const": "1995-2014 mean" },
+    "likelyRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confidence", "lowerQuantile", "medianQuantile", "upperQuantile"],
+      "properties": {
+        "confidence": { "const": "medium" },
+        "lowerQuantile": { "const": 0.167 },
+        "medianQuantile": { "const": 0.5 },
+        "upperQuantile": { "const": 0.833 }
+      }
+    },
+    "lookup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceLocationFamily",
+        "operator",
+        "maximumDistanceKilometres",
+        "distanceLimitInclusive",
+        "nativeResolutionDegrees",
+        "interpolation",
+        "extrapolation",
+        "tideGaugeFallback",
+        "nodataSubstitution",
+        "scientificArtifactRole"
+      ],
+      "properties": {
+        "sourceLocationFamily": { "const": "grid" },
+        "operator": { "const": "nearest-source-grid-location" },
+        "maximumDistanceKilometres": { "const": 100 },
+        "distanceLimitInclusive": { "const": true },
+        "nativeResolutionDegrees": { "const": 1 },
+        "interpolation": { "const": "prohibited" },
+        "extrapolation": { "const": "prohibited" },
+        "tideGaugeFallback": { "const": "prohibited" },
+        "nodataSubstitution": { "const": "prohibited" },
+        "scientificArtifactRole": { "const": "projection-analysis-cog" }
+      }
+    },
+    "resultStates": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "ProjectionAvailable" },
+        { "const": "DataUnavailable" },
+        { "const": "OutOfScope" },
+        { "const": "UnsupportedGeography" }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "prohibitedClaims": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "flooding" },
+        { "const": "inundation" },
+        { "const": "terrain-exposure" },
+        { "const": "flood-probability" },
+        { "const": "property-risk" }
+      ],
+      "items": false,
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

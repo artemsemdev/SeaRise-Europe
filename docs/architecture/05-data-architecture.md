@@ -58,8 +58,9 @@ releases/{dataReleaseId}/
 │   ├── coastal-analysis-zone.pmtiles
 │   └── boundaries.parquet
 ├── search/
-│   ├── europe-core.index.br
-│   ├── europe-coastal.index.br
+│   ├── europe-core.codepoint-trie.json.br
+│   ├── europe-coastal.codepoint-trie.json.br
+│   ├── settlement-browser-search-shards.receipt.json
 │   └── settlements.parquet
 ├── layers/
 │   ├── ssp1-26/{2030,2050,2100}.pmtiles
@@ -85,25 +86,21 @@ release; an application build pins one release for the duration of a session.
 ### 4.1 Release manifest
 
 `manifest.json` is the application entry point and authoritative release
-inventory. Its JSON Schema is versioned with the release. The manifest records:
-
-- release ID, methodology version, build time, code revision, and previous
-  release ID;
-- each source's authoritative URL, snapshot date/version, licence,
-  attribution, byte size, and SHA-256;
-- processing image and tool versions plus all scientific parameters;
-- Europe support and coastal-zone rules;
-- every artifact's canonical URL, media type, role, byte size, bounds, and
-  SHA-256;
-- completeness of exactly three scenarios by three horizons;
-- control-point results and a concise data-quality summary.
+inventory. Its authoritative shape is the versioned
+[`manifest.schema.json`](../../contracts/release/v1/manifest.schema.json); the
+complete contract catalogue and compatibility policy live beside the schemas
+in [`contracts/release/README.md`](../../contracts/release/README.md).
 
 Publication fails if the schema, sizes, hashes, source metadata, licence
 mapping, or nine-combination matrix is incomplete.
 
 ### 4.2 Configuration
 
-Configuration is data, not code. The release defines:
+Configuration is data, not code. Its exact shapes are defined by
+[`scenario-config.schema.json`](../../contracts/release/v1/scenario-config.schema.json),
+[`methodology.schema.json`](../../contracts/release/v1/methodology.schema.json),
+and [`attribution.schema.json`](../../contracts/release/v1/attribution.schema.json).
+The release fixes:
 
 - scenarios: `ssp1-26`, `ssp2-45`, and `ssp5-85`;
 - horizons: `2030`, `2050`, and `2100`;
@@ -154,13 +151,8 @@ Included feature codes are `PPL`, `PPLA`, `PPLA2`, `PPLA3`, `PPLA4`, `PPLA5`,
 and section-only records (`PPLH`, `PPLQ`, `PPLW`, `PPLX`) are excluded unless a
 documented data-quality exception says otherwise.
 
-The normalized public record is:
-
-```text
-id, canonicalName, asciiName, alternateNames[], countryCode,
-admin1Code, admin1Name, latitude, longitude, population,
-featureCode, distanceToCoastMeters, isCoastal, sourceUpdatedAt
-```
+The authoritative normalized record is
+[`search-record.schema.json`](../../contracts/release/v1/search-record.schema.json).
 
 The canonical records are published as GeoParquet. Compact Brotli-compressed
 indexes are built ahead of time and loaded into a Web Worker. The build proves
@@ -172,6 +164,8 @@ in an auditable rejection report.
 The STAC catalog describes spatial assets, bounds, time/scenario properties,
 roles, and links without operating a STAC API. `manifest.json` remains the
 browser contract; STAC is the standards-based discovery and portfolio layer.
+The repository's closed STAC 1.1.0 profile is
+[`stac.schema.json`](../../contracts/release/v1/stac.schema.json).
 
 The build emits SLSA-compatible provenance and a keyless Cosign/Sigstore bundle
 covering the manifest and release inventory. CI performs full verification;

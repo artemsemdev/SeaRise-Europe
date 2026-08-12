@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cryptographic-verification-receipt.schema.json",
+  "title": "SeaRise Europe cryptographic verification receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "receiptType", "candidateId", "dataReleaseId", "dataProvenanceClass", "controlledBuildRunId", "trustedInvocationUri", "identityPolicy", "cosign", "subjects", "claims"],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/cryptographic-verification-receipt.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "receiptType": { "const": "phase-1-sigstore-cryptographic-verification-v1" },
+    "candidateId": { "type": "string", "pattern": "^candidate-[a-z0-9][a-z0-9-]+$" },
+    "dataReleaseId": { "type": "string", "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$" },
+    "dataProvenanceClass": { "enum": ["synthetic-fixture", "real-source"] },
+    "controlledBuildRunId": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "trustedInvocationUri": { "type": "string", "pattern": "^https://github\\.com/artemsemdev/SeaRise-Europe/actions/runs/[1-9][0-9]*/attempts/1$" },
+    "identityPolicy": { "type": "object", "additionalProperties": false, "required": ["sha256", "certificateIdentity", "oidcIssuer"], "properties": { "sha256": { "$ref": "#/$defs/sha256" }, "certificateIdentity": { "const": "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master" }, "oidcIssuer": { "const": "https://token.actions.githubusercontent.com" } } },
+    "cosign": { "type": "object", "additionalProperties": false, "required": ["toolLockSha256", "executableSha256"], "properties": { "toolLockSha256": { "$ref": "#/$defs/sha256" }, "executableSha256": { "$ref": "#/$defs/sha256" } } },
+    "subjects": { "type": "array", "prefixItems": [{ "allOf": [{ "$ref": "#/$defs/subject" }, { "properties": { "path": { "const": "manifest.json" }, "bundlePath": { "const": "manifest.sigstore.json" } } }] }, { "allOf": [{ "$ref": "#/$defs/subject" }, { "properties": { "path": { "const": "provenance.intoto.jsonl" }, "bundlePath": { "const": "provenance.sigstore.json" } } }] }], "items": false, "minItems": 2 },
+    "claims": { "const": { "certificateWorkflowIdentityVerified": true, "oidcIssuerVerified": true, "protectedEnvironmentVerified": false, "subjectDigestsVerified": true, "productionClaim": false, "publicationClaim": false, "scientificApproval": false } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "subject": { "type": "object", "additionalProperties": false, "required": ["path", "sha256", "bundlePath", "bundleSha256", "verified"], "properties": { "path": { "enum": ["manifest.json", "provenance.intoto.jsonl"] }, "sha256": { "$ref": "#/$defs/sha256" }, "bundlePath": { "enum": ["manifest.sigstore.json", "provenance.sigstore.json"] }, "bundleSha256": { "$ref": "#/$defs/sha256" }, "verified": { "const": true } } }
+  }
+}

@@ -4,7 +4,7 @@
 > **Decision date:** 2026-08-04
 > **Decision owner:** Project owner
 > **Scope:** Production architecture, data distribution, search, hosting, delivery pipeline, and portfolio presentation
-> **Implementation state:** Static-first target retained; projection implementation and recovery gate remain blocked on #135 and #110
+> **Implementation state:** Static-first target retained; Phase 0R recovery approved and Phase 1 in progress
 
 > **Amendment:** ADR-024 supersedes this record's five-state, binary exposure,
 > terrain-comparison, connectivity, and classified-pixel requirements. The
@@ -232,8 +232,9 @@ releases/{dataReleaseId}/
 │   ├── coastal-analysis-zone.pmtiles
 │   └── boundaries.parquet
 ├── search/
-│   ├── europe-core.index.br
-│   ├── europe-coastal.index.br
+│   ├── europe-core.codepoint-trie.json.br
+│   ├── europe-coastal.codepoint-trie.json.br
+│   ├── settlement-browser-search-shards.receipt.json
 │   └── settlements.parquet
 ├── layers/
 │   ├── ssp1-26/{2030,2050,2100}.pmtiles
@@ -599,9 +600,10 @@ finitely bounded from the locked evidence. Independent review is pending, so
 the authoritative scientific and release disposition remains `blocked`. No
 scientific arrays or release artifacts were generated.
 
-Recovery is #106 → (#107, #108) → #109 → #110. Only an independently reviewed
-`approved` #110 with zero blockers may unlock #48 and Phase 1. CI, a synthetic
-fixture, or an all-nodata artifact cannot satisfy this gate.
+Recovery ultimately followed #106 → #135 → #110. Trusted dual-platform
+evidence passed with zero blockers, and the project owner separately recorded
+`releaseDisposition=approved`; #48 and Phase 1 are now open. CI, a synthetic
+fixture, or an all-nodata artifact did not make that decision.
 
 ## 15. Performance budgets and architecture fitness functions
 
@@ -705,17 +707,16 @@ path is proven.
 [Phase 0.14 gate](../../evidence/phase-0-14-final-no-go.md) preserves the
 earlier [Phase 0.9 `BLOCKED` evidence](../../evidence/phase-0-9-regional-gate.md)
 and stops all nine combinations before arrays. The automated v1 recommendation
-is `REJECTED`; the authoritative scientific and release disposition is
-`BLOCKED` because independent review is pending. No scientific artifacts or
-performance/parity claims were produced, and Phase 1 remains locked.
+is `REJECTED`; the authoritative v1 scientific and release disposition remains
+`BLOCKED`. No v1 scientific artifacts or performance/parity claims were
+produced. ADR-024 and the later Phase 0R approval opened Phase 1 without
+rewriting that historical no-go.
 
-The recovery dependency order is
+The completed recovery dependency order was
 [#106](https://github.com/artemsemdev/SeaRise-Europe/issues/106) →
-([#107](https://github.com/artemsemdev/SeaRise-Europe/issues/107),
-[#108](https://github.com/artemsemdev/SeaRise-Europe/issues/108)) →
-[#109](https://github.com/artemsemdev/SeaRise-Europe/issues/109) →
-[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Only an
-independently reviewed `approved` #110 with zero blockers may unlock
+[#135](https://github.com/artemsemdev/SeaRise-Europe/issues/135) →
+[#110](https://github.com/artemsemdev/SeaRise-Europe/issues/110). Its trusted
+evidence and owner approval unlocked
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48) and Phase 1.
 
 ### Phase 1 — define public artifacts

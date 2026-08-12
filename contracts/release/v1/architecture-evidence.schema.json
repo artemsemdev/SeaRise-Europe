@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/architecture-evidence.schema.json",
+  "title": "SeaRise Europe public architecture evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "codeRevision",
+    "generatedAt",
+    "runtime",
+    "privacy",
+    "measurements"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/architecture-evidence.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "verificationArtifacts": { "$ref": "#/$defs/verificationArtifacts" },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicationApiCalls", "prohibitedRoutes", "scientificLookupArtifact"],
+      "properties": {
+        "applicationApiCalls": { "const": 0 },
+        "prohibitedRoutes": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "/assess" },
+            { "const": "/geocode" },
+            { "const": "/config" }
+          ],
+          "items": false,
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "scientificLookupArtifact": { "const": "projection-analysis-cog" }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["searchSentToProjectServer", "coordinatesSentToProjectServer"],
+      "properties": {
+        "searchSentToProjectServer": { "const": false },
+        "coordinatesSentToProjectServer": { "const": false }
+      }
+    },
+    "measurements": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status", "observed", "threshold", "unit", "evidencePath"],
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+          "status": { "enum": ["passed", "failed", "pending"] },
+          "observed": { "type": ["number", "null"] },
+          "threshold": { "type": "number" },
+          "unit": { "type": "string", "minLength": 1 },
+          "evidencePath": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "dataProvenanceClass": { "const": "real-source" },
+        "verificationArtifacts": { "$ref": "#/$defs/verificationArtifacts" }
+      },
+      "required": ["dataProvenanceClass", "verificationArtifacts"]
+    },
+    {
+      "properties": {
+        "dataProvenanceClass": { "const": "synthetic-fixture" }
+      },
+      "required": ["dataProvenanceClass"]
+    }
+  ],
+  "$defs": {
+    "verificationArtifacts": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "allOf": [
+            { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+            { "const": "supply-chain/receipts/cryptographic-verification.json" }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+            { "const": "supply-chain/receipts/public-readback.json" }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+            { "const": "supply-chain/retention-receipt.json" }
+          ]
+        }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    }
+  }
+}

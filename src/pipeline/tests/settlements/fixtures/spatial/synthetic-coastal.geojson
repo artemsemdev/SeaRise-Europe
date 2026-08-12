@@ -1,0 +1,1 @@
+{"features":[{"geometry":{"coordinates":[[[[0,50],[1,50],[1,54],[0,54],[0,50]]]],"type":"MultiPolygon"},"properties":{"role":"coastal","status":"selected-scope-approximation"},"type":"Feature"}],"name":"synthetic_coastal","type":"FeatureCollection"}

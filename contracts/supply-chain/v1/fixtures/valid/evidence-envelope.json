@@ -1,0 +1,66 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/evidence-envelope.schema.json",
+  "schemaVersion": "1.0.0",
+  "contractId": "phase-1-signed-candidate-evidence-v1",
+  "candidateId": "candidate-synthetic-supply-chain",
+  "dataReleaseId": "searise-europe-v1.0.0-20260811-0123456789ab",
+  "dataProvenanceClass": "synthetic-fixture",
+  "candidateManifest": {
+    "path": "manifest.json",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "byteSize": 1
+  },
+  "identityPolicy": {
+    "path": "contracts/supply-chain/v1/identity-policy.json",
+    "sha256": "3dee2a4dd5e400ae060fb7c68f654ea6270c03e2740690417128b9fa9878738c"
+  },
+  "provenance": {
+    "role": "provenance",
+    "path": "provenance.intoto.jsonl",
+    "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "byteSize": 1,
+    "mediaType": "application/vnd.in-toto+json",
+    "statementType": "https://in-toto.io/Statement/v1",
+    "predicateType": "https://slsa.dev/provenance/v1"
+  },
+  "signatures": [
+    {
+      "role": "signature",
+      "path": "manifest.sigstore.json",
+      "sha256": "85555c108e6b42eb08086e808176fb35c5c4f67b81d3e42726f5c157758dcd82",
+      "byteSize": 499,
+      "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3",
+      "subjectPath": "manifest.json",
+      "subjectSha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "role": "signature",
+      "path": "provenance.sigstore.json",
+      "sha256": "dad8937bc2757dc1659253526486f44c4b6417093e0b326cfcc1e14c7aab9b19",
+      "byteSize": 499,
+      "mediaType": "application/vnd.dev.sigstore.bundle+json;version=0.3",
+      "subjectPath": "provenance.intoto.jsonl",
+      "subjectSha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "softwareBillsOfMaterials": [
+    {
+      "role": "software-bill-of-materials",
+      "path": "sbom/frontend.cdx.json",
+      "sha256": "a53dce427b766f489fc3dd9a12b85a5e5f3d75b1a26e65ce0ad620184b618777",
+      "mediaType": "application/vnd.cyclonedx+json",
+      "bomFormat": "CycloneDX",
+      "specVersion": "1.7"
+    }
+  ],
+  "verification": {
+    "status": "synthetic-unverified",
+    "fixtureOnly": true,
+    "verified": false,
+    "policySatisfied": false,
+    "productionClaim": false,
+    "certificateIdentity": "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master",
+    "oidcIssuer": "https://token.actions.githubusercontent.com",
+    "reason": "Contract fixture only; no signing event or cryptographic verification occurred."
+  }
+}

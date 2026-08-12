@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/manifest.schema.json",
+  "title": "SeaRise Europe immutable release manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "releaseAuthority",
+    "createdAt",
+    "codeRevision",
+    "previousReleaseId",
+    "methodologyVersion",
+    "defaults",
+    "publication",
+    "sources",
+    "contractArtifacts",
+    "artifacts",
+    "datasets"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/manifest.schema.json"
+    },
+    "schemaVersion": { "$ref": "defs.schema.json#/$defs/schemaVersion" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
+    "releaseAuthority": { "$ref": "defs.schema.json#/$defs/releaseAuthority" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "previousReleaseId": {
+      "oneOf": [
+        { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+        { "type": "null" }
+      ]
+    },
+    "methodologyVersion": { "const": "ar6-regional-projection-v1" },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "horizon"],
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2050 }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releasePath", "cacheControl", "appendOnly"],
+      "properties": {
+        "releasePath": {
+          "type": "string",
+          "pattern": "^releases/searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+        },
+        "cacheControl": { "const": "public, max-age=31536000, immutable" },
+        "appendOnly": { "const": true }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "contractArtifacts": { "$ref": "#/$defs/contractArtifacts" },
+    "artifacts": {
+      "type": "array",
+      "minItems": 41,
+      "uniqueItems": true,
+      "items": { "$ref": "artifact.schema.json" }
+    },
+    "datasets": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/ssp1262030" },
+        { "$ref": "#/$defs/ssp1262050" },
+        { "$ref": "#/$defs/ssp1262100" },
+        { "$ref": "#/$defs/ssp2452030" },
+        { "$ref": "#/$defs/ssp2452050" },
+        { "$ref": "#/$defs/ssp2452100" },
+        { "$ref": "#/$defs/ssp5852030" },
+        { "$ref": "#/$defs/ssp5852050" },
+        { "$ref": "#/$defs/ssp5852100" }
+      ],
+      "items": false,
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "artifactId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]+$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceId",
+        "sourceRelease",
+        "archiveSha256",
+        "attributionId",
+        "receiptArtifactId"
+      ],
+      "properties": {
+        "sourceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9./_-]+$" },
+        "sourceRelease": { "type": "string", "minLength": 1 },
+        "archiveSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "attributionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]+$"
+        },
+        "receiptArtifactId": { "$ref": "#/$defs/artifactId" }
+      }
+    },
+    "contractArtifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioConfig",
+        "methodology",
+        "attribution",
+        "sourceReceipts",
+        "buildReceipt",
+        "searchRecords",
+        "qualitySummary",
+        "architectureEvidence",
+        "stacCatalog",
+        "stacCollection",
+        "stacItems",
+        "checksums",
+        "provenance",
+        "signature"
+      ],
+      "properties": {
+        "scenarioConfig": { "$ref": "#/$defs/artifactId" },
+        "methodology": { "$ref": "#/$defs/artifactId" },
+        "attribution": { "$ref": "#/$defs/artifactId" },
+        "sourceReceipts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/artifactId" }
+        },
+        "buildReceipt": { "$ref": "#/$defs/artifactId" },
+        "searchRecords": { "$ref": "#/$defs/artifactId" },
+        "qualitySummary": { "$ref": "#/$defs/artifactId" },
+        "architectureEvidence": { "$ref": "#/$defs/artifactId" },
+        "stacCatalog": { "$ref": "#/$defs/artifactId" },
+        "stacCollection": { "$ref": "#/$defs/artifactId" },
+        "stacItems": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "stac-ssp1-26-2030" },
+            { "const": "stac-ssp1-26-2050" },
+            { "const": "stac-ssp1-26-2100" },
+            { "const": "stac-ssp2-45-2030" },
+            { "const": "stac-ssp2-45-2050" },
+            { "const": "stac-ssp2-45-2100" },
+            { "const": "stac-ssp5-85-2030" },
+            { "const": "stac-ssp5-85-2050" },
+            { "const": "stac-ssp5-85-2100" }
+          ],
+          "items": false,
+          "minItems": 9,
+          "maxItems": 9,
+          "uniqueItems": true
+        },
+        "checksums": { "$ref": "#/$defs/artifactId" },
+        "provenance": { "$ref": "#/$defs/artifactId" },
+        "signature": { "$ref": "#/$defs/artifactId" }
+      }
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario",
+        "horizon",
+        "analysisArtifactId",
+        "visualArtifactId",
+        "analyticalArtifactId",
+        "stacItemArtifactId"
+      ],
+      "properties": {
+        "scenario": { "$ref": "defs.schema.json#/$defs/scenarioId" },
+        "horizon": { "$ref": "defs.schema.json#/$defs/horizonYear" },
+        "analysisArtifactId": { "$ref": "#/$defs/artifactId" },
+        "visualArtifactId": { "$ref": "#/$defs/artifactId" },
+        "analyticalArtifactId": { "const": "projection-matrix-geoparquet" },
+        "stacItemArtifactId": { "$ref": "#/$defs/artifactId" }
+      }
+    },
+    "ssp1262030": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp1-26" },
+        "horizon": { "const": 2030 },
+        "analysisArtifactId": { "const": "projection-ssp1-26-2030-cog" },
+        "visualArtifactId": { "const": "projection-ssp1-26-2030-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp1-26-2030" }
+      }
+    },
+    "ssp1262050": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp1-26" },
+        "horizon": { "const": 2050 },
+        "analysisArtifactId": { "const": "projection-ssp1-26-2050-cog" },
+        "visualArtifactId": { "const": "projection-ssp1-26-2050-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp1-26-2050" }
+      }
+    },
+    "ssp1262100": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp1-26" },
+        "horizon": { "const": 2100 },
+        "analysisArtifactId": { "const": "projection-ssp1-26-2100-cog" },
+        "visualArtifactId": { "const": "projection-ssp1-26-2100-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp1-26-2100" }
+      }
+    },
+    "ssp2452030": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2030 },
+        "analysisArtifactId": { "const": "projection-ssp2-45-2030-cog" },
+        "visualArtifactId": { "const": "projection-ssp2-45-2030-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp2-45-2030" }
+      }
+    },
+    "ssp2452050": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2050 },
+        "analysisArtifactId": { "const": "projection-ssp2-45-2050-cog" },
+        "visualArtifactId": { "const": "projection-ssp2-45-2050-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp2-45-2050" }
+      }
+    },
+    "ssp2452100": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp2-45" },
+        "horizon": { "const": 2100 },
+        "analysisArtifactId": { "const": "projection-ssp2-45-2100-cog" },
+        "visualArtifactId": { "const": "projection-ssp2-45-2100-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp2-45-2100" }
+      }
+    },
+    "ssp5852030": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp5-85" },
+        "horizon": { "const": 2030 },
+        "analysisArtifactId": { "const": "projection-ssp5-85-2030-cog" },
+        "visualArtifactId": { "const": "projection-ssp5-85-2030-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp5-85-2030" }
+      }
+    },
+    "ssp5852050": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp5-85" },
+        "horizon": { "const": 2050 },
+        "analysisArtifactId": { "const": "projection-ssp5-85-2050-cog" },
+        "visualArtifactId": { "const": "projection-ssp5-85-2050-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp5-85-2050" }
+      }
+    },
+    "ssp5852100": {
+      "$ref": "#/$defs/dataset",
+      "properties": {
+        "scenario": { "const": "ssp5-85" },
+        "horizon": { "const": 2100 },
+        "analysisArtifactId": { "const": "projection-ssp5-85-2100-cog" },
+        "visualArtifactId": { "const": "projection-ssp5-85-2100-pmtiles" },
+        "stacItemArtifactId": { "const": "stac-ssp5-85-2100" }
+      }
+    }
+  }
+}

@@ -22,7 +22,7 @@ not as active guidance in this document.
 | ADR-018 | Use a 25 km coastal analysis zone | Accepted, amended by ADR-024 | The versioned Natural Earth-derived zone defines product scope only; it is not a flood-reach or exposure boundary. |
 | ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; product contract amended by ADR-024** | Offline build plane, immutable open artifacts, React/Vite browser runtime, local search/lookup, Cloudflare Static Assets + R2, and no runtime API/database/tile server. |
 | ADR-023 | Use an uncertainty-aware EGM2008 mean-water baseline | Superseded for publication by ADR-024 | Historical acquisition and no-go evidence is retained; its terrain-classification path cannot produce a release. |
-| ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; contract and lookup implemented** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. Publication remains blocked only on #110 trusted evidence and owner disposition. |
+| ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; recovery gate approved** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. Trusted #110 evidence and the owner disposition opened Phase 1. |
 
 ## Historical safety-gate decision
 

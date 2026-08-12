@@ -1,7 +1,7 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-05",
+  "updatedAt": "2026-08-12",
   "evidence": {
     "ci-30949490661": {
       "kind": "github-actions",
@@ -26,6 +26,156 @@
       "observedAt": "2026-08-05T00:10:00+02:00",
       "reference": "tests/evidence/tdd-slices.json",
       "environment": "macOS arm64; warm npm and Python dependencies; .NET 8; Docker available"
+    },
+    "local-2026-08-10-phase1-contracts": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T17:40:10+02:00",
+      "reference": "src/frontend/src/lib/contracts/public-contract-parity.test.ts",
+      "environment": "macOS arm64; Node 20-compatible Vitest; fixed checked-in JSON Schema fixtures"
+    },
+    "local-2026-08-11-search-evaluation-foundation": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T15:46:00+02:00",
+      "reference": "src/frontend/src/search/evaluation/evaluation.test.ts",
+      "environment": "macOS arm64; Node 20-compatible Vitest; 12 deterministic synthetic cases passed with MiniSearch 7.2.0 and FlexSearch 0.8.212; no browser or production corpus"
+    },
+    "local-2026-08-12-settlement-worker-performance": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-12T08:05:47+02:00",
+      "reference": "src/frontend/src/search/performance/browser-worker-evidence.test.ts",
+      "environment": "macOS x64 compatibility runtime; official Node 20.20.1; deterministic synthetic shards; isolated Node worker_threads; no browser, network, production corpus, or approval claim"
+    },
+    "local-2026-08-10-offline-stage-contracts": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T18:29:34+02:00",
+      "reference": "src/pipeline/tests/offline_release/test_model.py",
+      "environment": "macOS arm64; Python 3.11; deterministic offline model, engine, and profile tests"
+    },
+    "local-2026-08-10-boundary-geoparquet": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T21:40:03+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_geoparquet.py",
+      "environment": "macOS arm64; Python 3.11; pinned PyArrow/PROJ boundary packaging and mutation tests"
+    },
+    "local-2026-08-10-boundary-pmtiles-structure": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T23:29:47+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py",
+      "environment": "macOS arm64; Python 3.9.6; 5 structure contract and mutation tests passed in 2.24s; no external vector build executed"
+    },
+    "local-2026-08-10-boundary-pmtiles-parity": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T00:14:17+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py",
+      "environment": "macOS arm64; Python 3.9.6 and Shapely 2.0.7; 5 closed-oracle, tolerance-boundary, and topology-loss tests passed in 13.11s; no external vector build executed"
+    },
+    "local-2026-08-10-boundary-pmtiles-writer": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T23:35:56+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_pmtiles.py",
+      "environment": "macOS arm64; Python 3.9.6; 3 writer contract tests passed in 1.78s; 2 exact-pinned real-build tests skipped because official pinned assets were unavailable"
+    },
+    "local-2026-08-11-boundary-pmtiles-evidence": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T01:30:00+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_evidence.py",
+      "environment": "macOS arm64; Python 3.11; deterministic candidate orchestration fixtures; real exact-pinned build delegated to the macOS ARM64 release-toolchain CI job"
+    },
+    "local-2026-08-10-settlement-contracts": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T21:00:00+02:00",
+      "reference": "src/pipeline/tests/settlements/test_settlement_contracts.py",
+      "environment": "macOS arm64; Python 3.11 and Node 20-compatible Vitest; fixed synthetic JSON Schema goldens"
+    },
+    "local-2026-08-10-geonames-place-parser": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T23:01:07+02:00",
+      "reference": "src/pipeline/tests/settlements/test_geonames_parser.py",
+      "environment": "macOS arm64; Python 3.11; fixed hash-bound real-format excerpts and source-lock identity checks"
+    },
+    "local-2026-08-10-geonames-place-full-scan": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T00:34:23+02:00",
+      "reference": "src/pipeline/tests/settlements/fixtures/geonames/full-scan-report.json",
+      "environment": "macOS arm64; Python 3.11; 13,455,006 place-source and 3,865 admin1 rows parsed from an ignored hash-verified cache with zero unexplained failures in 374.800 seconds; no publication claim"
+    },
+    "local-2026-08-11-geonames-alternate-normalization": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T10:45:00+02:00",
+      "reference": "src/pipeline/tests/settlements/fixtures/geonames/alternate-full-scan-report.json",
+      "environment": "macOS arm64; Python 3.9; 19,037,112 alternate-name and 7,929 ISO-language rows parsed from the exact ignored cache with zero unexplained failures in 204.463 seconds; no publication claim"
+    },
+    "local-2026-08-11-settlement-spatial-toolchain": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T13:20:00+02:00",
+      "reference": "src/pipeline/tests/settlements/test_spatial_toolchain.py",
+      "environment": "macOS arm64; Python 3.10.9; 13 deterministic manifest, lock, cache, version, runtime, and load-path mutation tests passed without importing DuckDB or using a network"
+    },
+    "local-2026-08-11-settlement-shoreline-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T18:00:00+02:00",
+      "reference": "src/pipeline/tests/settlements/test_coastline_contract.py",
+      "environment": "macOS arm64; Python 3.9.6; closed JSON Schema, exact source-lock identities, half-even quantization controls, and deterministic mutations without source archives or network"
+    },
+    "local-2026-08-11-settlement-shoreline-build": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T18:00:00+02:00",
+      "reference": "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json",
+      "environment": "macOS arm64; Python 3.9.6; GeoPandas 1.0.1, Pyogrio 0.11.1, GDAL 3.10.3, Shapely 2.0.7, PyProj 3.6.1, PROJ 9.3.0, and GEOS 3.11.4; exact locked Natural Earth archive rebuild and deterministic mutation controls"
+    },
+    "local-2026-08-11-settlement-catalogue-domain": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T12:00:00+02:00",
+      "reference": "src/pipeline/tests/settlements/fixtures/geonames/catalogue-fixture-manifest.json",
+      "environment": "Pure Python 3.9 domain tests over hash-bound exact-format GeoNames excerpts; no spatial classification, artifact, performance, or publication claim"
+    },
+    "local-2026-08-11-settlement-spatial-classification": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T13:05:57+02:00",
+      "reference": "src/pipeline/tests/settlements/test_spatial_classification.py",
+      "environment": "macOS arm64; Python 3.9, pyproj 3.6.1, PROJ 9.3.0, and Shapely 2.0.7; 33 deterministic tests passed and the exact DuckDB Spatial live test skipped locally pending its mandatory CI cache"
+    },
+    "local-2026-08-10-release-gate-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-10T22:00:00+02:00",
+      "reference": "src/pipeline/tests/release/test_gate_report.py",
+      "environment": "macOS arm64; Python and Node 20-compatible Vitest; fixed JSON Schema fixtures and deterministic Markdown golden"
+    },
+    "local-2026-08-11-candidate-completeness-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-12T05:00:43+02:00",
+      "reference": "src/pipeline/tests/contracts/test_candidate_assembler.py, test_candidate_bytes.py, test_candidate_completeness_contract.py, and test_provenance_statement.py",
+      "environment": "macOS arm64; Python 3.9.6; 109 deterministic complete-fixture assembly, assembled-byte, candidate-contract, and unsigned in-toto/SLSA provenance tests passed"
+    },
+    "local-2026-08-11-supply-chain-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T13:44:45+02:00",
+      "reference": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py",
+      "environment": "macOS arm64; Python 3.9.6; deterministic offline schema, hash-binding, identity, SBOM, and exception-expiry tests over synthetic fixtures"
+    },
+    "local-2026-08-12-evidence-retention": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-12T08:54:00+02:00",
+      "reference": "src/pipeline/tests/supply_chain/test_evidence_retention.py",
+      "environment": "macOS arm64; Python 3.9.6; 19 deterministic local-handoff, public validation, exact-byte authority, race, no-overwrite, and failure-injection tests passed in 235.57 seconds over isolated synthetic and real byte-gated candidate evidence"
+    },
+    "local-2026-08-11-real-python-graphs": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T17:50:29+02:00",
+      "reference": "src/pipeline/tests/supply_chain/test_real_python_graph_annotations.py",
+      "environment": "macOS arm64; Python 3.9.6; 115 offline supply-chain tests passed over exact repository locks, reviewed graph annotations, and deterministic mutation controls; wheel review used separate hash-matched Linux and macOS caches"
+    },
+    "local-2026-08-10-cog-range-contract": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T01:20:00+02:00",
+      "reference": "src/pipeline/tests/offline_release/test_cog_range_evidence.py",
+      "environment": "macOS arm64; Python 3.9; exact checked-in reviewed COG bytes, loopback HTTP measurements, immutable evidence validation, and deterministic response mutations"
+    },
+    "local-2026-08-11-phase1-pmtiles-render": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-11T01:40:32+02:00",
+      "reference": "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
+      "environment": "macOS arm64; Node 20.20.1; 3 deterministic 512px PMTiles renders checked in under 1 second from fixed local bytes"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -148,6 +298,48 @@
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "All four checks passed in the referenced CI job." }
     },
     {
+      "id": "frontend-public-contract-parity",
+      "layer": "contract",
+      "owner": "frontend",
+      "purpose": "Require TypeScript and Python to accept, reject, and semantically derive the same versioned public contract fixtures.",
+      "sourcePaths": ["src/frontend/src/lib/contracts/*.test.ts", "src/frontend/src/lib/contracts/gate-report-semantics.ts"],
+      "changedPaths": ["contracts/**", "src/frontend/src/lib/contracts/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent shared-schema parity gate; replacement must validate the same fixtures in both runtimes." },
+      "commands": { "focused": "cd src/frontend && npm test -- src/lib/contracts", "full": "cd src/frontend && npm test" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-phase1-contracts", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "AJV 2020 validates only fixed local schemas and fixtures; no clock, random input, or network is used." }
+    },
+    {
+      "id": "frontend-search-evaluation-foundation",
+      "layer": "contract",
+      "owner": "frontend",
+      "purpose": "Keep neutral search evaluation plus receipt-bound core/coastal browser shard serialization, merge semantics, bounded I/O, and incompatibility failures exact.",
+      "sourcePaths": ["src/frontend/src/search/evaluation/*.test.ts", "src/frontend/src/search/shards/*.test.ts", "src/frontend/scripts/test-browser-shard-fs.py"],
+      "changedPaths": ["contracts/search-evaluation/**", "docs/operations/settlement-search-projection.md", "src/frontend/scripts/browser-shard-fs.py", "src/frontend/scripts/build-settlement-search-shards.ts", "src/frontend/scripts/test-browser-shard-fs.py", "src/frontend/src/search/evaluation/**", "src/frontend/src/search/shards/**", "src/frontend/.nvmrc", "src/frontend/package.json", "src/frontend/package-lock.json"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent neutral search-evaluation boundary; replacement must preserve exact synthetic outcomes and fail-closed serialization controls." },
+      "commands": { "focused": "cd src/frontend && npm test -- src/search", "full": "cd src/frontend && npm test" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-search-evaluation-foundation", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed synthetic fixtures and exact package versions use no browser, clock, random input, network, or production corpus." }
+    },
+    {
+      "id": "frontend-settlement-worker-performance",
+      "layer": "integration",
+      "owner": "frontend",
+      "purpose": "Keep exact settlement shard performance evidence receipt-bound, semantic-validated, provenance-explicit, and honest about its Node worker reference profile.",
+      "sourcePaths": ["src/frontend/src/search/performance/*.test.ts"],
+      "changedPaths": ["docs/operations/settlement-browser-worker-performance.md", "src/frontend/scripts/measure-settlement-browser-worker.ts", "src/frontend/src/search/performance/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent production-input measurement foundation; a browser runner may supplement but must not weaken exact receipt, byte, provenance, or nonclaim validation." },
+      "commands": { "focused": "cd src/frontend && npm test -- src/search/performance/browser-worker-evidence.test.ts", "full": "cd src/frontend && npm test" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 5, "class": "fast", "evidenceRef": "local-2026-08-12-settlement-worker-performance", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed synthetic bytes, explicit sample counts, no network, and semantic assertions; timing thresholds are deliberately generous in contract tests and are not release evidence." }
+    },
+    {
       "id": "api-domain-legacy",
       "layer": "unit",
       "owner": "science",
@@ -260,6 +452,174 @@
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic checked-in contracts and evidence passed in the successful combined Phase 0.2/0.3 run." }
     },
     {
+      "id": "pipeline-settlement-public-contracts",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep versioned settlement records, GeoParquet envelopes, search-shard envelopes, and compatibility rejection executable.",
+      "sourcePaths": ["src/pipeline/tests/settlements/test_*.py"],
+      "changedPaths": ["contracts/settlements/**", "src/pipeline/tests/settlements/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent settlement artifact shape, provenance, and fail-closed format/version compatibility gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-settlement-contracts", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Only fixed local schemas and synthetic fixtures are read; no clock, random input, network, or source archive is used." }
+    },
+    {
+      "id": "pipeline-geonames-place-parser",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep pinned GeoNames place/admin1 parsing lossless, lineage-exact, anomaly-explicit, and fail-closed outside its reviewed raw policy.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/**", "src/pipeline/tests/settlements/test_geonames_parser.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/geonames/**", "src/pipeline/tests/settlements/test_geonames_parser.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-source row parsing, lineage, anomaly policy, and full-snapshot validation." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_geonames_parser.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-geonames-place-parser", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed source-lock metadata and hash-bound real-format excerpts use no clock, random input, network, or source archive." }
+    },
+    {
+      "id": "pipeline-geonames-place-full-scan",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the reusable offline full-snapshot validator and reviewed local-only GeoNames count/anomaly report bound to the pinned parser and source identities.",
+      "sourcePaths": ["scripts/release/validate_geonames_place_snapshot.py", "src/pipeline/tests/settlements/fixtures/geonames/full-scan-report.json", "src/pipeline/tests/settlements/test_geonames_full_scan_report.py", "src/pipeline/tests/settlements/test_geonames_full_scan_validator.py"],
+      "changedPaths": ["scripts/release/validate_geonames_place_snapshot.py", "src/pipeline/tests/settlements/fixtures/geonames/full-scan-report.json", "src/pipeline/tests/settlements/test_geonames_full_scan_report.py", "src/pipeline/tests/settlements/test_geonames_full_scan_validator.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-asset offline scan command and immutable local report binding." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_geonames_full_scan_report.py src/pipeline/tests/settlements/test_geonames_full_scan_validator.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-geonames-place-full-scan", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "CI checks immutable report bindings without raw assets; the separately invoked offline validator compares the ignored full cache to the same exact result." }
+    },
+    {
+      "id": "pipeline-geonames-alternate-normalization",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the exact GeoNames alternate/ISO parsers, source-level normalization policy, selected-name lineage, archive scan, and provider-anomaly evidence fail-closed.",
+      "sourcePaths": ["scripts/release/validate_geonames_alternate_snapshot.py", "src/pipeline/searise_pipeline/settlements/alternate_names.py", "src/pipeline/settlements/normalization-policy-v2.json", "src/pipeline/tests/settlements/test_geonames_alternate_names.py", "src/pipeline/tests/settlements/test_geonames_alternate_scan.py"],
+      "changedPaths": ["scripts/release/validate_geonames_alternate_snapshot.py", "src/pipeline/searise_pipeline/settlements/**", "src/pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/geonames/**", "src/pipeline/tests/settlements/test_geonames_alternate_*.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-asset alternate-name parsing, policy, dedupe, lineage, anomaly, and full-snapshot validation gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_geonames_alternate_names.py src/pipeline/tests/settlements/test_geonames_alternate_scan.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-geonames-alternate-normalization", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "CI uses fixed hash-bound excerpts and an immutable full-scan report; the optional full archive command is offline, checksum-bound, and separately measured." }
+    },
+    {
+      "id": "pipeline-settlement-spatial-toolchain",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep the Python 3.11 DuckDB Spatial wheel/lock parity, derived native-extension identities, checksum-first cache admission, and two-platform network-free load preflight fail-closed.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/spatial_toolchain.py", "src/pipeline/tests/settlements/test_spatial_toolchain.py"],
+      "changedPaths": [".github/workflows/ci.yml", "docs/operations/settlement-spatial-toolchain.md", "src/pipeline/requirements-settlements-spatial-*.lock", "src/pipeline/searise_pipeline/settlements/spatial_toolchain.py", "src/pipeline/tests/settlements/test_spatial_toolchain.py", "src/pipeline/toolchain/duckdb-spatial-extensions.json"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent immutable native-extension identity, cache, version, lock, and two-platform live spatial-load gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_spatial_toolchain.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-spatial-toolchain", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Unit coverage uses generated fixed gzip bytes and a non-network fake DuckDB module; CI separately runs live Linux and macOS preflights from official pinned bytes." }
+    },
+    {
+      "id": "pipeline-settlement-catalogue-domain",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep pure settlement inclusion, stable IDs, admin1 context, selected lineage, notices, rejections, and output ordering deterministic and fail-closed.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/catalogue.py", "src/pipeline/settlements/catalogue-policy-v1.json", "src/pipeline/tests/settlements/fixtures/geonames/catalogue-fixture-manifest.json", "src/pipeline/tests/settlements/test_catalogue_domain.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/settlements/**", "src/pipeline/settlements/catalogue-policy-v1.json", "src/pipeline/tests/settlements/fixtures/geonames/catalogue-*", "src/pipeline/tests/settlements/test_catalogue_domain.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent deterministic normalized-catalogue domain and rejection/context ledger contract." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_catalogue_domain.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-catalogue-domain", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Hash-bound fixed excerpts and pure in-memory transforms use no clock, random input, network, spatial engine, or artifact writer." }
+    },
+    {
+      "id": "pipeline-settlement-spatial-classification",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep descriptor-bound spatial assets, receipt-bound normalized-catalogue staging, support/coastal coverage, whole-meter metric shoreline distance, shard policy, immutable search projection, accepted-audit output, and outside-support rejection deterministic and fail-closed.",
+      "sourcePaths": ["scripts/release/build_settlement_spatial_stage.py", "src/pipeline/searise_pipeline/settlements/search_projection.py", "src/pipeline/searise_pipeline/settlements/spatial_asset_authority.py", "src/pipeline/searise_pipeline/settlements/spatial_classification.py", "src/pipeline/searise_pipeline/settlements/spatial_classification_stage.py", "src/pipeline/searise_pipeline/settlements/spatial_stage_runner.py", "src/pipeline/tests/settlements/fixtures/spatial/**", "src/pipeline/tests/settlements/test_search_projection.py", "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "src/pipeline/tests/settlements/test_spatial_classification.py", "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "src/pipeline/tests/settlements/test_spatial_stage_runner.py"],
+      "changedPaths": [".github/workflows/ci.yml", "contracts/settlements/README.md", "docs/operations/settlement-search-projection.md", "docs/operations/settlement-spatial-*.md", "scripts/release/build_settlement_spatial_stage.py", "src/pipeline/searise_pipeline/settlements/**", "src/pipeline/tests/settlements/fixtures/spatial/**", "src/pipeline/tests/settlements/test_search_projection.py", "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "src/pipeline/tests/settlements/test_spatial_classification.py", "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "src/pipeline/tests/settlements/test_spatial_stage_runner.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent geometry-identity, ST_Covers, EPSG:3035 whole-meter half-even distance, shard-policy, ordering, rejection, and pinned live-engine gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_search_projection.py src/pipeline/tests/settlements/test_spatial_asset_authority.py src/pipeline/tests/settlements/test_spatial_classification.py src/pipeline/tests/settlements/test_spatial_classification_stage.py src/pipeline/tests/settlements/test_spatial_stage_runner.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-spatial-classification", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed hash-bound European synthetic geometry and rows use no clock, random input, or test-time network; CI requires the exact preflighted DuckDB Spatial cache." }
+    },
+    {
+      "id": "pipeline-settlement-shoreline-contract",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the direct Natural Earth shoreline source identities, claim boundary, EPSG:3035 distance method, and whole-meter persistence contract closed and fail-closed.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/settlements/coastline_contract.py", "src/pipeline/settlements/shoreline-distance-policy-v1.json", "src/pipeline/settlements/shoreline-distance-policy-v1.schema.json", "src/pipeline/sources/source-lock.phase-1-settlement-coastline.json", "src/pipeline/tests/settlements/test_coastline_contract.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/settlements/coastline_contract.py", "src/pipeline/settlements/shoreline-distance-policy-v1.json", "src/pipeline/settlements/shoreline-distance-policy-v1.schema.json", "src/pipeline/sources/source-lock.phase-1-settlement-coastline.json", "src/pipeline/tests/settlements/test_coastline_contract.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent source-identity, method-version, persistence, rights, and prohibited-claim contract." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_coastline_contract.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-shoreline-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Closed local policy, schema, and source-lock documents use no source archive, network, clock, random input, or spatial engine." }
+    },
+    {
+      "id": "pipeline-settlement-shoreline-build",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the direct Natural Earth settlement shoreline, whole-feature selection, named controls, and checked artifact deterministic and fail-closed.",
+      "sourcePaths": ["data/settlements/europe-settlement-shoreline-v1.geojson", "scripts/release/build_settlement_shoreline.py", "src/pipeline/searise_pipeline/settlements/coastline.py", "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json", "src/pipeline/tests/settlements/test_coastline_source.py"],
+      "changedPaths": [".github/workflows/ci.yml", "data/settlements/europe-settlement-shoreline-v1.geojson", "scripts/release/build_settlement_shoreline.py", "src/pipeline/searise_pipeline/settlements/coastline.py", "src/pipeline/settlements/evidence/shoreline-distance-qa-v1.json", "src/pipeline/tests/settlements/test_coastline_source.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-source, whole-line geometry, named-control, and byte-reproducibility gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/settlements/test_coastline_source.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 8, "class": "fast", "evidenceRef": "local-2026-08-11-settlement-shoreline-build", "scope": "ci-job" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Offline contract and mutation controls are deterministic; CI separately fetches the exact public hash-locked archives and requires the rebuild test to execute rather than skip." }
+    },
+    {
+      "id": "pipeline-release-gate-contract",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep release gate decisions fail-closed, authority-explicit, metric-bound, evidence-addressed, and deterministically renderable.",
+      "sourcePaths": ["src/pipeline/searise_pipeline/gate_report.py", "src/pipeline/tests/release/test_gate_report.py"],
+      "changedPaths": ["contracts/release-gates/**", "src/pipeline/searise_pipeline/gate_report.py", "src/pipeline/tests/release/test_gate_report.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent release-decision schema, semantic validation, cross-runtime rejection, and byte-stable human-rendering gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_gate_report.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-release-gate-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Fixed local schema, JSON fixtures, and Markdown golden use no clock, random input, network, or source archive." }
+    },
+    {
+      "id": "pipeline-candidate-completeness-contract",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Keep the Phase 1 pre-sign candidate bytes exact, immutable, manifest-last, rights-bound, and subject to a mandatory non-recursive supply-chain evidence gate.",
+      "sourcePaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "scripts/release/assemble_candidate_fixture.py", "scripts/release/validate_candidate_bytes.py", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_assembler.py", "src/pipeline/tests/contracts/test_candidate_bytes.py", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
+      "changedPaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "docs/operations/phase-1-candidate-byte-gate.md", "scripts/release/assemble_candidate_fixture.py", "scripts/release/validate_candidate_bytes.py", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_assembler.py", "src/pipeline/tests/contracts/test_candidate_bytes.py", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent descriptor-safe byte-integrity, exact-inventory, checksum-coverage, STAC-binding, terminal-order, geometry-nonclaim, and supply-chain-boundary gate." },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/contracts/test_candidate_assembler.py src/pipeline/tests/contracts/test_candidate_bytes.py src/pipeline/tests/contracts/test_candidate_completeness_contract.py src/pipeline/tests/contracts/test_provenance_statement.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 9, "class": "fast", "evidenceRef": "local-2026-08-11-candidate-completeness-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed checked-in schemas, inventory, fixtures, byte vectors, and isolated temporary trees use no clock, random input, network, credentials, or external binaries." }
+    },
+    {
+      "id": "pipeline-supply-chain-contract",
+      "layer": "security",
+      "owner": "security",
+      "purpose": "Keep signed-candidate evidence, exact local release-evidence handoffs, deterministic CycloneDX generation, reviewed Python graph authority, and dependency exceptions fail-closed.",
+      "sourcePaths": ["contracts/supply-chain/**", "scripts/release/retain_release_evidence.py", "scripts/release/validate_release_evidence_retention.py", "scripts/release/validate_build_plane_sbom.py", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
+      "changedPaths": ["contracts/supply-chain/**", "scripts/release/retain_release_evidence.py", "scripts/release/validate_release_evidence_retention.py", "scripts/release/validate_build_plane_sbom.py", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent signed-subject, pinned-identity, SBOM, exception-expiry, cryptographic-verification, public-readback, and exact local evidence-handoff boundary." },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/supply_chain -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-11-real-python-graphs", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "security", "issue": null, "expiresAt": null, "evidence": "Fixed local schemas, immutable locks, reviewed annotations, and synthetic fixtures use an explicit validation instant and no clock, random input, network, credentials, signing event, or external wheel cache during tests." }
+    },
+    {
       "id": "pipeline-ar6-release-source-fixture",
       "layer": "scientific",
       "owner": "science",
@@ -300,6 +660,137 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Checked-in real-source fixture, pinned PyArrow writer, exact readback, fixed row counts, and byte-identical rebuild assertion." }
+    },
+    {
+      "id": "pipeline-reviewed-cog-range-access",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Bind all nine reviewed COG identities and the exact workflow producer, then persist candidate-bound loopback HTTP evidence for the 54-request map, raw latency, and malformed, ignored, truncated, substituted, or corrupt response rejection.",
+      "sourcePaths": ["src/pipeline/tests/offline_release/test_cog_range.py", "src/pipeline/tests/offline_release/test_cog_range_evidence.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/offline_release/cog_range.py", "src/pipeline/searise_pipeline/offline_release/cog_range_evidence.py", "src/pipeline/searise_pipeline/offline_release/projection_bundle.py", "src/pipeline/tests/offline_release/test_cog_range.py", "src/pipeline/tests/offline_release/test_cog_range_evidence.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-identity, canonical-range, byte-parity, and reader-driven transport gate for every analysis COG." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/offline_release/test_cog_range.py src/pipeline/tests/offline_release/test_cog_range_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 4, "class": "fast", "evidenceRef": "local-2026-08-10-cog-range-contract", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in COG bytes, process-local HTTP, monotonic raw timing, and deterministic response mutations use no credentials, external binary, or public network." }
+    },
+    {
+      "id": "pipeline-boundary-geoparquet",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify checked-in engineering support and coastal boundaries retain exact input lineage, safe status, rights, canonical normalization, and deterministic GeoParquet bytes.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_geoparquet.py"],
+      "changedPaths": ["data/geometry/**", "src/pipeline/searise_pipeline/release/boundary_geoparquet.py", "src/pipeline/tests/release/test_boundary_geoparquet.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent boundary identity, safe-status, rights, geometry, and determinism gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_geoparquet.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 4, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-geoparquet", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in inputs, pinned local toolchain, no clock, random input, credentials, or network." }
+    },
+    {
+      "id": "pipeline-boundary-pmtiles-structure",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify exact boundary GeoParquet source identity, safe metadata, Shapely identity, and canonical PMTiles v3 header, section, and count contracts.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_pmtiles_structure.py"],
+      "changedPaths": ["data/geometry/**", "src/pipeline/searise_pipeline/release/boundary_geoparquet.py", "src/pipeline/searise_pipeline/release/boundary_pmtiles.py", "src/pipeline/tests/release/test_boundary_pmtiles_structure.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-source, safe-metadata, Python-geometry-tool, and PMTiles v3 structure mutation gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_pmtiles_structure.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-structure", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact checked-in source bytes and synthetic PMTiles header mutations; no external vector executable, credentials, clock input, randomness, or network." }
+    },
+    {
+      "id": "pipeline-boundary-pmtiles-parity",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify decoded boundary IDs, properties, and geometry against an independent closed oracle and a derived MVT quantization error model.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_pmtiles_parity.py"],
+      "changedPaths": ["src/pipeline/searise_pipeline/release/boundary_pmtiles.py", "src/pipeline/tests/release/test_boundary_pmtiles_parity.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent independent decoded ID/property oracle and pass-at/fail-over derived geometry-threshold gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_pmtiles_parity.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 14, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-parity", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Exact source geometry and deterministic in-memory decoded mutations; pinned Shapely version, no vector executable, credentials, randomness, or network." }
+    },
+    {
+      "id": "pipeline-boundary-pmtiles-writer",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Verify the atomic boundary PMTiles writer binds every material vector option, metadata edit, gzip canonicalization step, and exact-pinned determinism gate.",
+      "sourcePaths": ["src/pipeline/tests/release/test_boundary_pmtiles.py"],
+      "changedPaths": ["data/geometry/**", "src/pipeline/searise_pipeline/release/boundary_pmtiles.py", "src/pipeline/tests/release/test_boundary_pmtiles.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent atomic writer, complete generation-parameter, pinned-tool, corruption, and repeated-build determinism gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_pmtiles.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-10-boundary-pmtiles-writer", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Three contract/mutation tests are unconditional; two real-build determinism tests require exact pinned local assets and remain skipped when unavailable." }
+    },
+    {
+      "id": "pipeline-boundary-pmtiles-evidence",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, compare visual profiles, exercise z0/z3/z6 in Chromium and MapLibre, emit candidate-bound evidence, and fail closed on any drift.",
+      "sourcePaths": ["src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "changedPaths": [".github/workflows/ci.yml", "scripts/release/build_boundary_pmtiles_evidence.py", "src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-pinned dual-build, profile-selection, z0/z3/z6 browser render, receipt, checksum, structure, and decoded-parity evidence gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "release-toolchain-macos", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 600, "class": "slow", "evidenceRef": "local-2026-08-11-boundary-pmtiles-evidence", "scope": "ci-job" },
+      "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fast orchestration mutation tests are unconditional; the controlled job downloads hash-pinned public assets and package-lock-owned Chromium and requires the exact macOS ARM64 release runner." }
+    },
+    {
+      "id": "frontend-pmtiles-render-evidence",
+      "layer": "integration",
+      "owner": "science",
+      "purpose": "Rebuild immutable z0/z3/z6 projection-PMTiles QA renders and prove quantile/value-bin coverage plus source-nodata transparency against approved Phase 0R bytes.",
+      "sourcePaths": [
+        "src/frontend/scripts/render-pmtiles-evidence.mjs",
+        "src/pipeline/evidence/phase-1/pmtiles-render-v1/**"
+      ],
+      "changedPaths": [
+        "contracts/release/v1/fixtures/release/**/layers/**/*.pmtiles",
+        "src/frontend/scripts/render-pmtiles-evidence.mjs",
+        "src/frontend/package-lock.json",
+        "src/pipeline/evidence/ar6-regional-release/**",
+        "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
+        "src/pipeline/fixtures/ar6-regional-release/**"
+      ],
+      "disposition": "keep-permanently",
+      "replacementGate": {
+        "issue": null,
+        "evidenceRequired": "Permanent approved-artifact binding, deterministic z0/z3/z6 RGBA/PNG identity, representative value-bin, and transparent source-nodata gate."
+      },
+      "commands": {
+        "focused": "cd src/frontend && npm run evidence:pmtiles-render",
+        "full": "cd src/frontend && npm run evidence:pmtiles-render && npm test"
+      },
+      "execution": {
+        "tier": "fast",
+        "ciWorkflow": "ci.yml",
+        "ciJob": "frontend",
+        "requiresDocker": false,
+        "requiresCredentials": false
+      },
+      "cost": {
+        "estimatedSeconds": 1,
+        "class": "fast",
+        "evidenceRef": "local-2026-08-11-phase1-pmtiles-render",
+        "scope": "focused-suite"
+      },
+      "flakiness": {
+        "status": "none-observed",
+        "owner": "science",
+        "issue": null,
+        "expiresAt": null,
+        "evidence": "Fixed checked-in PMTiles/source bytes, pinned JavaScript decoders, integer software rasterization, and no clock, random input, browser, credentials, external executable, or network."
+      }
     },
     {
       "id": "pipeline-ar6-release-pmtiles",
@@ -356,6 +847,20 @@
       "execution": { "tier": "regional", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Deterministic synthetic writer adapters and fixed artifact receipts; no network, clock, or external binary dependency." }
+    },
+    {
+      "id": "pipeline-offline-release-builder",
+      "layer": "contract",
+      "owner": "data",
+      "purpose": "Enforce the typed Phase 1 build graph, strict plan identities, shared profiles, and closed failure taxonomy for the offline release builder.",
+      "sourcePaths": ["src/pipeline/tests/offline_release/test_*.py"],
+      "changedPaths": [".github/workflows/offline-release-controlled.yml", "docs/evidence/fixtures/offline-release-execution-receipt.example.json", "scripts/release/prepare_controlled_offline_inputs.py", "src/pipeline/searise_pipeline/offline_release/**", "src/pipeline/tests/offline_release/**", "src/pipeline/pyproject.toml"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent deterministic offline build-plan, stage-graph, identity, and failure-contract gate." },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/offline_release -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-10-offline-stage-contracts", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Pure fixed documents and hashes; no clock, random input, network, filesystem mutation, or external binary dependency." }
     },
     {
       "id": "pipeline-ar6-release-toolchain",
@@ -556,8 +1061,21 @@
     { "path": "src/frontend/src/__tests__/stores/uiStore.test.ts", "suite": "frontend-stores", "status": "active", "removalGate": 70, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/ar6/projection-lookup.golden.test.ts", "suite": "frontend-ar6-lookup-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/ar6/projection-lookup.test.ts", "suite": "frontend-ar6-lookup-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/lib/contracts/public-contract-parity.test.ts", "suite": "frontend-public-contract-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/search/evaluation/evaluation.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/search/shards/browser-shards.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts", "suite": "frontend-settlement-worker-performance", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_cog_range.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_cog_range_evidence.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_cli.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_controlled_inputs.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_engine.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_handlers.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_model.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_profiles.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/offline_release/test_toolchain.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_evidence.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_final_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -568,7 +1086,17 @@
     { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_delivery.py", "suite": "pipeline-ar6-release-delivery", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_gate_report.py", "suite": "pipeline-release-gate-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_candidate_assembler.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_candidate_bytes.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_provenance_statement.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_geoparquet.py", "suite": "pipeline-ar6-release-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_geoparquet.py", "suite": "pipeline-boundary-geoparquet", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_pmtiles_structure.py", "suite": "pipeline-boundary-pmtiles-structure", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_pmtiles_parity.py", "suite": "pipeline-boundary-pmtiles-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_pmtiles.py", "suite": "pipeline-boundary-pmtiles-writer", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_boundary_evidence.py", "suite": "pipeline-boundary-pmtiles-evidence", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_pmtiles.py", "suite": "pipeline-ar6-release-pmtiles", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_owner_promotion.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_promotion_cli.py", "suite": "pipeline-ar6-release-recovery-gate", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -595,8 +1123,46 @@
     { "path": "src/pipeline/tests/science/test_uncertainty.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/science/test_vertical_source_evidence.py", "suite": "pipeline-science-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_geonames_alternate_names.py", "suite": "pipeline-geonames-alternate-normalization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_geonames_alternate_scan.py", "suite": "pipeline-geonames-alternate-normalization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_report.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_geonames_full_scan_validator.py", "suite": "pipeline-geonames-place-full-scan", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_geonames_parser.py", "suite": "pipeline-geonames-place-parser", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_toolchain.py", "suite": "pipeline-settlement-spatial-toolchain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_catalogue_domain.py", "suite": "pipeline-settlement-catalogue-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_asset_authority.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_classification.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_search_projection.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_classification_stage.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_geoparquet.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_geoparquet_publication.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_spatial_stage_runner.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_coastline_contract.py", "suite": "pipeline-settlement-shoreline-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_coastline_source.py", "suite": "pipeline-settlement-shoreline-build", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_full_source_catalogue_contract.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_full_source_stage.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_normalized_catalogue_stage.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_reconciliation.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_build_plane_sbom.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_candidate_evidence_pair.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_cosign_tool.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_evidence_retention.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_production_evidence.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_sigstore_verifier.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_supply_chain_contracts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_nuget_sbom.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_protected_workflow_artifacts.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_public_readback.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_python_graph_contract.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_python_sbom.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_protected_signing_workflow.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_real_python_graph_annotations.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_real_source_unverified_evidence.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_sbom_generation.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/supply_chain/test_sbom_publication.py", "suite": "pipeline-supply-chain-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/tdd/test_result_state_characterization.py", "suite": "pipeline-five-state-characterization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_cogify.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_compute_exposure.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
@@ -607,7 +1173,8 @@
     { "path": "src/pipeline/tests/test_upload.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "src/pipeline/tests/test_validate.py", "suite": "pipeline-legacy-transform", "status": "active", "removalGate": 68, "replacementEvidence": null },
     { "path": "tests/harness/test_changed_suites.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
-    { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
+    { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/harness/test_immutable_dependencies.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
   ],
   "knownGaps": [
     {

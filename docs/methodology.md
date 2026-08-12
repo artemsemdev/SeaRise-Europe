@@ -1,11 +1,11 @@
 # AR6 Regional Projection Methodology
 
-> **Status:** Projection lookup and source parity validated; regional release gate pending
-> **Last reviewed:** 2026-08-05
+> **Status:** Projection lookup, source parity, and Phase 0R release gate approved
+> **Last reviewed:** 2026-08-10
 > **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Machine contract:** [`ar6-projection-contract.json`](../src/pipeline/science/ar6-projection-contract.json)
-> **Blocking gate:** #110 must produce the measured regional release gate and owner decision
-> **Phase 1:** `LOCKED`; CI validation cannot replace the project owner's release decision
+> **Release gate:** [`final-gate.json`](../src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json) records automated validation passed, zero blockers, and owner `releaseDisposition=approved`
+> **Phase 1:** `OPEN`; public artifact-contract work is in progress
 > **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
 > **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
 > **Canonical document:** `docs/methodology.md`
@@ -49,8 +49,8 @@ synthetic mutation control rather than a manufactured real-source golden.
 
 The NASA/Rutgers IPCC AR6 Sea Level Projection Tool is a supplementary manual
 cross-check only, not the CI oracle. Automated source/implementation parity for
-#135 has passed without authorizing publication; #110 and an explicit
-project-owner release decision remain required.
+#135 passed, and #110 subsequently recorded trusted dual-platform evidence plus
+the separate project-owner approval that opened Phase 1.
 
 The hash-bound `ar6-projection-contract.json` is the accepted pre-run decision
 snapshot. Its `publicationGate` therefore still records `automatedValidation`
@@ -288,13 +288,13 @@ states that must not be collapsed:
 
 All nine scenario/horizon attempts stopped before arrays. No classes, COGs,
 PMTiles, GeoParquet, statistics, release receipt, or synthetic substitute were
-created. Phase 1 remains locked.
+created. At that historical gate, Phase 1 remained locked.
 
 The original recovery plan through #107–#109 was superseded when ADR-024
-removed the absolute-water and terrain comparison. Current recovery is #135
-source/implementation parity followed by the #110 regional release gate. CI
-may record automated validation, but only the project owner may set the release
-decision that unlocks [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
+removed the absolute-water and terrain comparison. Recovery through #135 and
+#110 is complete. CI recorded automated validation; the project owner separately
+set the release decision that unlocked
+[#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
 
 ## Historical v1 required preprocessing record
 
@@ -440,4 +440,4 @@ ADR. Do not edit the v1 evidence or interpretation in place.
 | `v1.0` | 2026-08-05 | Controls selected; publication blocked | Phase 0.8 selected fail-closed GLO-30 terrain, explicit Europe/25 km product scope, and eight-neighbour ocean connectivity; independent approvals and terrain bounds remain open |
 | `v1.0` | 2026-08-05 | Phase 0.9 completed; scientific gate blocked | Phase 0.9 attempted all nine exact combinations, emitted no scientific artifacts, and recorded seven unresolved evidence gates; Phase 0 and Phase 1 remain blocked |
 | `v1.0` | 2026-08-05 | Phase 0 complete with no-go; publication superseded | Phase 0.14 preserved the authoritative `BLOCKED` state, recorded the automated `REJECTED` recommendation, emitted no release artifacts, and routed future work through #106–#110 |
-| `v2.0` | 2026-08-05 | Contract and lookup implemented; publication blocked | ADR-024 replaced binary exposure with source-native AR6 q0.167/q0.5/q0.833 reporting; #135 passed and #110 trusted evidence plus owner `releaseDisposition` remain required before release or Phase 1. |
+| `v2.0` | 2026-08-10 | Recovery approved; Phase 1 open | ADR-024 replaced binary exposure with source-native AR6 q0.167/q0.5/q0.833 reporting; #135 parity and the trusted, owner-approved #110 release gate passed. |

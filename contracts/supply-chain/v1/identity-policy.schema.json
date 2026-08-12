@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/identity-policy.schema.json",
+  "title": "SeaRise Europe production signing identity policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "contractId",
+    "repository",
+    "workflowPath",
+    "workflowRef",
+    "certificateIdentity",
+    "oidcIssuer",
+    "protectedEnvironment",
+    "bundleMediaType"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/identity-policy.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "contractId": { "const": "phase-1-production-signing-identity-v1" },
+    "repository": { "const": "artemsemdev/SeaRise-Europe" },
+    "workflowPath": { "const": ".github/workflows/phase-1-release-sign.yml" },
+    "workflowRef": { "const": "refs/heads/master" },
+    "certificateIdentity": {
+      "const": "https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master"
+    },
+    "oidcIssuer": { "const": "https://token.actions.githubusercontent.com" },
+    "protectedEnvironment": { "const": "phase-1-production-signing" },
+    "bundleMediaType": {
+      "const": "application/vnd.dev.sigstore.bundle+json;version=0.3"
+    }
+  }
+}

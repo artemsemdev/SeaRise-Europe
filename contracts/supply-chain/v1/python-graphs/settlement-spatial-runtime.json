@@ -1,0 +1,23 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/python-lock-graph.schema.json",
+  "schemaVersion": "1.0.0",
+  "annotationKind": "python-lock-graph",
+  "annotationId": "settlement-spatial-python-runtime-v1",
+  "graphScope": "target-active-runtime-dependencies",
+  "review": {"status":"reviewed-wheel-metadata","productionClaim":false,"note":"Reviewed from hash-matched DuckDB wheels for the isolated spatial build plane; this graph is not publication approval."},
+  "targets": [
+    {
+      "id": "linux-x86-64-cp311",
+      "lock": {"path":"src/pipeline/requirements-settlements-spatial-linux-x86_64.lock","sha256":"52b9b9081a9f84cac3c3067ca2f68622b4515f2ef8929183f0ae57c6df3db497"},
+      "markerEnvironment": {"implementation_name":"cpython","implementation_version":"3.11.15","os_name":"posix","platform_machine":"x86_64","platform_python_implementation":"CPython","platform_release":"ubuntu-24.04","platform_system":"Linux","platform_version":"ubuntu-24.04","python_full_version":"3.11.15","python_version":"3.11","sys_platform":"linux"}
+    },
+    {
+      "id": "macos-arm64-cp311",
+      "lock": {"path":"src/pipeline/requirements-settlements-spatial-macos-arm64.lock","sha256":"1c992360d57158a51053536ca8d70d6d718b7caa96f60af1b5615a0c8535e33e"},
+      "markerEnvironment": {"implementation_name":"cpython","implementation_version":"3.11.9","os_name":"posix","platform_machine":"arm64","platform_python_implementation":"CPython","platform_release":"macos-14","platform_system":"Darwin","platform_version":"macos-14","python_full_version":"3.11.9","python_version":"3.11","sys_platform":"darwin"}
+    }
+  ],
+  "packages": [
+    {"name":"duckdb","version":"1.5.4","root":true,"selectedExtras":[],"dependencies":[]}
+  ]
+}

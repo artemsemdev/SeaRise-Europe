@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "settlement-spatial-classification-synthetic-v1",
+  "dataProvenanceClass": "synthetic-fixture",
+  "geometryStatus": "selected-scope-approximation",
+  "publicationEligible": false,
+  "ownerApprovalClaim": false,
+  "toolchain": {"manifestPath":"src/pipeline/toolchain/duckdb-spatial-extensions.json","manifestSha256":"77c7ea3422e67be2f8d23f0dcef2d5d36236f01b8856f76289ed1e0532359ca6","duckdbVersion":"1.5.4","extensionVersion":"v1.5.4"},
+  "productionBlocker": {"reason":"shoreline-geometry-unavailable","prohibitedSubstitutes":["support-boundary","coastal-zone-boundary"]},
+  "distanceOracle": {
+    "library": "pyproj.Transformer+shapely.distance",
+    "pyprojVersion": "3.6.1",
+    "projVersion": "9.3.0",
+    "shapelyVersion": "2.0.7",
+    "sourceCrs": "EPSG:4326",
+    "metricCrs": "EPSG:3035",
+    "areaOfUseBoundsWgs84": [-35.58, 24.6, 44.83, 84.73],
+    "alwaysXY": true,
+    "operation": "transform-point-and-shoreline-then-planar-distance",
+    "distanceMethodVersion": "epsg3035-planar-whole-meter-half-even-v1",
+    "quantization": "DuckDB DOUBLE-to-BIGINT nearest-half-to-even"
+  },
+  "geometries": [
+    {"role":"support","id":"synthetic-europe-support","version":"synthetic-support-v1","path":"src/pipeline/tests/settlements/fixtures/spatial/synthetic-support.geojson","sha256":"90354aa036ebab60c4337b6f7143e5a15637f52e9e099e890e62253f616dd168","predicate":"ST_Covers"},
+    {"role":"coastal","id":"synthetic-coastal-zone","version":"synthetic-coastal-v1","path":"src/pipeline/tests/settlements/fixtures/spatial/synthetic-coastal.geojson","sha256":"25d532b30a665dd1e0edfeca2116f41667939a7b5024afd5d32ea5946c8be292","predicate":"ST_Covers"},
+    {"role":"shoreline","id":"synthetic-shoreline","version":"synthetic-shoreline-v1","path":"src/pipeline/tests/settlements/fixtures/spatial/synthetic-shoreline.geojson","sha256":"2f4e944caf0245d7e6b217813d77a517016d1561965449c9c0f23c86f6e0a719","predicate":"ST_Transform(EPSG:4326,EPSG:3035,always_xy=true)+CAST(ST_Distance AS BIGINT-half-even)"}
+  ],
+  "normalizationFixtureReferences": [
+    {"path":"src/pipeline/tests/settlements/fixtures/geonames/catalogue-fixture-manifest.json","sha256":"b284e0f51feccf4f0203ea8896464bf4b5e37422ffe6ebb3452572701ee38bd0","sourceRecordIds":[3128760]},
+    {"path":"src/pipeline/tests/settlements/fixtures/geonames/fixture-manifest.json","sha256":"d6286c4e080e8908bc2b43af767701d0a9c26bc2e188bc82182feb2de6cd3b03","sourceRecordIds":[3039322]},
+    {"path":"src/pipeline/tests/settlements/fixtures/geonames/alternate-fixture-manifest.json","sha256":"acbbb0ef270eca15bfdc6a3c0d4fb958c4b32cc5ffd43eb87ec2816cc3a1f5d8","sourceRecordIds":[3128760]}
+  ],
+  "cases": [
+    {"caseId":"inland-city","sourceLine":1,"placeId":"geonames:900000101","name":"Inland City","latitude":52.0,"longitude":3.0,"population":1200,"supportCovers":true,"coastalCovers":false,"distanceToShorelineMeters":205754},
+    {"caseId":"coastal-village","sourceLine":2,"placeId":"geonames:900000102","name":"Coastal Village","latitude":52.0,"longitude":0.5,"population":0,"supportCovers":true,"coastalCovers":true,"distanceToShorelineMeters":34291},
+    {"caseId":"support-boundary","sourceLine":3,"placeId":"geonames:900000103","name":"Boundary Place","latitude":54.0,"longitude":4.0,"population":12,"supportCovers":true,"coastalCovers":false,"distanceToShorelineMeters":262059},
+    {"caseId":"island-harbor","sourceLine":4,"placeId":"geonames:900000104","name":"Island Harbor","latitude":51.0,"longitude":0.0,"population":340,"supportCovers":true,"coastalCovers":true,"distanceToShorelineMeters":0},
+    {"caseId":"excluded-transcontinental","sourceLine":5,"placeId":"geonames:900000105","name":"Excluded Transcontinental City","latitude":52.0,"longitude":5.0,"population":4000,"supportCovers":false,"coastalCovers":false,"distanceToShorelineMeters":342820},
+    {"caseId":"zero-population","sourceLine":6,"placeId":"geonames:900000106","name":"Zero Population Hamlet","latitude":53.0,"longitude":2.0,"population":0,"supportCovers":true,"coastalCovers":false,"distanceToShorelineMeters":134100}
+  ]
+}

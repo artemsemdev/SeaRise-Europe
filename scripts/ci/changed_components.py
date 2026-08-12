@@ -36,6 +36,10 @@ FORCE_ALL = (
 
 FRONTEND = (
     "src/frontend/**",
+    "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
+    "src/pipeline/evidence/ar6-regional-release/**",
+    "src/pipeline/fixtures/ar6-regional-release/**",
+    "contracts/**",
     "tests/fixtures/tdd/**",
 )
 
@@ -47,14 +51,21 @@ API = (
 )
 
 PIPELINE = (
+    ".github/workflows/offline-release-controlled.yml",
+    ".github/workflows/phase-1-release-sign.yml",
     ".github/workflows/phase-0r-owner-promotion.yml",
+    "docs/evidence/fixtures/offline-release-execution-receipt.example.json",
+    "scripts/release/prepare_controlled_offline_inputs.py",
+    "scripts/release/validate_supply_chain_contract.py",
     "scripts/science/promote_phase_0r_release.py",
     "scripts/science/validate_ar6_delivery_trace.py",
     "src/pipeline/**",
     ".env.pipeline.example",
     ".gitignore",
     "data/geometry/**",
+    "data/settlements/**",
     "scripts/tests/**",
+    "contracts/**",
     "tests/**",
 )
 
@@ -62,7 +73,10 @@ PIPELINE = (
 # pinned geospatial toolchain preflight, while the 9.24 GB real-source build is
 # further isolated behind an explicit manual evidence dispatch.
 RELEASE = (
+    ".github/workflows/offline-release-controlled.yml",
+    ".github/workflows/phase-1-release-sign.yml",
     ".github/workflows/phase-0r-owner-promotion.yml",
+    "scripts/release/prepare_controlled_offline_inputs.py",
     "scripts/science/promote_phase_0r_release.py",
     "scripts/science/*ar6*release*.py",
     "scripts/science/build_ar6_lookup_goldens.py",

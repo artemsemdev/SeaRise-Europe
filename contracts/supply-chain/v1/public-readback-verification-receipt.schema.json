@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/public-readback-verification-receipt.schema.json",
+  "title": "SeaRise Europe public signed-subject readback receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "receiptType", "candidateId", "dataReleaseId", "controlledBuildRunId", "publicOrigin", "observedAt", "cryptographicVerificationReceiptSha256", "subjects", "claims"],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/public-readback-verification-receipt.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "receiptType": { "const": "phase-1-public-signed-subject-readback-v1" },
+    "candidateId": { "type": "string", "pattern": "^candidate-[a-z0-9][a-z0-9-]+$" },
+    "dataReleaseId": { "type": "string", "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$" },
+    "controlledBuildRunId": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "publicOrigin": { "type": "string", "pattern": "^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$" },
+    "observedAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "cryptographicVerificationReceiptSha256": { "$ref": "#/$defs/sha256" },
+    "subjects": {
+      "type": "array",
+      "prefixItems": [
+        { "allOf": [{ "$ref": "#/$defs/subject" }, { "properties": { "path": { "const": "manifest.json" } } }] },
+        { "allOf": [{ "$ref": "#/$defs/subject" }, { "properties": { "path": { "const": "provenance.intoto.jsonl" } } }] }
+      ],
+      "items": false,
+      "minItems": 2
+    },
+    "claims": {
+      "const": {
+        "cryptographicSubjectsReverified": true,
+        "publicBytesMatched": true,
+        "productionClaim": false,
+        "publicationApproval": false,
+        "scientificApproval": false
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "url", "byteSize", "sha256", "matchesCryptographicallyVerifiedSubject"],
+      "properties": {
+        "path": { "enum": ["manifest.json", "provenance.intoto.jsonl"] },
+        "url": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "byteSize": { "type": "integer", "minimum": 1, "maximum": 8388608 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "matchesCryptographicallyVerifiedSubject": { "const": true }
+      }
+    }
+  }
+}

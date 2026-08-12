@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v2/place.schema.json",
+  "title": "SeaRise Europe normalized settlement place v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass", "id",
+    "sourceSpelling", "canonicalName", "asciiName", "alternateNames",
+    "countryCode", "admin1Code", "admin1Name", "location", "population",
+    "featureCode", "spatialClassification", "sourceUpdatedAt", "lineage"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v2/place.schema.json"
+    },
+    "schemaVersion": { "const": "2.0.0" },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+    "id": { "type": "string", "pattern": "^geonames:[1-9][0-9]*$" },
+    "sourceSpelling": { "type": "string", "minLength": 1 },
+    "canonicalName": { "$ref": "#/$defs/nameVariant" },
+    "asciiName": { "type": "string", "minLength": 1 },
+    "alternateNames": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nameVariant" }
+    },
+    "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$" },
+    "admin1Code": { "type": ["string", "null"], "minLength": 1 },
+    "admin1Name": { "type": ["string", "null"], "minLength": 1 },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
+    "population": { "type": ["integer", "null"], "minimum": 0 },
+    "featureCode": {
+      "enum": ["PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF", "PPLG", "PPLL", "PPLR"]
+    },
+    "spatialClassification": { "$ref": "#/$defs/spatialClassification" },
+    "sourceUpdatedAt": { "type": ["string", "null"], "format": "date" },
+    "lineage": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sourceRecord" }
+    }
+  },
+  "$defs": {
+    "nameVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "language", "script"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "language": { "type": ["string", "null"], "pattern": "^[a-z]{2,3}$" },
+        "script": { "type": ["string", "null"], "pattern": "^[A-Z][a-z]{3}$" }
+      }
+    },
+    "sourceRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "sourceRelease", "sourceFile", "sourceLine", "sourceRecordId", "sourceSha256"],
+      "properties": {
+        "sourceId": { "const": "geonames" },
+        "sourceRelease": { "type": "string", "format": "date" },
+        "sourceFile": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+        "sourceLine": { "type": "integer", "minimum": 1 },
+        "sourceRecordId": { "type": "integer", "minimum": 1 },
+        "sourceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "spatialClassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supportGeometryVersion", "coastalGeometryVersion", "predicate",
+        "distanceToCoastMeters", "isCoastal", "catalogMembership"
+      ],
+      "properties": {
+        "supportGeometryVersion": { "type": "string", "minLength": 1 },
+        "coastalGeometryVersion": { "type": "string", "minLength": 1 },
+        "predicate": { "const": "covers" },
+        "distanceToCoastMeters": { "type": "number", "minimum": 0 },
+        "isCoastal": { "type": "boolean" },
+        "catalogMembership": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "enum": ["europe-core", "europe-coastal"] }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "isCoastal": { "const": true } }, "required": ["isCoastal"] },
+          "then": { "properties": { "catalogMembership": { "contains": { "const": "europe-coastal" } } } },
+          "else": { "properties": { "catalogMembership": { "not": { "contains": { "const": "europe-coastal" } } } } }
+        }
+      ]
+    }
+  }
+}

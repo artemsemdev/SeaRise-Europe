@@ -7,9 +7,10 @@ from pathlib import Path
 import click
 
 from .acquire import Acquirer, AcquisitionError
-from .registry import RegistryError, load_registry
+from .registry import RegistryError, load_registry, load_settlement_registry
 
 DEFAULT_LOCK = Path(__file__).parents[2] / "sources" / "source-lock.json"
+SETTLEMENT_LOCK_NAME = "source-lock.phase-1-settlements.json"
 REPOSITORY_ROOT = Path(__file__).parents[4]
 DEFAULT_CACHE = REPOSITORY_ROOT / "data" / "raw" / "sources"
 DEFAULT_RECEIPTS = REPOSITORY_ROOT / "artifacts" / "acquisition-receipts"
@@ -17,7 +18,12 @@ DEFAULT_RECEIPTS = REPOSITORY_ROOT / "artifacts" / "acquisition-receipts"
 
 def _registry(lock_path: Path):
     try:
-        return load_registry(lock_path)
+        loader = (
+            load_settlement_registry
+            if lock_path.name == SETTLEMENT_LOCK_NAME
+            else load_registry
+        )
+        return loader(lock_path)
     except RegistryError as exc:
         raise click.ClickException(str(exc)) from exc
 
