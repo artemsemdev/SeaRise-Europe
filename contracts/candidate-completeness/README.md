@@ -48,7 +48,14 @@ all staging writes, mode changes, syncs, validation, and cleanup use held
 directory descriptors. The publication commit point verifies the current
 parent and final directory identities before and after validation. A failed
 post-promotion check durably moves only the held assembler directory away from
-the final name. Its marker payloads are not valid COG, PMTiles, GeoParquet, or search indexes.
+the final name. Publication returns only after a third complete byte/tree pass
+reopens the exact final directory through its held parent authority. Because
+POSIX has no conditional unlink, cleanup prioritizes foreign preservation and
+retains at most one high-entropy mode-0700 `.candidate-assembly-*` quarantine
+wrapper outside the public candidate name. Operators may remove that private
+wrapper only after the assembler process exits; ephemeral CI runners remove it
+with the job workspace. Its marker payloads are not valid COG, PMTiles,
+GeoParquet, or search indexes.
 
 Provenance, signature, and SBOM sidecars are mandatory publication evidence,
 not deferred Phase 1 work. Pair validation is still pending: a dependent

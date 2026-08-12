@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, NoReturn
 
-from .byte_gate import validate_candidate_root
+from .byte_gate import CandidateByteSummary, validate_candidate_root
 from .validator import CandidateContractError, load_candidate_bytes, validate_candidate_document
 
 CONTRACT_ROOT = Path(__file__).resolve().parents[4] / "contracts/candidate-completeness/v1"
@@ -54,6 +54,15 @@ class CandidateAssemblySummary:
     output_directory: Path
     production: bool = False
     publication: bool = False
+
+
+@dataclass
+class _StageOwnership:
+    """Device/inode ledger for every entry created below one held stage root."""
+
+    root: tuple[int, int]
+    directories: dict[PurePosixPath, tuple[int, int]]
+    files: dict[PurePosixPath, tuple[int, int]]
 
 
 def _fail(code: str, message: str) -> NoReturn:
@@ -95,6 +104,7 @@ def _identity(metadata: os.stat_result) -> tuple[int, ...]:
 def _read_stable_file(path: Path, *, code: str, maximum_bytes: int) -> bytes:
     """Read one bounded, single-link file and reject a concurrent replacement."""
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_NONBLOCK", 0)
     descriptor = -1
     try:
         descriptor = os.open(path, flags)
@@ -123,7 +133,17 @@ def _read_stable_file(path: Path, *, code: str, maximum_bytes: int) -> bytes:
             os.close(descriptor)
 
 
+def _bounded_input_kind(path: Path, *, code: str) -> None:
+    try:
+        metadata = os.stat(path, follow_symlinks=False)
+    except OSError as exc:
+        raise CandidateAssemblyError(code, "input cannot be inspected safely") from exc
+    if not stat.S_ISREG(metadata.st_mode):
+        _fail(code, "input must be one bounded regular file")
+
+
 def _read_bound_receipt(path: Path) -> bytes:
+    _bounded_input_kind(path, code="assembly-receipt")
     return _read_stable_file(path, code="assembly-receipt", maximum_bytes=_MAX_RECEIPT_BYTES)
 
 
@@ -162,6 +182,8 @@ def _load_inputs(
 ) -> tuple[dict[str, Any], str, str, dict[str, bytes]]:
     try:
         receipt = load_candidate_bytes(_read_bound_receipt(receipt_path))
+    except CandidateAssemblyError:
+        raise
     except ValueError as exc:
         raise CandidateAssemblyError("assembly-receipt", "receipt is not strict JSON") from exc
     expected_keys = {
@@ -192,6 +214,7 @@ def _load_inputs(
     if receipt.get("rights") != _RIGHTS:
         _fail("fixture-rights", "fixture redistribution rights are invalid")
 
+    _bounded_input_kind(_TEMPLATE, code="assembly-template")
     template_raw = _read_stable_file(
         _TEMPLATE, code="assembly-template", maximum_bytes=_MAX_TEMPLATE_BYTES
     )
@@ -306,6 +329,13 @@ def _directory_identity(metadata: os.stat_result) -> tuple[int, int]:
     return metadata.st_dev, metadata.st_ino
 
 
+def _entry_identity(parent: int, name: str) -> tuple[int, int] | None:
+    try:
+        return _directory_identity(os.stat(name, dir_fd=parent, follow_symlinks=False))
+    except FileNotFoundError:
+        return None
+
+
 def _open_directory(parent: int, parts: Iterable[str]) -> int:
     descriptor = os.dup(parent)
     try:
@@ -319,19 +349,112 @@ def _open_directory(parent: int, parts: Iterable[str]) -> int:
         raise
 
 
-def _open_or_create_directory(parent: int, parts: Iterable[str]) -> int:
-    descriptor = os.dup(parent)
+def _open_owned_directory(
+    root: int, logical: PurePosixPath, ownership: _StageOwnership
+) -> int:
+    """Open only directories whose current entries match the creation ledger."""
+    descriptor = os.dup(root)
+    current = PurePosixPath()
     try:
-        for part in parts:
-            try:
-                os.mkdir(part, 0o755, dir_fd=descriptor)
-            except FileExistsError:
-                pass
+        for part in logical.parts:
+            current /= part
+            expected = ownership.directories.get(current)
+            if expected is None or _entry_identity(descriptor, part) != expected:
+                _fail("foreign-replacement", f"staging directory identity differs: {current}")
             child = os.open(part, _directory_flags(), dir_fd=descriptor)
+            if (
+                _directory_identity(os.fstat(child)) != expected
+                or _entry_identity(descriptor, part) != expected
+            ):
+                os.close(child)
+                _fail("foreign-replacement", f"staging directory changed while opened: {current}")
             os.close(descriptor)
             descriptor = child
         return descriptor
-    except OSError:
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+def _reserve_owned_directory(
+    parent: int, prefix: str, mode: int
+) -> tuple[str, int, tuple[int, int]]:
+    """Reserve a private directory and bind its held descriptor to the entry."""
+    for _ in range(128):
+        name = f"{prefix}{secrets.token_hex(16)}"
+        try:
+            created = _mkdir_exclusive(parent, name, mode)
+        except FileExistsError:
+            continue
+        descriptor = -1
+        try:
+            descriptor = os.open(name, _directory_flags(), dir_fd=parent)
+            if (
+                _directory_identity(os.fstat(descriptor)) != created
+                or _entry_identity(parent, name) != created
+            ):
+                _fail("foreign-replacement", f"private staging directory was replaced: {name}")
+            return name, descriptor, created
+        except Exception:
+            if descriptor >= 0:
+                os.close(descriptor)
+            raise
+    _fail("assembly-publication", "cannot reserve a private staging directory")
+
+
+def _create_owned_directory(
+    parent: int, name: str, mode: int = 0o755
+) -> tuple[int, tuple[int, int]]:
+    """Create privately, then atomically promote the exact held directory."""
+    private, descriptor, created = _reserve_owned_directory(
+        parent, ".candidate-directory-", mode
+    )
+    try:
+        if (
+            _directory_identity(os.fstat(descriptor)) != created
+            or _entry_identity(parent, private) != created
+        ):
+            _fail("foreign-replacement", f"private staging directory changed: {name}")
+        _rename_no_overwrite(parent, private, parent, name)
+        _sync_directory(parent)
+        if _entry_identity(parent, name) != created:
+            _fail("foreign-replacement", f"promoted staging directory was replaced: {name}")
+        return descriptor, created
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+
+
+def _ensure_owned_directory(
+    root: int, logical: PurePosixPath, ownership: _StageOwnership
+) -> int:
+    descriptor = os.dup(root)
+    current = PurePosixPath()
+    try:
+        for part in logical.parts:
+            current /= part
+            expected = ownership.directories.get(current)
+            if expected is None:
+                child, expected = _create_owned_directory(descriptor, part)
+                ownership.directories[current] = expected
+            else:
+                if _entry_identity(descriptor, part) != expected:
+                    _fail("foreign-replacement", f"staging directory identity differs: {current}")
+                child = os.open(part, _directory_flags(), dir_fd=descriptor)
+                if (
+                    _directory_identity(os.fstat(child)) != expected
+                    or _entry_identity(descriptor, part) != expected
+                ):
+                    os.close(child)
+                    _fail(
+                        "foreign-replacement",
+                        f"staging directory changed while opened: {current}",
+                    )
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except Exception:
         os.close(descriptor)
         raise
 
@@ -343,14 +466,16 @@ def _logical(path: str) -> PurePosixPath:
     return logical
 
 
-def _write_new(root: int, path: str, raw: bytes) -> None:
+def _write_new(root: int, path: str, raw: bytes, ownership: _StageOwnership) -> None:
     """Create one stage file through the held stage-root descriptor."""
     logical = _logical(path)
-    parent = _open_or_create_directory(root, logical.parts[:-1])
+    parent = _ensure_owned_directory(root, logical.parent, ownership)
     descriptor = -1
+    private = f".candidate-file-{secrets.token_hex(16)}"
+    created: tuple[int, int] | None = None
     try:
         descriptor = os.open(
-            logical.name,
+            private,
             os.O_WRONLY
             | os.O_CREAT
             | os.O_EXCL
@@ -359,13 +484,32 @@ def _write_new(root: int, path: str, raw: bytes) -> None:
             0o600,
             dir_fd=parent,
         )
+        created = _directory_identity(os.fstat(descriptor))
+        if _entry_identity(parent, private) != created:
+            _fail("foreign-replacement", f"private staging file was replaced: {logical}")
         offset = 0
         while offset < len(raw):
-            offset += os.write(descriptor, raw[offset:])
+            written = os.write(descriptor, raw[offset:])
+            if written <= 0:
+                raise OSError("candidate write made no progress")
+            offset += written
         os.fsync(descriptor)
+        if _entry_identity(parent, private) != created:
+            _fail("foreign-replacement", f"private staging file changed: {logical}")
+        _rename_no_overwrite(parent, private, parent, logical.name)
+        _sync_directory(parent)
+        if _entry_identity(parent, logical.name) != created:
+            _fail("foreign-replacement", f"promoted staging file was replaced: {logical}")
+        ownership.files[logical] = created
     finally:
         if descriptor >= 0:
             os.close(descriptor)
+        if created is not None:
+            for current in (private, logical.name):
+                if (
+                    current != logical.name or logical not in ownership.files
+                ) and _entry_identity(parent, current) == created:
+                    _quarantine_owned_entry(parent, current, created)
         os.close(parent)
 
 
@@ -377,44 +521,64 @@ def _stage_directories(paths: Iterable[str]) -> list[PurePosixPath]:
     )
 
 
-def _chmod_file(root: int, path: str, mode: int) -> None:
+def _chmod_file(root: int, path: str, mode: int, ownership: _StageOwnership) -> None:
     logical = _logical(path)
-    parent = _open_directory(root, logical.parts[:-1])
+    expected = ownership.files.get(logical)
+    if expected is None:
+        _fail("foreign-replacement", f"staging file is not owned: {logical}")
+    parent = _open_owned_directory(root, logical.parent, ownership)
     descriptor = -1
     try:
+        if _entry_identity(parent, logical.name) != expected:
+            _fail("foreign-replacement", f"staging file identity differs: {logical}")
         descriptor = os.open(
             logical.name,
             os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
             dir_fd=parent,
         )
+        if (
+            _directory_identity(os.fstat(descriptor)) != expected
+            or _entry_identity(parent, logical.name) != expected
+        ):
+            _fail("foreign-replacement", f"staging file changed while opened: {logical}")
         os.fchmod(descriptor, mode)
+        os.fsync(descriptor)
     finally:
         if descriptor >= 0:
             os.close(descriptor)
         os.close(parent)
 
 
-def _freeze(root: int, paths: Iterable[str]) -> None:
+def _freeze(root: int, paths: Iterable[str], ownership: _StageOwnership) -> None:
     paths = tuple(paths)
     for path in paths:
-        _chmod_file(root, path, 0o444)
+        _chmod_file(root, path, 0o444, ownership)
     for directory_path in _stage_directories(paths):
-        descriptor = _open_directory(root, directory_path.parts)
+        descriptor = _open_owned_directory(root, directory_path, ownership)
         try:
             os.fchmod(descriptor, 0o555)
+            os.fsync(descriptor)
         finally:
             os.close(descriptor)
     # Darwin RENAME_EXCL needs the moved directory to remain writable. Its
     # descriptor is frozen immediately after promotion.
     os.fchmod(root, 0o755)
+    os.fsync(root)
 
 
-def _thaw(root: int, paths: Iterable[str]) -> None:
+def _thaw(root: int, ownership: _StageOwnership) -> None:
     os.fchmod(root, 0o700)
-    for directory_path in _stage_directories(paths):
-        descriptor = _open_directory(root, directory_path.parts)
+    os.fsync(root)
+    for directory_path in sorted(
+        ownership.directories, key=lambda item: (len(item.parts), item.as_posix())
+    ):
+        try:
+            descriptor = _open_owned_directory(root, directory_path, ownership)
+        except (CandidateAssemblyError, OSError):
+            continue
         try:
             os.fchmod(descriptor, 0o700)
+            os.fsync(descriptor)
         finally:
             os.close(descriptor)
 
@@ -423,10 +587,10 @@ def _sync_directory(descriptor: int) -> None:
     os.fsync(descriptor)
 
 
-def _fsync_tree(root: int, paths: Iterable[str]) -> None:
+def _fsync_tree(root: int, paths: Iterable[str], ownership: _StageOwnership) -> None:
     """Synchronize child directories before their parents through held descriptors."""
     for directory_path in _stage_directories(paths):
-        descriptor = _open_directory(root, directory_path.parts)
+        descriptor = _open_owned_directory(root, directory_path, ownership)
         try:
             _sync_directory(descriptor)
         finally:
@@ -464,19 +628,23 @@ def _rename_no_overwrite(source_parent: int, source: str, output_parent: int, ta
         raise OSError(code, os.strerror(code), target)
 
 
-def _make_staging(parent: int) -> tuple[str, int]:
-    for _ in range(32):
-        name = f".candidate-assembly-{secrets.token_hex(16)}"
-        try:
-            os.mkdir(name, 0o700, dir_fd=parent)
-        except FileExistsError:
-            continue
-        try:
-            return name, os.open(name, _directory_flags(), dir_fd=parent)
-        except OSError:
-            os.rmdir(name, dir_fd=parent)
-            raise
-    _fail("assembly-publication", "cannot reserve a private staging directory")
+def _mkdir_exclusive(parent: int, name: str, mode: int) -> tuple[int, int]:
+    """Create a private child without exposing a predictable mkdir hook boundary."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    mkdir = libc.mkdirat
+    mkdir.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+    mkdir.restype = ctypes.c_int
+    if mkdir(parent, os.fsencode(name), mode) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), name)
+    created = _entry_identity(parent, name)
+    if created is None:
+        _fail("foreign-replacement", "private staging directory disappeared")
+    return created
+
+
+def _make_staging(parent: int) -> tuple[str, int, tuple[int, int]]:
+    return _reserve_owned_directory(parent, ".candidate-assembly-", 0o700)
 
 
 def _entry_matches(directory: int, name: str, expected: tuple[int, int]) -> bool:
@@ -497,20 +665,51 @@ def _commit_matches(parent_path: Path, parent: int, name: str, stage: int) -> bo
     return parent_matches and _entry_matches(parent, name, _directory_identity(os.fstat(stage)))
 
 
-def _remove_known_stage(root: int, paths: Iterable[str]) -> None:
-    paths = tuple(paths)
-    _thaw(root, paths)
-    for path in paths:
-        logical = _logical(path)
-        parent = _open_directory(root, logical.parts[:-1])
+def _quarantine_owned_entry(
+    parent: int, name: str, expected: tuple[int, int]
+) -> bool:
+    """Atomically isolate exact owned bytes; retain them because POSIX lacks conditional unlink."""
+    for _ in range(128):
+        quarantine = f".candidate-owned-{secrets.token_hex(16)}"
         try:
-            os.unlink(logical.name, dir_fd=parent)
+            _rename_no_overwrite(parent, name, parent, quarantine)
+        except FileNotFoundError:
+            return True
+        except FileExistsError:
+            continue
+        _sync_directory(parent)
+        if not _entry_matches(parent, quarantine, expected):
+            if _entry_identity(parent, name) is None:
+                _rename_no_overwrite(parent, quarantine, parent, name)
+                _sync_directory(parent)
+            return False
+        return True
+    _fail("assembly-publication", "cannot reserve an owned cleanup quarantine")
+
+
+def _remove_owned_stage(root: int, ownership: _StageOwnership) -> None:
+    """Remove only exact owned entries and durably preserve every replacement."""
+    _thaw(root, ownership)
+    for logical, expected in sorted(ownership.files.items(), key=lambda item: item[0].as_posix()):
+        try:
+            parent = _open_owned_directory(root, logical.parent, ownership)
+        except (CandidateAssemblyError, OSError):
+            continue
+        try:
+            _quarantine_owned_entry(parent, logical.name, expected)
         finally:
             os.close(parent)
-    for directory_path in _stage_directories(paths):
-        parent = _open_directory(root, directory_path.parts[:-1])
+    for logical, expected in sorted(
+        ownership.directories.items(),
+        key=lambda item: (len(item[0].parts), item[0].as_posix()),
+        reverse=True,
+    ):
         try:
-            os.rmdir(directory_path.name, dir_fd=parent)
+            parent = _open_owned_directory(root, logical.parent, ownership)
+        except (CandidateAssemblyError, OSError):
+            continue
+        try:
+            _quarantine_owned_entry(parent, logical.name, expected)
         finally:
             os.close(parent)
 
@@ -519,18 +718,22 @@ def _cleanup_staging(
     parent: int,
     temporary_name: str,
     temporary: int,
+    temporary_identity: tuple[int, int],
     stage: int,
-    paths: Iterable[str],
+    stage_name: str | None,
+    ownership: _StageOwnership | None,
 ) -> None:
     """Remove only the held staging tree; a replacement is intentionally retained."""
-    stage_identity = _directory_identity(os.fstat(stage))
-    if _entry_matches(temporary, "candidate", stage_identity):
-        _remove_known_stage(stage, paths)
-        if _entry_matches(temporary, "candidate", stage_identity):
-            os.rmdir("candidate", dir_fd=temporary)
-    temporary_identity = _directory_identity(os.fstat(temporary))
+    if stage >= 0 and stage_name is not None and ownership is not None:
+        if _entry_matches(temporary, stage_name, ownership.root):
+            _remove_owned_stage(stage, ownership)
+            _quarantine_owned_entry(temporary, stage_name, ownership.root)
+    # Retain one high-entropy mode-0700 wrapper. POSIX has no conditional rmdir,
+    # so deleting even an empty name would reopen a same-UID replacement race.
     if _entry_matches(parent, temporary_name, temporary_identity):
-        os.rmdir(temporary_name, dir_fd=parent)
+        os.fchmod(temporary, 0o700)
+        os.fsync(temporary)
+        _sync_directory(parent)
 
 
 def _rollback_owned_promotion(
@@ -538,13 +741,83 @@ def _rollback_owned_promotion(
     output_name: str,
     temporary: int,
     stage: int,
-) -> None:
+    ownership: _StageOwnership,
+) -> str | None:
     """Durably move our promoted inode away without touching a foreign final directory."""
-    if not _entry_matches(parent, output_name, _directory_identity(os.fstat(stage))):
-        return
+    stage_identity = _directory_identity(os.fstat(stage))
+    if not _entry_matches(parent, output_name, stage_identity):
+        return None
     os.fchmod(stage, 0o755)
-    _rename_no_overwrite(parent, output_name, temporary, "candidate")
+    os.fsync(stage)
+    # A high bound prevents hostile name generation from hanging error cleanup.
+    for _ in range(1024):
+        if not _entry_matches(parent, output_name, stage_identity):
+            return None
+        rollback_name = f".candidate-rollback-{secrets.token_hex(16)}"
+        try:
+            _rename_no_overwrite(parent, output_name, temporary, rollback_name)
+        except FileExistsError:
+            continue
+        if not _entry_matches(temporary, rollback_name, stage_identity):
+            return None
+        _sync_rename_parents(parent, temporary)
+        return rollback_name
+    # Last resort uses a separate, high-entropy parent quarantine namespace;
+    # cleanup occurs only after the exact owned directory is no longer final.
+    fallback = f".candidate-failed-{secrets.token_hex(32)}"
+    _rename_no_overwrite(parent, output_name, temporary, fallback)
     _sync_rename_parents(parent, temporary)
+    if not _entry_matches(temporary, fallback, stage_identity):
+        _fail("assembly-publication", "failed candidate quarantine identity differs")
+    return fallback
+
+
+def _final_publication_gate(
+    parent_path: Path,
+    parent: int,
+    output_name: str,
+    stage: int,
+    expected: CandidateByteSummary,
+) -> CandidateByteSummary:
+    """Return only one fully revalidated tree still bound to the final pathname."""
+    expected_parent = _directory_identity(os.fstat(parent))
+    expected_stage = _directory_identity(os.fstat(stage))
+
+    def authority() -> int:
+        current_parent = os.stat(parent_path, follow_symlinks=False)
+        if _directory_identity(current_parent) != expected_parent:
+            _fail("foreign-replacement", "candidate parent identity changed")
+        descriptor = os.open(output_name, _directory_flags(), dir_fd=parent)
+        if (
+            _directory_identity(os.fstat(descriptor)) != expected_stage
+            or _entry_identity(parent, output_name) != expected_stage
+            or _directory_identity(os.stat(parent_path, follow_symlinks=False))
+            != expected_parent
+        ):
+            os.close(descriptor)
+            _fail("foreign-replacement", "candidate final identity changed")
+        return descriptor
+
+    sealed = validate_candidate_root(stage, final_root_authority=authority)
+    if sealed != expected:
+        _fail("foreign-replacement", "candidate changed at the final publication boundary")
+    return sealed
+
+
+def _same_candidate_bytes(left: CandidateByteSummary, right: CandidateByteSummary) -> bool:
+    return (
+        left.candidate_id,
+        left.data_release_id,
+        left.artifact_count,
+        left.artifact_bytes,
+        left.manifest_sha256,
+    ) == (
+        right.candidate_id,
+        right.data_release_id,
+        right.artifact_count,
+        right.artifact_bytes,
+        right.manifest_sha256,
+    )
 
 
 def assemble_candidate_fixture(
@@ -582,19 +855,29 @@ def assemble_candidate_fixture(
     complete = False
     parent_descriptor = -1
     temporary_descriptor = -1
+    temporary_identity: tuple[int, int] | None = None
     stage_descriptor = -1
+    ownership: _StageOwnership | None = None
     temporary_name = ""
+    stage_name: str | None = "candidate"
     stage_paths = [*(artifact["path"] for artifact in assembled["artifacts"]), "manifest.json"]
     try:
         parent_descriptor = os.open(parent, _directory_flags())
-        temporary_name, temporary_descriptor = _make_staging(parent_descriptor)
-        os.mkdir("candidate", 0o700, dir_fd=temporary_descriptor)
-        stage_descriptor = os.open("candidate", _directory_flags(), dir_fd=temporary_descriptor)
+        temporary_name, temporary_descriptor, temporary_identity = _make_staging(parent_descriptor)
+        stage_descriptor, stage_identity = _create_owned_directory(
+            temporary_descriptor, "candidate", 0o700
+        )
+        ownership = _StageOwnership(root=stage_identity, directories={}, files={})
         for artifact in assembled["artifacts"]:
-            _write_new(stage_descriptor, artifact["path"], all_payloads[artifact["artifactId"]])
-        _write_new(stage_descriptor, "manifest.json", manifest_raw)
-        _freeze(stage_descriptor, stage_paths)
-        _fsync_tree(stage_descriptor, stage_paths)
+            _write_new(
+                stage_descriptor,
+                artifact["path"],
+                all_payloads[artifact["artifactId"]],
+                ownership,
+            )
+        _write_new(stage_descriptor, "manifest.json", manifest_raw, ownership)
+        _freeze(stage_descriptor, stage_paths, ownership)
+        _fsync_tree(stage_descriptor, stage_paths, ownership)
         _sync_directory(temporary_descriptor)
         gated = validate_candidate_root(stage_descriptor)
         _rename_no_overwrite(
@@ -604,6 +887,7 @@ def assemble_candidate_fixture(
             output.name,
         )
         promoted = True
+        stage_name = None
         os.fchmod(stage_descriptor, 0o555)
         _sync_directory(stage_descriptor)
         _sync_rename_parents(temporary_descriptor, parent_descriptor)
@@ -612,14 +896,17 @@ def assemble_candidate_fixture(
         final = validate_candidate_root(stage_descriptor)
         if not _commit_matches(parent, parent_descriptor, output.name, stage_descriptor):
             _fail("foreign-replacement", "candidate identity changed after validation")
-        if final != gated:
+        if not _same_candidate_bytes(final, gated):
             _fail("foreign-replacement", "published candidate differs from the staged gate")
+        sealed = _final_publication_gate(
+            parent, parent_descriptor, output.name, stage_descriptor, final
+        )
         complete = True
         return CandidateAssemblySummary(
-            candidate_id=final.candidate_id,
-            artifact_count=final.artifact_count,
-            artifact_bytes=final.artifact_bytes,
-            manifest_sha256=final.manifest_sha256,
+            candidate_id=sealed.candidate_id,
+            artifact_count=sealed.artifact_count,
+            artifact_bytes=sealed.artifact_bytes,
+            manifest_sha256=sealed.manifest_sha256,
             output_directory=output,
         )
     except CandidateAssemblyError:
@@ -634,27 +921,24 @@ def assemble_candidate_fixture(
     finally:
         try:
             if promoted and not complete:
-                _rollback_owned_promotion(
+                if ownership is None:
+                    _fail("assembly-publication", "promoted candidate ownership is unavailable")
+                stage_name = _rollback_owned_promotion(
                     parent_descriptor,
                     output.name,
                     temporary_descriptor,
                     stage_descriptor,
+                    ownership,
                 )
-            if not complete and temporary_descriptor >= 0:
+            if temporary_descriptor >= 0 and temporary_identity is not None:
                 _cleanup_staging(
                     parent_descriptor,
                     temporary_name,
                     temporary_descriptor,
+                    temporary_identity,
                     stage_descriptor,
-                    stage_paths,
-                )
-            elif complete and temporary_descriptor >= 0:
-                _cleanup_staging(
-                    parent_descriptor,
-                    temporary_name,
-                    temporary_descriptor,
-                    stage_descriptor,
-                    (),
+                    stage_name,
+                    ownership,
                 )
         finally:
             if stage_descriptor >= 0:

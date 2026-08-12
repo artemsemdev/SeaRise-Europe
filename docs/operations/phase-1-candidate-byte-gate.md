@@ -22,6 +22,13 @@ the manifest last, validates the complete staged bytes, and promotes the
 read-only directory with a platform-native no-overwrite rename. This is local
 candidate promotion only; it is not public release publication.
 
+Staging and rollback use device/inode ownership ledgers and atomically move
+owned entries to high-entropy private names before cleanup. A foreign or
+ambiguous entry is never unlinked. POSIX provides no conditional unlink, so a
+successful or failed run can retain one mode-0700 `.candidate-assembly-*`
+wrapper outside the public output name. Remove that wrapper only after the
+assembler process has exited, or let the ephemeral CI workspace remove it.
+
 The validator fails closed unless the root contains exactly the 53 artifact
 paths declared by the candidate contract plus `manifest.json`. It rejects
 missing or extra entries, symlinks, hard links, special files, unsafe paths,

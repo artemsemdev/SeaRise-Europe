@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, NoReturn
+from typing import Any, Callable, Mapping, NoReturn
 
 from .validator import CandidateContractError, load_candidate_bytes, validate_candidate_document
 
@@ -36,6 +37,7 @@ class CandidateByteSummary:
     artifact_count: int
     artifact_bytes: int
     manifest_sha256: str
+    tree_identity_sha256: str = ""
     production: bool = False
     publication: bool = False
 
@@ -46,6 +48,14 @@ def _fail(code: str, message: str) -> NoReturn:
 
 def _identity(value: os.stat_result) -> tuple[int, ...]:
     return tuple(int(getattr(value, field)) for field in _IDENTITY_FIELDS)
+
+
+def _tree_identity_sha256(identities: Mapping[PurePosixPath, tuple[int, ...]]) -> str:
+    payload = [
+        [path.as_posix(), list(identity)]
+        for path, identity in sorted(identities.items(), key=lambda item: item[0].as_posix())
+    ]
+    return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode()).hexdigest()
 
 
 def _open_root(path: Path | int) -> int:
@@ -232,7 +242,11 @@ def _checksum_bytes(candidate: Mapping[str, Any]) -> bytes:
     return "".join(f"{item['sha256']}  {item['path']}\n" for item in subjects).encode("utf-8")
 
 
-def validate_candidate_root(candidate_root: Path | int) -> CandidateByteSummary:
+def validate_candidate_root(
+    candidate_root: Path | int,
+    *,
+    final_root_authority: Callable[[], int] | None = None,
+) -> CandidateByteSummary:
     """Validate exact candidate bytes without writing, repairing, or approving them.
 
     A held directory descriptor avoids pathname redirection during local assembly.
@@ -307,12 +321,22 @@ def validate_candidate_root(candidate_root: Path | int) -> CandidateByteSummary:
                 _fail("candidate-changed", "candidate changed before byte-gate linearization")
         finally:
             os.close(linearized)
+        if final_root_authority is not None:
+            authority = final_root_authority()
+            try:
+                if _identity(os.fstat(authority)) != _identity(os.fstat(root)):
+                    _fail("candidate-changed", "final candidate root identity differs")
+                if _inspect_tree(authority, tree) != baseline:
+                    _fail("candidate-changed", "candidate changed at final publication handoff")
+            finally:
+                os.close(authority)
         return CandidateByteSummary(
             candidate_id=summary.candidate_id,
             data_release_id=summary.data_release_id,
             artifact_count=summary.artifact_count,
             artifact_bytes=artifact_bytes,
             manifest_sha256=manifest_sha256,
+            tree_identity_sha256=_tree_identity_sha256(baseline),
         )
     finally:
         os.close(root)

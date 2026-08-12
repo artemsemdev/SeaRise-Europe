@@ -50,6 +50,12 @@ def _bytes(root: Path) -> dict[str, bytes]:
     }
 
 
+def _private_wrappers(root: Path) -> list[Path]:
+    wrappers = sorted(root.glob(".candidate-assembly-*"))
+    assert all(path.is_dir() and path.stat().st_mode & 0o777 == 0o700 for path in wrappers)
+    return wrappers
+
+
 def _fails(
     tmp_path: Path,
     mutation: Callable[[dict[str, Any]], None],
@@ -64,7 +70,7 @@ def _fails(
     assert not output.exists()
 
 
-def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_twice(
+def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_three_times(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -74,13 +80,15 @@ def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_twice(
     real_write = assembler._write_new
     real_gate = assembler.validate_candidate_root
 
-    def observe_write(root: int, path: str, raw: bytes) -> None:
+    def observe_write(
+        root: int, path: str, raw: bytes, ownership: assembler._StageOwnership
+    ) -> None:
         writes.append(Path(path).name)
-        real_write(root, path, raw)
+        real_write(root, path, raw, ownership)
 
-    def observe_gate(root: int):  # type: ignore[no-untyped-def]
+    def observe_gate(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
         gates.append(root)
-        return real_gate(root)
+        return real_gate(root, **kwargs)
 
     monkeypatch.setattr(assembler, "_write_new", observe_write)
     monkeypatch.setattr(assembler, "validate_candidate_root", observe_gate)
@@ -88,7 +96,7 @@ def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_twice(
     summary = assemble_candidate_fixture(RECEIPT, output)
 
     assert writes[-4:] == ["gate-report.json", "gate-report.md", "checksums.txt", "manifest.json"]
-    assert len(gates) == 2 and gates[0] == gates[1]
+    assert len(gates) == 3 and gates[0] == gates[1] == gates[2]
     assert summary.artifact_count == 53
     assert summary.manifest_sha256 == _load()["expectedManifestSha256"]
     assert (summary.production, summary.publication) == (False, False)
@@ -96,10 +104,16 @@ def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_twice(
     assert validate_candidate_root(output).manifest_sha256 == summary.manifest_sha256
     assert all((path.stat().st_mode & 0o222) == 0 for path in output.rglob("*"))
     assert output.stat().st_mode & 0o222 == 0
+    wrappers = _private_wrappers(tmp_path)
+    assert len(wrappers) == 1
+    assert list(wrappers[0].iterdir()) == []
 
     cli_output = tmp_path / "candidate-cli"
     assert main(["--receipt", str(RECEIPT), "--output", str(cli_output)]) == 0
     assert "production and publication not claimed" in capsys.readouterr().out
+    wrappers = _private_wrappers(tmp_path)
+    assert len(wrappers) == 2
+    assert all(list(wrapper.iterdir()) == [] for wrapper in wrappers)
 
 
 def test_missing_layer_fails_before_staging(tmp_path: Path) -> None:
@@ -164,7 +178,44 @@ def test_failed_exclusive_rename_leaves_no_partial_publication(
         assemble_candidate_fixture(RECEIPT, output)
     assert caught.value.code == "assembly-publication"
     assert not output.exists()
-    assert not list(tmp_path.glob(".candidate-assembly-*"))
+    assert len(_private_wrappers(tmp_path)) <= 1
+
+
+def test_publication_collision_preserves_foreign_target_without_failed_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "candidate"
+    real_rename = assembler._rename_no_overwrite
+    collided = False
+
+    def collide(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal collided
+        if source == "candidate" and target == "candidate" and parent != destination:
+            collided = True
+            os.mkdir(target, 0o700, dir_fd=destination)
+            foreign_parent = os.open(
+                target, assembler._directory_flags(), dir_fd=destination
+            )
+            try:
+                foreign = os.open(
+                    "keep.txt",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=foreign_parent,
+                )
+                os.write(foreign, b"foreign")
+                os.close(foreign)
+            finally:
+                os.close(foreign_parent)
+        real_rename(parent, source, destination, target)
+
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", collide)
+    with pytest.raises(CandidateAssemblyError, match="could not be promoted"):
+        assemble_candidate_fixture(RECEIPT, output)
+    assert collided
+    assert (output / "keep.txt").read_bytes() == b"foreign"
+    assert not (output / "manifest.json").exists()
+    assert len(_private_wrappers(tmp_path)) == 1
 
 
 def test_rebuilds_are_byte_identical(tmp_path: Path) -> None:
@@ -184,8 +235,10 @@ def test_staging_parent_rename_cannot_redirect_held_descriptors(
     moved = tmp_path / "parent-moved"
     real_sync = assembler._fsync_tree
 
-    def rename_parent(root: int, paths: object) -> None:
-        real_sync(root, paths)  # type: ignore[arg-type]
+    def rename_parent(
+        root: int, paths: object, ownership: assembler._StageOwnership
+    ) -> None:
+        real_sync(root, paths, ownership)  # type: ignore[arg-type]
         parent.rename(moved)
         parent.mkdir()
         (parent / "foreign.txt").write_text("unchanged\n", encoding="utf-8")
@@ -194,7 +247,7 @@ def test_staging_parent_rename_cannot_redirect_held_descriptors(
     with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
         assemble_candidate_fixture(RECEIPT, output)
     assert (parent / "foreign.txt").read_text(encoding="utf-8") == "unchanged\n"
-    assert not list(moved.glob(".candidate-assembly-*"))
+    assert len(_private_wrappers(moved)) == 1
 
 
 def test_post_promotion_failure_rolls_back_only_owned_directory(
@@ -205,19 +258,51 @@ def test_post_promotion_failure_rolls_back_only_owned_directory(
     (unrelated / "keep.txt").write_text("keep\n", encoding="utf-8")
     real_gate, calls = assembler.validate_candidate_root, 0
 
-    def fail_final(root: int):  # type: ignore[no-untyped-def]
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
         nonlocal calls
         calls += 1
         if calls == 2:
             raise assembler.CandidateContractError("candidate-changed", "injected")
-        return real_gate(root)
+        return real_gate(root, **kwargs)
 
     monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
-    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
+    with pytest.raises(
+        CandidateAssemblyError, match="independent candidate byte gate failed"
+    ) as caught:
         assemble_candidate_fixture(RECEIPT, output)
+    assert caught.value.code == "foreign-replacement"
     assert not output.exists()
     assert (unrelated / "keep.txt").read_text(encoding="utf-8") == "keep\n"
-    assert not list(tmp_path.glob(".candidate-assembly-*"))
+    assert len(_private_wrappers(tmp_path)) == 1
+
+
+def test_post_promotion_rollback_avoids_foreign_staging_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "candidate"
+    real_gate, calls = assembler.validate_candidate_root, 0
+
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            temporary = next(tmp_path.glob(".candidate-assembly-*"))
+            foreign = temporary / "candidate"
+            foreign.mkdir()
+            (foreign / "keep.txt").write_text("keep\n", encoding="utf-8")
+            raise assembler.CandidateContractError("candidate-changed", "injected")
+        return real_gate(root, **kwargs)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    with pytest.raises(
+        CandidateAssemblyError, match="independent candidate byte gate failed"
+    ) as caught:
+        assemble_candidate_fixture(RECEIPT, output)
+    assert caught.value.code == "foreign-replacement"
+    assert not output.exists()
+    residues = list(tmp_path.glob(".candidate-assembly-*"))
+    assert len(residues) == 1
+    assert (residues[0] / "candidate/keep.txt").read_text(encoding="utf-8") == "keep\n"
 
 
 def test_rename_parent_syncs_source_before_destination(
@@ -246,3 +331,398 @@ def test_oversized_template_fails_before_staging(
     monkeypatch.setattr(assembler, "_TEMPLATE", template)
     with pytest.raises(CandidateAssemblyError, match="assembly-template"):
         assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+
+
+def test_fifo_receipt_is_rejected_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fifo = tmp_path / "receipt"
+    os.mkfifo(fifo)
+    real_open, opened = assembler.os.open, False
+
+    def observe(path: object, flags: int, *args: object, **kwargs: object) -> int:
+        nonlocal opened
+        if path == fifo:
+            opened = True
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(assembler.os, "open", observe)
+    with pytest.raises(CandidateAssemblyError, match="bounded regular file"):
+        assemble_candidate_fixture(fifo, tmp_path / "candidate")
+    assert not opened
+
+
+def test_predictable_directory_and_file_names_are_never_created_directly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_mkdir, real_open = assembler.os.mkdir, assembler.os.open
+    predictable_creates: list[str] = []
+
+    def replace_mkdir(name: object, *args: object, **kwargs: object) -> None:
+        real_mkdir(name, *args, **kwargs)
+        if name == "config":
+            predictable_creates.append(str(name))
+            directory = kwargs["dir_fd"]
+            os.rename("config", "owned-config", src_dir_fd=directory, dst_dir_fd=directory)
+            real_mkdir("config", 0o700, dir_fd=directory)
+
+    def replace_open(name: object, flags: int, *args: object, **kwargs: object) -> int:
+        if name == "scenarios.json" and flags & os.O_CREAT:
+            predictable_creates.append(str(name))
+        return real_open(name, flags, *args, **kwargs)
+
+    monkeypatch.setattr(assembler.os, "mkdir", replace_mkdir)
+    monkeypatch.setattr(assembler.os, "open", replace_open)
+    summary = assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert summary.artifact_count == 53
+    assert predictable_creates == []
+
+
+def test_private_directory_swap_before_create_returns_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_create = assembler._mkdir_exclusive
+    calls = 0
+
+    def swap(parent: int, name: str, mode: int) -> tuple[int, int]:
+        nonlocal calls
+        calls += 1
+        created = real_create(parent, name, mode)
+        if calls == 2:
+            os.rename(name, f"{name}-owned", src_dir_fd=parent, dst_dir_fd=parent)
+            os.mkdir(name, 0o700, dir_fd=parent)
+            foreign_parent = os.open(name, assembler._directory_flags(), dir_fd=parent)
+            try:
+                foreign = os.open(
+                    "foreign.txt",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=foreign_parent,
+                )
+                os.close(foreign)
+            finally:
+                os.close(foreign_parent)
+        return created
+
+    monkeypatch.setattr(assembler, "_mkdir_exclusive", swap)
+    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    wrapper = _private_wrappers(tmp_path)[0]
+    assert next(wrapper.rglob("foreign.txt")).read_bytes() == b""
+    assert not (tmp_path / "candidate").exists()
+
+
+def test_directory_promotion_swap_preserves_foreign_and_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_rename = assembler._rename_no_overwrite
+    injected = False
+
+    def swap(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal injected
+        real_rename(parent, source, destination, target)
+        if target == "candidate" and source.startswith(".candidate-directory-"):
+            injected = True
+            os.rename(target, "candidate-owned", src_dir_fd=destination, dst_dir_fd=destination)
+            os.mkdir(target, 0o700, dir_fd=destination)
+            foreign_parent = os.open(
+                target, assembler._directory_flags(), dir_fd=destination
+            )
+            try:
+                foreign = os.open(
+                    "keep.txt",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=foreign_parent,
+                )
+                os.write(foreign, b"foreign")
+                os.close(foreign)
+            finally:
+                os.close(foreign_parent)
+
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", swap)
+    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    wrapper = _private_wrappers(tmp_path)[0]
+    assert next(wrapper.rglob("keep.txt")).read_bytes() == b"foreign"
+    assert next(wrapper.rglob("candidate-owned")).is_dir()
+    assert not (tmp_path / "candidate").exists()
+
+
+def test_file_promotion_swap_preserves_foreign_and_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_rename = assembler._rename_no_overwrite
+    injected = False
+
+    def swap(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal injected
+        real_rename(parent, source, destination, target)
+        if target == "scenarios.json" and source.startswith(".candidate-file-"):
+            injected = True
+            os.rename(
+                target,
+                "scenarios-owned.json",
+                src_dir_fd=destination,
+                dst_dir_fd=destination,
+            )
+            foreign = os.open(
+                target,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=destination,
+            )
+            os.write(foreign, b"foreign")
+            os.close(foreign)
+
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", swap)
+    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    wrapper = _private_wrappers(tmp_path)[0]
+    assert next(wrapper.rglob("scenarios.json")).read_bytes() == b"foreign"
+    assert next(wrapper.rglob("scenarios-owned.json")).is_file()
+    assert not (tmp_path / "candidate").exists()
+
+
+def test_cleanup_swap_restores_foreign_file_without_unlinking_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    root = os.open(stage, assembler._directory_flags())
+    ownership = assembler._StageOwnership(
+        root=assembler._directory_identity(os.fstat(root)), directories={}, files={}
+    )
+    assembler._write_new(root, "payload.bin", b"owned", ownership)
+    real_rename, injected = assembler._rename_no_overwrite, False
+
+    def swap(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal injected
+        if source == "payload.bin" and target.startswith(".candidate-owned-") and not injected:
+            injected = True
+            real_rename(parent, source, parent, "owned-moved")
+            foreign = os.open(
+                source, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent
+            )
+            try:
+                os.write(foreign, b"foreign")
+            finally:
+                os.close(foreign)
+        real_rename(parent, source, destination, target)
+
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", swap)
+    try:
+        assembler._remove_owned_stage(root, ownership)
+    finally:
+        os.close(root)
+    assert injected
+    assert (stage / "payload.bin").read_bytes() == b"foreign"
+    assert (stage / "owned-moved").read_bytes() == b"owned"
+
+
+def test_partial_stage_initialization_failure_leaves_no_owned_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_create = assembler._create_owned_directory
+
+    def fail(parent: int, name: str, mode: int = 0o755):  # type: ignore[no-untyped-def]
+        if name == "candidate":
+            raise OSError("injected candidate open failure")
+        return real_create(parent, name, mode)
+
+    monkeypatch.setattr(assembler, "_create_owned_directory", fail)
+    with pytest.raises(CandidateAssemblyError, match="could not be promoted"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert len(_private_wrappers(tmp_path)) == 1
+
+
+def test_rollback_quarantine_swap_preserves_foreign_without_public_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler.validate_candidate_root
+    real_rename = assembler._rename_no_overwrite
+    gate_calls = 0
+    rollback_swapped = False
+
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        nonlocal gate_calls
+        gate_calls += 1
+        if gate_calls == 2:
+            raise assembler.CandidateContractError("candidate-changed", "injected")
+        return real_gate(root, **kwargs)
+
+    def swap(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal rollback_swapped
+        real_rename(parent, source, destination, target)
+        if target.startswith(".candidate-rollback-"):
+            rollback_swapped = True
+            os.rename(
+                target,
+                f"{target}-owned",
+                src_dir_fd=destination,
+                dst_dir_fd=destination,
+            )
+            os.mkdir(target, 0o700, dir_fd=destination)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", swap)
+    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert rollback_swapped
+    assert not (tmp_path / "candidate").exists()
+    wrapper = _private_wrappers(tmp_path)[0]
+    assert len(list(wrapper.glob(".candidate-rollback-*"))) == 2
+
+
+def test_rollback_collision_exhaustion_uses_nonpublic_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler.validate_candidate_root
+    real_rename = assembler._rename_no_overwrite
+    gate_calls = collisions = 0
+    fallback_swapped = False
+
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        nonlocal gate_calls
+        gate_calls += 1
+        if gate_calls == 2:
+            raise assembler.CandidateContractError("candidate-changed", "injected")
+        return real_gate(root, **kwargs)
+
+    def collide(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal collisions, fallback_swapped
+        if target.startswith(".candidate-rollback-"):
+            collisions += 1
+            raise FileExistsError(target)
+        real_rename(parent, source, destination, target)
+        if target.startswith(".candidate-failed-"):
+            fallback_swapped = True
+            os.rename(
+                target,
+                f"{target}-owned",
+                src_dir_fd=destination,
+                dst_dir_fd=destination,
+            )
+            os.mkdir(target, 0o700, dir_fd=destination)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", collide)
+    with pytest.raises(CandidateAssemblyError, match="failed candidate quarantine"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert collisions == 1024
+    assert fallback_swapped
+    assert not (tmp_path / "candidate").exists()
+    wrapper = _private_wrappers(tmp_path)[0]
+    assert len(list(wrapper.glob(".candidate-failed-*"))) == 2
+
+
+def test_every_mode_change_is_fsynced_before_the_next_operation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_chmod, real_fsync = assembler.os.fchmod, assembler.os.fsync
+    events: list[tuple[str, int]] = []
+
+    def chmod(descriptor: int, mode: int) -> None:
+        events.append(("chmod", os.fstat(descriptor).st_ino))
+        real_chmod(descriptor, mode)
+
+    def fsync(descriptor: int) -> None:
+        events.append(("fsync", os.fstat(descriptor).st_ino))
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(assembler.os, "fchmod", chmod)
+    monkeypatch.setattr(assembler.os, "fsync", fsync)
+    assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    for index, event in enumerate(events):
+        if event[0] == "chmod":
+            assert events[index + 1] == ("fsync", event[1])
+
+
+def test_cleanup_syncs_parent_and_leaves_no_owned_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_rename = assembler._rename_no_overwrite
+    real_sync = assembler._sync_directory
+    synced: list[int] = []
+
+    def fail_promotion(parent: int, source: str, destination: int, target: str) -> None:
+        if source == "candidate" and target == "candidate":
+            raise OSError("injected promotion failure")
+        real_rename(parent, source, destination, target)
+
+    def sync(descriptor: int) -> None:
+        synced.append(os.fstat(descriptor).st_ino)
+        real_sync(descriptor)
+
+    parent_inode = tmp_path.stat().st_ino
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", fail_promotion)
+    monkeypatch.setattr(assembler, "_sync_directory", sync)
+    with pytest.raises(CandidateAssemblyError, match="assembly-publication"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert parent_inode in synced
+    assert len(_private_wrappers(tmp_path)) == 1
+
+
+def test_transient_post_validation_mutation_is_detected_and_rolled_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_commit = assembler._commit_matches
+    calls = 0
+
+    def mutate(parent_path: Path, parent: int, name: str, stage: int) -> bool:
+        nonlocal calls
+        calls += 1
+        result = real_commit(parent_path, parent, name, stage)
+        if calls == 2:
+            descriptor = os.open("checksums.txt", os.O_RDONLY, dir_fd=stage)
+            os.fchmod(descriptor, 0o600)
+            os.close(descriptor)
+            descriptor = os.open("checksums.txt", os.O_RDWR, dir_fd=stage)
+            original = os.pread(descriptor, 1, 0)
+            os.pwrite(descriptor, b"X", 0)
+            os.fsync(descriptor)
+            os.pwrite(descriptor, original, 0)
+            os.fsync(descriptor)
+            os.fchmod(descriptor, 0o444)
+            os.fsync(descriptor)
+            os.close(descriptor)
+        return result
+
+    monkeypatch.setattr(assembler, "_commit_matches", mutate)
+    with pytest.raises(CandidateAssemblyError, match="final publication boundary"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert len(_private_wrappers(tmp_path)) == 1
+
+
+def test_transient_mutation_during_final_authority_pass_is_detected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler.validate_candidate_root
+
+    def mutate(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        authority = kwargs.get("final_root_authority")
+        if authority is not None:
+            def changed() -> int:
+                descriptor = authority()  # type: ignore[operator]
+                mode_descriptor = os.open("checksums.txt", os.O_RDONLY, dir_fd=descriptor)
+                os.fchmod(mode_descriptor, 0o600)
+                os.close(mode_descriptor)
+                file_descriptor = os.open("checksums.txt", os.O_RDWR, dir_fd=descriptor)
+                original = os.pread(file_descriptor, 1, 0)
+                os.pwrite(file_descriptor, b"X", 0)
+                os.fsync(file_descriptor)
+                os.pwrite(file_descriptor, original, 0)
+                os.fsync(file_descriptor)
+                os.fchmod(file_descriptor, 0o444)
+                os.fsync(file_descriptor)
+                os.close(file_descriptor)
+                return descriptor
+
+            kwargs["final_root_authority"] = changed
+        return real_gate(root, **kwargs)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", mutate)
+    with pytest.raises(CandidateAssemblyError, match="independent candidate byte gate failed"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert not (tmp_path / "candidate").exists()
+    assert len(_private_wrappers(tmp_path)) == 1
