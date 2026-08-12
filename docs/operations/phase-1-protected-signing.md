@@ -62,7 +62,7 @@ publication, scientific approval, protected-environment verification, and
 public-readback claims remain false; any later publication/readback gate must
 produce separately reviewed evidence.
 
-## Release-lifetime evidence handoff
+## Exact local evidence handoff
 
 The workflow artifact is an execution handoff, not the durable product-release
 record. After a separately reviewed public upload and successful
@@ -80,9 +80,26 @@ PYTHONPATH=src/pipeline python scripts/release/retain_release_evidence.py \
 
 The output parent must already exist, be owned by the runner, have mode `0700`,
 and sit outside the candidate, evidence, receipt, and repository authorities.
-The command publishes one no-overwrite tree containing 18 read-only files: the
-manifest, 14 finalized evidence files, both verification receipts, and
-`retention-receipt.json`. The receipt binds the other 17 files by byte size and
-SHA-256 and declares `immutable-release-lifetime`; any correction uses a new
-data release ID. This operation does not publish or activate the candidate and
-makes no production, publication, or scientific-approval claim.
+The command publishes one no-overwrite tree containing 18 initially read-only
+files: the manifest, 14 finalized evidence files, both verification receipts,
+and `retention-receipt.json`. The receipt binds the other 17 exact ordered files
+by byte size and SHA-256. Verify a committed tree independently with:
+
+```bash
+PYTHONPATH=src/pipeline python scripts/release/validate_release_evidence_retention.py \
+  --retention-root /absolute/release-store/<dataReleaseId>/supply-chain
+```
+
+The local command proves atomic no-overwrite publication only. It cannot prove
+or enforce the external store's release-lifetime policy, deletion prevention,
+or co-retention with the data release. Configure and audit those controls
+separately before treating this handoff as durably retained. The two retained
+verification receipts remain audit records from their separate verifier gates;
+the handoff does not reauthenticate them, publish or activate the candidate, or
+make a production, publication, or scientific-approval claim.
+
+A failure before the final commit never leaves `supply-chain` as a completion
+path. Cleanup may preserve the owned partial tree as one bounded private
+`.evidence-incomplete-*` residue under the output parent. After the process
+exits, an operator may inspect and remove that residue; never rename it to the
+completion path or repair a failed handoff in place.

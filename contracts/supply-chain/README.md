@@ -38,16 +38,22 @@ signing, or protected-environment approval.
 `candidate-evidence-pair` descriptor-safely binds candidate, receipt, provenance, policy, bundles,
 and ten SBOMs, structurally checks bundles, and regenerates SBOMs without verification claims.
 
-## Immutable release evidence retention
+## Exact local release evidence handoff
 
-`v1/release-evidence-retention-receipt.schema.json` defines the durable handoff
-after cryptographic verification and public readback. The handoff retains the
-exact candidate manifest, 14 finalized evidence files, cryptographic receipt,
-and public-readback receipt under `<dataReleaseId>/supply-chain`, then binds all
-17 inputs in a canonical retention receipt. Publication is atomic and
-no-overwrite; a correction requires a new data release ID. The retention record
-proves only which bytes were co-retained for the release lifetime. It does not
-approve production, publication, or scientific claims.
+`v1/release-evidence-retention-receipt.schema.json` defines the atomic local
+handoff after cryptographic verification and public readback. The handoff
+retains the exact candidate manifest, 14 finalized evidence files,
+cryptographic receipt, and public-readback receipt under
+`<dataReleaseId>/supply-chain`, then binds all
+17 inputs in a canonical receipt. The schema pins the exact ordered inventory;
+the public validator recomputes the deterministic identity, file hashes and
+sizes, tree modes, and cross-document bindings. Publication is atomic and
+no-overwrite at one local commit point. The receipt does not prove an external
+retention policy, deletion prevention, or co-retention with data-release bytes.
+Those controls require separately audited release-store authority. Retained
+verification receipts are audit records from their separate gates, not newly
+authenticated evidence, and the handoff does not approve production,
+publication, or scientific claims.
 
 ## Production identity policy
 

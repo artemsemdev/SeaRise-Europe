@@ -24,11 +24,12 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
-- Added an immutable release-lifetime supply-chain evidence handoff that
-  descriptor-validates and co-retains the exact manifest, finalized evidence,
-  cryptographic-verification receipt, and public-readback receipt under the
-  data release ID, with canonical file hashes, no-overwrite publication, and
-  explicit production, publication, and scientific-approval nonclaims.
+- Added an atomic local supply-chain evidence handoff and independent validator
+  that bind the exact manifest, finalized evidence, cryptographic-verification
+  receipt, and public-readback receipt under the data release ID. The receipt
+  explicitly leaves external retention, deletion prevention, and data-release
+  co-retention unverified and makes no production, publication, or scientific
+  approval claim.
 
 - Added fail-closed, descriptor-bound finalization for exact pre-verification
   candidate evidence, with complete source authority, a durable pathname
