@@ -1136,6 +1136,7 @@
     { "path": "src/pipeline/tests/settlements/test_full_source_catalogue_contract.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_full_source_stage.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_normalized_catalogue_stage.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/settlements/test_reconciliation.py", "suite": "pipeline-settlement-spatial-classification", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/settlements/test_settlement_contracts.py", "suite": "pipeline-settlement-public-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_acquire.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/sources/test_registry.py", "suite": "pipeline-source-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

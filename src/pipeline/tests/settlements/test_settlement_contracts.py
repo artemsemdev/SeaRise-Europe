@@ -16,6 +16,12 @@ from searise_pipeline.settlements.contract_semantics import (
     SettlementContractSemanticError,
     validate_settlement_search_shard_semantics,
 )
+from searise_pipeline.settlements.reconciliation import (
+    CATALOGUE_REJECTION_REASONS,
+    SPATIAL_REJECTION_REASONS,
+    SettlementReconciliationError,
+    validate_reconciliation_report_semantics,
+)
 
 REPO_ROOT = Path(__file__).parents[4]
 CONTRACT_DIR = REPO_ROOT / "contracts" / "settlements" / "v2"
@@ -213,6 +219,7 @@ def test_settlement_v3_schemas_pass_the_draft_2020_12_metaschema() -> None:
     assert [path.name for path in schemas] == [
         "artifact-envelope.schema.json",
         "place.schema.json",
+        "reconciliation-report.schema.json",
     ]
     for path in schemas:
         Draft202012Validator.check_schema(_read(path))
@@ -245,7 +252,8 @@ def test_v3_search_semantic_vectors_are_schema_valid_and_shared() -> None:
     valid_path = V3_CONTRACT_DIR / "fixtures" / "valid" / "settlement-search-shard.json"
     mismatch_path = V3_CONTRACT_DIR / "fixtures" / "semantic-invalid" / "record-count-mismatch.json"
     assert {path.name for path in mismatch_path.parent.glob("*.json")} == {
-        "record-count-mismatch.json"
+        "reconciliation-source-flow-mismatch.json",
+        "record-count-mismatch.json",
     }
     valid = _read(valid_path)
     mismatch = _read(mismatch_path)
@@ -255,6 +263,45 @@ def test_v3_search_semantic_vectors_are_schema_valid_and_shared() -> None:
     validate_settlement_search_shard_semantics(valid)
     with pytest.raises(SettlementContractSemanticError, match="recordCount"):
         validate_settlement_search_shard_semantics(mismatch)
+
+
+def test_v3_reconciliation_semantic_vector_is_schema_valid_but_arithmetically_invalid() -> None:
+    path = (
+        V3_CONTRACT_DIR
+        / "fixtures"
+        / "semantic-invalid"
+        / "reconciliation-source-flow-mismatch.json"
+    )
+    document = _read(path)
+
+    _fixture_validator(path).validate(document)
+    with pytest.raises(SettlementReconciliationError, match="catalogue accepted plus"):
+        validate_reconciliation_report_semantics(document)
+
+
+@pytest.mark.parametrize("ledger", ["catalogue", "spatial"])
+def test_v3_reconciliation_schema_rejects_invented_rejection_reasons(ledger: str) -> None:
+    path = V3_CONTRACT_DIR / "fixtures" / "valid" / "settlement-reconciliation.json"
+    document = _read(path)
+    document["rejections"][ledger][0]["reason"] = f"invented-{ledger}-reason"
+
+    assert list(_fixture_validator(path).iter_errors(document))
+
+
+def test_v3_reconciliation_schema_and_semantic_reason_vocabularies_match() -> None:
+    schema = _read(V3_CONTRACT_DIR / "reconciliation-report.schema.json")
+    definitions = schema["$defs"]
+
+    assert (
+        frozenset(definitions["catalogueReasonBucket"]["properties"]["reason"]["enum"])
+        == CATALOGUE_REJECTION_REASONS
+    )
+    assert (
+        frozenset(
+            {definitions["spatialReasonBucket"]["properties"]["reason"]["const"]}
+        )
+        == SPATIAL_REJECTION_REASONS
+    )
 
 
 @pytest.mark.parametrize(

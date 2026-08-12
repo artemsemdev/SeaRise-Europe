@@ -5,7 +5,8 @@ the European settlement catalog. It is separate from `contracts/release/v1` so
 the already published release-v1 validation meaning remains immutable.
 
 [`v3`](v3/) is the compatible successor for spatially classified settlement
-audit records, GeoParquet envelopes, and search-shard envelopes. It preserves
+audit records, GeoParquet envelopes, search-shard envelopes, and settlement
+reconciliation evidence. It preserves
 the v2 meanings of stable GeoNames IDs, source spelling, canonical and
 alternate names, country and admin context, WGS84 coordinates, population,
 feature codes, source update dates, and per-record lineage. The checked-in v2
@@ -134,6 +135,19 @@ The JSON Schema enforces the latter. Python consumers must also call
 `validate_settlement_search_shard_semantics`, and TypeScript consumers must
 call `validateSettlementSearchShardSemantics`, to enforce the cross-field
 count that JSON Schema cannot express.
+
+The v3 reconciliation report binds the exact normalized-catalogue and spatial
+database/receipt pairs. Its flow deliberately has two equations:
+`sourcePlaceRows = catalogueAccepted + catalogueRejected`, followed by
+`catalogueAccepted = spatialClassified + spatialRejected`. Pre-spatial
+catalogue rejections therefore cannot be mistaken for records evaluated by
+geometry. Country, feature class/code, population band, and coastal-status
+buckets count normalized places; language and script buckets count selected
+normalized canonical and alternate names. Every bucket preserves classified
+and spatial-rejected subtotals. Consumers must apply
+`validate_reconciliation_report_semantics` after JSON Schema validation to
+enforce arithmetic, order, rejection totals, deterministic identity, and
+claim boundaries.
 
 Every artifact envelope carries geography status separately from source
 provenance. The current goldens are explicitly a
