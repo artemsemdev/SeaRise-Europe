@@ -1,17 +1,15 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import {
   closeSync,
   constants as fsConstants,
   fstatSync,
-  fsyncSync,
-  linkSync,
   lstatSync,
   openSync,
   readSync,
-  unlinkSync,
-  writeSync,
 } from "node:fs";
-import type { Stats } from "node:fs";
+import type { BigIntStats } from "node:fs";
+import { platform } from "node:os";
 import { join } from "node:path";
 import {
   brotliCompressSync,
@@ -39,6 +37,12 @@ const PROJECTION_DOCUMENT = "settlement-search-projection-document";
 const PROJECTION_FOOTER = "settlement-search-projection-footer";
 const SHARD_SET_FORMAT_VERSION = "settlement-browser-search-shard-set-v1";
 const SHARD_ORDER = ["europe-core", "europe-coastal"] as const;
+const FS_HELPER = join(process.cwd(), "scripts", "browser-shard-fs.py");
+const MAX_QUERY_CODE_POINTS = 256;
+const MAX_SEARCH_CANDIDATES = 10_000;
+const RUNTIME = {
+  brotli: "1.2.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.2.12",
+} as const;
 const FALSE_CLAIMS = [
   "canonicalGeometryClaim",
   "hazardExtentClaim",
@@ -106,6 +110,7 @@ export type BrowserShard = {
   signingClaim: false;
   engine: typeof miniSearchAdapter.descriptor;
   compression: { algorithm: "brotli"; mode: "text"; quality: 11 };
+  runtime: typeof RUNTIME;
   ranking: {
     normalizationVersion: "unicode-nfkd-lowercase-v1";
     orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1";
@@ -145,6 +150,32 @@ function canonical(value: unknown): string {
   return fail("search shard contains a non-JSON value");
 }
 
+function pythonFloat(value: number): string {
+  if (!Number.isFinite(value) || Object.is(value, -0)) fail("search projection has an invalid float");
+  if (value !== 0 && Math.abs(value) < 0.0001) {
+    const [coefficient, exponent] = value.toExponential().split("e");
+    const numericExponent = Number(exponent);
+    return `${coefficient}e${numericExponent < 0 ? "-" : "+"}${String(Math.abs(numericExponent)).padStart(2, "0")}`;
+  }
+  return Number.isInteger(value) ? `${value}.0` : String(value);
+}
+
+function projectionCanonical(value: unknown, path: readonly string[] = []): string {
+  if (typeof value === "number" && path.at(-2) === "location"
+      && ["latitude", "longitude"].includes(path.at(-1)!)) return pythonFloat(value);
+  if (value === null || typeof value === "boolean" || typeof value === "string"
+      || typeof value === "number") return canonical(value);
+  if (Array.isArray(value)) return `[${value.map((item) => projectionCanonical(item, path)).join(",")}]`;
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+      left < right ? -1 : left > right ? 1 : 0
+    );
+    return `{${entries.map(([key, item]) =>
+      `${JSON.stringify(key)}:${projectionCanonical(item, [...path, key])}`).join(",")}}`;
+  }
+  return fail("search projection contains a non-JSON value");
+}
+
 function exactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
@@ -155,28 +186,45 @@ function positiveLimit(value: number, label: string): void {
 }
 
 function checkedLimits(limits: Readonly<ShardLimits>): void {
-  for (const [name, value] of Object.entries(limits)) positiveLimit(value, name);
+  const names = Object.keys(DEFAULT_SHARD_LIMITS) as Array<keyof ShardLimits>;
+  if (!exactKeys(limits, names)) fail("search shard limit fields differ");
+  for (const name of names) {
+    const value = limits[name];
+    positiveLimit(value, name);
+    if (value > DEFAULT_SHARD_LIMITS[name]) fail(`${name} exceeds its hard cap`);
+  }
+  if (limits.maxLineBytes > limits.maxProjectionBytes
+      || limits.maxCompressedShardBytes > limits.maxRawShardBytes) {
+    fail("search shard limits are not relationally bounded");
+  }
+  if (!(["darwin", "linux"] as const).includes(platform() as "darwin" | "linux")) {
+    fail("browser shard tooling requires macOS or Linux");
+  }
+  for (const [name, version] of Object.entries(RUNTIME)) {
+    if (process.versions[name as keyof NodeJS.ProcessVersions] !== version) {
+      fail(`browser shard runtime ${name} differs from its exact binding`);
+    }
+  }
 }
 
-function sameNode(left: Stats, right: Stats): boolean {
-  return left.dev === right.dev && left.ino === right.ino && left.mode === right.mode;
+function sameFile(left: BigIntStats, right: BigIntStats): boolean {
+  return left.dev === right.dev && left.ino === right.ino && left.mode === right.mode
+    && left.nlink === right.nlink && left.size === right.size
+    && left.mtimeNs === right.mtimeNs && left.ctimeNs === right.ctimeNs;
 }
 
-function sameFile(left: Stats, right: Stats): boolean {
-  return sameNode(left, right) && left.nlink === right.nlink && left.size === right.size
-    && left.mtimeMs === right.mtimeMs && left.ctimeMs === right.ctimeMs;
-}
-
-function openBounded(path: string, maximum: number, label: string): { descriptor: number; size: number; before: Stats } {
-  const before = lstatSync(path);
+function openBounded(
+  path: string, maximum: number, label: string,
+): { descriptor: number; size: number; before: BigIntStats } {
+  const before = lstatSync(path, { bigint: true });
   if (!before.isFile() || before.isSymbolicLink()) fail(`${label} must be a regular non-symlink file`);
-  if (before.size > maximum) fail(`${label} exceeds its ${maximum}-byte limit`);
+  if (before.size > BigInt(maximum)) fail(`${label} exceeds its ${maximum}-byte limit`);
   let descriptor = -1;
   try {
     descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
-    const opened = fstatSync(descriptor);
+    const opened = fstatSync(descriptor, { bigint: true });
     if (!opened.isFile() || !sameFile(before, opened)) fail(`${label} changed while opened`);
-    return { descriptor, size: opened.size, before };
+    return { descriptor, size: Number(opened.size), before };
   } catch (error) {
     if (descriptor >= 0) closeSync(descriptor);
     if (error instanceof BrowserShardError) throw error;
@@ -184,11 +232,11 @@ function openBounded(path: string, maximum: number, label: string): { descriptor
   }
 }
 
-function verifyAndClose(path: string, descriptor: number, before: Stats, label: string): void {
+function verifyAndClose(path: string, descriptor: number, before: BigIntStats, label: string): void {
   try {
-    if (readSync(descriptor, Buffer.alloc(1), 0, 1, before.size)) fail(`${label} grew while read`);
-    const after = fstatSync(descriptor);
-    const linked = lstatSync(path);
+    if (readSync(descriptor, Buffer.alloc(1), 0, 1, Number(before.size))) fail(`${label} grew while read`);
+    const after = fstatSync(descriptor, { bigint: true });
+    const linked = lstatSync(path, { bigint: true });
     if (!sameFile(before, after) || !sameFile(after, linked)) fail(`${label} changed while read`);
   } finally {
     closeSync(descriptor);
@@ -198,8 +246,10 @@ function verifyAndClose(path: string, descriptor: number, before: Stats, label: 
 function parseJsonLine(raw: Buffer, label: string): Record<string, unknown> {
   if (!raw.length || raw.includes(0x0d)) fail(`${label} is not canonical NDJSON`);
   try {
-    const value: unknown = JSON.parse(UTF8.decode(raw));
+    const text = UTF8.decode(raw);
+    const value: unknown = JSON.parse(text);
     if (typeof value !== "object" || value === null || Array.isArray(value)) fail(`${label} is not an object`);
+    if (projectionCanonical(value) !== text) fail(`${label} is not canonical duplicate-free JSON`);
     return value as Record<string, unknown>;
   } catch (error) {
     if (error instanceof BrowserShardError) throw error;
@@ -209,6 +259,10 @@ function parseJsonLine(raw: Buffer, label: string): Record<string, unknown> {
 
 function assertSha(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || !/^[0-9a-f]{64}$/.test(value)) fail(`${label} is not a SHA-256`);
+}
+
+function nullableText(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
 }
 
 function headerFrom(raw: Buffer): ProjectionHeader {
@@ -261,7 +315,7 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
   if (id <= previous) fail("search projection placeIds are not strictly ordered");
   const names = value.alternateNames;
   if (!Array.isArray(names) || names.some((item) => !exactKeys(item, ["language", "script", "value"])
-      || typeof item.value !== "string" || typeof item.language !== "string" || typeof item.script !== "string")) {
+      || typeof item.value !== "string" || !nullableText(item.language) || !nullableText(item.script))) {
     fail("search projection alternate names differ");
   }
   const memberships = value.spatialClassification.catalogMembership;
@@ -280,10 +334,26 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
   const latitude = value.location.latitude;
   const longitude = value.location.longitude;
   const distance = value.spatialClassification.distanceToShorelineMeters;
-  if (typeof value.canonicalName.value !== "string" || typeof value.sourceSpelling !== "string"
-      || typeof value.asciiName !== "string" || typeof value.countryCode !== "string"
+  const lineageKeys = [
+    "asset_id", "source_file", "source_line", "source_record_id", "source_release", "source_sha256",
+  ];
+  if (typeof value.canonicalName.value !== "string"
+      || !nullableText(value.canonicalName.language) || !nullableText(value.canonicalName.script)
+      || typeof value.sourceSpelling !== "string" || typeof value.asciiName !== "string"
+      || typeof value.countryCode !== "string" || !/^[A-Z]{2}$/.test(value.countryCode)
+      || !nullableText(value.admin1Code)
+      || (typeof value.admin1Code === "string" && !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value.admin1Code))
       || !(value.admin1Name === null || typeof value.admin1Name === "string")
-      || typeof featureCode !== "string" || !Array.isArray(value.lineage) || !value.lineage.length
+      || typeof featureCode !== "string" || !/^[A-Z][A-Z0-9]*$/.test(featureCode)
+      || typeof value.sourceUpdatedAt !== "string"
+      || !/^\d{4}-\d{2}-\d{2}$/.test(value.sourceUpdatedAt)
+      || !Array.isArray(value.lineage) || !value.lineage.length
+      || value.lineage.some((item) => !exactKeys(item, lineageKeys)
+        || typeof item.asset_id !== "string" || typeof item.source_file !== "string"
+        || typeof item.source_release !== "string" || typeof item.source_sha256 !== "string"
+        || !/^[0-9a-f]{64}$/.test(item.source_sha256)
+        || !Number.isSafeInteger(item.source_line) || (item.source_line as number) < 1
+        || !Number.isSafeInteger(item.source_record_id) || (item.source_record_id as number) < 1)
       || !(population === null || (Number.isSafeInteger(population) && (population as number) >= 0))
       || typeof latitude !== "number" || latitude < -90 || latitude > 90
       || typeof longitude !== "number" || longitude < -180 || longitude > 180
@@ -429,6 +499,7 @@ function shardRaw(projection: ParsedProjection, shardId: ShardId, limits: Readon
     signingClaim: false,
     engine: miniSearchAdapter.descriptor,
     compression: { algorithm: "brotli", mode: "text", quality: 11 },
+    runtime: RUNTIME,
     ranking: {
       normalizationVersion: "unicode-nfkd-lowercase-v1",
       orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
@@ -485,126 +556,35 @@ function receiptBytes(bytes: Record<ShardId, Buffer>): Buffer {
   }));
 }
 
-function writeAll(descriptor: number, bytes: Buffer): void {
-  let offset = 0;
-  while (offset < bytes.length) {
-    const written = writeSync(descriptor, bytes, offset, bytes.length - offset, offset);
-    if (written < 1) fail("search shard write made no progress");
-    offset += written;
-  }
+type FsArtifact = { name: string; bytes: Buffer; size: number; sha256: string };
+
+function artifactSet(bytes: Record<ShardId, Buffer>): FsArtifact[] {
+  return [
+    ...SHARD_ORDER.map((shard) => ({ name: SHARD_FILENAMES[shard], bytes: bytes[shard] })),
+    { name: SHARD_RECEIPT_FILENAME, bytes: receiptBytes(bytes) },
+  ].map((item) => ({ ...item, size: item.bytes.length, sha256: sha256(item.bytes) }));
 }
 
-function removeOwned(path: string, identity: Stats): boolean {
-  try {
-    const current = lstatSync(path);
-    if (!sameNode(current, identity)) return false;
-    unlinkSync(path);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
-    throw error;
+function filesystemHelper(
+  command: "publish" | "read", outputDirectory: string, artifacts: readonly FsArtifact[],
+): Buffer {
+  const metadata = artifacts.map(({ name, size, sha256: digest }) => ({ name, sha256: digest, size }));
+  const header = Buffer.from(`${JSON.stringify({ artifacts: metadata, command })}\n`);
+  const input = command === "publish"
+    ? Buffer.concat([header, ...artifacts.map(({ bytes }) => bytes)]) : header;
+  const expectedOutput = command === "read" ? artifacts[0].size + artifacts[1].size : 0;
+  const result = spawnSync("python3", [FS_HELPER, outputDirectory], {
+    input, maxBuffer: Math.max(1024 * 1024, expectedOutput + 64 * 1024),
+  });
+  if (result.error || result.status !== 0) {
+    fail(`browser shard filesystem helper failed: ${result.stderr.toString().trim()}`);
   }
-}
-
-function verifyOwned(path: string, identity: Stats, bytes: Buffer, label: string): void {
-  if (!sameNode(lstatSync(path), identity)) fail(`${label} inode was replaced`);
-  const actual = readBounded(path, bytes.length, label);
-  if (!actual.equals(bytes) || !sameNode(lstatSync(path), identity)) {
-    fail(`${label} bytes or inode changed`);
-  }
+  if (result.stdout.length !== expectedOutput) fail("browser shard filesystem handoff length differs");
+  return result.stdout;
 }
 
 function publishSet(outputDirectory: string, bytes: Record<ShardId, Buffer>): void {
-  const directory = lstatSync(outputDirectory);
-  if (!directory.isDirectory() || directory.isSymbolicLink()) fail("output directory is unsafe");
-  const directoryDescriptor = openSync(
-    outputDirectory, fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW
-  );
-  const heldDirectory = fstatSync(directoryDescriptor);
-  const verifyDirectory = (): void => {
-    if (!sameNode(directory, heldDirectory) || !sameNode(heldDirectory, fstatSync(directoryDescriptor))
-        || !sameNode(heldDirectory, lstatSync(outputDirectory))) {
-      fail("output directory identity changed during publication");
-    }
-  };
-  const artifacts = [
-    ...SHARD_ORDER.map((shard) => ({ name: SHARD_FILENAMES[shard], bytes: bytes[shard] })),
-    { name: SHARD_RECEIPT_FILENAME, bytes: receiptBytes(bytes) },
-  ].map((artifact) => ({
-    ...artifact,
-    final: join(outputDirectory, artifact.name),
-    identity: undefined as Stats | undefined,
-    temporary: join(outputDirectory, `.search-shard-${randomBytes(16).toString("hex")}`),
-  }));
-  const promoted: typeof artifacts = [];
-  try {
-    verifyDirectory();
-    for (const artifact of artifacts) {
-      try {
-        lstatSync(artifact.final);
-        fail("search shard output exists; overwrite is refused");
-      } catch (error) {
-        if (error instanceof BrowserShardError) throw error;
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-      const descriptor = openSync(
-        artifact.temporary, fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL
-          | fsConstants.O_NOFOLLOW, 0o600
-      );
-      try {
-        artifact.identity = fstatSync(descriptor);
-        writeAll(descriptor, artifact.bytes);
-        fsyncSync(descriptor);
-      } finally {
-        closeSync(descriptor);
-      }
-      verifyOwned(artifact.temporary, artifact.identity, artifact.bytes, "staged search shard");
-      verifyDirectory();
-    }
-    for (const artifact of artifacts) {
-      verifyOwned(artifact.temporary, artifact.identity!, artifact.bytes, "staged search shard");
-      verifyDirectory();
-      linkSync(artifact.temporary, artifact.final);
-      promoted.push(artifact);
-      verifyOwned(artifact.temporary, artifact.identity!, artifact.bytes, "staged search shard");
-      verifyOwned(artifact.final, artifact.identity!, artifact.bytes, "published search shard");
-      verifyDirectory();
-    }
-    if (!artifacts.every((artifact) => removeOwned(artifact.temporary, artifact.identity!))) {
-      fail("foreign staged search shard replacement was preserved");
-    }
-    fsyncSync(directoryDescriptor);
-    artifacts.forEach((artifact) =>
-      verifyOwned(artifact.final, artifact.identity!, artifact.bytes, "published search shard")
-    );
-    verifyDirectory();
-  } catch (error) {
-    [...promoted].reverse().forEach((artifact) => removeOwned(artifact.final, artifact.identity!));
-    artifacts.forEach((artifact) => {
-      if (artifact.identity) removeOwned(artifact.temporary, artifact.identity);
-    });
-    try { fsyncSync(directoryDescriptor); } catch { /* retain the primary failure */ }
-    if (error instanceof BrowserShardError) throw error;
-    fail(`search shard publication failed: ${(error as Error).message}`);
-  } finally {
-    closeSync(directoryDescriptor);
-  }
-}
-
-function readBounded(path: string, maximum: number, label: string): Buffer {
-  const { descriptor, size, before } = openBounded(path, maximum, label);
-  const bytes = Buffer.allocUnsafe(size);
-  try {
-    let offset = 0;
-    while (offset < size) {
-      const length = readSync(descriptor, bytes, offset, size - offset, offset);
-      if (!length) fail(`${label} ended before its declared size`);
-      offset += length;
-    }
-    return bytes;
-  } finally {
-    verifyAndClose(path, descriptor, before, label);
-  }
+  filesystemHelper("publish", outputDirectory, artifactSet(bytes));
 }
 
 function candidateDocuments(shard: BrowserShard): CandidateDocument[] {
@@ -643,13 +623,14 @@ export function decodeBrowserShard(
   const keys = [
     ...FALSE_CLAIMS, "compression", "dataProvenanceClass", "engine", "formatVersion",
     "geometryStatus", "indexBase64", "merge", "publicationEligible", "ranking", "recordCount",
-    "records", "recordsSha256", "shardId", "source",
+    "records", "recordsSha256", "runtime", "shardId", "source",
   ];
   if (!exactKeys(value, keys) || value.formatVersion !== SHARD_FORMAT_VERSION
       || value.shardId !== expectedShardId || value.publicationEligible !== false
       || FALSE_CLAIMS.some((claim) => value[claim] !== false)
       || canonical(value.engine) !== canonical(miniSearchAdapter.descriptor)
       || canonical(value.compression) !== canonical({ algorithm: "brotli", mode: "text", quality: 11 })
+      || canonical(value.runtime) !== canonical(RUNTIME)
       || canonical(value.ranking) !== canonical({
         normalizationVersion: "unicode-nfkd-lowercase-v1",
         orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
@@ -703,12 +684,18 @@ export function decodeBrowserShard(
   if (documents.some(({ record }) => expectedShardId === "europe-core"
     ? !((record.population !== null && record.population >= 500) || ADMIN_FEATURE_CODES.has(record.featureCode))
     : !record.isCoastal)) fail("search shard contains a record outside its membership");
-  if (Buffer.from(shard.indexBase64, "base64").toString("base64") !== shard.indexBase64) {
+  if (typeof shard.indexBase64 !== "string"
+      || Buffer.from(shard.indexBase64, "base64").toString("base64") !== shard.indexBase64) {
     fail("search shard index encoding differs");
   }
+  const identity = { evaluationId: "browser-search-shard-v1", shardId: expectedShardId };
+  const actualIndex = Buffer.from(shard.indexBase64, "base64");
+  const expectedIndex = Buffer.from(
+    miniSearchAdapter.serialize(miniSearchAdapter.build(documents, identity))
+  );
+  if (!actualIndex.equals(expectedIndex)) fail("search shard index differs from its exact records");
   miniSearchAdapter.deserialize(
-    Buffer.from(shard.indexBase64, "base64"), documents,
-    { evaluationId: "browser-search-shard-v1", shardId: expectedShardId },
+    actualIndex, documents, identity,
   );
   return shard;
 }
@@ -732,24 +719,39 @@ export function validateBrowserSearchShards(
   outputDirectory: string,
   limits: Readonly<ShardLimits> = DEFAULT_SHARD_LIMITS,
 ): Record<ShardId, { byteSize: number; sha256: string; recordCount: number }> {
+  const loaded = loadBrowserSearchShards(projectionPath, outputDirectory, limits);
+  return Object.fromEntries(SHARD_ORDER.map((shard) => [shard, {
+    byteSize: loaded.shards[shard].bytes.length,
+    sha256: sha256(loaded.shards[shard].bytes),
+    recordCount: loaded.shards[shard].shard.recordCount,
+  }])) as Record<ShardId, { byteSize: number; sha256: string; recordCount: number }>;
+}
+
+export type LoadedBrowserShardSet = {
+  receipt: Buffer;
+  shards: Record<ShardId, { bytes: Buffer; shard: BrowserShard }>;
+};
+
+export function loadBrowserSearchShards(
+  projectionPath: string,
+  outputDirectory: string,
+  limits: Readonly<ShardLimits> = DEFAULT_SHARD_LIMITS,
+): LoadedBrowserShardSet {
   const expected = buildBytes(projectionPath, limits);
-  const expectedReceipt = receiptBytes(expected);
-  const actualReceipt = readBounded(
-    join(outputDirectory, SHARD_RECEIPT_FILENAME), expectedReceipt.length,
-    "search shard completion receipt",
-  );
-  if (!actualReceipt.equals(expectedReceipt)) fail("search shard set is incomplete or its receipt differs");
-  return Object.fromEntries(SHARD_ORDER.map((shard) => {
-    const actual = readBounded(
-      outputPath(outputDirectory, shard), limits.maxCompressedShardBytes, `${shard} search shard`
-    );
-    if (!actual.equals(expected[shard])) fail(`${shard} search shard differs from its exact projection`);
-    const decoded = decodeBrowserShard(actual, shard, limits);
-    return [shard, { byteSize: actual.length, sha256: sha256(actual), recordCount: decoded.recordCount }];
-  })) as Record<ShardId, { byteSize: number; sha256: string; recordCount: number }>;
+  const artifacts = artifactSet(expected);
+  const raw = filesystemHelper("read", outputDirectory, artifacts);
+  let offset = 0;
+  const shards = Object.fromEntries(SHARD_ORDER.map((shard, index) => {
+    const bytes = Buffer.from(raw.subarray(offset, offset + artifacts[index].size));
+    offset += bytes.length;
+    if (!bytes.equals(expected[shard])) fail(`${shard} search shard differs from its exact projection`);
+    return [shard, { bytes, shard: decodeBrowserShard(bytes, shard, limits) }];
+  })) as LoadedBrowserShardSet["shards"];
+  return { receipt: artifacts[2].bytes, shards };
 }
 
 export function searchBrowserShard(shard: BrowserShard, query: string): BrowserSearchRecord[] {
+  if (Array.from(query).length > MAX_QUERY_CODE_POINTS) fail("browser search query exceeds its limit");
   const documents = candidateDocuments(shard);
   const records = new Map(shard.records.map((record) => [record.placeId, record]));
   const restored = miniSearchAdapter.deserialize(
@@ -757,7 +759,7 @@ export function searchBrowserShard(shard: BrowserShard, query: string): BrowserS
     { evaluationId: "browser-search-shard-v1", shardId: shard.shardId },
   );
   const byOrdinal = new Map(documents.map((document) => [document.ordinal, document]));
-  const matches = miniSearchAdapter.search(restored, query, documents.length)
+  const matches = miniSearchAdapter.search(restored, query, Math.min(documents.length, MAX_SEARCH_CANDIDATES))
     .map((ordinal) => byOrdinal.get(ordinal)).filter((item): item is CandidateDocument => item !== undefined);
   return rankDocuments(query, matches).map(({ record }) => records.get(record.placeId)!);
 }

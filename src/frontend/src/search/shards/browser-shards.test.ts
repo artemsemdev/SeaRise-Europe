@@ -15,6 +15,7 @@ import {
   SHARD_RECEIPT_FILENAME,
   buildBrowserSearchShards,
   decodeBrowserShard,
+  loadBrowserSearchShards,
   mergeCoreFirst,
   searchBrowserShard,
   validateBrowserSearchShards,
@@ -27,6 +28,13 @@ const canonicalBrotli = (raw: Buffer) => brotliCompressSync(raw, { params: {
   [zlibConstants.BROTLI_PARAM_QUALITY]: 11,
   [zlibConstants.BROTLI_PARAM_SIZE_HINT]: raw.length,
 } });
+const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+const canonicalJson = (value: unknown): string => {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+};
 
 function withFsPatch<T>(patch: Record<string, unknown>, action: () => T): T {
   const mutable = fs as unknown as Record<string, unknown>;
@@ -60,6 +68,9 @@ describe("receipt-bound browser search shards", () => {
     expect(core.engine).toEqual({
       engineId: "minisearch", packageVersion: "7.2.0", serializationVersion: "minisearch-json-v1",
     });
+    expect(core.runtime).toEqual({
+      brotli: "1.2.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.2.12",
+    });
     expect(core.source).toMatchObject({
       spatialDatabaseSha256: "a".repeat(64), spatialReceiptSha256: "b".repeat(64),
     });
@@ -83,6 +94,23 @@ describe("receipt-bound browser search shards", () => {
       .toEqual(["geonames:104"]);
     expect(() => mergeCoreFirst([...coreMatches, ...coreMatches], coastalMatches, 5))
       .toThrow(/core results contain a duplicate/);
+    expect(() => searchBrowserShard(core, "x".repeat(257))).toThrow(/query exceeds/);
+  });
+
+  it("hands receipt-gated decoded bytes to the consumer without reopening paths", () => {
+    const built = build();
+    const loaded = loadBrowserSearchShards(fixture, built.output);
+    writeFileSync(join(built.output, SHARD_FILENAMES["europe-core"]), "changed after handoff");
+    writeFileSync(join(built.output, SHARD_RECEIPT_FILENAME), "changed after handoff");
+    expect(loaded.shards["europe-core"].bytes).toEqual(built.core);
+    expect(searchBrowserShard(loaded.shards["europe-core"].shard, "alpha")
+      .map(({ placeId }) => placeId)).toEqual(["geonames:101"]);
+  });
+
+  it("rejects a symlinked output root at the consumer handoff", () => {
+    const built = build(); const alias = join(temporary(), "artifact-set");
+    symlinkSync(built.output, alias);
+    expect(() => loadBrowserSearchShards(fixture, alias)).toThrow(/filesystem helper failed/);
   });
 
   it("rejects incompatible shard format and changed exact bytes", () => {
@@ -94,10 +122,10 @@ describe("receipt-bound browser search shards", () => {
     expect(() => decodeBrowserShard(incompatible, "europe-core")).toThrow(/format/);
 
     writeFileSync(join(built.output, SHARD_FILENAMES["europe-core"]), incompatible);
-    expect(() => validateBrowserSearchShards(fixture, built.output)).toThrow(/exact projection/);
+    expect(() => validateBrowserSearchShards(fixture, built.output)).toThrow(/unsafe|exact projection/);
   });
 
-  it.each(["duplicate", "reordered", "footer", "schema"])(
+  it.each(["duplicate", "reordered", "footer", "schema", "noncanonical", "duplicate-key"])(
     "rejects %s projection drift before writing outputs",
     (mutation) => {
       const lines = readFileSync(fixture, "utf8").trimEnd().split("\n");
@@ -105,6 +133,10 @@ describe("receipt-bound browser search shards", () => {
       if (mutation === "reordered") [lines[1], lines[2]] = [lines[2], lines[1]];
       if (mutation === "footer") lines[lines.length - 1] = lines.at(-1)!.replace('"recordCount":3', '"recordCount":4');
       if (mutation === "schema") lines[0] = lines[0].replace(PROJECTION_VERSION, "unknown-projection-v1");
+      if (mutation === "noncanonical") lines[0] = ` ${lines[0]}`;
+      if (mutation === "duplicate-key") lines[0] = lines[0].replace(
+        "{", '{"kind":"settlement-search-projection-header",'
+      );
       const root = temporary();
       const projection = join(root, "projection.ndjson");
       const output = join(root, "output");
@@ -112,6 +144,52 @@ describe("receipt-bound browser search shards", () => {
       writeFileSync(projection, `${lines.join("\n")}\n`);
       expect(() => buildBrowserSearchShards(projection, output)).toThrow(BrowserShardError);
       expect(() => statSync(join(output, SHARD_FILENAMES["europe-core"]))).toThrow();
+    }
+  );
+
+  it.each(["admin1Code", "sourceUpdatedAt", "lineage", "canonicalLanguage"])(
+    "rejects malformed %s projection metadata",
+    (mutation) => {
+      const values = readFileSync(fixture, "utf8").trimEnd().split("\n")
+        .map((line) => JSON.parse(line));
+      const header = values[0]; const documents = values.slice(1, -1); const document = documents[0];
+      if (mutation === "admin1Code") document.admin1Code = 17;
+      if (mutation === "sourceUpdatedAt") document.sourceUpdatedAt = { unexpected: true };
+      if (mutation === "lineage") document.lineage = [null];
+      if (mutation === "canonicalLanguage") document.canonicalName.language = 99;
+      const lines = documents.map((document) => JSON.stringify(document));
+      const documentsSha256 = digest(lines.map((line) => `${line}\n`).join(""));
+      const footer = {
+        deterministicIdentity: digest(`${canonicalJson({
+          documentsSha256, header, recordCount: documents.length,
+        })}\n`), documentsSha256, kind: "settlement-search-projection-footer",
+        recordCount: documents.length,
+      };
+      const root = temporary(); const projection = join(root, "projection.ndjson");
+      const output = join(root, "output"); mkdirSync(output);
+      writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
+      expect(() => buildBrowserSearchShards(projection, output)).toThrow(/document values/);
+    }
+  );
+
+  it.each([[50, "50.0"], [0.00001, "1e-05"]])(
+    "accepts producer-canonical coordinate %s encoded as %s", (coordinate, encoded) => {
+      const values = readFileSync(fixture, "utf8").trimEnd().split("\n").map((line) => JSON.parse(line));
+      const header = values[0]; const documents = values.slice(1, -1);
+      documents[0].location.latitude = coordinate;
+      const lines = documents.map((document) => JSON.stringify(document));
+      lines[0] = lines[0].replace(`"latitude":${JSON.stringify(coordinate)}`, `"latitude":${encoded}`);
+      const documentsSha256 = digest(lines.map((line) => `${line}\n`).join(""));
+      const footer = {
+        deterministicIdentity: digest(`${canonicalJson({
+          documentsSha256, header, recordCount: documents.length,
+        })}\n`), documentsSha256, kind: "settlement-search-projection-footer",
+        recordCount: documents.length,
+      };
+      const root = temporary(); const projection = join(root, "projection.ndjson");
+      const output = join(root, "output"); mkdirSync(output);
+      writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
+      expect(() => buildBrowserSearchShards(projection, output)).not.toThrow();
     }
   );
 
@@ -123,7 +201,13 @@ describe("receipt-bound browser search shards", () => {
     expect(() => buildBrowserSearchShards(fixture, root, {
       ...DEFAULT_SHARD_LIMITS,
       maxProjectionBytes: statSync(fixture).size - 1,
-    })).toThrow(/byte limit/);
+    })).toThrow(/bounded|byte limit/);
+    expect(() => buildBrowserSearchShards(fixture, root, {
+      ...DEFAULT_SHARD_LIMITS, maxRecords: DEFAULT_SHARD_LIMITS.maxRecords + 1,
+    })).toThrow(/hard cap/);
+    expect(() => buildBrowserSearchShards(fixture, root, {
+      maxRecords: 3,
+    } as typeof DEFAULT_SHARD_LIMITS)).toThrow(/limit fields/);
 
     const existing = join(root, SHARD_FILENAMES["europe-core"]);
     writeFileSync(existing, "preserve");
@@ -132,7 +216,7 @@ describe("receipt-bound browser search shards", () => {
     expect(() => statSync(join(root, SHARD_FILENAMES["europe-coastal"]))).toThrow();
   });
 
-  it("rejects same-inode source mutation and staged-file substitution", () => {
+  it("rejects same-inode source mutation with nanosecond identity", () => {
     const root = temporary(); const projection = join(root, "projection.ndjson");
     writeFileSync(projection, readFileSync(fixture)); mkdirSync(join(root, "source-output"));
     const originalRead = fs.readSync; let changed = false;
@@ -144,44 +228,14 @@ describe("receipt-bound browser search shards", () => {
       return length;
     } }, () => expect(() => buildBrowserSearchShards(projection, join(root, "source-output")))
       .toThrow(/changed while read/));
-
-    const output = join(root, "temp-output"); mkdirSync(output); const originalLink = fs.linkSync;
-    withFsPatch({ linkSync: (source: string, destination: string) => {
-      fs.unlinkSync(source); writeFileSync(source, "foreign"); originalLink(source, destination);
-    } }, () => expect(() => buildBrowserSearchShards(fixture, output)).toThrow(/inode was replaced/));
-    expect(readFileSync(join(output, SHARD_FILENAMES["europe-core"]), "utf8")).toBe("foreign");
-    expect(() => statSync(join(output, SHARD_RECEIPT_FILENAME))).toThrow();
   });
 
-  it("fails on output-directory displacement while preserving its replacement", () => {
-    const root = temporary(); const output = join(root, "output"); const moved = join(root, "moved");
-    mkdirSync(output); const originalLink = fs.linkSync; let links = 0;
-    withFsPatch({ linkSync: (source: string, destination: string) => {
-      originalLink(source, destination); if (++links === 2) { fs.renameSync(output, moved);
-        mkdirSync(output); writeFileSync(join(output, "foreign"), "preserve"); }
-    } }, () => expect(() => buildBrowserSearchShards(fixture, output)).toThrow(/publication failed/));
-    expect(readFileSync(join(output, "foreign"), "utf8")).toBe("preserve");
-    expect(() => statSync(join(output, SHARD_RECEIPT_FILENAME))).toThrow();
-  });
-
-  it("exposes completion last and durably rolls back owned outputs", () => {
-    const output = temporary(); const originalLink = fs.linkSync; let incomplete = 0; let links = 0;
-    withFsPatch({ linkSync: (source: string, destination: string) => {
-      originalLink(source, destination); if (++links < 3) {
-        expect(() => validateBrowserSearchShards(fixture, output)).toThrow(); incomplete++;
-      }
-    } }, () => buildBrowserSearchShards(fixture, output));
-    expect(incomplete).toBe(2); expect(statSync(join(output, SHARD_RECEIPT_FILENAME)).isFile()).toBe(true);
-
-    const rollback = temporary(); let directorySyncs = 0; links = 0; const originalFsync = fs.fsyncSync;
-    withFsPatch({ fsyncSync: (descriptor: number) => { if (fs.fstatSync(descriptor).isDirectory()) directorySyncs++;
-      originalFsync(descriptor); }, linkSync: (source: string, destination: string) => {
-      if (++links === 2) throw new Error("injected link failure"); originalLink(source, destination);
-    } }, () => expect(() => buildBrowserSearchShards(fixture, rollback)).toThrow(/injected link failure/));
-    expect(directorySyncs).toBeGreaterThan(0);
-    for (const name of [...Object.values(SHARD_FILENAMES), SHARD_RECEIPT_FILENAME]) {
-      expect(() => statSync(join(rollback, name))).toThrow();
-    }
+  it("passes descriptor-relative displacement, rollback, receipt, and fsync probes", () => {
+    const result = spawnSync("python3", [resolve(process.cwd(), "scripts/test-browser-shard-fs.py")], {
+      encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("adversarial checks passed");
   });
 
   it("rejects alternate Brotli parameters and reordered records", () => {
@@ -196,6 +250,18 @@ describe("receipt-bound browser search shards", () => {
     value.recordsSha256 = createHash("sha256").update(JSON.stringify(value.records)).digest("hex");
     expect(() => decodeBrowserShard(canonicalBrotli(Buffer.from(JSON.stringify(value))), "europe-core"))
       .toThrow(/record values differ/);
+
+    const tampered = JSON.parse(raw.toString("utf8"));
+    const envelope = JSON.parse(Buffer.from(tampered.indexBase64, "base64").toString("utf8"));
+    const payload = JSON.parse(envelope.payload);
+    payload.index = payload.index.map(([term, postings]: [string, unknown]) => [
+      term === "alpha" ? "zzzz" : term, postings,
+    ]);
+    envelope.payload = JSON.stringify(payload);
+    tampered.indexBase64 = Buffer.from(JSON.stringify(envelope)).toString("base64");
+    expect(() => decodeBrowserShard(
+      canonicalBrotli(Buffer.from(JSON.stringify(tampered))), "europe-core"
+    )).toThrow(/index differs from its exact records/);
   });
 
   it("provides build and validation CLI commands", () => {

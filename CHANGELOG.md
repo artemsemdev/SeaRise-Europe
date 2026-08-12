@@ -77,8 +77,9 @@ All notable changes to this project will be documented in this file.
   explicitly making no production or publication claim.
 - Added deterministic, Brotli-compressed MiniSearch browser candidates for the
   core and coastal settlement memberships, with exact projection binding,
-  receipt-last set completion, canonical compression, core-first duplicate-free
-  merge semantics, and explicit nonpublication claims.
+  descriptor-relative receipt-gated handoff, rebuilt index verification,
+  canonical compression, core-first duplicate-free merge semantics, and
+  explicit nonpublication claims.
 - Added fail-closed offline validation for the exact pre-sign candidate inventory,
   checksum subjects, STAC matrix, and required pending evidence-pair gate without
   reading artifacts, signing, or making a publication decision.
