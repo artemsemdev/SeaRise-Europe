@@ -137,9 +137,9 @@
     },
     "local-2026-08-11-candidate-completeness-contract": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-12T02:03:19+02:00",
-      "reference": "src/pipeline/tests/contracts/test_candidate_bytes.py, test_candidate_completeness_contract.py, and test_provenance_statement.py",
-      "environment": "macOS arm64; Python 3.11; deterministic assembled-byte, candidate-contract, and unsigned in-toto/SLSA provenance tests"
+      "observedAt": "2026-08-12T05:00:43+02:00",
+      "reference": "src/pipeline/tests/contracts/test_candidate_assembler.py, test_candidate_bytes.py, test_candidate_completeness_contract.py, and test_provenance_statement.py",
+      "environment": "macOS arm64; Python 3.9.6; 109 deterministic complete-fixture assembly, assembled-byte, candidate-contract, and unsigned in-toto/SLSA provenance tests passed"
     },
     "local-2026-08-11-supply-chain-contract": {
       "kind": "local-measurement",
@@ -303,12 +303,12 @@
       "id": "frontend-search-evaluation-foundation",
       "layer": "contract",
       "owner": "frontend",
-      "purpose": "Keep neutral search fixtures, deterministic ranking, adapter serialization, and incompatibility failures exact across the two pinned candidate engines.",
-      "sourcePaths": ["src/frontend/src/search/evaluation/*.test.ts"],
-      "changedPaths": ["contracts/search-evaluation/**", "src/frontend/src/search/evaluation/**", "src/frontend/package.json", "src/frontend/package-lock.json"],
+      "purpose": "Keep neutral search evaluation plus receipt-bound core/coastal browser shard serialization, merge semantics, bounded I/O, and incompatibility failures exact.",
+      "sourcePaths": ["src/frontend/src/search/**/*.test.ts", "src/frontend/scripts/test-browser-shard-fs.py"],
+      "changedPaths": ["contracts/search-evaluation/**", "docs/operations/settlement-search-projection.md", "src/frontend/scripts/browser-shard-fs.py", "src/frontend/scripts/build-settlement-search-shards.ts", "src/frontend/scripts/test-browser-shard-fs.py", "src/frontend/src/search/**", "src/frontend/.nvmrc", "src/frontend/package.json", "src/frontend/package-lock.json"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent neutral search-evaluation boundary; replacement must preserve exact synthetic outcomes and fail-closed serialization controls." },
-      "commands": { "focused": "cd src/frontend && npm test -- src/search/evaluation", "full": "cd src/frontend && npm test" },
+      "commands": { "focused": "cd src/frontend && npm test -- src/search", "full": "cd src/frontend && npm test" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-search-evaluation-foundation", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed synthetic fixtures and exact package versions use no browser, clock, random input, network, or production corpus." }
@@ -570,13 +570,13 @@
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the Phase 1 pre-sign candidate bytes exact, immutable, manifest-last, rights-bound, and subject to a mandatory non-recursive supply-chain evidence gate.",
-      "sourcePaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "scripts/release/validate_candidate_bytes.py", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_bytes.py", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
-      "changedPaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "docs/operations/phase-1-candidate-byte-gate.md", "scripts/release/validate_candidate_bytes.py", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_bytes.py", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
+      "sourcePaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "scripts/release/assemble_candidate_fixture.py", "scripts/release/validate_candidate_bytes.py", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_assembler.py", "src/pipeline/tests/contracts/test_candidate_bytes.py", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
+      "changedPaths": ["contracts/candidate-completeness/**", "contracts/supply-chain/v1/build-types/**", "docs/operations/phase-1-candidate-byte-gate.md", "scripts/release/assemble_candidate_fixture.py", "scripts/release/validate_candidate_bytes.py", "src/pipeline/searise_pipeline/candidate_completeness/**", "src/pipeline/tests/contracts/test_candidate_assembler.py", "src/pipeline/tests/contracts/test_candidate_bytes.py", "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "src/pipeline/tests/contracts/test_provenance_statement.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent descriptor-safe byte-integrity, exact-inventory, checksum-coverage, STAC-binding, terminal-order, geometry-nonclaim, and supply-chain-boundary gate." },
-      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/contracts/test_candidate_bytes.py src/pipeline/tests/contracts/test_candidate_completeness_contract.py src/pipeline/tests/contracts/test_provenance_statement.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
+      "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/contracts/test_candidate_assembler.py src/pipeline/tests/contracts/test_candidate_bytes.py src/pipeline/tests/contracts/test_candidate_completeness_contract.py src/pipeline/tests/contracts/test_provenance_statement.py -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 7, "class": "fast", "evidenceRef": "local-2026-08-11-candidate-completeness-contract", "scope": "focused-suite" },
+      "cost": { "estimatedSeconds": 9, "class": "fast", "evidenceRef": "local-2026-08-11-candidate-completeness-contract", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fixed checked-in schemas, inventory, fixtures, byte vectors, and isolated temporary trees use no clock, random input, network, credentials, or external binaries." }
     },
     {
@@ -1039,6 +1039,7 @@
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/search/evaluation/evaluation.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/search/shards/browser-shards.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range_evidence.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cli.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1059,6 +1060,7 @@
     { "path": "src/pipeline/tests/release/test_delivery.py", "suite": "pipeline-ar6-release-delivery", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_gate_report.py", "suite": "pipeline-release-gate-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/contracts/test_candidate_assembler.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/contracts/test_candidate_bytes.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/contracts/test_candidate_completeness_contract.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/contracts/test_provenance_statement.py", "suite": "pipeline-candidate-completeness-contract", "status": "active", "removalGate": null, "replacementEvidence": null },

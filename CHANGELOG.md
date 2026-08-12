@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a deterministic complete-candidate fixture assembler that verifies 50
+  explicit synthetic inputs, generates the terminal gate reports and checksum
+  inventory, writes the manifest last, runs the independent byte gate, and
+  exclusively promotes a read-only 53-artifact candidate without making
+  production, scientific, format-validity, or publication claims.
 - Added a read-only, descriptor-bound Phase 1 candidate byte gate that requires
   the exact 53-artifact inventory with no extra entries, streams and verifies
   declared sizes and SHA-256 values, reconstructs checksum content, and rejects
@@ -23,6 +28,10 @@ All notable changes to this project will be documented in this file.
   candidate evidence, with complete source authority, a durable pathname
   checkpoint, a stable whole-evidence content identity, and bounded private
   snapshot residue retained for pathname-race safety on isolated ephemeral runners.
+- Hardened complete-candidate assembly with inode-bound private staging,
+  foreign-preserving bounded quarantine rollback, an owner-controlled isolated
+  runner boundary, and a coherent point-in-time final tree-identity pass before
+  success is returned.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
@@ -79,6 +88,11 @@ All notable changes to this project will be documented in this file.
 - Added a receipt-bound, streaming settlement search-projection contract that
   preserves normalized names, context, lineage, and spatial membership while
   explicitly making no production or publication claim.
+- Added deterministic, Brotli-compressed code-point-trie browser candidates for
+  the core and coastal settlement memberships, with exact projection binding,
+  descriptor-relative receipt-gated handoff, rebuilt index verification,
+  canonical compression, core-first duplicate-free merge semantics, and
+  explicit nonpublication claims.
 - Added fail-closed offline validation for the exact pre-sign candidate inventory,
   checksum subjects, STAC matrix, and required pending evidence-pair gate without
   reading artifacts, signing, or making a publication decision.

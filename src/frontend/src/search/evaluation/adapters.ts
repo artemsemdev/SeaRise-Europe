@@ -1,7 +1,14 @@
 import { createHash } from "node:crypto";
 import { Index } from "flexsearch";
 import MiniSearch from "minisearch";
-import { normalizeSearchText, tokenizeSearchText } from "./search";
+import {
+  compareRankedCandidates,
+  hasQualifiedSearchContext,
+  normalizeSearchText,
+  searchFuzzyAllowance,
+  tokenizeSearchText,
+} from "./search";
+import type { RankedCandidateDocument, SearchMatchKey } from "./search";
 import type { CandidateAdapter, CandidateDocument, EngineDescriptor, EvaluationIdentity } from "./types";
 
 const FORMAT_VERSION = "search-evaluation-index-v1";
@@ -98,9 +105,308 @@ export const miniSearchAdapter: CandidateAdapter = {
     return { binding: expected, index: MiniSearch.loadJSON<MiniDocument>(payload, miniOptions()) };
   },
   search(value, query, limit) {
-    const fuzzy = Array.from(normalizeSearchText(query)).length < 4 ? false : 1;
-    return (built(value).index as MiniSearch<MiniDocument>).search(query, { prefix: true, fuzzy, combineWith: "AND" })
-      .slice(0, limit).map((result) => Number(result.id));
+    if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("MiniSearch candidate limit is invalid");
+    const length = Array.from(normalizeSearchText(query)).length;
+    const fuzzy = length < 4 ? false : length < 8 ? 1 : 2;
+    const results = (built(value).index as MiniSearch<MiniDocument>).search(query, {
+      prefix: true, fuzzy, maxFuzzy: 2, combineWith: "AND",
+    });
+    return results.slice(0, limit).map((result) => Number(result.id));
+  },
+};
+
+export const BOUNDED_SEARCH_WORK_LIMIT = 250_000;
+export const MAX_NORMALIZED_SEARCH_CODE_POINTS = 1_024;
+const BOUNDED_OPTIONS_SHA256 = sha256(
+  "searise-codepoint-trie-1.0.0|full-name-codepoints|qualified-context|prefix|levenshtein-max-2|global-rank-cap|work=250000",
+);
+
+type TrieEntry = [string, number[]];
+type TriePayload = { serializationVersion: 1; entries: TrieEntry[] };
+type TrieNode = { children: Map<string, TrieNode>; ordinals: number[] };
+type TrieRuntime = {
+  documents: Map<number, CandidateDocument>;
+  payload: TriePayload;
+  root: TrieNode;
+};
+
+function normalizedName(value: string): string {
+  const normalized = normalizeSearchText(value);
+  const length = Array.from(normalized).length;
+  if (!length || length > MAX_NORMALIZED_SEARCH_CODE_POINTS) {
+    throw new Error("bounded search name has an invalid normalized length");
+  }
+  return normalized;
+}
+
+function triePayload(documents: readonly CandidateDocument[]): TriePayload {
+  const names = new Map<string, Set<number>>();
+  for (const document of documents) {
+    if (!Number.isSafeInteger(document.ordinal) || document.ordinal < 1) {
+      throw new Error("bounded search document ordinal is invalid");
+    }
+    for (const name of Array.from(new Set([
+      document.record.displayName,
+      ...document.record.searchNames,
+    ].map(normalizedName)))) {
+      const ordinals = names.get(name) ?? new Set<number>();
+      ordinals.add(document.ordinal);
+      names.set(name, ordinals);
+    }
+  }
+  return {
+    serializationVersion: 1,
+    entries: Array.from(names.entries()).sort(([left], [right]) =>
+      left < right ? -1 : left > right ? 1 : 0)
+      .map(([name, ordinals]) => [name, Array.from(ordinals).sort((left, right) => left - right)]),
+  };
+}
+
+function trieFrom(payload: TriePayload): TrieNode {
+  const root: TrieNode = { children: new Map(), ordinals: [] };
+  for (const [name, ordinals] of payload.entries) {
+    let node = root;
+    for (const point of Array.from(name)) {
+      let child = node.children.get(point);
+      if (!child) {
+        child = { children: new Map(), ordinals: [] };
+        node.children.set(point, child);
+      }
+      node = child;
+    }
+    node.ordinals = ordinals;
+  }
+  return root;
+}
+
+function trieRuntime(documents: readonly CandidateDocument[]): TrieRuntime {
+  const payload = triePayload(documents);
+  return {
+    documents: new Map(documents.map((document) => [document.ordinal, document])),
+    payload,
+    root: trieFrom(payload),
+  };
+}
+
+function assertTriePayload(value: unknown, expected: TriePayload): asserts value is TriePayload {
+  if (!exactKeys(value, ["entries", "serializationVersion"])
+      || value.serializationVersion !== 1 || !Array.isArray(value.entries)
+      || JSON.stringify(value) !== JSON.stringify(expected)) {
+    throw new Error("bounded search payload is incompatible with its exact documents");
+  }
+}
+
+function trieBuilt(value: unknown): { binding: Binding; index: TrieRuntime } {
+  const result = built(value);
+  const index = result.index as Partial<TrieRuntime>;
+  if (!(index.documents instanceof Map) || !(index.root?.children instanceof Map)
+      || !exactKeys(index.payload, ["entries", "serializationVersion"])) {
+    throw new Error("bounded search runtime is invalid");
+  }
+  return result as { binding: Binding; index: TrieRuntime };
+}
+
+type Work = { value: number };
+function spend(work: Work, amount = 1): void {
+  work.value += amount;
+  if (work.value > BOUNDED_SEARCH_WORK_LIMIT) {
+    throw new Error("bounded search query exceeds its traversal-work limit");
+  }
+}
+
+type BestCandidates = {
+  byOrdinal: Map<number, RankedCandidateDocument>;
+  limit: number;
+  values: RankedCandidateDocument[];
+};
+
+function insertCandidate(best: BestCandidates, candidate: RankedCandidateDocument): void {
+  let low = 0;
+  let high = best.values.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (compareRankedCandidates(candidate, best.values[middle]) < 0) high = middle;
+    else low = middle + 1;
+  }
+  best.values.splice(low, 0, candidate);
+  best.byOrdinal.set(candidate.document.ordinal, candidate);
+}
+
+function offerCandidate(
+  best: BestCandidates, document: CandidateDocument, match: SearchMatchKey,
+): void {
+  const candidate = { document, match };
+  const existing = best.byOrdinal.get(document.ordinal);
+  if (existing) {
+    if (compareRankedCandidates(candidate, existing) >= 0) return;
+    const index = best.values.indexOf(existing);
+    if (index < 0) throw new Error("bounded search candidate set is inconsistent");
+    best.values.splice(index, 1);
+    best.byOrdinal.delete(document.ordinal);
+    insertCandidate(best, candidate);
+    return;
+  }
+  if (best.values.length >= best.limit) {
+    const worst = best.values.at(-1)!;
+    if (compareRankedCandidates(candidate, worst) >= 0) return;
+    best.values.pop();
+    best.byOrdinal.delete(worst.document.ordinal);
+  }
+  insertCandidate(best, candidate);
+}
+
+function addOrdinals(
+  runtime: TrieRuntime,
+  ordinals: readonly number[],
+  best: BestCandidates,
+  match: SearchMatchKey | ((document: CandidateDocument) => SearchMatchKey),
+  work: Work,
+  predicate?: (document: CandidateDocument) => boolean,
+): void {
+  for (const ordinal of ordinals) {
+    spend(work);
+    const document = runtime.documents.get(ordinal);
+    if (!document) throw new Error("bounded search posting has no document");
+    if (!predicate || predicate(document)) {
+      offerCandidate(best, document, typeof match === "function" ? match(document) : match);
+    }
+  }
+}
+
+function addPrefix(
+  runtime: TrieRuntime, node: TrieNode, best: BestCandidates, work: Work,
+): void {
+  addOrdinals(runtime, node.ordinals, best, [2, 0], work);
+  const children = node.children.values();
+  for (let item = children.next(); !item.done; item = children.next()) {
+    const child = item.value;
+    spend(work);
+    addPrefix(runtime, child, best, work);
+  }
+}
+
+type DistanceRow = { first: number; values: number[] };
+function rowValue(row: DistanceRow, column: number, fallback: number): number {
+  const offset = column - row.first;
+  return offset >= 0 && offset < row.values.length ? row.values[offset] : fallback;
+}
+
+function fuzzyWalk(
+  runtime: TrieRuntime,
+  node: TrieNode,
+  query: readonly string[],
+  maximum: number,
+  depth: number,
+  previous: DistanceRow,
+  best: BestCandidates,
+  work: Work,
+): void {
+  const children = node.children.entries();
+  for (let item = children.next(); !item.done; item = children.next()) {
+    const [point, child] = item.value;
+    const nextDepth = depth + 1;
+    const first = Math.max(0, nextDepth - maximum);
+    const last = Math.min(query.length, nextDepth + maximum);
+    const current: DistanceRow = { first, values: [] };
+    let minimum = maximum + 1;
+    for (let column = first; column <= last; column += 1) {
+      spend(work);
+      const distance = column === 0 ? nextDepth : Math.min(
+        rowValue(previous, column, maximum + 1) + 1,
+        rowValue(current, column - 1, maximum + 1) + 1,
+        rowValue(previous, column - 1, maximum + 1) + (point === query[column - 1] ? 0 : 1),
+      );
+      current.values.push(distance);
+      minimum = Math.min(minimum, distance);
+    }
+    if (minimum > maximum) continue;
+    const distance = rowValue(current, query.length, maximum + 1);
+    if (distance <= maximum) {
+      addOrdinals(runtime, child.ordinals, best, [3, distance], work);
+    }
+    fuzzyWalk(runtime, child, query, maximum, nextDepth, current, best, work);
+  }
+}
+
+function boundedTrieSearch(runtime: TrieRuntime, rawQuery: string, limit: number): number[] {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("bounded search candidate limit is invalid");
+  const query = normalizeSearchText(rawQuery);
+  const points = Array.from(query);
+  if (!points.length) return [];
+  if (points.length > MAX_NORMALIZED_SEARCH_CODE_POINTS) {
+    throw new Error("bounded search query has an invalid normalized length");
+  }
+  const best: BestCandidates = { byOrdinal: new Map(), limit, values: [] };
+  const work: Work = { value: 0 };
+  let node: TrieNode | undefined = runtime.root;
+  let prefix = "";
+  const qualified: Array<{ name: string; node: TrieNode }> = [];
+  for (let index = 0; index < points.length && node; index += 1) {
+    spend(work);
+    node = node.children.get(points[index]);
+    if (!node) break;
+    prefix += points[index];
+    if (node.ordinals.length && points[index + 1] === " ") {
+      qualified.push({ name: prefix, node });
+    }
+  }
+  if (node) {
+    addOrdinals(runtime, node.ordinals, best, ({ record }) =>
+      [normalizeSearchText(record.displayName) === query ? 0 : 1, 0], work);
+  }
+  for (const item of qualified) {
+    addOrdinals(runtime, item.node.ordinals, best, ({ record }) =>
+      [normalizeSearchText(record.displayName) === item.name ? 0 : 1, 0], work,
+    ({ record }) => hasQualifiedSearchContext(query, item.name, record));
+  }
+  if (node) {
+    const children = node.children.values();
+    for (let item = children.next(); !item.done; item = children.next()) {
+      spend(work);
+      addPrefix(runtime, item.value, best, work);
+    }
+  }
+  const maximum = searchFuzzyAllowance(query);
+  if (maximum) {
+    const first = Math.max(0, -maximum);
+    const last = Math.min(points.length, maximum);
+    fuzzyWalk(runtime, runtime.root, points, maximum, 0, {
+      first,
+      values: Array.from({ length: last - first + 1 }, (_, index) => first + index),
+    }, best, work);
+  }
+  return best.values.map(({ document }) => document.ordinal);
+}
+
+export const boundedTrieAdapter: CandidateAdapter = {
+  descriptor: {
+    engineId: "searise-codepoint-trie",
+    packageVersion: "1.0.0",
+    serializationVersion: "codepoint-trie-json-v1",
+  },
+  build(documents, identity) {
+    return { binding: bindingFor(documents, identity, BOUNDED_OPTIONS_SHA256), index: trieRuntime(documents) };
+  },
+  serialize(value) {
+    const { binding, index } = trieBuilt(value);
+    return encodeEnvelope(this.descriptor, binding, index.payload);
+  },
+  deserialize(bytes, documents, identity) {
+    const expectedBinding = bindingFor(documents, identity, BOUNDED_OPTIONS_SHA256);
+    const payload = decodeEnvelope(bytes, this.descriptor, expectedBinding).payload;
+    const expectedPayload = triePayload(documents);
+    assertTriePayload(payload, expectedPayload);
+    return {
+      binding: expectedBinding,
+      index: {
+        documents: new Map(documents.map((document) => [document.ordinal, document])),
+        payload,
+        root: trieFrom(payload),
+      },
+    };
+  },
+  search(value, query, limit) {
+    return boundedTrieSearch(trieBuilt(value).index, query, limit);
   },
 };
 
