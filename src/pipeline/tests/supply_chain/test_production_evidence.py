@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import errno
 import hashlib
 import json
 import os
@@ -1288,6 +1289,50 @@ def test_unisolated_output_parent_is_rejected_before_staging(tmp_path: Path) -> 
     shared.chmod(0o755)
     with pytest.raises(SupplyChainContractError, match="inaccessible to group/other"):
         production_evidence._output_parent(shared / "evidence")
+
+
+@pytest.mark.parametrize("operation", ["stat", "open"])
+def test_post_mkdir_snapshot_setup_failure_retains_one_root_without_retry(
+    operation: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = 0
+    original = getattr(production_evidence.os, operation)
+
+    def fail(path: object, *args: object, **kwargs: object) -> object:
+        nonlocal calls
+        if (
+            isinstance(path, str)
+            and path.startswith("searise-production-evidence-")
+            and kwargs.get("dir_fd") is not None
+        ):
+            calls += 1
+            raise OSError(errno.EMFILE, "injected post-mkdir setup failure")
+        return original(path, *args, **kwargs)  # type: ignore[call-overload]
+
+    monkeypatch.setattr(production_evidence.os, operation, fail)
+    with pytest.raises(SupplyChainContractError, match="could not create private"):
+        production_evidence._new_private_snapshot()
+    residues = list(production_evidence._TEMP_ROOT.iterdir())
+    assert calls == 1
+    assert len(residues) == 1
+    assert residues[0].name.startswith("searise-production-evidence-")
+
+
+def test_private_snapshot_retries_only_a_true_precreation_collision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tokens = iter(("0" * 32, "1" * 32))
+    collision = production_evidence._TEMP_ROOT / f"searise-production-evidence-{'0' * 32}"
+    collision.mkdir(mode=0o700)
+    monkeypatch.setattr(production_evidence.secrets, "token_hex", lambda _size: next(tokens))
+    parent, name, descriptor, path, _identity = production_evidence._new_private_snapshot()
+    try:
+        assert name == f"searise-production-evidence-{'1' * 32}"
+        assert path == production_evidence._TEMP_ROOT / name
+        assert collision.is_dir()
+    finally:
+        os.close(descriptor)
+        os.close(parent)
 
 
 def test_finalizer_is_non_reentrant_before_reading_inputs(tmp_path: Path) -> None:

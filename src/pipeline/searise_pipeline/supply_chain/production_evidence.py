@@ -86,6 +86,10 @@ class ProductionEvidenceSummary:
     sbom_count: int
 
 
+class _DirectoryCollision(SupplyChainContractError):
+    """A random private pathname existed before this process created it."""
+
+
 @dataclass
 class _ReadBudget:
     remaining: int = _MAX_TOTAL_READ_BYTES
@@ -289,6 +293,11 @@ def _create_directory(parent: int, name: str, label: str) -> int:
     _logical(name, label)
     try:
         os.mkdir(name, 0o700, dir_fd=parent)
+    except FileExistsError as exc:
+        raise _DirectoryCollision(f"private {label} directory name already exists") from exc
+    except OSError as exc:
+        raise SupplyChainContractError(f"could not create private {label} directory") from exc
+    try:
         created = os.stat(name, dir_fd=parent, follow_symlinks=False)
         descriptor = os.open(
             name,
@@ -318,16 +327,14 @@ def _new_private_snapshot() -> tuple[int, str, int, Path, os.stat_result]:
         name = f"searise-production-evidence-{secrets.token_hex(16)}"
         try:
             descriptor = _create_directory(parent, name, "private snapshot")
-        except SupplyChainContractError as exc:
-            try:
-                os.stat(name, dir_fd=parent, follow_symlinks=False)
-            except FileNotFoundError:
-                os.close(parent)
-                raise exc
+        except _DirectoryCollision:
             continue
+        except SupplyChainContractError:
+            _close_quietly(parent)
+            raise
         identity = os.fstat(descriptor)
         return parent, name, descriptor, _TEMP_ROOT / name, identity
-    os.close(parent)
+    _close_quietly(parent)
     _fail("could not reserve a private snapshot directory")
 
 
