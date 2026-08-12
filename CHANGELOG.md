@@ -25,6 +25,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a candidate-wide QA executor that byte-gates the complete manifest,
+  dispatches every schema-selected artifact in manifest order, retains explicit
+  pass, fail, and not-measured dispositions, and rejects candidate mutation
+  during validation before any release eligibility can be reported.
 - Added a version-selected candidate QA routing matrix and explicit-outcome
   dispatcher that cover every v2 artifact role, media type, and content
   encoding and fail closed on missing, duplicate, unsorted, unknown, or
