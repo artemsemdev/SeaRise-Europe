@@ -430,7 +430,17 @@ def _reserve_owned_directory(
             return name, descriptor, created
         except Exception:
             if descriptor >= 0:
-                os.close(descriptor)
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+            # The exact child is known after mkdir. Atomically move only that
+            # identity to a retained private quarantine before rethrowing; a
+            # replacement is preserved and an unprovable cleanup stays visible.
+            try:
+                _quarantine_owned_entry(parent, name, created)
+            except (CandidateAssemblyError, OSError):
+                pass
             raise
     _fail("assembly-publication", "cannot reserve a private staging directory")
 

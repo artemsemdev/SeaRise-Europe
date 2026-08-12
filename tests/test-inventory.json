@@ -137,9 +137,9 @@
     },
     "local-2026-08-11-candidate-completeness-contract": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-12T04:56:48+02:00",
+      "observedAt": "2026-08-12T05:00:43+02:00",
       "reference": "src/pipeline/tests/contracts/test_candidate_assembler.py, test_candidate_bytes.py, test_candidate_completeness_contract.py, and test_provenance_statement.py",
-      "environment": "macOS arm64; Python 3.9.6; 108 deterministic complete-fixture assembly, assembled-byte, candidate-contract, and unsigned in-toto/SLSA provenance tests passed"
+      "environment": "macOS arm64; Python 3.9.6; 109 deterministic complete-fixture assembly, assembled-byte, candidate-contract, and unsigned in-toto/SLSA provenance tests passed"
     },
     "local-2026-08-11-supply-chain-contract": {
       "kind": "local-measurement",
