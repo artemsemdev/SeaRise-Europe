@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import runpy
-import shutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -74,13 +74,13 @@ def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_twice(
     real_write = assembler._write_new
     real_gate = assembler.validate_candidate_root
 
-    def observe_write(path: Path, raw: bytes) -> None:
-        writes.append(path.name)
-        real_write(path, raw)
+    def observe_write(root: int, path: str, raw: bytes) -> None:
+        writes.append(Path(path).name)
+        real_write(root, path, raw)
 
-    def observe_gate(path: Path):  # type: ignore[no-untyped-def]
-        gates.append(path)
-        return real_gate(path)
+    def observe_gate(root: int):  # type: ignore[no-untyped-def]
+        gates.append(root)
+        return real_gate(root)
 
     monkeypatch.setattr(assembler, "_write_new", observe_write)
     monkeypatch.setattr(assembler, "validate_candidate_root", observe_gate)
@@ -88,7 +88,7 @@ def test_complete_fixture_writes_manifest_last_and_runs_byte_gate_twice(
     summary = assemble_candidate_fixture(RECEIPT, output)
 
     assert writes[-4:] == ["gate-report.json", "gate-report.md", "checksums.txt", "manifest.json"]
-    assert len(gates) == 2 and gates[0] != output and gates[1] == output
+    assert len(gates) == 2 and gates[0] == gates[1]
     assert summary.artifact_count == 53
     assert summary.manifest_sha256 == _load()["expectedManifestSha256"]
     assert (summary.production, summary.publication) == (False, False)
@@ -176,21 +176,73 @@ def test_rebuilds_are_byte_identical(tmp_path: Path) -> None:
     assert _bytes(first.output_directory) == _bytes(second.output_directory)
 
 
-def test_foreign_replacement_is_detected_and_preserved(
+def test_staging_parent_rename_cannot_redirect_held_descriptors(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    output = tmp_path / "candidate"
-    real_rename = assembler._rename_no_overwrite
+    parent, output = tmp_path / "parent", tmp_path / "parent" / "candidate"
+    parent.mkdir()
+    moved = tmp_path / "parent-moved"
+    real_sync = assembler._fsync_tree
 
-    def replace(source_parent: int, source: str, output_parent: int, target: str) -> None:
-        real_rename(source_parent, source, output_parent, target)
-        assembler._thaw(output)
-        shutil.rmtree(output)
-        output.mkdir()
-        (output / "foreign.txt").write_text("preserve foreign bytes\n", encoding="utf-8")
+    def rename_parent(root: int, paths: object) -> None:
+        real_sync(root, paths)  # type: ignore[arg-type]
+        parent.rename(moved)
+        parent.mkdir()
+        (parent / "foreign.txt").write_text("unchanged\n", encoding="utf-8")
 
-    monkeypatch.setattr(assembler, "_rename_no_overwrite", replace)
-    with pytest.raises(CandidateAssemblyError) as caught:
+    monkeypatch.setattr(assembler, "_fsync_tree", rename_parent)
+    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
         assemble_candidate_fixture(RECEIPT, output)
-    assert caught.value.code == "foreign-replacement"
-    assert (output / "foreign.txt").read_text(encoding="utf-8") == "preserve foreign bytes\n"
+    assert (parent / "foreign.txt").read_text(encoding="utf-8") == "unchanged\n"
+    assert not list(moved.glob(".candidate-assembly-*"))
+
+
+def test_post_promotion_failure_rolls_back_only_owned_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output, unrelated = tmp_path / "candidate", tmp_path / "unrelated"
+    unrelated.mkdir()
+    (unrelated / "keep.txt").write_text("keep\n", encoding="utf-8")
+    real_gate, calls = assembler.validate_candidate_root, 0
+
+    def fail_final(root: int):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise assembler.CandidateContractError("candidate-changed", "injected")
+        return real_gate(root)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    with pytest.raises(CandidateAssemblyError, match="foreign-replacement"):
+        assemble_candidate_fixture(RECEIPT, output)
+    assert not output.exists()
+    assert (unrelated / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+    assert not list(tmp_path.glob(".candidate-assembly-*"))
+
+
+def test_rename_parent_syncs_source_before_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, destination = tmp_path / "source", tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    source_fd = os.open(source, assembler._directory_flags())
+    destination_fd = os.open(destination, assembler._directory_flags())
+    observed: list[int] = []
+    try:
+        monkeypatch.setattr(assembler, "_sync_directory", lambda fd: observed.append(fd))
+        assembler._sync_rename_parents(source_fd, destination_fd)
+    finally:
+        os.close(source_fd)
+        os.close(destination_fd)
+    assert observed == [source_fd, destination_fd]
+
+
+def test_oversized_template_fails_before_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    template = tmp_path / "template.json"
+    template.write_bytes(b"x" * (assembler._MAX_TEMPLATE_BYTES + 1))
+    monkeypatch.setattr(assembler, "_TEMPLATE", template)
+    with pytest.raises(CandidateAssemblyError, match="assembly-template"):
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")

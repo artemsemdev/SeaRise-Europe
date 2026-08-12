@@ -43,11 +43,12 @@ write order from mutable timestamps.
 The compact `fixtures/assembly/complete-synthetic.json` receipt drives the
 normal-CI completeness assembler. It binds all 50 pre-gate fixture inputs,
 their grid and pair-parity identities, STAC asset links, redistribution status,
-and false claims. The assembler deterministically generates the two gate
-reports and `checksums.txt`, writes `manifest.json` last, freezes the tree,
-passes the independent byte gate, and uses an OS-level exclusive rename for
-local no-overwrite promotion. Its marker payloads intentionally are not valid
-COG, PMTiles, GeoParquet, or search-index formats.
+and false claims. Darwin and Linux use native no-overwrite directory renames;
+all staging writes, mode changes, syncs, validation, and cleanup use held
+directory descriptors. The publication commit point verifies the current
+parent and final directory identities before and after validation. A failed
+post-promotion check durably moves only the held assembler directory away from
+the final name. Its marker payloads are not valid COG, PMTiles, GeoParquet, or search indexes.
 
 Provenance, signature, and SBOM sidecars are mandatory publication evidence,
 not deferred Phase 1 work. Pair validation is still pending: a dependent

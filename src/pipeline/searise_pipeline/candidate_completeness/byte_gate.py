@@ -48,7 +48,9 @@ def _identity(value: os.stat_result) -> tuple[int, ...]:
     return tuple(int(getattr(value, field)) for field in _IDENTITY_FIELDS)
 
 
-def _open_root(path: Path) -> int:
+def _open_root(path: Path | int) -> int:
+    if isinstance(path, int):
+        return os.dup(path)
     if ".." in path.parts:
         _fail("candidate-root", "candidate root must not contain parent traversal")
     absolute = path.absolute()
@@ -230,8 +232,12 @@ def _checksum_bytes(candidate: Mapping[str, Any]) -> bytes:
     return "".join(f"{item['sha256']}  {item['path']}\n" for item in subjects).encode("utf-8")
 
 
-def validate_candidate_root(candidate_root: Path) -> CandidateByteSummary:
-    """Validate exact candidate bytes without writing, repairing, or approving them."""
+def validate_candidate_root(candidate_root: Path | int) -> CandidateByteSummary:
+    """Validate exact candidate bytes without writing, repairing, or approving them.
+
+    A held directory descriptor avoids pathname redirection during local assembly.
+    Path callers additionally receive the documented pathname linearization check.
+    """
     root = _open_root(candidate_root)
     try:
         manifest_raw, manifest_sha256, _ = _read_file(
@@ -291,8 +297,8 @@ def validate_candidate_root(candidate_root: Path) -> CandidateByteSummary:
         if _inspect_tree(root, tree) != baseline:
             _fail("candidate-changed", "candidate tree changed during validation")
         # Resolving this descriptor from the current pathname is the documented
-        # linearization point. Keep it open for the complete final pass so a
-        # later pathname replacement cannot change the observed tree.
+        # linearization point. Descriptor callers already hold the observed
+        # directory; their publisher verifies the final name separately.
         linearized = _open_root(candidate_root)
         try:
             if _identity(os.fstat(linearized)) != _identity(os.fstat(root)):

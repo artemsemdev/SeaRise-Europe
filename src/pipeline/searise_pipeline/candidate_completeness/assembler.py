@@ -8,13 +8,12 @@ import hashlib
 import json
 import os
 import re
-import shutil
+import secrets
 import stat
 import sys
-import tempfile
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Mapping, NoReturn
+from pathlib import Path, PurePosixPath
+from typing import Any, Iterable, Mapping, NoReturn
 
 from .byte_gate import validate_candidate_root
 from .validator import CandidateContractError, load_candidate_bytes, validate_candidate_document
@@ -23,6 +22,7 @@ CONTRACT_ROOT = Path(__file__).resolve().parents[4] / "contracts/candidate-compl
 _TEMPLATE = CONTRACT_ROOT / "fixtures/valid/engineering-candidate.json"
 _PRE_GATE_COUNT = 50
 _MAX_RECEIPT_BYTES = 2 * 1024 * 1024
+_MAX_TEMPLATE_BYTES = 2 * 1024 * 1024
 _ENTRY_KEYS = {"artifactId", "gridId", "parityId", "stacAssets", "payloadSha256"}
 _CLAIMS = {
     "formatValid": False,
@@ -92,7 +92,8 @@ def _identity(metadata: os.stat_result) -> tuple[int, ...]:
     )
 
 
-def _read_bound_receipt(path: Path) -> bytes:
+def _read_stable_file(path: Path, *, code: str, maximum_bytes: int) -> bytes:
+    """Read one bounded, single-link file and reject a concurrent replacement."""
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = -1
     try:
@@ -101,25 +102,29 @@ def _read_bound_receipt(path: Path) -> bytes:
         if (
             not stat.S_ISREG(before.st_mode)
             or before.st_nlink != 1
-            or before.st_size > _MAX_RECEIPT_BYTES
+            or before.st_size > maximum_bytes
         ):
-            _fail("assembly-receipt", "receipt must be one bounded regular file")
+            _fail(code, "input must be one bounded regular file")
         raw = bytearray()
         while len(raw) < before.st_size:
             chunk = os.read(descriptor, before.st_size - len(raw))
             if not chunk:
-                _fail("assembly-receipt", "receipt ended while it was read")
+                _fail(code, "input ended while it was read")
             raw.extend(chunk)
         if os.read(descriptor, 1) or _identity(os.fstat(descriptor)) != _identity(before):
-            _fail("assembly-receipt", "receipt changed while it was read")
+            _fail(code, "input changed while it was read")
         return bytes(raw)
     except CandidateAssemblyError:
         raise
     except OSError as exc:
-        raise CandidateAssemblyError("assembly-receipt", "receipt cannot be opened safely") from exc
+        raise CandidateAssemblyError(code, "input cannot be opened safely") from exc
     finally:
         if descriptor >= 0:
             os.close(descriptor)
+
+
+def _read_bound_receipt(path: Path) -> bytes:
+    return _read_stable_file(path, code="assembly-receipt", maximum_bytes=_MAX_RECEIPT_BYTES)
 
 
 def _payload_bytes(fixture_id: str, entry: Mapping[str, Any]) -> bytes:
@@ -187,7 +192,9 @@ def _load_inputs(
     if receipt.get("rights") != _RIGHTS:
         _fail("fixture-rights", "fixture redistribution rights are invalid")
 
-    template_raw = _TEMPLATE.read_bytes()
+    template_raw = _read_stable_file(
+        _TEMPLATE, code="assembly-template", maximum_bytes=_MAX_TEMPLATE_BYTES
+    )
     if receipt.get("candidateTemplateSha256") != _sha256(template_raw):
         _fail("assembly-input-hash", "candidate template SHA-256 differs")
     candidate = load_candidate_bytes(template_raw)
@@ -203,7 +210,10 @@ def _load_inputs(
 
     payloads: dict[str, bytes] = {}
     parity: dict[tuple[str, int], dict[str, str]] = {}
-    for entry, artifact in zip(entries, required, strict=True):
+    # Keep this loop usable by the project's Python 3.9 minimum version.
+    for index in range(_PRE_GATE_COUNT):
+        entry = entries[index]
+        artifact = required[index]
         if not isinstance(entry, dict) or set(entry) != _ENTRY_KEYS:
             _fail("assembly-inputs", "each input must have the exact fixture shape")
         raw = _payload_bytes(fixture_id, entry)
@@ -288,40 +298,146 @@ def _candidate_bytes(
     return _canonical(candidate), payloads
 
 
-def _write_new(path: Path, raw: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("xb") as stream:
-        stream.write(raw)
-        stream.flush()
-        os.fsync(stream.fileno())
+def _directory_flags() -> int:
+    return os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
 
 
-def _freeze(root: Path) -> None:
-    for path in sorted(root.rglob("*"), reverse=True):
-        os.chmod(path, 0o555 if path.is_dir() else 0o444, follow_symlinks=False)
-    # macOS RENAME_EXCL requires write permission on the moved directory.
-    # The held descriptor removes it immediately after exclusive promotion.
-    os.chmod(root, 0o755)
+def _directory_identity(metadata: os.stat_result) -> tuple[int, int]:
+    return metadata.st_dev, metadata.st_ino
 
 
-def _thaw(root: Path) -> None:
-    if not root.exists():
-        return
-    os.chmod(root, 0o700)
-    for path in root.rglob("*"):
-        os.chmod(path, 0o700 if path.is_dir() else 0o600, follow_symlinks=False)
+def _open_directory(parent: int, parts: Iterable[str]) -> int:
+    descriptor = os.dup(parent)
+    try:
+        for part in parts:
+            child = os.open(part, _directory_flags(), dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except OSError:
+        os.close(descriptor)
+        raise
 
 
-def _fsync_tree(root: Path) -> None:
-    directories = [root, *(path for path in root.rglob("*") if path.is_dir())]
-    flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    for directory in sorted(directories, key=lambda path: len(path.parts), reverse=True):
-        descriptor = os.open(directory, flags)
+def _open_or_create_directory(parent: int, parts: Iterable[str]) -> int:
+    descriptor = os.dup(parent)
+    try:
+        for part in parts:
+            try:
+                os.mkdir(part, 0o755, dir_fd=descriptor)
+            except FileExistsError:
+                pass
+            child = os.open(part, _directory_flags(), dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except OSError:
+        os.close(descriptor)
+        raise
+
+
+def _logical(path: str) -> PurePosixPath:
+    logical = PurePosixPath(path)
+    if logical.is_absolute() or any(part in {"", ".", ".."} for part in logical.parts):
+        _fail("assembly-publication", "candidate artifact path is unsafe")
+    return logical
+
+
+def _write_new(root: int, path: str, raw: bytes) -> None:
+    """Create one stage file through the held stage-root descriptor."""
+    logical = _logical(path)
+    parent = _open_or_create_directory(root, logical.parts[:-1])
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            logical.name,
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=parent,
+        )
+        offset = 0
+        while offset < len(raw):
+            offset += os.write(descriptor, raw[offset:])
+        os.fsync(descriptor)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent)
+
+
+def _stage_directories(paths: Iterable[str]) -> list[PurePosixPath]:
+    return sorted(
+        {PurePosixPath(part) for path in paths for part in _logical(path).parents if part.parts},
+        key=lambda item: (len(item.parts), item.as_posix()),
+        reverse=True,
+    )
+
+
+def _chmod_file(root: int, path: str, mode: int) -> None:
+    logical = _logical(path)
+    parent = _open_directory(root, logical.parts[:-1])
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            logical.name,
+            os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent,
+        )
+        os.fchmod(descriptor, mode)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        os.close(parent)
+
+
+def _freeze(root: int, paths: Iterable[str]) -> None:
+    paths = tuple(paths)
+    for path in paths:
+        _chmod_file(root, path, 0o444)
+    for directory_path in _stage_directories(paths):
+        descriptor = _open_directory(root, directory_path.parts)
         try:
-            os.fsync(descriptor)
+            os.fchmod(descriptor, 0o555)
         finally:
             os.close(descriptor)
+    # Darwin RENAME_EXCL needs the moved directory to remain writable. Its
+    # descriptor is frozen immediately after promotion.
+    os.fchmod(root, 0o755)
+
+
+def _thaw(root: int, paths: Iterable[str]) -> None:
+    os.fchmod(root, 0o700)
+    for directory_path in _stage_directories(paths):
+        descriptor = _open_directory(root, directory_path.parts)
+        try:
+            os.fchmod(descriptor, 0o700)
+        finally:
+            os.close(descriptor)
+
+
+def _sync_directory(descriptor: int) -> None:
+    os.fsync(descriptor)
+
+
+def _fsync_tree(root: int, paths: Iterable[str]) -> None:
+    """Synchronize child directories before their parents through held descriptors."""
+    for directory_path in _stage_directories(paths):
+        descriptor = _open_directory(root, directory_path.parts)
+        try:
+            _sync_directory(descriptor)
+        finally:
+            os.close(descriptor)
+    _sync_directory(root)
+
+
+def _sync_rename_parents(source_parent: int, destination_parent: int) -> None:
+    """Persist metadata changed by a cross-directory rename on both supported OSes."""
+    _sync_directory(source_parent)
+    _sync_directory(destination_parent)
 
 
 def _rename_no_overwrite(source_parent: int, source: str, output_parent: int, target: str) -> None:
@@ -346,6 +462,89 @@ def _rename_no_overwrite(source_parent: int, source: str, output_parent: int, ta
     ):
         code = ctypes.get_errno()
         raise OSError(code, os.strerror(code), target)
+
+
+def _make_staging(parent: int) -> tuple[str, int]:
+    for _ in range(32):
+        name = f".candidate-assembly-{secrets.token_hex(16)}"
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent)
+        except FileExistsError:
+            continue
+        try:
+            return name, os.open(name, _directory_flags(), dir_fd=parent)
+        except OSError:
+            os.rmdir(name, dir_fd=parent)
+            raise
+    _fail("assembly-publication", "cannot reserve a private staging directory")
+
+
+def _entry_matches(directory: int, name: str, expected: tuple[int, int]) -> bool:
+    try:
+        observed = os.stat(name, dir_fd=directory, follow_symlinks=False)
+        return _directory_identity(observed) == expected
+    except FileNotFoundError:
+        return False
+
+
+def _commit_matches(parent_path: Path, parent: int, name: str, stage: int) -> bool:
+    """Check the pathname parent and final entry at the publication commit point."""
+    try:
+        current_parent = os.stat(parent_path, follow_symlinks=False)
+    except OSError:
+        return False
+    parent_matches = _directory_identity(current_parent) == _directory_identity(os.fstat(parent))
+    return parent_matches and _entry_matches(parent, name, _directory_identity(os.fstat(stage)))
+
+
+def _remove_known_stage(root: int, paths: Iterable[str]) -> None:
+    paths = tuple(paths)
+    _thaw(root, paths)
+    for path in paths:
+        logical = _logical(path)
+        parent = _open_directory(root, logical.parts[:-1])
+        try:
+            os.unlink(logical.name, dir_fd=parent)
+        finally:
+            os.close(parent)
+    for directory_path in _stage_directories(paths):
+        parent = _open_directory(root, directory_path.parts[:-1])
+        try:
+            os.rmdir(directory_path.name, dir_fd=parent)
+        finally:
+            os.close(parent)
+
+
+def _cleanup_staging(
+    parent: int,
+    temporary_name: str,
+    temporary: int,
+    stage: int,
+    paths: Iterable[str],
+) -> None:
+    """Remove only the held staging tree; a replacement is intentionally retained."""
+    stage_identity = _directory_identity(os.fstat(stage))
+    if _entry_matches(temporary, "candidate", stage_identity):
+        _remove_known_stage(stage, paths)
+        if _entry_matches(temporary, "candidate", stage_identity):
+            os.rmdir("candidate", dir_fd=temporary)
+    temporary_identity = _directory_identity(os.fstat(temporary))
+    if _entry_matches(parent, temporary_name, temporary_identity):
+        os.rmdir(temporary_name, dir_fd=parent)
+
+
+def _rollback_owned_promotion(
+    parent: int,
+    output_name: str,
+    temporary: int,
+    stage: int,
+) -> None:
+    """Durably move our promoted inode away without touching a foreign final directory."""
+    if not _entry_matches(parent, output_name, _directory_identity(os.fstat(stage))):
+        return
+    os.fchmod(stage, 0o755)
+    _rename_no_overwrite(parent, output_name, temporary, "candidate")
+    _sync_rename_parents(parent, temporary)
 
 
 def assemble_candidate_fixture(
@@ -379,32 +578,25 @@ def assemble_candidate_fixture(
     if os.path.lexists(output):
         _fail("assembly-publication", "immutable candidate output already exists")
 
-    temporary = Path(tempfile.mkdtemp(prefix=".candidate-assembly-", dir=parent))
-    stage = temporary / "candidate"
-    stage.mkdir()
     promoted = False
+    complete = False
     parent_descriptor = -1
     temporary_descriptor = -1
     stage_descriptor = -1
+    temporary_name = ""
+    stage_paths = [*(artifact["path"] for artifact in assembled["artifacts"]), "manifest.json"]
     try:
+        parent_descriptor = os.open(parent, _directory_flags())
+        temporary_name, temporary_descriptor = _make_staging(parent_descriptor)
+        os.mkdir("candidate", 0o700, dir_fd=temporary_descriptor)
+        stage_descriptor = os.open("candidate", _directory_flags(), dir_fd=temporary_descriptor)
         for artifact in assembled["artifacts"]:
-            _write_new(stage / artifact["path"], all_payloads[artifact["artifactId"]])
-        _write_new(stage / "manifest.json", manifest_raw)
-        _freeze(stage)
-        _fsync_tree(stage)
-        stage_descriptor = os.open(
-            stage,
-            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0),
-        )
-        gated = validate_candidate_root(stage)
-        parent_descriptor = os.open(
-            parent,
-            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0),
-        )
-        temporary_descriptor = os.open(
-            temporary,
-            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0),
-        )
+            _write_new(stage_descriptor, artifact["path"], all_payloads[artifact["artifactId"]])
+        _write_new(stage_descriptor, "manifest.json", manifest_raw)
+        _freeze(stage_descriptor, stage_paths)
+        _fsync_tree(stage_descriptor, stage_paths)
+        _sync_directory(temporary_descriptor)
+        gated = validate_candidate_root(stage_descriptor)
         _rename_no_overwrite(
             temporary_descriptor,
             "candidate",
@@ -413,18 +605,16 @@ def assemble_candidate_fixture(
         )
         promoted = True
         os.fchmod(stage_descriptor, 0o555)
-        os.fsync(stage_descriptor)
-        before = os.fstat(stage_descriptor)
-        os.fsync(parent_descriptor)
-        current = os.stat(output.name, dir_fd=parent_descriptor, follow_symlinks=False)
-        if (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino):
+        _sync_directory(stage_descriptor)
+        _sync_rename_parents(temporary_descriptor, parent_descriptor)
+        if not _commit_matches(parent, parent_descriptor, output.name, stage_descriptor):
             _fail("foreign-replacement", "candidate identity changed during publication")
-        final = validate_candidate_root(output)
-        current = os.stat(output.name, dir_fd=parent_descriptor, follow_symlinks=False)
-        if (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino):
+        final = validate_candidate_root(stage_descriptor)
+        if not _commit_matches(parent, parent_descriptor, output.name, stage_descriptor):
             _fail("foreign-replacement", "candidate identity changed after validation")
         if final != gated:
             _fail("foreign-replacement", "published candidate differs from the staged gate")
+        complete = True
         return CandidateAssemblySummary(
             candidate_id=final.candidate_id,
             artifact_count=final.artifact_count,
@@ -442,12 +632,34 @@ def assemble_candidate_fixture(
             "assembly-publication", "candidate could not be promoted without overwrite"
         ) from exc
     finally:
-        if parent_descriptor >= 0:
-            os.close(parent_descriptor)
-        if temporary_descriptor >= 0:
-            os.close(temporary_descriptor)
-        if stage_descriptor >= 0:
-            os.close(stage_descriptor)
-        if not promoted:
-            _thaw(stage)
-        shutil.rmtree(temporary, ignore_errors=False)
+        try:
+            if promoted and not complete:
+                _rollback_owned_promotion(
+                    parent_descriptor,
+                    output.name,
+                    temporary_descriptor,
+                    stage_descriptor,
+                )
+            if not complete and temporary_descriptor >= 0:
+                _cleanup_staging(
+                    parent_descriptor,
+                    temporary_name,
+                    temporary_descriptor,
+                    stage_descriptor,
+                    stage_paths,
+                )
+            elif complete and temporary_descriptor >= 0:
+                _cleanup_staging(
+                    parent_descriptor,
+                    temporary_name,
+                    temporary_descriptor,
+                    stage_descriptor,
+                    (),
+                )
+        finally:
+            if stage_descriptor >= 0:
+                os.close(stage_descriptor)
+            if temporary_descriptor >= 0:
+                os.close(temporary_descriptor)
+            if parent_descriptor >= 0:
+                os.close(parent_descriptor)
