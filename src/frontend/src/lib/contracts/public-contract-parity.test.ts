@@ -17,18 +17,35 @@ interface ContractDocument {
   [key: string]: unknown;
 }
 
+const repositoryContracts = resolve(process.cwd(), "../../contracts");
+const releaseV1ContractDirectory = resolve(repositoryContracts, "release/v1");
+const releaseV2ContractDirectory = resolve(repositoryContracts, "release/v2");
+const releaseGateContractDirectory = resolve(repositoryContracts, "release-gates/v1");
+const settlementV2ContractDirectory = resolve(repositoryContracts, "settlements/v2");
+const settlementV3ContractDirectory = resolve(repositoryContracts, "settlements/v3");
+const settlementV4ContractDirectory = resolve(repositoryContracts, "settlements/v4");
+const candidateV1ContractDirectory = resolve(
+  repositoryContracts,
+  "candidate-completeness/v1",
+);
+const candidateV2ContractDirectory = resolve(
+  repositoryContracts,
+  "candidate-completeness/v2",
+);
 const contractDirectories = [
-  resolve(process.cwd(), "../../contracts/release/v1"),
-  resolve(process.cwd(), "../../contracts/release-gates/v1"),
-  resolve(process.cwd(), "../../contracts/settlements/v2"),
-  resolve(process.cwd(), "../../contracts/settlements/v3"),
-  resolve(process.cwd(), "../../contracts/settlements/v4"),
-  resolve(process.cwd(), "../../contracts/candidate-completeness/v1"),
+  releaseV1ContractDirectory,
+  releaseV2ContractDirectory,
+  releaseGateContractDirectory,
+  settlementV2ContractDirectory,
+  settlementV3ContractDirectory,
+  settlementV4ContractDirectory,
+  candidateV1ContractDirectory,
+  candidateV2ContractDirectory,
 ];
-const releaseGateContractDirectory = contractDirectories[1];
-const settlementContractDirectories = contractDirectories.slice(2, 4);
-const settlementV3ContractDirectory = contractDirectories[3];
-const settlementV4ContractDirectory = contractDirectories[4];
+const settlementContractDirectories = [
+  settlementV2ContractDirectory,
+  settlementV3ContractDirectory,
+];
 
 function readJson(path: string): ContractDocument {
   return JSON.parse(readFileSync(path, "utf8")) as ContractDocument;

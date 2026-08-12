@@ -1,10 +1,12 @@
 # Candidate completeness contract
 
 This contract defines the exact Phase 1 engineering candidate boundary before
-signing. `v1/required-artifacts.json` is the authoritative 54-artifact
-inventory; `v1/candidate.schema.json` closes the public document shape and
-reuses the release v1 path, hash, role, media-type, scenario, and horizon
-definitions.
+signing. The published `v1` tree remains byte-immutable with its original
+53-artifact inventory. `v2/required-artifacts.json` is the authoritative
+54-artifact successor inventory; `v2/candidate.schema.json` closes the public
+document shape and reuses the release v2 path, hash, role, media-type, scenario,
+and horizon definitions. Validators select the exact version from `$schema`
+and reject cross-version coercion.
 
 The deterministic seal order is:
 
@@ -43,7 +45,7 @@ claim. The byte gate requires terminal write sequence 55 in the contract and a
 complete exact tree when `manifest.json` is read; it does not infer historical
 write order from mutable timestamps.
 
-The compact `fixtures/assembly/complete-synthetic.json` receipt drives the
+The compact `v2/fixtures/assembly/complete-synthetic.json` receipt drives the
 normal-CI completeness assembler. It binds all 51 pre-gate fixture inputs,
 their grid and pair-parity identities, STAC asset links, redistribution status,
 and false claims. Run it as one isolated, non-reentrant process with an absolute,

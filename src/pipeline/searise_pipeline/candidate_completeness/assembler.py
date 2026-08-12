@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping, NoReturn
 from .byte_gate import CandidateByteSummary, validate_candidate_root
 from .validator import CandidateContractError, load_candidate_bytes, validate_candidate_document
 
-CONTRACT_ROOT = Path(__file__).resolve().parents[4] / "contracts/candidate-completeness/v1"
+CONTRACT_ROOT = Path(__file__).resolve().parents[4] / "contracts/candidate-completeness/v2"
 _TEMPLATE = CONTRACT_ROOT / "fixtures/valid/engineering-candidate.json"
 _PRE_GATE_COUNT = 51
 _MAX_RECEIPT_BYTES = 2 * 1024 * 1024

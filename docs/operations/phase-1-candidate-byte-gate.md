@@ -12,7 +12,7 @@ Normal CI exercises the complete synthetic assembly path with:
 
 ```bash
 PYTHONPATH=src/pipeline python scripts/release/assemble_candidate_fixture.py \
-  --receipt contracts/candidate-completeness/v1/fixtures/assembly/complete-synthetic.json \
+  --receipt contracts/candidate-completeness/v2/fixtures/assembly/complete-synthetic.json \
   --output /absolute/new/path/to/candidate
 ```
 
@@ -55,6 +55,11 @@ identity drift through its final descriptor-bound linearization pass. It rejects
 the first unexpected directory entry with bounded diagnostics and rejects more
 than 64 GiB for one artifact or 256 GiB across the 54 artifacts. The validator
 performs no repair or write operation.
+
+The byte gate dispatches by the candidate's exact `$schema`: the immutable v1
+53-artifact contract remains supported for historical verification, while new
+assembly uses v2. A v1 candidate cannot be coerced through the v2 inventory, or
+vice versa.
 
 Success proves that the locally assembled bytes match the exact engineering
 candidate metadata at the linearization point where the candidate pathname is

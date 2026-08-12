@@ -33,7 +33,8 @@ All notable changes to this project will be documented in this file.
   receipt and geometry identities, source provenance, runtime, ranking, merge,
   and Brotli semantics while retaining fail-closed nonpublication claims. The
   build now replays the projection against its exact spatial database and lists
-  the receipt-last completion marker in the candidate inventory.
+  the receipt-last completion marker in the candidate v2 inventory while the
+  published candidate v1 and release v1 definition bytes remain unchanged.
 - Added a deterministic complete-candidate fixture assembler that verifies 51
   explicit synthetic inputs, generates the terminal gate reports and checksum
   inventory, writes the manifest last, runs the independent byte gate, and
@@ -149,7 +150,7 @@ All notable changes to this project will be documented in this file.
 - Added fail-closed offline validation for the exact pre-sign candidate inventory,
   checksum subjects, STAC matrix, and required pending evidence-pair gate without
   reading artifacts, signing, or making a publication decision.
-- Added the exact 54-artifact pre-sign engineering candidate contract, with
+- Added the exact 54-artifact pre-sign engineering candidate v2 contract, with
   manifest-last sealing, complete 3 x 3 and settlement inventory, and a
   mandatory non-recursive supply-chain evidence-envelope gate.
 - Added typed JSON and Markdown release-gate report artifacts to the immutable

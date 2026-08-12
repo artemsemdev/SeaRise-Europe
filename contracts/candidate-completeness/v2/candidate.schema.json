@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v1/candidate.schema.json",
-  "title": "SeaRise Europe pre-sign engineering candidate v1",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v2/candidate.schema.json",
+  "title": "SeaRise Europe pre-sign engineering candidate v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,18 +10,18 @@
     "checksumInventory", "stacBindings", "gateSnapshot", "manifest", "supplyChainGate"
   ],
   "properties": {
-    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v1/candidate.schema.json" },
-    "schemaVersion": { "const": "1.0.0" },
-    "contractId": { "const": "phase-1-pre-sign-candidate-completeness-v1" },
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/candidate-completeness/v2/candidate.schema.json" },
+    "schemaVersion": { "const": "2.0.0" },
+    "contractId": { "const": "phase-1-pre-sign-candidate-completeness-v2" },
     "candidateId": { "type": "string", "pattern": "^candidate-[a-z0-9][a-z0-9-]*-[0-9]{8}-[a-f0-9]{12}$" },
-    "dataReleaseId": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataReleaseId" },
-    "dataProvenanceClass": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataProvenanceClass" },
+    "dataReleaseId": { "$ref": "../../release/v2/defs.schema.json#/$defs/dataReleaseId" },
+    "dataProvenanceClass": { "$ref": "../../release/v2/defs.schema.json#/$defs/dataProvenanceClass" },
     "publicationClaim": { "const": false },
     "geometryPolicy": { "$ref": "#/$defs/geometryPolicy" },
     "artifacts": {
       "type": "array",
-      "minItems": 53,
-      "maxItems": 53,
+      "minItems": 54,
+      "maxItems": 54,
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/artifact" }
     },
@@ -32,7 +32,7 @@
       "properties": {
         "path": { "const": "checksums.txt" },
         "algorithm": { "const": "sha256" },
-        "subjectCount": { "const": 52 },
+        "subjectCount": { "const": 53 },
         "excludedPaths": {
           "type": "array",
           "prefixItems": [{ "const": "checksums.txt" }, { "const": "manifest.json" }],
@@ -42,8 +42,8 @@
         },
         "subjects": {
           "type": "array",
-          "minItems": 52,
-          "maxItems": 52,
+          "minItems": 53,
+          "maxItems": 53,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/fileIdentity" }
         }
@@ -71,7 +71,7 @@
       "required": ["state", "validatedArtifactCount", "excludedPaths"],
       "properties": {
         "state": { "const": "pre-terminal-seal" },
-        "validatedArtifactCount": { "const": 50 },
+        "validatedArtifactCount": { "const": 51 },
         "excludedPaths": {
           "type": "array",
           "prefixItems": [
@@ -92,8 +92,8 @@
       "required": ["path", "artifactCount", "writeSequence", "selfHashExcluded"],
       "properties": {
         "path": { "const": "manifest.json" },
-        "artifactCount": { "const": 53 },
-        "writeSequence": { "const": 54 },
+        "artifactCount": { "const": 54 },
+        "writeSequence": { "const": 55 },
         "selfHashExcluded": { "const": true }
       }
     },
@@ -146,8 +146,8 @@
       "additionalProperties": false,
       "required": ["path", "sha256"],
       "properties": {
-        "path": { "$ref": "../../release/v1/defs.schema.json#/$defs/releaseRelativePath" },
-        "sha256": { "$ref": "../../release/v1/defs.schema.json#/$defs/sha256" }
+        "path": { "$ref": "../../release/v2/defs.schema.json#/$defs/releaseRelativePath" },
+        "sha256": { "$ref": "../../release/v2/defs.schema.json#/$defs/sha256" }
       }
     },
     "rights": {
@@ -168,16 +168,16 @@
       ],
       "properties": {
         "artifactId": { "$ref": "#/$defs/identifier" },
-        "path": { "$ref": "../../release/v1/defs.schema.json#/$defs/releaseRelativePath" },
-        "role": { "$ref": "../../release/v1/defs.schema.json#/$defs/artifactRole" },
-        "mediaType": { "$ref": "../../release/v1/defs.schema.json#/$defs/mediaType" },
+        "path": { "$ref": "../../release/v2/defs.schema.json#/$defs/releaseRelativePath" },
+        "role": { "$ref": "../../release/v2/defs.schema.json#/$defs/artifactRole" },
+        "mediaType": { "$ref": "../../release/v2/defs.schema.json#/$defs/mediaType" },
         "contentEncoding": { "enum": ["identity", "br"] },
-        "dataReleaseId": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataReleaseId" },
-        "dataProvenanceClass": { "$ref": "../../release/v1/defs.schema.json#/$defs/dataProvenanceClass" },
+        "dataReleaseId": { "$ref": "../../release/v2/defs.schema.json#/$defs/dataReleaseId" },
+        "dataProvenanceClass": { "$ref": "../../release/v2/defs.schema.json#/$defs/dataProvenanceClass" },
         "immutable": { "const": true },
         "byteSize": { "type": "integer", "minimum": 1 },
-        "sha256": { "$ref": "../../release/v1/defs.schema.json#/$defs/sha256" },
-        "writeSequence": { "type": "integer", "minimum": 1, "maximum": 53 },
+        "sha256": { "$ref": "../../release/v2/defs.schema.json#/$defs/sha256" },
+        "writeSequence": { "type": "integer", "minimum": 1, "maximum": 54 },
         "rights": { "$ref": "#/$defs/rights" }
       }
     },
@@ -201,8 +201,8 @@
       "required": ["itemArtifactId", "scenario", "horizon", "analysisArtifactId", "visualArtifactId", "tableArtifactId"],
       "properties": {
         "itemArtifactId": { "$ref": "#/$defs/identifier" },
-        "scenario": { "$ref": "../../release/v1/defs.schema.json#/$defs/scenarioId" },
-        "horizon": { "$ref": "../../release/v1/defs.schema.json#/$defs/horizonYear" },
+        "scenario": { "$ref": "../../release/v2/defs.schema.json#/$defs/scenarioId" },
+        "horizon": { "$ref": "../../release/v2/defs.schema.json#/$defs/horizonYear" },
         "analysisArtifactId": { "$ref": "#/$defs/identifier" },
         "visualArtifactId": { "$ref": "#/$defs/identifier" },
         "tableArtifactId": { "const": "projection-matrix-geoparquet" }

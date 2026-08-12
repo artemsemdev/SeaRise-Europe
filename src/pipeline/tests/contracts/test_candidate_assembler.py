@@ -20,7 +20,7 @@ from searise_pipeline.candidate_completeness import (
 )
 
 ROOT = Path(__file__).resolve().parents[4]
-RECEIPT = ROOT / "contracts/candidate-completeness/v1/fixtures/assembly/complete-synthetic.json"
+RECEIPT = ROOT / "contracts/candidate-completeness/v2/fixtures/assembly/complete-synthetic.json"
 main = runpy.run_path(str(ROOT / "scripts/release/assemble_candidate_fixture.py"))["main"]
 
 

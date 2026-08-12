@@ -20,7 +20,7 @@ from searise_pipeline.candidate_completeness import (
 )
 
 ROOT = Path(__file__).resolve().parents[4]
-FIXTURE = ROOT / "contracts/candidate-completeness/v1/fixtures/valid/engineering-candidate.json"
+FIXTURE = ROOT / "contracts/candidate-completeness/v2/fixtures/valid/engineering-candidate.json"
 main = runpy.run_path(str(ROOT / "scripts/release/validate_candidate_bytes.py"))["main"]
 
 
@@ -72,7 +72,7 @@ def _artifact(candidate: dict[str, Any], role: str) -> dict[str, Any]:
     return next(item for item in candidate["artifacts"] if item["role"] == role)
 
 
-def test_exact_53_artifact_candidate_validates_without_write_access(
+def test_exact_54_artifact_candidate_validates_without_write_access(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root, candidate, contents = _candidate(tmp_path)
