@@ -123,7 +123,15 @@ const BOUNDED_OPTIONS_SHA256 = sha256(
 
 type TrieEntry = [string, number[]];
 type TriePayload = { serializationVersion: 1; entries: TrieEntry[] };
-type TrieNode = { children: Map<string, TrieNode>; ordinals: number[] };
+type TrieNode = {
+  children: Map<string, TrieNode>;
+  ordinals: number[];
+  // Admissible subtree filters. `maxNameLength` is the longest name under the
+  // node; the signature bits are the union of every code point in those names.
+  maxNameLength: number;
+  signatureHigh: number;
+  signatureLow: number;
+};
 type TrieRuntime = {
   documents: Map<number, CandidateDocument>;
   payload: TriePayload;
@@ -162,19 +170,45 @@ function triePayload(documents: readonly CandidateDocument[]): TriePayload {
   };
 }
 
+function emptyTrieNode(): TrieNode {
+  return { children: new Map(), maxNameLength: 0, ordinals: [], signatureHigh: 0, signatureLow: 0 };
+}
+
+/** Map one code point onto one of the 64 subtree-signature buckets. */
+function signatureBucket(point: string): number {
+  return Math.imul(point.codePointAt(0)!, 0x9e3779b1) >>> 26;
+}
+
 function trieFrom(payload: TriePayload): TrieNode {
-  const root: TrieNode = { children: new Map(), ordinals: [] };
+  const root = emptyTrieNode();
+  const path: TrieNode[] = [];
   for (const [name, ordinals] of payload.entries) {
+    const points = Array.from(name);
+    let signatureHigh = 0;
+    let signatureLow = 0;
+    for (const point of points) {
+      const bucket = signatureBucket(point);
+      if (bucket < 32) signatureLow |= 1 << bucket;
+      else signatureHigh |= 1 << (bucket - 32);
+    }
+    path.length = 0;
     let node = root;
-    for (const point of Array.from(name)) {
+    path.push(node);
+    for (const point of points) {
       let child = node.children.get(point);
       if (!child) {
-        child = { children: new Map(), ordinals: [] };
+        child = emptyTrieNode();
         node.children.set(point, child);
       }
       node = child;
+      path.push(node);
     }
     node.ordinals = ordinals;
+    for (const item of path) {
+      item.signatureHigh |= signatureHigh;
+      item.signatureLow |= signatureLow;
+      if (points.length > item.maxNameLength) item.maxNameLength = points.length;
+    }
   }
   return root;
 }
@@ -291,10 +325,34 @@ function rowValue(row: DistanceRow, column: number, fallback: number): number {
   return offset >= 0 && offset < row.values.length ? row.values[offset] : fallback;
 }
 
+/**
+ * Report whether every name under `node` is provably further than `maximum`
+ * edits from the query. Both tests are admissible lower bounds on the edit
+ * distance, so pruning here can never drop a match:
+ * a name of length `L` needs at least `query.length - L` edits, and every query
+ * position whose code point is absent from the subtree needs at least one edit.
+ * The signature is a union over the subtree and its buckets may collide, which
+ * can only understate the bound.
+ */
+function outOfFuzzyReach(
+  node: TrieNode, queryBuckets: readonly number[], maximum: number,
+): boolean {
+  if (node.maxNameLength + maximum < queryBuckets.length) return true;
+  let missing = 0;
+  for (const bucket of queryBuckets) {
+    const present = bucket < 32
+      ? (node.signatureLow >>> bucket) & 1
+      : (node.signatureHigh >>> (bucket - 32)) & 1;
+    if (!present && (missing += 1) > maximum) return true;
+  }
+  return false;
+}
+
 function fuzzyWalk(
   runtime: TrieRuntime,
   node: TrieNode,
   query: readonly string[],
+  queryBuckets: readonly number[],
   maximum: number,
   depth: number,
   previous: DistanceRow,
@@ -304,6 +362,8 @@ function fuzzyWalk(
   const children = node.children.entries();
   for (let item = children.next(); !item.done; item = children.next()) {
     const [point, child] = item.value;
+    spend(work);
+    if (outOfFuzzyReach(child, queryBuckets, maximum)) continue;
     const nextDepth = depth + 1;
     const first = Math.max(0, nextDepth - maximum);
     const last = Math.min(query.length, nextDepth + maximum);
@@ -324,7 +384,7 @@ function fuzzyWalk(
     if (distance <= maximum) {
       addOrdinals(runtime, child.ordinals, best, [3, distance], work);
     }
-    fuzzyWalk(runtime, child, query, maximum, nextDepth, current, best, work);
+    fuzzyWalk(runtime, child, query, queryBuckets, maximum, nextDepth, current, best, work);
   }
 }
 
@@ -367,10 +427,12 @@ function boundedTrieSearch(runtime: TrieRuntime, rawQuery: string, limit: number
     }
   }
   const maximum = searchFuzzyAllowance(query);
-  if (maximum) {
+  // Every fuzzy key ranks below every exact, qualified, and prefix key, so a
+  // saturated candidate set cannot accept one and the walk cannot change it.
+  if (maximum && best.values.length < limit) {
     const first = Math.max(0, -maximum);
     const last = Math.min(points.length, maximum);
-    fuzzyWalk(runtime, runtime.root, points, maximum, 0, {
+    fuzzyWalk(runtime, runtime.root, points, points.map(signatureBucket), maximum, 0, {
       first,
       values: Array.from({ length: last - first + 1 }, (_, index) => first + index),
     }, best, work);
