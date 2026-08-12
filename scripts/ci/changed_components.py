@@ -52,6 +52,7 @@ API = (
 
 PIPELINE = (
     ".github/workflows/offline-release-controlled.yml",
+    ".github/workflows/phase-1-release-sign.yml",
     ".github/workflows/phase-0r-owner-promotion.yml",
     "docs/evidence/fixtures/offline-release-execution-receipt.example.json",
     "scripts/release/prepare_controlled_offline_inputs.py",
@@ -73,6 +74,7 @@ PIPELINE = (
 # further isolated behind an explicit manual evidence dispatch.
 RELEASE = (
     ".github/workflows/offline-release-controlled.yml",
+    ".github/workflows/phase-1-release-sign.yml",
     ".github/workflows/phase-0r-owner-promotion.yml",
     "scripts/release/prepare_controlled_offline_inputs.py",
     "scripts/science/promote_phase_0r_release.py",
