@@ -337,6 +337,36 @@ def test_report_bytes_are_deterministic_and_overwrite_is_refused(tmp_path: Path)
         )
 
 
+@pytest.mark.parametrize(("database_index", "label"), [(0, "catalogue"), (2, "spatial")])
+def test_reserved_database_wal_output_is_rejected_before_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    database_index: int,
+    label: str,
+) -> None:
+    inputs = _fixture(tmp_path)
+    output = Path(f"{inputs[database_index]}.wal")
+
+    monkeypatch.setattr(
+        reconciliation.authority,
+        "_create_private",
+        lambda *_args: (_ for _ in ()).throw(
+            AssertionError("private staging must not be created")
+        ),
+    )
+
+    with pytest.raises(
+        reconciliation.SettlementReconciliationError,
+        match=rf"reserved {label} DuckDB WAL",
+    ):
+        reconciliation.build_settlement_reconciliation_report(
+            *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
+        )
+
+    assert not output.exists()
+    assert _residue(tmp_path) == []
+
+
 @pytest.mark.parametrize(
     "failure",
     ["link", "post-link-fsync", "binding", "post-cleanup-fsync"],
@@ -525,6 +555,19 @@ def test_semantic_validator_rejects_schema_valid_cross_field_drift(
     _resign(changed)
 
     with pytest.raises(reconciliation.SettlementReconciliationError, match=message):
+        reconciliation.validate_reconciliation_report_semantics(changed)
+
+
+@pytest.mark.parametrize("ledger", ["catalogue", "spatial"])
+def test_semantic_validator_rejects_invented_rejection_reasons(
+    tmp_path: Path, ledger: str
+) -> None:
+    report, _, _ = _build(tmp_path)
+    changed = copy.deepcopy(report)
+    changed["rejections"][ledger][0]["reason"] = f"invented-{ledger}-reason"
+    _resign(changed)
+
+    with pytest.raises(reconciliation.SettlementReconciliationError, match="unsupported"):
         reconciliation.validate_reconciliation_report_semantics(changed)
 
 

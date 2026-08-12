@@ -21,9 +21,10 @@ PYTHONPATH=src/pipeline python scripts/release/build_settlement_reconciliation.p
 Success prints the deterministic report identity. The output is canonical JSON
 and is published without overwrite after descriptor-bound snapshots, receipt
 and database reconciliation, semantic validation, file sync, and directory
-sync. The implementation streams rows in numeric GeoNames order, merges the
-two spatial decision tables with bounded lookahead, disables DuckDB spill, and
-caps distinct dimension keys.
+sync. An output in a source database directory must not use either database's
+reserved `<database-name>.wal` sidecar name. The implementation streams rows
+in numeric GeoNames order, merges the two spatial decision tables with bounded
+lookahead, disables DuckDB spill, and caps distinct dimension keys.
 
 Success is committed only after private staging cleanup, a second output-parent
 sync, closure of the original directory authority, and a fresh pathname,
@@ -47,8 +48,9 @@ catalogueAccepted
 `catalogueRejected` means the source record failed before geometry. Those rows
 appear only in the catalogue rejection-reason ledger. Every normalized row
 reaches exactly one later outcome: `spatialClassified` or `spatialRejected`.
-Current spatial rejection reason `outside-support` remains distinct from the
-classified `coastal` and `inland` statuses.
+Catalogue reasons are closed to the reviewed catalogue-v1 precedence list.
+The only spatial-v1 rejection reason, `outside-support`, remains distinct from
+the classified `coastal` and `inland` statuses.
 
 Country, feature class, feature code, population band, and coastal-status
 dimensions use normalized-place counts. Language and script use

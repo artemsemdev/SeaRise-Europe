@@ -324,6 +324,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Closed settlement reconciliation rejection reasons to the reviewed stage
+  vocabularies and prevented reserved DuckDB WAL output names from reaching staging.
 - Corrected the immutable full-source contract to match the official
   `alternateNamesV2.zip` member order while retaining path-based member staging.
 - Hardened normalized-catalogue validation with exact source replay, reconciled

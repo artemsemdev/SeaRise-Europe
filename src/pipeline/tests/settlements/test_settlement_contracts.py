@@ -17,6 +17,8 @@ from searise_pipeline.settlements.contract_semantics import (
     validate_settlement_search_shard_semantics,
 )
 from searise_pipeline.settlements.reconciliation import (
+    CATALOGUE_REJECTION_REASONS,
+    SPATIAL_REJECTION_REASONS,
     SettlementReconciliationError,
     validate_reconciliation_report_semantics,
 )
@@ -275,6 +277,31 @@ def test_v3_reconciliation_semantic_vector_is_schema_valid_but_arithmetically_in
     _fixture_validator(path).validate(document)
     with pytest.raises(SettlementReconciliationError, match="catalogue accepted plus"):
         validate_reconciliation_report_semantics(document)
+
+
+@pytest.mark.parametrize("ledger", ["catalogue", "spatial"])
+def test_v3_reconciliation_schema_rejects_invented_rejection_reasons(ledger: str) -> None:
+    path = V3_CONTRACT_DIR / "fixtures" / "valid" / "settlement-reconciliation.json"
+    document = _read(path)
+    document["rejections"][ledger][0]["reason"] = f"invented-{ledger}-reason"
+
+    assert list(_fixture_validator(path).iter_errors(document))
+
+
+def test_v3_reconciliation_schema_and_semantic_reason_vocabularies_match() -> None:
+    schema = _read(V3_CONTRACT_DIR / "reconciliation-report.schema.json")
+    definitions = schema["$defs"]
+
+    assert (
+        frozenset(definitions["catalogueReasonBucket"]["properties"]["reason"]["enum"])
+        == CATALOGUE_REJECTION_REASONS
+    )
+    assert (
+        frozenset(
+            {definitions["spatialReasonBucket"]["properties"]["reason"]["const"]}
+        )
+        == SPATIAL_REJECTION_REASONS
+    )
 
 
 @pytest.mark.parametrize(

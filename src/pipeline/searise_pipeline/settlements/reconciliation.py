@@ -18,7 +18,7 @@ from . import search_projection as projection
 from . import spatial_asset_authority as authority
 from . import spatial_classification_stage as spatial_stage
 from . import spatial_stage_runner as publication
-from .catalogue import CataloguePlace, CatalogueRejection
+from .catalogue import REJECTION_PRECEDENCE, CataloguePlace, CatalogueRejection
 
 RECONCILIATION_SCHEMA_VERSION = "1.0.0"
 RECONCILIATION_SCHEMA_ID = (
@@ -44,6 +44,8 @@ PLACE_DIMENSIONS = (
 )
 NAME_DIMENSIONS = ("languages", "scripts")
 MAX_DIMENSION_KEYS = 8192
+CATALOGUE_REJECTION_REASONS = frozenset(REJECTION_PRECEDENCE)
+SPATIAL_REJECTION_REASONS = frozenset({"outside-support"})
 
 _RELEASE_ID = re.compile(r"^searise-europe-v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$")
 _FALSE_CLAIMS = (
@@ -149,6 +151,26 @@ def _snapshots(paths: Mapping[str, Path], work_dir: Path) -> Iterator[tuple[Path
         yield root, assets
         projection._reject_wal(catalogue_parent, catalogue_database.name)
         authority._assert_directory(catalogue_parent)
+
+
+def _reject_reserved_output(
+    output_directory: Any,
+    output_name: str,
+    databases: tuple[tuple[str, Path], ...],
+) -> None:
+    with ExitStack() as stack:
+        for label, database in databases:
+            source_directory = stack.enter_context(
+                authority._open_directory_path(database.parent, f"{label} source directory")
+            )
+            if (
+                (source_directory.device, source_directory.inode)
+                == (output_directory.device, output_directory.inode)
+                and output_name == f"{database.name}.wal"
+            ):
+                raise SettlementReconciliationError(
+                    f"reconciliation output collides with the reserved {label} DuckDB WAL"
+                )
 
 
 def _population_band(population: int | None) -> str:
@@ -419,7 +441,12 @@ def _validate_bucket_array(
     return totals[0], totals[1], totals[2], keys
 
 
-def _validate_reasons(value: object, label: str, expected: int) -> None:
+def _validate_reasons(
+    value: object,
+    label: str,
+    expected: int,
+    supported: frozenset[str],
+) -> None:
     if type(value) is not list:
         raise SettlementReconciliationError(f"{label} rejection reasons are invalid")
     previous: str | None = None
@@ -439,6 +466,8 @@ def _validate_reasons(value: object, label: str, expected: int) -> None:
             raise SettlementReconciliationError(
                 f"{label} rejection reasons are not ordered, unique, and positive"
             )
+        if reason not in supported:
+            raise SettlementReconciliationError(f"{label} rejection reason is unsupported")
         previous = reason
         total += count
     if total != expected:
@@ -509,8 +538,18 @@ def validate_reconciliation_report_semantics(document: Mapping[str, Any]) -> Non
             )
         ):
             raise SettlementReconciliationError("coastal status decision differs")
-        _validate_reasons(rejections["catalogue"], "catalogue", catalogue_rejected)
-        _validate_reasons(rejections["spatial"], "spatial", spatial_rejected)
+        _validate_reasons(
+            rejections["catalogue"],
+            "catalogue",
+            catalogue_rejected,
+            CATALOGUE_REJECTION_REASONS,
+        )
+        _validate_reasons(
+            rejections["spatial"],
+            "spatial",
+            spatial_rejected,
+            SPATIAL_REJECTION_REASONS,
+        )
     except SettlementReconciliationError:
         raise
     except (KeyError, TypeError, ValueError) as exc:
@@ -605,6 +644,14 @@ def build_settlement_reconciliation_report(
             authority._open_directory_path(output.parent, "reconciliation output directory")
         )
         authority._assert_secure_work_directory(output_directory)
+        _reject_reserved_output(
+            output_directory,
+            output.name,
+            (
+                ("catalogue", catalogue_database),
+                ("spatial", spatial_database),
+            ),
+        )
         if not publication._absent(output_directory, output.name):
             raise SettlementReconciliationError(
                 "reconciliation output exists; overwrite is refused"

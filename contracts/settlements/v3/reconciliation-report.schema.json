@@ -91,8 +91,8 @@
       "additionalProperties": false,
       "required": ["catalogue", "spatial"],
       "properties": {
-        "catalogue": { "$ref": "#/$defs/reasonBuckets" },
-        "spatial": { "$ref": "#/$defs/reasonBuckets" }
+        "catalogue": { "$ref": "#/$defs/catalogueReasonBuckets" },
+        "spatial": { "$ref": "#/$defs/spatialReasonBuckets" }
       }
     },
     "dimensions": {
@@ -149,18 +149,37 @@
         }
       ]
     },
-    "reasonBucket": {
+    "catalogueReasonBucket": {
       "type": "object",
       "additionalProperties": false,
       "required": ["reason", "count"],
       "properties": {
-        "reason": { "type": "string", "minLength": 1 },
+        "reason": {
+          "enum": [
+            "feature-class-not-populated-place", "feature-code-not-included",
+            "country-code-missing", "invalid-coordinate", "negative-population",
+            "unsafe-canonical-name"
+          ]
+        },
         "count": { "type": "integer", "minimum": 1 }
       }
     },
-    "reasonBuckets": {
+    "catalogueReasonBuckets": {
       "type": "array",
-      "items": { "$ref": "#/$defs/reasonBucket" }
+      "items": { "$ref": "#/$defs/catalogueReasonBucket" }
+    },
+    "spatialReasonBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "count"],
+      "properties": {
+        "reason": { "const": "outside-support" },
+        "count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "spatialReasonBuckets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/spatialReasonBucket" }
     },
     "decisionBucket": {
       "type": "object",
