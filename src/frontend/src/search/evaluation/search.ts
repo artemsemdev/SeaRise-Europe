@@ -53,7 +53,12 @@ export function prepareCandidateDocuments(records: readonly SearchDocument[]): C
   });
 }
 
-function boundedEditDistance(left: string, right: string, maximum: number): number {
+export function searchFuzzyAllowance(normalizedQuery: string): 0 | 1 | 2 {
+  const length = Array.from(normalizedQuery).length;
+  return length < 4 ? 0 : length < 8 ? 1 : 2;
+}
+
+export function boundedEditDistance(left: string, right: string, maximum: number): number {
   const leftPoints = Array.from(left);
   const rightPoints = Array.from(right);
   if (Math.abs(leftPoints.length - rightPoints.length) > maximum) return maximum + 1;
@@ -75,17 +80,22 @@ function boundedEditDistance(left: string, right: string, maximum: number): numb
   return previous[rightPoints.length];
 }
 
+export function hasQualifiedSearchContext(
+  query: string, name: string, record: SearchDocument,
+): boolean {
+  if (!query.startsWith(`${name} `)) return false;
+  const context = new Set(tokenizeSearchText(`${record.countryCode} ${record.admin1Name ?? ""}`));
+  return tokenizeSearchText(query.slice(name.length)).every((term) => context.has(term));
+}
+
 function matchKey(query: string, record: SearchDocument): [number, number] {
   const canonical = normalizeSearchText(record.displayName);
   const alternates = record.searchNames.map(normalizeSearchText).filter((name) => name !== canonical);
-  const context = new Set(tokenizeSearchText(`${record.countryCode} ${record.admin1Name ?? ""}`));
-  const qualified = (name: string) => query === name
-    || (query.startsWith(`${name} `) && tokenizeSearchText(query.slice(name.length)).every((term) => context.has(term)));
+  const qualified = (name: string) => query === name || hasQualifiedSearchContext(query, name, record);
   if (qualified(canonical)) return [0, 0];
   if (alternates.some(qualified)) return [1, 0];
   if ([canonical, ...alternates].some((name) => name.startsWith(query))) return [2, 0];
-  const queryLength = Array.from(query).length;
-  const allowance = queryLength < 4 ? 0 : queryLength < 8 ? 1 : 2;
+  const allowance = searchFuzzyAllowance(query);
   if (allowance === 0) return [4, 1];
   let distance = boundedEditDistance(query, canonical, allowance);
   for (const alternate of alternates) {

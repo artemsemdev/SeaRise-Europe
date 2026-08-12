@@ -16,7 +16,11 @@ import {
   brotliDecompressSync,
   constants as zlibConstants,
 } from "node:zlib";
-import { MINI_SEARCH_POSTING_VISIT_LIMIT, miniSearchAdapter } from "../evaluation/adapters";
+import {
+  BOUNDED_SEARCH_WORK_LIMIT,
+  MAX_NORMALIZED_SEARCH_CODE_POINTS,
+  boundedTrieAdapter,
+} from "../evaluation/adapters";
 import {
   normalizeSearchText,
   prepareCandidateDocuments,
@@ -26,8 +30,8 @@ import type { CandidateDocument, SearchDocument } from "../evaluation/types";
 
 export const SHARD_FORMAT_VERSION = "settlement-browser-search-shard-v1";
 export const SHARD_FILENAMES = {
-  "europe-core": "europe-core.minisearch.json.br",
-  "europe-coastal": "europe-coastal.minisearch.json.br",
+  "europe-core": "europe-core.codepoint-trie.json.br",
+  "europe-coastal": "europe-coastal.codepoint-trie.json.br",
 } as const;
 export const SHARD_RECEIPT_FILENAME = "settlement-browser-search-shards.receipt.json";
 
@@ -133,15 +137,15 @@ export type BrowserShard = {
   publicationClaim: false;
   scientificApprovalClaim: false;
   signingClaim: false;
-  engine: typeof miniSearchAdapter.descriptor;
+  engine: typeof boundedTrieAdapter.descriptor;
   compression: { algorithm: "brotli"; mode: "text"; quality: 11 };
   runtime: typeof RUNTIME;
   ranking: {
     candidateLimit: 128;
-    fuzzyDistance: "banded-levenshtein-max-2-v1";
+    fuzzyDistance: "unicode-codepoint-levenshtein-max-2-v1";
     normalizationVersion: "unicode-nfkd-lowercase-v1";
     orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1";
-    postingVisitLimit: 250000;
+    queryWorkLimit: 250000;
     resultLimit: 100;
   };
   merge: {
@@ -305,7 +309,9 @@ function boundedText(value: unknown, label: string, nullable = false): value is 
   if (nullable && value === null) return true;
   if (typeof value !== "string" || !value || Array.from(value).length > MAX_NAME_CODE_POINTS
       || value !== value.normalize("NFC")) fail(`${label} is not bounded canonical text`);
-  normalizeSearchText(value);
+  if (Array.from(normalizeSearchText(value)).length > MAX_NORMALIZED_SEARCH_CODE_POINTS) {
+    fail(`${label} exceeds its normalized search bound`);
+  }
   return true;
 }
 
@@ -316,7 +322,9 @@ function boundedSourceText(value: unknown, label: string, nullable = false): val
   if (typeof value !== "string" || !value || Array.from(value).length > MAX_NAME_CODE_POINTS) {
     fail(`${label} is not bounded source text`);
   }
-  normalizeSearchText(value);
+  if (Array.from(normalizeSearchText(value)).length > MAX_NORMALIZED_SEARCH_CODE_POINTS) {
+    fail(`${label} exceeds its normalized search bound`);
+  }
   return true;
 }
 
@@ -579,7 +587,7 @@ function shardRaw(projection: ParsedProjection, shardId: ShardId, limits: Readon
     ...sourceRecords.get(record.placeId)!,
   }));
   const identity = { evaluationId: "browser-search-shard-v1", shardId };
-  const index = miniSearchAdapter.serialize(miniSearchAdapter.build(prepared, identity));
+  const index = boundedTrieAdapter.serialize(boundedTrieAdapter.build(prepared, identity));
   const value: BrowserShard = {
     formatVersion: SHARD_FORMAT_VERSION,
     shardId,
@@ -598,15 +606,15 @@ function shardRaw(projection: ParsedProjection, shardId: ShardId, limits: Readon
     publicationClaim: false,
     scientificApprovalClaim: false,
     signingClaim: false,
-    engine: miniSearchAdapter.descriptor,
+    engine: boundedTrieAdapter.descriptor,
     compression: { algorithm: "brotli", mode: "text", quality: 11 },
     runtime: RUNTIME,
     ranking: {
       candidateLimit: MAX_SEARCH_CANDIDATES,
-      fuzzyDistance: "banded-levenshtein-max-2-v1",
+      fuzzyDistance: "unicode-codepoint-levenshtein-max-2-v1",
       normalizationVersion: "unicode-nfkd-lowercase-v1",
       orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
-      postingVisitLimit: MINI_SEARCH_POSTING_VISIT_LIMIT,
+      queryWorkLimit: BOUNDED_SEARCH_WORK_LIMIT,
       resultLimit: MAX_SEARCH_RESULTS,
     },
     merge: {
@@ -733,15 +741,15 @@ export function decodeBrowserShard(
   if (!exactKeys(value, keys) || value.formatVersion !== SHARD_FORMAT_VERSION
       || value.shardId !== expectedShardId || value.publicationEligible !== false
       || FALSE_CLAIMS.some((claim) => value[claim] !== false)
-      || canonical(value.engine) !== canonical(miniSearchAdapter.descriptor)
+      || canonical(value.engine) !== canonical(boundedTrieAdapter.descriptor)
       || canonical(value.compression) !== canonical({ algorithm: "brotli", mode: "text", quality: 11 })
       || canonical(value.runtime) !== canonical(RUNTIME)
       || canonical(value.ranking) !== canonical({
         candidateLimit: MAX_SEARCH_CANDIDATES,
-        fuzzyDistance: "banded-levenshtein-max-2-v1",
+        fuzzyDistance: "unicode-codepoint-levenshtein-max-2-v1",
         normalizationVersion: "unicode-nfkd-lowercase-v1",
         orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
-        postingVisitLimit: MINI_SEARCH_POSTING_VISIT_LIMIT,
+        queryWorkLimit: BOUNDED_SEARCH_WORK_LIMIT,
         resultLimit: MAX_SEARCH_RESULTS,
       })
       || canonical(value.merge) !== canonical({
@@ -808,10 +816,10 @@ export function decodeBrowserShard(
   const identity = { evaluationId: "browser-search-shard-v1", shardId: expectedShardId };
   const actualIndex = Buffer.from(shard.indexBase64, "base64");
   const expectedIndex = Buffer.from(
-    miniSearchAdapter.serialize(miniSearchAdapter.build(documents, identity))
+    boundedTrieAdapter.serialize(boundedTrieAdapter.build(documents, identity))
   );
   if (!actualIndex.equals(expectedIndex)) fail("search shard index differs from its exact records");
-  const index = miniSearchAdapter.deserialize(
+  const index = boundedTrieAdapter.deserialize(
     actualIndex, documents, identity,
   );
   VALIDATED_RUNTIMES.set(shard, {
@@ -876,7 +884,7 @@ export function searchBrowserShard(shard: BrowserShard, query: string): BrowserS
   if (Array.from(query).length > MAX_QUERY_CODE_POINTS) fail("browser search query exceeds its limit");
   const runtime = VALIDATED_RUNTIMES.get(shard);
   if (!runtime) fail("browser search shard was not validated by its decoder");
-  const matches = miniSearchAdapter.search(runtime.index, query, MAX_SEARCH_CANDIDATES)
+  const matches = boundedTrieAdapter.search(runtime.index, query, MAX_SEARCH_CANDIDATES)
     .map((ordinal) => runtime.byOrdinal.get(ordinal))
     .filter((item): item is CandidateDocument => item !== undefined);
   return rankDocuments(query, matches).slice(0, MAX_SEARCH_RESULTS)

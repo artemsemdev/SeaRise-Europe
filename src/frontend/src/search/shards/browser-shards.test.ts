@@ -7,9 +7,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
-import MiniSearch from "minisearch";
 import { describe, expect, it, vi } from "vitest";
-import { miniSearchAdapter } from "../evaluation/adapters";
+import {
+  BOUNDED_SEARCH_WORK_LIMIT,
+  boundedTrieAdapter,
+} from "../evaluation/adapters";
 import { prepareCandidateDocuments, rankDocuments } from "../evaluation/search";
 import {
   BrowserShardError,
@@ -78,7 +80,7 @@ function projectionFrom(
 }
 
 describe("receipt-bound browser search shards", () => {
-  it("builds deterministic Brotli MiniSearch shards with exact false claims", () => {
+  it("builds deterministic Brotli code-point-trie shards with exact false claims", () => {
     const first = build();
     const second = build();
     expect(first.core).toEqual(second.core);
@@ -90,7 +92,8 @@ describe("receipt-bound browser search shards", () => {
 
     const core = decodeBrowserShard(first.core, "europe-core");
     expect(core.engine).toEqual({
-      engineId: "minisearch", packageVersion: "7.2.0", serializationVersion: "minisearch-json-v1",
+      engineId: "searise-codepoint-trie", packageVersion: "1.0.0",
+      serializationVersion: "codepoint-trie-json-v1",
     });
     expect(core.runtime).toEqual({
       brotli: "1.2.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.2.12",
@@ -125,8 +128,8 @@ describe("receipt-bound browser search shards", () => {
   it("reuses decoded runtime state and rejects unvalidated structural copies", () => {
     const built = build();
     const core = decodeBrowserShard(built.core, "europe-core");
-    const deserialize = vi.spyOn(miniSearchAdapter, "deserialize");
-    const prepare = vi.spyOn(miniSearchAdapter, "build");
+    const deserialize = vi.spyOn(boundedTrieAdapter, "deserialize");
+    const prepare = vi.spyOn(boundedTrieAdapter, "build");
     try {
       expect(searchBrowserShard(core, "alpha")).toHaveLength(1);
       expect(searchBrowserShard(core, "charlie")).toHaveLength(1);
@@ -173,6 +176,20 @@ describe("receipt-bound browser search shards", () => {
     buildBrowserSearchShards(projection, output);
     const shard = loadBrowserSearchShards(projection, output).shards["europe-core"].shard;
     expect(searchBrowserShard(shard, "sprangfiold")[0]?.placeId).toBe("geonames:101");
+  });
+
+  it.each([
+    ["New York", "newyork"],
+    [`abcdefgh\u{10428}\u{10429}`, `abcdefgh\u{1e922}\u{1e923}`],
+  ])("uses the ranker's exact code-point distance for %s", (name, query) => {
+    const { projection, output } = projectionFrom((_header, documents) => {
+      const document = documents[0];
+      document.sourceSpelling = document.canonicalName.value = document.asciiName = name;
+      document.canonicalName.script = null;
+    });
+    buildBrowserSearchShards(projection, output);
+    const shard = loadBrowserSearchShards(projection, output).shards["europe-core"].shard;
+    expect(searchBrowserShard(shard, query)[0]?.placeId).toBe("geonames:101");
   });
 
   it("hands receipt-gated decoded bytes to the consumer without reopening paths", () => {
@@ -316,14 +333,14 @@ describe("receipt-bound browser search shards", () => {
     }
   );
 
-  it("caps engine materialization before the public result cap", () => {
+  it("caps candidates and does not lose a later exact multi-word match", () => {
     const { projection, output } = projectionFrom((_header, documents) => {
       const template = documents[0];
       documents.splice(0, documents.length, ...Array.from({ length: 150 }, (_, index) => {
         const id = 1000 + index;
         const document = structuredClone(template);
         document.placeId = `geonames:${id}`;
-        document.sourceSpelling = `Common Place ${id}`;
+        document.sourceSpelling = index === 149 ? "Common Rare" : `Common Place ${id}`;
         document.canonicalName.value = document.sourceSpelling;
         document.asciiName = document.sourceSpelling;
         document.alternateNames = [];
@@ -335,15 +352,29 @@ describe("receipt-bound browser search shards", () => {
     });
     buildBrowserSearchShards(projection, output);
     const loaded = loadBrowserSearchShards(projection, output);
-    const original = MiniSearch.prototype.search; let materialized = 0;
-    const search = vi.spyOn(MiniSearch.prototype, "search").mockImplementation(function (this: MiniSearch, ...args) {
-      const results = original.apply(this, args); materialized = Math.max(materialized, results.length);
-      return results;
-    });
-    try {
-      expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
-      expect(materialized).toBe(128);
-    } finally { search.mockRestore(); }
+    expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
+    expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common rare")
+      .map(({ placeId }) => placeId)).toEqual(["geonames:1149"]);
+  });
+
+  it("bounds fuzzy term traversal before an unbounded match map can materialize", () => {
+    const characters = Array.from({ length: 501 }, (_, index) => String.fromCodePoint(0x4e00 + index));
+    const searchNames: string[] = [];
+    outer: for (const left of characters) {
+      for (const right of characters) {
+        searchNames.push(`aaaaaa${left}${right}`);
+        if (searchNames.length === BOUNDED_SEARCH_WORK_LIMIT + 1) break outer;
+      }
+    }
+    const record = {
+      placeId: "synthetic:1", displayName: searchNames[0], searchNames,
+      countryCode: "AA", admin1Name: null, population: 1, featureCode: "PPL",
+      distanceToCoastMeters: 1, isCoastal: false,
+    };
+    const documents = prepareCandidateDocuments([record]);
+    const index = boundedTrieAdapter.build(documents, { evaluationId: "bounded-audit", shardId: "fuzzy" });
+    expect(() => boundedTrieAdapter.search(index, "aaaaaaaa", BOUNDED_SEARCH_WORK_LIMIT + 1))
+      .toThrow(/traversal-work limit/);
   });
 
   it("applies public-contract value checks when decoding standalone shards", () => {
@@ -440,11 +471,7 @@ describe("receipt-bound browser search shards", () => {
 
     const tampered = JSON.parse(raw.toString("utf8"));
     const envelope = JSON.parse(Buffer.from(tampered.indexBase64, "base64").toString("utf8"));
-    const payload = JSON.parse(envelope.payload);
-    payload.index = payload.index.map(([term, postings]: [string, unknown]) => [
-      term === "alpha" ? "zzzz" : term, postings,
-    ]);
-    envelope.payload = JSON.stringify(payload);
+    envelope.payload.entries[0][0] = "zzzz";
     tampered.indexBase64 = Buffer.from(JSON.stringify(envelope)).toString("base64");
     expect(() => decodeBrowserShard(
       canonicalBrotli(Buffer.from(JSON.stringify(tampered))), "europe-core"

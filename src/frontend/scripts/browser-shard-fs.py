@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import fcntl
 import hashlib
 import json
 import os
@@ -13,8 +14,8 @@ from pathlib import Path
 from typing import BinaryIO, NoReturn
 
 NAMES = (
-    "europe-core.minisearch.json.br",
-    "europe-coastal.minisearch.json.br",
+    "europe-core.codepoint-trie.json.br",
+    "europe-coastal.codepoint-trie.json.br",
     "settlement-browser-search-shards.receipt.json",
 )
 READ_SIZE = 1024 * 1024
@@ -200,43 +201,58 @@ def rename_no_overwrite(root: int, source: str, target: str) -> None:
 def remove_owned(root: int, name: str, expected: os.stat_result) -> bool:
     """Atomically quarantine one pathname without ever restoring it publicly."""
     retained = f".search-shard-quarantine-{secrets.token_hex(16)}"
-    try:
-        rename_no_overwrite(root, name, retained)
-    except FileNotFoundError:
-        return True
+    for attempt in range(3):
+        try:
+            rename_no_overwrite(root, name, retained)
+            break
+        except FileNotFoundError:
+            return True
+        except OSError:
+            if attempt == 2:
+                raise
     moved = os.stat(retained, dir_fd=root, follow_symlinks=False)
     return node(moved) == node(expected) and stat.S_ISREG(moved.st_mode)
 
 
-def close_all(opened: list[tuple[dict[str, object], int, os.stat_result]]) -> None:
-    primary = None
+def close_all(
+    opened: list[tuple[dict[str, object], int, os.stat_result]],
+    primary: BaseException | None,
+) -> None:
+    close_error = None
     for _, descriptor, _ in reversed(opened):
         try:
             os.close(descriptor)
         except OSError as error:
-            primary = primary or error
-    if primary is not None:
-        raise primary
+            close_error = close_error or error
+    if primary is None and close_error is not None:
+        raise close_error
 
 
 def coherent_read(
-    root: int, output: Path, artifacts: list[dict[str, object]], *, receipt_first: bool
+    root: int,
+    output: Path,
+    artifacts: list[dict[str, object]],
+    *,
+    receipt_first: bool,
+    names: tuple[str, str, str] = NAMES,
 ) -> list[bytes]:
+    inventory = [dict(item, name=name) for item, name in zip(artifacts, names)]
     opened: list[tuple[dict[str, object], int, os.stat_result]] = []
+    primary = None
     try:
-        for item in artifacts:
+        for item in inventory:
             descriptor, before = open_file(root, item)
             opened.append((item, descriptor, before))
         receipt = (
-            read_opened(opened[2][1], artifacts[2], opened[2][2])
+            read_opened(opened[2][1], inventory[2], opened[2][2])
             if receipt_first
             else None
         )
         shards = [
-            read_opened(opened[index][1], artifacts[index], opened[index][2])
+            read_opened(opened[index][1], inventory[index], opened[index][2])
             for index in range(2)
         ]
-        final_receipt = read_opened(opened[2][1], artifacts[2], opened[2][2])
+        final_receipt = read_opened(opened[2][1], inventory[2], opened[2][2])
         if receipt is not None and receipt != final_receipt:
             fail("browser shard receipt changed before consumer handoff")
         for item, descriptor, before in opened:
@@ -248,8 +264,11 @@ def coherent_read(
         for item, descriptor, before in opened:
             assert_opened(root, item, descriptor, before)
         return [*shards, final_receipt]
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        close_all(opened)
+        close_all(opened, primary)
 
 
 def publish(
@@ -310,16 +329,40 @@ def publish(
             promoted.append((final, metadata))
         os.fsync(root)
         temporary, final, metadata = staged[2]
+        coherent_read(
+            root,
+            output,
+            artifacts,
+            receipt_first=False,
+            names=(NAMES[0], NAMES[1], temporary),
+        )
         rename_no_overwrite(root, temporary, final)
         promoted.append((final, metadata))
         os.fsync(root)
-        coherent_read(root, output, artifacts, receipt_first=False)
-    except Exception:
+    except BaseException as primary:
+        cleanup_error = None
         for final, metadata in reversed(promoted):
-            remove_owned(root, final, metadata)
+            try:
+                if not remove_owned(root, final, metadata):
+                    cleanup_error = cleanup_error or ShardFsError(
+                        "browser shard rollback encountered a foreign inode"
+                    )
+            except OSError as error:
+                cleanup_error = cleanup_error or error
         for temporary, _, metadata in staged:
-            remove_owned(root, temporary, metadata)
-        os.fsync(root)
+            try:
+                if not remove_owned(root, temporary, metadata):
+                    cleanup_error = cleanup_error or ShardFsError(
+                        "browser shard staging cleanup encountered a foreign inode"
+                    )
+            except OSError as error:
+                cleanup_error = cleanup_error or error
+        try:
+            os.fsync(root)
+        except OSError as error:
+            cleanup_error = cleanup_error or error
+        if cleanup_error is not None:
+            primary.__context__ = cleanup_error
         raise
 
 
@@ -342,14 +385,22 @@ def main() -> int:
     command, artifacts = header(sys.stdin.buffer)
     output = Path(sys.argv[1])
     root = open_root(output)
+    completed = False
     try:
+        lock = fcntl.LOCK_EX if command == "publish" else fcntl.LOCK_SH
+        fcntl.flock(root, lock | fcntl.LOCK_NB)
         if command == "publish":
             publish(root, output, artifacts, sys.stdin.buffer)
         else:
             sys.stdout.buffer.write(read_set(root, output, artifacts))
+        completed = True
         return 0
     finally:
-        os.close(root)
+        try:
+            os.close(root)
+        except OSError:
+            if not completed:
+                raise
 
 
 if __name__ == "__main__":

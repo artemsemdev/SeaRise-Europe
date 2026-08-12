@@ -15,12 +15,12 @@ The output is deliberately an internal pre-publication contract. A reviewed brow
 ## Browser shard candidates
 
 `src/frontend/scripts/build-settlement-search-shards.ts` converts an exact
-projection into `europe-core.minisearch.json.br` and
-`europe-coastal.minisearch.json.br`. The build is bound to Node 20.20.1,
-Brotli 1.2.0, zlib 1.2.12, ICU 78.2, Unicode 17.0, and the lock-pinned
-MiniSearch 7.2.0 `minisearch-json-v1` serialization. Validation rejects a
-different runtime, rebuilds the exact MiniSearch payload from the records, and
-requires byte-identical quality-11 Brotli text compression. The envelopes bind
+projection into `europe-core.codepoint-trie.json.br` and
+`europe-coastal.codepoint-trie.json.br`. The build is bound to Node 20.20.1,
+Brotli 1.2.0, zlib 1.2.12, ICU 78.2, Unicode 17.0, and the versioned
+`searise-codepoint-trie` 1.0.0 / `codepoint-trie-json-v1` serialization.
+Validation rejects a different runtime and rebuilds both the exact trie payload
+and byte-identical quality-11 Brotli text compression. The envelopes bind
 the exact projection byte hash, projection footer identity, spatial database,
 spatial receipt, and spatial candidate. They retain false production, signing,
 publication, owner, scientific, hazard, and canonical-geometry claims.
@@ -44,10 +44,13 @@ name lengths of 180 and 200 Unicode code points, respectively, at most 835
 alternate rows for one place, and at most 7,354 aggregate alternate-name code
 points for one place. The browser boundary deliberately rounds these upward to
 256 code points per name, 1,024 alternates, and 16,384 aggregate name code
-points per record. A query is limited to 256 code points, MiniSearch may hand at
-most 128 candidates to bounded edit-distance-two ranking, MiniSearch posting
-evaluation fails closed after 250,000 visits, and the public search helper returns
-at most 100 results. Source spelling is checked against the producer-emitted NFC
+points per record. A query is limited to 256 source and 1,024 normalized code
+points. Full-name exact, qualified-context, prefix, and Unicode-code-point
+Levenshtein-distance-two retrieval shares the ranker's normalization and may
+hand at most 128 candidates to ranking. Trie cells, edges, and postings share a
+250,000-unit traversal-work limit before any unbounded match map can form, and
+the public search helper returns at most 100 results. Source spelling is checked
+against the producer-emitted NFC
 canonical spelling; producer-emitted script metadata is consumed without a
 second, runtime-divergent Unicode classifier. These are versioned safety bounds,
 not claims about GeoNames completeness.
@@ -63,16 +66,23 @@ node --import tsx scripts/build-settlement-search-shards.ts validate \
 On macOS or Linux with Python 3.9 or newer, the builder performs stable
 descriptor-bound reads, bounded Brotli decompression, exclusive descriptor-
 relative staging, and no-overwrite promotion through a held owner-controlled
-output directory.
-It preflights the complete three-name inventory before payload I/O, then syncs
-both final single-link shards before atomically promoting and syncing
+output directory. Cooperating helper processes take a nonblocking directory
+lock; the operational boundary is an isolated owner-controlled directory with
+no uncooperative same-UID writer.
+It preflights the complete three-name inventory before payload I/O, syncs both
+final single-link shards, and validates those names together with the staged
+receipt before atomically promoting and syncing
 `settlement-browser-search-shards.receipt.json` as the canonical completion
 marker. Cleanup never unlinks or restores a pathname: one atomic no-overwrite
 rename quarantines whatever inode occupies an owned name under a high-entropy
 diagnostic name. A foreign inode is preserved and no helper placeholder ever
 occupies a public final name. Every created staging entry is registered before
 payload I/O, so one invocation leaves at most one diagnostic entry per staged or
-promoted artifact; retries against an unchanged existing final name stage nothing.
+promoted artifact; retries against an unchanged existing final name stage
+nothing. Rollback preserves the primary failure, retries transient quarantine
+errors, and attempts every remaining cleanup. Once the receipt rename and root
+sync complete, descriptor-close errors are cleanup-only and cannot reverse the
+reported commit outcome.
 
 Consumers must treat the set as absent until that exact receipt exists. Use
 `loadBrowserSearchShards` for the receipt-gated handoff: it opens the output root

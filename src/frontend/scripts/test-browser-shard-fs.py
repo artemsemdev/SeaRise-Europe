@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import io
+import json
 import os
 import stat
+import sys
 import tempfile
 from pathlib import Path
 
@@ -292,7 +294,7 @@ def existing_outputs_do_not_stage_on_retry() -> None:
             root = browser_fs.open_root(output)
             try:
                 expect_failure(
-                    lambda: browser_fs.publish(
+                    lambda root=root, output=output: browser_fs.publish(
                         root, output, artifacts, io.BytesIO(payload)
                     )
                 )
@@ -368,6 +370,82 @@ def final_link_replacement() -> None:
     assert any(path.read_bytes() == b"foreign" for path in output.iterdir())
 
 
+def rollback_retries_and_preserves_primary() -> None:
+    output = Path(tempfile.mkdtemp(prefix="browser-shard-rollback-retry-"))
+    artifacts, payload = inventory()
+    root = browser_fs.open_root(output)
+    original_read = browser_fs.coherent_read
+    original_rename = browser_fs.rename_no_overwrite
+    failed = False
+
+    def primary_failure(*_args: object, **_kwargs: object) -> list[bytes]:
+        raise browser_fs.ShardFsError("primary validation failure")
+
+    def fail_first_quarantine(descriptor: int, source: str, target: str) -> None:
+        nonlocal failed
+        if target.startswith(".search-shard-quarantine-") and not failed:
+            failed = True
+            raise PermissionError("transient quarantine failure")
+        original_rename(descriptor, source, target)
+
+    browser_fs.coherent_read = primary_failure
+    browser_fs.rename_no_overwrite = fail_first_quarantine
+    try:
+        try:
+            browser_fs.publish(root, output, artifacts, io.BytesIO(payload))
+        except browser_fs.ShardFsError as error:
+            assert str(error) == "primary validation failure"
+        else:
+            raise AssertionError("primary publication failure was lost")
+    finally:
+        browser_fs.coherent_read = original_read
+        browser_fs.rename_no_overwrite = original_rename
+        os.close(root)
+    assert failed and not any((output / name).exists() for name in browser_fs.NAMES)
+    assert_hidden_residue(output, 3)
+
+
+def final_root_close_is_cleanup_only() -> None:
+    output = Path(tempfile.mkdtemp(prefix="browser-shard-final-close-"))
+    artifacts, payload = inventory()
+    raw = (
+        json.dumps(
+            {"artifacts": artifacts, "command": "publish"},
+            separators=(",", ":"),
+        ).encode()
+        + b"\n"
+        + payload
+    )
+    root = browser_fs.open_root(output)
+    original_open_root = browser_fs.open_root
+    original_close = browser_fs.os.close
+    original_argv, original_stdin = sys.argv, sys.stdin
+    calls = 0
+
+    def open_for_main(path: Path) -> int:
+        nonlocal calls
+        calls += 1
+        return root if calls == 1 else original_open_root(path)
+
+    def fail_final_close(descriptor: int) -> None:
+        if descriptor == root:
+            raise OSError("injected final root close")
+        original_close(descriptor)
+
+    browser_fs.open_root = open_for_main
+    browser_fs.os.close = fail_final_close
+    sys.argv = [str(HELPER), str(output)]
+    sys.stdin = type("Input", (), {"buffer": io.BytesIO(raw)})()
+    try:
+        assert browser_fs.main() == 0
+    finally:
+        browser_fs.open_root = original_open_root
+        browser_fs.os.close = original_close
+        sys.argv, sys.stdin = original_argv, original_stdin
+        original_close(root)
+    assert {path.name for path in output.iterdir()} == set(browser_fs.NAMES)
+
+
 publication_phases()
 displaced_publication()
 replacement_before_staging()
@@ -378,4 +456,6 @@ foreign_cleanup_race()
 existing_outputs_do_not_stage_on_retry()
 final_identity_pass()
 final_link_replacement()
+rollback_retries_and_preserves_primary()
+final_root_close_is_cleanup_only()
 print("browser shard filesystem adversarial checks passed")
