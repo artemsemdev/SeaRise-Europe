@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import stat
@@ -13,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+import searise_pipeline.supply_chain.sbom as immutable_publication
+from searise_pipeline.supply_chain.contracts import SupplyChainContractError
 from searise_pipeline.supply_chain.protected_workflow_artifacts import (
     CONTROLLED_WORKFLOW_NAME,
     CONTROLLED_WORKFLOW_PATH,
@@ -124,19 +127,36 @@ def _zip(path: Path, files: dict[str, bytes], directories: tuple[str, ...] = ())
 
 
 def _authority_for_archive(tmp_path: Path, archive: Path) -> Path:
-    authority = CandidateArtifactAuthority(
-        profile=PROFILE,
-        source_revision=REVISION,
-        workflow_id=WORKFLOW_ID,
-        run_id=RUN_ID,
-        artifact_id=ARTIFACT_ID,
-        artifact_name=f"offline-release-{PROFILE}-{REVISION}-{RUN_ID}",
+    authority = _authority(
         artifact_sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
         artifact_byte_size=archive.stat().st_size,
     )
     path = tmp_path / "authority.json"
     write_candidate_artifact_authority(path, authority)
     return path
+
+
+def _authority(
+    *, artifact_sha256: str = SHA, artifact_byte_size: int = 123
+) -> CandidateArtifactAuthority:
+    return CandidateArtifactAuthority(
+        profile=PROFILE,
+        source_revision=REVISION,
+        workflow_id=WORKFLOW_ID,
+        run_id=RUN_ID,
+        artifact_id=ARTIFACT_ID,
+        artifact_name=f"offline-release-{PROFILE}-{REVISION}-{RUN_ID}",
+        artifact_sha256=artifact_sha256,
+        artifact_byte_size=artifact_byte_size,
+    )
+
+
+def _load_contract_cli():
+    spec = importlib.util.spec_from_file_location("validate_supply_chain_contract", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _output(path: str = "output.bin") -> dict[str, object]:
@@ -499,6 +519,225 @@ def test_authority_receipt_is_canonical_immutable_and_false_claimed(tmp_path: Pa
         write_candidate_artifact_authority(receipt, authority)
 
 
+def test_authority_publication_retries_short_writes_before_atomic_exposure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _validate(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir()
+    receipt = output / "authority.json"
+    real_write = immutable_publication.os.write
+    short_write_seen = False
+
+    def short_write(descriptor: int, content) -> int:
+        nonlocal short_write_seen
+        if not short_write_seen and len(content) > 1:
+            short_write_seen = True
+            return real_write(descriptor, content[: len(content) // 2])
+        return real_write(descriptor, content)
+
+    monkeypatch.setattr(immutable_publication.os, "write", short_write)
+    write_candidate_artifact_authority(receipt, authority)
+
+    assert short_write_seen
+    assert load_candidate_artifact_authority(receipt) == authority
+    assert stat.S_IMODE(receipt.stat().st_mode) == 0o400
+    assert [path.name for path in output.iterdir()] == ["authority.json"]
+
+
+def test_authority_publication_removes_partial_after_interrupted_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _validate(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir()
+    receipt = output / "authority.json"
+    real_write = immutable_publication.os.write
+    calls = 0
+
+    def interrupted_write(descriptor: int, content) -> int:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return real_write(descriptor, content[:1])
+        raise OSError("injected write failure")
+
+    monkeypatch.setattr(immutable_publication.os, "write", interrupted_write)
+    with pytest.raises(ProtectedWorkflowArtifactError, match="publication failed"):
+        write_candidate_artifact_authority(receipt, authority)
+
+    assert not receipt.exists()
+    assert list(output.iterdir()) == []
+
+
+@pytest.mark.parametrize("failed_call", [1, 2])
+def test_authority_publication_rolls_back_file_or_directory_fsync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failed_call: int
+) -> None:
+    authority = _validate(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir()
+    receipt = output / "authority.json"
+    real_fsync = immutable_publication.os.fsync
+    calls = 0
+
+    def injected_fsync(descriptor: int) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == failed_call:
+            raise OSError("injected fsync failure")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(immutable_publication.os, "fsync", injected_fsync)
+    with pytest.raises(ProtectedWorkflowArtifactError, match="publication failed"):
+        write_candidate_artifact_authority(receipt, authority)
+
+    assert not receipt.exists()
+    assert not any(path.name == "authority.json" for path in output.iterdir())
+
+
+def test_authority_publication_rejects_link_failure_without_final_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _validate(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir()
+    receipt = output / "authority.json"
+
+    def fail_link(*args, **kwargs) -> None:
+        raise OSError("injected link failure")
+
+    monkeypatch.setattr(immutable_publication.os, "link", fail_link)
+    with pytest.raises(ProtectedWorkflowArtifactError, match="publication failed"):
+        write_candidate_artifact_authority(receipt, authority)
+
+    assert not receipt.exists()
+    assert list(output.iterdir()) == []
+
+
+def test_authority_publication_rejects_partial_ownership_race(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _validate(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir()
+    receipt = output / "authority.json"
+    real_path_inode = immutable_publication._path_inode
+
+    def raced_inode(parent: int, name: str):
+        identity = real_path_inode(parent, name)
+        if name.startswith(".searise-protected-receipt-") and name.endswith(".partial"):
+            return None if identity is None else (identity[0], identity[1] + 1)
+        return identity
+
+    monkeypatch.setattr(immutable_publication, "_path_inode", raced_inode)
+    with pytest.raises(ProtectedWorkflowArtifactError, match="ownership changed"):
+        write_candidate_artifact_authority(receipt, authority)
+
+    assert not receipt.exists()
+    assert list(output.iterdir()) == []
+
+
+def test_authority_publication_preserves_existing_and_racing_final_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _validate(tmp_path)
+    existing_output = tmp_path / "existing"
+    existing_output.mkdir()
+    existing = existing_output / "authority.json"
+    existing.write_bytes(b"owner bytes")
+    with pytest.raises(ProtectedWorkflowArtifactError, match="already exists"):
+        write_candidate_artifact_authority(existing, authority)
+    assert existing.read_bytes() == b"owner bytes"
+
+    racing_output = tmp_path / "racing"
+    racing_output.mkdir()
+    racing = racing_output / "authority.json"
+    real_link = immutable_publication.os.link
+
+    def replace_after_link(source: str, target: str, **kwargs) -> None:
+        real_link(source, target, **kwargs)
+        parent = kwargs["dst_dir_fd"]
+        os.unlink(target, dir_fd=parent)
+        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=parent)
+        try:
+            os.write(descriptor, b"racing owner bytes")
+        finally:
+            os.close(descriptor)
+
+    monkeypatch.setattr(immutable_publication.os, "link", replace_after_link)
+    with pytest.raises(ProtectedWorkflowArtifactError, match="ownership changed"):
+        write_candidate_artifact_authority(racing, authority)
+
+    assert racing.read_bytes() == b"racing owner bytes"
+
+
+def test_authority_publication_cleanup_failure_never_leaves_invalid_final(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _validate(tmp_path)
+    output = tmp_path / "receipts"
+    output.mkdir()
+    receipt = output / "authority.json"
+    real_unlink_if_owned = immutable_publication._unlink_if_owned
+
+    def reject_partial_cleanup(parent: int, name: str, expected) -> bool:
+        if name.startswith(".searise-protected-receipt-"):
+            return False
+        return real_unlink_if_owned(parent, name, expected)
+
+    monkeypatch.setattr(immutable_publication, "_unlink_if_owned", reject_partial_cleanup)
+    with pytest.raises(ProtectedWorkflowArtifactError, match="cleanup failed"):
+        write_candidate_artifact_authority(receipt, authority)
+
+    assert not receipt.exists()
+    assert all(path.name != "authority.json" for path in output.iterdir())
+
+
+def test_unsupported_exclusive_cleanup_syscall_is_normalized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class MissingRename:
+        pass
+
+    monkeypatch.setattr(immutable_publication.sys, "platform", "linux")
+    monkeypatch.setattr(
+        immutable_publication.ctypes, "CDLL", lambda *args, **kwargs: MissingRename()
+    )
+    with pytest.raises(SupplyChainContractError, match="unavailable"):
+        immutable_publication._rename_no_overwrite(-1, "foreign", "original")
+
+    authority = _validate(tmp_path)
+    receipt = tmp_path / "authority.json"
+    with pytest.raises(ProtectedWorkflowArtifactError, match="publication failed"):
+        write_candidate_artifact_authority(receipt, authority)
+    assert not receipt.exists()
+
+
+def test_linux_exclusive_cleanup_uses_renameat2_noreplace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[object, ...]] = []
+
+    class RenameAt2:
+        argtypes = None
+        restype = None
+
+        def __call__(self, *args) -> int:
+            calls.append(args)
+            return 0
+
+    class LinuxLibc:
+        renameat2 = RenameAt2()
+
+    monkeypatch.setattr(immutable_publication.sys, "platform", "linux")
+    monkeypatch.setattr(immutable_publication.ctypes, "CDLL", lambda *a, **k: LinuxLibc())
+
+    immutable_publication._rename_no_overwrite(7, "foreign", "original")
+
+    assert calls == [(7, b"foreign", 7, b"original", 1)]
+
+
 def test_authority_loader_rejects_noncanonical_or_claim_broadening(tmp_path: Path) -> None:
     authority = _validate(tmp_path)
     receipt = tmp_path / "authority.json"
@@ -750,7 +989,24 @@ def test_cli_exposes_atomic_authority_and_both_distinct_extractors(tmp_path: Pat
     )
 
     assert result.returncode == 0, result.stderr
-    assert "production, publication, and scientific approval not claimed" in result.stdout
+    assert json.loads(result.stdout) == {
+        "artifactByteSize": 123,
+        "artifactId": ARTIFACT_ID,
+        "artifactSha256": SHA,
+        "claims": {
+            "production": False,
+            "publication": False,
+            "scientificApproval": False,
+        },
+        "command": "protected-candidate-authority",
+        "output": str(output),
+        "runId": RUN_ID,
+        "status": "ok",
+    }
+    assert (
+        result.stdout
+        == json.dumps(json.loads(result.stdout), separators=(",", ":"), sort_keys=True) + "\n"
+    )
     assert load_candidate_artifact_authority(output).artifact_id == ARTIFACT_ID
     help_result = subprocess.run(
         [sys.executable, str(SCRIPT), "--help"],
@@ -761,6 +1017,229 @@ def test_cli_exposes_atomic_authority_and_both_distinct_extractors(tmp_path: Pat
     )
     assert "protected-candidate-extract" in help_result.stdout
     assert "protected-evidence-extract" in help_result.stdout
+
+
+def test_protected_cli_real_closed_pipe_keeps_committed_zero_exit(tmp_path: Path) -> None:
+    run_path = tmp_path / "run.json"
+    inventory_path = tmp_path / "inventory.json"
+    output = tmp_path / "authority.json"
+    _dump(run_path, _run())
+    _dump(inventory_path, _inventory())
+    environment = {**os.environ, "PYTHONPATH": str(REPO_ROOT / "src/pipeline")}
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "protected-candidate-authority",
+            "--run-json",
+            str(run_path),
+            "--artifacts-json",
+            str(inventory_path),
+            "--profile",
+            PROFILE,
+            "--source-revision",
+            REVISION,
+            "--candidate-run-id",
+            str(RUN_ID),
+            "--output",
+            str(output),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=environment,
+    )
+    assert process.stdout is not None and process.stderr is not None
+    process.stdout.close()
+    stderr = process.stderr.read().decode("utf-8")
+
+    assert process.wait() == 0, stderr
+    assert load_candidate_artifact_authority(output).artifact_id == ARTIFACT_ID
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        (
+            "protected-candidate-authority",
+            {
+                "artifactByteSize": 123,
+                "artifactId": ARTIFACT_ID,
+                "artifactSha256": SHA,
+                "command": "protected-candidate-authority",
+                "output": "authority.json",
+                "runId": RUN_ID,
+            },
+        ),
+        (
+            "protected-candidate-extract",
+            {
+                "artifactByteSize": 123,
+                "artifactId": ARTIFACT_ID,
+                "artifactSha256": SHA,
+                "command": "protected-candidate-extract",
+                "outputRoot": "candidate-root",
+                "runId": RUN_ID,
+            },
+        ),
+        (
+            "protected-evidence-extract",
+            {
+                "archiveByteSize": 456,
+                "archiveSha256": SHA,
+                "command": "protected-evidence-extract",
+                "outputRoot": "evidence-root",
+            },
+        ),
+    ],
+)
+def test_protected_cli_success_is_exact_canonical_json(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    expected: dict[str, object],
+) -> None:
+    cli = _load_contract_cli()
+    authority = _authority()
+    if command == "protected-candidate-authority":
+        monkeypatch.setattr(cli, "validate_candidate_artifact_authority", lambda *a, **k: authority)
+        monkeypatch.setattr(cli, "write_candidate_artifact_authority", lambda *a, **k: None)
+        argv = [
+            command,
+            "--run-json",
+            "run.json",
+            "--artifacts-json",
+            "artifacts.json",
+            "--profile",
+            PROFILE,
+            "--source-revision",
+            REVISION,
+            "--candidate-run-id",
+            str(RUN_ID),
+            "--output",
+            "authority.json",
+        ]
+    elif command == "protected-candidate-extract":
+        monkeypatch.setattr(cli, "extract_protected_candidate", lambda *a, **k: authority)
+        argv = [
+            command,
+            "--archive",
+            "candidate.zip",
+            "--authority",
+            "authority.json",
+            "--output-root",
+            "candidate-root",
+        ]
+    else:
+        monkeypatch.setattr(cli, "extract_protected_evidence", lambda *a, **k: None)
+        argv = [
+            command,
+            "--archive",
+            "evidence.zip",
+            "--expected-sha256",
+            SHA,
+            "--expected-byte-size",
+            "456",
+            "--output-root",
+            "evidence-root",
+        ]
+
+    assert cli.main(argv) == 0
+    document = json.loads(capsys.readouterr().out)
+    assert document == {
+        **expected,
+        "claims": {
+            "production": False,
+            "publication": False,
+            "scientificApproval": False,
+        },
+        "status": "ok",
+    }
+
+
+@pytest.mark.parametrize(
+    ("command", "stream_error"),
+    [
+        (command, stream_error)
+        for command in (
+            "protected-candidate-authority",
+            "protected-candidate-extract",
+            "protected-evidence-extract",
+        )
+        for stream_error in (BrokenPipeError, OSError, ValueError)
+    ],
+)
+def test_protected_cli_committed_success_survives_failed_stdout(
+    monkeypatch: pytest.MonkeyPatch, command: str, stream_error: type[Exception]
+) -> None:
+    cli = _load_contract_cli()
+    authority = _authority()
+    committed: list[str] = []
+
+    class FailedStdout:
+        def write(self, value: str) -> int:
+            raise stream_error("closed stdout")
+
+        def flush(self) -> None:
+            raise stream_error("closed stdout")
+
+    if command == "protected-candidate-authority":
+        monkeypatch.setattr(cli, "validate_candidate_artifact_authority", lambda *a, **k: authority)
+        monkeypatch.setattr(
+            cli,
+            "write_candidate_artifact_authority",
+            lambda *a, **k: committed.append(command),
+        )
+        argv = [
+            command,
+            "--run-json",
+            "run.json",
+            "--artifacts-json",
+            "artifacts.json",
+            "--profile",
+            PROFILE,
+            "--source-revision",
+            REVISION,
+            "--candidate-run-id",
+            str(RUN_ID),
+            "--output",
+            "authority.json",
+        ]
+    elif command == "protected-candidate-extract":
+        monkeypatch.setattr(
+            cli,
+            "extract_protected_candidate",
+            lambda *a, **k: (committed.append(command), authority)[1],
+        )
+        argv = [
+            command,
+            "--archive",
+            "candidate.zip",
+            "--authority",
+            "authority.json",
+            "--output-root",
+            "candidate-root",
+        ]
+    else:
+        monkeypatch.setattr(
+            cli,
+            "extract_protected_evidence",
+            lambda *a, **k: committed.append(command),
+        )
+        argv = [
+            command,
+            "--archive",
+            "evidence.zip",
+            "--expected-sha256",
+            SHA,
+            "--expected-byte-size",
+            "456",
+            "--output-root",
+            "evidence-root",
+        ]
+    monkeypatch.setattr(cli.sys, "stdout", FailedStdout())
+
+    assert cli.main(argv) == 0
+    assert committed == [command]
 
 
 def test_module_uses_no_unsafe_recursive_extraction_helpers() -> None:

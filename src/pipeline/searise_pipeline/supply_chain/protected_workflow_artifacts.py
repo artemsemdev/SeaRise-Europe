@@ -18,6 +18,9 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO, Callable, Mapping, NoReturn
 
+from .contracts import SupplyChainContractError
+from .sbom import write_new_immutable_bytes
+
 REPOSITORY = "artemsemdev/SeaRise-Europe"
 REPOSITORY_ID = 1196432661
 CONTROLLED_WORKFLOW_NAME = "Controlled offline release build"
@@ -332,33 +335,16 @@ def _canonical(document: Mapping[str, Any]) -> bytes:
 
 
 def _write_new(path: Path, content: bytes, label: str) -> None:
-    if ".." in path.parts:
-        _fail(f"{label} path must not contain parent traversal")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
-    flags |= getattr(os, "O_NOFOLLOW", 0)
-    parent = -1
     try:
-        parent = _open_parent(path)
-        descriptor = os.open(path.absolute().name, flags, 0o400, dir_fd=parent)
-    except OSError as exc:
-        raise ProtectedWorkflowArtifactError(f"{label} must be a new non-symlink file") from exc
-    finally:
-        if parent >= 0:
-            os.close(parent)
-    try:
-        view = memoryview(content)
-        while view:
-            written = os.write(descriptor, view)
-            if written <= 0:
-                _fail(f"{label} write made no progress")
-            view = view[written:]
-        os.fsync(descriptor)
-        metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
-            _fail(f"{label} did not remain one linked regular file")
-        _confirm_binding(path, descriptor, metadata, label)
-    finally:
-        os.close(descriptor)
+        write_new_immutable_bytes(
+            path,
+            content,
+            label=label,
+            mode=0o400,
+            partial_prefix=".searise-protected-receipt-",
+        )
+    except (OSError, SupplyChainContractError) as exc:
+        raise ProtectedWorkflowArtifactError(f"{label} publication failed: {exc}") from exc
 
 
 @dataclass(frozen=True)
