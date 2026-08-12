@@ -33,6 +33,11 @@ All notable changes to this project will be documented in this file.
   foreign-preserving bounded quarantine rollback, an owner-controlled isolated
   runner boundary, and a coherent point-in-time final tree-identity pass before
   success is returned.
+- Added a standard-library-only protected-workflow artifact boundary that
+  atomically binds the exact successful controlled `master` run to its complete
+  GitHub artifact inventory, emits an immutable canonical authority receipt,
+  and safely streams distinct candidate and evidence ZIP inventories without
+  following links or making production, publication, or scientific claims.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
