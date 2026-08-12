@@ -40,6 +40,12 @@ function threshold(options: Map<string, string>, name: string): number | null {
   return raw === undefined || raw === "not-measured" ? null : Number(raw);
 }
 
+function optional(options: Map<string, string>, name: string): string | undefined {
+  const value = options.get(name);
+  options.delete(name);
+  return value;
+}
+
 async function main(): Promise<void> {
   const parsed = argumentsByName(process.argv.slice(2));
   const reportPath = required(parsed.options, "--report");
@@ -49,6 +55,10 @@ async function main(): Promise<void> {
     queryP95Milliseconds: threshold(parsed.options, "--max-query-p95-ms"),
     peakWorkerMemoryBytes: threshold(parsed.options, "--max-worker-memory-bytes"),
   };
+  const spatialDatabasePath = optional(parsed.options, "--spatial-database");
+  const spatialReceiptPath = optional(parsed.options, "--spatial-receipt");
+  const validationWorkDirectory = optional(parsed.options, "--validation-work-dir");
+  const dataReleaseId = optional(parsed.options, "--data-release-id");
   const options: PerformanceOptions = {
     projectionPath: required(parsed.options, "--projection"),
     shardDirectory: required(parsed.options, "--shard-dir"),
@@ -57,6 +67,10 @@ async function main(): Promise<void> {
     initializationSamples: count(parsed.options, "--init-samples", 5),
     querySamples: count(parsed.options, "--query-samples", 30),
     thresholds,
+    ...(spatialDatabasePath === undefined ? {} : { spatialDatabasePath }),
+    ...(spatialReceiptPath === undefined ? {} : { spatialReceiptPath }),
+    ...(validationWorkDirectory === undefined ? {} : { validationWorkDirectory }),
+    ...(dataReleaseId === undefined ? {} : { dataReleaseId }),
   };
   if (parsed.options.size) fail(`unsupported option: ${parsed.options.keys().next().value}`);
   if (parsed.command === "measure") {

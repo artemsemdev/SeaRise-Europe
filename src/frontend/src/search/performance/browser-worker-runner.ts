@@ -4,6 +4,7 @@ import { getHeapStatistics } from "node:v8";
 import { parentPort, workerData } from "node:worker_threads";
 
 import {
+  SHARD_FORMAT_VERSION,
   decodeBrowserShard,
   mergeCoreFirst,
   searchBrowserShard,
@@ -12,6 +13,23 @@ import type { BrowserShard } from "../shards/browser-shards";
 
 const SHARD_IDS = ["europe-core", "europe-coastal"] as const;
 type ShardId = (typeof SHARD_IDS)[number];
+
+type WorkerShardAuthority = {
+  dataReleaseId: string;
+  dataProvenanceClass: string;
+  geometryStatus: string;
+  source: Record<string, string>;
+  spatialIdentity: Record<string, unknown>;
+};
+
+type DecodeShard = {
+  (compressed: Buffer, shardId: ShardId): BrowserShard;
+  (
+    compressed: Buffer,
+    shardId: ShardId,
+    authority: WorkerShardAuthority,
+  ): BrowserShard;
+};
 
 function memory() {
   const values = getHeapStatistics();
@@ -33,11 +51,19 @@ try {
   }
   const shards = {} as Record<ShardId, BrowserShard>;
   const shardSha256 = {} as Record<ShardId, string>;
+  const v4 = String(SHARD_FORMAT_VERSION) === "settlement-browser-search-shard-v2";
+  const authority = workerData.authority as WorkerShardAuthority | null | undefined;
+  if ((v4 && (!authority || typeof authority !== "object")) || (!v4 && authority != null)) {
+    throw new Error("worker shard authority differs from its contract version");
+  }
+  const decode = decodeBrowserShard as unknown as DecodeShard;
   for (const shardId of SHARD_IDS) {
     const bytes = workerData.shards[shardId];
     if (!(bytes instanceof Uint8Array)) throw new Error(`${shardId} worker bytes differ`);
     shardSha256[shardId] = digest(bytes);
-    shards[shardId] = decodeBrowserShard(Buffer.from(bytes), shardId);
+    shards[shardId] = v4
+      ? decode(Buffer.from(bytes), shardId, authority!)
+      : decode(Buffer.from(bytes), shardId);
   }
   parentPort.postMessage({ kind: "ready", shardSha256, memory: memory() });
   parentPort.on("message", (message: unknown) => {

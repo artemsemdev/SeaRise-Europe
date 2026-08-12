@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Extended settlement browser-worker evidence to pass explicit spatial source,
+  validation-workspace, and release authorities through the v4 shard builder,
+  loader, and worker decoder while retaining byte-exact v3 fixture validation.
+
 ### Added
 
 - Added receipt-bound, bounded-memory settlement reconciliation evidence that
@@ -345,6 +351,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Replaced full-corpus settlement search-projection sorts with single-pass,
+  order-checking spatial-stage scans while retaining the 1 GiB no-spill
+  validation profile and exact receipt reconciliation.
 - Closed settlement reconciliation rejection reasons to the reviewed stage
   vocabularies and prevented reserved DuckDB WAL output names from reaching staging.
 - Corrected the immutable full-source contract to match the official

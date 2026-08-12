@@ -14,6 +14,7 @@ import { Worker } from "node:worker_threads";
 
 import {
   DEFAULT_SHARD_LIMITS,
+  SHARD_FORMAT_VERSION,
   SHARD_FILENAMES,
   SHARD_RECEIPT_FILENAME,
   buildBrowserSearchShards,
@@ -46,6 +47,10 @@ export type PerformanceThresholds = {
 
 export type PerformanceOptions = {
   projectionPath: string;
+  spatialDatabasePath?: string;
+  spatialReceiptPath?: string;
+  validationWorkDirectory?: string;
+  dataReleaseId?: string;
   shardDirectory: string;
   querySetPath: string;
   buildSamples: number;
@@ -193,8 +198,48 @@ export type BrowserWorkerPerformanceReport = {
 
 type EvidenceBindings = {
   loaded: LoadedBrowserShardSet;
+  shardAuthority: WorkerShardAuthority | null;
   queryBytes: Buffer;
   querySet: QuerySet;
+};
+
+type V4AuthorityInputs = {
+  spatialDatabasePath: string;
+  spatialReceiptPath: string;
+  validationWorkDirectory: string;
+  dataReleaseId: string;
+};
+
+type WorkerShardAuthority = {
+  dataReleaseId: string;
+  dataProvenanceClass: string;
+  geometryStatus: string;
+  source: Record<string, string>;
+  spatialIdentity: Record<string, unknown>;
+};
+
+type BuildShards = {
+  (projectionPath: string, outputDirectory: string): unknown;
+  (
+    projectionPath: string,
+    spatialDatabasePath: string,
+    spatialReceiptPath: string,
+    validationWorkDirectory: string,
+    dataReleaseId: string,
+    outputDirectory: string,
+  ): unknown;
+};
+
+type LoadShards = {
+  (projectionPath: string, outputDirectory: string): LoadedBrowserShardSet;
+  (
+    projectionPath: string,
+    spatialDatabasePath: string,
+    spatialReceiptPath: string,
+    validationWorkDirectory: string,
+    dataReleaseId: string,
+    outputDirectory: string,
+  ): LoadedBrowserShardSet;
 };
 
 export class BrowserWorkerEvidenceError extends Error {}
@@ -318,6 +363,84 @@ function querySet(bytes: Buffer): QuerySet {
   return value as unknown as QuerySet;
 }
 
+function v4AuthorityInputs(options: PerformanceOptions): V4AuthorityInputs | null {
+  const entries = [
+    ["spatial database", options.spatialDatabasePath],
+    ["spatial receipt", options.spatialReceiptPath],
+    ["validation work directory", options.validationWorkDirectory],
+    ["data release ID", options.dataReleaseId],
+  ] as const;
+  const supplied = entries.filter(([, value]) => value !== undefined);
+  const v4 = String(SHARD_FORMAT_VERSION) === "settlement-browser-search-shard-v2";
+  if (supplied.length !== (v4 ? entries.length : 0)) {
+    fail(v4
+      ? "v4 performance evidence requires spatial database, receipt, work directory, and release ID"
+      : "v3 performance evidence does not accept v4 authority inputs");
+  }
+  if (!v4) return null;
+  for (const [label, path] of entries.slice(0, 3)) {
+    if (!isAbsolute(path!)) fail(`${label} path must be absolute`);
+  }
+  return {
+    spatialDatabasePath: options.spatialDatabasePath!,
+    spatialReceiptPath: options.spatialReceiptPath!,
+    validationWorkDirectory: options.validationWorkDirectory!,
+    dataReleaseId: options.dataReleaseId!,
+  };
+}
+
+function loadShards(
+  options: PerformanceOptions,
+  authority: V4AuthorityInputs | null,
+): LoadedBrowserShardSet {
+  const load = loadBrowserSearchShards as unknown as LoadShards;
+  return authority === null
+    ? load(options.projectionPath, options.shardDirectory)
+    : load(
+      options.projectionPath,
+      authority.spatialDatabasePath,
+      authority.spatialReceiptPath,
+      authority.validationWorkDirectory,
+      authority.dataReleaseId,
+      options.shardDirectory,
+    );
+}
+
+function buildShards(
+  options: PerformanceOptions,
+  authority: V4AuthorityInputs | null,
+  outputDirectory: string,
+): void {
+  const build = buildBrowserSearchShards as unknown as BuildShards;
+  if (authority === null) {
+    build(options.projectionPath, outputDirectory);
+  } else {
+    build(
+      options.projectionPath,
+      authority.spatialDatabasePath,
+      authority.spatialReceiptPath,
+      authority.validationWorkDirectory,
+      authority.dataReleaseId,
+      outputDirectory,
+    );
+  }
+}
+
+function workerShardAuthority(
+  loaded: LoadedBrowserShardSet,
+  authority: V4AuthorityInputs | null,
+): WorkerShardAuthority | null {
+  if (authority === null) return null;
+  const core = loaded.shards["europe-core"].shard as unknown as WorkerShardAuthority;
+  return {
+    dataReleaseId: core.dataReleaseId,
+    dataProvenanceClass: core.dataProvenanceClass,
+    geometryStatus: core.geometryStatus,
+    source: core.source,
+    spatialIdentity: core.spatialIdentity,
+  };
+}
+
 function inputBindings(options: PerformanceOptions): EvidenceBindings {
   for (const [label, path] of [
     ["projection", options.projectionPath],
@@ -326,17 +449,27 @@ function inputBindings(options: PerformanceOptions): EvidenceBindings {
   ] as const) {
     if (!isAbsolute(path)) fail(`${label} path must be absolute`);
   }
-  const loaded = loadBrowserSearchShards(options.projectionPath, options.shardDirectory);
+  const authority = v4AuthorityInputs(options);
+  const loaded = loadShards(options, authority);
   const queryBytes = readFileSync(options.querySetPath);
   const queries = querySet(queryBytes);
   const provenance = new Set(SHARD_IDS.map((id) => loaded.shards[id].shard.dataProvenanceClass));
   if (provenance.size !== 1 || !provenance.has(queries.dataProvenanceClass)) {
     fail("query provenance differs from the exact browser shards");
   }
-  return { loaded, queryBytes, querySet: queries };
+  return {
+    loaded,
+    shardAuthority: workerShardAuthority(loaded, authority),
+    queryBytes,
+    querySet: queries,
+  };
 }
 
-function exactBuildSamples(options: PerformanceOptions, expected: LoadedBrowserShardSet): number[] {
+function exactBuildSamples(
+  options: PerformanceOptions,
+  expected: LoadedBrowserShardSet,
+  authority: V4AuthorityInputs | null,
+): number[] {
   const observations: number[] = [];
   for (let index = 0; index < options.buildSamples; index += 1) {
     const root = mkdtempSync(join(tmpdir(), "searise-settlement-search-build-"));
@@ -344,7 +477,7 @@ function exactBuildSamples(options: PerformanceOptions, expected: LoadedBrowserS
     mkdirSync(output, { mode: 0o700 });
     try {
       const started = performance.now();
-      buildBrowserSearchShards(options.projectionPath, output);
+      buildShards(options, authority, output);
       observations.push(performance.now() - started);
       for (const shardId of SHARD_IDS) {
         if (!readFileSync(join(output, SHARD_FILENAMES[shardId])).equals(expected.shards[shardId].bytes)) {
@@ -391,12 +524,15 @@ function nextMessage<T extends WorkerResponse["kind"]>(
   });
 }
 
-function startWorker(loaded: LoadedBrowserShardSet): { worker: Worker; ready: Promise<WorkerReady> } {
+function startWorker(bindings: EvidenceBindings): { worker: Worker; ready: Promise<WorkerReady> } {
   const started = performance.now();
   const worker = new Worker(WORKER_BOOTSTRAP_URL, {
     workerData: {
+      authority: bindings.shardAuthority,
       moduleUrl: WORKER_URL.href,
-      shards: Object.fromEntries(SHARD_IDS.map((id) => [id, new Uint8Array(loaded.shards[id].bytes)])),
+      shards: Object.fromEntries(
+        SHARD_IDS.map((id) => [id, new Uint8Array(bindings.loaded.shards[id].bytes)])
+      ),
     },
   });
   return {
@@ -421,7 +557,7 @@ async function workerMeasurements(
   const memory: MemorySnapshot[] = [];
   let queryWorker: Worker | null = null;
   for (let index = 0; index < options.initializationSamples; index += 1) {
-    const active = startWorker(bindings.loaded);
+    const active = startWorker(bindings);
     let ready: WorkerReady & { initializationMilliseconds: number };
     try {
       ready = await active.ready as WorkerReady & { initializationMilliseconds: number };
@@ -544,7 +680,11 @@ export async function measureBrowserWorkerPerformance(
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   if (new Date(generatedAt).toISOString() !== generatedAt) fail("generatedAt must be canonical UTC");
   const bindings = inputBindings(options);
-  const build = distribution(exactBuildSamples(options, bindings.loaded));
+  const build = distribution(exactBuildSamples(
+    options,
+    bindings.loaded,
+    v4AuthorityInputs(options),
+  ));
   const workers = await workerMeasurements(options, bindings);
   const expectedResultCountsSha256 = deterministicResultCountsSha256(bindings);
   if (workers.resultCountsSha256 !== expectedResultCountsSha256) {

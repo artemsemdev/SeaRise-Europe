@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
-from contextlib import ExitStack, contextmanager
+from contextlib import ExitStack, closing, contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator, Mapping
 
@@ -236,9 +236,25 @@ def _candidate(receipt_asset: Any) -> tuple[dict[str, Any], str]:
     return candidate, hashlib.sha256(raw).hexdigest()
 
 
-def _spatial_documents(connection: Any) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
+def _ordered_spatial_rows(connection: Any, table: str) -> Iterator[tuple[Any, ...]]:
+    """Stream stage storage order and reject physical key-order drift."""
+
+    if table not in spatial_stage._COLUMNS:
+        raise SearchProjectionError("spatial table is not part of the versioned schema")
+    columns = ", ".join(name for name, _ in spatial_stage._COLUMNS[table])
     previous = 0
-    for geoname_id, place_id, raw in spatial_stage._stored_rows(connection, "spatial_places"):
+    with closing(connection.cursor()) as cursor:
+        cursor.execute(f"SELECT {columns} FROM {table}")
+        for row in catalogue_stage._rows(cursor, spatial_stage.MAX_BATCH_ROWS):
+            geoname_id = row[0]
+            if type(geoname_id) is not int or geoname_id <= previous:
+                raise SearchProjectionError(f"{table} storage keys are duplicate or unordered")
+            previous = geoname_id
+            yield row
+
+
+def _spatial_documents(connection: Any) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
+    for geoname_id, place_id, raw in _ordered_spatial_rows(connection, "spatial_places"):
         document = source_stage._strict_json(raw, "spatial place document")
         if type(document) is not dict or source_stage._canonical_json(document) != raw:
             raise SearchProjectionError("spatial place document is not canonical JSON")
@@ -253,9 +269,7 @@ def _spatial_documents(connection: Any) -> Iterator[tuple[dict[str, Any], dict[s
             raise SearchProjectionError("spatial place document fields differ")
         place = catalogue_stage._decode(CataloguePlace, document["place"], "spatial place")
         if (
-            type(geoname_id) is not int
-            or geoname_id <= previous
-            or place.id != place_id
+            place.id != place_id
             or place_id != f"geonames:{geoname_id}"
             or not place.lineage
             or place.lineage[0].source_record_id != geoname_id
@@ -274,7 +288,6 @@ def _spatial_documents(connection: Any) -> Iterator[tuple[dict[str, Any], dict[s
         )
         if memberships != expected_memberships:
             raise SearchProjectionError("spatial place membership differs")
-        previous = geoname_id
         yield document, _projection_document(place, document)
 
 
@@ -319,16 +332,13 @@ def _validate_source(connection: Any, candidate: Mapping[str, Any]) -> None:
         counts["europeCoreMemberships"] += int("europe-core" in spatial["catalogMembership"])
         counts["europeCoastalMemberships"] += int(spatial["coastalCovers"])
         hashes["classifiedPlaces"].update(source_stage._canonical_json(spatial).encode() + b"\n")
-    previous = 0
-    for geoname_id, place_id, reason, raw in spatial_stage._stored_rows(
+    for geoname_id, place_id, reason, raw in _ordered_spatial_rows(
         connection, "spatial_rejections"
     ):
         document = source_stage._strict_json(raw, "spatial rejection document")
         if (
             type(document) is not dict
             or source_stage._canonical_json(document) != raw
-            or type(geoname_id) is not int
-            or geoname_id <= previous
             or place_id != f"geonames:{geoname_id}"
             or reason != "outside-support"
             or document
@@ -337,7 +347,6 @@ def _validate_source(connection: Any, candidate: Mapping[str, Any]) -> None:
             or not document["lineage"]
         ):
             raise SearchProjectionError("spatial rejection keys, ordering, or values differ")
-        previous = geoname_id
         counts["normalizedPlaces"] += 1
         counts["spatialRejections"] += 1
         counts["outsideSupportRejections"] += 1
