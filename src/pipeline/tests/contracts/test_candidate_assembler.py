@@ -575,13 +575,11 @@ def test_rollback_quarantine_swap_preserves_foreign_without_public_failure(
     assert len(list(wrapper.glob(".candidate-rollback-*"))) == 2
 
 
-def test_rollback_collision_exhaustion_uses_nonpublic_fallback(
+def test_rollback_exchange_collision_exhaustion_reports_public_residue(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     real_gate = assembler.validate_candidate_root
-    real_rename = assembler._rename_no_overwrite
     gate_calls = collisions = 0
-    fallback_swapped = False
 
     def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
         nonlocal gate_calls
@@ -590,38 +588,27 @@ def test_rollback_collision_exhaustion_uses_nonpublic_fallback(
             raise assembler.CandidateContractError("candidate-changed", "injected")
         return real_gate(root, **kwargs)
 
-    def collide(parent: int, source: str, destination: int, target: str) -> None:
-        nonlocal collisions, fallback_swapped
-        if target.startswith(".candidate-rollback-"):
-            collisions += 1
-            raise FileExistsError(target)
-        real_rename(parent, source, destination, target)
-        if target.startswith(".candidate-failed-"):
-            fallback_swapped = True
-            os.rename(
-                target,
-                f"{target}-owned",
-                src_dir_fd=destination,
-                dst_dir_fd=destination,
-            )
-            os.mkdir(target, 0o700, dir_fd=destination)
+    def collide(_left: int, _source: str, _right: int, _target: str) -> None:
+        nonlocal collisions
+        collisions += 1
+        raise FileExistsError("injected exchange collision")
 
     monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
-    monkeypatch.setattr(assembler, "_rename_no_overwrite", collide)
-    with pytest.raises(CandidateAssemblyError, match="failed candidate quarantine"):
+    monkeypatch.setattr(assembler, "_rename_exchange", collide)
+    with pytest.raises(CandidateAssemblyError) as caught:
         assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert caught.value.cleanup_error is not None
+    assert caught.value.cleanup_error.startswith("assembly-rollback:")
     assert collisions == 1024
-    assert fallback_swapped
-    assert not (tmp_path / "candidate").exists()
-    wrapper = _private_wrappers(tmp_path)[0]
-    assert len(list(wrapper.glob(".candidate-failed-*"))) == 2
+    assert (tmp_path / "candidate/manifest.json").is_file()
+    assert list(tmp_path.glob(".candidate-rollback-*")) == []
 
 
 def test_transient_rollback_permission_error_is_retried_without_public_residue(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     real_gate = assembler.validate_candidate_root
-    real_rename = assembler._rename_no_overwrite
+    real_exchange = assembler._rename_exchange
     gate_calls = rollback_calls = 0
 
     def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
@@ -631,16 +618,15 @@ def test_transient_rollback_permission_error_is_retried_without_public_residue(
             raise assembler.CandidateContractError("candidate-changed", "primary failure")
         return real_gate(root, **kwargs)
 
-    def transient(parent: int, source: str, destination: int, target: str) -> None:
+    def transient(left: int, source: str, right: int, target: str) -> None:
         nonlocal rollback_calls
-        if source == "candidate" and target.startswith(".candidate-rollback-"):
-            rollback_calls += 1
-            if rollback_calls == 1:
-                raise PermissionError("transient rollback denial")
-        real_rename(parent, source, destination, target)
+        rollback_calls += 1
+        if rollback_calls == 1:
+            raise PermissionError("transient rollback denial")
+        real_exchange(left, source, right, target)
 
     monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
-    monkeypatch.setattr(assembler, "_rename_no_overwrite", transient)
+    monkeypatch.setattr(assembler, "_rename_exchange", transient)
     with pytest.raises(CandidateAssemblyError) as caught:
         assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
     assert caught.value.code == "foreign-replacement"
@@ -653,7 +639,6 @@ def test_persistent_rollback_failure_preserves_primary_error_and_reports_residue
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     real_gate = assembler.validate_candidate_root
-    real_rename = assembler._rename_no_overwrite
     gate_calls = 0
 
     def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
@@ -663,16 +648,11 @@ def test_persistent_rollback_failure_preserves_primary_error_and_reports_residue
             raise assembler.CandidateContractError("candidate-changed", "primary failure")
         return real_gate(root, **kwargs)
 
-    def deny(parent: int, source: str, destination: int, target: str) -> None:
-        if source == "candidate" and (
-            target.startswith(".candidate-rollback-")
-            or target.startswith(".candidate-failed-")
-        ):
-            raise PermissionError("persistent rollback denial")
-        real_rename(parent, source, destination, target)
+    def deny(_left: int, _source: str, _right: int, _target: str) -> None:
+        raise PermissionError("persistent rollback denial")
 
     monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
-    monkeypatch.setattr(assembler, "_rename_no_overwrite", deny)
+    monkeypatch.setattr(assembler, "_rename_exchange", deny)
     with pytest.raises(CandidateAssemblyError) as caught:
         assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
     assert caught.value.code == "foreign-replacement"
@@ -680,6 +660,63 @@ def test_persistent_rollback_failure_preserves_primary_error_and_reports_residue
     assert caught.value.cleanup_error.startswith("assembly-rollback:")
     assert "cleanup failure: assembly-rollback:" in str(caught.value)
     assert (tmp_path / "candidate/manifest.json").is_file()
+    assert list(tmp_path.glob(".candidate-rollback-*")) == []
+
+
+def test_post_promotion_fchmod_failure_moves_candidate_away_before_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_rename = assembler._rename_no_overwrite
+    real_fchmod = assembler.os.fchmod
+    promoted = False
+
+    def observe_promotion(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal promoted
+        real_rename(parent, source, destination, target)
+        if source == "candidate" and target == "candidate" and parent != destination:
+            promoted = True
+
+    def deny_after_promotion(descriptor: int, mode: int) -> None:
+        if promoted:
+            raise PermissionError("persistent post-promotion fchmod denial")
+        real_fchmod(descriptor, mode)
+
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", observe_promotion)
+    monkeypatch.setattr(assembler.os, "fchmod", deny_after_promotion)
+    with pytest.raises(CandidateAssemblyError) as caught:
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert caught.value.code == "assembly-publication"
+    assert caught.value.cleanup_error is not None
+    assert not (tmp_path / "candidate").exists()
+    assert len(list(tmp_path.glob(".candidate-rollback-*"))) == 1
+
+
+def test_post_promotion_fsync_failure_moves_candidate_away_before_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_rename = assembler._rename_no_overwrite
+    real_fsync = assembler.os.fsync
+    promoted = False
+
+    def observe_promotion(parent: int, source: str, destination: int, target: str) -> None:
+        nonlocal promoted
+        real_rename(parent, source, destination, target)
+        if source == "candidate" and target == "candidate" and parent != destination:
+            promoted = True
+
+    def deny_after_promotion(descriptor: int) -> None:
+        if promoted:
+            raise PermissionError("persistent post-promotion fsync denial")
+        real_fsync(descriptor)
+
+    monkeypatch.setattr(assembler, "_rename_no_overwrite", observe_promotion)
+    monkeypatch.setattr(assembler.os, "fsync", deny_after_promotion)
+    with pytest.raises(CandidateAssemblyError) as caught:
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert caught.value.code == "assembly-publication"
+    assert caught.value.cleanup_error is not None
+    assert not (tmp_path / "candidate").exists()
+    assert len(list(tmp_path.glob(".candidate-rollback-*"))) == 1
 
 
 def test_output_requires_absolute_symlink_free_owner_controlled_parent(
@@ -882,3 +919,50 @@ def test_success_is_point_in_time_not_a_pathname_lease(
     assert summary.artifact_count == 53
     assert not output.exists()
     assert validate_candidate_root(displaced).manifest_sha256 == summary.manifest_sha256
+
+
+def test_post_commit_staging_cleanup_failure_does_not_hide_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cleanup_called = False
+
+    def fail_cleanup(*_args: object) -> None:
+        nonlocal cleanup_called
+        cleanup_called = True
+        raise OSError("injected post-commit staging cleanup failure")
+
+    monkeypatch.setattr(assembler, "_cleanup_staging", fail_cleanup)
+    output = tmp_path / "candidate"
+    summary = assemble_candidate_fixture(RECEIPT, output)
+    assert cleanup_called
+    assert summary.output_directory == output
+    assert validate_candidate_root(output).manifest_sha256 == summary.manifest_sha256
+
+
+def test_post_commit_descriptor_close_failure_does_not_hide_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler._final_publication_gate
+    real_close = assembler.os.close
+    committed = close_failed = False
+
+    def observe_commit(*args: object, **kwargs: object) -> assembler.CandidateByteSummary:
+        nonlocal committed
+        result = real_gate(*args, **kwargs)  # type: ignore[arg-type]
+        committed = True
+        return result
+
+    def fail_first_close(descriptor: int) -> None:
+        nonlocal close_failed
+        if committed and not close_failed:
+            close_failed = True
+            raise OSError("injected post-commit descriptor close failure")
+        real_close(descriptor)
+
+    monkeypatch.setattr(assembler, "_final_publication_gate", observe_commit)
+    monkeypatch.setattr(assembler.os, "close", fail_first_close)
+    output = tmp_path / "candidate"
+    summary = assemble_candidate_fixture(RECEIPT, output)
+    assert close_failed
+    assert summary.output_directory == output
+    assert validate_candidate_root(output).manifest_sha256 == summary.manifest_sha256

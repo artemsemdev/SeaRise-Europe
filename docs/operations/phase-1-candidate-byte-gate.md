@@ -30,11 +30,16 @@ ambiguous entry is never unlinked. POSIX provides no conditional unlink, so a
 successful or failed run can retain one mode-0700 `.candidate-assembly-*`
 wrapper per invocation outside the public output name. Repeated runs can retain
 multiple wrappers. Remove a wrapper only after the assembler process has exited,
-or let the ephemeral CI workspace remove it. Transient rollback rename failures
-are retried. A persistent kernel refusal preserves the primary validation error,
+or let the ephemeral CI workspace remove it. Rollback moves the exact owned
+directory away from the public name before any fallible thaw or residue cleanup.
+Transient rollback rename failures are retried. A persistent kernel refusal preserves the primary validation error,
 adds an explicit `assembly-rollback` cleanup failure, and can leave the exact
 owned failed directory at the public name; isolate that failed workspace before
-operator cleanup.
+operator cleanup. Once rollback clears the public name, a later thaw or sync
+failure can retain the failed candidate under a high-entropy
+`.candidate-rollback-*` sibling, but does not restore it to the output name.
+Cleanup-only staging or descriptor errors after the final linearization do not
+change the already truthful success result.
 
 Run the assembler in one isolated process. It rejects reentrant calls, but its
 portable POSIX boundary cannot defend against malicious hooks in that process,

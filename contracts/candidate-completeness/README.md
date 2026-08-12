@@ -67,11 +67,18 @@ wrapper only after the assembler process exits; ephemeral CI runners remove it
 with the job workspace. Its marker payloads are not valid COG, PMTiles,
 GeoParquet, or search indexes.
 
-Rollback retries bounded transient rename failures. If the operating system
+Rollback moves the exact owned failed directory away from the output name
+before attempting any fallible thaw or residue cleanup, then retries bounded
+transient rename failures. If the operating system
 rejects every quarantine attempt while the exact owned failed directory is
 still at the output name, the primary validation error is preserved and gains
 an explicit `assembly-rollback` cleanup failure. Treat that workspace as failed
-and isolate it before operator cleanup; no success summary is returned.
+and isolate it before operator cleanup; no success summary is returned. A
+failure after the public name is cleared can retain a high-entropy
+`.candidate-rollback-*` sibling until operator cleanup, but cannot restore the
+invalid candidate to the output name. Cleanup-only staging or descriptor errors
+after the final linearization do not turn a truthful committed result into a
+reported failure.
 
 Provenance, signature, and SBOM sidecars are mandatory publication evidence,
 not deferred Phase 1 work. Pair validation is still pending: a dependent

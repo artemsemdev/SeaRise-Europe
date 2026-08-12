@@ -661,6 +661,31 @@ def _rename_no_overwrite(source_parent: int, source: str, output_parent: int, ta
         raise OSError(code, os.strerror(code), target)
 
 
+def _rename_exchange(left_parent: int, left: str, right_parent: int, right: str) -> None:
+    """Atomically exchange two existing entries without requiring either child writable."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename, flag = libc.renameatx_np, 2
+    elif sys.platform.startswith("linux"):
+        rename, flag = libc.renameat2, 2
+    else:
+        _fail("assembly-publication", "atomic directory exchange is unsupported")
+    rename.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+    rename.restype = ctypes.c_int
+    if (
+        rename(
+            left_parent,
+            os.fsencode(left),
+            right_parent,
+            os.fsencode(right),
+            flag,
+        )
+        != 0
+    ):
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), right)
+
+
 def _mkdir_exclusive(parent: int, name: str, mode: int) -> tuple[int, int]:
     """Create a private child without exposing a predictable mkdir hook boundary."""
     libc = ctypes.CDLL(None, use_errno=True)
@@ -780,43 +805,68 @@ def _rollback_owned_promotion(
     stage_identity = _directory_identity(os.fstat(stage))
     if not _entry_matches(parent, output_name, stage_identity):
         return None
-    os.fchmod(stage, 0o755)
-    os.fsync(stage)
-    # A high bound prevents hostile name generation from hanging error cleanup.
+    public_quarantine, placeholder, placeholder_identity = _reserve_owned_directory(
+        parent, ".candidate-rollback-", 0o700
+    )
+    exchanged = False
+    # Darwin's exclusive rename rejects a mode-0555 directory. Exchanging the
+    # final with an exact owned empty slot moves it away without thawing it and
+    # cannot overwrite an existing entry.
     last_error: OSError | None = None
-    for _ in range(1024):
-        if not _entry_matches(parent, output_name, stage_identity):
-            return None
-        rollback_name = f".candidate-rollback-{secrets.token_hex(16)}"
-        try:
-            _rename_no_overwrite(parent, output_name, temporary, rollback_name)
-        except OSError as exc:
-            last_error = exc
+    try:
+        for _ in range(1024):
             if not _entry_matches(parent, output_name, stage_identity):
                 return None
-            continue
+            if not _entry_matches(parent, public_quarantine, placeholder_identity):
+                return None
+            try:
+                _rename_exchange(parent, output_name, parent, public_quarantine)
+            except OSError as exc:
+                last_error = exc
+                continue
+            exchanged = True
+            break
+        if not exchanged:
+            detail = f"; last retry error was {last_error}" if last_error is not None else ""
+            raise CandidateAssemblyError(
+                "assembly-rollback",
+                "owned failed candidate remains at the public output after bounded quarantine "
+                f"attempts{detail}",
+            ) from last_error
+        candidate_matches = _entry_matches(parent, public_quarantine, stage_identity)
+        placeholder_matches = _entry_matches(parent, output_name, placeholder_identity)
+        if placeholder_matches:
+            try:
+                os.rmdir(output_name, dir_fd=parent)
+            except OSError as exc:
+                raise CandidateAssemblyError(
+                    "assembly-rollback",
+                    "owned empty rollback placeholder remains at the public output",
+                ) from exc
+        if not candidate_matches or not placeholder_matches:
+            _fail("assembly-publication", "failed candidate exchange identity differs")
+        _sync_directory(parent)
+        # The invalid candidate is already absent from the public name. Thawing
+        # and moving it under the retained private wrapper are cleanup-only.
+        os.fchmod(stage, 0o700)
+        os.fsync(stage)
+        rollback_name = f".candidate-rollback-{secrets.token_hex(16)}"
+        _rename_no_overwrite(parent, public_quarantine, temporary, rollback_name)
         if not _entry_matches(temporary, rollback_name, stage_identity):
-            return None
+            _fail("assembly-publication", "failed candidate quarantine identity differs")
         _sync_rename_parents(parent, temporary)
         return rollback_name
-    # Last resort uses a separate, high-entropy parent quarantine namespace;
-    # cleanup occurs only after the exact owned directory is no longer final.
-    fallback = f".candidate-failed-{secrets.token_hex(32)}"
-    try:
-        _rename_no_overwrite(parent, output_name, temporary, fallback)
-    except OSError as exc:
-        if not _entry_matches(parent, output_name, stage_identity):
-            return None
-        detail = f"; last retry error was {last_error}" if last_error is not None else ""
-        raise CandidateAssemblyError(
-            "assembly-rollback",
-            "owned failed candidate remains at the public output after bounded quarantine "
-            f"attempts{detail}",
-        ) from exc
-    _sync_rename_parents(parent, temporary)
-    if not _entry_matches(temporary, fallback, stage_identity):
-        _fail("assembly-publication", "failed candidate quarantine identity differs")
-    return fallback
+    finally:
+        if not exchanged and _entry_matches(parent, public_quarantine, placeholder_identity):
+            try:
+                os.rmdir(public_quarantine, dir_fd=parent)
+                _sync_directory(parent)
+            except OSError:
+                pass
+        try:
+            os.close(placeholder)
+        except OSError:
+            pass
 
 
 def _final_publication_gate(
@@ -994,13 +1044,21 @@ def _assemble_candidate_fixture_once(
                 )
                 cleanup_failure.__cause__ = exc
         finally:
-            if stage_descriptor >= 0:
-                os.close(stage_descriptor)
-            if temporary_descriptor >= 0:
-                os.close(temporary_descriptor)
-            if parent_descriptor >= 0:
-                os.close(parent_descriptor)
-        if cleanup_failure is not None:
+            for descriptor in (stage_descriptor, temporary_descriptor, parent_descriptor):
+                if descriptor < 0:
+                    continue
+                try:
+                    os.close(descriptor)
+                except OSError as exc:
+                    if cleanup_failure is None:
+                        cleanup_failure = CandidateAssemblyError(
+                            "assembly-cleanup", "candidate descriptors could not be closed"
+                        )
+                        cleanup_failure.__cause__ = exc
+        # Once the final byte/tree pass has linearized a truthful publication,
+        # retained private staging and descriptor closure are cleanup-only. A
+        # caller must never receive failure for an already committed candidate.
+        if cleanup_failure is not None and not complete:
             if isinstance(primary_error, CandidateAssemblyError):
                 primary_error.preserve_cleanup_error(cleanup_failure)
             else:
