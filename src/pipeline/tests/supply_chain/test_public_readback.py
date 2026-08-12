@@ -7,6 +7,7 @@ import http.client
 import inspect
 import json
 import socket
+import ssl
 import threading
 import time
 from datetime import datetime, timezone
@@ -198,11 +199,19 @@ def test_incomplete_http_body_is_mapped_to_contract_error(monkeypatch: pytest.Mo
             pass
 
         @staticmethod
+        def _reset_remaining_timeout(**_kwargs: Any) -> None:
+            pass
+
+        @staticmethod
         def getresponse() -> Response:
             return Response()
 
         @staticmethod
         def close() -> None:
+            pass
+
+        @staticmethod
+        def abort() -> None:
             pass
 
     monkeypatch.setattr(readback, "_resolve_public_addresses", lambda _host, **_kwargs: ())
@@ -216,27 +225,38 @@ def test_incomplete_http_body_is_mapped_to_contract_error(monkeypatch: pytest.Mo
         readback._fetch("https://artemsemdev.github.io/manifest.json", 1)
 
 
-def test_total_deadline_interrupts_stalled_response_headers(
+def test_total_deadline_shutdown_interrupts_real_makefile_header_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    closed = threading.Event()
+    instances: list[Connection] = []
 
-    class Connection:
-        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-            pass
+    class Connection(readback._PinnedHTTPSConnection):
+        def __init__(self, host: str, addresses: Any, *, deadline: float) -> None:
+            super().__init__(host, addresses, deadline=deadline)
+            active, self.peer = socket.socketpair()
+            assert self._publish_socket(active)
+            self.header_read_started = threading.Event()
+            instances.append(self)
 
         @staticmethod
         def request(*_args: Any, **_kwargs: Any) -> None:
             pass
 
-        @staticmethod
-        def getresponse() -> None:
-            closed.wait(1)
-            raise OSError("connection closed at total deadline")
+        def _reset_remaining_timeout(self, **_kwargs: Any) -> None:
+            # Exercise the timer's abort path rather than a per-read socket timeout.
+            pass
 
-        @staticmethod
-        def close() -> None:
-            closed.set()
+        def getresponse(self) -> None:
+            active = self.sock
+            assert active is not None
+            with active.makefile("rb") as stream:
+                self.header_read_started.set()
+                stream.readline()
+            raise OSError("connection aborted at total deadline")
+
+        def close(self) -> None:
+            super().close()
+            self.peer.close()
 
     monkeypatch.setattr(readback, "_READBACK_DEADLINE_SECONDS", 0.02)
     monkeypatch.setattr(readback, "_resolve_public_addresses", lambda _host, **_kwargs: ())
@@ -245,6 +265,234 @@ def test_total_deadline_interrupts_stalled_response_headers(
     with pytest.raises(SupplyChainContractError, match="readback failed"):
         readback._fetch("https://artemsemdev.github.io/manifest.json", 1)
     assert time.monotonic() - started < 0.5
+    assert instances and instances[0].header_read_started.is_set()
+
+
+def test_pinned_connection_enforces_tls_identity_and_falls_back_addresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts: list[tuple[object, ...]] = []
+    raw_sockets: list[Any] = []
+    wrap_calls: list[tuple[str, bool]] = []
+
+    class RawSocket:
+        def __init__(self, family: int) -> None:
+            self.family = family
+            self.closed = False
+            raw_sockets.append(self)
+
+        def settimeout(self, value: float) -> None:
+            assert 0 < value <= 1
+
+        def connect(self, address: tuple[object, ...]) -> None:
+            attempts.append(address)
+            if address[0] == "93.184.216.34":
+                raise OSError("first public address unavailable")
+
+        def close(self) -> None:
+            self.closed = True
+
+    class TlsSocket:
+        def __init__(self, raw: RawSocket) -> None:
+            self.raw = raw
+            self.handshakes = 0
+            self.closed = False
+
+        def settimeout(self, value: float) -> None:
+            assert 0 < value <= 1
+
+        def do_handshake(self) -> None:
+            self.handshakes += 1
+
+        @staticmethod
+        def getpeername() -> tuple[str, int, int, int]:
+            return ("2606:2800:220:1:248:1893:25c8:1946", 443, 0, 0)
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Context:
+        verify_mode = ssl.CERT_REQUIRED
+        check_hostname = True
+
+        @staticmethod
+        def wrap_socket(
+            raw: RawSocket,
+            *,
+            server_hostname: str,
+            do_handshake_on_connect: bool,
+        ) -> TlsSocket:
+            wrap_calls.append((server_hostname, do_handshake_on_connect))
+            return TlsSocket(raw)
+
+    monkeypatch.setattr(
+        readback.socket,
+        "socket",
+        lambda family, _socket_type: RawSocket(family),
+    )
+    monkeypatch.setattr(readback.ssl, "create_default_context", lambda: Context())
+    addresses = (
+        (socket.AF_INET, ("93.184.216.34", 443), "93.184.216.34"),
+        (
+            socket.AF_INET6,
+            ("2606:2800:220:1:248:1893:25c8:1946", 443, 0, 0),
+            "2606:2800:220:1:248:1893:25c8:1946",
+        ),
+    )
+    connection = readback._PinnedHTTPSConnection(
+        "artemsemdev.github.io",
+        addresses,
+        deadline=time.monotonic() + 1,
+    )
+
+    connection.connect()
+
+    assert attempts == [addresses[0][1], addresses[1][1]]
+    assert raw_sockets[0].closed
+    assert wrap_calls == [("artemsemdev.github.io", False)]
+    assert isinstance(connection.sock, TlsSocket)
+    assert connection.sock.handshakes == 1
+    connection.close()
+
+
+@pytest.mark.parametrize(
+    ("verify_mode", "check_hostname"),
+    [(ssl.CERT_NONE, False), (ssl.CERT_REQUIRED, False)],
+)
+def test_pinned_connection_rejects_nonverifying_tls_context(
+    monkeypatch: pytest.MonkeyPatch,
+    verify_mode: ssl.VerifyMode,
+    check_hostname: bool,
+) -> None:
+    class Context:
+        pass
+
+    context = Context()
+    context.verify_mode = verify_mode
+    context.check_hostname = check_hostname
+    monkeypatch.setattr(readback.ssl, "create_default_context", lambda: context)
+    connection = readback._PinnedHTTPSConnection(
+        "artemsemdev.github.io",
+        ((socket.AF_INET, ("93.184.216.34", 443), "93.184.216.34"),),
+        deadline=time.monotonic() + 1,
+    )
+
+    with pytest.raises(SupplyChainContractError, match="hostname verification"):
+        connection.connect()
+
+
+@pytest.mark.parametrize("failure", ["peer-mismatch", "tls-failure"])
+def test_pinned_connection_rejects_peer_drift_and_tls_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    closed: list[str] = []
+
+    class RawSocket:
+        @staticmethod
+        def settimeout(_value: float) -> None:
+            pass
+
+        @staticmethod
+        def connect(_address: tuple[object, ...]) -> None:
+            pass
+
+        @staticmethod
+        def close() -> None:
+            closed.append("raw")
+
+    class TlsSocket:
+        @staticmethod
+        def settimeout(_value: float) -> None:
+            pass
+
+        @staticmethod
+        def do_handshake() -> None:
+            pass
+
+        @staticmethod
+        def getpeername() -> tuple[str, int]:
+            return ("93.184.216.35", 443)
+
+        @staticmethod
+        def close() -> None:
+            closed.append("tls")
+
+    class Context:
+        verify_mode = ssl.CERT_REQUIRED
+        check_hostname = True
+
+        @staticmethod
+        def wrap_socket(
+            _raw: RawSocket,
+            *,
+            server_hostname: str,
+            do_handshake_on_connect: bool,
+        ) -> TlsSocket:
+            assert server_hostname == "artemsemdev.github.io"
+            assert do_handshake_on_connect is False
+            if failure == "tls-failure":
+                raise ssl.SSLError("untrusted certificate")
+            return TlsSocket()
+
+    monkeypatch.setattr(readback.socket, "socket", lambda *_args: RawSocket())
+    monkeypatch.setattr(readback.ssl, "create_default_context", lambda: Context())
+    connection = readback._PinnedHTTPSConnection(
+        "artemsemdev.github.io",
+        ((socket.AF_INET, ("93.184.216.34", 443), "93.184.216.34"),),
+        deadline=time.monotonic() + 1,
+    )
+
+    with pytest.raises(OSError, match="pinned public address"):
+        connection.connect()
+
+    assert connection.sock is None
+    assert "tls" in closed if failure == "peer-mismatch" else "raw" in closed
+
+
+@pytest.mark.parametrize("status", [301, 302, 307, 308])
+def test_redirect_response_fails_after_exactly_one_request(
+    monkeypatch: pytest.MonkeyPatch,
+    status: int,
+) -> None:
+    instances: list[Connection] = []
+
+    class Response:
+        def __init__(self) -> None:
+            self.status = status
+
+    class Connection:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            self.requests = 0
+            instances.append(self)
+
+        def request(self, *_args: Any, **_kwargs: Any) -> None:
+            self.requests += 1
+
+        @staticmethod
+        def _reset_remaining_timeout(**_kwargs: Any) -> None:
+            pass
+
+        @staticmethod
+        def getresponse() -> Response:
+            return Response()
+
+        @staticmethod
+        def abort() -> None:
+            pass
+
+        @staticmethod
+        def close() -> None:
+            pass
+
+    monkeypatch.setattr(readback, "_resolve_public_addresses", lambda _host, **_kwargs: ())
+    monkeypatch.setattr(readback, "_PinnedHTTPSConnection", Connection)
+
+    with pytest.raises(SupplyChainContractError, match="response identity differs"):
+        readback._fetch("https://artemsemdev.github.io/manifest.json", 1)
+
+    assert len(instances) == 1
+    assert instances[0].requests == 1
 
 
 def test_existing_receipt_is_never_overwritten(tmp_path: Path) -> None:

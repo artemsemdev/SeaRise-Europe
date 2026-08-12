@@ -47,6 +47,8 @@ All notable changes to this project will be documented in this file.
 - Added a fail-closed HTTPS readback hook that reruns identity-bound Cosign
   verification before proving public manifest and provenance bytes exactly
   match the signed subjects, with a canonical non-approval audit receipt.
+  Retrieval is restricted to reviewed origins, entirely public DNS answers,
+  pinned TLS peers, direct responses, and an enforced per-subject deadline.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.

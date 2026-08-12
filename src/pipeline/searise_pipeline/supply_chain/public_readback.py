@@ -268,40 +268,98 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
         super().__init__(host, 443, timeout=_READBACK_DEADLINE_SECONDS)
         self._addresses = addresses
         self._deadline = deadline
+        self._socket_lock = threading.Lock()
+        self._aborted = threading.Event()
 
     def _remaining(self) -> float:
+        if self._aborted.is_set():
+            raise TimeoutError("public subject readback was aborted")
         remaining = self._deadline - time.monotonic()
         if remaining <= 0:
             raise TimeoutError("public subject readback deadline expired")
         return remaining
 
+    def _publish_socket(self, active: socket.socket) -> bool:
+        with self._socket_lock:
+            if self._aborted.is_set():
+                return False
+            self.sock = active
+            return True
+
+    def _release_socket(self, active: socket.socket) -> None:
+        with self._socket_lock:
+            if self.sock is active:
+                self.sock = None
+
+    def _reset_remaining_timeout(self, *, require_socket: bool = False) -> None:
+        remaining = self._remaining()
+        self.timeout = remaining
+        with self._socket_lock:
+            active = self.sock
+        if require_socket and active is None:
+            raise OSError("public subject connection closed unexpectedly")
+        if active is not None:
+            active.settimeout(remaining)
+
+    def abort(self) -> None:
+        """Interrupt in-flight socket and make later connection work fail closed."""
+        self._aborted.set()
+        with self._socket_lock:
+            active = self.sock
+            self.sock = None
+        if active is None:
+            return
+        try:
+            active.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        try:
+            active.close()
+        except OSError:
+            pass
+
     def connect(self) -> None:
         last_error: OSError | None = None
         context = ssl.create_default_context()
+        if context.verify_mode != ssl.CERT_REQUIRED or not context.check_hostname:
+            _fail("public subject TLS context does not enforce hostname verification")
         for family, sockaddr, expected_peer in self._addresses:
             raw: socket.socket | None = None
+            wrapped: ssl.SSLSocket | None = None
+            succeeded = False
             try:
                 raw = socket.socket(family, socket.SOCK_STREAM)
-                self.sock = raw
+                if not self._publish_socket(raw):
+                    raise TimeoutError("public subject readback was aborted")
                 raw.settimeout(self._remaining())
                 raw.connect(sockaddr)
-                raw.settimeout(self._remaining())
-                wrapped = context.wrap_socket(raw, server_hostname=self.host)
-                self.sock = wrapped
+                self._release_socket(raw)
+                wrapped = context.wrap_socket(
+                    raw,
+                    server_hostname=self.host,
+                    do_handshake_on_connect=False,
+                )
                 raw = None
+                if not self._publish_socket(wrapped):
+                    raise TimeoutError("public subject readback was aborted")
+                wrapped.settimeout(self._remaining())
+                wrapped.do_handshake()
+                wrapped.settimeout(self._remaining())
                 peer = ipaddress.ip_address(str(wrapped.getpeername()[0])).compressed
                 if peer != expected_peer:
-                    wrapped.close()
                     raise OSError("public subject peer differs from its pinned DNS address")
-                self.sock = wrapped
+                succeeded = True
                 return
             except OSError as exc:
                 last_error = exc
             finally:
-                if raw is not None:
-                    raw.close()
-                    if self.sock is raw:
-                        self.sock = None
+                active = wrapped if wrapped is not None else raw
+                if active is not None and not succeeded:
+                    self._release_socket(active)
+                    try:
+                        active.close()
+                    except OSError:
+                        pass
         raise OSError("could not connect to a pinned public address") from last_error
 
 
@@ -310,9 +368,7 @@ def _read_response_chunk(
     connection: _PinnedHTTPSConnection,
     size: int,
 ) -> bytes:
-    if connection.sock is None:
-        raise OSError("public subject connection closed unexpectedly")
-    connection.sock.settimeout(connection._remaining())
+    connection._reset_remaining_timeout(require_socket=True)
     return response.read1(size)
 
 
@@ -328,11 +384,12 @@ def _fetch(url: str, expected_size: int) -> bytes:
         deadline=deadline,
     )
     timeout = max(0.0, deadline - time.monotonic())
-    deadline_timer = threading.Timer(timeout, connection.close)
+    deadline_timer = threading.Timer(timeout, connection.abort)
     deadline_timer.daemon = True
     deadline_timer.start()
     path = parsed.path
     try:
+        connection._reset_remaining_timeout()
         connection.request(
             "GET",
             path,
@@ -343,6 +400,7 @@ def _fetch(url: str, expected_size: int) -> bytes:
                 "User-Agent": "SeaRise-Europe-public-readback-v1",
             },
         )
+        connection._reset_remaining_timeout(require_socket=True)
         response = connection.getresponse()
         if response.status != 200:
             _fail("public subject response identity differs")
