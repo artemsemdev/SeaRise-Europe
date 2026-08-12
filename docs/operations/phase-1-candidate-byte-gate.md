@@ -18,12 +18,12 @@ than 64 GiB for one artifact or 256 GiB across the 53 artifacts. The validator
 performs no repair or write operation.
 
 Success proves that the locally assembled bytes match the exact engineering
-candidate metadata at the linearization point between the comparison pass and
-the final identity pass over the root descriptor opened at entry. Matching
-identities during that final pass prove the tree had not drifted before the
-point. The summary is an observation, not a lease on the mutable candidate
-pathname. Keep the candidate offline and rerun the gate immediately before
-another process consumes it. Success does not prove historical filesystem write
-order, artifact-format correctness, production readiness, scientific approval,
-signing, supply-chain approval, or publication. Those decisions remain in their
-independent gates.
+candidate metadata at the linearization point where the candidate pathname is
+reopened immediately before the final identity pass. That descriptor remains
+open for the complete pass. Matching identities during the pass prove the tree
+had not drifted before the point. The summary is an observation, not a lease on
+the mutable candidate pathname. Keep the candidate offline and rerun the gate
+immediately before another process consumes it. Success does not prove
+historical filesystem write order, artifact-format correctness, production
+readiness, scientific approval, signing, supply-chain approval, or publication.
+Those decisions remain in their independent gates.

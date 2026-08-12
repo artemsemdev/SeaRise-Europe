@@ -307,6 +307,30 @@ def test_candidate_root_replacement_after_comparison_scan_fails_closed(
     assert caught.value.code == "candidate-changed"
 
 
+def test_candidate_root_replacement_before_linearized_pass_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, _ = _candidate(tmp_path / "authority")
+    replacement, _, _ = _candidate(tmp_path / "replacement")
+    displaced = tmp_path / "displaced-authority"
+    real_inspect = byte_gate._inspect_tree
+    inspections = 0
+
+    def replace_before_linearized_pass(*args: object, **kwargs: object):
+        nonlocal inspections
+        inspections += 1
+        if inspections == 3:
+            root.replace(displaced)
+            replacement.replace(root)
+        return real_inspect(*args, **kwargs)
+
+    monkeypatch.setattr(byte_gate, "_inspect_tree", replace_before_linearized_pass)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "candidate-changed"
+    assert inspections == 3
+
+
 def test_failure_never_repairs_or_rewrites_candidate(tmp_path: Path) -> None:
     root, candidate, _ = _candidate(tmp_path)
     target = root / candidate["artifacts"][0]["path"]

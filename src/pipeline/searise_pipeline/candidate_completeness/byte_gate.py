@@ -290,17 +290,17 @@ def validate_candidate_root(candidate_root: Path) -> CandidateByteSummary:
             _fail("candidate-changed", "candidate manifest changed during validation")
         if _inspect_tree(root, tree) != baseline:
             _fail("candidate-changed", "candidate tree changed during validation")
-        reopened = _open_root(candidate_root)
+        # Resolving this descriptor from the current pathname is the documented
+        # linearization point. Keep it open for the complete final pass so a
+        # later pathname replacement cannot change the observed tree.
+        linearized = _open_root(candidate_root)
         try:
-            if _identity(os.fstat(reopened)) != _identity(os.fstat(root)):
+            if _identity(os.fstat(linearized)) != _identity(os.fstat(root)):
                 _fail("candidate-changed", "candidate root changed during validation")
+            if _inspect_tree(linearized, tree) != baseline:
+                _fail("candidate-changed", "candidate changed before byte-gate linearization")
         finally:
-            os.close(reopened)
-        # The start of this final pass is the documented linearization point.
-        # Later matching identities prove that no entry had drifted before that
-        # point; the result does not lease the mutable pathname after the pass.
-        if _inspect_tree(root, tree) != baseline:
-            _fail("candidate-changed", "candidate changed before byte-gate linearization")
+            os.close(linearized)
         return CandidateByteSummary(
             candidate_id=summary.candidate_id,
             data_release_id=summary.data_release_id,
