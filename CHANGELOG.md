@@ -28,7 +28,9 @@ All notable changes to this project will be documented in this file.
 - Added a candidate-wide QA executor that byte-gates the complete manifest,
   dispatches every schema-selected artifact in manifest order, retains explicit
   pass, fail, and not-measured dispositions, and rejects candidate mutation
-  during validation before any release eligibility can be reported.
+  during validation before any release eligibility can be reported. The same
+  authority now validates the exact 51-artifact pre-terminal snapshot before
+  gate reports, checksums, and the manifest exist.
 - Added a release-bound settlement Web Worker and Chromium evidence harness
   with core-first loading, monotonic query tokens, bounded search, static-only
   networking, worker-isolate memory telemetry, and accepted production-scale

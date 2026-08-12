@@ -18,6 +18,14 @@ The deterministic seal order is:
 5. pass the separate supply-chain evidence-envelope and signing gate before any
    publication.
 
+`execute_pre_gate_qa` enforces step 1 against the version-selected routing
+matrix. It requires the exact ordered 51-artifact v2 inventory, streams every
+single-link regular file through a no-follow descriptor before dispatch, and
+rehashes the complete snapshot after dispatch. Validators receive the candidate
+and release identities plus the peer-artifact root, while the manifest identity
+remains explicitly absent until the last-write seal exists. Any missing route,
+non-pass disposition, byte mismatch, or concurrent byte change blocks sealing.
+
 `scripts/release/validate_candidate_bytes.py` applies the read-only byte gate
 to an assembled candidate root. It opens the root and descendants without
 following symlinks, requires exactly 54 single-link regular files plus

@@ -15,7 +15,9 @@ from .provenance import (
 from .qa_execution import (
     CandidateQaArtifactResult,
     CandidateQaExecution,
+    PreGateQaExecution,
     execute_candidate_qa,
+    execute_pre_gate_qa,
 )
 from .validator import (
     CandidateContractError,
@@ -35,9 +37,11 @@ __all__ = [
     "CandidateQaExecution",
     "CandidateSummary",
     "ProvenanceContractError",
+    "PreGateQaExecution",
     "assemble_candidate_fixture",
     "canonical_provenance_bytes",
     "execute_candidate_qa",
+    "execute_pre_gate_qa",
     "generate_provenance_statement",
     "load_candidate",
     "load_candidate_bytes",

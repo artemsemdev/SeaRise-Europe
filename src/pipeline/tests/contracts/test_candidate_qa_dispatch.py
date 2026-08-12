@@ -7,6 +7,7 @@ import pytest
 
 from searise_pipeline.candidate_completeness.qa_dispatch import (
     ArtifactValidator,
+    CandidateQaContext,
     QaValidationOutcome,
     QaValidationRequest,
     QaValidatorDispatcher,
@@ -27,12 +28,21 @@ def _registry() -> dict[str, ArtifactValidator]:
 
 
 def _request(selector: ArtifactSelector | None = None) -> QaValidationRequest:
+    context = CandidateQaContext(
+        candidate_root=Path("candidate"),
+        candidate_id="candidate-phase-1-fixture-20260811-0123456789ab",
+        data_release_id="searise-europe-v1.0.0-20260811-0123456789ab",
+        data_provenance_class="synthetic-fixture",
+        manifest_sha256="b" * 64,
+        artifact_count=54,
+    )
     return QaValidationRequest(
         artifact_id="scenario-config",
         artifact_path=Path("candidate/config/scenarios.json"),
         selector=selector
         or ArtifactSelector("scenario-config", "application/json", "identity"),
         declared_sha256="a" * 64,
+        candidate=context,
     )
 
 

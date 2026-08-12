@@ -13,6 +13,18 @@ QaStatus = Literal["pass", "fail", "not-measured"]
 
 
 @dataclass(frozen=True)
+class CandidateQaContext:
+    """Immutable candidate identity and peer-artifact root available to validators."""
+
+    candidate_root: Path
+    candidate_id: str
+    data_release_id: str
+    data_provenance_class: str
+    manifest_sha256: str | None
+    artifact_count: int
+
+
+@dataclass(frozen=True)
 class QaValidationRequest:
     """One declared artifact routed to an authoritative validator.
 
@@ -25,6 +37,7 @@ class QaValidationRequest:
     artifact_path: Path
     selector: ArtifactSelector
     declared_sha256: str
+    candidate: CandidateQaContext
 
 
 @dataclass(frozen=True)
@@ -73,6 +86,11 @@ class QaValidatorDispatcher:
     @property
     def validator_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._validators))
+
+    @property
+    def matrix(self) -> QaRoutingMatrix:
+        """Expose the exact immutable routing authority selected by the dispatcher."""
+        return self._matrix
 
     def validator_id_for(self, selector: ArtifactSelector) -> str:
         validator_id = self._routes.get(selector)
