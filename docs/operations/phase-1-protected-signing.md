@@ -61,3 +61,28 @@ deploy, publish or activate a candidate, or perform public readback. Production,
 publication, scientific approval, protected-environment verification, and
 public-readback claims remain false; any later publication/readback gate must
 produce separately reviewed evidence.
+
+## Release-lifetime evidence handoff
+
+The workflow artifact is an execution handoff, not the durable product-release
+record. After a separately reviewed public upload and successful
+`verify_public_signed_subjects.py` run, retain the exact evidence set with:
+
+```bash
+PYTHONPATH=src/pipeline python scripts/release/retain_release_evidence.py \
+  --candidate-root /absolute/path/to/candidate \
+  --evidence-root /absolute/path/to/finalized-evidence \
+  --cryptographic-receipt /absolute/path/to/cryptographic-verification.json \
+  --public-readback-receipt /absolute/path/to/public-readback.json \
+  --repository-root "$PWD" \
+  --output-root /absolute/release-store/<dataReleaseId>/supply-chain
+```
+
+The output parent must already exist, be owned by the runner, have mode `0700`,
+and sit outside the candidate, evidence, receipt, and repository authorities.
+The command publishes one no-overwrite tree containing 18 read-only files: the
+manifest, 14 finalized evidence files, both verification receipts, and
+`retention-receipt.json`. The receipt binds the other 17 files by byte size and
+SHA-256 and declares `immutable-release-lifetime`; any correction uses a new
+data release ID. This operation does not publish or activate the candidate and
+makes no production, publication, or scientific-approval claim.

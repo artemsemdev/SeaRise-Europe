@@ -74,6 +74,15 @@ leave the previous verified release active; do not repair or overwrite a failed
 candidate in place. Verification and public-readback receipts follow the same
 immutable retention period as the candidate they identify.
 
+After both verification gates pass, use
+`scripts/release/retain_release_evidence.py` to create the exact
+`<dataReleaseId>/supply-chain` handoff. The command copies the manifest,
+finalized evidence, cryptographic-verification receipt, and public-readback
+receipt into one descriptor-validated, read-only tree and writes a canonical
+retention receipt. The final path is append-only: corrections require a new
+data release ID. Retention records evidence availability only; they do not
+grant production, publication, or scientific approval.
+
 ## Supported versions
 
 There are no versioned public releases. Security fixes target the default branch
