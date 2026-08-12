@@ -24,15 +24,18 @@ per query. The report records:
 
 Percentiles use the nearest-rank definition over the retained raw observations.
 
-The report is canonical JSON with a deterministic identity. The validator
+The report is canonical JSON with a deterministic content identity. The validator
 rebinds it to the exact projection, receipt, shard bytes, and canonical query
-set and recomputes every distribution and budget outcome. Raw query text is not
-copied into the report; only the query-set byte identity and deterministic
-result-count identity are retained.
+set, recomputes the deterministic result-count identity from those exact inputs,
+and recomputes every distribution and budget outcome. Raw query text is not
+copied into the report; only the query-set byte identity and result-count
+identity are retained. Validation does not authenticate the recorded timing or
+memory observations: they remain diagnostic until an external controlled
+evidence workflow retains or signs the exact report identity.
 
 ## Reference profile and limitations
 
-`settlement-node-worker-reference-v1` is a repeatable production-input harness
+`settlement-node-worker-reference-v1` is a repeatable production-input-format harness
 profile, not the accepted browser mobile profile. It uses the exact Node
 20.20.1 shard runtime, `worker_threads`, a `tsx` source loader, structured-clone
 transfer, a warm local filesystem after receipt validation, and no network.

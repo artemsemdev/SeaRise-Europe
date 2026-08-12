@@ -22,6 +22,8 @@ import {
   SHARD_RECEIPT_FILENAME,
   buildBrowserSearchShards,
   loadBrowserSearchShards,
+  mergeCoreFirst,
+  searchBrowserShard,
 } from "../shards/browser-shards";
 import type { LoadedBrowserShardSet } from "../shards/browser-shards";
 
@@ -185,7 +187,7 @@ export type BrowserWorkerPerformanceReport = {
   };
   interpretation: {
     exactReceiptAndShardBytesMeasured: true;
-    productionInputCompatible: true;
+    productionInputFormatCompatible: true;
     browserOrMobilePerformanceMeasured: false;
     completeAcceptedBudgetsMeasured: false;
   };
@@ -521,6 +523,20 @@ function allBudgetOutcome(outcomes: readonly Outcome[]): Outcome {
   return outcomes.every((outcome) => outcome === "pass") ? "pass" : "not-measured";
 }
 
+function deterministicResultCountsSha256(bindings: EvidenceBindings): string {
+  const core = bindings.loaded.shards["europe-core"].shard;
+  const coastal = bindings.loaded.shards["europe-coastal"].shard;
+  const counts = bindings.querySet.queries.map(({ id, query }) => [
+    id,
+    mergeCoreFirst(
+      searchBrowserShard(core, query),
+      searchBrowserShard(coastal, query),
+      100,
+    ).length,
+  ]);
+  return digest(`${canonical(counts)}\n`);
+}
+
 export async function measureBrowserWorkerPerformance(
   options: PerformanceOptions,
 ): Promise<BrowserWorkerPerformanceReport> {
@@ -533,6 +549,10 @@ export async function measureBrowserWorkerPerformance(
   const bindings = inputBindings(options);
   const build = distribution(exactBuildSamples(options, bindings.loaded));
   const workers = await workerMeasurements(options, bindings);
+  const expectedResultCountsSha256 = deterministicResultCountsSha256(bindings);
+  if (workers.resultCountsSha256 !== expectedResultCountsSha256) {
+    fail("worker query results differ from the exact shard semantics");
+  }
   const initialization = distribution(workers.initialization);
   const query = distribution(workers.query);
   const peak = (key: keyof MemorySnapshot) => Math.max(...workers.memory.map((item) => item[key]));
@@ -550,7 +570,6 @@ export async function measureBrowserWorkerPerformance(
     Object.values(budgets).map(({ outcome }) => outcome)
   );
   const artifacts = reportArtifacts(bindings.loaded);
-  const core = bindings.loaded.shards["europe-core"].shard;
   const unsigned = {
     schemaVersion: PERFORMANCE_REPORT_VERSION,
     generatedAt,
@@ -601,7 +620,7 @@ export async function measureBrowserWorkerPerformance(
       byteSize: bindings.queryBytes.length,
       sha256: digest(bindings.queryBytes),
       queryCount: bindings.querySet.queries.length,
-      resultCountsSha256: workers.resultCountsSha256,
+      resultCountsSha256: expectedResultCountsSha256,
     },
     measurements: {
       build: { executionOutcome: "pass" as const, distribution: build, budget: budgets.build },
@@ -620,7 +639,7 @@ export async function measureBrowserWorkerPerformance(
     },
     interpretation: {
       exactReceiptAndShardBytesMeasured: true as const,
-      productionInputCompatible: true as const,
+      productionInputFormatCompatible: true as const,
       browserOrMobilePerformanceMeasured: false as const,
       completeAcceptedBudgetsMeasured: false as const,
     },
@@ -689,7 +708,7 @@ export function validateBrowserWorkerPerformanceReport(
       || report.querySet.byteSize !== bindings.queryBytes.length
       || report.querySet.sha256 !== digest(bindings.queryBytes)
       || report.querySet.queryCount !== bindings.querySet.queries.length
-      || !/^[0-9a-f]{64}$/.test(report.querySet.resultCountsSha256)) {
+      || report.querySet.resultCountsSha256 !== deterministicResultCountsSha256(bindings)) {
     fail("performance report query-set binding differs");
   }
   if (!exactKeys(report.profile, ["profileId", "runtime", "execution", "sampling"])
@@ -758,11 +777,11 @@ export function validateBrowserWorkerPerformanceReport(
   const expectedOverall = allBudgetOutcome(outcomes);
   if (report.operatorThresholdOutcome !== expectedOverall
       || !exactKeys(report.interpretation, [
-        "exactReceiptAndShardBytesMeasured", "productionInputCompatible",
+        "exactReceiptAndShardBytesMeasured", "productionInputFormatCompatible",
         "browserOrMobilePerformanceMeasured", "completeAcceptedBudgetsMeasured",
       ])
       || report.interpretation.exactReceiptAndShardBytesMeasured !== true
-      || report.interpretation.productionInputCompatible !== true
+      || report.interpretation.productionInputFormatCompatible !== true
       || report.interpretation.browserOrMobilePerformanceMeasured !== false
       || report.interpretation.completeAcceptedBudgetsMeasured !== false) {
     fail("performance report interpretation differs");

@@ -321,7 +321,7 @@
     },
     {
       "id": "frontend-settlement-worker-performance",
-      "layer": "performance",
+      "layer": "integration",
       "owner": "frontend",
       "purpose": "Keep exact settlement shard performance evidence receipt-bound, semantic-validated, provenance-explicit, and honest about its Node worker reference profile.",
       "sourcePaths": ["src/frontend/src/search/performance/*.test.ts"],
@@ -330,7 +330,7 @@
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent production-input measurement foundation; a browser runner may supplement but must not weaken exact receipt, byte, provenance, or nonclaim validation." },
       "commands": { "focused": "cd src/frontend && npm test -- src/search/performance/browser-worker-evidence.test.ts", "full": "cd src/frontend && npm test" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 5, "class": "fast", "evidenceRef": "local-2026-08-12-settlement-worker-performance", "scope": "focused synthetic suite" },
+      "cost": { "estimatedSeconds": 5, "class": "fast", "evidenceRef": "local-2026-08-12-settlement-worker-performance", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed synthetic bytes, explicit sample counts, no network, and semantic assertions; timing thresholds are deliberately generous in contract tests and are not release evidence." }
     },
     {

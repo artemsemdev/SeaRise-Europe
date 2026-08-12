@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -22,6 +23,25 @@ let shardDirectory: string;
 let querySetPath: string;
 let options: PerformanceOptions;
 let measured: BrowserWorkerPerformanceReport;
+
+function canonicalForTest(value: unknown): string {
+  if (value === null || typeof value === "boolean" || typeof value === "string"
+      || typeof value === "number") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalForTest).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+    left < right ? -1 : left > right ? 1 : 0
+  );
+  return `{${entries.map(([key, item]) =>
+    `${JSON.stringify(key)}:${canonicalForTest(item)}`).join(",")}}`;
+}
+
+function recomputeIdentity(report: BrowserWorkerPerformanceReport): void {
+  const unsigned = Object.fromEntries(
+    Object.entries(report).filter(([key]) => key !== "deterministicIdentity")
+  );
+  report.deterministicIdentity = createHash("sha256")
+    .update(`${canonicalForTest(unsigned)}\n`).digest("hex");
+}
 
 describe("receipt-bound settlement browser worker performance evidence", () => {
   beforeAll(async () => {
@@ -76,7 +96,7 @@ describe("receipt-bound settlement browser worker performance evidence", () => {
       profile: { execution: { browserRuntimeMeasured: false } },
       interpretation: {
         exactReceiptAndShardBytesMeasured: true,
-        productionInputCompatible: true,
+        productionInputFormatCompatible: true,
         browserOrMobilePerformanceMeasured: false,
         completeAcceptedBudgetsMeasured: false,
       },
@@ -87,10 +107,21 @@ describe("receipt-bound settlement browser worker performance evidence", () => {
     )).toBe(true);
     expect(measured.artifacts.uniqueRecordCount).toBe(3);
     expect(measured.querySet).not.toHaveProperty("queries");
+    expect(measured.interpretation).not.toHaveProperty("productionInputCompatible");
     expect(measured.measurements.build.distribution.sampleCount).toBe(1);
     expect(measured.measurements.initialization.distribution.sampleCount).toBe(2);
     expect(measured.measurements.query.distribution.sampleCount).toBe(4);
     expect(measured.measurements.workerMemory.peakObservedWorkerBytes).toBeGreaterThan(0);
+  });
+
+  it("rejects a replaced deterministic result identity after report reidentification", () => {
+    const tampered = structuredClone(measured);
+    tampered.querySet.resultCountsSha256 = "0".repeat(64);
+    recomputeIdentity(tampered);
+    const reportPath = join(root, "tampered-result-counts.json");
+    writePerformanceReport(reportPath, tampered);
+    expect(() => readAndValidateBrowserWorkerPerformanceReport(reportPath, options))
+      .toThrow(/query-set binding differs/);
   });
 
   it("round-trips a canonical report and rejects browser or production claim mutations", () => {
