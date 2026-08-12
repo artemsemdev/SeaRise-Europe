@@ -71,8 +71,21 @@ A signature proves subject integrity and signing identity, not scientific
 correctness, protected-environment configuration, publication approval, or
 continuous availability. A failed signing, verification, or readback gate must
 leave the previous verified release active; do not repair or overwrite a failed
-candidate in place. Verification and public-readback receipts follow the same
-immutable retention period as the candidate they identify.
+candidate in place. Verification and public-readback receipts must be assigned
+the same externally enforced retention period as the candidate they identify.
+Local file modes do not establish or enforce that storage policy.
+
+After both verification gates pass, use
+`scripts/release/retain_release_evidence.py` to create the exact
+`<dataReleaseId>/supply-chain` handoff. The command copies the manifest,
+finalized evidence, cryptographic-verification receipt, and public-readback
+receipt into one descriptor-validated, initially read-only tree and writes a
+canonical handoff receipt. The command proves an atomic local no-overwrite
+commit, not release-lifetime retention, deletion prevention, or co-retention
+with published data. Apply and audit those controls in the external release
+store. The retained verification receipts remain audit records produced by
+their separate verifier gates; this handoff does not reauthenticate those
+gates or grant production, publication, or scientific approval.
 
 ## Supported versions
 
