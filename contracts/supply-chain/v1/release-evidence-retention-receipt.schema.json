@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/release-evidence-retention-receipt.schema.json",
+  "title": "SeaRise Europe immutable release evidence retention receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "receiptType", "candidateId", "dataReleaseId", "dataProvenanceClass", "controlledBuildRunId", "files", "retention", "claims", "deterministicIdentity"],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v1/release-evidence-retention-receipt.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "receiptType": { "const": "phase-1-release-evidence-retention-v1" },
+    "candidateId": { "type": "string", "pattern": "^candidate-[a-z0-9][a-z0-9-]+$" },
+    "dataReleaseId": { "type": "string", "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$" },
+    "dataProvenanceClass": { "enum": ["synthetic-fixture", "real-source"] },
+    "controlledBuildRunId": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+    "files": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "items": { "$ref": "#/$defs/file" }
+    },
+    "retention": {
+      "const": {
+        "class": "immutable-release-lifetime",
+        "coRetainedWithDataRelease": true,
+        "overwriteAllowed": false,
+        "correctionPolicy": "new-data-release-id"
+      }
+    },
+    "claims": {
+      "const": {
+        "completeHandoff": true,
+        "cryptographicVerificationReceiptRetained": true,
+        "publicReadbackReceiptRetained": true,
+        "productionClaim": false,
+        "publicationApproval": false,
+        "scientificApproval": false
+      }
+    },
+    "deterministicIdentity": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "byteSize", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[?#\\\\])(?:[A-Za-z0-9][A-Za-z0-9._-]*)(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$" },
+        "byteSize": { "type": "integer", "minimum": 1, "maximum": 134217728 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

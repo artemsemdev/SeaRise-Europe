@@ -11,6 +11,7 @@ from .contracts import (
     validate_evidence_files,
 )
 from .cosign_tool import CosignToolSummary, validate_cosign_tool_lock
+from .evidence_retention import ReleaseEvidenceRetention, retain_release_evidence
 from .nuget_sbom import generate_nuget_sbom, publish_nuget_sbom, validate_nuget_sbom
 from .protected_workflow_artifacts import (
     CandidateArtifactAuthority,
@@ -41,6 +42,7 @@ __all__ = [
     "CosignToolSummary",
     "ProtectedWorkflowArtifactError",
     "PublicReadbackVerification",
+    "ReleaseEvidenceRetention",
     "SupplyChainContractError",
     "canonical_sbom_bytes",
     "discover_dependency_inputs",
@@ -55,6 +57,7 @@ __all__ = [
     "publish_npm_sbom",
     "publish_nuget_sbom",
     "publish_python_sbom",
+    "retain_release_evidence",
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_candidate_evidence_pair",
