@@ -1,4 +1,11 @@
-"""Immutable pre-verification evidence finalization for controlled candidates."""
+"""Immutable pre-verification evidence finalization for controlled candidates.
+
+Each run retains one bounded, mode-0700, high-entropy private snapshot under the
+system temporary directory. The protected runner reclaims it when the runner is
+destroyed; an operator may remove it only after this process exits. Retention is
+intentional because POSIX has no inode-conditional recursive deletion primitive
+that can preserve every same-UID racing replacement.
+"""
 
 from __future__ import annotations
 
@@ -8,11 +15,11 @@ import re
 import secrets
 import stat
 import sys
-import tempfile
+from contextlib import contextmanager
 from ctypes import CDLL, c_char_p, c_int, get_errno
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, NoReturn
+from typing import Any, Iterator, Mapping, NoReturn
 
 from searise_pipeline.candidate_completeness import (
     CandidateContractError,
@@ -48,7 +55,7 @@ _ENVELOPE = PurePosixPath("evidence-envelope.json")
 _SBOM_ROOT = PurePosixPath("contracts/supply-chain/v1/sboms")
 _DEPENDENCY_INVENTORY = PurePosixPath("contracts/supply-chain/v1/dependency-inventory.json")
 _RUN_ID = re.compile(r"[1-9][0-9]*")
-_TEMP_ROOT = Path(tempfile.gettempdir()).resolve()
+_TEMP_ROOT = Path(os.getenv("TMPDIR", "/tmp")).resolve()
 _MAX_RUN_ID_BYTES = 20
 _MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 _MAX_RECEIPT_BYTES = 2 * 1024 * 1024
@@ -136,6 +143,11 @@ def _same_file(left: os.stat_result, right: os.stat_result) -> bool:
     return all(getattr(left, field) == getattr(right, field) for field in fields)
 
 
+def _require_single_link(value: os.stat_result, label: str) -> None:
+    if value.st_nlink != 1:
+        _fail(f"{label} must have exactly one hard link")
+
+
 def _bounded_names(directory: int, *, maximum: int, label: str) -> tuple[str, ...]:
     """Stream at most ``maximum`` descriptor-bound names, then sort that bounded set."""
     names: list[str] = []
@@ -194,6 +206,7 @@ def _read_bounded(
             linked = os.stat(logical.name, dir_fd=directory, follow_symlinks=False)
             if not stat.S_ISREG(before.st_mode) or not _same_file(before, linked):
                 _fail(f"{label} must be a regular file")
+            _require_single_link(before, label)
             if before.st_size > maximum:
                 _fail(f"{label} exceeds its {maximum}-byte limit")
             budget.reserve(before.st_size, label)
@@ -216,6 +229,7 @@ def _read_bounded(
                 or len(raw) != after.st_size
             ):
                 _fail(f"{label} changed while it was read")
+            _require_single_link(after, label)
             return raw
         finally:
             os.close(descriptor)
@@ -247,6 +261,7 @@ def _create_directory(parent: int, name: str, label: str) -> int:
     _logical(name, label)
     try:
         os.mkdir(name, 0o700, dir_fd=parent)
+        created = os.stat(name, dir_fd=parent, follow_symlinks=False)
         descriptor = os.open(
             name,
             os.O_RDONLY
@@ -256,7 +271,7 @@ def _create_directory(parent: int, name: str, label: str) -> int:
             dir_fd=parent,
         )
         linked = os.stat(name, dir_fd=parent, follow_symlinks=False)
-        if not _same(os.fstat(descriptor), linked):
+        if not _same(created, os.fstat(descriptor)) or not _same(created, linked):
             _fail(f"{label} directory changed during creation")
         return descriptor
     except Exception as exc:
@@ -267,6 +282,25 @@ def _create_directory(parent: int, name: str, label: str) -> int:
         if not isinstance(exc, OSError):
             raise
         raise SupplyChainContractError(f"could not create private {label} directory") from exc
+
+
+def _new_private_snapshot() -> tuple[int, str, int, Path, os.stat_result]:
+    parent = _open_root(_TEMP_ROOT, "private snapshot parent")
+    for _ in range(128):
+        name = f"searise-production-evidence-{secrets.token_hex(16)}"
+        try:
+            descriptor = _create_directory(parent, name, "private snapshot")
+        except SupplyChainContractError as exc:
+            try:
+                os.stat(name, dir_fd=parent, follow_symlinks=False)
+            except FileNotFoundError:
+                os.close(parent)
+                raise exc
+            continue
+        identity = os.fstat(descriptor)
+        return parent, name, descriptor, _TEMP_ROOT / name, identity
+    os.close(parent)
+    _fail("could not reserve a private snapshot directory")
 
 
 def _candidate_snapshot(
@@ -408,6 +442,28 @@ def _require_current_source_root(
         os.close(current)
 
 
+def _require_current_path(path: Path, held: int, expected: os.stat_result, label: str) -> None:
+    if not _same(expected, os.fstat(held)):
+        _fail(f"held {label} changed during finalization")
+    current = _open_root(path, f"current {label}")
+    try:
+        if not _same(expected, os.fstat(current)):
+            _fail(f"{label} path changed during finalization")
+    finally:
+        os.close(current)
+
+
+@contextmanager
+def _descriptor_working_directory(descriptor: int) -> Iterator[None]:
+    previous = os.open(".", os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0))
+    try:
+        os.fchdir(descriptor)
+        yield
+    finally:
+        os.fchdir(previous)
+        os.close(previous)
+
+
 def _repository_snapshots(
     repository_root: Path,
     destination: Path,
@@ -493,13 +549,21 @@ def _repository_snapshots(
         for logical, raw in repository_files.items():
             _snapshot_fd(destination_descriptor, logical, raw)
         baseline = _validate_tree(destination_descriptor, repository_files)
-        validate_dependency_inventory(
-            destination / _DEPENDENCY_INVENTORY,
-            repository_root=destination,
-        )
-        for logical in _SBOM_PATHS:
-            source = _SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
-            _validate_sbom_authority(logical, destination / source, destination)
+        with _descriptor_working_directory(destination_descriptor):
+            descriptor_root = Path(".")
+            validated_inventory = validate_dependency_inventory(
+                descriptor_root / _DEPENDENCY_INVENTORY,
+                repository_root=descriptor_root,
+            )
+            if validated_inventory != inventory:
+                _fail("dependency inventory validator did not consume descriptor snapshot bytes")
+            for logical in _SBOM_PATHS:
+                source = _SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
+                validated = _validate_sbom_authority(
+                    logical, descriptor_root / source, descriptor_root
+                )
+                if canonical_provenance_bytes(validated) != sboms[logical]:
+                    _fail(f"SBOM validator did not consume descriptor snapshot bytes: {logical}")
         _validate_tree(destination_descriptor, repository_files, baseline=baseline)
         current_discovery, current_records = _discover_source_dependencies(descriptor)
         if current_discovery != discovered or current_records != source_baseline:
@@ -508,6 +572,117 @@ def _repository_snapshots(
         return policy, sboms, repository_files, baseline
     finally:
         os.close(descriptor)
+
+
+def _validate_snapshot_authorities(
+    candidate_descriptor: int,
+    repository_descriptor: int,
+    manifest: Mapping[str, Any],
+    manifest_raw: bytes,
+    provenance_raw: bytes,
+    policy_raw: bytes,
+    bundle_raw: Mapping[str, bytes],
+    sboms: Mapping[str, bytes],
+    candidate_files: Mapping[PurePosixPath, bytes],
+    trusted_invocation_uri: str,
+) -> None:
+    with _descriptor_working_directory(repository_descriptor):
+        descriptor_root = Path(".")
+        validated_inventory = validate_dependency_inventory(
+            descriptor_root / _DEPENDENCY_INVENTORY,
+            repository_root=descriptor_root,
+        )
+        inventory = _strict_json(
+            _read_bounded(
+                repository_descriptor,
+                _DEPENDENCY_INVENTORY,
+                "descriptor snapshot dependency inventory",
+                maximum=_MAX_INVENTORY_BYTES,
+                budget=_ReadBudget(_MAX_INVENTORY_BYTES),
+            ),
+            "descriptor snapshot dependency inventory",
+        )
+        if validated_inventory != inventory:
+            _fail("dependency inventory validator did not consume descriptor snapshot bytes")
+        for logical in _SBOM_PATHS:
+            source = _SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
+            validated = _validate_sbom_authority(logical, descriptor_root / source, descriptor_root)
+            if canonical_provenance_bytes(validated) != sboms[logical]:
+                _fail(f"SBOM validator did not consume descriptor snapshot bytes: {logical}")
+    with _descriptor_working_directory(candidate_descriptor):
+        generated = canonical_provenance_bytes(
+            generate_provenance_statement(
+                Path(_MANIFEST.as_posix()),
+                Path(_RECEIPT.as_posix()),
+                trusted_invocation_uri=trusted_invocation_uri,
+            )
+        )
+    if generated != provenance_raw:
+        _fail("descriptor-bound candidate snapshot does not match generated provenance")
+    _require_provenance_byte_bindings(provenance_raw, manifest, manifest_raw, candidate_files)
+    _validate_real_source_unverified_evidence(
+        canonical_provenance_bytes(
+            _envelope(
+                manifest,
+                manifest_raw,
+                provenance_raw,
+                policy_raw,
+                bundle_raw,
+                sboms,
+            )
+        ),
+        manifest_raw,
+        provenance_raw,
+        policy_raw,
+        bundle_raw,
+        sboms,
+    )
+
+
+def _require_provenance_byte_bindings(
+    provenance_raw: bytes,
+    manifest: Mapping[str, Any],
+    manifest_raw: bytes,
+    candidate_files: Mapping[PurePosixPath, bytes],
+) -> None:
+    statement = _strict_json(provenance_raw, "generated provenance")
+    try:
+        definition = statement["predicate"]["buildDefinition"]
+        byproducts = statement["predicate"]["runDetails"]["byproducts"]
+        build_raw = candidate_files[_RECEIPT]
+        artifacts = {item["path"]: item for item in manifest["artifacts"]}
+        subjects = [
+            {"name": item["path"], "digest": {"sha256": item["sha256"]}}
+            for item in artifacts.values()
+            if item["role"]
+            in {"projection-analysis-cog", "projection-geoparquet", "projection-visual-pmtiles"}
+        ]
+        subjects.append({"name": "manifest.json", "digest": {"sha256": _sha256(manifest_raw)}})
+        subjects.sort(key=lambda item: item["name"])
+        dependencies = {item["uri"]: item["digest"] for item in definition["resolvedDependencies"]}
+        expected_receipts = {
+            f"urn:searise:source-receipt:{item['path'].replace('/', '%2F')}": {
+                "sha256": item["sha256"]
+            }
+            for item in manifest["artifacts"]
+            if item["role"] == "source-receipt"
+        }
+        if (
+            definition["externalParameters"]["actualManifestSha256"] != _sha256(manifest_raw)
+            or statement["subject"] != subjects
+            or byproducts
+            != [
+                {
+                    "name": "receipts/build.json",
+                    "digest": {"sha256": _sha256(build_raw)},
+                    "annotations": {"byteSize": len(build_raw)},
+                }
+            ]
+            or any(dependencies.get(uri) != digest for uri, digest in expected_receipts.items())
+        ):
+            _fail("generated provenance does not bind descriptor snapshot bytes")
+    except (KeyError, TypeError) as exc:
+        raise SupplyChainContractError("generated provenance byte bindings are malformed") from exc
 
 
 def _descriptor(path: str, raw: bytes, **fields: object) -> dict[str, object]:
@@ -613,7 +788,11 @@ def _new_stage(parent: int) -> tuple[str, int, os.stat_result]:
     _fail("could not reserve a private evidence staging directory")
 
 
-def _snapshot_fd(root: int, logical: PurePosixPath, raw: bytes) -> None:
+def _snapshot_fd(
+    root: int,
+    logical: PurePosixPath,
+    raw: bytes,
+) -> None:
     _logical(logical.as_posix(), "snapshot")
     directory = os.dup(root)
     directories = [directory]
@@ -658,6 +837,7 @@ def _snapshot_fd(root: int, logical: PurePosixPath, raw: bytes) -> None:
             current = os.fstat(descriptor)
             if not _same_file(current, linked) or current.st_size != len(raw):
                 _fail("descriptor-bound evidence file changed while it was written")
+            _require_single_link(current, "descriptor-bound evidence file")
         finally:
             os.close(descriptor)
         for item in reversed(directories):
@@ -749,6 +929,7 @@ def _validate_tree(
                     or not _same_file(before, linked)
                 ):
                     _fail("evidence tree entry is not the expected private regular file")
+                _require_single_link(before, "evidence tree regular file")
                 raw = expected_files[child_path]
                 if before.st_size != len(raw):
                     _fail("evidence tree file size changed before publication")
@@ -771,6 +952,7 @@ def _validate_tree(
                     or digest != _sha256(raw)
                 ):
                     _fail("evidence tree file identity or SHA-256 changed")
+                _require_single_link(after, "evidence tree regular file")
                 records[child_path] = _record(after, "file", digest)
             finally:
                 os.close(child)
@@ -924,23 +1106,34 @@ def _move_owned_to_residue(parent: int, expected: os.stat_result, output_name: s
     for _ in range(128):
         residue = f".evidence-incomplete-{secrets.token_hex(16)}"
         try:
-            os.stat(residue, dir_fd=parent, follow_symlinks=False)
-        except FileNotFoundError:
-            try:
-                _rename_exclusive(parent, owned_name, residue)
-            except SupplyChainContractError:
-                continue
-            moved = os.stat(residue, dir_fd=parent, follow_symlinks=False)
-            if not _same_inode(expected, moved):
-                try:
-                    _rename_exclusive(parent, residue, owned_name)
-                    os.fsync(parent)
-                except Exception:
-                    pass
-                return None
+            _rename_exclusive(parent, owned_name, residue)
+        except SupplyChainContractError:
+            continue
+        moved = os.stat(residue, dir_fd=parent, follow_symlinks=False)
+        if _same_inode(expected, moved):
             os.fsync(parent)
             return residue
+        _restore_foreign_residue(parent, residue, owned_name, moved)
+        return None
     return None
+
+
+def _restore_foreign_residue(
+    parent: int,
+    residue: str,
+    original_name: str,
+    foreign: os.stat_result,
+) -> None:
+    try:
+        _rename_exclusive(parent, residue, original_name)
+    except SupplyChainContractError:
+        return
+    try:
+        restored = os.stat(original_name, dir_fd=parent, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if _same_inode(foreign, restored):
+        os.fsync(parent)
 
 
 def _quarantine_failed_publication(parent: int, expected: os.stat_result, output_name: str) -> None:
@@ -1000,30 +1193,27 @@ def finalize_production_evidence(
             _SIGNATURE_PATHS[0]: _read_external(manifest_bundle, "manifest bundle", budget),
             _SIGNATURE_PATHS[1]: _read_external(provenance_bundle, "provenance bundle", budget),
         }
-        with tempfile.TemporaryDirectory(
-            prefix="searise-production-evidence-", dir=_TEMP_ROOT
-        ) as temp:
-            root = Path(temp)
+        snapshot_parent, snapshot_name, snapshot_descriptor, root, snapshot_identity = (
+            _new_private_snapshot()
+        )
+        try:
             candidate_snapshot = root / "candidate"
             repository_snapshot = root / "repository"
-            snapshot_parent = _open_root(root, "private snapshot")
             try:
                 candidate_descriptor = _create_directory(
-                    snapshot_parent, "candidate", "candidate snapshot"
+                    snapshot_descriptor, "candidate", "candidate snapshot"
                 )
             except Exception:
-                os.close(snapshot_parent)
                 raise
             try:
                 repository_descriptor = _create_directory(
-                    snapshot_parent, "repository", "repository snapshot"
+                    snapshot_descriptor, "repository", "repository snapshot"
                 )
             except Exception:
                 os.close(candidate_descriptor)
-                os.close(snapshot_parent)
                 raise
             try:
-                manifest_path, manifest, manifest_raw, candidate_files = _candidate_snapshot(
+                _manifest_path, manifest, manifest_raw, candidate_files = _candidate_snapshot(
                     candidate_root,
                     candidate_snapshot,
                     candidate_descriptor,
@@ -1041,16 +1231,18 @@ def finalize_production_evidence(
                     repository_descriptor,
                     budget,
                 )
-                provenance_raw = canonical_provenance_bytes(
-                    generate_provenance_statement(
-                        manifest_path,
-                        candidate_snapshot / _RECEIPT,
-                        trusted_invocation_uri=(
-                            "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/"
-                            f"{controlled_build_run_id}/attempts/1"
-                        ),
-                    )
+                trusted_invocation_uri = (
+                    "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/"
+                    f"{controlled_build_run_id}/attempts/1"
                 )
+                with _descriptor_working_directory(candidate_descriptor):
+                    provenance_raw = canonical_provenance_bytes(
+                        generate_provenance_statement(
+                            Path(_MANIFEST.as_posix()),
+                            Path(_RECEIPT.as_posix()),
+                            trusted_invocation_uri=trusted_invocation_uri,
+                        )
+                    )
                 _validate_tree(
                     candidate_descriptor,
                     candidate_files,
@@ -1071,18 +1263,24 @@ def finalize_production_evidence(
                         sboms,
                     )
                 )
-                _validate_real_source_unverified_evidence(
-                    envelope_raw,
+                _validate_snapshot_authorities(
+                    candidate_descriptor,
+                    repository_descriptor,
+                    manifest,
                     manifest_raw,
                     provenance_raw,
                     policy_raw,
                     bundle_raw,
                     sboms,
+                    candidate_files,
+                    trusted_invocation_uri,
+                )
+                _require_current_path(
+                    root, snapshot_descriptor, snapshot_identity, "private snapshot"
                 )
             finally:
                 os.close(candidate_descriptor)
                 os.close(repository_descriptor)
-                os.close(snapshot_parent)
             stage_files = {
                 _PROVENANCE: provenance_raw,
                 **{PurePosixPath(logical): raw for logical, raw in bundle_raw.items()},
@@ -1116,6 +1314,12 @@ def finalize_production_evidence(
                         stage_baseline,
                         output_root.name,
                     )
+                    _require_current_path(
+                        output_root.parent,
+                        output_parent,
+                        output_parent_identity,
+                        "output evidence parent",
+                    )
                 except Exception as primary:
                     _quarantine_failed_publication(
                         output_parent,
@@ -1129,6 +1333,9 @@ def finalize_production_evidence(
                     ) from primary
             finally:
                 os.close(stage_descriptor)
+        finally:
+            os.close(snapshot_descriptor)
+            os.close(snapshot_parent)
     finally:
         os.close(output_parent)
     return ProductionEvidenceSummary(

@@ -30,6 +30,13 @@ INVENTORY = ROOT / "contracts/supply-chain/v1/dependency-inventory.json"
 POLICY = ROOT / "contracts/supply-chain/v1/identity-policy.json"
 
 
+@pytest.fixture(autouse=True)
+def _private_snapshot_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "private-snapshots"
+    root.mkdir()
+    monkeypatch.setattr(production_evidence, "_TEMP_ROOT", root)
+
+
 def _candidate(root: Path) -> tuple[Path, Path]:
     candidate, build = _documents()
     candidate["dataProvenanceClass"] = build["dataProvenanceClass"] = "real-source"
@@ -244,6 +251,37 @@ def test_output_parent_swap_fails_and_preserves_replacement(
     assert (parent / "alien").read_text() == "preserve"
 
 
+def test_output_parent_swap_after_publish_fails_and_preserves_foreign_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
+    parent, moved = tmp_path / "output", tmp_path / "moved-output"
+    parent.mkdir()
+    output = (parent / "evidence").absolute()
+    original = production_evidence._rename_exclusive
+
+    def swap(parent_descriptor: int, source: str, destination: str) -> None:
+        original(parent_descriptor, source, destination)
+        if destination == output.name:
+            parent.rename(moved)
+            parent.mkdir()
+            output.mkdir()
+            (output / "alien").write_text("preserve", encoding="utf-8")
+
+    monkeypatch.setattr(production_evidence, "_rename_exclusive", swap)
+    with pytest.raises(SupplyChainContractError, match="parent.*changed"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=output,
+        )
+    assert (output / "alien").read_text(encoding="utf-8") == "preserve"
+    assert not (output / "evidence-envelope.json").exists()
+
+
 def test_stage_name_swap_fails_without_deleting_foreign_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -314,6 +352,104 @@ def test_intermediate_symlink_race_preserves_primary_failure(
             output_root=(tmp_path / "evidence").absolute(),
         )
     assert list(foreign.iterdir()) == []
+
+
+def test_transient_private_snapshot_path_swap_cannot_change_descriptor_consumers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
+    original = production_evidence.generate_provenance_statement
+    original_snapshot = production_evidence._new_private_snapshot
+    captured: list[Path] = []
+    foreign_root = tmp_path / "foreign-snapshot"
+    foreign_root.mkdir()
+    (foreign_root / "sentinel").write_text("preserve", encoding="utf-8")
+
+    def capture() -> tuple[int, str, int, Path, os.stat_result]:
+        result = original_snapshot()
+        captured.append(result[3])
+        return result
+
+    def swap(manifest_path: Path, receipt_path: Path, **kwargs: object) -> object:
+        snapshot_root = captured[0]
+        retired = snapshot_root.with_name(snapshot_root.name + "-retired")
+        snapshot_root.rename(retired)
+        foreign_root.rename(snapshot_root)
+        try:
+            return original(manifest_path, receipt_path, **kwargs)
+        finally:
+            snapshot_root.rename(foreign_root)
+            retired.rename(snapshot_root)
+
+    monkeypatch.setattr(production_evidence, "_new_private_snapshot", capture)
+    monkeypatch.setattr(production_evidence, "generate_provenance_statement", swap)
+    finalize_production_evidence(
+        candidate,
+        repository_root=ROOT,
+        controlled_build_run_id=RUN_ID,
+        manifest_bundle=manifest_bundle.absolute(),
+        provenance_bundle=provenance_bundle.absolute(),
+        output_root=(tmp_path / "evidence").absolute(),
+    )
+    assert (foreign_root / "sentinel").read_text(encoding="utf-8") == "preserve"
+
+
+def test_transient_swap_inside_dependency_resolve_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
+    original_snapshot = production_evidence._new_private_snapshot
+    original_resolve = Path.resolve
+    original_validate = production_evidence.validate_dependency_inventory
+    captured: list[Path] = []
+    swapped: list[tuple[Path, Path, Path]] = []
+    active = False
+
+    def capture() -> tuple[int, str, int, Path, os.stat_result]:
+        result = original_snapshot()
+        captured.append(result[3])
+        return result
+
+    def resolve(path: Path, *args: object, **kwargs: object) -> Path:
+        resolved = original_resolve(path, *args, **kwargs)  # type: ignore[arg-type]
+        if active and path == Path(".") and not swapped:
+            snapshot = captured[0]
+            retired = snapshot.with_name(snapshot.name + "-retired")
+            foreign = snapshot.with_name(snapshot.name + "-foreign")
+            shutil.copytree(snapshot, foreign)
+            target = foreign / "repository/src/frontend/package.json"
+            target.chmod(0o600)
+            target.write_bytes(target.read_bytes() + b" ")
+            snapshot.rename(retired)
+            foreign.rename(snapshot)
+            swapped.append((snapshot, retired, foreign))
+        return resolved
+
+    def validate(*args: object, **kwargs: object) -> dict[str, object]:
+        nonlocal active
+        active = True
+        try:
+            return original_validate(*args, **kwargs)  # type: ignore[return-value]
+        finally:
+            active = False
+            if swapped:
+                snapshot, retired, foreign = swapped[0]
+                snapshot.rename(foreign)
+                retired.rename(snapshot)
+
+    monkeypatch.setattr(production_evidence, "_new_private_snapshot", capture)
+    monkeypatch.setattr(Path, "resolve", resolve)
+    monkeypatch.setattr(production_evidence, "validate_dependency_inventory", validate)
+    with pytest.raises(SupplyChainContractError, match="dependency input"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=(tmp_path / "evidence").absolute(),
+        )
+    assert not (tmp_path / "evidence").exists()
 
 
 def test_bad_bundle_leaves_no_final_output(tmp_path: Path) -> None:
@@ -511,9 +647,9 @@ def test_all_ten_sboms_are_checked_against_merged_authorities(
     validated = []
     original = production_evidence._validate_sbom_authority
 
-    def record(logical: str, path: Path, root: Path) -> None:
+    def record(logical: str, path: Path, root: Path) -> dict[str, object]:
         validated.append(logical)
-        original(logical, path, root)
+        return original(logical, path, root)
 
     monkeypatch.setattr(production_evidence, "_validate_sbom_authority", record)
     finalize_production_evidence(
@@ -524,7 +660,7 @@ def test_all_ten_sboms_are_checked_against_merged_authorities(
         provenance_bundle=provenance_bundle.absolute(),
         output_root=(tmp_path / "evidence").absolute(),
     )
-    assert tuple(validated) == production_evidence._SBOM_PATHS
+    assert tuple(validated) == production_evidence._SBOM_PATHS * 2
 
 
 @pytest.mark.parametrize("mutation", ["extra", "missing", "replacement"])
@@ -717,6 +853,136 @@ def test_owned_final_path_is_quarantined_without_parent_scan(
     assert residue is not None
     assert not output.exists()
     assert (tmp_path / residue).is_dir()
+
+
+def test_quarantine_rename_restores_foreign_racing_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "evidence"
+    output.mkdir(mode=0o700)
+    expected = output.stat(follow_symlinks=False)
+    owned_away = tmp_path / "owned-away"
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    (foreign / "sentinel").write_text("preserve", encoding="utf-8")
+    original = production_evidence._rename_exclusive
+    injected = False
+
+    def race(parent: int, left: str, right: str) -> None:
+        nonlocal injected
+        if not injected:
+            injected = True
+            output.rename(owned_away)
+            foreign.rename(output)
+        original(parent, left, right)
+
+    monkeypatch.setattr(production_evidence, "_rename_exclusive", race)
+    parent = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        assert production_evidence._move_owned_to_residue(parent, expected, output.name) is None
+    finally:
+        os.close(parent)
+    assert (output / "sentinel").read_text(encoding="utf-8") == "preserve"
+    assert owned_away.is_dir()
+    assert not any(path.name.startswith(".evidence-incomplete-") for path in tmp_path.iterdir())
+
+
+def test_quarantine_restore_never_overwrites_second_foreign_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "evidence"
+    output.mkdir(mode=0o700)
+    expected = output.stat(follow_symlinks=False)
+    owned_away = tmp_path / "owned-away"
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    (foreign / "first").write_text("preserve", encoding="utf-8")
+    original = production_evidence._rename_exclusive
+    calls = 0
+
+    def race(parent: int, left: str, right: str) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            output.rename(owned_away)
+            foreign.rename(output)
+        elif calls == 2:
+            output.mkdir()
+            (output / "second").write_text("preserve", encoding="utf-8")
+        original(parent, left, right)
+
+    monkeypatch.setattr(production_evidence, "_rename_exclusive", race)
+    parent = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        assert production_evidence._move_owned_to_residue(parent, expected, output.name) is None
+    finally:
+        os.close(parent)
+    assert (output / "second").read_text(encoding="utf-8") == "preserve"
+    residues = [
+        path for path in tmp_path.iterdir() if path.name.startswith(".evidence-incomplete-")
+    ]
+    assert len(residues) == 1
+    assert (residues[0] / "first").read_text(encoding="utf-8") == "preserve"
+    assert owned_away.is_dir()
+
+
+def test_failure_retains_one_bounded_private_snapshot_and_no_public_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
+    output = (tmp_path / "evidence").absolute()
+    original = production_evidence._require_published_tree
+    calls = 0
+
+    def fail(*args: object) -> None:
+        nonlocal calls
+        calls += 1
+        original(*args)  # type: ignore[arg-type]
+        if calls == 2:
+            raise SupplyChainContractError("injected post-publication failure")
+
+    monkeypatch.setattr(production_evidence, "_require_published_tree", fail)
+    with pytest.raises(SupplyChainContractError, match="injected post-publication failure"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=output,
+        )
+    assert not output.exists()
+    residues = list(production_evidence._TEMP_ROOT.iterdir())
+    assert len(residues) == 1
+    assert residues[0].name.startswith("searise-production-evidence-")
+    assert residues[0].stat().st_mode & 0o777 == 0o700
+    assert (residues[0] / "candidate/manifest.json").is_file()
+    assert (residues[0] / "repository/contracts/supply-chain/v1").is_dir()
+
+
+def test_external_hardlink_to_staged_file_fails_before_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
+    external = tmp_path / "external-hardlink"
+    original = production_evidence._snapshot_fd
+
+    def link(root: int, logical: PurePosixPath, raw: bytes) -> None:
+        original(root, logical, raw)
+        if logical == production_evidence._PROVENANCE:
+            os.link(logical.name, external, src_dir_fd=root)
+
+    monkeypatch.setattr(production_evidence, "_snapshot_fd", link)
+    with pytest.raises(SupplyChainContractError, match="exactly one hard link"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=(tmp_path / "evidence").absolute(),
+        )
+    assert not (tmp_path / "evidence").exists()
 
 
 def test_replacement_after_publish_is_rejected_and_foreign_path_is_preserved(
@@ -941,3 +1207,29 @@ def test_snapshot_child_descriptor_closes_on_identity_failure(
     assert len(captured) == 1
     with pytest.raises(OSError):
         os.fstat(captured[0])
+
+
+def test_created_directory_inode_is_bound_before_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parent = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    original = os.open
+    moved = tmp_path / "owned-created"
+    injected = False
+
+    def replace(path: str, flags: int, *args: object, **kwargs: object) -> int:
+        nonlocal injected
+        if path == "child" and not injected:
+            injected = True
+            (tmp_path / "child").rename(moved)
+            (tmp_path / "child").mkdir()
+        return original(path, flags, *args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(production_evidence.os, "open", replace)
+    try:
+        with pytest.raises(SupplyChainContractError, match="changed during creation"):
+            production_evidence._create_directory(parent, "child", "test")
+    finally:
+        os.close(parent)
+    assert moved.is_dir()
+    assert (tmp_path / "child").is_dir()

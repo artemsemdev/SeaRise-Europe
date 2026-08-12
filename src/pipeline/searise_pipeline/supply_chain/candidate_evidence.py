@@ -237,19 +237,19 @@ def _bind_bytes(descriptor: Mapping[str, Any], raw: bytes, label: str) -> None:
         _fail(f"{label} descriptor does not bind its exact bytes")
 
 
-def _validate_sbom_authority(logical: str, path: Path, root: Path) -> None:
+def _validate_sbom_authority(logical: str, path: Path, root: Path) -> dict[str, Any]:
     if logical == _SBOM_PATHS[0]:
         inventory = root / "contracts/supply-chain/v1/dependency-inventory.json"
-        validate_build_plane_sbom(path, inventory, repository_root=root)
+        return validate_build_plane_sbom(path, inventory, repository_root=root)
     elif logical == _SBOM_PATHS[1]:
         lock = root / "src/frontend/package-lock.json"
-        validate_npm_sbom(
+        return validate_npm_sbom(
             path, lock, repository_root=root, logical_path="src/frontend/package-lock.json"
         )
     elif logical.startswith("sbom/nuget/"):
         component = logical.split("searise-", 1)[1].split("-net8.0", 1)[0].title()
         project = root / f"src/api/SeaRise.{component}"
-        validate_nuget_sbom(
+        return validate_nuget_sbom(
             path,
             project / f"SeaRise.{component}.csproj",
             project / "packages.lock.json",
@@ -261,7 +261,7 @@ def _validate_sbom_authority(logical: str, path: Path, root: Path) -> None:
         target = next(item for item in _PYTHON_TARGETS if stem.endswith(item))
         graph = stem.removesuffix(f"-{target}")
         annotation = root / f"contracts/supply-chain/v1/python-graphs/{graph}-runtime.json"
-        validate_python_sbom(path, annotation, repository_root=root, target_id=target)
+        return validate_python_sbom(path, annotation, repository_root=root, target_id=target)
 
 
 def _validate_candidate_evidence_pair(
