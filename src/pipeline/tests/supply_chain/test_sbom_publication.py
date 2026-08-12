@@ -382,6 +382,31 @@ def test_partial_inode_race_is_detected_without_deleting_racing_bytes(
     assert _partials(tmp_path)[0].read_bytes() == racing
 
 
+@pytest.mark.parametrize("constraint", ["parent", "ancestor"])
+def test_generic_publication_enforces_reviewed_parent_and_forbidden_ancestor(
+    tmp_path: Path, constraint: str
+) -> None:
+    parent = tmp_path / "receipt-parent"
+    parent.mkdir()
+    parent_inode = sbom_module._inode(parent.stat())
+    options = (
+        {"required_parent_inode": (parent_inode[0], parent_inode[1] + 1)}
+        if constraint == "parent"
+        else {"forbidden_ancestor_inodes": frozenset({parent_inode})}
+    )
+
+    with pytest.raises(SupplyChainContractError, match="reviewed identity|protected input root"):
+        sbom_module.write_new_immutable_bytes(
+            parent / "receipt.json",
+            b"exact\n",
+            label="test receipt",
+            mode=0o400,
+            partial_prefix=".test-receipt-",
+            **options,
+        )
+    assert list(parent.iterdir()) == []
+
+
 def test_unsafe_or_symlinked_output_ancestry_fails_closed(tmp_path: Path) -> None:
     with pytest.raises(SupplyChainContractError, match="unsafe SBOM output path"):
         write_new_sbom(Path("../escape.json"), b"content")

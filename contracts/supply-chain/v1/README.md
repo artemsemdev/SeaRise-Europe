@@ -22,8 +22,8 @@ HTTPS readback of the exact manifest and provenance subjects. The readback hook
 reruns Cosign verification against the reviewed workflow identity immediately
 before fetching, refuses redirects, compression, cross-origin URLs, unbounded
 responses, and byte drift, then binds the public URLs and SHA-256 values to the
-fresh cryptographic-verification receipt. It proves byte equality at the
-recorded instant; it is not publication approval, availability monitoring, a
+fresh cryptographic-verification receipt. It proves byte equality during a
+readback completed by the recorded instant; it is not publication approval, availability monitoring, a
 production claim, or scientific approval.
 
 The reviewed Cosign Linux AMD64 source lock is documented in
@@ -45,8 +45,9 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
 
 The output parent directory must already exist and must not be a symlink. The
 command never replaces an existing path. It writes and synchronizes a unique
-same-directory partial file, promotes it without overwrite, and removes the
-partial file if publication fails.
+same-directory partial file and promotes it with an exclusive rename. A failed
+publication moves writer-owned residue to a random `searise-sbom-rollback`
+name for inspection instead of risking deletion of a concurrently replaced path.
 
 Validate the checked-in public bytes against the exact repository lock:
 

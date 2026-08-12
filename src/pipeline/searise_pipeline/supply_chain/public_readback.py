@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import ipaddress
 import json
 import os
 import re
+import socket
+import ssl
 import stat
-import urllib.error
+import threading
+import time
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Mapping, NoReturn
+from queue import Queue
+from typing import Any, Callable, Iterable, Mapping, NoReturn, Sequence
 
 from .candidate_evidence import _open_root
 from .contracts import SupplyChainContractError, _validate_schema
@@ -27,6 +31,8 @@ _SCHEMA_URI = (
 )
 _SUBJECT_PATHS = ("manifest.json", "provenance.intoto.jsonl")
 _MAX_SUBJECT_BYTES = 8 * 1024 * 1024
+_READBACK_DEADLINE_SECONDS = 30.0
+_REVIEWED_PUBLIC_ORIGINS = frozenset({"https://artemsemdev.github.io"})
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -109,7 +115,11 @@ def _read_subject(root: Path, logical: str) -> bytes:
         os.close(descriptor)
 
 
-def _origin(value: str) -> str:
+def _origin(
+    value: str,
+    *,
+    reviewed_origins: Iterable[str] = _REVIEWED_PUBLIC_ORIGINS,
+) -> str:
     try:
         parsed = urllib.parse.urlsplit(value)
         port = parsed.port
@@ -130,6 +140,8 @@ def _origin(value: str) -> str:
     canonical = f"https://{host}"
     if value != canonical:
         _fail("public readback origin must already be canonical")
+    if canonical not in frozenset(reviewed_origins):
+        _fail("public readback origin is not in the reviewed allowlist")
     return canonical
 
 
@@ -192,47 +204,172 @@ def _subject_url(value: str, expected_origin: str) -> str:
     return canonical
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, *args: Any, **kwargs: Any) -> None:
-        return None
+_ResolvedAddress = tuple[int, tuple[object, ...], str]
+
+
+def _resolve_public_addresses(
+    host: str,
+    *,
+    deadline: float | None = None,
+) -> tuple[_ResolvedAddress, ...]:
+    results: Queue[object] = Queue(maxsize=1)
+
+    def resolve() -> None:
+        try:
+            results.put(socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM))
+        except BaseException as exc:
+            results.put(exc)
+
+    resolver = threading.Thread(target=resolve, name="searise-public-readback-dns", daemon=True)
+    resolver.start()
+    timeout = None if deadline is None else max(0.0, deadline - time.monotonic())
+    resolver.join(timeout)
+    if resolver.is_alive():
+        _fail("public subject DNS resolution exceeded the readback deadline")
+    result = results.get_nowait()
+    if isinstance(result, BaseException):
+        if isinstance(result, socket.gaierror):
+            raise SupplyChainContractError("public subject DNS resolution failed") from result
+        raise result
+    records = result
+    if not isinstance(records, list):
+        _fail("public subject DNS returned an invalid result")
+    resolved: list[_ResolvedAddress] = []
+    seen: set[tuple[int, str]] = set()
+    for family, socket_type, protocol, _canonical, sockaddr in records:
+        if family not in (socket.AF_INET, socket.AF_INET6) or socket_type != socket.SOCK_STREAM:
+            continue
+        address = str(sockaddr[0])
+        try:
+            parsed = ipaddress.ip_address(address)
+        except ValueError as exc:
+            raise SupplyChainContractError(
+                "public subject DNS returned a malformed address"
+            ) from exc
+        if not parsed.is_global:
+            _fail("public subject DNS resolved outside the public Internet")
+        key = family, parsed.compressed
+        if key not in seen:
+            seen.add(key)
+            resolved.append((family, tuple(sockaddr), parsed.compressed))
+    if not resolved:
+        _fail("public subject DNS returned no public address")
+    return tuple(resolved)
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(
+        self,
+        host: str,
+        addresses: Sequence[_ResolvedAddress],
+        *,
+        deadline: float,
+    ) -> None:
+        super().__init__(host, 443, timeout=_READBACK_DEADLINE_SECONDS)
+        self._addresses = addresses
+        self._deadline = deadline
+
+    def _remaining(self) -> float:
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("public subject readback deadline expired")
+        return remaining
+
+    def connect(self) -> None:
+        last_error: OSError | None = None
+        context = ssl.create_default_context()
+        for family, sockaddr, expected_peer in self._addresses:
+            raw: socket.socket | None = None
+            try:
+                raw = socket.socket(family, socket.SOCK_STREAM)
+                self.sock = raw
+                raw.settimeout(self._remaining())
+                raw.connect(sockaddr)
+                raw.settimeout(self._remaining())
+                wrapped = context.wrap_socket(raw, server_hostname=self.host)
+                self.sock = wrapped
+                raw = None
+                peer = ipaddress.ip_address(str(wrapped.getpeername()[0])).compressed
+                if peer != expected_peer:
+                    wrapped.close()
+                    raise OSError("public subject peer differs from its pinned DNS address")
+                self.sock = wrapped
+                return
+            except OSError as exc:
+                last_error = exc
+            finally:
+                if raw is not None:
+                    raw.close()
+                    if self.sock is raw:
+                        self.sock = None
+        raise OSError("could not connect to a pinned public address") from last_error
+
+
+def _read_response_chunk(
+    response: http.client.HTTPResponse,
+    connection: _PinnedHTTPSConnection,
+    size: int,
+) -> bytes:
+    if connection.sock is None:
+        raise OSError("public subject connection closed unexpectedly")
+    connection.sock.settimeout(connection._remaining())
+    return response.read1(size)
 
 
 def _fetch(url: str, expected_size: int) -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/octet-stream",
-            "Accept-Encoding": "identity",
-            "User-Agent": "SeaRise-Europe-public-readback-v1",
-        },
-        method="GET",
+    parsed = urllib.parse.urlsplit(url)
+    host = parsed.hostname
+    if host is None:
+        _fail("public subject URL has no host")
+    deadline = time.monotonic() + _READBACK_DEADLINE_SECONDS
+    connection = _PinnedHTTPSConnection(
+        host,
+        _resolve_public_addresses(host, deadline=deadline),
+        deadline=deadline,
     )
-    opener = urllib.request.build_opener(_NoRedirect)
+    timeout = max(0.0, deadline - time.monotonic())
+    deadline_timer = threading.Timer(timeout, connection.close)
+    deadline_timer.daemon = True
+    deadline_timer.start()
+    path = parsed.path
     try:
-        with opener.open(request, timeout=30) as response:
-            if response.status != 200 or response.geturl() != url:
-                _fail("public subject response identity differs")
-            encoding = response.headers.get("Content-Encoding")
-            if encoding not in (None, "identity"):
-                _fail("public subject response uses content encoding")
-            declared = response.headers.get("Content-Length")
-            if declared is not None and (not declared.isdigit() or int(declared) != expected_size):
-                _fail("public subject Content-Length differs")
-            chunks: list[bytes] = []
-            remaining = expected_size
-            while remaining:
-                chunk = response.read(min(65536, remaining))
-                if not chunk:
-                    _fail("public subject response ended early")
-                chunks.append(chunk)
-                remaining -= len(chunk)
-            if response.read(1):
-                _fail("public subject response exceeds the signed byte size")
-            return b"".join(chunks)
+        connection.request(
+            "GET",
+            path,
+            headers={
+                "Accept": "application/octet-stream",
+                "Accept-Encoding": "identity",
+                "Host": host,
+                "User-Agent": "SeaRise-Europe-public-readback-v1",
+            },
+        )
+        response = connection.getresponse()
+        if response.status != 200:
+            _fail("public subject response identity differs")
+        encoding = response.getheader("Content-Encoding")
+        if encoding not in (None, "identity"):
+            _fail("public subject response uses content encoding")
+        declared = response.getheader("Content-Length")
+        if declared is not None and (not declared.isdigit() or int(declared) != expected_size):
+            _fail("public subject Content-Length differs")
+        chunks: list[bytes] = []
+        remaining = expected_size
+        while remaining:
+            chunk = _read_response_chunk(response, connection, min(65536, remaining))
+            if not chunk:
+                _fail("public subject response ended early")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if _read_response_chunk(response, connection, 1):
+            _fail("public subject response exceeds the signed byte size")
+        return b"".join(chunks)
     except SupplyChainContractError:
         raise
-    except (OSError, urllib.error.URLError) as exc:
+    except (OSError, http.client.HTTPException) as exc:
         raise SupplyChainContractError("public subject readback failed") from exc
+    finally:
+        deadline_timer.cancel()
+        connection.close()
 
 
 def _write_new(path: Path, raw: bytes) -> None:
@@ -241,7 +378,7 @@ def _write_new(path: Path, raw: bytes) -> None:
     write_new_sbom(path, raw)
 
 
-def verify_public_signed_subjects(
+def _verify_public_signed_subjects(
     candidate_root: Path,
     evidence_root: Path,
     *,
@@ -254,10 +391,10 @@ def verify_public_signed_subjects(
     manifest_url: str,
     provenance_url: str,
     receipt_path: Path | None = None,
-    observed_at: datetime | None = None,
-    fetch: Callable[[str, int], bytes] = _fetch,
+    fetch: Callable[[str, int], bytes],
+    clock: Callable[[], datetime],
+    reviewed_origins: Iterable[str],
 ) -> PublicReadbackVerification:
-    """Reverify signatures, then require public bytes to equal both signed subjects."""
     verification = verify_candidate_evidence_cryptographically(
         candidate_root,
         evidence_root,
@@ -267,7 +404,7 @@ def verify_public_signed_subjects(
         cosign_tool_lock=cosign_tool_lock,
         trusted_cosign_tool_lock_sha256=trusted_cosign_tool_lock_sha256,
     )
-    origin = _origin(expected_origin)
+    origin = _origin(expected_origin, reviewed_origins=reviewed_origins)
     urls = {
         "manifest.json": _subject_url(manifest_url, origin),
         "provenance.intoto.jsonl": _subject_url(provenance_url, origin),
@@ -285,7 +422,7 @@ def verify_public_signed_subjects(
         ):
             _fail(f"local subject differs from fresh cryptographic verification: {logical}")
         public = fetch(urls[logical], len(local))
-        if public != local:
+        if type(public) is not bytes or public != local:
             _fail(f"public bytes differ from the verified signed subject: {logical}")
         subjects.append(
             {
@@ -296,7 +433,7 @@ def verify_public_signed_subjects(
                 "matchesCryptographicallyVerifiedSubject": True,
             }
         )
-    instant = observed_at or datetime.now(timezone.utc)
+    instant = clock()
     if instant.tzinfo is None or instant.utcoffset() is None:
         _fail("public readback observation instant must include a timezone")
     document = {
@@ -323,3 +460,40 @@ def verify_public_signed_subjects(
     if receipt_path is not None:
         _write_new(receipt_path, raw)
     return PublicReadbackVerification(receipt=document, receipt_bytes=raw)
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def verify_public_signed_subjects(
+    candidate_root: Path,
+    evidence_root: Path,
+    *,
+    repository_root: Path,
+    controlled_build_run_id: str,
+    cosign_executable: Path,
+    cosign_tool_lock: Path,
+    trusted_cosign_tool_lock_sha256: str,
+    expected_origin: str,
+    manifest_url: str,
+    provenance_url: str,
+    receipt_path: Path | None = None,
+) -> PublicReadbackVerification:
+    """Reverify signatures, then require approved public bytes to equal both subjects."""
+    return _verify_public_signed_subjects(
+        candidate_root,
+        evidence_root,
+        repository_root=repository_root,
+        controlled_build_run_id=controlled_build_run_id,
+        cosign_executable=cosign_executable,
+        cosign_tool_lock=cosign_tool_lock,
+        trusted_cosign_tool_lock_sha256=trusted_cosign_tool_lock_sha256,
+        expected_origin=expected_origin,
+        manifest_url=manifest_url,
+        provenance_url=provenance_url,
+        receipt_path=receipt_path,
+        fetch=_fetch,
+        clock=_utc_now,
+        reviewed_origins=_REVIEWED_PUBLIC_ORIGINS,
+    )

@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
+import inspect
 import json
+import socket
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,7 +42,7 @@ def _verify(
         assert len(raw) == size
         return raw
 
-    result = readback.verify_public_signed_subjects(
+    result = readback._verify_public_signed_subjects(
         candidate,
         evidence,
         repository_root=ROOT,
@@ -49,8 +54,9 @@ def _verify(
         manifest_url="https://downloads.example.test/release/manifest.json",
         provenance_url="https://downloads.example.test/release/provenance.intoto.jsonl",
         receipt_path=(tmp_path / "public-readback.json") if receipt else None,
-        observed_at=datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
         fetch=fetch or exact,
+        clock=lambda: datetime(2026, 8, 12, 2, 0, tzinfo=timezone.utc),
+        reviewed_origins={"https://downloads.example.test"},
     )
     return result, candidate, evidence
 
@@ -143,8 +149,102 @@ def test_public_byte_tamper_fails_without_receipt(tmp_path: Path, logical: str) 
 )
 def test_public_url_boundary_rejects_unsafe_or_different_origins(origin: str, url: str) -> None:
     with pytest.raises(SupplyChainContractError, match="origin|URL|host"):
-        normalized = readback._origin(origin)
+        normalized = readback._origin(origin, reviewed_origins={origin})
         readback._subject_url(url, normalized)
+
+
+def test_exported_api_has_no_fetch_or_clock_override() -> None:
+    parameters = inspect.signature(readback.verify_public_signed_subjects).parameters
+    assert "fetch" not in parameters
+    assert "observed_at" not in parameters
+    assert "clock" not in parameters
+
+
+def test_unreviewed_public_origin_is_rejected() -> None:
+    with pytest.raises(SupplyChainContractError, match="reviewed allowlist"):
+        readback._origin("https://downloads.example.test")
+
+
+def test_dns_resolution_rejects_any_nonpublic_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        readback.socket,
+        "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),
+        ],
+    )
+    with pytest.raises(SupplyChainContractError, match="outside the public Internet"):
+        readback._resolve_public_addresses("artemsemdev.github.io")
+
+
+def test_incomplete_http_body_is_mapped_to_contract_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Headers:
+        @staticmethod
+        def getheader(_name: str) -> None:
+            return None
+
+    class Response(Headers):
+        status = 200
+
+    class Connection:
+        sock = object()
+
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        @staticmethod
+        def request(*_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        @staticmethod
+        def getresponse() -> Response:
+            return Response()
+
+        @staticmethod
+        def close() -> None:
+            pass
+
+    monkeypatch.setattr(readback, "_resolve_public_addresses", lambda _host, **_kwargs: ())
+    monkeypatch.setattr(readback, "_PinnedHTTPSConnection", Connection)
+    monkeypatch.setattr(
+        readback,
+        "_read_response_chunk",
+        lambda *_args: (_ for _ in ()).throw(http.client.IncompleteRead(b"")),
+    )
+    with pytest.raises(SupplyChainContractError, match="readback failed"):
+        readback._fetch("https://artemsemdev.github.io/manifest.json", 1)
+
+
+def test_total_deadline_interrupts_stalled_response_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    closed = threading.Event()
+
+    class Connection:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        @staticmethod
+        def request(*_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        @staticmethod
+        def getresponse() -> None:
+            closed.wait(1)
+            raise OSError("connection closed at total deadline")
+
+        @staticmethod
+        def close() -> None:
+            closed.set()
+
+    monkeypatch.setattr(readback, "_READBACK_DEADLINE_SECONDS", 0.02)
+    monkeypatch.setattr(readback, "_resolve_public_addresses", lambda _host, **_kwargs: ())
+    monkeypatch.setattr(readback, "_PinnedHTTPSConnection", Connection)
+    started = time.monotonic()
+    with pytest.raises(SupplyChainContractError, match="readback failed"):
+        readback._fetch("https://artemsemdev.github.io/manifest.json", 1)
+    assert time.monotonic() - started < 0.5
 
 
 def test_existing_receipt_is_never_overwritten(tmp_path: Path) -> None:
@@ -171,7 +271,7 @@ def test_naive_observation_instant_is_rejected(tmp_path: Path) -> None:
     roots = {"manifest.json": candidate, "provenance.intoto.jsonl": evidence}
 
     with pytest.raises(SupplyChainContractError, match="timezone"):
-        readback.verify_public_signed_subjects(
+        readback._verify_public_signed_subjects(
             candidate,
             evidence,
             repository_root=ROOT,
@@ -182,8 +282,9 @@ def test_naive_observation_instant_is_rejected(tmp_path: Path) -> None:
             expected_origin="https://downloads.example.test",
             manifest_url="https://downloads.example.test/release/manifest.json",
             provenance_url="https://downloads.example.test/release/provenance.intoto.jsonl",
-            observed_at=datetime(2026, 8, 12, 2, 0),
             fetch=lambda url, _size: (
                 roots[url.rsplit("/", 1)[1]] / url.rsplit("/", 1)[1]
             ).read_bytes(),
+            clock=lambda: datetime(2026, 8, 12, 2, 0),
+            reviewed_origins={"https://downloads.example.test"},
         )
