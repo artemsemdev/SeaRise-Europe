@@ -18,7 +18,8 @@
     "type-check": "npm run contracts:check && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "measure:ar6-release": "node scripts/measure-ar6-release.mjs"
+    "measure:ar6-release": "node scripts/measure-ar6-release.mjs",
+    "measure:settlement-worker": "node --import tsx scripts/measure-settlement-browser-worker.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.2",
