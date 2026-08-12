@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "matrixId": "phase-1-candidate-qa-role-validator-v1",
+  "candidateInventory": "contracts/candidate-completeness/v2/required-artifacts.json",
+  "routes": [
+    {"role":"architecture-evidence","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.public-contract.architecture-evidence"},
+    {"role":"build-receipt","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.build-receipt"},
+    {"role":"checksums","mediaType":"text/plain","contentEncoding":"identity","validatorId":"candidate.byte-gate.checksums"},
+    {"role":"coastal-boundary","mediaType":"application/vnd.apache.parquet","contentEncoding":"identity","validatorId":"release.boundary-geoparquet.coastal"},
+    {"role":"coastal-boundary","mediaType":"application/vnd.pmtiles","contentEncoding":"identity","validatorId":"release.boundary-pmtiles.coastal"},
+    {"role":"methodology","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.public-contract.methodology"},
+    {"role":"projection-analysis-cog","mediaType":"image/tiff; application=geotiff; profile=cloud-optimized","contentEncoding":"identity","validatorId":"release.analysis-cog"},
+    {"role":"projection-geoparquet","mediaType":"application/vnd.apache.parquet","contentEncoding":"identity","validatorId":"release.projection-geoparquet"},
+    {"role":"projection-visual-pmtiles","mediaType":"application/vnd.pmtiles","contentEncoding":"identity","validatorId":"release.projection-pmtiles"},
+    {"role":"quality-summary","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.public-contract.quality-summary"},
+    {"role":"release-gate-report","mediaType":"application/json","contentEncoding":"identity","validatorId":"candidate.qa-report-json"},
+    {"role":"release-gate-report","mediaType":"text/markdown","contentEncoding":"identity","validatorId":"candidate.qa-report-markdown"},
+    {"role":"scenario-config","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.public-contract.scenario-config"},
+    {"role":"settlement-geoparquet","mediaType":"application/vnd.apache.parquet","contentEncoding":"identity","validatorId":"settlements.geoparquet"},
+    {"role":"settlement-search-index","mediaType":"application/vnd.searise.search-index+json","contentEncoding":"br","validatorId":"settlements.browser-search-shard"},
+    {"role":"settlement-search-receipt","mediaType":"application/json","contentEncoding":"identity","validatorId":"settlements.browser-search-receipt"},
+    {"role":"source-attribution","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.rights"},
+    {"role":"source-receipt","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.public-contract.source-receipt"},
+    {"role":"stac-catalog","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.stac.catalog"},
+    {"role":"stac-collection","mediaType":"application/json","contentEncoding":"identity","validatorId":"release.stac.collection"},
+    {"role":"stac-item","mediaType":"application/geo+json","contentEncoding":"identity","validatorId":"release.stac.item"},
+    {"role":"support-boundary","mediaType":"application/vnd.apache.parquet","contentEncoding":"identity","validatorId":"release.boundary-geoparquet.support"},
+    {"role":"support-boundary","mediaType":"application/vnd.pmtiles","contentEncoding":"identity","validatorId":"release.boundary-pmtiles.support"}
+  ]
+}
