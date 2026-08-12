@@ -57,6 +57,23 @@ Report issues involving:
 - If a credential is committed, revoke it first, then remove it from the current
   tree and coordinate history cleanup privately.
 
+## Release trust chain
+
+The Phase 1 trust boundary is commit and byte based. A controlled offline build
+produces an immutable candidate; a protected, first-attempt workflow verifies
+the complete candidate byte gate, signs the exact manifest and provenance with
+keyless Cosign, and an independent job verifies the expected repository,
+workflow, and OIDC issuer. After any public upload, run
+`scripts/release/verify_public_signed_subjects.py` against the final HTTPS URLs.
+That hook reruns cryptographic verification and accepts only exact public bytes.
+
+A signature proves subject integrity and signing identity, not scientific
+correctness, protected-environment configuration, publication approval, or
+continuous availability. A failed signing, verification, or readback gate must
+leave the previous verified release active; do not repair or overwrite a failed
+candidate in place. Verification and public-readback receipts follow the same
+immutable retention period as the candidate they identify.
+
 ## Supported versions
 
 There are no versioned public releases. Security fixes target the default branch

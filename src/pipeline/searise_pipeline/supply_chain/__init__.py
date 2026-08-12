@@ -21,6 +21,7 @@ from .protected_workflow_artifacts import (
     validate_candidate_artifact_authority,
     write_candidate_artifact_authority,
 )
+from .public_readback import PublicReadbackVerification, verify_public_signed_subjects
 from .python_graph import validate_python_lock_graph
 from .python_sbom import generate_python_sbom, publish_python_sbom, validate_python_sbom
 from .sbom import (
@@ -39,6 +40,7 @@ __all__ = [
     "CandidateArtifactAuthority",
     "CosignToolSummary",
     "ProtectedWorkflowArtifactError",
+    "PublicReadbackVerification",
     "SupplyChainContractError",
     "canonical_sbom_bytes",
     "discover_dependency_inputs",
@@ -64,6 +66,7 @@ __all__ = [
     "validate_python_lock_graph",
     "validate_python_sbom",
     "verify_candidate_evidence_cryptographically",
+    "verify_public_signed_subjects",
     "write_new_sbom",
     "write_candidate_artifact_authority",
 ]
