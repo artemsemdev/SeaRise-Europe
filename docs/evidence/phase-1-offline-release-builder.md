@@ -87,6 +87,40 @@ The complete synthetic
 validates against the checked-in operator receipt schema and shows the exact
 external shape without presenting diagnostic values as release evidence.
 
+## Local production-data handoff (2026-08-12)
+
+The production settlement inputs, intermediates, outputs, receipts, and the
+validated Node-worker diagnostic were retained on the project owner's local
+workstation at:
+
+```text
+~/Desktop/Github/SeaRise Europe/local-data/phase-1/
+```
+
+The repository-relative location is `local-data/phase-1/`. The complete local
+directory occupied approximately 14 GiB when verified and contained:
+
+- the four hash-locked GeoNames source assets and captured response headers;
+- the normalized catalogue and spatial DuckDB databases with their receipts;
+- the settlement reconciliation report;
+- the 701,881-row GeoParquet artifact and receipt;
+- the 701,881-record search projection;
+- both v4 Brotli browser shards and their receipt;
+- the production query set and validated Node-worker diagnostic report; and
+- private validation work directories used for read-only replay.
+
+`local-data/` is intentionally ignored by the root `.gitignore`; these large
+bytes must not be committed. At verification time the GeoNames full scans had
+zero parser failures, the search projection reproduced byte-for-byte from the
+spatial database, and the diagnostic report validated with deterministic
+identity `36d21fd8dc303f523e5a19cb00c789804dd2a42ed9c15ba3c3d1cddff56083e9`.
+
+This location is a local operational handoff only. It is not an external
+immutable-retention authority, protected-workflow evidence, a signed release,
+or proof that the complete Phase 1 candidate gates passed. The local directory
+must be preserved until the exact bytes have been incorporated into the
+candidate-wide validation, signing, readback, and retention workflows.
+
 Two local clean invocations used independent cache roots and produced the same
 42-file candidate inventory above; recursive byte diff returned no
 differences. A third invocation using the first cache produced seven hits and
