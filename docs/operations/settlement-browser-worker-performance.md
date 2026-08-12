@@ -82,11 +82,20 @@ All paths must be absolute. The defaults are one build, five fresh worker
 initializations, and 30 measured samples per query after one warm-up. Omitted
 thresholds are written as `not-measured`; a controlled operator may supply
 positive thresholds after the applicable profile and budgets are approved.
+The historical v3 API uses only the projection and shard-directory inputs shown
+below. The v4 API additionally requires the exact spatial database and receipt,
+an isolated validation work directory, and the data release ID; the harness
+forwards all four authorities through every load, timed rebuild, and worker
+decode instead of coercing them into the older API.
 
 ```bash
 cd src/frontend
 node --import tsx scripts/measure-settlement-browser-worker.ts measure \
   --projection /absolute/search-projection.ndjson \
+  --spatial-database /absolute/spatial.duckdb \
+  --spatial-receipt /absolute/spatial-receipt.json \
+  --validation-work-dir /absolute/private-validation-work \
+  --data-release-id searise-europe-v1.0.0-YYYYMMDD-0123456789ab \
   --shard-dir /absolute/browser-shards \
   --queries /absolute/performance-queries.json \
   --report /absolute/browser-worker-performance.json \
@@ -100,6 +109,10 @@ node --import tsx scripts/measure-settlement-browser-worker.ts measure \
 
 node --import tsx scripts/measure-settlement-browser-worker.ts validate \
   --projection /absolute/search-projection.ndjson \
+  --spatial-database /absolute/spatial.duckdb \
+  --spatial-receipt /absolute/spatial-receipt.json \
+  --validation-work-dir /absolute/private-validation-work \
+  --data-release-id searise-europe-v1.0.0-YYYYMMDD-0123456789ab \
   --shard-dir /absolute/browser-shards \
   --queries /absolute/performance-queries.json \
   --report /absolute/browser-worker-performance.json
