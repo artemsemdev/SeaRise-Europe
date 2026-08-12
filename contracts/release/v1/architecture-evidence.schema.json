@@ -24,6 +24,7 @@
     "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
     "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "generatedAt": { "type": "string", "format": "date-time" },
+    "verificationArtifacts": { "$ref": "#/$defs/verificationArtifacts" },
     "runtime": {
       "type": "object",
       "additionalProperties": false,
@@ -70,6 +71,49 @@
           "evidencePath": { "$ref": "defs.schema.json#/$defs/releaseRelativePath" }
         }
       }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "dataProvenanceClass": { "const": "real-source" },
+        "verificationArtifacts": { "$ref": "#/$defs/verificationArtifacts" }
+      },
+      "required": ["dataProvenanceClass", "verificationArtifacts"]
+    },
+    {
+      "properties": {
+        "dataProvenanceClass": { "const": "synthetic-fixture" }
+      },
+      "required": ["dataProvenanceClass"]
+    }
+  ],
+  "$defs": {
+    "verificationArtifacts": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "allOf": [
+            { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+            { "const": "supply-chain/receipts/cryptographic-verification.json" }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+            { "const": "supply-chain/receipts/public-readback.json" }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "defs.schema.json#/$defs/releaseRelativePath" },
+            { "const": "supply-chain/retention-receipt.json" }
+          ]
+        }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
     }
   }
 }

@@ -12,6 +12,7 @@ const outputDirectory = join(frontendDirectory, "src/lib/contracts/generated");
 const checkOnly = process.argv.includes("--check");
 
 const targets = [
+  ["architecture-evidence.schema.json", "architecture-evidence.ts"],
   ["manifest.schema.json", "manifest.ts"],
   ["projection-result.schema.json", "projection-result.ts"],
   ["scenario-config.schema.json", "scenario-config.ts"],
