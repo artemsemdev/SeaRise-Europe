@@ -39,6 +39,8 @@ All notable changes to this project will be documented in this file.
   hashes without making a publication claim. A manifest-last production
   assembler now seals those inputs into the complete 54-artifact candidate and
   reruns the byte gate and full validator matrix before exclusive publication.
+  Repository-controlled terminal validators independently verify the report
+  schema and binding, deterministic Markdown rendering, and checksum inventory.
 - Added a release-bound settlement Web Worker and Chromium evidence harness
   with core-first loading, monotonic query tokens, bounded search, static-only
   networking, worker-isolate memory telemetry, and accepted production-scale
