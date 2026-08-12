@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Extended settlement browser-worker evidence to pass explicit spatial source,
+  validation-workspace, and release authorities through the v4 shard builder,
+  loader, and worker decoder while retaining byte-exact v3 fixture validation.
+
 ### Added
 
 - Added receipt-bound, bounded-memory settlement reconciliation evidence that
