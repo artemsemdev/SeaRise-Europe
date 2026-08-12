@@ -25,9 +25,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added a version-selected candidate QA routing matrix that covers every v2
-  artifact role, media type, and content encoding and fails closed on missing,
-  duplicate, unsorted, or unknown validator routes.
+- Added a version-selected candidate QA routing matrix and explicit-outcome
+  dispatcher that cover every v2 artifact role, media type, and content
+  encoding and fail closed on missing, duplicate, unsorted, unknown, or
+  unimplemented validator routes.
 - Added a durable Phase 1 settlement production inventory binding the verified
   GeoNames, catalogue, spatial, GeoParquet, search, shard, query-set, and
   Node-worker diagnostic identities while keeping browser and publication
