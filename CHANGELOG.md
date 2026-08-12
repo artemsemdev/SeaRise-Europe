@@ -28,6 +28,9 @@ All notable changes to this project will be documented in this file.
 - Added release v2 attribution and build-receipt contracts that cover the
   settlement search receipt role introduced by the 54-artifact candidate
   contract while leaving the published release v1 contracts immutable.
+- Added an authoritative validator for already-built projection PMTiles that
+  rechecks pinned tool identities, canonical metadata and headers, and decoded
+  source-property parity without rebuilding the archive.
 
 - Added a candidate-wide QA executor that byte-gates the complete manifest,
   dispatches every schema-selected artifact in manifest order, retains explicit
