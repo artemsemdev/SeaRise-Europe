@@ -31,6 +31,9 @@ All notable changes to this project will be documented in this file.
 - Added an authoritative validator for already-built projection PMTiles that
   rechecks pinned tool identities, canonical metadata and headers, and decoded
   source-property parity without rebuilding the archive.
+- Added candidate-bound production validators for projection COG, GeoParquet,
+  and PMTiles files, exact support and coastal boundary packages, and the
+  descriptor-bound settlement GeoParquet spatial stage.
 
 - Added a candidate-wide QA executor that byte-gates the complete manifest,
   dispatches every schema-selected artifact in manifest order, retains explicit
