@@ -93,18 +93,26 @@ describe("receipt-bound settlement browser worker performance evidence", () => {
     expect(measured.measurements.workerMemory.peakObservedWorkerBytes).toBeGreaterThan(0);
   });
 
-  it("round-trips a canonical report and rejects a semantic claim mutation", () => {
+  it("round-trips a canonical report and rejects browser or production claim mutations", () => {
     const reportPath = join(root, "report.json");
     writePerformanceReport(reportPath, measured);
     expect(readAndValidateBrowserWorkerPerformanceReport(reportPath, options).deterministicIdentity)
       .toBe(measured.deterministicIdentity);
 
-    const tampered = structuredClone(measured);
-    (tampered.claims as { productionClaim: boolean }).productionClaim = true;
-    const tamperedPath = join(root, "tampered.json");
-    writePerformanceReport(tamperedPath, tampered as BrowserWorkerPerformanceReport);
-    expect(() => readAndValidateBrowserWorkerPerformanceReport(tamperedPath, options))
-      .toThrow(/claims differ/);
+    for (const mutation of ["production", "accepted-browser-budget"] as const) {
+      const tampered = structuredClone(measured) as Omit<
+        BrowserWorkerPerformanceReport, "acceptedBrowserBudgetOutcome"
+      > & { acceptedBrowserBudgetOutcome: string };
+      if (mutation === "production") {
+        (tampered.claims as { productionClaim: boolean }).productionClaim = true;
+      } else {
+        tampered.acceptedBrowserBudgetOutcome = "pass";
+      }
+      const tamperedPath = join(root, `tampered-${mutation}.json`);
+      writePerformanceReport(tamperedPath, tampered as BrowserWorkerPerformanceReport);
+      expect(() => readAndValidateBrowserWorkerPerformanceReport(tamperedPath, options))
+        .toThrow(mutation === "production" ? /claims differ/ : /envelope differs/);
+    }
   });
 
   it("reports absent operator thresholds explicitly as not measured", async () => {

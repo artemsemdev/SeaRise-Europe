@@ -22,6 +22,8 @@ per query. The report records:
 - explicit `pass`, `fail`, or `not-measured` outcomes for each optional
   operator-supplied diagnostic threshold.
 
+Percentiles use the nearest-rank definition over the retained raw observations.
+
 The report is canonical JSON with a deterministic identity. The validator
 rebinds it to the exact projection, receipt, shard bytes, and canonical query
 set and recomputes every distribution and budget outcome. Raw query text is not

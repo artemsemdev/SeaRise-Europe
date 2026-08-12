@@ -378,7 +378,8 @@ function nextMessage<T extends WorkerResponse["kind"]>(
     };
     const error = (cause: Error) => { cleanup(); reject(cause); };
     const exit = (code: number) => {
-      if (code !== 0) { cleanup(); reject(new BrowserWorkerEvidenceError(`worker exited with ${code}`)); }
+      cleanup();
+      reject(new BrowserWorkerEvidenceError(`worker exited with ${code} before ${kind}`));
     };
     const cleanup = () => {
       worker.off("message", message);
@@ -422,7 +423,13 @@ async function workerMeasurements(
   let queryWorker: Worker | null = null;
   for (let index = 0; index < options.initializationSamples; index += 1) {
     const active = startWorker(bindings.loaded);
-    const ready = await active.ready as WorkerReady & { initializationMilliseconds: number };
+    let ready: WorkerReady & { initializationMilliseconds: number };
+    try {
+      ready = await active.ready as WorkerReady & { initializationMilliseconds: number };
+    } catch (error) {
+      await active.worker.terminate();
+      throw error;
+    }
     for (const shardId of SHARD_IDS) {
       if (ready.shardSha256[shardId] !== digest(bindings.loaded.shards[shardId].bytes)) {
         await active.worker.terminate();
@@ -789,7 +796,13 @@ export function writePerformanceReport(path: string, report: BrowserWorkerPerfor
       fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
       0o600,
     );
-    writeSync(descriptor, Buffer.from(`${canonical(report)}\n`));
+    const bytes = Buffer.from(`${canonical(report)}\n`);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const written = writeSync(descriptor, bytes, offset, bytes.length - offset);
+      if (written < 1) fail("performance report write made no progress");
+      offset += written;
+    }
     fsyncSync(descriptor);
   } catch (error) {
     if (error instanceof BrowserWorkerEvidenceError) throw error;
