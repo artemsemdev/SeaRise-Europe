@@ -19,6 +19,7 @@ from .qa_execution import (
     execute_candidate_qa,
     execute_pre_gate_qa,
 )
+from .qa_report import build_pre_gate_report
 from .validator import (
     CandidateContractError,
     CandidateSummary,
@@ -40,6 +41,7 @@ __all__ = [
     "PreGateQaExecution",
     "assemble_candidate_fixture",
     "canonical_provenance_bytes",
+    "build_pre_gate_report",
     "execute_candidate_qa",
     "execute_pre_gate_qa",
     "generate_provenance_statement",

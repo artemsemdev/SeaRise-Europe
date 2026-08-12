@@ -25,6 +25,12 @@ rehashes the complete snapshot after dispatch. Validators receive the candidate
 and release identities plus the peer-artifact root, while the manifest identity
 remains explicitly absent until the last-write seal exists. Any missing route,
 non-pass disposition, byte mismatch, or concurrent byte change blocks sealing.
+`build_pre_gate_report` deterministically groups those explicit outcomes by
+authoritative validator, preserves pass, fail, and `not-measured`, binds every
+check to release-relative artifact paths and SHA-256 identities, and renders the
+shared JSON/Markdown gate-report contract. The report remains automation-only
+and non-promoting; later owner and supply-chain gates cannot be inferred from a
+successful pre-terminal validation.
 
 `scripts/release/validate_candidate_bytes.py` applies the read-only byte gate
 to an assembled candidate root. It opens the root and descendants without

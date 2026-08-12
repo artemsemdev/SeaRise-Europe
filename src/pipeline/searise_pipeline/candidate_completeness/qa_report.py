@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
@@ -14,6 +15,7 @@ from searise_pipeline.gate_report import (
     validate_gate_report_semantics,
 )
 
+from .qa_execution import PreGateQaExecution
 from .validator import CandidateContractError
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -22,6 +24,29 @@ GATE_SCHEMA_URL = (
     "https://artemsemdev.github.io/SeaRise-Europe/contracts/"
     "release-gates/v1/gate-report.schema.json"
 )
+
+_VALIDATOR_STOP_REASONS = {
+    "release.public-contract.architecture-evidence": "owner-approval-missing",
+    "release.build-receipt": "supply-chain-invalid",
+    "release.boundary-geoparquet.coastal": "scientific-parity-failed",
+    "release.boundary-pmtiles.coastal": "scientific-parity-failed",
+    "release.public-contract.methodology": "scientific-parity-failed",
+    "release.analysis-cog": "scientific-parity-failed",
+    "release.projection-geoparquet": "scientific-parity-failed",
+    "release.projection-pmtiles": "scientific-parity-failed",
+    "release.public-contract.quality-summary": "cross-runtime-parity-failed",
+    "release.public-contract.scenario-config": "schema-invalid",
+    "settlements.geoparquet": "cross-runtime-parity-failed",
+    "settlements.browser-search-shard": "cross-runtime-parity-failed",
+    "settlements.browser-search-receipt": "cross-runtime-parity-failed",
+    "release.rights": "rights-incomplete",
+    "release.public-contract.source-receipt": "rights-incomplete",
+    "release.stac.catalog": "schema-invalid",
+    "release.stac.collection": "schema-invalid",
+    "release.stac.item": "schema-invalid",
+    "release.boundary-geoparquet.support": "scientific-parity-failed",
+    "release.boundary-pmtiles.support": "scientific-parity-failed",
+}
 
 
 def _fail(code: str, message: str) -> NoReturn:
@@ -65,6 +90,99 @@ def _artifact_evidence(
     if artifact is None:
         _fail("qa-report-evidence", f"evidence artifact is absent: {artifact_id}")
     return [_evidence(str(artifact["path"]), str(artifact["sha256"]))]
+
+
+def _validate_report(report: Mapping[str, Any]) -> None:
+    schema = json.loads(GATE_SCHEMA_PATH.read_text(encoding="utf-8"))
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(report),
+        key=lambda error: list(error.path),
+    )
+    if errors:
+        _fail("qa-report-schema", errors[0].message)
+    validate_gate_report_semantics(report)
+
+
+def build_pre_gate_report(
+    execution: PreGateQaExecution,
+    *,
+    generated_at: str,
+) -> tuple[bytes, bytes]:
+    """Render deterministic reports from the exact pre-terminal QA outcomes."""
+    if not execution.results or len(execution.results) != execution.candidate.artifact_count:
+        _fail("qa-report-execution", "pre-gate execution is incomplete")
+    grouped: dict[str, list[Any]] = defaultdict(list)
+    for result in execution.results:
+        grouped[result.validator_id].append(result)
+    unknown = sorted(set(grouped) - set(_VALIDATOR_STOP_REASONS))
+    if unknown:
+        _fail("qa-report-validator", f"validator report mapping is missing: {unknown}")
+
+    checks: list[dict[str, Any]] = []
+    for validator_id in sorted(grouped):
+        results = grouped[validator_id]
+        statuses = {result.outcome.status for result in results}
+        if "fail" in statuses:
+            status = "fail"
+            measured: int | None = sum(
+                result.outcome.status != "pass" for result in results
+            )
+        elif "not-measured" in statuses:
+            status = "not-measured"
+            measured = None
+        else:
+            status = "pass"
+            measured = 0
+        check: dict[str, Any] = {
+            "checkId": validator_id.replace(".", "-"),
+            "label": validator_id.replace(".", " ").replace("-", " ").title(),
+            "status": status,
+            "nonWaivable": True,
+            "unit": "count",
+            "target": {"operator": "exactly", "value": 0},
+            "measuredValue": measured,
+            "evidence": sorted(
+                (_evidence(result.artifact_path, result.declared_sha256) for result in results),
+                key=lambda item: item["path"],
+            ),
+        }
+        if status != "pass":
+            check["stopReasonCode"] = _VALIDATOR_STOP_REASONS[validator_id]
+        checks.append(check)
+
+    aggregate = (
+        "fail"
+        if any(check["status"] == "fail" for check in checks)
+        else "not-measured"
+        if any(check["status"] == "not-measured" for check in checks)
+        else "pass"
+    )
+    report: dict[str, Any] = {
+        "$schema": GATE_SCHEMA_URL,
+        "schemaVersion": "1.0.0",
+        "rendererVersion": "markdown-v1",
+        "ordering": "check-id-then-evidence-path-utf8-bytewise",
+        "candidateId": execution.candidate.candidate_id,
+        "dataReleaseId": execution.candidate.data_release_id,
+        "dataProvenanceClass": execution.candidate.data_provenance_class,
+        "generatedAt": generated_at,
+        "authority": {
+            "kind": "automation",
+            "automatedValidation": aggregate,
+            "ownerDisposition": "not-recorded",
+        },
+        "releasable": False,
+        "checks": checks,
+        "stopReasonCodes": sorted(
+            {
+                str(check["stopReasonCode"])
+                for check in checks
+                if "stopReasonCode" in check
+            }
+        ),
+    }
+    _validate_report(report)
+    return canonical_json(report), render_gate_report_markdown(report).encode("utf-8")
 
 
 def build_synthetic_fixture_gate_report(
@@ -185,12 +303,5 @@ def build_synthetic_fixture_gate_report(
             "supply-chain-invalid",
         ],
     }
-    schema = json.loads(GATE_SCHEMA_PATH.read_text(encoding="utf-8"))
-    errors = sorted(
-        Draft202012Validator(schema).iter_errors(report),
-        key=lambda error: list(error.path),
-    )
-    if errors:
-        _fail("qa-report-schema", errors[0].message)
-    validate_gate_report_semantics(report)
+    _validate_report(report)
     return canonical_json(report), render_gate_report_markdown(report).encode("utf-8")
