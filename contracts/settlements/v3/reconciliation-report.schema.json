@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/reconciliation-report.schema.json",
+  "title": "SeaRise Europe settlement reconciliation report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "schemaVersion", "reportType", "dataReleaseId",
+    "dataProvenanceClass", "geometryStatus", "productionClaim",
+    "publicationClaim", "signingClaim", "canonicalGeometryClaim",
+    "hazardExtentClaim", "scientificApprovalClaim", "ownerApprovalClaim",
+    "sourceBindings", "method", "recordFlow", "nameFlow", "rejections",
+    "dimensions", "deterministicIdentity"
+  ],
+  "properties": {
+    "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/reconciliation-report.schema.json" },
+    "schemaVersion": { "const": "1.0.0" },
+    "reportType": { "const": "settlement-reconciliation" },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+    "geometryStatus": { "const": "selected-scope-approximation" },
+    "productionClaim": { "const": false },
+    "publicationClaim": { "const": false },
+    "signingClaim": { "const": false },
+    "canonicalGeometryClaim": { "const": false },
+    "hazardExtentClaim": { "const": false },
+    "scientificApprovalClaim": { "const": false },
+    "ownerApprovalClaim": { "const": false },
+    "sourceBindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalogue", "spatial"],
+      "properties": {
+        "catalogue": { "$ref": "#/$defs/catalogueBinding" },
+        "spatial": { "$ref": "#/$defs/spatialBinding" }
+      }
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "populationBandVersion", "populationBandOrder", "placeDimensionUnit",
+        "nameDimensionUnit", "missingLanguageKey", "missingScriptKey"
+      ],
+      "properties": {
+        "populationBandVersion": { "const": "settlement-population-band-v1" },
+        "populationBandOrder": {
+          "const": [
+            "unknown", "zero", "1-499", "500-999", "1000-9999",
+            "10000-99999", "100000-plus"
+          ]
+        },
+        "placeDimensionUnit": { "const": "normalized-place" },
+        "nameDimensionUnit": { "const": "selected-normalized-name" },
+        "missingLanguageKey": { "const": "und" },
+        "missingScriptKey": { "const": "Zzzz" }
+      }
+    },
+    "recordFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePlaceRows", "catalogueAccepted", "catalogueRejected",
+        "spatialClassified", "spatialRejected"
+      ],
+      "properties": {
+        "sourcePlaceRows": { "$ref": "#/$defs/count" },
+        "catalogueAccepted": { "$ref": "#/$defs/count" },
+        "catalogueRejected": { "$ref": "#/$defs/count" },
+        "spatialClassified": { "$ref": "#/$defs/count" },
+        "spatialRejected": { "$ref": "#/$defs/count" }
+      }
+    },
+    "nameFlow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classifiedSelectedNames", "spatialRejectedSelectedNames", "selectedNames"
+      ],
+      "properties": {
+        "classifiedSelectedNames": { "$ref": "#/$defs/count" },
+        "spatialRejectedSelectedNames": { "$ref": "#/$defs/count" },
+        "selectedNames": { "$ref": "#/$defs/count" }
+      }
+    },
+    "rejections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalogue", "spatial"],
+      "properties": {
+        "catalogue": { "$ref": "#/$defs/reasonBuckets" },
+        "spatial": { "$ref": "#/$defs/reasonBuckets" }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "countries", "featureClasses", "featureCodes", "populationBands",
+        "coastalStatuses", "languages", "scripts"
+      ],
+      "properties": {
+        "countries": { "$ref": "#/$defs/decisionBuckets" },
+        "featureClasses": { "$ref": "#/$defs/decisionBuckets" },
+        "featureCodes": { "$ref": "#/$defs/decisionBuckets" },
+        "populationBands": { "$ref": "#/$defs/decisionBuckets" },
+        "coastalStatuses": { "$ref": "#/$defs/decisionBuckets" },
+        "languages": { "$ref": "#/$defs/decisionBuckets" },
+        "scripts": { "$ref": "#/$defs/decisionBuckets" }
+      }
+    },
+    "deterministicIdentity": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "count": { "type": "integer", "minimum": 0 },
+    "baseBinding": {
+      "type": "object",
+      "required": [
+        "databaseSha256", "databaseByteSize", "receiptSha256", "receiptByteSize",
+        "stageSchemaVersion", "candidateIdentity"
+      ],
+      "properties": {
+        "databaseSha256": { "$ref": "#/$defs/sha256" },
+        "databaseByteSize": { "type": "integer", "minimum": 1 },
+        "receiptSha256": { "$ref": "#/$defs/sha256" },
+        "receiptByteSize": { "type": "integer", "minimum": 1 },
+        "stageSchemaVersion": { "type": "string", "minLength": 1 },
+        "candidateIdentity": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "catalogueBinding": {
+      "unevaluatedProperties": false,
+      "allOf": [{ "$ref": "#/$defs/baseBinding" }]
+    },
+    "spatialBinding": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/baseBinding" },
+        {
+          "type": "object",
+          "required": ["geometryContractSha256"],
+          "properties": {
+            "geometryContractSha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "reasonBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "count"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "reasonBuckets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reasonBucket" }
+    },
+    "decisionBucket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "classified", "spatialRejected", "total"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "classified": { "$ref": "#/$defs/count" },
+        "spatialRejected": { "$ref": "#/$defs/count" },
+        "total": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "decisionBuckets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/decisionBucket" }
+    }
+  }
+}

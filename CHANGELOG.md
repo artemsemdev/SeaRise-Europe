@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added receipt-bound, bounded-memory settlement reconciliation evidence that
+  separates pre-spatial catalogue rejections from classified and
+  spatial-rejected normalized records, reports decision-split quality
+  dimensions, and fails closed on arithmetic, ordering, identity, or claim
+  drift without making a production or publication claim.
 - Added a deterministic complete-candidate fixture assembler that verifies 50
   explicit synthetic inputs, generates the terminal gate reports and checksum
   inventory, writes the manifest last, runs the independent byte gate, and
