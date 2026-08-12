@@ -45,6 +45,12 @@ no candidate at the requested output path. The assembler assigns the
 dispatcher must contain the authoritative production validators described by
 the QA matrix.
 
+The three terminal routes are repository-controlled: the JSON report is checked
+against the shared schema, semantics, and candidate binding; the Markdown bytes
+must equal the deterministic renderer output for that JSON; and `checksums.txt`
+must equal the manifest's ordered checksum subjects. Callers cannot replace
+these validators when composing a production registry.
+
 `scripts/release/validate_candidate_bytes.py` applies the read-only byte gate
 to an assembled candidate root. It opens the root and descendants without
 following symlinks, requires exactly 54 single-link regular files plus

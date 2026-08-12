@@ -21,6 +21,7 @@ from searise_pipeline.candidate_completeness.qa_dispatch import (
     QaValidationOutcome,
     QaValidationRequest,
     QaValidatorDispatcher,
+    terminal_validator_registry,
 )
 from searise_pipeline.candidate_completeness.qa_matrix import load_qa_routing_matrix
 
@@ -34,7 +35,11 @@ METADATA = ProductionCandidateMetadata(
 
 
 def _registry(validator: ArtifactValidator) -> dict[str, ArtifactValidator]:
-    return {route.validator_id: validator for route in load_qa_routing_matrix().routes}
+    terminal = terminal_validator_registry()
+    return {
+        route.validator_id: terminal.get(route.validator_id, validator)
+        for route in load_qa_routing_matrix().routes
+    }
 
 
 def _pass(_: QaValidationRequest) -> QaValidationOutcome:
@@ -84,8 +89,6 @@ def test_assembles_real_source_candidate_with_manifest_written_last(tmp_path: Pa
     assert report["releasable"] is False
     assert (output / "checksums.txt").read_text().count("\n") == 53
     _make_writable(output)
-
-
 def test_production_assembly_is_byte_deterministic(tmp_path: Path) -> None:
     inputs = _input_root(tmp_path)
     dispatcher = QaValidatorDispatcher(_registry(_pass))

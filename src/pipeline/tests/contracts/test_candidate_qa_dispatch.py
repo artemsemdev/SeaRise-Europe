@@ -11,6 +11,8 @@ from searise_pipeline.candidate_completeness.qa_dispatch import (
     QaValidationOutcome,
     QaValidationRequest,
     QaValidatorDispatcher,
+    terminal_validator_registry,
+    with_terminal_validators,
 )
 from searise_pipeline.candidate_completeness.qa_matrix import (
     ArtifactSelector,
@@ -106,3 +108,14 @@ def test_unexpected_validator_exception_is_wrapped_with_stable_code() -> None:
     with pytest.raises(CandidateContractError) as caught:
         QaValidatorDispatcher(registry).dispatch(_request())
     assert caught.value.code == "qa-validator-execution"
+
+
+def test_terminal_validators_cannot_be_replaced() -> None:
+    terminal = terminal_validator_registry()
+    assert set(terminal) == {
+        "candidate.byte-gate.checksums",
+        "candidate.qa-report-json",
+        "candidate.qa-report-markdown",
+    }
+    with pytest.raises(CandidateContractError, match="cannot be replaced"):
+        with_terminal_validators({"candidate.qa-report-json": _pass})
