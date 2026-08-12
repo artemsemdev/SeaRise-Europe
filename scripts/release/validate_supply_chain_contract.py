@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 from searise_pipeline.supply_chain import (
+    ProtectedWorkflowArtifactError,
     SupplyChainContractError,
+    extract_protected_candidate,
+    extract_protected_evidence,
     load_json,
     parse_timestamp,
     publish_npm_sbom,
     publish_nuget_sbom,
     publish_python_sbom,
+    validate_candidate_artifact_authority,
     validate_candidate_evidence_pair,
     validate_cosign_tool_lock,
     validate_dependency_exception,
@@ -23,6 +28,7 @@ from searise_pipeline.supply_chain import (
     validate_nuget_sbom,
     validate_python_sbom,
     verify_candidate_evidence_cryptographically,
+    write_candidate_artifact_authority,
 )
 
 
@@ -31,6 +37,45 @@ def _sbom(value: str) -> tuple[str, Path]:
     if not separator or not logical_path or not file_path:
         raise argparse.ArgumentTypeError("SBOM must use LOGICAL_PATH=FILE")
     return logical_path, Path(file_path)
+
+
+_PROTECTED_NONCLAIMS = {
+    "production": False,
+    "publication": False,
+    "scientificApproval": False,
+}
+
+
+def _best_effort_success(document: dict[str, object]) -> None:
+    """Do not turn a committed artifact operation into a false failure."""
+    message = json.dumps(
+        document,
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    try:
+        sys.stdout.write(f"{message}\n")
+        sys.stdout.flush()
+    except (OSError, ValueError):
+        # A real closed pipe can be retried by Python's shutdown flush and
+        # change an otherwise successful process exit to 120. Redirect that
+        # descriptor after the diagnostic failure; custom/closed streams may
+        # have no usable descriptor and are already safe to ignore here.
+        replacement = -1
+        try:
+            descriptor = sys.stdout.fileno()
+            replacement = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(replacement, descriptor)
+        except (AttributeError, OSError, ValueError):
+            pass
+        finally:
+            if replacement >= 0:
+                try:
+                    os.close(replacement)
+                except OSError:
+                    pass
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -97,13 +142,83 @@ def _parser() -> argparse.ArgumentParser:
     python_validate.add_argument("--annotation", type=Path, required=True)
     python_validate.add_argument("--repository-root", type=Path, default=Path.cwd())
     python_validate.add_argument("--target", required=True)
+    protected_authority = commands.add_parser("protected-candidate-authority")
+    protected_authority.add_argument("--run-json", type=Path, required=True)
+    protected_authority.add_argument("--artifacts-json", type=Path, required=True)
+    protected_authority.add_argument("--profile", required=True)
+    protected_authority.add_argument("--source-revision", required=True)
+    protected_authority.add_argument("--candidate-run-id", type=int, required=True)
+    protected_authority.add_argument("--output", type=Path, required=True)
+    protected_candidate = commands.add_parser("protected-candidate-extract")
+    protected_candidate.add_argument("--archive", type=Path, required=True)
+    protected_candidate.add_argument("--authority", type=Path, required=True)
+    protected_candidate.add_argument("--output-root", type=Path, required=True)
+    protected_evidence = commands.add_parser("protected-evidence-extract")
+    protected_evidence.add_argument("--archive", type=Path, required=True)
+    protected_evidence.add_argument("--expected-sha256", required=True)
+    protected_evidence.add_argument("--expected-byte-size", type=int, required=True)
+    protected_evidence.add_argument("--output-root", type=Path, required=True)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.command == "candidate-evidence-pair":
+        if args.command == "protected-candidate-authority":
+            authority = validate_candidate_artifact_authority(
+                args.run_json,
+                args.artifacts_json,
+                profile=args.profile,
+                source_revision=args.source_revision,
+                candidate_run_id=args.candidate_run_id,
+            )
+            write_candidate_artifact_authority(args.output, authority)
+            _best_effort_success(
+                {
+                    "artifactByteSize": authority.artifact_byte_size,
+                    "artifactId": authority.artifact_id,
+                    "artifactSha256": authority.artifact_sha256,
+                    "claims": _PROTECTED_NONCLAIMS,
+                    "command": args.command,
+                    "output": str(args.output),
+                    "runId": authority.run_id,
+                    "status": "ok",
+                }
+            )
+        elif args.command == "protected-candidate-extract":
+            authority = extract_protected_candidate(
+                args.archive, args.output_root, args.authority
+            )
+            _best_effort_success(
+                {
+                    "artifactByteSize": authority.artifact_byte_size,
+                    "artifactId": authority.artifact_id,
+                    "artifactSha256": authority.artifact_sha256,
+                    "claims": _PROTECTED_NONCLAIMS,
+                    "command": args.command,
+                    "outputRoot": str(args.output_root),
+                    "runId": authority.run_id,
+                    "status": "ok",
+                }
+            )
+        elif args.command == "protected-evidence-extract":
+            extract_protected_evidence(
+                args.archive,
+                args.output_root,
+                expected_sha256=args.expected_sha256,
+                expected_byte_size=args.expected_byte_size,
+            )
+            _best_effort_success(
+                {
+                    "archiveByteSize": args.expected_byte_size,
+                    "archiveSha256": args.expected_sha256,
+                    "claims": _PROTECTED_NONCLAIMS,
+                    "command": args.command,
+                    "outputRoot": str(args.output_root),
+                    "status": "ok",
+                }
+            )
+        elif args.command == "candidate-evidence-pair":
             summary = validate_candidate_evidence_pair(
                 args.candidate_root,
                 args.evidence_root,
@@ -225,7 +340,12 @@ def main(argv: list[str] | None = None) -> int:
                 f"validated {len(document['components'])} Python components "
                 f"for {args.target}: {args.sbom}"
             )
-    except (OSError, json.JSONDecodeError, SupplyChainContractError) as exc:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        ProtectedWorkflowArtifactError,
+        SupplyChainContractError,
+    ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     return 0

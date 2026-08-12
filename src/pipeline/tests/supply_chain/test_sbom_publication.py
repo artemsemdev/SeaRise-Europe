@@ -232,7 +232,7 @@ def test_rollback_restores_replacement_racing_the_owned_unlink(
     mutated = b"changed!\n"
     racing = b"racing replacement\n"
     original_match = sbom_module._parent_path_matches
-    original_rename = sbom_module.os.rename
+    original_rename = sbom_module._rename_no_overwrite
     match_calls = 0
     replaced = False
 
@@ -243,25 +243,25 @@ def test_rollback_restores_replacement_racing_the_owned_unlink(
             output.write_bytes(mutated)
         return original_match(anchor, parts, expected)
 
-    def replace_before_rollback(source: str, target: str, **kwargs: Any) -> None:
+    def replace_before_rollback(parent: int, source: str, target: str) -> None:
         nonlocal replaced
         if source == output.name and not replaced:
-            os.unlink(source, dir_fd=kwargs["src_dir_fd"])
+            os.unlink(source, dir_fd=parent)
             descriptor = os.open(
                 source,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL,
                 0o600,
-                dir_fd=kwargs["src_dir_fd"],
+                dir_fd=parent,
             )
             try:
                 os.write(descriptor, racing)
             finally:
                 os.close(descriptor)
             replaced = True
-        original_rename(source, target, **kwargs)
+        original_rename(parent, source, target)
 
     monkeypatch.setattr(sbom_module, "_parent_path_matches", mutate_after_directory_fsync)
-    monkeypatch.setattr(sbom_module.os, "rename", replace_before_rollback)
+    monkeypatch.setattr(sbom_module, "_rename_no_overwrite", replace_before_rollback)
     with pytest.raises(SupplyChainContractError, match="output bytes changed"):
         write_new_sbom(output, trusted)
 

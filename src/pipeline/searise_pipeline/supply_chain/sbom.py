@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import base64
 import binascii
+import ctypes
 import hashlib
 import json
 import os
 import re
 import secrets
 import stat
+import sys
 import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from urllib.parse import quote, unquote, urlsplit
 
 from .contracts import SupplyChainContractError, _validate_cyclonedx
@@ -126,34 +128,70 @@ def _parent_path_matches(anchor: int, parts: tuple[str, ...], expected: _Inode) 
         os.close(current)
 
 
-def _unlink_if_owned(parent: int, name: str, expected: _Inode) -> bool:
-    quarantine = f".searise-sbom-rollback-{secrets.token_hex(16)}"
+def _exclusive_rename() -> tuple[Any, int]:
     try:
-        os.rename(name, quarantine, src_dir_fd=parent, dst_dir_fd=parent)
-    except FileNotFoundError:
+        libc = ctypes.CDLL(None, use_errno=True)
+        if sys.platform == "darwin":
+            rename, flag = libc.renameatx_np, 4
+        elif sys.platform.startswith("linux"):
+            rename, flag = libc.renameat2, 1
+        else:
+            raise SupplyChainContractError("exclusive immutable-file rename is unsupported")
+    except (AttributeError, OSError) as exc:
+        raise SupplyChainContractError("exclusive immutable-file rename is unavailable") from exc
+    return rename, flag
+
+
+def _rename_no_overwrite(parent: int, source: str, target: str) -> None:
+    rename, flag = _exclusive_rename()
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    if rename(parent, os.fsencode(source), parent, os.fsencode(target), flag) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), target)
+
+
+def _unlink_if_owned(parent: int, name: str, expected: _Inode) -> bool:
+    """Quarantine before unlinking so a racing replacement is never deleted."""
+    quarantine = ""
+    for _ in range(32):
+        quarantine = f".searise-sbom-rollback-{secrets.token_hex(16)}"
+        try:
+            _rename_no_overwrite(parent, name, quarantine)
+        except FileExistsError:
+            continue
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
+        break
+    else:
         return False
     if _path_inode(parent, quarantine) == expected:
-        os.unlink(quarantine, dir_fd=parent)
-        return True
+        try:
+            os.unlink(quarantine, dir_fd=parent)
+        except OSError:
+            return False
+        else:
+            return True
     try:
-        os.link(
-            quarantine,
-            name,
-            src_dir_fd=parent,
-            dst_dir_fd=parent,
-            follow_symlinks=False,
-        )
+        _rename_no_overwrite(parent, quarantine, name)
     except OSError:
         return False
-    os.unlink(quarantine, dir_fd=parent)
     return False
 
 
-def _create_partial(parent: int) -> tuple[int, str]:
+def _create_partial(parent: int, prefix: str = ".searise-sbom-") -> tuple[int, str]:
     flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
     flags |= getattr(os, "O_NOFOLLOW", 0)
     for _ in range(32):
-        name = f".searise-sbom-{secrets.token_hex(16)}.partial"
+        name = f"{prefix}{secrets.token_hex(16)}.partial"
         try:
             return os.open(name, flags, 0o600, dir_fd=parent), name
         except FileExistsError:
@@ -183,10 +221,19 @@ def _descriptor_has_exact_bytes(descriptor: int, content: bytes) -> bool:
     return os.pread(descriptor, 1, len(content)) == b""
 
 
-def write_new_sbom(output_path: Path, content: bytes) -> None:
-    """Durably publish exact new SBOM bytes without following or overwriting paths."""
+def write_new_immutable_bytes(
+    output_path: Path,
+    content: bytes,
+    *,
+    label: str,
+    mode: int,
+    partial_prefix: str,
+) -> None:
+    """Durably publish exact new bytes with ownership-safe no-overwrite promotion."""
     if type(content) is not bytes:
-        raise SupplyChainContractError("SBOM output content must be exact bytes")
+        raise SupplyChainContractError(f"{label} content must be exact bytes")
+    if not label or mode not in {0o400, 0o600}:
+        raise SupplyChainContractError("immutable-file publication parameters are invalid")
     anchor, parent, parent_parts, output_name = _open_output_parent(output_path)
     parent_inode = _inode(os.fstat(parent))
     partial_descriptor = -1
@@ -196,23 +243,31 @@ def write_new_sbom(output_path: Path, content: bytes) -> None:
     directory_changed = False
     try:
         if _path_inode(parent, output_name) is not None:
-            raise SupplyChainContractError(f"SBOM output path already exists: {output_path}")
-        partial_descriptor, partial_name = _create_partial(parent)
+            raise SupplyChainContractError(f"{label} path already exists: {output_path}")
+        partial_descriptor, partial_name = _create_partial(parent, partial_prefix)
         partial_stat = os.fstat(partial_descriptor)
         if not stat.S_ISREG(partial_stat.st_mode):
-            raise SupplyChainContractError("SBOM partial must remain a regular file")
+            raise SupplyChainContractError(f"{label} partial must remain a regular file")
         owned_inode = _inode(partial_stat)
         _write_all(partial_descriptor, content)
+        os.fchmod(partial_descriptor, mode)
         os.fsync(partial_descriptor)
-        if _inode(os.fstat(partial_descriptor)) != owned_inode:
-            raise SupplyChainContractError("SBOM partial ownership changed during publication")
+        partial_stat = os.fstat(partial_descriptor)
+        if (
+            _inode(partial_stat) != owned_inode
+            or not stat.S_ISREG(partial_stat.st_mode)
+            or stat.S_IMODE(partial_stat.st_mode) != mode
+            or partial_stat.st_nlink != 1
+        ):
+            raise SupplyChainContractError(f"{label} partial ownership changed during publication")
         if not _descriptor_has_exact_bytes(partial_descriptor, content):
-            raise SupplyChainContractError("SBOM partial bytes changed during publication")
+            raise SupplyChainContractError(f"{label} partial bytes changed during publication")
 
         if not _parent_path_matches(anchor, parent_parts, parent_inode):
-            raise SupplyChainContractError("SBOM output parent changed during publication")
+            raise SupplyChainContractError(f"{label} output parent changed during publication")
         if _path_inode(parent, partial_name) != owned_inode:
-            raise SupplyChainContractError("SBOM partial ownership changed before promotion")
+            raise SupplyChainContractError(f"{label} partial ownership changed before promotion")
+        _exclusive_rename()
         try:
             os.link(
                 partial_name,
@@ -222,42 +277,73 @@ def write_new_sbom(output_path: Path, content: bytes) -> None:
                 follow_symlinks=False,
             )
         except FileExistsError as exc:
-            raise SupplyChainContractError(
-                f"SBOM output path already exists: {output_path}"
-            ) from exc
-        if _path_inode(parent, output_name) != owned_inode:
-            raise SupplyChainContractError("SBOM promotion ownership changed")
+            raise SupplyChainContractError(f"{label} path already exists: {output_path}") from exc
         promoted = True
-        if not _unlink_if_owned(parent, partial_name, owned_inode):
-            raise SupplyChainContractError("SBOM partial ownership changed after promotion")
-        partial_name = None
         directory_changed = True
+        if _path_inode(parent, output_name) != owned_inode:
+            raise SupplyChainContractError(f"{label} promotion ownership changed")
+        if not _descriptor_has_exact_bytes(partial_descriptor, content):
+            raise SupplyChainContractError(f"{label} promoted bytes changed")
+        if not _unlink_if_owned(parent, partial_name, owned_inode):
+            raise SupplyChainContractError(f"{label} partial cleanup failed after promotion")
+        partial_name = None
+        if os.fstat(partial_descriptor).st_nlink != 1:
+            raise SupplyChainContractError(f"{label} final link count is invalid")
         os.fsync(parent)
         directory_changed = False
         if not _parent_path_matches(anchor, parent_parts, parent_inode):
-            raise SupplyChainContractError("SBOM output parent changed during publication")
+            raise SupplyChainContractError(f"{label} output parent changed during publication")
         if _path_inode(parent, output_name) != owned_inode:
-            raise SupplyChainContractError("SBOM output ownership changed during publication")
+            raise SupplyChainContractError(f"{label} output ownership changed during publication")
         if not _descriptor_has_exact_bytes(partial_descriptor, content):
-            raise SupplyChainContractError("SBOM output bytes changed during publication")
+            raise SupplyChainContractError(f"{label} output bytes changed during publication")
     except Exception:
+        cleanup_error: Exception | None = None
         if promoted and owned_inode is not None:
-            directory_changed = _unlink_if_owned(parent, output_name, owned_inode)
+            try:
+                directory_changed = _unlink_if_owned(parent, output_name, owned_inode)
+            except Exception as exc:
+                cleanup_error = exc
         if partial_name is not None and owned_inode is not None:
-            directory_changed = (
-                _unlink_if_owned(parent, partial_name, owned_inode) or directory_changed
-            )
+            try:
+                directory_changed = (
+                    _unlink_if_owned(parent, partial_name, owned_inode) or directory_changed
+                )
+            except Exception as exc:
+                cleanup_error = cleanup_error or exc
         if directory_changed:
             try:
                 os.fsync(parent)
             except OSError:
                 pass
+        if cleanup_error is not None:
+            raise SupplyChainContractError(f"{label} rollback was incomplete") from cleanup_error
         raise
     finally:
         if partial_descriptor >= 0:
-            os.close(partial_descriptor)
-        os.close(parent)
-        os.close(anchor)
+            try:
+                os.close(partial_descriptor)
+            except OSError:
+                pass
+        try:
+            os.close(parent)
+        except OSError:
+            pass
+        try:
+            os.close(anchor)
+        except OSError:
+            pass
+
+
+def write_new_sbom(output_path: Path, content: bytes) -> None:
+    """Durably publish exact new SBOM bytes without following or overwriting paths."""
+    write_new_immutable_bytes(
+        output_path,
+        content,
+        label="SBOM output",
+        mode=0o600,
+        partial_prefix=".searise-sbom-",
+    )
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -602,7 +688,7 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
     input_sha256 = _sha256_bytes(input_bytes)
     root_ref = f"urn:searise:sbom:npm-root:sha256:{input_sha256}"
     _dependency_groups(root, root=True)
-    root_properties = [
+    root_properties: list[tuple[str, object]] = [
         (
             f"npm.root.{group}",
             json.dumps(
@@ -631,7 +717,7 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
         "properties": _properties(*root_properties),
     }
 
-    relationships = [
+    relationships: list[dict[str, Any]] = [
         {
             "ref": root_ref,
             "dependsOn": list(_resolved_edges(None, root, package_entries, refs)),
@@ -692,7 +778,7 @@ def _repository_lock_bytes(
             flags | getattr(os, "O_NONBLOCK", 0),
             dir_fd=parent_descriptor,
         )
-        return _read_descriptor(file_descriptor, label="npm lock", path=logical)
+        return cast(bytes, _read_descriptor(file_descriptor, label="npm lock", path=logical))
     except OSError as exc:
         raise SupplyChainContractError(
             f"npm lock must exist beneath the repository without symlinks: {logical}"
