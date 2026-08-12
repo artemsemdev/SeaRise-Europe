@@ -45,6 +45,10 @@ const PROJECTION_FOOTER = "settlement-search-projection-footer";
 const SHARD_SET_FORMAT_VERSION = "settlement-browser-search-shard-set-v2";
 const SHARD_ORDER = ["europe-core", "europe-coastal"] as const;
 const FS_HELPER = join(process.cwd(), "scripts", "browser-shard-fs.py");
+const PROJECTION_VALIDATOR = join(
+  process.cwd(), "..", "..", "scripts", "release", "validate_settlement_search_projection.py"
+);
+const PIPELINE_ROOT = join(process.cwd(), "..", "pipeline");
 const MAX_QUERY_CODE_POINTS = 256;
 const MAX_SEARCH_CANDIDATES = 128;
 const MAX_SEARCH_RESULTS = 100;
@@ -52,6 +56,7 @@ const MAX_NAME_CODE_POINTS = 256;
 const MAX_ALTERNATE_NAMES = 1_024;
 const MAX_RECORD_NAME_CODE_POINTS = 16_384;
 const MAX_SPATIAL_RECEIPT_BYTES = 4 * 1024 * 1024;
+const MAX_PROJECTION_AUTHORITY_BYTES = 1024 * 1024;
 const RUNTIME = {
   brotli: "1.1.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.3.1-e00f703",
 } as const;
@@ -119,6 +124,7 @@ export type BrowserSearchRecord = SearchDocument & { latitude: number; longitude
 type ParsedProjection = {
   header: ProjectionHeader;
   footer: ProjectionFooter;
+  projectionByteSize: number;
   projectionSha256: string;
   shards: Record<ShardId, BrowserSearchRecord[]>;
 };
@@ -347,7 +353,8 @@ function assertSha(value: unknown, label: string): asserts value is string {
 }
 
 function publicAuthority(
-  receiptPath: string, dataReleaseId: string, projection: ParsedProjection,
+  spatialDatabasePath: string, receiptPath: string, projectionPath: string,
+  validationWorkDirectory: string, dataReleaseId: string, projection: ParsedProjection,
 ): PublicAuthority {
   if (!/^searise-europe-v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$/.test(dataReleaseId)) {
     fail("data release ID does not match the public contract");
@@ -466,7 +473,7 @@ function publicAuthority(
   const identity = Object.fromEntries(geometries.map((item) => [`${item.role}Geometry`, {
     artifactId: item.id, version: item.version, sha256: item.sha256,
   }])) as Pick<SpatialIdentity, "supportGeometry" | "coastalGeometry" | "shorelineGeometry">;
-  return {
+  const authority: PublicAuthority = {
     dataReleaseId,
     dataProvenanceClass: geometry.dataProvenanceClass as string,
     geometryStatus: geometry.geometryStatus as string,
@@ -475,6 +482,72 @@ function publicAuthority(
       distanceMethodVersion: "epsg3035-planar-whole-meter-half-even-v1",
     },
   };
+  const validation = spawnSync("python3", [
+    PROJECTION_VALIDATOR,
+    "--spatial-database", spatialDatabasePath,
+    "--spatial-receipt", receiptPath,
+    "--projection", projectionPath,
+    "--data-release-id", dataReleaseId,
+    "--work-dir", validationWorkDirectory,
+  ], {
+    encoding: "buffer",
+    env: { ...process.env, PYTHONPATH: PIPELINE_ROOT, PYTHONDONTWRITEBYTECODE: "1" },
+    maxBuffer: MAX_PROJECTION_AUTHORITY_BYTES,
+  });
+  if (validation.error || validation.status !== 0) {
+    fail(`projection replay validator failed: ${validation.stderr.toString().trim()}`);
+  }
+  const authorityRaw = Buffer.from(validation.stdout);
+  if (!authorityRaw.length || authorityRaw.length > MAX_PROJECTION_AUTHORITY_BYTES) {
+    fail("projection authority exceeds its byte limit");
+  }
+  let projectionAuthority: Record<string, unknown>;
+  try {
+    const text = UTF8.decode(authorityRaw);
+    projectionAuthority = JSON.parse(text) as Record<string, unknown>;
+    if (`${canonical(projectionAuthority)}\n` !== text) {
+      fail("projection authority is not canonical JSON");
+    }
+  } catch (error) {
+    if (error instanceof BrowserShardError) throw error;
+    return fail("projection authority is not strict UTF-8 JSON");
+  }
+  if (!exactKeys(projectionAuthority, [
+    "$schema", "artifactType", "canonicalGeometryClaim", "complete",
+    "dataProvenanceClass", "dataReleaseId", "deterministicIdentity", "formatVersion",
+    "hazardExtentClaim", "ownerApprovalClaim", "productionClaim", "projectionByteSize",
+    "projectionDeterministicIdentity", "projectionDocumentsSha256", "projectionSha256",
+    "publicationClaim", "publicationEligible", "recordCount", "schemaVersion",
+    "scientificApprovalClaim", "signingClaim", "source", "spatialIdentity", "validator",
+  ]) || projectionAuthority.$schema !== SHARD_SCHEMA
+      || projectionAuthority.schemaVersion !== SHARD_SCHEMA_VERSION
+      || projectionAuthority.formatVersion !== "settlement-search-projection-authority-v1"
+      || projectionAuthority.artifactType !== "settlement-search-projection-authority"
+      || projectionAuthority.complete !== true
+      || projectionAuthority.dataReleaseId !== dataReleaseId
+      || projectionAuthority.dataProvenanceClass !== authority.dataProvenanceClass
+      || projectionAuthority.projectionByteSize !== projection.projectionByteSize
+      || projectionAuthority.projectionSha256 !== projection.projectionSha256
+      || projectionAuthority.projectionDeterministicIdentity
+        !== projection.footer.deterministicIdentity
+      || projectionAuthority.projectionDocumentsSha256 !== projection.footer.documentsSha256
+      || projectionAuthority.recordCount !== projection.footer.recordCount
+      || FALSE_CLAIMS.some((claim) => projectionAuthority[claim] !== false)
+      || projectionAuthority.publicationEligible !== false
+      || canonical(projectionAuthority.source) !== canonical(sourceBinding(projection))
+      || canonical(projectionAuthority.spatialIdentity) !== canonical(authority.spatialIdentity)
+      || canonical(projectionAuthority.validator) !== canonical({
+        validatorId:
+          "searise_pipeline.settlements.search_projection.validate_search_projection",
+        version: "1",
+      })) fail("projection authority differs from its exact replay");
+  assertSha(projectionAuthority.deterministicIdentity, "projection authority identity");
+  const unsignedAuthority = { ...projectionAuthority };
+  delete unsignedAuthority.deterministicIdentity;
+  if (sha256(`${canonical(unsignedAuthority)}\n`) !== projectionAuthority.deterministicIdentity) {
+    fail("projection authority identity differs");
+  }
+  return authority;
 }
 
 function nullableText(value: unknown): value is string | null {
@@ -734,7 +807,10 @@ function parseProjection(path: string, limits: Readonly<ShardLimits>): ParsedPro
     if (buffer.length) fail("search projection must end with a newline");
     if (!header || !pending) fail("search projection is incomplete");
     const footer = footerFrom(pending, header, count, documentDigest.digest("hex"));
-    return { header, footer, projectionSha256: projectionDigest.digest("hex"), shards };
+    return {
+      header, footer, projectionByteSize: size,
+      projectionSha256: projectionDigest.digest("hex"), shards,
+    };
   } finally {
     verifyAndClose(path, descriptor, before, "search projection");
   }
@@ -838,12 +914,24 @@ type BuiltSet = {
   source: Record<string, string>;
 };
 
+export type BrowserShardAuthority = {
+  dataReleaseId: string;
+  dataProvenanceClass: string;
+  geometryStatus: string;
+  source: Record<string, string>;
+  spatialIdentity: SpatialIdentity;
+};
+
 function buildBytes(
-  projectionPath: string, spatialReceiptPath: string, dataReleaseId: string,
+  projectionPath: string, spatialDatabasePath: string, spatialReceiptPath: string,
+  validationWorkDirectory: string, dataReleaseId: string,
   limits: Readonly<ShardLimits>,
 ): BuiltSet {
   const projection = parseProjection(projectionPath, limits);
-  const authority = publicAuthority(spatialReceiptPath, dataReleaseId, projection);
+  const authority = publicAuthority(
+    spatialDatabasePath, spatialReceiptPath, projectionPath, validationWorkDirectory,
+    dataReleaseId, projection
+  );
   const bytes = {
     "europe-core": compress(
       shardRaw(projection, authority, "europe-core", limits), "europe-core", limits
@@ -925,10 +1013,11 @@ function candidateDocuments(shard: BrowserShard): CandidateDocument[] {
 export function decodeBrowserShard(
   compressed: Buffer,
   expectedShardId: ShardId,
-  expectedDataReleaseId: string,
+  expectedAuthority: Readonly<BrowserShardAuthority>,
   limits: Readonly<ShardLimits> = DEFAULT_SHARD_LIMITS,
 ): BrowserShard {
   checkedLimits(limits);
+  const expectedDataReleaseId = expectedAuthority.dataReleaseId;
   if (!/^searise-europe-v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$/.test(
     expectedDataReleaseId
   )) fail("expected data release ID does not match the public contract");
@@ -963,6 +1052,10 @@ export function decodeBrowserShard(
   if (!exactKeys(value, keys) || value.$schema !== SHARD_SCHEMA
       || value.schemaVersion !== SHARD_SCHEMA_VERSION
       || value.dataReleaseId !== expectedDataReleaseId
+      || value.dataProvenanceClass !== expectedAuthority.dataProvenanceClass
+      || value.geometryStatus !== expectedAuthority.geometryStatus
+      || canonical(value.source) !== canonical(expectedAuthority.source)
+      || canonical(value.spatialIdentity) !== canonical(expectedAuthority.spatialIdentity)
       || value.artifactType !== "settlement-browser-search-shard"
       || value.mediaType !== "application/vnd.searise.search-index+json"
       || value.contentEncoding !== "br" || value.placeSchema
@@ -1081,12 +1174,17 @@ export function decodeBrowserShard(
 
 export function buildBrowserSearchShards(
   projectionPath: string,
+  spatialDatabasePath: string,
   spatialReceiptPath: string,
+  validationWorkDirectory: string,
   dataReleaseId: string,
   outputDirectory: string,
   limits: Readonly<ShardLimits> = DEFAULT_SHARD_LIMITS,
 ): Record<ShardId, { path: string; byteSize: number; sha256: string }> {
-  const built = buildBytes(projectionPath, spatialReceiptPath, dataReleaseId, limits);
+  const built = buildBytes(
+    projectionPath, spatialDatabasePath, spatialReceiptPath, validationWorkDirectory,
+    dataReleaseId, limits
+  );
   publishSet(outputDirectory, built);
   return Object.fromEntries(SHARD_ORDER.map((shard) => [shard, {
     path: outputPath(outputDirectory, shard),
@@ -1097,13 +1195,16 @@ export function buildBrowserSearchShards(
 
 export function validateBrowserSearchShards(
   projectionPath: string,
+  spatialDatabasePath: string,
   spatialReceiptPath: string,
+  validationWorkDirectory: string,
   dataReleaseId: string,
   outputDirectory: string,
   limits: Readonly<ShardLimits> = DEFAULT_SHARD_LIMITS,
 ): Record<ShardId, { byteSize: number; sha256: string; recordCount: number }> {
   const loaded = loadBrowserSearchShards(
-    projectionPath, spatialReceiptPath, dataReleaseId, outputDirectory, limits
+    projectionPath, spatialDatabasePath, spatialReceiptPath, validationWorkDirectory,
+    dataReleaseId, outputDirectory, limits
   );
   return Object.fromEntries(SHARD_ORDER.map((shard) => [shard, {
     byteSize: loaded.shards[shard].bytes.length,
@@ -1119,12 +1220,17 @@ export type LoadedBrowserShardSet = {
 
 export function loadBrowserSearchShards(
   projectionPath: string,
+  spatialDatabasePath: string,
   spatialReceiptPath: string,
+  validationWorkDirectory: string,
   dataReleaseId: string,
   outputDirectory: string,
   limits: Readonly<ShardLimits> = DEFAULT_SHARD_LIMITS,
 ): LoadedBrowserShardSet {
-  const expected = buildBytes(projectionPath, spatialReceiptPath, dataReleaseId, limits);
+  const expected = buildBytes(
+    projectionPath, spatialDatabasePath, spatialReceiptPath, validationWorkDirectory,
+    dataReleaseId, limits
+  );
   const artifacts = artifactSet(expected);
   const raw = filesystemHelper("read", outputDirectory, artifacts);
   let offset = 0;
@@ -1134,7 +1240,13 @@ export function loadBrowserSearchShards(
     if (!bytes.equals(expected.bytes[shard])) {
       fail(`${shard} search shard differs from its exact projection, receipt, or release`);
     }
-    return [shard, { bytes, shard: decodeBrowserShard(bytes, shard, dataReleaseId, limits) }];
+    return [shard, { bytes, shard: decodeBrowserShard(bytes, shard, {
+      dataReleaseId,
+      dataProvenanceClass: expected.authority.dataProvenanceClass,
+      geometryStatus: expected.authority.geometryStatus,
+      source: expected.source,
+      spatialIdentity: expected.authority.spatialIdentity,
+    }, limits) }];
   })) as LoadedBrowserShardSet["shards"];
   return { receipt: artifacts[2].bytes, shards };
 }

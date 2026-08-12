@@ -27,9 +27,15 @@ spatial receipt, and spatial candidate. They retain false production, signing,
 publication, owner, scientific, hazard, and canonical-geometry claims.
 Each compressed payload implements the public settlement v4 search contract,
 without altering the fixture-only v3 envelope. The caller must provide the
-exact canonical spatial receipt and an explicit `dataReleaseId`. The builder
-verifies the receipt byte hash and candidate identity already bound by the
-projection, derives the three geometry identities from that authority, and
+exact spatial DuckDB database, canonical receipt, private validation work
+directory, and an explicit `dataReleaseId`. Before building any shard, the
+builder invokes the pinned Python projection validator. That validator opens
+descriptor-safe snapshots, reconciles the database with the receipt, and
+replays every projection document in lockstep. Its canonical authority commits
+the projection bytes, document identity, counts, release, source, and geometry;
+same-count substitutions therefore fail closed. The builder also verifies the
+receipt byte hash and candidate identity already bound by the projection,
+derives the three geometry identities from that authority, and
 places the same release, provenance, spatial, source, engine, runtime, ranking,
 merge, and compression identities in both shards and the receipt-last set.
 
@@ -68,12 +74,16 @@ not claims about GeoNames completeness.
 cd src/frontend
 node --import tsx scripts/build-settlement-search-shards.ts build \
   --projection /absolute/search-projection.ndjson \
+  --spatial-database /absolute/spatial.duckdb \
   --spatial-receipt /absolute/spatial-stage.receipt.json \
+  --validation-work-dir /absolute/private-validation-work \
   --data-release-id searise-europe-v1.0.0-20260812-0123456789ab \
   --output-dir /private/output
 node --import tsx scripts/build-settlement-search-shards.ts validate \
   --projection /absolute/search-projection.ndjson \
+  --spatial-database /absolute/spatial.duckdb \
   --spatial-receipt /absolute/spatial-stage.receipt.json \
+  --validation-work-dir /absolute/private-validation-work \
   --data-release-id searise-europe-v1.0.0-20260812-0123456789ab \
   --output-dir /private/output
 ```
@@ -108,10 +118,19 @@ pass. Successful publication and loading are point-in-time linearized at that
 final pass; they are not a lease on paths after the function returns.
 Downstream code must use those returned objects rather than reopen artifact
 paths. Supplying a different release ID or receipt produces a different exact
-set and cannot validate an existing set. These artifacts do not provide the Web Worker, production-scale
+set and cannot validate an existing set. The standalone decoder also requires
+the caller's complete expected release, provenance, source, and spatial
+authority; self-asserted hashes inside a recompressed shard are insufficient.
+These artifacts do not provide the Web Worker, production-scale
 benchmarks, or publication approval required by the consumer frontend issue.
 
 The [settlement browser-worker performance harness](settlement-browser-worker-performance.md)
 can bind these exact receipt-gated bytes and measure production-sized inputs on
 its documented Node worker reference profile. It deliberately remains separate
 from real browser/mobile promotion evidence.
+
+The receipt is a first-class candidate artifact at
+`search/settlement-browser-search-shards.receipt.json`. It follows the two shard
+entries in write order and is included in the exact artifact and checksum
+inventories; omitting it or treating it as an unlisted extra fails the candidate
+byte gate.

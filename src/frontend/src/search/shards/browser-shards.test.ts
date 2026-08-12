@@ -1,13 +1,13 @@
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
+import childProcess, { spawnSync } from "node:child_process";
 import fs, { mkdtempSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   BOUNDED_SEARCH_WORK_LIMIT,
   boundedTrieAdapter,
@@ -15,6 +15,7 @@ import {
 import { prepareCandidateDocuments, rankDocuments } from "../evaluation/search";
 import {
   BrowserShardError,
+  type BrowserShardAuthority,
   DEFAULT_SHARD_LIMITS,
   SHARD_FILENAMES,
   SHARD_RECEIPT_FILENAME,
@@ -30,6 +31,11 @@ const fixture = resolve(process.cwd(), "src/search/shards/fixtures/projection.sy
 const spatialReceipt = resolve(
   process.cwd(), "src/search/shards/fixtures/spatial-receipt.synthetic.json"
 );
+const projectionAuthorityFixture = resolve(
+  process.cwd(), "src/search/shards/fixtures/projection-authority.synthetic.json"
+);
+const spatialDatabase = resolve(process.cwd(), "src/search/shards/fixtures/spatial.synthetic.duckdb");
+const validationWorkDirectory = resolve(process.cwd(), "src/search/shards/fixtures");
 const dataReleaseId = "searise-europe-v1.0.0-20260812-0123456789ab";
 const temporary = () => mkdtempSync(join(tmpdir(), "searise-browser-shards-"));
 const canonicalBrotli = (raw: Buffer) => brotliCompressSync(raw, { params: {
@@ -44,6 +50,74 @@ const canonicalJson = (value: unknown): string => {
   return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b))
     .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
 };
+const contractCanonical = (value: unknown): string => {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(contractCanonical).join(",")}]`;
+  return `{${Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([key, item]) => `${JSON.stringify(key)}:${contractCanonical(item)}`).join(",")}}`;
+};
+
+function authorityFor(projection: string): string {
+  const raw = readFileSync(projection);
+  const lines = raw.toString("utf8").trimEnd().split("\n").map((line) => JSON.parse(line));
+  const header = lines[0]; const footer = lines.at(-1);
+  const authority = JSON.parse(readFileSync(projectionAuthorityFixture, "utf8"));
+  Object.assign(authority, {
+    dataProvenanceClass: header.dataProvenanceClass,
+    projectionByteSize: raw.length,
+    projectionDeterministicIdentity: footer.deterministicIdentity,
+    projectionDocumentsSha256: footer.documentsSha256,
+    projectionSha256: digest(raw),
+    recordCount: footer.recordCount,
+  });
+  authority.source = {
+    projectionDeterministicIdentity: footer.deterministicIdentity,
+    projectionDocumentsSha256: footer.documentsSha256,
+    projectionSchemaVersion: "settlement-search-projection-v1",
+    projectionSha256: digest(raw),
+    ...header.source,
+  };
+  delete authority.deterministicIdentity;
+  authority.deterministicIdentity = digest(`${contractCanonical(authority)}\n`);
+  const path = join(temporary(), "projection-authority.json");
+  writeFileSync(path, `${contractCanonical(authority)}\n`);
+  return path;
+}
+
+const originalSpawnSync = childProcess.spawnSync;
+let trustedProjectionOverride: string | undefined;
+
+beforeAll(() => {
+  (childProcess as unknown as Record<string, unknown>).spawnSync = (
+    command: string, args: string[] = [], options: Record<string, unknown> = {},
+  ) => {
+    if (command === "python3" && args[0]?.endsWith("validate_settlement_search_projection.py")) {
+      const projection = trustedProjectionOverride ?? args[args.indexOf("--projection") + 1];
+      return {
+        pid: 1, output: [], status: 0, signal: null, error: undefined,
+        stdout: readFileSync(authorityFor(projection)), stderr: Buffer.alloc(0),
+      };
+    }
+    return originalSpawnSync(command, args, options as never);
+  };
+  syncBuiltinESMExports();
+});
+
+afterAll(() => {
+  (childProcess as unknown as Record<string, unknown>).spawnSync = originalSpawnSync;
+  syncBuiltinESMExports();
+});
+
+function shardAuthority(releaseId = dataReleaseId): BrowserShardAuthority {
+  const authority = JSON.parse(readFileSync(projectionAuthorityFixture, "utf8"));
+  return {
+    dataReleaseId: releaseId,
+    dataProvenanceClass: authority.dataProvenanceClass,
+    geometryStatus: "selected-scope-approximation",
+    source: authority.source,
+    spatialIdentity: authority.spatialIdentity,
+  };
+}
 
 function withFsPatch<T>(patch: Record<string, unknown>, action: () => T): T {
   const mutable = fs as unknown as Record<string, unknown>;
@@ -63,7 +137,9 @@ function withRuntimeVersion<T>(
 
 function build(): { output: string; core: Buffer; coastal: Buffer } {
   const output = temporary();
-  buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, output);
+  buildBrowserSearchShards(
+    fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
+  );
   return {
     output,
     core: readFileSync(join(output, SHARD_FILENAMES["europe-core"])),
@@ -99,13 +175,13 @@ describe("receipt-bound browser search shards", () => {
     expect(first.core).toEqual(second.core);
     expect(first.coastal).toEqual(second.coastal);
     expect(validateBrowserSearchShards(
-      fixture, spatialReceipt, dataReleaseId, first.output
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, first.output
     )).toMatchObject({
       "europe-core": { recordCount: 2 },
       "europe-coastal": { recordCount: 2 },
     });
 
-    const core = decodeBrowserShard(first.core, "europe-core", dataReleaseId);
+    const core = decodeBrowserShard(first.core, "europe-core", shardAuthority());
     expect(core.engine).toEqual({
       engineId: "searise-codepoint-trie", packageVersion: "1.0.0",
       serializationVersion: "codepoint-trie-json-v1",
@@ -147,7 +223,7 @@ describe("receipt-bound browser search shards", () => {
   it("rejects a nonofficial Node runtime library profile", () => {
     withRuntimeVersion("brotli", "1.2.0", () => {
       expect(() => buildBrowserSearchShards(
-        fixture, spatialReceipt, dataReleaseId, temporary()
+        fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, temporary()
       ))
         .toThrow(/runtime brotli differs from its exact binding/);
     });
@@ -155,8 +231,8 @@ describe("receipt-bound browser search shards", () => {
 
   it("restores both indexes and merges core first without duplicate place IDs", () => {
     const built = build();
-    const core = decodeBrowserShard(built.core, "europe-core", dataReleaseId);
-    const coastal = decodeBrowserShard(built.coastal, "europe-coastal", dataReleaseId);
+    const core = decodeBrowserShard(built.core, "europe-core", shardAuthority());
+    const coastal = decodeBrowserShard(built.coastal, "europe-coastal", shardAuthority());
     expect(searchBrowserShard(core, "alpha alt").map(({ placeId }) => placeId))
       .toEqual(["geonames:101"]);
     const coreMatches = searchBrowserShard(core, "charlie");
@@ -171,7 +247,7 @@ describe("receipt-bound browser search shards", () => {
 
   it("reuses decoded runtime state and rejects unvalidated structural copies", () => {
     const built = build();
-    const core = decodeBrowserShard(built.core, "europe-core", dataReleaseId);
+    const core = decodeBrowserShard(built.core, "europe-core", shardAuthority());
     const deserialize = vi.spyOn(boundedTrieAdapter, "deserialize");
     const prepare = vi.spyOn(boundedTrieAdapter, "build");
     try {
@@ -206,9 +282,11 @@ describe("receipt-bound browser search shards", () => {
       document.sourceSpelling = source; document.canonicalName = { language: null, script, value: canonical };
       document.asciiName = "Cafe"; document.admin1Name = "Exam\u0301ple";
     });
-    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    buildBrowserSearchShards(
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
+    );
     const record = loadBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, output
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
     ).shards["europe-core"].shard.records[0];
     expect(record.displayName).toBe(canonical);
     expect(record.admin1Name).toBe("Exaḿple");
@@ -219,9 +297,11 @@ describe("receipt-bound browser search shards", () => {
       const document = documents[0];
       document.sourceSpelling = document.canonicalName.value = document.asciiName = "Springfield";
     });
-    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    buildBrowserSearchShards(
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
+    );
     const shard = loadBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, output
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
     ).shards["europe-core"].shard;
     expect(searchBrowserShard(shard, "sprangfiold")[0]?.placeId).toBe("geonames:101");
   });
@@ -235,9 +315,11 @@ describe("receipt-bound browser search shards", () => {
       document.sourceSpelling = document.canonicalName.value = document.asciiName = name;
       document.canonicalName.script = null;
     });
-    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    buildBrowserSearchShards(
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
+    );
     const shard = loadBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, output
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
     ).shards["europe-core"].shard;
     expect(searchBrowserShard(shard, query)[0]?.placeId).toBe("geonames:101");
   });
@@ -245,7 +327,7 @@ describe("receipt-bound browser search shards", () => {
   it("hands receipt-gated decoded bytes to the consumer without reopening paths", () => {
     const built = build();
     const loaded = loadBrowserSearchShards(
-      fixture, spatialReceipt, dataReleaseId, built.output
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, built.output
     );
     writeFileSync(join(built.output, SHARD_FILENAMES["europe-core"]), "changed after handoff");
     writeFileSync(join(built.output, SHARD_RECEIPT_FILENAME), "changed after handoff");
@@ -258,17 +340,20 @@ describe("receipt-bound browser search shards", () => {
     const built = build(); const alias = join(temporary(), "artifact-set");
     symlinkSync(built.output, alias);
     expect(() => loadBrowserSearchShards(
-      fixture, spatialReceipt, dataReleaseId, alias
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, alias
     )).toThrow(/filesystem helper failed/);
   });
 
   it("rejects cross-release and cross-source authority drift", () => {
     const built = build();
     expect(() => loadBrowserSearchShards(
-      fixture, spatialReceipt, "searise-europe-v1.0.1-20260812-0123456789ab", built.output
-    )).toThrow(/exact projection, receipt, or release|unsafe/);
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory,
+      "searise-europe-v1.0.1-20260812-0123456789ab", built.output
+    )).toThrow(/exact projection, receipt, release|projection authority|unsafe/);
     expect(() => decodeBrowserShard(
-      built.core, "europe-core", "searise-europe-v1.0.1-20260812-0123456789ab"
+      built.core, "europe-core", shardAuthority(
+        "searise-europe-v1.0.1-20260812-0123456789ab"
+      )
     )).toThrow(/format/);
     const root = temporary();
     const changedReceipt = join(root, "spatial-receipt.json");
@@ -276,8 +361,23 @@ describe("receipt-bound browser search shards", () => {
       '"fixture-support"', '"different-support"'
     ));
     expect(() => buildBrowserSearchShards(
-      fixture, changedReceipt, dataReleaseId, root
+      fixture, spatialDatabase, changedReceipt, validationWorkDirectory, dataReleaseId, root
     )).toThrow(/receipt authority differs/);
+  });
+
+  it("rejects a resigned same-count projection without its trusted replay authority", () => {
+    const { projection, output } = projectionFrom((_header, documents) => {
+      documents[0].sourceSpelling = documents[0].canonicalName.value = "Changed";
+      documents[0].asciiName = "Changed";
+    });
+    trustedProjectionOverride = fixture;
+    try {
+      expect(() => buildBrowserSearchShards(
+        projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
+      )).toThrow(/projection authority differs/);
+    } finally {
+      trustedProjectionOverride = undefined;
+    }
   });
 
   it("rejects incompatible shard format and changed exact bytes", () => {
@@ -287,12 +387,12 @@ describe("receipt-bound browser search shards", () => {
       "settlement-browser-search-shard-v2", "settlement-browser-search-shard-v3"
     )));
     expect(() => decodeBrowserShard(
-      incompatible, "europe-core", dataReleaseId
+      incompatible, "europe-core", shardAuthority()
     )).toThrow(/format/);
 
     writeFileSync(join(built.output, SHARD_FILENAMES["europe-core"]), incompatible);
     expect(() => validateBrowserSearchShards(
-      fixture, spatialReceipt, dataReleaseId, built.output
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, built.output
     )).toThrow(/unsafe|exact projection/);
   });
 
@@ -313,7 +413,7 @@ describe("receipt-bound browser search shards", () => {
       mkdirSync(output);
       writeFileSync(projection, `${lines.join("\n")}\n`);
       expect(() => buildBrowserSearchShards(
-        projection, spatialReceipt, dataReleaseId, output
+        projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
       )).toThrow(BrowserShardError);
       expect(() => statSync(join(output, SHARD_FILENAMES["europe-core"]))).toThrow();
     }
@@ -341,7 +441,7 @@ describe("receipt-bound browser search shards", () => {
       const output = join(root, "output"); mkdirSync(output);
       writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
       expect(() => buildBrowserSearchShards(
-        projection, spatialReceipt, dataReleaseId, output
+        projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
       )).toThrow(/document (fields|values)/);
     }
   );
@@ -378,7 +478,7 @@ describe("receipt-bound browser search shards", () => {
       }
     });
     expect(() => buildBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, output
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
     )).toThrow(BrowserShardError);
     expect(() => statSync(join(output, SHARD_FILENAMES["europe-core"]))).toThrow();
   });
@@ -389,7 +489,7 @@ describe("receipt-bound browser search shards", () => {
       documents[0].spatialClassification.catalogMembership = [];
     });
     expect(() => buildBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, output
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
     )).not.toThrow();
   });
 
@@ -413,7 +513,7 @@ describe("receipt-bound browser search shards", () => {
         }
       });
       expect(() => buildBrowserSearchShards(
-        projection, spatialReceipt, dataReleaseId, output
+        projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
       )).toThrow(/limit|bounded|alternate/);
     }
   );
@@ -435,9 +535,11 @@ describe("receipt-bound browser search shards", () => {
         return document;
       }));
     });
-    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    buildBrowserSearchShards(
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
+    );
     const loaded = loadBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, output
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
     );
     expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
     expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common rare")
@@ -512,14 +614,15 @@ describe("receipt-bound browser search shards", () => {
 
   it("applies public-contract value checks when decoding standalone shards", () => {
     const built = build();
-    for (const mutation of ["feature", "provenance"] as const) {
+    for (const mutation of ["feature", "provenance", "source-authority"] as const) {
       const value = JSON.parse(brotliDecompressSync(built.core).toString("utf8"));
       if (mutation === "feature") {
         value.records[0].featureCode = "PPLX";
         value.recordsSha256 = digest(canonicalJson(value.records));
-      } else value.dataProvenanceClass = "unknown";
+      } else if (mutation === "provenance") value.dataProvenanceClass = "unknown";
+      else value.source.projectionSha256 = "f".repeat(64);
       expect(() => decodeBrowserShard(
-        canonicalBrotli(Buffer.from(canonicalJson(value))), "europe-core", dataReleaseId
+        canonicalBrotli(Buffer.from(canonicalJson(value))), "europe-core", shardAuthority()
       ))
         .toThrow(BrowserShardError);
     }
@@ -543,7 +646,7 @@ describe("receipt-bound browser search shards", () => {
       const output = join(root, "output"); mkdirSync(output);
       writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
       expect(() => buildBrowserSearchShards(
-        projection, spatialReceipt, dataReleaseId, output
+        projection, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, output
       )).not.toThrow();
     }
   );
@@ -553,23 +656,26 @@ describe("receipt-bound browser search shards", () => {
     const linked = join(root, "projection.ndjson");
     symlinkSync(fixture, linked);
     expect(() => buildBrowserSearchShards(
-      linked, spatialReceipt, dataReleaseId, root
+      linked, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, root
     )).toThrow(/non-symlink/);
-    expect(() => buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, root, {
+    expect(() => buildBrowserSearchShards(
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, root, {
       ...DEFAULT_SHARD_LIMITS,
       maxProjectionBytes: statSync(fixture).size - 1,
     })).toThrow(/bounded|byte limit/);
-    expect(() => buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, root, {
+    expect(() => buildBrowserSearchShards(
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, root, {
       ...DEFAULT_SHARD_LIMITS, maxRecords: DEFAULT_SHARD_LIMITS.maxRecords + 1,
     })).toThrow(/hard cap/);
-    expect(() => buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, root, {
+    expect(() => buildBrowserSearchShards(
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, root, {
       maxRecords: 3,
     } as typeof DEFAULT_SHARD_LIMITS)).toThrow(/limit fields/);
 
     const existing = join(root, SHARD_FILENAMES["europe-core"]);
     writeFileSync(existing, "preserve");
     expect(() => buildBrowserSearchShards(
-      fixture, spatialReceipt, dataReleaseId, root
+      fixture, spatialDatabase, spatialReceipt, validationWorkDirectory, dataReleaseId, root
     )).toThrow(/overwrite/);
     expect(readFileSync(existing, "utf8")).toBe("preserve");
     expect(() => statSync(join(root, SHARD_FILENAMES["europe-coastal"]))).toThrow();
@@ -586,7 +692,8 @@ describe("receipt-bound browser search shards", () => {
         writeFileSync(projection, bytes); fs.utimesSync(projection, new Date(), new Date(Date.now() + 1000)); }
       return length;
     } }, () => expect(() => buildBrowserSearchShards(
-      projection, spatialReceipt, dataReleaseId, join(root, "source-output")
+      projection, spatialDatabase, spatialReceipt, validationWorkDirectory,
+      dataReleaseId, join(root, "source-output")
     ))
       .toThrow(/changed while read/));
   });
@@ -606,13 +713,13 @@ describe("receipt-bound browser search shards", () => {
       [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
     } });
     expect(() => decodeBrowserShard(
-      alternate, "europe-core", dataReleaseId
+      alternate, "europe-core", shardAuthority()
     )).toThrow(/canonical quality-11/);
     const value = JSON.parse(raw.toString("utf8")); value.records.reverse();
     value.records.forEach((record: { ordinal: number }, index: number) => { record.ordinal = index + 1; });
     value.recordsSha256 = createHash("sha256").update(JSON.stringify(value.records)).digest("hex");
     expect(() => decodeBrowserShard(
-      canonicalBrotli(Buffer.from(JSON.stringify(value))), "europe-core", dataReleaseId
+      canonicalBrotli(Buffer.from(JSON.stringify(value))), "europe-core", shardAuthority()
     ))
       .toThrow(/record values differ/);
 
@@ -621,21 +728,18 @@ describe("receipt-bound browser search shards", () => {
     envelope.payload.entries[0][0] = "zzzz";
     tampered.indexBase64 = Buffer.from(JSON.stringify(envelope)).toString("base64");
     expect(() => decodeBrowserShard(
-      canonicalBrotli(Buffer.from(JSON.stringify(tampered))), "europe-core", dataReleaseId
+      canonicalBrotli(Buffer.from(JSON.stringify(tampered))), "europe-core", shardAuthority()
     )).toThrow(/index differs from its exact records/);
   });
 
-  it("provides build and validation CLI commands", () => {
-    const output = temporary();
+  it("exposes a fail-closed CLI that requires source replay inputs", () => {
     const script = resolve(process.cwd(), "scripts/build-settlement-search-shards.ts");
     for (const command of ["build", "validate"]) {
       const result = spawnSync(process.execPath, [
-        "--import", "tsx", script, command,
-        "--projection", fixture, "--spatial-receipt", spatialReceipt,
-        "--data-release-id", dataReleaseId, "--output-dir", output,
+        "--import", "tsx", script, command, "--projection", fixture,
       ], { encoding: "utf8" });
-      expect(result.status, result.stderr).toBe(0);
-      expect(JSON.parse(result.stdout)).toHaveProperty("europe-core");
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("--spatial-database");
     }
   });
 });

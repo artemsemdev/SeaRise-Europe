@@ -6,14 +6,17 @@ import {
 function usage(): never {
   throw new Error(
     "usage: build-settlement-search-shards.ts <build|validate> --projection <path> "
-      + "--spatial-receipt <path> --data-release-id <id> --output-dir <path>"
+      + "--spatial-database <path> --spatial-receipt <path> --validation-work-dir <path> "
+      + "--data-release-id <id> --output-dir <path>"
   );
 }
 
 function options(argv: string[]): {
   command: "build" | "validate";
   projection: string;
+  spatialDatabase: string;
   spatialReceipt: string;
+  validationWorkDirectory: string;
   dataReleaseId: string;
   output: string;
 } {
@@ -26,12 +29,16 @@ function options(argv: string[]): {
     if (!name?.startsWith("--") || !value || value.startsWith("--") || values.has(name)) usage();
     values.set(name, value);
   }
-  if (values.size !== 4 || !values.has("--projection") || !values.has("--spatial-receipt")
-      || !values.has("--data-release-id") || !values.has("--output-dir")) usage();
+  if (values.size !== 6 || !values.has("--projection") || !values.has("--spatial-database")
+      || !values.has("--spatial-receipt") || !values.has("--validation-work-dir")
+      || !values.has("--data-release-id")
+      || !values.has("--output-dir")) usage();
   return {
     command,
     projection: values.get("--projection")!,
+    spatialDatabase: values.get("--spatial-database")!,
     spatialReceipt: values.get("--spatial-receipt")!,
+    validationWorkDirectory: values.get("--validation-work-dir")!,
     dataReleaseId: values.get("--data-release-id")!,
     output: values.get("--output-dir")!,
   };
@@ -41,10 +48,14 @@ try {
   const parsed = options(process.argv.slice(2));
   const result = parsed.command === "build"
     ? buildBrowserSearchShards(
-      parsed.projection, parsed.spatialReceipt, parsed.dataReleaseId, parsed.output
+      parsed.projection, parsed.spatialDatabase, parsed.spatialReceipt,
+      parsed.validationWorkDirectory,
+      parsed.dataReleaseId, parsed.output
     )
     : validateBrowserSearchShards(
-      parsed.projection, parsed.spatialReceipt, parsed.dataReleaseId, parsed.output
+      parsed.projection, parsed.spatialDatabase, parsed.spatialReceipt,
+      parsed.validationWorkDirectory,
+      parsed.dataReleaseId, parsed.output
     );
   process.stdout.write(`${JSON.stringify(result)}\n`);
 } catch (error) {
