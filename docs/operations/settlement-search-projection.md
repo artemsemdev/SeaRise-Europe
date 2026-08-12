@@ -96,3 +96,8 @@ final pass; they are not a lease on paths after the function returns.
 Downstream code must use those returned objects rather than reopen artifact
 paths. These candidate shards do not provide the Web Worker, production-scale
 benchmarks, or publication approval required by the consumer frontend issue.
+
+The [settlement browser-worker performance harness](settlement-browser-worker-performance.md)
+can bind these exact receipt-gated bytes and measure production-sized inputs on
+its documented Node worker reference profile. It deliberately remains separate
+from real browser/mobile promotion evidence.
