@@ -6,11 +6,25 @@ and deterministic provenance bytes. The only job allowed to request an OIDC
 token is the signing job, and that job targets the protected environment
 `phase-1-production-signing`.
 
-The workflow refuses pull-request, fork, non-master, mutable-revision, rerun,
-and non-controlled-build inputs. A second job has no OIDC permission or
-protected environment. It downloads the original candidate and retained
-evidence again, validates the exact uploaded archive and subject bytes, then
-verifies both Sigstore identities against:
+The workflow refuses pull-request, fork, wrong-repository-ID, non-master,
+mutable-revision, rerun, and non-controlled-build inputs. Its four jobs keep
+the trust planes separate:
+
+1. `intake` has no OIDC permission or protected environment. It authenticates
+   the complete controlled-run artifact inventory, downloads the artifact by
+   numeric ID, safely extracts exact authority-bound bytes, runs the candidate
+   byte gate, and generates deterministic provenance.
+2. `sign` is the only protected job and the only job with `id-token: write`.
+   It revalidates the prepared candidate and provenance before signing only
+   `manifest.json` and `provenance.intoto.jsonl`.
+3. `finalize` has no OIDC permission or protected environment. It runs the
+   reviewed production-evidence finalizer once with dedicated private mode-0700
+   snapshot and output parents. Only the exact durable evidence leaf is
+   retained; the workflow contains no duplicate finalization implementation.
+4. `verify` has no OIDC permission or protected environment. It independently
+   authenticates and extracts the original candidate and the retained evidence
+   archive, validates the truthful pre-verification envelope, and verifies both
+   Sigstore identities against:
 
 - repository: `artemsemdev/SeaRise-Europe`;
 - workflow: `.github/workflows/phase-1-release-sign.yml`;
@@ -40,8 +54,10 @@ Repository environment settings cannot be created or proven by committed code.
 Until an owner configures and reviews them, the protected-environment gate is
 pending and no real workflow execution is claimed.
 
-This public repository's authenticated readers can download retained workflow artifacts
-during their 14-day lifetime. They contain review evidence, not secrets, and are not
-product publication: the workflow does not release, deploy, publish or activate a candidate,
-or perform public post-upload readback. Production, publication, and scientific approval
-remain false; the later publication/readback gate must produce separately reviewed evidence.
+This public repository's authenticated readers can download retained workflow
+artifacts during their 14-day lifetime. They contain review evidence, not
+secrets, and are not product publication: the workflow does not release,
+deploy, publish or activate a candidate, or perform public readback. Production,
+publication, scientific approval, protected-environment verification, and
+public-readback claims remain false; any later publication/readback gate must
+produce separately reviewed evidence.
