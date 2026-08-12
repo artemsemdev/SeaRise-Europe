@@ -28,36 +28,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sign:
-    name: Sign exact candidate bytes
+  intake:
+    name: Authenticate and prepare exact candidate bytes
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'artemsemdev/SeaRise-Europe' &&
+      github.repository_id == '1196432661' &&
       github.event.repository.fork == false &&
       github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    environment: phase-1-production-signing
     permissions:
       actions: read
       contents: read
-      id-token: write
     outputs:
-      evidence_artifact: ${{ steps.evidence-name.outputs.name }}
-      evidence_artifact_id: ${{ steps.upload-evidence.outputs.artifact-id }}
-      evidence_digest: ${{ steps.upload-evidence.outputs.artifact-digest }}
+      prepared_artifact: ${{ steps.names.outputs.prepared }}
     steps:
-      - id: evidence-name
-        name: Validate protected dispatch boundary
+      - id: names
+        name: Validate unprivileged dispatch boundary
         env:
           PROFILE: ${{ inputs.profile }}
           SOURCE_REVISION: ${{ inputs.source_revision }}
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          REPOSITORY_ID: ${{ github.repository_id }}
           REPOSITORY_IS_FORK: ${{ github.event.repository.fork }}
         run: |
           set -euo pipefail
           [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]
           [[ "${GITHUB_REPOSITORY}" == "artemsemdev/SeaRise-Europe" ]]
+          [[ "${REPOSITORY_ID}" == "1196432661" ]]
           [[ "${REPOSITORY_IS_FORK}" == "false" ]]
           [[ "${GITHUB_REF}" == "refs/heads/master" ]]
           [[ "${GITHUB_WORKFLOW_REF}" == "artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master" ]]
@@ -67,83 +66,13 @@ jobs:
           [[ "${SOURCE_REVISION}" == "${GITHUB_SHA}" ]]
           [[ "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
           [[ "${CANDIDATE_RUN_ID}" != "${GITHUB_RUN_ID}" ]]
-          echo "name=phase-1-unverified-evidence-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          echo "prepared=phase-1-signing-inputs-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 1
           persist-credentials: false
           ref: ${{ inputs.source_revision }}
-
-      - name: Verify controlled build authority
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_REVISION: ${{ inputs.source_revision }}
-          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${SOURCE_REVISION}"
-          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --max-filesize 1048576 \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            --output "${RUNNER_TEMP}/candidate-run.json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}"
-          jq -e \
-            --arg repository "artemsemdev/SeaRise-Europe" \
-            --arg revision "${SOURCE_REVISION}" '
-            .repository.full_name == $repository and
-            .head_repository.full_name == $repository and
-            .event == "workflow_dispatch" and
-            .path == ".github/workflows/offline-release-controlled.yml" and
-            .head_branch == "master" and
-            .head_sha == $revision and
-            .run_attempt == 1 and
-            .status == "completed" and
-            .conclusion == "success" and
-            (.pull_requests | length) == 0
-          ' "${RUNNER_TEMP}/candidate-run.json"
-
-      - name: Download exact controlled candidate
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: offline-release-${{ inputs.profile }}-${{ inputs.source_revision }}-${{ inputs.candidate_run_id }}
-          path: ${{ runner.temp }}/candidate-download
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.candidate_run_id }}
-
-      - name: Validate downloaded candidate boundary
-        env:
-          PROFILE: ${{ inputs.profile }}
-          SOURCE_REVISION: ${{ inputs.source_revision }}
-          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
-        run: |
-          set -euo pipefail
-          root="${RUNNER_TEMP}/candidate-download"
-          test -z "$(find "${root}" -type l -print -quit)"
-          test -d "${root}/candidate"
-          test -f "${root}/execution.json"
-          test -f "${root}/dispatch.json"
-          test ! -e "${root}/failure.json"
-          test "$(find "${root}" -mindepth 1 -maxdepth 1 -print | wc -l | tr -d ' ')" = "3"
-          jq -e --arg profile "${PROFILE}" --arg revision "${SOURCE_REVISION}" \
-            --arg run_id "${CANDIDATE_RUN_ID}" '
-            .profile == $profile and
-            .sourceRevision == $revision and
-            .workflowRunId == $run_id and
-            .publicationAttempted == false and
-            .activationAttempted == false
-          ' "${root}/dispatch.json"
-          jq -e --arg profile "${PROFILE}" '
-            .status == "complete" and .profile == $profile and
-            .networkAccess == "disabled"
-          ' "${root}/execution.json"
-          jq -e --arg revision "${SOURCE_REVISION}" '
-            .codeRevision == $revision and .buildMode == "offline" and
-            .networkAccess == "disabled" and .dataProvenanceClass == "real-source"
-          ' "${root}/candidate/receipts/build.json"
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
@@ -154,47 +83,83 @@ jobs:
       - name: Install immutable release validator
         run: |
           set -euo pipefail
-          python -m venv "${RUNNER_TEMP}/release-venv"
-          "${RUNNER_TEMP}/release-venv/bin/python" -m pip install \
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_revision }}"
+          python -m venv "${RUNNER_TEMP}/intake-venv"
+          "${RUNNER_TEMP}/intake-venv/bin/python" -m pip install \
             --require-hashes \
             --requirement src/pipeline/requirements-release.lock
 
-      - name: Download and validate reviewed Cosign
+      - name: Bind complete candidate run and artifact inventory
         env:
-          PYTHONDONTWRITEBYTECODE: "1"
-        run: |
-          set -euo pipefail
-          tool_root="${RUNNER_TEMP}/cosign-sign"
-          mkdir -p "${tool_root}"
-          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/release-venv/bin/python" \
-            scripts/release/validate_supply_chain_contract.py cosign-tool-lock \
-            --lock contracts/supply-chain/v1/tools/cosign-linux-amd64.json \
-            --trusted-lock-sha256 dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9
-          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --max-filesize 135178161 \
-            --output "${tool_root}/cosign" \
-            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64
-          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --max-filesize 3906 \
-            --output "${tool_root}/cosign_checksums.txt" \
-            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign_checksums.txt
-          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/release-venv/bin/python" \
-            scripts/release/validate_supply_chain_contract.py cosign-tool-lock \
-            --lock contracts/supply-chain/v1/tools/cosign-linux-amd64.json \
-            --trusted-lock-sha256 dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9 \
-            --executable "${tool_root}/cosign" \
-            --checksums "${tool_root}/cosign_checksums.txt"
-          chmod 0500 "${tool_root}/cosign"
-
-      - name: Generate deterministic provenance bytes
-        env:
-          CANDIDATE_ROOT: ${{ runner.temp }}/candidate-download/candidate
+          GH_TOKEN: ${{ github.token }}
+          PROFILE: ${{ inputs.profile }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
-          PROVENANCE_PATH: ${{ runner.temp }}/provenance.intoto.jsonl
+        run: |
+          set -euo pipefail
+          umask 077
+          prepared="${RUNNER_TEMP}/prepared-inputs"
+          mkdir -m 0700 "${prepared}"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 1048576 \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/candidate-run.json" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/runs/${CANDIDATE_RUN_ID}"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 1048576 \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/candidate-artifacts.json" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/runs/${CANDIDATE_RUN_ID}/artifacts?per_page=100"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/intake-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py \
+            protected-candidate-authority \
+            --run-json "${RUNNER_TEMP}/candidate-run.json" \
+            --artifacts-json "${RUNNER_TEMP}/candidate-artifacts.json" \
+            --profile "${PROFILE}" \
+            --source-revision "${SOURCE_REVISION}" \
+            --candidate-run-id "${CANDIDATE_RUN_ID}" \
+            --output "${prepared}/candidate-artifact-authority.json"
+
+      - name: Download and safely extract authority-bound candidate archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          authority="${RUNNER_TEMP}/prepared-inputs/candidate-artifact-authority.json"
+          artifact_id="$(jq -er '.artifact.id | select(type == "number" and . > 0)' "${authority}")"
+          artifact_bytes="$(jq -er '.artifact.byteSize | select(type == "number" and . > 0)' "${authority}")"
+          archive="${RUNNER_TEMP}/candidate.zip"
+          test ! -e "${archive}"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize "${artifact_bytes}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${archive}" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/artifacts/${artifact_id}/zip"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/intake-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py \
+            protected-candidate-extract \
+            --archive "${archive}" \
+            --authority "${authority}" \
+            --output-root "${RUNNER_TEMP}/prepared-inputs/source"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/intake-venv/bin/python" \
+            scripts/release/validate_candidate_bytes.py \
+            --candidate-root "${RUNNER_TEMP}/prepared-inputs/source/candidate"
+
+      - name: Generate deterministic signing provenance without OIDC permission
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/release-venv/bin/python" - <<'PY'
+          CANDIDATE_ROOT="${RUNNER_TEMP}/prepared-inputs/source/candidate" \
+          PROVENANCE_PATH="${RUNNER_TEMP}/prepared-inputs/provenance.intoto.jsonl" \
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/intake-venv/bin/python" - <<'PY'
           import os
           from pathlib import Path
 
@@ -215,22 +180,238 @@ jobs:
                   trusted_invocation_uri=invocation,
               )
           )
-          output = Path(os.environ["PROVENANCE_PATH"])
-          with output.open("xb") as stream:
+          with Path(os.environ["PROVENANCE_PATH"]).open("xb") as stream:
               stream.write(raw)
           PY
 
-      - name: Sign exact manifest and provenance bytes
+      - name: Upload immutable prepared signing inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.names.outputs.prepared }}
+          path: ${{ runner.temp }}/prepared-inputs
+          if-no-files-found: error
+          overwrite: false
+          include-hidden-files: false
+          retention-days: 14
+
+  sign:
+    name: Sign exact final inventory and provenance
+    needs: intake
+    if: >-
+      needs.intake.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'artemsemdev/SeaRise-Europe' &&
+      github.repository_id == '1196432661' &&
+      github.event.repository.fork == false &&
+      github.ref == 'refs/heads/master'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: phase-1-production-signing
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    outputs:
+      signatures_artifact: ${{ steps.names.outputs.signatures }}
+    steps:
+      - id: names
+        name: Revalidate protected signing identity
+        env:
+          PROFILE: ${{ inputs.profile }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+          REPOSITORY_IS_FORK: ${{ github.event.repository.fork }}
         run: |
           set -euo pipefail
+          [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]
+          [[ "${GITHUB_REPOSITORY}" == "artemsemdev/SeaRise-Europe" ]]
+          [[ "${REPOSITORY_ID}" == "1196432661" ]]
+          [[ "${REPOSITORY_IS_FORK}" == "false" ]]
+          [[ "${GITHUB_REF}" == "refs/heads/master" ]]
+          [[ "${GITHUB_WORKFLOW_REF}" == "artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master" ]]
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]
+          [[ "${SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${SOURCE_REVISION}" == "${GITHUB_SHA}" ]]
+          [[ "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${CANDIDATE_RUN_ID}" != "${GITHUB_RUN_ID}" ]]
+          echo "signatures=phase-1-signature-bundles-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ inputs.source_revision }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: 3.11.9
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
+
+      - name: Install immutable signing validator
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_revision }}"
+          python -m venv "${RUNNER_TEMP}/sign-venv"
+          "${RUNNER_TEMP}/sign-venv/bin/python" -m pip install \
+            --require-hashes \
+            --requirement src/pipeline/requirements-release.lock
+
+      - name: Download unprivileged prepared signing inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.intake.outputs.prepared_artifact }}
+          path: ${{ runner.temp }}/prepared-inputs
+
+      - name: Revalidate exact prepared candidate and provenance
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          prepared="${RUNNER_TEMP}/prepared-inputs"
+          test "$(find "${prepared}" -mindepth 1 -maxdepth 1 -print | wc -l | tr -d ' ')" = "3"
+          test -f "${prepared}/candidate-artifact-authority.json"
+          test -f "${prepared}/provenance.intoto.jsonl"
+          test -d "${prepared}/source"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/sign-venv/bin/python" \
+            scripts/release/validate_candidate_bytes.py \
+            --candidate-root "${prepared}/source/candidate"
+          CANDIDATE_ROOT="${prepared}/source/candidate" \
+          PROVENANCE_PATH="${RUNNER_TEMP}/expected-provenance.intoto.jsonl" \
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/sign-venv/bin/python" - <<'PY'
+          import os
+          from pathlib import Path
+
+          from searise_pipeline.candidate_completeness import (
+              canonical_provenance_bytes,
+              generate_provenance_statement,
+          )
+
+          candidate = Path(os.environ["CANDIDATE_ROOT"])
+          invocation = (
+              "https://github.com/artemsemdev/SeaRise-Europe/actions/runs/"
+              f"{os.environ['CANDIDATE_RUN_ID']}/attempts/1"
+          )
+          raw = canonical_provenance_bytes(
+              generate_provenance_statement(
+                  candidate / "manifest.json",
+                  candidate / "receipts/build.json",
+                  trusted_invocation_uri=invocation,
+              )
+          )
+          with Path(os.environ["PROVENANCE_PATH"]).open("xb") as stream:
+              stream.write(raw)
+          PY
+          cmp --silent \
+            "${prepared}/provenance.intoto.jsonl" \
+            "${RUNNER_TEMP}/expected-provenance.intoto.jsonl"
+
+      - name: Download and validate reviewed Cosign
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          tool_root="${RUNNER_TEMP}/cosign-sign"
+          mkdir -m 0700 "${tool_root}"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/sign-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py cosign-tool-lock \
+            --lock contracts/supply-chain/v1/tools/cosign-linux-amd64.json \
+            --trusted-lock-sha256 dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 135178161 \
+            --output "${tool_root}/cosign" \
+            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 3906 \
+            --output "${tool_root}/cosign_checksums.txt" \
+            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign_checksums.txt
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/sign-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py cosign-tool-lock \
+            --lock contracts/supply-chain/v1/tools/cosign-linux-amd64.json \
+            --trusted-lock-sha256 dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9 \
+            --executable "${tool_root}/cosign" \
+            --checksums "${tool_root}/cosign_checksums.txt"
+          chmod 0500 "${tool_root}/cosign"
+
+      - name: Sign exact final inventory and deterministic provenance
+        run: |
+          set -euo pipefail
+          umask 077
+          bundles="${RUNNER_TEMP}/signature-bundles"
+          mkdir -m 0700 "${bundles}"
           cosign="${RUNNER_TEMP}/cosign-sign/cosign"
-          candidate="${RUNNER_TEMP}/candidate-download/candidate"
+          prepared="${RUNNER_TEMP}/prepared-inputs"
           "${cosign}" sign-blob --yes \
-            --bundle "${RUNNER_TEMP}/manifest.sigstore.json" \
-            "${candidate}/manifest.json"
+            --bundle "${bundles}/manifest.sigstore.json" \
+            "${prepared}/source/candidate/manifest.json"
           "${cosign}" sign-blob --yes \
-            --bundle "${RUNNER_TEMP}/provenance.sigstore.json" \
-            "${RUNNER_TEMP}/provenance.intoto.jsonl"
+            --bundle "${bundles}/provenance.sigstore.json" \
+            "${prepared}/provenance.intoto.jsonl"
+
+      - name: Upload immutable signature bundles
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.names.outputs.signatures }}
+          path: ${{ runner.temp }}/signature-bundles
+          if-no-files-found: error
+          overwrite: false
+          include-hidden-files: false
+          retention-days: 14
+
+  finalize:
+    name: Finalize immutable evidence without OIDC permission
+    needs:
+      - intake
+      - sign
+    if: ${{ needs.sign.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      evidence_artifact: ${{ steps.names.outputs.evidence }}
+      evidence_artifact_id: ${{ steps.upload-evidence.outputs.artifact-id }}
+      evidence_digest: ${{ steps.upload-evidence.outputs.artifact-digest }}
+    steps:
+      - id: names
+        name: Define immutable evidence identity
+        run: echo "evidence=phase-1-unverified-evidence-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ inputs.source_revision }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: 3.11.9
+          cache: pip
+          cache-dependency-path: src/pipeline/requirements-release.lock
+
+      - name: Install immutable evidence finalizer
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_revision }}"
+          python -m venv "${RUNNER_TEMP}/finalize-venv"
+          "${RUNNER_TEMP}/finalize-venv/bin/python" -m pip install \
+            --require-hashes \
+            --requirement src/pipeline/requirements-release.lock
+
+      - name: Download prepared candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.intake.outputs.prepared_artifact }}
+          path: ${{ runner.temp }}/prepared-inputs
+
+      - name: Download exact protected signature bundles
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ needs.sign.outputs.signatures_artifact }}
+          path: ${{ runner.temp }}/signature-bundles
 
       - name: Finalize truthful immutable pre-verification evidence
         env:
@@ -238,30 +419,56 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
-          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/release-venv/bin/python" \
+          umask 077
+          test "$(find "${RUNNER_TEMP}/signature-bundles" -mindepth 1 -maxdepth 1 -type f -print | wc -l | tr -d ' ')" = "2"
+          test -f "${RUNNER_TEMP}/signature-bundles/manifest.sigstore.json"
+          test -f "${RUNNER_TEMP}/signature-bundles/provenance.sigstore.json"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/finalize-venv/bin/python" \
+            scripts/release/validate_candidate_bytes.py \
+            --candidate-root "${RUNNER_TEMP}/prepared-inputs/source/candidate"
+          finalizer_root="${RUNNER_TEMP}/production-evidence-finalizer"
+          snapshot_parent="${finalizer_root}/private-snapshots"
+          output_parent="${finalizer_root}/output"
+          evidence_root="${output_parent}/evidence"
+          [[ "${finalizer_root}" == /* ]]
+          [[ "${snapshot_parent}" != "${GITHUB_WORKSPACE}"* ]]
+          [[ "${snapshot_parent}" != "${RUNNER_TEMP}/prepared-inputs"* ]]
+          [[ "${output_parent}" != "${GITHUB_WORKSPACE}"* ]]
+          [[ "${output_parent}" != "${RUNNER_TEMP}/prepared-inputs"* ]]
+          test ! -e "${finalizer_root}"
+          mkdir -m 0700 "${finalizer_root}"
+          mkdir -m 0700 "${snapshot_parent}" "${output_parent}"
+          test "$(stat -c '%a' "${snapshot_parent}")" = "700"
+          test "$(stat -c '%a' "${output_parent}")" = "700"
+          test "$(stat -c '%u' "${snapshot_parent}")" = "$(id -u)"
+          test "$(stat -c '%u' "${output_parent}")" = "$(id -u)"
+          test ! -e "${evidence_root}"
+          RUNNER_TEMP="${snapshot_parent}" \
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/finalize-venv/bin/python" \
             scripts/release/finalize_production_evidence.py \
-            --candidate-root "${RUNNER_TEMP}/candidate-download/candidate" \
+            --candidate-root "${RUNNER_TEMP}/prepared-inputs/source/candidate" \
             --repository-root "${GITHUB_WORKSPACE}" \
             --controlled-build-run-id "${CANDIDATE_RUN_ID}" \
-            --manifest-bundle "${RUNNER_TEMP}/manifest.sigstore.json" \
-            --provenance-bundle "${RUNNER_TEMP}/provenance.sigstore.json" \
-            --output-root "${RUNNER_TEMP}/unverified-evidence"
+            --manifest-bundle "${RUNNER_TEMP}/signature-bundles/manifest.sigstore.json" \
+            --provenance-bundle "${RUNNER_TEMP}/signature-bundles/provenance.sigstore.json" \
+            --output-root "${evidence_root}"
+          test -d "${evidence_root}"
 
       - id: upload-evidence
         name: Upload retained review evidence for clean verification
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ${{ steps.evidence-name.outputs.name }}
-          path: ${{ runner.temp }}/unverified-evidence
+          name: ${{ steps.names.outputs.evidence }}
+          path: ${{ runner.temp }}/production-evidence-finalizer/output/evidence
           if-no-files-found: error
           overwrite: false
           include-hidden-files: false
           retention-days: 14
 
   verify:
-    name: Independently verify downloaded bytes
-    needs: sign
-    if: ${{ needs.sign.result == 'success' }}
+    name: Independently verify freshly downloaded bytes
+    needs: finalize
+    if: ${{ needs.finalize.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -274,100 +481,6 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.source_revision }}
 
-      - name: Download original controlled candidate again
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: offline-release-${{ inputs.profile }}-${{ inputs.source_revision }}-${{ inputs.candidate_run_id }}
-          path: ${{ runner.temp }}/verify-candidate-download
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.candidate_run_id }}
-
-      - name: Download, authenticate, and safely extract exact evidence
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_ID: ${{ needs.sign.outputs.evidence_artifact_id }}
-          EXPECTED_DIGEST: ${{ needs.sign.outputs.evidence_digest }}
-        run: |
-          set -euo pipefail
-          candidate_root="${RUNNER_TEMP}/verify-candidate-download"
-          test -z "$(find "${candidate_root}" -type l -print -quit)"
-          test "$(find "${candidate_root}" -mindepth 1 -maxdepth 1 -print | wc -l | tr -d ' ')" = "3"
-          test -d "${candidate_root}/candidate"
-          test -f "${candidate_root}/execution.json"
-          test -f "${candidate_root}/dispatch.json"
-          test ! -e "${candidate_root}/failure.json"
-          [[ "${ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
-          [[ "${EXPECTED_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
-          archive="${RUNNER_TEMP}/verified-evidence.zip"
-          test ! -e "${archive}"
-          umask 077
-          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --max-filesize 4194304 \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            --output "${archive}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip"
-          printf '%s  %s\n' "${EXPECTED_DIGEST#sha256:}" "${archive}" | sha256sum --check --status
-          ARCHIVE="${archive}" EVIDENCE_ROOT="${RUNNER_TEMP}/verify-evidence-download" python3 - <<'PY'
-          import os, stat, zipfile
-          from pathlib import Path, PurePosixPath
-
-          expected = {
-              "evidence-envelope.json", "manifest.sigstore.json",
-              "provenance.intoto.jsonl", "provenance.sigstore.json",
-              "sbom/build-plane.cdx.json", "sbom/frontend-npm.cdx.json",
-              *(f"sbom/nuget/searise-{name}-net8.0.cdx.json" for name in ("api", "application", "domain", "infrastructure")),
-              *(f"sbom/python-{graph}-{target}.cdx.json" for graph in ("release", "settlement-spatial") for target in ("linux-x86-64-cp311", "macos-arm64-cp311")),
-          }
-          allowed_directories = {"sbom", "sbom/nuget"}
-          maximum_file_bytes, maximum_total_bytes, root = 1048576, 2097152, Path(os.environ["EVIDENCE_ROOT"])
-          with zipfile.ZipFile(os.environ["ARCHIVE"]) as archive:
-              files, directories = {}, set()
-              for info in archive.infolist():
-                  name = info.filename.rstrip("/")
-                  logical = PurePosixPath(name)
-                  kind = stat.S_IFMT(info.external_attr >> 16)
-                  if not name or logical.as_posix() != name or logical.is_absolute() or ".." in logical.parts:
-                      raise ValueError("evidence archive contains a non-canonical path")
-                  if info.is_dir():
-                      if name in directories or name not in allowed_directories or kind not in (0, stat.S_IFDIR):
-                          raise ValueError("evidence archive contains an unexpected directory")
-                      directories.add(name)
-                      continue
-                  if name in files or name not in expected or kind not in (0, stat.S_IFREG) or info.flag_bits & 1:
-                      raise ValueError("evidence archive contains an unexpected or non-regular file")
-                  if info.file_size > maximum_file_bytes:
-                      raise ValueError("evidence archive member exceeds its byte ceiling")
-                  files[name] = info
-              if set(files) != expected or sum(info.file_size for info in files.values()) > maximum_total_bytes:
-                  raise ValueError("evidence archive does not match the exact bounded file set")
-              root.mkdir(mode=0o700)
-              for name, info in sorted(files.items()):
-                  target = root.joinpath(*PurePosixPath(name).parts)
-                  target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-                  descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o400)
-                  try:
-                      with archive.open(info) as source:
-                          remaining = info.file_size
-                          while remaining:
-                              chunk = source.read(min(65536, remaining))
-                              if not chunk:
-                                  raise ValueError("evidence archive member is truncated")
-                              view = memoryview(chunk)
-                              while view:
-                                  written = os.write(descriptor, view)
-                                  if written <= 0:
-                                      raise OSError("evidence write made no progress")
-                                  view = view[written:]
-                              remaining -= len(chunk)
-                          if source.read(1):
-                              raise ValueError("evidence archive member exceeds its declared size")
-                  finally:
-                      os.close(descriptor)
-          PY
-
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: 3.11.9
@@ -377,96 +490,151 @@ jobs:
       - name: Install independent immutable validator
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_revision }}"
           python -m venv "${RUNNER_TEMP}/verify-venv"
           "${RUNNER_TEMP}/verify-venv/bin/python" -m pip install \
             --require-hashes \
             --requirement src/pipeline/requirements-release.lock
 
-      - name: Independently download and validate reviewed Cosign
+      - name: Independently authenticate and extract original candidate
         env:
-          PYTHONDONTWRITEBYTECODE: "1"
+          GH_TOKEN: ${{ github.token }}
+          PROFILE: ${{ inputs.profile }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
         run: |
           set -euo pipefail
-          tool_root="${RUNNER_TEMP}/cosign-verify"
-          mkdir -p "${tool_root}"
+          umask 077
           curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --max-filesize 135178161 \
-            --output "${tool_root}/cosign" \
-            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64
+            --max-filesize 1048576 \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/verify-candidate-run.json" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/runs/${CANDIDATE_RUN_ID}"
           curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --max-filesize 3906 \
-            --output "${tool_root}/cosign_checksums.txt" \
-            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign_checksums.txt
+            --max-filesize 1048576 \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/verify-candidate-artifacts.json" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/runs/${CANDIDATE_RUN_ID}/artifacts?per_page=100"
           PYTHONPATH=src/pipeline "${RUNNER_TEMP}/verify-venv/bin/python" \
-            scripts/release/validate_supply_chain_contract.py cosign-tool-lock \
-            --lock contracts/supply-chain/v1/tools/cosign-linux-amd64.json \
-            --trusted-lock-sha256 dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9 \
-            --executable "${tool_root}/cosign" \
-            --checksums "${tool_root}/cosign_checksums.txt"
-          chmod 0500 "${tool_root}/cosign"
+            scripts/release/validate_supply_chain_contract.py \
+            protected-candidate-authority \
+            --run-json "${RUNNER_TEMP}/verify-candidate-run.json" \
+            --artifacts-json "${RUNNER_TEMP}/verify-candidate-artifacts.json" \
+            --profile "${PROFILE}" \
+            --source-revision "${SOURCE_REVISION}" \
+            --candidate-run-id "${CANDIDATE_RUN_ID}" \
+            --output "${RUNNER_TEMP}/verify-candidate-authority.json"
+          authority="${RUNNER_TEMP}/verify-candidate-authority.json"
+          artifact_id="$(jq -er '.artifact.id | select(type == "number" and . > 0)' "${authority}")"
+          artifact_bytes="$(jq -er '.artifact.byteSize | select(type == "number" and . > 0)' "${authority}")"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize "${artifact_bytes}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/verify-candidate.zip" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/artifacts/${artifact_id}/zip"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/verify-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py \
+            protected-candidate-extract \
+            --archive "${RUNNER_TEMP}/verify-candidate.zip" \
+            --authority "${authority}" \
+            --output-root "${RUNNER_TEMP}/verify-candidate"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/verify-venv/bin/python" \
+            scripts/release/validate_candidate_bytes.py \
+            --candidate-root "${RUNNER_TEMP}/verify-candidate/candidate"
 
-      - name: Validate truthful envelope against exact downloaded bytes
+      - name: Authenticate and safely extract exact evidence archive
         env:
-          CANDIDATE_ROOT: ${{ runner.temp }}/verify-candidate-download/candidate
-          EVIDENCE_ROOT: ${{ runner.temp }}/verify-evidence-download
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.finalize.outputs.evidence_artifact_id }}
+          ARTIFACT_NAME: ${{ needs.finalize.outputs.evidence_artifact }}
+          EXPECTED_DIGEST: ${{ needs.finalize.outputs.evidence_digest }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+          [[ "${ARTIFACT_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${EXPECTED_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 1048576 \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/evidence-artifact.json" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/artifacts/${ARTIFACT_ID}"
+          jq -e \
+            --argjson artifact_id "${ARTIFACT_ID}" \
+            --arg artifact_name "${ARTIFACT_NAME}" \
+            --arg digest "${EXPECTED_DIGEST}" \
+            --arg revision "${SOURCE_REVISION}" \
+            --argjson run_id "${GITHUB_RUN_ID}" '
+            .id == $artifact_id and
+            .name == $artifact_name and
+            .expired == false and
+            .digest == $digest and
+            .size_in_bytes > 0 and
+            .size_in_bytes <= 4194304 and
+            .url == ("https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/artifacts/" + ($artifact_id | tostring)) and
+            .archive_download_url == ("https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/artifacts/" + ($artifact_id | tostring) + "/zip") and
+            .workflow_run == {
+              id: $run_id,
+              repository_id: 1196432661,
+              head_repository_id: 1196432661,
+              head_branch: "master",
+              head_sha: $revision
+            }
+          ' "${RUNNER_TEMP}/evidence-artifact.json"
+          artifact_bytes="$(jq -er '.size_in_bytes | select(type == "number" and . > 0 and . <= 4194304)' "${RUNNER_TEMP}/evidence-artifact.json")"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize "${artifact_bytes}" \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --output "${RUNNER_TEMP}/verified-evidence.zip" \
+            "https://api.github.com/repos/artemsemdev/SeaRise-Europe/actions/artifacts/${ARTIFACT_ID}/zip"
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/verify-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py \
+            protected-evidence-extract \
+            --archive "${RUNNER_TEMP}/verified-evidence.zip" \
+            --expected-sha256 "${EXPECTED_DIGEST#sha256:}" \
+            --expected-byte-size "${artifact_bytes}" \
+            --output-root "${RUNNER_TEMP}/verify-evidence"
+
+      - name: Validate truthful envelope against exact extracted bytes
+        env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: |
           set -euo pipefail
+          CANDIDATE_ROOT="${RUNNER_TEMP}/verify-candidate/candidate" \
+          EVIDENCE_ROOT="${RUNNER_TEMP}/verify-evidence" \
           PYTHONPATH=src/pipeline "${RUNNER_TEMP}/verify-venv/bin/python" - <<'PY'
-          import os, stat
-          from pathlib import Path, PurePosixPath
+          import os
+          from pathlib import Path
 
           from searise_pipeline.supply_chain.contracts import (
               _REAL_SOURCE_EVIDENCE_SBOM_PATHS,
               _validate_real_source_unverified_evidence,
           )
 
-          def bounded_read(root: Path, relative: str, maximum: int) -> bytes:
-              identity = lambda value: (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
-              logical = PurePosixPath(relative)
-              flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-              directory = os.open(root, flags | os.O_DIRECTORY)
-              try:
-                  for part in logical.parts[:-1]:
-                      child = os.open(part, flags | os.O_DIRECTORY, dir_fd=directory)
-                      os.close(directory)
-                      directory = child
-                  descriptor = os.open(logical.name, flags, dir_fd=directory)
-                  try:
-                      before = os.fstat(descriptor)
-                      if not stat.S_ISREG(before.st_mode) or before.st_size > maximum:
-                          raise ValueError(f"unsafe or oversized evidence file: {relative}")
-                      remaining, chunks = before.st_size, []
-                      while remaining:
-                          chunk = os.read(descriptor, min(65536, remaining))
-                          if not chunk:
-                              raise ValueError(f"truncated evidence file: {relative}")
-                          chunks.append(chunk)
-                          remaining -= len(chunk)
-                      extra, after, linked = os.read(descriptor, 1), os.fstat(descriptor), os.stat(logical.name, dir_fd=directory, follow_symlinks=False)
-                      if extra or identity(before) != identity(after) or identity(after) != identity(linked):
-                          raise ValueError(f"evidence file changed while read: {relative}")
-                      return b"".join(chunks)
-                  finally:
-                      os.close(descriptor)
-              finally:
-                  os.close(directory)
-
-          candidate, evidence = Path(os.environ["CANDIDATE_ROOT"]), Path(os.environ["EVIDENCE_ROOT"])
-          sboms = {
-              path: bounded_read(evidence, path, 1048576)
-              for path in _REAL_SOURCE_EVIDENCE_SBOM_PATHS
-          }
+          candidate = Path(os.environ["CANDIDATE_ROOT"])
+          evidence = Path(os.environ["EVIDENCE_ROOT"])
           envelope = _validate_real_source_unverified_evidence(
-              bounded_read(evidence, "evidence-envelope.json", 1048576),
-              bounded_read(candidate, "manifest.json", 1048576),
-              bounded_read(evidence, "provenance.intoto.jsonl", 1048576),
+              (evidence / "evidence-envelope.json").read_bytes(),
+              (candidate / "manifest.json").read_bytes(),
+              (evidence / "provenance.intoto.jsonl").read_bytes(),
               Path("contracts/supply-chain/v1/identity-policy.json").read_bytes(),
               {
-                  name: bounded_read(evidence, name, 1048576)
+                  name: (evidence / name).read_bytes()
                   for name in ("manifest.sigstore.json", "provenance.sigstore.json")
               },
-              sboms,
+              {
+                  path: (evidence / path).read_bytes()
+                  for path in _REAL_SOURCE_EVIDENCE_SBOM_PATHS
+              },
           )
           assert envelope["verification"] == {
               "status": "real-source-unverified",
@@ -484,6 +652,29 @@ jobs:
           }
           PY
 
+      - name: Independently download and validate reviewed Cosign
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          tool_root="${RUNNER_TEMP}/cosign-verify"
+          mkdir -m 0700 "${tool_root}"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 135178161 \
+            --output "${tool_root}/cosign" \
+            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --max-filesize 3906 \
+            --output "${tool_root}/cosign_checksums.txt" \
+            https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign_checksums.txt
+          PYTHONPATH=src/pipeline "${RUNNER_TEMP}/verify-venv/bin/python" \
+            scripts/release/validate_supply_chain_contract.py cosign-tool-lock \
+            --lock contracts/supply-chain/v1/tools/cosign-linux-amd64.json \
+            --trusted-lock-sha256 dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9 \
+            --executable "${tool_root}/cosign" \
+            --checksums "${tool_root}/cosign_checksums.txt"
+          chmod 0500 "${tool_root}/cosign"
+
       - name: Verify both identities without OIDC permission
         env:
           CERTIFICATE_IDENTITY: https://github.com/artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master
@@ -491,8 +682,8 @@ jobs:
         run: |
           set -euo pipefail
           cosign="${RUNNER_TEMP}/cosign-verify/cosign"
-          candidate="${RUNNER_TEMP}/verify-candidate-download/candidate"
-          evidence="${RUNNER_TEMP}/verify-evidence-download"
+          candidate="${RUNNER_TEMP}/verify-candidate/candidate"
+          evidence="${RUNNER_TEMP}/verify-evidence"
           "${cosign}" verify-blob \
             --bundle "${evidence}/manifest.sigstore.json" \
             --certificate-identity "${CERTIFICATE_IDENTITY}" \
@@ -504,14 +695,14 @@ jobs:
             --certificate-oidc-issuer "${OIDC_ISSUER}" \
             "${evidence}/provenance.intoto.jsonl"
 
-      - name: Record retained verification audit
+      - name: Record non-publishing verification audit
         env:
           CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
-          EVIDENCE_ARTIFACT: ${{ needs.sign.outputs.evidence_artifact }}
-          EVIDENCE_DIGEST: ${{ needs.sign.outputs.evidence_digest }}
+          EVIDENCE_ARTIFACT: ${{ needs.finalize.outputs.evidence_artifact }}
+          EVIDENCE_DIGEST: ${{ needs.finalize.outputs.evidence_digest }}
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/verification-audit"
+          mkdir -m 0700 "${RUNNER_TEMP}/verification-audit"
           jq -n \
             --arg runId "${GITHUB_RUN_ID}" \
             --arg candidateRunId "${CANDIDATE_RUN_ID}" \
@@ -538,7 +729,7 @@ jobs:
             echo "Production, publication, scientific approval, protected-environment verification, and public readback are not claimed."
           } >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Upload retained verification audit
+      - name: Upload retained non-publishing verification audit
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: phase-1-verification-audit-${{ github.run_id }}
