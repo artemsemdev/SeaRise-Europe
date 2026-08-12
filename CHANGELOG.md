@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a read-only, descriptor-bound Phase 1 candidate byte gate that requires
+  the exact 53-artifact inventory with no extra entries, streams and verifies
+  declared sizes and SHA-256 values, reconstructs checksum content, and rejects
+  symlink escapes or concurrent mutation without claiming production or
+  publication readiness.
 - Added an immutable Cosign Linux AMD64 tool lock backed by the official
   versioned release checksum asset, with fail-closed local validation and
   build-plane SBOM coverage. Signing remains blocked on the reviewed evidence
