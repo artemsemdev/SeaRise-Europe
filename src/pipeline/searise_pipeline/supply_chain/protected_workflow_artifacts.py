@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import stat
@@ -228,6 +229,13 @@ def _reject_constant(value: str) -> NoReturn:
     _fail(f"JSON contains forbidden non-finite value {value}")
 
 
+def _finite_float(value: str) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        _fail(f"JSON contains forbidden non-finite value {value}")
+    return parsed
+
+
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
@@ -311,6 +319,7 @@ def _json_bytes(raw: bytes, label: str) -> Mapping[str, Any]:
             text,
             object_pairs_hook=_pairs,
             parse_constant=_reject_constant,
+            parse_float=_finite_float,
         )
     except (json.JSONDecodeError, UnicodeError) as exc:
         raise ProtectedWorkflowArtifactError(f"{label} must be valid strict JSON") from exc
@@ -1150,6 +1159,11 @@ def _validate_build(
     for index, value in enumerate(outputs):
         _file_identity(value, f"build output {index}", public_output=True)
     _require_unique(outputs, "build outputs")
+    execution_outputs = [
+        {key: item[key] for key in ("path", "byteSize", "sha256")} for item in outputs
+    ]
+    if execution_outputs != execution["finalOutputs"]:
+        _fail("build outputs differ from the exact ordered execution final outputs")
     comparison = _exact_keys(
         build["reproducibilityComparison"],
         {"identityFields", "excludedVolatileFields"},

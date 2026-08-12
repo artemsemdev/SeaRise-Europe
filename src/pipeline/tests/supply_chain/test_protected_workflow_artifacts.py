@@ -164,14 +164,14 @@ def _output(path: str = "output.bin") -> dict[str, object]:
 
 
 def _candidate_documents(*, dispatch_change=None, execution_change=None, build_change=None):
-    output = _output()
+    outputs = [_output(), _output("second.bin")]
     stages = [
         {
             "stage": stage,
             "stageKeySha256": "c" * 64,
             "cacheStatus": "miss",
             "durationSeconds": 0.1,
-            "outputs": [output],
+            "outputs": outputs,
             "warnings": [],
             "qualityResults": {},
         }
@@ -186,7 +186,7 @@ def _candidate_documents(*, dispatch_change=None, execution_change=None, build_c
         )
     ]
     encoded = json.dumps(
-        [output], ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
+        outputs, ensure_ascii=False, allow_nan=False, separators=(",", ":"), sort_keys=True
     ).encode()
     dispatch = {
         "schemaVersion": 1,
@@ -216,10 +216,10 @@ def _candidate_documents(*, dispatch_change=None, execution_change=None, build_c
         "networkAccess": "disabled",
         "status": "complete",
         "stages": stages,
-        "finalOutputs": [output],
+        "finalOutputs": outputs,
         "candidate": {
-            "fileCount": 1,
-            "byteSize": 1,
+            "fileCount": len(outputs),
+            "byteSize": sum(output["byteSize"] for output in outputs),
             "inventorySha256": hashlib.sha256(encoded).hexdigest(),
         },
         "resourceUsage": {"totalDurationSeconds": 1.0, "peakProcessRssBytes": 1},
@@ -251,6 +251,7 @@ def _candidate_documents(*, dispatch_change=None, execution_change=None, build_c
                 "role": "projection-analysis-cog",
                 "mediaType": "image/tiff; application=geotiff; profile=cloud-optimized",
             }
+            for output in outputs
         ],
         "reproducibilityComparison": {
             "identityFields": [
@@ -275,14 +276,17 @@ def _candidate_documents(*, dispatch_change=None, execution_change=None, build_c
     return dispatch, execution, build
 
 
-def _candidate_archive(tmp_path: Path, **changes) -> Path:
+def _candidate_archive(tmp_path: Path, *, raw_execution_change=None, **changes) -> Path:
     dispatch, execution, build = _candidate_documents(**changes)
+    execution_bytes = json.dumps(execution).encode()
+    if raw_execution_change:
+        execution_bytes = raw_execution_change(execution_bytes)
     path = tmp_path / "candidate.zip"
     _zip(
         path,
         {
             "dispatch.json": json.dumps(dispatch).encode(),
-            "execution.json": json.dumps(execution).encode(),
+            "execution.json": execution_bytes,
             "candidate/manifest.json": b"{}",
             "candidate/receipts/build.json": json.dumps(build).encode(),
         },
@@ -434,15 +438,16 @@ def test_authority_rejects_duplicate_json_keys_and_nonfinite_values(tmp_path: Pa
             candidate_run_id=RUN_ID,
         )
 
-    run_path.write_text('{"id":NaN}', encoding="utf-8")
-    with pytest.raises(ProtectedWorkflowArtifactError, match="non-finite"):
-        validate_candidate_artifact_authority(
-            run_path,
-            inventory_path,
-            profile=PROFILE,
-            source_revision=REVISION,
-            candidate_run_id=RUN_ID,
-        )
+    for invalid in ("NaN", "Infinity", "1e400"):
+        run_path.write_text(f'{{"id":{invalid}}}', encoding="utf-8")
+        with pytest.raises(ProtectedWorkflowArtifactError, match="non-finite"):
+            validate_candidate_artifact_authority(
+                run_path,
+                inventory_path,
+                profile=PROFILE,
+                source_revision=REVISION,
+                candidate_run_id=RUN_ID,
+            )
 
 
 def test_authority_metadata_rejects_symlink_and_hardlink(tmp_path: Path) -> None:
@@ -796,6 +801,15 @@ def test_candidate_extractor_streams_exact_archive_and_validates_receipts(tmp_pa
         {"build_change": lambda value: value.update(dataProvenanceClass="synthetic-fixture")},
         {"build_change": lambda value: value.update(networkAccess="enabled")},
         {"build_change": lambda value: value.update(extra="forbidden")},
+        {"build_change": lambda value: value["outputs"][0].update(path="forged.bin")},
+        {"build_change": lambda value: value["outputs"][0].update(sha256="9" * 64)},
+        {"build_change": lambda value: value["outputs"][0].update(byteSize=2)},
+        {"build_change": lambda value: value["outputs"].reverse()},
+        {
+            "raw_execution_change": lambda value: value.replace(
+                b'"totalDurationSeconds": 1.0', b'"totalDurationSeconds": 1e400'
+            )
+        },
     ],
 )
 def test_candidate_extractor_rejects_descriptor_drift(tmp_path: Path, change) -> None:
