@@ -97,8 +97,9 @@ workstation at:
 ~/Desktop/Github/SeaRise Europe/local-data/phase-1/
 ```
 
-The repository-relative location is `local-data/phase-1/`. The complete local
-directory occupied approximately 14 GiB when verified and contained:
+The repository-relative location is `local-data/phase-1/`. After the exact AR6
+source and reviewed build artifacts were added, the complete local directory
+occupied 23,993,008 KiB (approximately 22.9 GiB) and contained:
 
 - the four hash-locked GeoNames source assets and captured response headers;
 - the normalized catalogue and spatial DuckDB databases with their receipts;
@@ -109,17 +110,34 @@ directory occupied approximately 14 GiB when verified and contained:
 - the production query set and validated Node-worker diagnostic report; and
 - private validation work directories used for read-only replay.
 
+The following subdirectories are the historical handoff authority for inputs
+that are too large or inappropriate for Git. All are covered by the root
+`local-data/` ignore rule:
+
+| Local path below `local-data/phase-1/` | Identity and origin |
+|---|---|
+| `ar6-source/ar6-regional-confidence.zip` | 9,243,771,601 bytes; SHA-256 `d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91`; exact IPCC AR6 archive selected by the audited source lock |
+| `ar6-regional-candidate/` | macOS ARM64 candidate artifact `8973969557` from protected validation run `31113582612`, source commit `c2ed9074624c7cfe61bf610a1a67f4303aca7580`; manifest SHA-256 `6fe1115ba80857a2dcdd39fefada92ec51122cd6f8e7a2704e20083dd3e616ac` |
+| `ar6-owner-decision/` | protected owner-decision artifact from run `31395573924`; the final gate records automated validation passed, owner approval, and the same manifest identity |
+| `boundary-candidate/` | four independently validated boundary GeoParquet/PMTiles files from run `31644862275`; local `checksums.txt` SHA-256 `255defa0e3391c8c367017e1cce13f7b621587df00c636eeed15913a895e467a` |
+| `geonames-sources/`, `catalogue/`, `spatial/`, `reconciliation/`, `geoparquet/`, `search-projection/`, `browser-shards/`, `browser-worker-performance/` | exact settlement source, intermediate, final, and Chromium evidence described by the production inventory |
+
 `local-data/` is intentionally ignored by the root `.gitignore`; these large
 bytes must not be committed. At verification time the GeoNames full scans had
 zero parser failures, the search projection reproduced byte-for-byte from the
 spatial database, and the diagnostic report validated with deterministic
 identity `36d21fd8dc303f523e5a19cb00c789804dd2a42ed9c15ba3c3d1cddff56083e9`.
+The later production Chromium worker report is retained separately under
+`browser-worker-performance/` with deterministic identity
+`af39b9913228452464454e878a303f534e9fc573a2fa58b413e05c9c1b8b928f`.
 
-This location is a local operational handoff only. It is not an external
-immutable-retention authority, protected-workflow evidence, a signed release,
-or proof that the complete Phase 1 candidate gates passed. The local directory
-must be preserved until the exact bytes have been incorporated into the
-candidate-wide validation, signing, readback, and retention workflows.
+The downloaded AR6 and boundary directories retain bytes produced by the cited
+protected workflows, but this combined location is still a local operational
+handoff only. It is not an external immutable-retention authority, a signed
+54-artifact release, or proof that the combined Phase 1 candidate gates passed.
+The local directory must be preserved until the exact bytes have been
+incorporated into the candidate-wide validation, signing, readback, and
+retention workflows.
 
 Two local clean invocations used independent cache roots and produced the same
 42-file candidate inventory above; recursive byte diff returned no
