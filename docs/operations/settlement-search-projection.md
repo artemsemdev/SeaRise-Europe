@@ -25,6 +25,19 @@ byte-identical quality-11 Brotli text compression. The envelopes bind
 the exact projection byte hash, projection footer identity, spatial database,
 spatial receipt, and spatial candidate. They retain false production, signing,
 publication, owner, scientific, hazard, and canonical-geometry claims.
+Each compressed payload implements the public settlement v4 search contract,
+without altering the fixture-only v3 envelope. The caller must provide the
+exact spatial DuckDB database, canonical receipt, private validation work
+directory, and an explicit `dataReleaseId`. Before building any shard, the
+builder invokes the pinned Python projection validator. That validator opens
+descriptor-safe snapshots, reconciles the database with the receipt, and
+replays every projection document in lockstep. Its canonical authority commits
+the projection bytes, document identity, counts, release, source, and geometry;
+same-count substitutions therefore fail closed. The builder also verifies the
+receipt byte hash and candidate identity already bound by the projection,
+derives the three geometry identities from that authority, and
+places the same release, provenance, spatial, source, engine, runtime, ranking,
+merge, and compression identities in both shards and the receipt-last set.
 
 Projection input must be canonical, duplicate-free NDJSON with the exact nested
 name, location, lineage, and spatial-classification shapes. Records remain in
@@ -60,9 +73,19 @@ not claims about GeoNames completeness.
 ```bash
 cd src/frontend
 node --import tsx scripts/build-settlement-search-shards.ts build \
-  --projection /absolute/search-projection.ndjson --output-dir /private/output
+  --projection /absolute/search-projection.ndjson \
+  --spatial-database /absolute/spatial.duckdb \
+  --spatial-receipt /absolute/spatial-stage.receipt.json \
+  --validation-work-dir /absolute/private-validation-work \
+  --data-release-id searise-europe-v1.0.0-20260812-0123456789ab \
+  --output-dir /private/output
 node --import tsx scripts/build-settlement-search-shards.ts validate \
-  --projection /absolute/search-projection.ndjson --output-dir /private/output
+  --projection /absolute/search-projection.ndjson \
+  --spatial-database /absolute/spatial.duckdb \
+  --spatial-receipt /absolute/spatial-stage.receipt.json \
+  --validation-work-dir /absolute/private-validation-work \
+  --data-release-id searise-europe-v1.0.0-20260812-0123456789ab \
+  --output-dir /private/output
 ```
 
 On macOS or Linux with Python 3.9 or newer, the builder performs stable
@@ -94,10 +117,20 @@ last, then performs a final all-descriptor, all-path, and output-root identity
 pass. Successful publication and loading are point-in-time linearized at that
 final pass; they are not a lease on paths after the function returns.
 Downstream code must use those returned objects rather than reopen artifact
-paths. These candidate shards do not provide the Web Worker, production-scale
+paths. Supplying a different release ID or receipt produces a different exact
+set and cannot validate an existing set. The standalone decoder also requires
+the caller's complete expected release, provenance, source, and spatial
+authority; self-asserted hashes inside a recompressed shard are insufficient.
+These artifacts do not provide the Web Worker, production-scale
 benchmarks, or publication approval required by the consumer frontend issue.
 
 The [settlement browser-worker performance harness](settlement-browser-worker-performance.md)
 can bind these exact receipt-gated bytes and measure production-sized inputs on
 its documented Node worker reference profile. It deliberately remains separate
 from real browser/mobile promotion evidence.
+
+The receipt is a first-class candidate artifact at
+`search/settlement-browser-search-shards.receipt.json`. It follows the two shard
+entries in write order and is included in the exact artifact and checksum
+inventories; omitting it or treating it as an unlisted extra fails the candidate
+byte gate.

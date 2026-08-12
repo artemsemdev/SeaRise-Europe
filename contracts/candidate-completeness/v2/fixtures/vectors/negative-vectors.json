@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "baseFixture": "../valid/engineering-candidate.json",
+  "vectors": [
+    {"id":"missing-cog","expectedCode":"artifact-inventory","operations":[{"op":"remove","path":"/artifacts/32"}]},
+    {"id":"unsafe-artifact-path","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/artifacts/0/path","value":"../config/scenarios.json"}]},
+    {"id":"malformed-hash","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/artifacts/0/sha256","value":"not-a-sha256"}]},
+    {"id":"wrong-media-role","expectedCode":"artifact-inventory","operations":[{"op":"replace","path":"/artifacts/32/role","value":"projection-visual-pmtiles"}]},
+    {"id":"wrong-rights","expectedCode":"artifact-inventory","operations":[{"op":"replace","path":"/artifacts/16/rights/attributionIds","value":["searise-europe-candidate-completeness-v1"]}]},
+    {"id":"conditional-redistribution","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/artifacts/0/rights/redistribution","value":"conditional"}]},
+    {"id":"cross-release-artifact","expectedCode":"release-identity","operations":[{"op":"replace","path":"/artifacts/0/dataReleaseId","value":"searise-europe-v1.0.0-20260811-ffffffffffff"}]},
+    {"id":"checksum-missing-subject","expectedCode":"checksum-coverage","operations":[{"op":"remove","path":"/checksumInventory/subjects/0"}]},
+    {"id":"stac-analysis-mismatch","expectedCode":"stac-binding","operations":[{"op":"replace","path":"/stacBindings/items/0/analysisArtifactId","value":"projection-ssp1-26-2050-cog"}]},
+    {"id":"terminal-order-drift","expectedCode":"manifest-order","operations":[{"op":"replace","path":"/artifacts/51/writeSequence","value":53}]},
+    {"id":"manifest-not-last","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/manifest/writeSequence","value":54}]},
+    {"id":"supply-chain-gate-optional","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/supplyChainGate/requiredForPublication","value":false}]},
+    {"id":"sidecar-in-self-hashed-inventory","expectedCode":"artifact-inventory","operations":[{"op":"replace","path":"/artifacts/0/role","value":"provenance"}]},
+    {"id":"synthetic-publication-claim","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/publicationClaim","value":true}]},
+    {"id":"synthetic-hazard-claim","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/geometryPolicy/hazardExtentClaim","value":true}]},
+    {"id":"real-source-canonical-claim","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/dataProvenanceClass","value":"real-source"},{"op":"replace","path":"/geometryPolicy/canonical","value":true}]},
+    {"id":"real-source-production-claim","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/dataProvenanceClass","value":"real-source"},{"op":"replace","path":"/geometryPolicy/production","value":true}]},
+    {"id":"real-source-publication-claim","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/dataProvenanceClass","value":"real-source"},{"op":"replace","path":"/geometryPolicy/publicationEligible","value":true}]},
+    {"id":"real-source-hazard-claim","expectedCode":"candidate-schema","operations":[{"op":"replace","path":"/dataProvenanceClass","value":"real-source"},{"op":"replace","path":"/geometryPolicy/hazardExtentClaim","value":true}]}
+  ]
+}

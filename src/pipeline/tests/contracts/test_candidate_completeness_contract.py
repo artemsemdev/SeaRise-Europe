@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -19,16 +20,36 @@ from searise_pipeline.candidate_completeness import (
 from searise_pipeline.candidate_completeness.cli import cli
 
 ROOT = Path(__file__).resolve().parents[4]
-CONTRACT_ROOT = ROOT / "contracts/candidate-completeness/v1"
-RELEASE_ROOT = ROOT / "contracts/release/v1"
+V1_CONTRACT_ROOT = ROOT / "contracts/candidate-completeness/v1"
+CONTRACT_ROOT = ROOT / "contracts/candidate-completeness/v2"
+RELEASE_ROOT = ROOT / "contracts/release/v2"
 SCHEMA = CONTRACT_ROOT / "candidate.schema.json"
 INVENTORY = CONTRACT_ROOT / "required-artifacts.json"
 FIXTURE = CONTRACT_ROOT / "fixtures/valid/engineering-candidate.json"
 VECTORS = CONTRACT_ROOT / "fixtures/vectors/negative-vectors.json"
 
+_V1_SHA256 = {
+    "candidate.schema.json": "c253ad7d0ee8f5f1b051477c5c2868a362257268290ed0dcbae4c0eef25bf98f",
+    "fixtures/assembly/complete-synthetic.json": (
+        "bd50c134b6969309d452ec5c3d7c698c301f1c52a80e3c21e86fc1386710c042"
+    ),
+    "fixtures/valid/engineering-candidate.json": (
+        "3af08d2fd3fd30128b9155603c15ad32efa5c87d653bd51060cb1294ce4271e6"
+    ),
+    "fixtures/vectors/negative-vectors.json": (
+        "b92a8e2b2c92b27e170af883beb15d1f2cf80090350074b5d994db739361066c"
+    ),
+    "required-artifacts.json": "afe44b12f07979e5040b131a86b0de7526cf83fad172ead8a8e4fbe20c12b1ec",
+}
+_RELEASE_V1_DEFS_SHA256 = "d699fae42af40cf413834af1e051eac1c0a9815e87cc1f1d0ef08e40a79cf3d3"
+
 
 def _read(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _validator() -> Draft202012Validator:
@@ -80,7 +101,7 @@ def _semantic_errors(candidate: dict[str, Any]) -> set[str]:
         for item in artifacts
     ):
         errors.add("release-identity")
-    if [item.get("writeSequence") for item in artifacts] != list(range(1, 54)):
+    if [item.get("writeSequence") for item in artifacts] != list(range(1, 55)):
         errors.add("manifest-order")
     if [item.get("artifactId") for item in artifacts[-3:]] != contract["terminalArtifactIds"]:
         errors.add("manifest-order")
@@ -158,8 +179,8 @@ def test_candidate_fixture_matches_schema_and_exact_inventory() -> None:
 
     contract = _read(INVENTORY)
     artifacts = candidate["artifacts"]
-    assert len(artifacts) == contract["artifactCount"] == 53
-    assert len(candidate["checksumInventory"]["subjects"]) == 52
+    assert len(artifacts) == contract["artifactCount"] == 54
+    assert len(candidate["checksumInventory"]["subjects"]) == 53
     assert sum(item["role"] == "projection-analysis-cog" for item in artifacts) == 9
     assert sum(item["role"] == "projection-visual-pmtiles" for item in artifacts) == 9
     assert sum(item["role"] == "projection-geoparquet" for item in artifacts) == 1
@@ -170,6 +191,47 @@ def test_candidate_fixture_matches_schema_and_exact_inventory() -> None:
         "settlements-europe-core",
         "settlements-europe-coastal",
     }
+    assert {
+        item["artifactId"]
+        for item in artifacts
+        if item["role"] == "settlement-search-receipt"
+    } == {"settlements-search-shard-set-receipt"}
+    receipt = next(
+        item for item in artifacts if item["artifactId"] == "settlements-search-shard-set-receipt"
+    )
+    assert receipt["writeSequence"] == 20
+    assert any(
+        item["path"] == receipt["path"] for item in candidate["checksumInventory"]["subjects"]
+    )
+
+
+def test_published_v1_bytes_and_validation_meaning_remain_immutable() -> None:
+    actual_paths = {
+        path.relative_to(V1_CONTRACT_ROOT).as_posix(): _sha256(path)
+        for path in V1_CONTRACT_ROOT.rglob("*")
+        if path.is_file()
+    }
+    assert actual_paths == _V1_SHA256
+    assert _sha256(ROOT / "contracts/release/v1/defs.schema.json") == _RELEASE_V1_DEFS_SHA256
+
+    v1_fixture = V1_CONTRACT_ROOT / "fixtures/valid/engineering-candidate.json"
+    assert validate_candidate(v1_fixture).artifact_count == 53
+    with pytest.raises(CandidateContractError) as v1_through_v2:
+        validate_candidate(v1_fixture, contract_root=CONTRACT_ROOT)
+    with pytest.raises(CandidateContractError) as v2_through_v1:
+        validate_candidate(FIXTURE, contract_root=V1_CONTRACT_ROOT)
+    assert v1_through_v2.value.code == "candidate-schema"
+    assert v2_through_v1.value.code == "candidate-schema"
+
+
+def test_unhashable_schema_selector_fails_with_a_stable_contract_error() -> None:
+    candidate = _read(FIXTURE)
+    candidate["$schema"] = []
+
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_document(candidate)
+
+    assert caught.value.code == "candidate-contract-version"
 
 
 def test_inventory_uses_current_release_roles_and_media_types() -> None:
@@ -244,7 +306,7 @@ def test_offline_validator_returns_candidate_metadata_without_reading_artifacts(
 
     assert summary.candidate_id == "candidate-phase-1-fixture-20260811-0123456789ab"
     assert summary.data_release_id == "searise-europe-v1.0.0-20260811-0123456789ab"
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
 
 
 def test_semantic_validation_never_indexes_schema_malformed_artifact_fields() -> None:

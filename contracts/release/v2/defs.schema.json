@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/defs.schema.json",
+  "title": "SeaRise Europe release contract definitions v2",
+  "$defs": {
+    "schemaVersion": {
+      "const": "2.0.0"
+    },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "scenarioId": {
+      "enum": ["ssp1-26", "ssp2-45", "ssp5-85"]
+    },
+    "horizonYear": {
+      "enum": [2030, 2050, 2100]
+    },
+    "resultState": {
+      "enum": [
+        "ProjectionAvailable",
+        "DataUnavailable",
+        "OutOfScope",
+        "UnsupportedGeography"
+      ]
+    },
+    "dataProvenanceClass": {
+      "enum": ["real-source", "synthetic-fixture"]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "releaseRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[?#\\\\])(?:[A-Za-z0-9][A-Za-z0-9._-]*)(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
+    },
+    "artifactRole": {
+      "enum": [
+        "release-manifest",
+        "contract-schema",
+        "scenario-config",
+        "methodology",
+        "source-attribution",
+        "source-receipt",
+        "build-receipt",
+        "support-boundary",
+        "coastal-boundary",
+        "settlement-search-index",
+        "settlement-search-receipt",
+        "settlement-geoparquet",
+        "projection-analysis-cog",
+        "projection-visual-pmtiles",
+        "projection-geoparquet",
+        "quality-summary",
+        "release-gate-report",
+        "architecture-evidence",
+        "stac-catalog",
+        "stac-collection",
+        "stac-item",
+        "checksums",
+        "provenance",
+        "signature"
+      ]
+    },
+    "mediaType": {
+      "enum": [
+        "application/json",
+        "application/geo+json",
+        "application/vnd.apache.parquet",
+        "application/vnd.in-toto+json",
+        "application/vnd.pmtiles",
+        "application/vnd.searise.search-index+json",
+        "application/vnd.dev.sigstore.bundle+json;version=0.3",
+        "application/x-ndjson",
+        "image/tiff; application=geotiff; profile=cloud-optimized",
+        "text/markdown",
+        "text/plain"
+      ]
+    },
+    "coordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
+      }
+    },
+    "releaseAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "automatedValidation",
+        "releaseDisposition",
+        "dataProvenanceClass",
+        "statusDisclosureRequired"
+      ],
+      "properties": {
+        "automatedValidation": {
+          "enum": ["pending", "passed", "failed"]
+        },
+        "releaseDisposition": {
+          "enum": ["pending-owner", "approved", "rejected", "blocked"]
+        },
+        "dataProvenanceClass": {
+          "$ref": "#/$defs/dataProvenanceClass"
+        },
+        "statusDisclosureRequired": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "releaseDisposition": { "const": "approved" }
+            },
+            "required": ["releaseDisposition"]
+          },
+          "then": {
+            "properties": {
+              "automatedValidation": { "const": "passed" },
+              "dataProvenanceClass": { "const": "real-source" }
+            }
+          }
+        },
+        {
+          "if": {
+            "not": {
+              "properties": {
+                "releaseDisposition": { "const": "approved" }
+              },
+              "required": ["releaseDisposition"]
+            }
+          },
+          "then": {
+            "properties": {
+              "statusDisclosureRequired": { "const": true }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "dataProvenanceClass": { "const": "synthetic-fixture" }
+            },
+            "required": ["dataProvenanceClass"]
+          },
+          "then": {
+            "properties": {
+              "releaseDisposition": {
+                "enum": ["pending-owner", "rejected", "blocked"]
+              },
+              "statusDisclosureRequired": { "const": true }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

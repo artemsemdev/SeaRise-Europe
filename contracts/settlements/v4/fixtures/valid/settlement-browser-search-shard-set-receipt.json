@@ -1,0 +1,44 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json",
+  "schemaVersion": "4.0.0",
+  "formatVersion": "settlement-browser-search-shard-set-v2",
+  "complete": true,
+  "writeSequence": 3,
+  "dataReleaseId": "searise-europe-v1.0.0-20260812-0123456789ab",
+  "dataProvenanceClass": "synthetic-fixture",
+  "source": {
+    "projectionDeterministicIdentity": "5555555555555555555555555555555555555555555555555555555555555555",
+    "projectionDocumentsSha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "projectionSchemaVersion": "settlement-search-projection-v1",
+    "projectionSha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "spatialCandidateIdentity": "8888888888888888888888888888888888888888888888888888888888888888",
+    "spatialDatabaseSha256": "9999999999999999999999999999999999999999999999999999999999999999",
+    "spatialReceiptSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "spatialStageSchemaVersion": "spatial-classification-stage-v1"
+  },
+  "spatialIdentity": {
+    "supportGeometry": {"artifactId": "fixture-support", "version": "v1", "sha256": "1111111111111111111111111111111111111111111111111111111111111111"},
+    "coastalGeometry": {"artifactId": "fixture-coastal", "version": "v1", "sha256": "2222222222222222222222222222222222222222222222222222222222222222"},
+    "shorelineGeometry": {"artifactId": "fixture-shoreline", "version": "v1", "sha256": "3333333333333333333333333333333333333333333333333333333333333333"},
+    "predicate": "covers",
+    "distanceMethodVersion": "epsg3035-planar-whole-meter-half-even-v1"
+  },
+  "shards": [
+    {
+      "byteSize": 100,
+      "contentEncoding": "br",
+      "formatVersion": "settlement-browser-search-shard-v2",
+      "path": "europe-core.codepoint-trie.json.br",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "shardId": "europe-core"
+    },
+    {
+      "byteSize": 80,
+      "contentEncoding": "br",
+      "formatVersion": "settlement-browser-search-shard-v2",
+      "path": "europe-coastal.codepoint-trie.json.br",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "shardId": "europe-coastal"
+    }
+  ]
+}

@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json",
+  "title": "SeaRise Europe public settlement browser search artifacts v4",
+  "oneOf": [
+    { "$ref": "#/$defs/shard" },
+    { "$ref": "#/$defs/receipt" },
+    { "$ref": "#/$defs/projectionAuthority" }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "dataReleaseId": {
+      "type": "string",
+      "pattern": "^searise-europe-v[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}-[a-f0-9]{12}$"
+    },
+    "shardId": { "enum": ["europe-core", "europe-coastal"] },
+    "geometryArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "version", "sha256"],
+      "properties": {
+        "artifactId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "spatialIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supportGeometry", "coastalGeometry", "shorelineGeometry", "predicate",
+        "distanceMethodVersion"
+      ],
+      "properties": {
+        "supportGeometry": { "$ref": "#/$defs/geometryArtifact" },
+        "coastalGeometry": { "$ref": "#/$defs/geometryArtifact" },
+        "shorelineGeometry": { "$ref": "#/$defs/geometryArtifact" },
+        "predicate": { "const": "covers" },
+        "distanceMethodVersion": { "const": "epsg3035-planar-whole-meter-half-even-v1" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectionDeterministicIdentity", "projectionDocumentsSha256",
+        "projectionSchemaVersion", "projectionSha256", "spatialCandidateIdentity",
+        "spatialDatabaseSha256", "spatialReceiptSha256", "spatialStageSchemaVersion"
+      ],
+      "properties": {
+        "projectionDeterministicIdentity": { "$ref": "#/$defs/sha256" },
+        "projectionDocumentsSha256": { "$ref": "#/$defs/sha256" },
+        "projectionSchemaVersion": { "const": "settlement-search-projection-v1" },
+        "projectionSha256": { "$ref": "#/$defs/sha256" },
+        "spatialCandidateIdentity": { "$ref": "#/$defs/sha256" },
+        "spatialDatabaseSha256": { "$ref": "#/$defs/sha256" },
+        "spatialReceiptSha256": { "$ref": "#/$defs/sha256" },
+        "spatialStageSchemaVersion": { "const": "spatial-classification-stage-v1" }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engineId", "packageVersion", "serializationVersion"],
+      "properties": {
+        "engineId": { "const": "searise-codepoint-trie" },
+        "packageVersion": { "const": "1.0.0" },
+        "serializationVersion": { "const": "codepoint-trie-json-v1" }
+      }
+    },
+    "compression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "mode", "quality"],
+      "properties": {
+        "algorithm": { "const": "brotli" },
+        "mode": { "const": "text" },
+        "quality": { "const": 11 }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brotli", "icu", "node", "unicode", "zlib"],
+      "properties": {
+        "brotli": { "const": "1.1.0" },
+        "icu": { "const": "78.2" },
+        "node": { "const": "20.20.1" },
+        "unicode": { "const": "17.0" },
+        "zlib": { "const": "1.3.1-e00f703" }
+      }
+    },
+    "ranking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateLimit", "fuzzyDistance", "normalizationVersion", "orderingVersion",
+        "queryWorkLimit", "resultLimit"
+      ],
+      "properties": {
+        "candidateLimit": { "const": 128 },
+        "fuzzyDistance": { "const": "unicode-codepoint-levenshtein-max-2-v1" },
+        "normalizationVersion": { "const": "unicode-nfkd-lowercase-v1" },
+        "orderingVersion": { "const": "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1" },
+        "queryWorkLimit": { "const": 250000 },
+        "resultLimit": { "const": 100 }
+      }
+    },
+    "merge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "deduplicateBy", "resultOrder"],
+      "properties": {
+        "order": {
+          "type": "array",
+          "prefixItems": [{ "const": "europe-core" }, { "const": "europe-coastal" }],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "deduplicateBy": { "const": "placeId" },
+        "resultOrder": { "const": "core-results-then-unseen-coastal-results" }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal", "placeId", "displayName", "searchNames", "countryCode", "admin1Name",
+        "population", "featureCode", "distanceToCoastMeters", "isCoastal", "latitude", "longitude"
+      ],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "placeId": { "type": "string", "pattern": "^geonames:[1-9][0-9]*$" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "searchNames": {
+          "type": "array", "maxItems": 1026, "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "countryCode": { "type": "string", "pattern": "^[A-Z]{2}$" },
+        "admin1Name": { "type": ["string", "null"], "minLength": 1, "maxLength": 256 },
+        "population": { "type": ["integer", "null"], "minimum": 0 },
+        "featureCode": { "enum": ["PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF", "PPLG", "PPLL", "PPLR"] },
+        "distanceToCoastMeters": { "type": "integer", "minimum": 0 },
+        "isCoastal": { "type": "boolean" },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
+    "shard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass", "artifactType",
+        "mediaType", "contentEncoding", "formatVersion", "placeSchema", "shardId",
+        "catalogMembership", "normalizationVersion", "spatialIdentity", "geometryStatus",
+        "canonicalGeometryClaim", "hazardExtentClaim", "scientificApprovalClaim",
+        "ownerApprovalClaim", "productionClaim", "publicationClaim", "publicationEligible",
+        "signingClaim", "recordCount", "recordsSha256", "records", "indexBase64", "source",
+        "engine", "compression", "runtime", "ranking", "merge"
+      ],
+      "properties": {
+        "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "dataReleaseId": { "$ref": "#/$defs/dataReleaseId" },
+        "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+        "artifactType": { "const": "settlement-browser-search-shard" },
+        "mediaType": { "const": "application/vnd.searise.search-index+json" },
+        "contentEncoding": { "const": "br" },
+        "formatVersion": { "const": "settlement-browser-search-shard-v2" },
+        "placeSchema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v3/place.schema.json" },
+        "shardId": { "$ref": "#/$defs/shardId" },
+        "catalogMembership": { "$ref": "#/$defs/shardId" },
+        "normalizationVersion": { "const": "settlement-normalization-v2" },
+        "spatialIdentity": { "$ref": "#/$defs/spatialIdentity" },
+        "geometryStatus": { "const": "selected-scope-approximation" },
+        "canonicalGeometryClaim": { "const": false },
+        "hazardExtentClaim": { "const": false },
+        "scientificApprovalClaim": { "const": false },
+        "ownerApprovalClaim": { "const": false },
+        "productionClaim": { "const": false },
+        "publicationClaim": { "const": false },
+        "publicationEligible": { "const": false },
+        "signingClaim": { "const": false },
+        "recordCount": { "type": "integer", "minimum": 0 },
+        "recordsSha256": { "$ref": "#/$defs/sha256" },
+        "records": { "type": "array", "items": { "$ref": "#/$defs/record" } },
+        "indexBase64": { "type": "string", "minLength": 1, "contentEncoding": "base64" },
+        "source": { "$ref": "#/$defs/source" },
+        "engine": { "$ref": "#/$defs/engine" },
+        "compression": { "$ref": "#/$defs/compression" },
+        "runtime": { "$ref": "#/$defs/runtime" },
+        "ranking": { "$ref": "#/$defs/ranking" },
+        "merge": { "$ref": "#/$defs/merge" }
+      }
+    },
+    "receiptShard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["byteSize", "contentEncoding", "formatVersion", "path", "sha256", "shardId"],
+      "properties": {
+        "byteSize": { "type": "integer", "minimum": 1 },
+        "contentEncoding": { "const": "br" },
+        "formatVersion": { "const": "settlement-browser-search-shard-v2" },
+        "path": { "enum": ["europe-core.codepoint-trie.json.br", "europe-coastal.codepoint-trie.json.br"] },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "shardId": { "$ref": "#/$defs/shardId" }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema", "schemaVersion", "formatVersion", "complete", "writeSequence",
+        "dataReleaseId", "dataProvenanceClass", "source", "spatialIdentity", "shards"
+      ],
+      "properties": {
+        "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "formatVersion": { "const": "settlement-browser-search-shard-set-v2" },
+        "complete": { "const": true },
+        "writeSequence": { "const": 3 },
+        "dataReleaseId": { "$ref": "#/$defs/dataReleaseId" },
+        "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+        "source": { "$ref": "#/$defs/source" },
+        "spatialIdentity": { "$ref": "#/$defs/spatialIdentity" },
+        "shards": {
+          "type": "array",
+          "prefixItems": [
+            { "allOf": [{ "$ref": "#/$defs/receiptShard" }, { "properties": { "shardId": { "const": "europe-core" }, "path": { "const": "europe-core.codepoint-trie.json.br" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/receiptShard" }, { "properties": { "shardId": { "const": "europe-coastal" }, "path": { "const": "europe-coastal.codepoint-trie.json.br" } } }] }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "projectionAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema", "schemaVersion", "formatVersion", "artifactType", "complete",
+        "dataReleaseId", "dataProvenanceClass", "projectionByteSize",
+        "projectionSha256", "projectionDeterministicIdentity",
+        "projectionDocumentsSha256", "recordCount", "source", "spatialIdentity",
+        "canonicalGeometryClaim", "hazardExtentClaim", "scientificApprovalClaim",
+        "ownerApprovalClaim", "productionClaim", "publicationClaim",
+        "publicationEligible", "signingClaim", "validator", "deterministicIdentity"
+      ],
+      "properties": {
+        "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "formatVersion": { "const": "settlement-search-projection-authority-v1" },
+        "artifactType": { "const": "settlement-search-projection-authority" },
+        "complete": { "const": true },
+        "dataReleaseId": { "$ref": "#/$defs/dataReleaseId" },
+        "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+        "projectionByteSize": { "type": "integer", "minimum": 1 },
+        "projectionSha256": { "$ref": "#/$defs/sha256" },
+        "projectionDeterministicIdentity": { "$ref": "#/$defs/sha256" },
+        "projectionDocumentsSha256": { "$ref": "#/$defs/sha256" },
+        "recordCount": { "type": "integer", "minimum": 0 },
+        "source": { "$ref": "#/$defs/source" },
+        "spatialIdentity": { "$ref": "#/$defs/spatialIdentity" },
+        "canonicalGeometryClaim": { "const": false },
+        "hazardExtentClaim": { "const": false },
+        "scientificApprovalClaim": { "const": false },
+        "ownerApprovalClaim": { "const": false },
+        "productionClaim": { "const": false },
+        "publicationClaim": { "const": false },
+        "publicationEligible": { "const": false },
+        "signingClaim": { "const": false },
+        "validator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["validatorId", "version"],
+          "properties": {
+            "validatorId": { "const": "searise_pipeline.settlements.search_projection.validate_search_projection" },
+            "version": { "const": "1" }
+          }
+        },
+        "deterministicIdentity": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

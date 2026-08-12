@@ -217,7 +217,67 @@ def test_projection_round_trip_is_deterministic_and_preserves_search_context(
     assert footer_line == footer
 
 
-@pytest.mark.parametrize("tamper", ["truncated", "duplicate", "reordered", "footer"])
+def test_public_authority_is_emitted_only_from_the_replayed_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = _spatial_document(
+        _place(101, "Alpha", 1_000), memberships=["europe-core"], coastal=False, distance=20
+    )
+    candidate = _candidate([first], [])
+    header = projection._header(candidate, "a" * 64, "b" * 64)
+    footer = projection._footer(header, 1, "c" * 64)
+    projection_path = tmp_path / "projection.ndjson"
+    projection_path.write_bytes(b"fixture\n")
+
+    @contextmanager
+    def replayed(*args, **kwargs):  # type: ignore[no-untyped-def]
+        assets = {
+            "spatial.duckdb": type("Asset", (), {"sha256": "a" * 64})(),
+            "spatial-receipt.json": type("Asset", (), {"sha256": "b" * 64})(),
+            "search-projection.ndjson": type(
+                "Asset", (), {"sha256": hashlib.sha256(b"fixture\n").hexdigest(), "size": 8}
+            )(),
+        }
+        yield footer, candidate, assets
+
+    monkeypatch.setattr(projection, "_validated_snapshot", replayed)
+    authority_receipt = projection.validated_search_projection_authority(
+        tmp_path / "spatial.duckdb",
+        tmp_path / "spatial-receipt.json",
+        projection_path,
+        "searise-europe-v1.0.0-20260812-0123456789ab",
+        work_dir=tmp_path,
+    )
+
+    assert authority_receipt["projectionDeterministicIdentity"] == footer["deterministicIdentity"]
+    assert authority_receipt["source"]["spatialDatabaseSha256"] == "a" * 64
+    assert authority_receipt["complete"] is True
+    assert all(
+        authority_receipt[name] is False
+        for name in (
+            "canonicalGeometryClaim",
+            "hazardExtentClaim",
+            "scientificApprovalClaim",
+            "ownerApprovalClaim",
+            "productionClaim",
+            "publicationClaim",
+            "publicationEligible",
+            "signingClaim",
+        )
+    )
+    unsigned = {
+        key: value
+        for key, value in authority_receipt.items()
+        if key != "deterministicIdentity"
+    }
+    assert authority_receipt["deterministicIdentity"] == hashlib.sha256(
+        projection._canonical(unsigned)
+    ).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "tamper", ["truncated", "duplicate", "reordered", "footer", "resigned-same-count"]
+)
 def test_validator_rejects_tampered_or_unstable_projection(tmp_path: Path, tamper: str) -> None:
     database, receipt, work = _fixture(tmp_path)
     output = tmp_path / "projection.ndjson"
@@ -229,6 +289,21 @@ def test_validator_rejects_tampered_or_unstable_projection(tmp_path: Path, tampe
         output.write_bytes(b"".join([lines[0], lines[1], lines[1], *lines[2:]]))
     elif tamper == "reordered":
         output.write_bytes(b"".join([lines[0], lines[2], lines[1], lines[3]]))
+    elif tamper == "resigned-same-count":
+        documents = [
+            source_stage._strict_json(line, "projection") for line in lines[1:-1]
+        ]
+        documents[0]["sourceSpelling"] = "Changed"
+        documents[0]["canonicalName"]["value"] = "Changed"
+        documents[0]["asciiName"] = "Changed"
+        document_bytes = [_canonical(document) for document in documents]
+        header = source_stage._strict_json(lines[0], "projection header")
+        digest = hashlib.sha256(b"".join(document_bytes)).hexdigest()
+        output.write_bytes(
+            b"".join(
+                [lines[0], *document_bytes, _canonical(projection._footer(header, 2, digest))]
+            )
+        )
     else:
         output.write_bytes(
             b"".join([*lines[:-1], lines[-1].replace(b'"recordCount":2', b'"recordCount":3')])

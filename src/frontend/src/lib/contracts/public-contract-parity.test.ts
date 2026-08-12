@@ -17,16 +17,35 @@ interface ContractDocument {
   [key: string]: unknown;
 }
 
+const repositoryContracts = resolve(process.cwd(), "../../contracts");
+const releaseV1ContractDirectory = resolve(repositoryContracts, "release/v1");
+const releaseV2ContractDirectory = resolve(repositoryContracts, "release/v2");
+const releaseGateContractDirectory = resolve(repositoryContracts, "release-gates/v1");
+const settlementV2ContractDirectory = resolve(repositoryContracts, "settlements/v2");
+const settlementV3ContractDirectory = resolve(repositoryContracts, "settlements/v3");
+const settlementV4ContractDirectory = resolve(repositoryContracts, "settlements/v4");
+const candidateV1ContractDirectory = resolve(
+  repositoryContracts,
+  "candidate-completeness/v1",
+);
+const candidateV2ContractDirectory = resolve(
+  repositoryContracts,
+  "candidate-completeness/v2",
+);
 const contractDirectories = [
-  resolve(process.cwd(), "../../contracts/release/v1"),
-  resolve(process.cwd(), "../../contracts/release-gates/v1"),
-  resolve(process.cwd(), "../../contracts/settlements/v2"),
-  resolve(process.cwd(), "../../contracts/settlements/v3"),
-  resolve(process.cwd(), "../../contracts/candidate-completeness/v1"),
+  releaseV1ContractDirectory,
+  releaseV2ContractDirectory,
+  releaseGateContractDirectory,
+  settlementV2ContractDirectory,
+  settlementV3ContractDirectory,
+  settlementV4ContractDirectory,
+  candidateV1ContractDirectory,
+  candidateV2ContractDirectory,
 ];
-const releaseGateContractDirectory = contractDirectories[1];
-const settlementContractDirectories = contractDirectories.slice(2, 4);
-const settlementV3ContractDirectory = contractDirectories[3];
+const settlementContractDirectories = [
+  settlementV2ContractDirectory,
+  settlementV3ContractDirectory,
+];
 
 function readJson(path: string): ContractDocument {
   return JSON.parse(readFileSync(path, "utf8")) as ContractDocument;
@@ -223,5 +242,29 @@ describe("Python and TypeScript public contract parity", () => {
         mismatch as unknown as SettlementSearchShardDocument,
       ),
     ).toThrow(/recordCount/);
+  });
+
+  it("validates the public v4 shard and receipt and rejects count drift", () => {
+    const ajv = contractValidator();
+    const shard = readJson(resolve(
+      settlementV4ContractDirectory,
+      "fixtures/valid/settlement-browser-search-shard.json",
+    ));
+    const receipt = readJson(resolve(
+      settlementV4ContractDirectory,
+      "fixtures/valid/settlement-browser-search-shard-set-receipt.json",
+    ));
+    const validate = ajv.getSchema(shard.$schema as string);
+
+    expect(validate?.(shard), JSON.stringify(validate?.errors)).toBe(true);
+    expect(validate?.(receipt), JSON.stringify(validate?.errors)).toBe(true);
+    expect(() => validateSettlementSearchShardSemantics(
+      shard as unknown as SettlementSearchShardDocument,
+    )).not.toThrow();
+    const mismatch = { ...shard, recordCount: 2 };
+    expect(validate?.(mismatch), JSON.stringify(validate?.errors)).toBe(true);
+    expect(() => validateSettlementSearchShardSemantics(
+      mismatch as unknown as SettlementSearchShardDocument,
+    )).toThrow(/recordCount/);
   });
 });

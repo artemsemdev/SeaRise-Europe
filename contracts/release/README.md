@@ -1,8 +1,9 @@
 # Public release contracts
 
-The JSON Schemas in [`v1`](v1/) are the only authority for the shape of a
-SeaRise Europe public data release. Architecture and delivery documents explain
-why the fields exist, but must link here instead of copying field definitions.
+The JSON Schemas in [`v1`](v1/) remain the immutable authority for the shape of
+a SeaRise Europe v1 public data release. Architecture and delivery documents
+explain why the fields exist, but must link here instead of copying field
+definitions.
 
 The browser enters a release through `manifest.json` only. Static STAC is the
 discovery representation; it is not a runtime API and cannot replace the
@@ -29,6 +30,14 @@ The `v1` path and every schema's `$id` identify schema version `1.0.0`.
 | Static STAC 1.1.0 profile | [`stac.schema.json`](v1/stac.schema.json) |
 | Mutable pointer to one immutable manifest | [`release-pointer.schema.json`](v1/release-pointer.schema.json) |
 | Shared closed definitions | [`defs.schema.json`](v1/defs.schema.json) |
+
+## Version 2 shared definitions
+
+[`v2/defs.schema.json`](v2/defs.schema.json) is the closed successor definition
+set used by the candidate-completeness v2 contract. It adds the explicit
+settlement search shard-set receipt role without changing the published v1
+bytes or validation meaning. No v2 release manifest is defined by this scoped
+successor; v1 release documents continue to validate only against v1 schemas.
 
 JSON Schema validation proves individual document shape. The Python public
 contract validator additionally proves cross-document release identity,
