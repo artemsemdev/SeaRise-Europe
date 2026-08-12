@@ -255,6 +255,56 @@ def test_serializer_rejects_symlink_source_and_database_receipt_drift(tmp_path: 
         )
 
 
+@pytest.mark.parametrize(
+    ("table", "rows"),
+    [
+        ("spatial_places", [(2, "geonames:2", "{}"), (1, "geonames:1", "{}")]),
+        (
+            "spatial_rejections",
+            [
+                (2, "geonames:2", "outside-support", "{}"),
+                (1, "geonames:1", "outside-support", "{}"),
+            ],
+        ),
+    ],
+)
+def test_stream_rejects_unordered_physical_spatial_rows(
+    table: str, rows: list[tuple[object, ...]]
+) -> None:
+    with duckdb.connect(":memory:") as connection:
+        spatial_stage._create_schema(connection)
+        placeholders = ", ".join("?" for _ in rows[0])
+        connection.executemany(f"INSERT INTO {table} VALUES ({placeholders})", rows)
+
+        with pytest.raises(
+            projection.SearchProjectionError,
+            match=rf"{table} storage keys are duplicate or unordered",
+        ):
+            list(projection._ordered_spatial_rows(connection, table))
+
+
+def test_serializer_fails_closed_on_unordered_physical_source_rows(tmp_path: Path) -> None:
+    database, receipt, work = _fixture(tmp_path)
+    with duckdb.connect(str(database)) as connection:
+        rows = connection.execute(
+            "SELECT * FROM spatial_places ORDER BY geoname_id DESC"
+        ).fetchall()
+        connection.execute("DELETE FROM spatial_places")
+        connection.executemany("INSERT INTO spatial_places VALUES (?, ?, ?)", rows)
+        assert connection.execute("SELECT geoname_id FROM spatial_places").fetchall() == [
+            (102,),
+            (101,),
+        ]
+
+    output = tmp_path / "unordered.ndjson"
+    with pytest.raises(
+        projection.SearchProjectionError,
+        match="spatial_places storage keys are duplicate or unordered",
+    ):
+        projection.serialize_search_projection(database, receipt, output, work_dir=work)
+    assert not output.exists()
+
+
 def test_serializer_refuses_existing_or_replaced_output(tmp_path: Path) -> None:
     database, receipt, work = _fixture(tmp_path)
     output = tmp_path / "projection.ndjson"

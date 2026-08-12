@@ -338,6 +338,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Replaced full-corpus settlement search-projection sorts with single-pass,
+  order-checking spatial-stage scans while retaining the 1 GiB no-spill
+  validation profile and exact receipt reconciliation.
 - Closed settlement reconciliation rejection reasons to the reviewed stage
   vocabularies and prevented reserved DuckDB WAL output names from reaching staging.
 - Corrected the immutable full-source contract to match the official
