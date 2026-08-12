@@ -28,6 +28,15 @@ def inventory() -> tuple[list[dict[str, object]], bytes]:
     return artifacts, b"".join(values)
 
 
+def report_inventory() -> tuple[dict[str, object], bytes]:
+    payload = b'{"report":"exact"}\n'
+    return {
+        "name": "worker-performance.json",
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "size": len(payload),
+    }, payload
+
+
 def expect_failure(action: object) -> None:
     try:
         action()  # type: ignore[operator]
@@ -446,6 +455,152 @@ def final_root_close_is_cleanup_only() -> None:
     assert {path.name for path in output.iterdir()} == set(browser_fs.NAMES)
 
 
+def report_publication_is_exact_and_read_only() -> None:
+    output = Path(tempfile.mkdtemp(prefix="worker-report-exact-"))
+    item, payload = report_inventory()
+    root = browser_fs.open_root(output)
+    try:
+        browser_fs.publish_report(root, output, item, payload)
+    finally:
+        os.close(root)
+    report = output / str(item["name"])
+    assert report.read_bytes() == payload
+    assert stat.S_IMODE(report.stat().st_mode) == 0o400
+    assert report.stat().st_nlink == 1
+    assert [path.name for path in output.iterdir()] == [item["name"]]
+
+
+def report_short_write_and_no_overwrite() -> None:
+    output = Path(tempfile.mkdtemp(prefix="worker-report-short-write-"))
+    item, payload = report_inventory()
+    root = browser_fs.open_root(output)
+    original_write = browser_fs.os.write
+
+    def short_write(descriptor: int, content: object) -> int:
+        return original_write(descriptor, content[:1])  # type: ignore[index]
+
+    browser_fs.os.write = short_write
+    try:
+        browser_fs.publish_report(root, output, item, payload)
+    finally:
+        browser_fs.os.write = original_write
+    before = {path.name: path.read_bytes() for path in output.iterdir()}
+    try:
+        for _ in range(2):
+            expect_failure(
+                lambda root=root, output=output, item=item, payload=payload: (
+                    browser_fs.publish_report(root, output, item, payload)
+                )
+            )
+            assert {path.name: path.read_bytes() for path in output.iterdir()} == before
+    finally:
+        os.close(root)
+
+
+def report_write_and_fsync_failures_clean_owned_paths() -> None:
+    for mode in ("write", "fsync"):
+        output = Path(tempfile.mkdtemp(prefix=f"worker-report-{mode}-"))
+        item, payload = report_inventory()
+        root = browser_fs.open_root(output)
+        original_write = browser_fs.os.write
+        original_fsync = browser_fs.os.fsync
+        if mode == "write":
+            browser_fs.os.write = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                OSError("injected report write failure")
+            )
+        else:
+            browser_fs.os.fsync = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                OSError("injected report fsync failure")
+            )
+        try:
+            expect_failure(
+                lambda root=root, output=output, item=item, payload=payload: (
+                    browser_fs.publish_report(root, output, item, payload)
+                )
+            )
+        finally:
+            browser_fs.os.write = original_write
+            browser_fs.os.fsync = original_fsync
+            os.close(root)
+        assert list(output.iterdir()) == []
+
+
+def displaced_report_publication_preserves_new_parent() -> None:
+    parent = Path(tempfile.mkdtemp(prefix="worker-report-displaced-"))
+    output, moved = parent / "output", parent / "moved"
+    output.mkdir()
+    item, payload = report_inventory()
+    root = browser_fs.open_root(output)
+    original_link = browser_fs.os.link
+    displaced = False
+
+    def displace_after_link(*args: object, **kwargs: object) -> None:
+        nonlocal displaced
+        original_link(*args, **kwargs)
+        if not displaced:
+            displaced = True
+            output.rename(moved)
+            output.mkdir()
+            (output / "foreign").write_bytes(b"preserve")
+
+    browser_fs.os.link = displace_after_link
+    try:
+        expect_failure(lambda: browser_fs.publish_report(root, output, item, payload))
+    finally:
+        browser_fs.os.link = original_link
+        os.close(root)
+    assert displaced
+    assert {path.name: path.read_bytes() for path in output.iterdir()} == {
+        "foreign": b"preserve"
+    }
+    assert list(moved.iterdir()) == []
+
+
+def final_report_close_is_cleanup_only() -> None:
+    output = Path(tempfile.mkdtemp(prefix="worker-report-final-close-"))
+    item, payload = report_inventory()
+    raw = (
+        json.dumps(
+            {"artifacts": [item], "command": "publish-report"},
+            separators=(",", ":"),
+        ).encode()
+        + b"\n"
+        + payload
+    )
+    root = browser_fs.open_root(output)
+    original_open_root = browser_fs.open_root
+    original_close = browser_fs.os.close
+    original_argv, original_stdin = sys.argv, sys.stdin
+    calls = 0
+    close_failure_observed = False
+
+    def open_for_main(path: Path) -> int:
+        nonlocal calls
+        calls += 1
+        return root if calls == 1 else original_open_root(path)
+
+    def fail_regular_close(descriptor: int) -> None:
+        nonlocal close_failure_observed
+        regular = stat.S_ISREG(os.fstat(descriptor).st_mode)
+        original_close(descriptor)
+        if regular:
+            close_failure_observed = True
+            raise OSError("injected final report close failure")
+
+    browser_fs.open_root = open_for_main
+    browser_fs.os.close = fail_regular_close
+    sys.argv = [str(HELPER), str(output)]
+    sys.stdin = type("Input", (), {"buffer": io.BytesIO(raw)})()
+    try:
+        assert browser_fs.main() == 0
+    finally:
+        browser_fs.open_root = original_open_root
+        browser_fs.os.close = original_close
+        sys.argv, sys.stdin = original_argv, original_stdin
+    assert close_failure_observed
+    assert (output / str(item["name"])).read_bytes() == payload
+
+
 publication_phases()
 displaced_publication()
 replacement_before_staging()
@@ -458,4 +613,9 @@ final_identity_pass()
 final_link_replacement()
 rollback_retries_and_preserves_primary()
 final_root_close_is_cleanup_only()
+report_publication_is_exact_and_read_only()
+report_short_write_and_no_overwrite()
+report_write_and_fsync_failures_clean_owned_paths()
+displaced_report_publication_preserves_new_parent()
+final_report_close_is_cleanup_only()
 print("browser shard filesystem adversarial checks passed")

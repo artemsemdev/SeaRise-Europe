@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
   spatial-rejected normalized records, reports decision-split quality
   dimensions, and fails closed on arithmetic, ordering, identity, or claim
   drift without making a production or publication claim.
+- Added a receipt-bound settlement search performance harness that measures
+  exact raw/compressed shard sizes, record counts, deterministic build and Node
+  worker initialization/query distributions, and observed worker memory while
+  preserving explicit browser, production, owner, scientific, and publication
+  nonclaims.
 - Added a deterministic complete-candidate fixture assembler that verifies 50
   explicit synthetic inputs, generates the terminal gate reports and checksum
   inventory, writes the manifest last, runs the independent byte gate, and

@@ -39,6 +39,12 @@
       "reference": "src/frontend/src/search/evaluation/evaluation.test.ts",
       "environment": "macOS arm64; Node 20-compatible Vitest; 12 deterministic synthetic cases passed with MiniSearch 7.2.0 and FlexSearch 0.8.212; no browser or production corpus"
     },
+    "local-2026-08-12-settlement-worker-performance": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-12T08:05:47+02:00",
+      "reference": "src/frontend/src/search/performance/browser-worker-evidence.test.ts",
+      "environment": "macOS x64 compatibility runtime; official Node 20.20.1; deterministic synthetic shards; isolated Node worker_threads; no browser, network, production corpus, or approval claim"
+    },
     "local-2026-08-10-offline-stage-contracts": {
       "kind": "local-measurement",
       "observedAt": "2026-08-10T18:29:34+02:00",
@@ -304,14 +310,28 @@
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Keep neutral search evaluation plus receipt-bound core/coastal browser shard serialization, merge semantics, bounded I/O, and incompatibility failures exact.",
-      "sourcePaths": ["src/frontend/src/search/**/*.test.ts", "src/frontend/scripts/test-browser-shard-fs.py"],
-      "changedPaths": ["contracts/search-evaluation/**", "docs/operations/settlement-search-projection.md", "src/frontend/scripts/browser-shard-fs.py", "src/frontend/scripts/build-settlement-search-shards.ts", "src/frontend/scripts/test-browser-shard-fs.py", "src/frontend/src/search/**", "src/frontend/.nvmrc", "src/frontend/package.json", "src/frontend/package-lock.json"],
+      "sourcePaths": ["src/frontend/src/search/evaluation/*.test.ts", "src/frontend/src/search/shards/*.test.ts", "src/frontend/scripts/test-browser-shard-fs.py"],
+      "changedPaths": ["contracts/search-evaluation/**", "docs/operations/settlement-search-projection.md", "src/frontend/scripts/browser-shard-fs.py", "src/frontend/scripts/build-settlement-search-shards.ts", "src/frontend/scripts/test-browser-shard-fs.py", "src/frontend/src/search/evaluation/**", "src/frontend/src/search/shards/**", "src/frontend/.nvmrc", "src/frontend/package.json", "src/frontend/package-lock.json"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent neutral search-evaluation boundary; replacement must preserve exact synthetic outcomes and fail-closed serialization controls." },
       "commands": { "focused": "cd src/frontend && npm test -- src/search", "full": "cd src/frontend && npm test" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-search-evaluation-foundation", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed synthetic fixtures and exact package versions use no browser, clock, random input, network, or production corpus." }
+    },
+    {
+      "id": "frontend-settlement-worker-performance",
+      "layer": "integration",
+      "owner": "frontend",
+      "purpose": "Keep exact settlement shard performance evidence receipt-bound, semantic-validated, provenance-explicit, and honest about its Node worker reference profile.",
+      "sourcePaths": ["src/frontend/src/search/performance/*.test.ts"],
+      "changedPaths": ["docs/operations/settlement-browser-worker-performance.md", "src/frontend/scripts/measure-settlement-browser-worker.ts", "src/frontend/src/search/performance/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent production-input measurement foundation; a browser runner may supplement but must not weaken exact receipt, byte, provenance, or nonclaim validation." },
+      "commands": { "focused": "cd src/frontend && npm test -- src/search/performance/browser-worker-evidence.test.ts", "full": "cd src/frontend && npm test" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 5, "class": "fast", "evidenceRef": "local-2026-08-12-settlement-worker-performance", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Fixed synthetic bytes, explicit sample counts, no network, and semantic assertions; timing thresholds are deliberately generous in contract tests and are not release evidence." }
     },
     {
       "id": "api-domain-legacy",
@@ -1040,6 +1060,7 @@
     { "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts", "suite": "frontend-regional-fixture-parity", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/search/evaluation/evaluation.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/search/shards/browser-shards.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts", "suite": "frontend-settlement-worker-performance", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range_evidence.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cli.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
