@@ -86,7 +86,7 @@ def test_exact_53_artifact_candidate_validates_without_write_access(
     monkeypatch.setattr(byte_gate.os, "open", read_only_open)
     summary = validate_candidate_root(root)
     assert summary.candidate_id == candidate["candidateId"]
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
     assert summary.artifact_bytes == sum(map(len, contents.values()))
     assert (
         summary.manifest_sha256 == hashlib.sha256((root / "manifest.json").read_bytes()).hexdigest()
@@ -94,7 +94,7 @@ def test_exact_53_artifact_candidate_validates_without_write_access(
     assert (summary.production, summary.publication) == (False, False)
     assert main(["--candidate-root", str(root)]) == 0
     output = capsys.readouterr().out
-    assert "53 artifacts" in output
+    assert "54 artifacts" in output
     assert "production and publication not claimed" in output
 
 
@@ -358,7 +358,7 @@ def test_manifest_must_be_present_only_after_all_53_artifacts(tmp_path: Path) ->
         validate_candidate_root(root)
     assert caught.value.code == "artifact-bytes"
     _write_manifest(root, candidate)
-    assert validate_candidate_root(root).artifact_count == 53
+    assert validate_candidate_root(root).artifact_count == 54
 
 
 @pytest.mark.parametrize(

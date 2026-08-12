@@ -21,7 +21,7 @@ from .validator import CandidateContractError, load_candidate_bytes, validate_ca
 
 CONTRACT_ROOT = Path(__file__).resolve().parents[4] / "contracts/candidate-completeness/v1"
 _TEMPLATE = CONTRACT_ROOT / "fixtures/valid/engineering-candidate.json"
-_PRE_GATE_COUNT = 50
+_PRE_GATE_COUNT = 51
 _MAX_RECEIPT_BYTES = 2 * 1024 * 1024
 _MAX_TEMPLATE_BYTES = 2 * 1024 * 1024
 _ENTRY_KEYS = {"artifactId", "gridId", "parityId", "stacAssets", "payloadSha256"}
@@ -233,7 +233,7 @@ def _load_inputs(
     required = candidate["artifacts"][:_PRE_GATE_COUNT]
     entries = receipt.get("inputs")
     if not isinstance(entries, list) or len(entries) != _PRE_GATE_COUNT:
-        _fail("assembly-inputs", "receipt must contain exactly 50 pre-gate inputs")
+        _fail("assembly-inputs", "receipt must contain exactly 51 pre-gate inputs")
     if [entry.get("artifactId") if isinstance(entry, Mapping) else None for entry in entries] != [
         item["artifactId"] for item in required
     ]:
@@ -314,16 +314,16 @@ def _candidate_bytes(
         "release-gate-report-markdown": report_markdown,
     }
     artifacts = candidate["artifacts"]
-    for artifact in artifacts[:52]:
+    for artifact in artifacts[:53]:
         raw = payloads[artifact["artifactId"]]
         artifact.update(byteSize=len(raw), sha256=_sha256(raw))
     subjects = sorted(
-        ({"path": item["path"], "sha256": item["sha256"]} for item in artifacts[:52]),
+        ({"path": item["path"], "sha256": item["sha256"]} for item in artifacts[:53]),
         key=lambda item: item["path"],
     )
     candidate["checksumInventory"]["subjects"] = subjects
     checksums = "".join(f"{item['sha256']}  {item['path']}\n" for item in subjects).encode()
-    artifacts[52].update(byteSize=len(checksums), sha256=_sha256(checksums))
+    artifacts[53].update(byteSize=len(checksums), sha256=_sha256(checksums))
     payloads["checksums"] = checksums
     validate_candidate_document(candidate)
     return _canonical(candidate), payloads

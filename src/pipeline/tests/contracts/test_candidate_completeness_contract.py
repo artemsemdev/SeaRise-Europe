@@ -80,7 +80,7 @@ def _semantic_errors(candidate: dict[str, Any]) -> set[str]:
         for item in artifacts
     ):
         errors.add("release-identity")
-    if [item.get("writeSequence") for item in artifacts] != list(range(1, 54)):
+    if [item.get("writeSequence") for item in artifacts] != list(range(1, 55)):
         errors.add("manifest-order")
     if [item.get("artifactId") for item in artifacts[-3:]] != contract["terminalArtifactIds"]:
         errors.add("manifest-order")
@@ -158,8 +158,8 @@ def test_candidate_fixture_matches_schema_and_exact_inventory() -> None:
 
     contract = _read(INVENTORY)
     artifacts = candidate["artifacts"]
-    assert len(artifacts) == contract["artifactCount"] == 53
-    assert len(candidate["checksumInventory"]["subjects"]) == 52
+    assert len(artifacts) == contract["artifactCount"] == 54
+    assert len(candidate["checksumInventory"]["subjects"]) == 53
     assert sum(item["role"] == "projection-analysis-cog" for item in artifacts) == 9
     assert sum(item["role"] == "projection-visual-pmtiles" for item in artifacts) == 9
     assert sum(item["role"] == "projection-geoparquet" for item in artifacts) == 1
@@ -170,6 +170,18 @@ def test_candidate_fixture_matches_schema_and_exact_inventory() -> None:
         "settlements-europe-core",
         "settlements-europe-coastal",
     }
+    assert {
+        item["artifactId"]
+        for item in artifacts
+        if item["role"] == "settlement-search-receipt"
+    } == {"settlements-search-shard-set-receipt"}
+    receipt = next(
+        item for item in artifacts if item["artifactId"] == "settlements-search-shard-set-receipt"
+    )
+    assert receipt["writeSequence"] == 20
+    assert any(
+        item["path"] == receipt["path"] for item in candidate["checksumInventory"]["subjects"]
+    )
 
 
 def test_inventory_uses_current_release_roles_and_media_types() -> None:
@@ -244,7 +256,7 @@ def test_offline_validator_returns_candidate_metadata_without_reading_artifacts(
 
     assert summary.candidate_id == "candidate-phase-1-fixture-20260811-0123456789ab"
     assert summary.data_release_id == "searise-europe-v1.0.0-20260811-0123456789ab"
-    assert summary.artifact_count == 53
+    assert summary.artifact_count == 54
 
 
 def test_semantic_validation_never_indexes_schema_malformed_artifact_fields() -> None:

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "fixtureId": "phase-1-complete-synthetic-v1",
-  "candidateTemplateSha256": "a60c9050877c812622858011f82d7bb2b6d9e48d23466c0283f5ea2b0c5be895",
-  "expectedManifestSha256": "5cc42dcacf7f308fb66c3fe8793d369089d4d5029881b43723359c373313f1d5",
+  "candidateTemplateSha256": "13f77a2638a19b243e12878292986447b489e29a92b3c981c2e49799f15b4ba4",
+  "expectedManifestSha256": "36e9b12c47b74493429aa3150a537444d1b5f410628357e13b87ec37c38d2ede",
   "gridId": "880db09c10ea43d5132c603946c65ca049630a59da1b495e800a84cee2b47585",
   "claims": {"formatValid": false, "ownerApproval": false, "production": false, "publication": false, "scientific": false, "syntheticFixture": true},
   "rights": {"redistribution": "allowed", "syntheticOnly": true},
@@ -26,6 +26,7 @@
     {"artifactId":"settlements-geoparquet","gridId":null,"parityId":null,"payloadSha256":"6f189437f00aaffa2fd091a10545b3a21b07d8809267b2765993d0b7de91ed76","stacAssets":null},
     {"artifactId":"settlements-europe-core","gridId":null,"parityId":null,"payloadSha256":"8144e0f0e9e9eb627783153b4b34ae43a38e881fa224a3999aa4e5df676d44b9","stacAssets":null},
     {"artifactId":"settlements-europe-coastal","gridId":null,"parityId":null,"payloadSha256":"d84ca56becd727e72a7820c0f0ad5f80fd12bfa0f19a4f46a633430e9797743d","stacAssets":null},
+    {"artifactId":"settlements-search-shard-set-receipt","gridId":null,"parityId":null,"payloadSha256":"7894b08187de04a99fde930a2cf59097645642850c498149bef65930c8b0e265","stacAssets":null},
     {"artifactId":"quality-summary","gridId":null,"parityId":null,"payloadSha256":"0f573777842165a95856db6c09b9f27095b72708882475f5700d9c54543ce412","stacAssets":null},
     {"artifactId":"architecture-evidence","gridId":null,"parityId":null,"payloadSha256":"ac80b73b030b8ef44079c35109c8f324186d5a272e152dbfd09c7c93aceaea4e","stacAssets":null},
     {"artifactId":"stac-catalog","gridId":null,"parityId":null,"payloadSha256":"e9c2e73bccb4edb0ea76322cc352a72cad490a5683281478c6eb005bf5ca1709","stacAssets":null},

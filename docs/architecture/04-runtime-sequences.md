@@ -49,6 +49,7 @@ sequenceDiagram
 
     U->>UI: Focus search
     UI->>W: initialize(release, core, coastal)
+    W->>C: Read and verify receipt-last completion marker
     W->>C: Read core index
     alt Core index cached
         C-->>W: Compressed core index

@@ -18,9 +18,9 @@ _SCHEMA_URL = (
     "candidate-completeness/v1/candidate.schema.json"
 )
 _CONTRACT_ID = "phase-1-pre-sign-candidate-completeness-v1"
-_ARTIFACT_COUNT = 53
-_CHECKSUM_SUBJECT_COUNT = 52
-_MANIFEST_SEQUENCE = 54
+_ARTIFACT_COUNT = 54
+_CHECKSUM_SUBJECT_COUNT = 53
+_MANIFEST_SEQUENCE = 55
 _TERMINAL_ARTIFACT_IDS = (
     "release-gate-report-json",
     "release-gate-report-markdown",
@@ -149,7 +149,7 @@ def _validate_inventory(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
         "contractId": _CONTRACT_ID,
         "candidateSchema": _SCHEMA_URL,
         "artifactCount": _ARTIFACT_COUNT,
-        "preGateArtifactCount": 50,
+        "preGateArtifactCount": 51,
         "checksumSubjectCount": _CHECKSUM_SUBJECT_COUNT,
         "manifestWriteSequence": _MANIFEST_SEQUENCE,
         "terminalArtifactIds": list(_TERMINAL_ARTIFACT_IDS),
@@ -163,7 +163,7 @@ def _validate_inventory(contract: Mapping[str, Any]) -> list[Mapping[str, Any]]:
             _fail("candidate-contract", f"inventory field differs: {field}")
     artifacts = contract.get("requiredArtifacts")
     if not isinstance(artifacts, list) or len(artifacts) != _ARTIFACT_COUNT:
-        _fail("candidate-contract", "inventory must declare exactly 53 artifacts")
+        _fail("candidate-contract", "inventory must declare exactly 54 artifacts")
     if not all(isinstance(item, Mapping) for item in artifacts):
         _fail("candidate-contract", "inventory artifacts must be objects")
     identifiers = [item.get("artifactId") for item in artifacts]

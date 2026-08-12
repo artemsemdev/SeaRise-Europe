@@ -215,6 +215,7 @@ export interface Common {
     | "support-boundary"
     | "coastal-boundary"
     | "settlement-search-index"
+    | "settlement-search-receipt"
     | "settlement-geoparquet"
     | "projection-analysis-cog"
     | "projection-visual-pmtiles"
