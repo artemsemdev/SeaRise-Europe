@@ -28,6 +28,10 @@ All notable changes to this project will be documented in this file.
   worker initialization/query distributions, and observed worker memory while
   preserving explicit browser, production, owner, scientific, and publication
   nonclaims.
+- Added the settlement v4 public browser-search envelope and receipt-last set,
+  binding the code-point-trie shards to one explicit data release, exact spatial
+  receipt and geometry identities, source provenance, runtime, ranking, merge,
+  and Brotli semantics while retaining fail-closed nonpublication claims.
 - Added a deterministic complete-candidate fixture assembler that verifies 50
   explicit synthetic inputs, generates the terminal gate reports and checksum
   inventory, writes the manifest last, runs the independent byte gate, and

@@ -22,11 +22,13 @@ const contractDirectories = [
   resolve(process.cwd(), "../../contracts/release-gates/v1"),
   resolve(process.cwd(), "../../contracts/settlements/v2"),
   resolve(process.cwd(), "../../contracts/settlements/v3"),
+  resolve(process.cwd(), "../../contracts/settlements/v4"),
   resolve(process.cwd(), "../../contracts/candidate-completeness/v1"),
 ];
 const releaseGateContractDirectory = contractDirectories[1];
 const settlementContractDirectories = contractDirectories.slice(2, 4);
 const settlementV3ContractDirectory = contractDirectories[3];
+const settlementV4ContractDirectory = contractDirectories[4];
 
 function readJson(path: string): ContractDocument {
   return JSON.parse(readFileSync(path, "utf8")) as ContractDocument;
@@ -223,5 +225,29 @@ describe("Python and TypeScript public contract parity", () => {
         mismatch as unknown as SettlementSearchShardDocument,
       ),
     ).toThrow(/recordCount/);
+  });
+
+  it("validates the public v4 shard and receipt and rejects count drift", () => {
+    const ajv = contractValidator();
+    const shard = readJson(resolve(
+      settlementV4ContractDirectory,
+      "fixtures/valid/settlement-browser-search-shard.json",
+    ));
+    const receipt = readJson(resolve(
+      settlementV4ContractDirectory,
+      "fixtures/valid/settlement-browser-search-shard-set-receipt.json",
+    ));
+    const validate = ajv.getSchema(shard.$schema as string);
+
+    expect(validate?.(shard), JSON.stringify(validate?.errors)).toBe(true);
+    expect(validate?.(receipt), JSON.stringify(validate?.errors)).toBe(true);
+    expect(() => validateSettlementSearchShardSemantics(
+      shard as unknown as SettlementSearchShardDocument,
+    )).not.toThrow();
+    const mismatch = { ...shard, recordCount: 2 };
+    expect(validate?.(mismatch), JSON.stringify(validate?.errors)).toBe(true);
+    expect(() => validateSettlementSearchShardSemantics(
+      mismatch as unknown as SettlementSearchShardDocument,
+    )).toThrow(/recordCount/);
   });
 });
