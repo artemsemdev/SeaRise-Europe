@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -127,8 +127,12 @@ describe("receipt-bound settlement browser worker performance evidence", () => {
   it("round-trips a canonical report and rejects browser or production claim mutations", () => {
     const reportPath = join(root, "report.json");
     writePerformanceReport(reportPath, measured);
+    expect(statSync(reportPath).mode & 0o777).toBe(0o400);
+    expect(readdirSync(root).filter((name) => name.startsWith(".worker-performance-")))
+      .toEqual([]);
     expect(readAndValidateBrowserWorkerPerformanceReport(reportPath, options).deterministicIdentity)
       .toBe(measured.deterministicIdentity);
+    expect(() => writePerformanceReport(reportPath, measured)).toThrow(/overwrite is refused/);
 
     for (const mutation of ["production", "accepted-browser-budget"] as const) {
       const tampered = structuredClone(measured) as Omit<

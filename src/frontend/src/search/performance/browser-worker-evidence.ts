@@ -1,17 +1,13 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import {
-  closeSync,
-  constants as fsConstants,
-  fsyncSync,
   mkdirSync,
   mkdtempSync,
-  openSync,
   readFileSync,
   rmSync,
-  writeSync,
 } from "node:fs";
 import { cpus, platform, release, tmpdir, totalmem } from "node:os";
-import { basename, isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { brotliDecompressSync } from "node:zlib";
 import { Worker } from "node:worker_threads";
@@ -35,6 +31,7 @@ const OUTCOMES = new Set(["pass", "fail", "not-measured"]);
 const CORPUS_SCALES = new Set(["synthetic-fixture", "real-source-sample", "production-candidate"]);
 const WORKER_URL = new URL("./browser-worker-runner.ts", import.meta.url);
 const WORKER_BOOTSTRAP_URL = new URL("./browser-worker-bootstrap.mjs", import.meta.url);
+const REPORT_FS_HELPER = join(process.cwd(), "scripts", "browser-shard-fs.py");
 
 type ShardId = (typeof SHARD_IDS)[number];
 type Outcome = "pass" | "fail" | "not-measured";
@@ -807,26 +804,25 @@ export function readAndValidateBrowserWorkerPerformanceReport(
 }
 
 export function writePerformanceReport(path: string, report: BrowserWorkerPerformanceReport): void {
-  if (!isAbsolute(path)) fail("performance report output path must be absolute");
-  let descriptor = -1;
-  try {
-    descriptor = openSync(
-      path,
-      fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW,
-      0o600,
-    );
-    const bytes = Buffer.from(`${canonical(report)}\n`);
-    let offset = 0;
-    while (offset < bytes.length) {
-      const written = writeSync(descriptor, bytes, offset, bytes.length - offset);
-      if (written < 1) fail("performance report write made no progress");
-      offset += written;
-    }
-    fsyncSync(descriptor);
-  } catch (error) {
-    if (error instanceof BrowserWorkerEvidenceError) throw error;
-    return fail(`performance report ${basename(path)} could not be written without overwrite`);
-  } finally {
-    if (descriptor >= 0) closeSync(descriptor);
+  if (!isAbsolute(path) || resolve(path) !== path) {
+    fail("performance report output path must be canonical and absolute");
   }
+  const bytes = Buffer.from(`${canonical(report)}\n`);
+  const artifact = {
+    name: basename(path),
+    sha256: digest(bytes),
+    size: bytes.length,
+  };
+  const header = Buffer.from(`${JSON.stringify({
+    artifacts: [artifact], command: "publish-report",
+  })}\n`);
+  const result = spawnSync("python3", [REPORT_FS_HELPER, dirname(path)], {
+    input: Buffer.concat([header, bytes]),
+    maxBuffer: 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) {
+    const detail = result.stderr?.toString().trim() || result.error?.message || "";
+    fail(`performance report ${artifact.name} publication failed${detail ? `: ${detail}` : ""}`);
+  }
+  if (result.stdout.length !== 0) fail("performance report helper output differs");
 }

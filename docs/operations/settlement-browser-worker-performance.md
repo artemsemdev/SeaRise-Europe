@@ -95,6 +95,9 @@ node --import tsx scripts/measure-settlement-browser-worker.ts validate \
   --report /absolute/browser-worker-performance.json
 ```
 
-The writer refuses to overwrite an existing report. Production inputs remain
-read-only; timed rebuilds use private temporary directories and are removed
-after exact byte comparison.
+The writer requires an existing owner-controlled output directory. It writes a
+private partial, verifies and syncs the exact canonical bytes, makes the report
+read-only, promotes it through an atomic no-overwrite link, removes the partial,
+and syncs the directory before returning success. It never replaces an existing
+report. Production inputs remain read-only; timed rebuilds use private temporary
+directories and are removed after exact byte comparison.

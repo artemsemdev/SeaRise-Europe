@@ -1,4 +1,4 @@
-"""Descriptor-relative publication and loading for one browser shard set."""
+"""Descriptor-relative publication and loading for browser search artifacts."""
 
 from __future__ import annotations
 
@@ -19,6 +19,9 @@ NAMES = (
     "settlement-browser-search-shards.receipt.json",
 )
 READ_SIZE = 1024 * 1024
+MAX_REPORT_BYTES = 16 * 1024 * 1024
+REPORT_PARTIAL_PREFIX = ".worker-performance-report-"
+REPORT_QUARANTINE_PREFIX = ".worker-performance-quarantine-"
 
 
 class ShardFsError(ValueError):
@@ -54,6 +57,10 @@ def node(value: os.stat_result) -> tuple[int, int, int]:
     return value.st_dev, value.st_ino, value.st_mode
 
 
+def inode(value: os.stat_result) -> tuple[int, int]:
+    return value.st_dev, value.st_ino
+
+
 def open_root(path: Path) -> int:
     if os.name != "posix" or ".." in path.parts:
         fail("browser shard filesystem helper requires a canonical POSIX path")
@@ -77,6 +84,17 @@ def open_root(path: Path) -> int:
         raise
 
 
+def safe_filename(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and value not in {"", ".", ".."}
+        and Path(value).name == value
+        and "/" not in value
+        and "\\" not in value
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+    )
+
+
 def header(stream: BinaryIO) -> tuple[str, list[dict[str, object]]]:
     raw = stream.readline(64 * 1024)
     if not raw.endswith(b"\n") or len(raw) >= 64 * 1024:
@@ -87,14 +105,19 @@ def header(stream: BinaryIO) -> tuple[str, list[dict[str, object]]]:
         raise ShardFsError("browser shard helper header is invalid") from exc
     if not isinstance(value, dict) or set(value) != {"artifacts", "command"}:
         fail("browser shard helper header fields differ")
+    command = value["command"]
     artifacts = value["artifacts"]
-    if (
-        value["command"] not in {"publish", "read"}
-        or not isinstance(artifacts, list)
-        or [item.get("name") if isinstance(item, dict) else None for item in artifacts]
-        != list(NAMES)
+    if command not in {"publish", "read", "publish-report"} or not isinstance(
+        artifacts, list
     ):
         fail("browser shard helper command or inventory differs")
+    names = [item.get("name") if isinstance(item, dict) else None for item in artifacts]
+    if command in {"publish", "read"} and names != list(NAMES):
+        fail("browser shard helper command or inventory differs")
+    if command == "publish-report" and (
+        len(artifacts) != 1 or not safe_filename(names[0])
+    ):
+        fail("performance report helper inventory differs")
     for item in artifacts:
         if (
             not isinstance(item, dict)
@@ -107,7 +130,9 @@ def header(stream: BinaryIO) -> tuple[str, list[dict[str, object]]]:
             or set(item["sha256"]) - set("0123456789abcdef")
         ):
             fail("browser shard helper artifact identity differs")
-    return str(value["command"]), artifacts
+    if command == "publish-report" and int(artifacts[0]["size"]) > MAX_REPORT_BYTES:
+        fail("performance report exceeds its byte limit")
+    return str(command), artifacts
 
 
 def read_exact(stream: BinaryIO, size: int, expected_sha256: str) -> bytes:
@@ -212,6 +237,180 @@ def remove_owned(root: int, name: str, expected: os.stat_result) -> bool:
                 raise
     moved = os.stat(retained, dir_fd=root, follow_symlinks=False)
     return node(moved) == node(expected) and stat.S_ISREG(moved.st_mode)
+
+
+def unlink_owned_report(root: int, name: str, expected: os.stat_result) -> bool:
+    """Quarantine before unlinking so a racing replacement is never deleted."""
+    for _ in range(32):
+        retained = f"{REPORT_QUARANTINE_PREFIX}{secrets.token_hex(16)}"
+        try:
+            rename_no_overwrite(root, name, retained)
+        except FileExistsError:
+            continue
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
+        break
+    else:
+        return False
+    moved = os.stat(retained, dir_fd=root, follow_symlinks=False)
+    if inode(moved) == inode(expected) and stat.S_ISREG(moved.st_mode):
+        try:
+            os.unlink(retained, dir_fd=root)
+        except OSError:
+            return False
+        return True
+    try:
+        rename_no_overwrite(root, retained, name)
+    except OSError:
+        return False
+    return False
+
+
+def descriptor_has_exact_bytes(descriptor: int, content: bytes) -> bool:
+    if os.fstat(descriptor).st_size != len(content):
+        return False
+    offset = 0
+    while offset < len(content):
+        expected = content[offset : offset + READ_SIZE]
+        actual = os.pread(descriptor, len(expected), offset)
+        if actual != expected:
+            return False
+        offset += len(actual)
+    return os.pread(descriptor, 1, len(content)) == b""
+
+
+def close_quietly(descriptor: int) -> None:
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+
+
+def create_report_partial(root: int) -> tuple[int, str]:
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    for _ in range(32):
+        name = f"{REPORT_PARTIAL_PREFIX}{secrets.token_hex(16)}.partial"
+        try:
+            return os.open(name, flags, 0o600, dir_fd=root), name
+        except FileExistsError:
+            continue
+    fail("performance report partial allocation failed")
+
+
+def publish_report(
+    root: int, output: Path, item: dict[str, object], content: bytes
+) -> None:
+    """Durably publish one exact read-only report without overwriting a path."""
+    final = str(item["name"])
+    descriptor = -1
+    partial: str | None = None
+    owned: os.stat_result | None = None
+    promoted = False
+    directory_changed = False
+    try:
+        try:
+            os.stat(final, dir_fd=root, follow_symlinks=False)
+            fail("performance report exists; overwrite is refused")
+        except FileNotFoundError:
+            pass
+        descriptor, partial = create_report_partial(root)
+        directory_changed = True
+        try:
+            owned = os.fstat(descriptor)
+        except OSError:
+            owned = os.fstat(descriptor)
+            raise
+        if not stat.S_ISREG(owned.st_mode) or owned.st_nlink != 1:
+            fail("performance report partial is not an owned single-link regular file")
+        remaining = memoryview(content)
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written < 1:
+                fail("performance report write made no progress")
+            remaining = remaining[written:]
+        os.fchmod(descriptor, 0o400)
+        os.fsync(descriptor)
+        after = os.fstat(descriptor)
+        if (
+            inode(after) != inode(owned)
+            or not stat.S_ISREG(after.st_mode)
+            or stat.S_IMODE(after.st_mode) != 0o400
+            or after.st_nlink != 1
+            or not descriptor_has_exact_bytes(descriptor, content)
+        ):
+            fail("performance report partial changed during publication")
+        owned = after
+        if not same_root(output, root):
+            fail("performance report output directory changed before promotion")
+        if inode(os.stat(partial, dir_fd=root, follow_symlinks=False)) != inode(owned):
+            fail("performance report partial ownership changed before promotion")
+        try:
+            os.link(
+                partial,
+                final,
+                src_dir_fd=root,
+                dst_dir_fd=root,
+                follow_symlinks=False,
+            )
+        except FileExistsError as error:
+            raise ShardFsError(
+                "performance report exists; overwrite is refused"
+            ) from error
+        promoted = True
+        directory_changed = True
+        if inode(os.stat(final, dir_fd=root, follow_symlinks=False)) != inode(owned):
+            fail("performance report promotion ownership changed")
+        if not descriptor_has_exact_bytes(descriptor, content):
+            fail("performance report promoted bytes changed")
+        if not unlink_owned_report(root, partial, owned):
+            fail("performance report partial cleanup failed after promotion")
+        partial = None
+        if os.fstat(descriptor).st_nlink != 1:
+            fail("performance report final link count is invalid")
+        os.fsync(root)
+        directory_changed = False
+        if (
+            not same_root(output, root)
+            or inode(os.stat(final, dir_fd=root, follow_symlinks=False)) != inode(owned)
+            or not descriptor_has_exact_bytes(descriptor, content)
+        ):
+            fail("performance report changed before its linearization point")
+    except BaseException as primary:
+        cleanup_error: BaseException | None = None
+        if promoted and owned is not None:
+            try:
+                removed = unlink_owned_report(root, final, owned)
+                directory_changed = removed or directory_changed
+                if not removed:
+                    cleanup_error = ShardFsError(
+                        "performance report rollback encountered a foreign inode"
+                    )
+            except OSError as error:
+                cleanup_error = error
+        if partial is not None and owned is not None:
+            try:
+                removed = unlink_owned_report(root, partial, owned)
+                directory_changed = removed or directory_changed
+                if not removed:
+                    cleanup_error = cleanup_error or ShardFsError(
+                        "performance report partial cleanup encountered a foreign inode"
+                    )
+            except OSError as error:
+                cleanup_error = cleanup_error or error
+        if directory_changed:
+            try:
+                os.fsync(root)
+            except OSError:
+                pass
+        if cleanup_error is not None:
+            primary.__context__ = cleanup_error
+        raise
+    finally:
+        if descriptor >= 0:
+            close_quietly(descriptor)
 
 
 def close_all(
@@ -387,10 +586,19 @@ def main() -> int:
     root = open_root(output)
     completed = False
     try:
-        lock = fcntl.LOCK_EX if command == "publish" else fcntl.LOCK_SH
+        lock = (
+            fcntl.LOCK_EX if command in {"publish", "publish-report"} else fcntl.LOCK_SH
+        )
         fcntl.flock(root, lock | fcntl.LOCK_NB)
         if command == "publish":
             publish(root, output, artifacts, sys.stdin.buffer)
+        elif command == "publish-report":
+            content = read_exact(
+                sys.stdin.buffer, int(artifacts[0]["size"]), str(artifacts[0]["sha256"])
+            )
+            if sys.stdin.buffer.read(1):
+                fail("performance report helper payload has trailing bytes")
+            publish_report(root, output, artifacts[0], content)
         else:
             sys.stdout.buffer.write(read_set(root, output, artifacts))
         completed = True
