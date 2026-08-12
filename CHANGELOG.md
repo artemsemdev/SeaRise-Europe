@@ -25,6 +25,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a durable Phase 1 settlement production inventory binding the verified
+  GeoNames, catalogue, spatial, GeoParquet, search, shard, query-set, and
+  Node-worker diagnostic identities while keeping browser and publication
+  claims explicitly blocked.
 - Added receipt-bound, bounded-memory settlement reconciliation evidence that
   separates pre-spatial catalogue rejections from classified and
   spatial-rejected normalized records, reports decision-split quality
