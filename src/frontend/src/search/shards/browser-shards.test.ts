@@ -229,9 +229,8 @@ describe("receipt-bound browser search shards", () => {
       if (mutation === "footer") lines[lines.length - 1] = lines.at(-1)!.replace('"recordCount":3', '"recordCount":4');
       if (mutation === "schema") lines[0] = lines[0].replace(PROJECTION_VERSION, "unknown-projection-v1");
       if (mutation === "noncanonical") lines[0] = ` ${lines[0]}`;
-      if (mutation === "duplicate-key") lines[0] = lines[0].replace(
-        "{", '{"kind":"settlement-search-projection-header",'
-      );
+      if (mutation === "duplicate-key") lines[0] =
+        `{"kind":"settlement-search-projection-header",${lines[0].slice(1)}`;
       const root = temporary();
       const projection = join(root, "projection.ndjson");
       const output = join(root, "output");
