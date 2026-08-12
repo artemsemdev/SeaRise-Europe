@@ -5,8 +5,16 @@ import hashlib
 import json
 from pathlib import Path
 
+from searise_pipeline.candidate_completeness.production_binary_validators import (
+    BoundaryQaAuthority,
+    ProductionBinaryQaAuthorities,
+    ProjectionQaAuthority,
+    SettlementQaAuthority,
+)
 from searise_pipeline.candidate_completeness.production_validators import (
+    ProductionQaAuthorities,
     production_json_validator_registry,
+    production_validator_dispatcher,
 )
 from searise_pipeline.candidate_completeness.qa_dispatch import (
     CandidateQaContext,
@@ -293,3 +301,42 @@ def test_stac_catalog_and_collection_bind_the_exact_graph(tmp_path: Path) -> Non
         )
         path.write_bytes(_canonical(document))
         assert validator(request).code == "stac-binding"
+
+
+def test_production_dispatcher_covers_the_complete_closed_matrix(tmp_path: Path) -> None:
+    binary = ProductionBinaryQaAuthorities(
+        projection=ProjectionQaAuthority(
+            source=object(),  # type: ignore[arg-type]
+            contract={},
+            tippecanoe=tmp_path / "tippecanoe",
+            decode=tmp_path / "decode",
+            pmtiles=tmp_path / "pmtiles",
+            tippecanoe_source=tmp_path / "tippecanoe-source",
+            tippecanoe_build_receipt=tmp_path / "tippecanoe-receipt",
+            pmtiles_distribution_asset=tmp_path / "pmtiles-asset",
+            platform="test-platform",
+        ),
+        boundary=BoundaryQaAuthority(
+            contract={},
+            support_geojson=tmp_path / "support.geojson",
+            coastal_geojson=tmp_path / "coastal.geojson",
+            tools=object(),  # type: ignore[arg-type]
+        ),
+        settlement=SettlementQaAuthority(
+            spatial_database=tmp_path / "spatial.duckdb",
+            spatial_receipt=tmp_path / "spatial.receipt.json",
+            work_directory=tmp_path / "spatial-work",
+        ),
+    )
+    dispatcher = production_validator_dispatcher(
+        ProductionQaAuthorities(
+            binary=binary,
+            brotli=tmp_path / "brotli",
+            brotli_sha256="0" * 64,
+            work_directory=tmp_path / "search-work",
+        )
+    )
+    assert len(dispatcher.validator_ids) == 23
+    assert set(dispatcher.validator_ids) == {
+        route.validator_id for route in dispatcher.matrix.routes
+    }
