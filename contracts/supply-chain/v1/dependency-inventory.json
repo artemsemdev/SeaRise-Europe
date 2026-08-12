@@ -49,8 +49,8 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "e6f473609bab3adf9040390ba78d2a8a83109e49f88f64b17c291c6d931a247d" },
-        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "c3d95c56f309309284fdfef6c902d2f7b6eab5e504ad79013a9d41443aebdc95" }
+        { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "9e7cbb247a3e6274910b2a01b4d3736c83c2a93f42ab579ddc4ef36df48999fc" },
+        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "f2052cb316dcaf4c5187c71d0d9c704991db746dd03a26fd054ae84263f2bf03" }
       ],
       "note": "npm ci consumes lockfileVersion 3 with registry integrity values."
     },
@@ -60,7 +60,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "2d05d689f2ea079179f59a5f7d221d19ce9e5fbb9593def3ba2a6d588a53c213" },
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "4cdd6e3b8045a10de4540af9f3cfcd744815e2c602137306e4b062ef32451684" },
         { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" }

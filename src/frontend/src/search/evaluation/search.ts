@@ -53,13 +53,22 @@ export function prepareCandidateDocuments(records: readonly SearchDocument[]): C
   });
 }
 
-function editDistance(left: string, right: string): number {
+export function searchFuzzyAllowance(normalizedQuery: string): 0 | 1 | 2 {
+  const length = Array.from(normalizedQuery).length;
+  return length < 4 ? 0 : length < 8 ? 1 : 2;
+}
+
+export function boundedEditDistance(left: string, right: string, maximum: number): number {
   const leftPoints = Array.from(left);
   const rightPoints = Array.from(right);
+  if (Math.abs(leftPoints.length - rightPoints.length) > maximum) return maximum + 1;
   let previous = Array.from({ length: rightPoints.length + 1 }, (_, index) => index);
   for (let leftIndex = 1; leftIndex <= leftPoints.length; leftIndex += 1) {
-    const current = [leftIndex];
-    for (let rightIndex = 1; rightIndex <= rightPoints.length; rightIndex += 1) {
+    const current = Array<number>(rightPoints.length + 1).fill(maximum + 1);
+    current[0] = leftIndex;
+    const first = Math.max(1, leftIndex - maximum);
+    const last = Math.min(rightPoints.length, leftIndex + maximum);
+    for (let rightIndex = first; rightIndex <= last; rightIndex += 1) {
       current[rightIndex] = Math.min(
         current[rightIndex - 1] + 1,
         previous[rightIndex] + 1,
@@ -71,32 +80,56 @@ function editDistance(left: string, right: string): number {
   return previous[rightPoints.length];
 }
 
-function matchKey(query: string, record: SearchDocument): [number, number] {
+export function hasQualifiedSearchContext(
+  query: string, name: string, record: SearchDocument,
+): boolean {
+  if (!query.startsWith(`${name} `)) return false;
+  const context = new Set(tokenizeSearchText(`${record.countryCode} ${record.admin1Name ?? ""}`));
+  return tokenizeSearchText(query.slice(name.length)).every((term) => context.has(term));
+}
+
+export type SearchMatchKey = readonly [number, number];
+
+export type RankedCandidateDocument = {
+  document: CandidateDocument;
+  match: SearchMatchKey;
+};
+
+function matchKey(query: string, record: SearchDocument): SearchMatchKey {
   const canonical = normalizeSearchText(record.displayName);
   const alternates = record.searchNames.map(normalizeSearchText).filter((name) => name !== canonical);
-  const context = new Set(tokenizeSearchText(`${record.countryCode} ${record.admin1Name ?? ""}`));
-  const qualified = (name: string) => query === name
-    || (query.startsWith(`${name} `) && tokenizeSearchText(query.slice(name.length)).every((term) => context.has(term)));
+  const qualified = (name: string) => query === name || hasQualifiedSearchContext(query, name, record);
   if (qualified(canonical)) return [0, 0];
   if (alternates.some(qualified)) return [1, 0];
   if ([canonical, ...alternates].some((name) => name.startsWith(query))) return [2, 0];
-  const queryLength = Array.from(query).length;
-  const allowance = queryLength < 4 ? 0 : queryLength < 8 ? 1 : 2;
-  const distance = Math.min(...[canonical, ...alternates].map((name) => editDistance(query, name)));
-  return allowance > 0 && distance <= allowance ? [3, distance] : [4, distance];
+  const allowance = searchFuzzyAllowance(query);
+  if (allowance === 0) return [4, 1];
+  let distance = boundedEditDistance(query, canonical, allowance);
+  for (const alternate of alternates) {
+    const candidate = boundedEditDistance(query, alternate, allowance);
+    if (candidate < distance) distance = candidate;
+    if (distance === 1) break;
+  }
+  return distance <= allowance ? [3, distance] : [4, distance];
+}
+
+export function compareRankedCandidates(
+  left: RankedCandidateDocument, right: RankedCandidateDocument,
+): number {
+  return left.match[0] - right.match[0]
+    || left.match[1] - right.match[1]
+    || (right.document.record.population ?? -1) - (left.document.record.population ?? -1)
+    || (ADMIN_PRIORITY[right.document.record.featureCode] ?? 0)
+      - (ADMIN_PRIORITY[left.document.record.featureCode] ?? 0)
+    || left.document.record.distanceToCoastMeters - right.document.record.distanceToCoastMeters
+    || compareId(left.document.record.placeId, right.document.record.placeId);
 }
 
 export function rankDocuments(queryText: string, documents: readonly CandidateDocument[]): CandidateDocument[] {
   const query = normalizeSearchText(queryText);
   if (!query) return [];
-  return [...documents].filter((document) => matchKey(query, document.record)[0] < 4).sort((left, right) => {
-    const leftMatch = matchKey(query, left.record);
-    const rightMatch = matchKey(query, right.record);
-    return leftMatch[0] - rightMatch[0]
-      || leftMatch[1] - rightMatch[1]
-      || (right.record.population ?? -1) - (left.record.population ?? -1)
-      || (ADMIN_PRIORITY[right.record.featureCode] ?? 0) - (ADMIN_PRIORITY[left.record.featureCode] ?? 0)
-      || left.record.distanceToCoastMeters - right.record.distanceToCoastMeters
-      || compareId(left.record.placeId, right.record.placeId);
-  });
+  return documents.map((document) => ({ document, match: matchKey(query, document.record) }))
+    .filter(({ match }) => match[0] < 4)
+    .sort(compareRankedCandidates)
+    .map(({ document }) => document);
 }

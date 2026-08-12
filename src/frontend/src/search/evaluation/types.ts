@@ -17,9 +17,9 @@ export interface CandidateDocument {
 }
 
 export interface EngineDescriptor {
-  engineId: "minisearch" | "flexsearch";
-  packageVersion: "7.2.0" | "0.8.212";
-  serializationVersion: "minisearch-json-v1" | "flexsearch-export-v1";
+  engineId: "minisearch" | "flexsearch" | "searise-codepoint-trie";
+  packageVersion: "7.2.0" | "0.8.212" | "1.0.0";
+  serializationVersion: "minisearch-json-v1" | "flexsearch-export-v1" | "codepoint-trie-json-v1";
 }
 
 export interface EvaluationIdentity {

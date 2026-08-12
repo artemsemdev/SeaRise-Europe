@@ -75,6 +75,11 @@ All notable changes to this project will be documented in this file.
 - Added a receipt-bound, streaming settlement search-projection contract that
   preserves normalized names, context, lineage, and spatial membership while
   explicitly making no production or publication claim.
+- Added deterministic, Brotli-compressed code-point-trie browser candidates for
+  the core and coastal settlement memberships, with exact projection binding,
+  descriptor-relative receipt-gated handoff, rebuilt index verification,
+  canonical compression, core-first duplicate-free merge semantics, and
+  explicit nonpublication claims.
 - Added fail-closed offline validation for the exact pre-sign candidate inventory,
   checksum subjects, STAC matrix, and required pending evidence-pair gate without
   reading artifacts, signing, or making a publication decision.
