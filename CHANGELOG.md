@@ -26,8 +26,9 @@ All notable changes to this project will be documented in this file.
 
 - Added fail-closed, descriptor-bound finalization for exact pre-verification
   candidate evidence, with complete source authority, a durable pathname
-  checkpoint, a stable whole-evidence content identity, and bounded private
-  snapshot residue retained for pathname-race safety on isolated ephemeral runners.
+  checkpoint, a machine-readable whole-evidence commit identity, isolated work
+  parents, and bounded private snapshot residue retained for pathname-race safety
+  on isolated ephemeral runners.
 - Hardened complete-candidate assembly with inode-bound private staging,
   foreign-preserving bounded quarantine rollback, an owner-controlled isolated
   runner boundary, and a coherent point-in-time final tree-identity pass before

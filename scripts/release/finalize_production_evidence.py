@@ -3,13 +3,52 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
 from pathlib import Path
 
 from searise_pipeline.supply_chain import SupplyChainContractError
 from searise_pipeline.supply_chain.production_evidence import (
+    ProductionEvidenceSummary,
     finalize_production_evidence,
 )
+
+
+def _canonical_success(summary: ProductionEvidenceSummary) -> bytes:
+    return (
+        json.dumps(
+            {
+                "candidateId": summary.candidate_id,
+                "cryptographicVerification": False,
+                "evidenceRoot": str(summary.evidence_root),
+                "evidenceSha256": summary.evidence_sha256,
+                "productionClaim": False,
+                "provenanceSha256": summary.provenance_sha256,
+                "publicationClaim": False,
+                "sbomCount": summary.sbom_count,
+                "scientificApproval": False,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
+def _emit_committed_success(summary: ProductionEvidenceSummary) -> None:
+    """Best-effort unbuffered reporting cannot reverse a durable commit."""
+    try:
+        remaining = memoryview(_canonical_success(summary))
+        descriptor = sys.stdout.fileno()
+        while remaining:
+            written = os.write(descriptor, remaining)
+            if written <= 0:
+                raise OSError("success reporting made no progress")
+            remaining = remaining[written:]
+    except (OSError, ValueError):
+        return
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -40,10 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     except SupplyChainContractError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
-    print(
-        f"finalized {summary.candidate_id}: {summary.sbom_count} SBOMs; "
-        "cryptographic verification, production, publication, and scientific approval not claimed"
-    )
+    _emit_committed_success(summary)
     return 0
 
 

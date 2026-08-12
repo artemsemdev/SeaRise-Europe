@@ -26,6 +26,7 @@ from typing import Any, Iterator, Mapping, NoReturn
 
 from searise_pipeline.candidate_completeness import (
     CandidateContractError,
+    ProvenanceContractError,
     canonical_provenance_bytes,
     generate_provenance_statement,
     validate_candidate_document,
@@ -73,6 +74,7 @@ _MAX_TOTAL_READ_BYTES = 128 * 1024 * 1024
 _MAX_DISCOVERY_ENTRIES = 100_000
 _MAX_DEPENDENCY_PATHS = 256
 _MAX_QUARANTINE_ENTRIES = 4_096
+_MAX_ANCESTRY_DEPTH = 1_024
 
 
 @dataclass(frozen=True)
@@ -178,6 +180,63 @@ def _open_private_parent(path: Path, label: str) -> int:
         raise
     _close_quietly(descriptor)
     _fail(f"{label} must be owned by the runner user and inaccessible to group/other users")
+
+
+def _require_parent_outside_authorities(
+    parent: int,
+    *,
+    candidate_root: Path,
+    repository_root: Path,
+    label: str,
+) -> None:
+    """Reject a held work parent equal to or below either immutable authority."""
+    authority_identities: set[tuple[int, int]] = set()
+    try:
+        for path, authority_label in (
+            (candidate_root, "candidate"),
+            (repository_root, "repository"),
+        ):
+            descriptor = _open_root(path, authority_label)
+            try:
+                identity = os.fstat(descriptor)
+                authority_identities.add((identity.st_dev, identity.st_ino))
+            finally:
+                _close_quietly(descriptor)
+        current = os.dup(parent)
+    except OSError as exc:
+        raise SupplyChainContractError(f"could not verify isolated {label} authorities") from exc
+    flags = (
+        os.O_RDONLY
+        | os.O_DIRECTORY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    visited: set[tuple[int, int]] = set()
+    try:
+        for _ in range(_MAX_ANCESTRY_DEPTH):
+            identity = os.fstat(current)
+            key = (identity.st_dev, identity.st_ino)
+            if key in authority_identities:
+                _fail(f"{label} must be outside candidate and repository authorities")
+            if key in visited:
+                _fail(f"{label} ancestry contains a directory cycle")
+            visited.add(key)
+            ancestor = os.open("..", flags, dir_fd=current)
+            try:
+                ancestor_identity = os.fstat(ancestor)
+            except Exception:
+                _close_quietly(ancestor)
+                raise
+            if _same_inode(identity, ancestor_identity):
+                _close_quietly(ancestor)
+                return
+            _close_quietly(current)
+            current = ancestor
+    except OSError as exc:
+        raise SupplyChainContractError(f"could not verify isolated {label} ancestry") from exc
+    finally:
+        _close_quietly(current)
+    _fail(f"{label} ancestry exceeds its {_MAX_ANCESTRY_DEPTH}-directory limit")
 
 
 def _bounded_names(directory: int, *, maximum: int, label: str) -> tuple[str, ...]:
@@ -321,8 +380,26 @@ def _create_directory(parent: int, name: str, label: str) -> int:
         raise SupplyChainContractError(f"could not create private {label} directory") from exc
 
 
-def _new_private_snapshot() -> tuple[int, str, int, Path, os.stat_result]:
+def _new_private_snapshot(
+    *,
+    candidate_root: Path | None = None,
+    repository_root: Path | None = None,
+) -> tuple[int, str, int, Path, os.stat_result]:
     parent = _open_private_parent(_TEMP_ROOT, "private snapshot parent")
+    if (candidate_root is None) != (repository_root is None):
+        _close_quietly(parent)
+        _fail("private snapshot authority roots must be provided together")
+    if candidate_root is not None and repository_root is not None:
+        try:
+            _require_parent_outside_authorities(
+                parent,
+                candidate_root=candidate_root,
+                repository_root=repository_root,
+                label="private snapshot parent",
+            )
+        except Exception:
+            _close_quietly(parent)
+            raise
     for _ in range(128):
         name = f"searise-production-evidence-{secrets.token_hex(16)}"
         try:
@@ -1237,14 +1314,17 @@ def finalize_production_evidence(
     if not _FINALIZATION_LOCK.acquire(blocking=False):
         _fail("production evidence finalization is non-reentrant")
     try:
-        return _finalize_production_evidence(
-            candidate_root,
-            repository_root=repository_root,
-            controlled_build_run_id=controlled_build_run_id,
-            manifest_bundle=manifest_bundle,
-            provenance_bundle=provenance_bundle,
-            output_root=output_root,
-        )
+        try:
+            return _finalize_production_evidence(
+                candidate_root,
+                repository_root=repository_root,
+                controlled_build_run_id=controlled_build_run_id,
+                manifest_bundle=manifest_bundle,
+                provenance_bundle=provenance_bundle,
+                output_root=output_root,
+            )
+        except ProvenanceContractError as exc:
+            raise SupplyChainContractError(str(exc)) from exc
     finally:
         _FINALIZATION_LOCK.release()
 
@@ -1268,12 +1348,21 @@ def _finalize_production_evidence(
         budget = _ReadBudget(_MAX_TOTAL_READ_BYTES)
         output_parent_identity = os.fstat(output_parent)
         _require_absent(output_parent, output_root.name)
+        _require_parent_outside_authorities(
+            output_parent,
+            candidate_root=candidate_root,
+            repository_root=repository_root,
+            label="output evidence parent",
+        )
         bundle_raw = {
             _SIGNATURE_PATHS[0]: _read_external(manifest_bundle, "manifest bundle", budget),
             _SIGNATURE_PATHS[1]: _read_external(provenance_bundle, "provenance bundle", budget),
         }
         snapshot_parent, snapshot_name, snapshot_descriptor, root, snapshot_identity = (
-            _new_private_snapshot()
+            _new_private_snapshot(
+                candidate_root=candidate_root,
+                repository_root=repository_root,
+            )
         )
         try:
             candidate_snapshot = root / "candidate"
