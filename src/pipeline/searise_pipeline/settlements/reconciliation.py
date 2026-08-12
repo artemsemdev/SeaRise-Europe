@@ -44,6 +44,7 @@ PLACE_DIMENSIONS = (
 )
 NAME_DIMENSIONS = ("languages", "scripts")
 MAX_DIMENSION_KEYS = 8192
+RECONCILIATION_MEMORY_LIMIT = "4GiB"
 CATALOGUE_REJECTION_REASONS = frozenset(REJECTION_PRECEDENCE)
 SPATIAL_REJECTION_REASONS = frozenset({"outside-support"})
 
@@ -80,6 +81,26 @@ _CATALOGUE_COUNT_KEYS = {
 
 class SettlementReconciliationError(ValueError):
     """A reconciliation source, report, or publication is invalid."""
+
+
+def _assert_connection_limits(connection: Any) -> None:
+    actual = connection.execute(
+        "SELECT current_setting('threads'), current_setting('memory_limit'), "
+        "current_setting('temp_directory')"
+    ).fetchone()
+    if actual != (1, "4.0 GiB", ""):
+        raise SettlementReconciliationError(
+            "reconciliation DuckDB limits were not retained"
+        )
+
+
+def _configure_connection(connection: Any) -> None:
+    """Keep full-corpus ordered scans bounded without unsafe external spill."""
+
+    connection.execute("SET threads=1")
+    connection.execute(f"SET memory_limit='{RECONCILIATION_MEMORY_LIMIT}'")
+    connection.execute("SET temp_directory=''")
+    _assert_connection_limits(connection)
 
 
 def _canonical(value: object) -> bytes:
@@ -564,8 +585,8 @@ def _build_from_snapshots(
     duckdb, _ = source_stage._load_tools()
     with duckdb.connect(str(root / "catalogue.duckdb"), read_only=True) as catalogue:
         with duckdb.connect(str(root / "spatial.duckdb"), read_only=True) as spatial:
-            projection._configure_connection(catalogue)
-            projection._configure_connection(spatial)
+            _configure_connection(catalogue)
+            _configure_connection(spatial)
             catalogue_candidate, catalogue_binding, catalogue_stage_binding = _catalogue_authority(
                 catalogue, assets["catalogue-receipt.json"]
             )
@@ -604,8 +625,8 @@ def _build_from_snapshots(
                 catalogue_rejections,
                 spatial_rejections,
             )
-            projection._assert_no_spill(catalogue)
-            projection._assert_no_spill(spatial)
+            _assert_connection_limits(catalogue)
+            _assert_connection_limits(spatial)
     validate_reconciliation_report_semantics(report)
     return report
 

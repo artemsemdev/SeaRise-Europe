@@ -341,6 +341,23 @@ def test_report_reconciles_distinct_stage_outcomes_and_matches_golden(tmp_path: 
     reconciliation.validate_reconciliation_report_semantics(report)
 
 
+def test_reconciliation_connection_has_a_bounded_full_corpus_memory_profile() -> None:
+    with duckdb.connect(":memory:") as connection:
+        reconciliation._configure_connection(connection)
+
+        assert connection.execute(
+            "SELECT current_setting('threads'), current_setting('memory_limit'), "
+            "current_setting('temp_directory')"
+        ).fetchone() == (1, "4.0 GiB", "")
+
+        connection.execute("SET memory_limit='1GB'")
+        with pytest.raises(
+            reconciliation.SettlementReconciliationError,
+            match="limits were not retained",
+        ):
+            reconciliation._assert_connection_limits(connection)
+
+
 def test_report_bytes_are_deterministic_and_overwrite_is_refused(tmp_path: Path) -> None:
     report, output, inputs = _build(tmp_path)
     second = tmp_path / "second.json"

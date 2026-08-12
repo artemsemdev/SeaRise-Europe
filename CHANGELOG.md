@@ -32,6 +32,12 @@ All notable changes to this project will be documented in this file.
   build-plane SBOM coverage. Signing remains blocked on the reviewed evidence
   finalizer and protected workflow.
 
+### Fixed
+
+- Raised the bounded, no-spill settlement reconciliation memory profile to
+  support full-source ordered scans that cannot complete under the projection
+  serializer's smaller 1 GiB limit.
+
 ### Security
 
 - Added fail-closed, descriptor-bound finalization for exact pre-verification

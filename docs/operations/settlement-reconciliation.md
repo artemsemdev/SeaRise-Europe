@@ -24,7 +24,11 @@ and database reconciliation, semantic validation, file sync, and directory
 sync. An output in a source database directory must not use either database's
 reserved `<database-name>.wal` sidecar name. The implementation streams rows
 in numeric GeoNames order, merges the two spatial decision tables with bounded
-lookahead, disables DuckDB spill, and caps distinct dimension keys.
+lookahead, caps each read-only DuckDB connection at 4 GiB, disables DuckDB
+spill, and caps distinct dimension keys. The dedicated reconciliation cap is
+larger than the projection serializer's 1 GiB profile because the full-source
+ordered catalogue scan exceeded that smaller bound; it remains single-threaded
+and fail-closed instead of writing attacker-replaceable temporary files.
 
 Success is committed only after private staging cleanup, a second output-parent
 sync, closure of the original directory authority, and a fresh pathname,
