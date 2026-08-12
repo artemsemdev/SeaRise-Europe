@@ -12,6 +12,15 @@ from .contracts import (
 )
 from .cosign_tool import CosignToolSummary, validate_cosign_tool_lock
 from .nuget_sbom import generate_nuget_sbom, publish_nuget_sbom, validate_nuget_sbom
+from .protected_workflow_artifacts import (
+    CandidateArtifactAuthority,
+    ProtectedWorkflowArtifactError,
+    extract_protected_candidate,
+    extract_protected_evidence,
+    load_candidate_artifact_authority,
+    validate_candidate_artifact_authority,
+    write_candidate_artifact_authority,
+)
 from .python_graph import validate_python_lock_graph
 from .python_sbom import generate_python_sbom, publish_python_sbom, validate_python_sbom
 from .sbom import (
@@ -27,14 +36,19 @@ from .sigstore_verifier import (
 
 __all__ = [
     "CandidateEvidenceSummary",
+    "CandidateArtifactAuthority",
     "CosignToolSummary",
+    "ProtectedWorkflowArtifactError",
     "SupplyChainContractError",
     "canonical_sbom_bytes",
     "discover_dependency_inputs",
+    "extract_protected_candidate",
+    "extract_protected_evidence",
     "generate_npm_sbom",
     "generate_nuget_sbom",
     "generate_python_sbom",
     "load_json",
+    "load_candidate_artifact_authority",
     "parse_timestamp",
     "publish_npm_sbom",
     "publish_nuget_sbom",
@@ -42,6 +56,7 @@ __all__ = [
     "validate_dependency_exception",
     "validate_dependency_inventory",
     "validate_candidate_evidence_pair",
+    "validate_candidate_artifact_authority",
     "validate_cosign_tool_lock",
     "validate_evidence_files",
     "validate_npm_sbom",
@@ -50,4 +65,5 @@ __all__ = [
     "validate_python_sbom",
     "verify_candidate_evidence_cryptographically",
     "write_new_sbom",
+    "write_candidate_artifact_authority",
 ]
