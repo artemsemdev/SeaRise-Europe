@@ -191,6 +191,12 @@ locality, request count, and browser latency as `not-generated` or `not-run`.
 Those target budgets remain unmeasured and cannot be inferred from source
 checks or unit-test duration.
 
+The [settlement worker harness](../operations/settlement-browser-worker-performance.md)
+adds exact receipt/byte, size, build, initialization, query, and observed worker
+memory evidence for production-sized search shards. Its Node worker profile is
+an execution surrogate; it explicitly does not satisfy the browser/mobile
+promotion profile or authorize the release targets above.
+
 ## 9. Failure and degradation rules
 
 - If a required uncached range is unavailable, return a clear
