@@ -48,6 +48,15 @@ function withFsPatch<T>(patch: Record<string, unknown>, action: () => T): T {
   try { return action(); } finally { Object.assign(mutable, originals); syncBuiltinESMExports(); }
 }
 
+function withRuntimeVersion<T>(
+  name: keyof NodeJS.ProcessVersions, value: string, action: () => T,
+): T {
+  const original = Object.getOwnPropertyDescriptor(process.versions, name);
+  if (!original) throw new Error(`missing runtime version ${name}`);
+  Object.defineProperty(process.versions, name, { ...original, value });
+  try { return action(); } finally { Object.defineProperty(process.versions, name, original); }
+}
+
 function build(): { output: string; core: Buffer; coastal: Buffer } {
   const output = temporary();
   buildBrowserSearchShards(fixture, output);
@@ -96,7 +105,8 @@ describe("receipt-bound browser search shards", () => {
       serializationVersion: "codepoint-trie-json-v1",
     });
     expect(core.runtime).toEqual({
-      brotli: "1.2.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.2.12",
+      brotli: "1.1.0", icu: "78.2", node: "20.20.1", unicode: "17.0",
+      zlib: "1.3.1-e00f703",
     });
     expect(core.source).toMatchObject({
       spatialDatabaseSha256: "a".repeat(64), spatialReceiptSha256: "b".repeat(64),
@@ -107,6 +117,13 @@ describe("receipt-bound browser search shards", () => {
       core.ownerApprovalClaim, core.scientificApprovalClaim, core.canonicalGeometryClaim,
       core.hazardExtentClaim, core.signingClaim,
     ]).toEqual(Array(8).fill(false));
+  });
+
+  it("rejects a nonofficial Node runtime library profile", () => {
+    withRuntimeVersion("brotli", "1.2.0", () => {
+      expect(() => buildBrowserSearchShards(fixture, temporary()))
+        .toThrow(/runtime brotli differs from its exact binding/);
+    });
   });
 
   it("restores both indexes and merges core first without duplicate place IDs", () => {

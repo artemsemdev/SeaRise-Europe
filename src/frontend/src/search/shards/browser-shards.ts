@@ -49,7 +49,7 @@ const MAX_NAME_CODE_POINTS = 256;
 const MAX_ALTERNATE_NAMES = 1_024;
 const MAX_RECORD_NAME_CODE_POINTS = 16_384;
 const RUNTIME = {
-  brotli: "1.2.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.2.12",
+  brotli: "1.1.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.3.1-e00f703",
 } as const;
 const FALSE_CLAIMS = [
   "canonicalGeometryClaim",

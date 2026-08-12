@@ -16,11 +16,12 @@ The output is deliberately an internal pre-publication contract. A reviewed brow
 
 `src/frontend/scripts/build-settlement-search-shards.ts` converts an exact
 projection into `europe-core.codepoint-trie.json.br` and
-`europe-coastal.codepoint-trie.json.br`. The build is bound to Node 20.20.1,
-Brotli 1.2.0, zlib 1.2.12, ICU 78.2, Unicode 17.0, and the versioned
-`searise-codepoint-trie` 1.0.0 / `codepoint-trie-json-v1` serialization.
-Validation rejects a different runtime and rebuilds both the exact trie payload
-and byte-identical quality-11 Brotli text compression. The envelopes bind
+`europe-coastal.codepoint-trie.json.br`. The build is bound to the official
+Node 20.20.1 binary profile: Brotli 1.1.0, zlib 1.3.1-e00f703, ICU 78.2, and
+Unicode 17.0. This exact profile is shared by the official Linux and macOS x64
+and arm64 distributions; repackaged Node builds with different embedded
+libraries are rejected. Validation rebuilds both the exact trie payload and
+byte-identical quality-11 Brotli text compression. The envelopes bind
 the exact projection byte hash, projection footer identity, spatial database,
 spatial receipt, and spatial candidate. They retain false production, signing,
 publication, owner, scientific, hazard, and canonical-geometry claims.
