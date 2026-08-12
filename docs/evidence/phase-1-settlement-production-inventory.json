@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "issue": 298,
+  "recordedAt": "2026-08-12",
+  "dataReleaseId": "searise-europe-v1.0.0-20260812-939053bab621",
+  "dataProvenanceClass": "real-source",
+  "localHandoffRoot": "local-data/phase-1",
+  "sourceValidation": {
+    "placeScan": {
+      "sourceRows": 13455006,
+      "admin1Rows": 3865,
+      "failureCount": 0
+    },
+    "alternateNameScan": {
+      "alternateNameRows": 19037112,
+      "languageRows": 7929,
+      "failureCount": 0
+    }
+  },
+  "artifacts": [
+    {"id":"geonames-all-countries","path":"geonames-sources/allCountries.zip","byteSize":419923777,"sha256":"06f423eaf760d28101cd11a9744ade90f65c618d073ac2168501c388e1bd4afa"},
+    {"id":"geonames-alternate-names-v2","path":"geonames-sources/alternateNamesV2.zip","byteSize":202510374,"sha256":"eaea640b50b7081f7270d9563720b66d6b345af81522a6eb8ee55873507b17fe"},
+    {"id":"geonames-admin1-codes-ascii","path":"geonames-sources/admin1CodesASCII.txt","byteSize":151572,"sha256":"34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992"},
+    {"id":"geonames-format-readme","path":"geonames-sources/readme.txt","byteSize":8843,"sha256":"b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5"},
+    {"id":"settlement-catalogue","path":"catalogue/geonames-normalized-catalogue-v1.duckdb","byteSize":7188525056,"sha256":"9e1bb94b02840911bec71fdd63e1ada999860bce094c22e9c94239cbd7a5b9cc"},
+    {"id":"settlement-catalogue-receipt","path":"catalogue/geonames-normalized-catalogue-v1.receipt.json","byteSize":2093,"sha256":"dc15461feea3cdb1c9afd1b5cbdcd26e52eba1ca4ffa835f10da07b6a3a48f74"},
+    {"id":"settlement-spatial-stage","path":"spatial/geonames-spatial-stage-v1.duckdb","byteSize":6575108096,"sha256":"83c346808759fc8fad5268dc21859de5fab9eda72c9c636702a6a54ad253982d"},
+    {"id":"settlement-spatial-stage-receipt","path":"spatial/geonames-spatial-stage-v1.receipt.json","byteSize":2848,"sha256":"406ca89b338071fffb87d1b91f574367a447fc4f5a96ffb19ce1b51e47b93971"},
+    {"id":"settlement-reconciliation","path":"reconciliation/settlement-reconciliation-v1.json","byteSize":50435,"sha256":"29c6df40f466a29deee173283816a518e35e9c0e4a18ef4c861a3caff49b49fd"},
+    {"id":"settlements-geoparquet","path":"geoparquet/settlements.parquet","byteSize":45687205,"sha256":"abf871457732ecb27d4210d024ed1178adffc365c00017120274daebf7528643"},
+    {"id":"settlements-geoparquet-receipt","path":"geoparquet/settlements.receipt.json","byteSize":1519,"sha256":"963885f928e6ad7d7655c81832530570c9432a6ba88177d219e75d4c07f5a61a"},
+    {"id":"settlement-search-projection","path":"search-projection/settlement-search-projection.ndjson","byteSize":841801277,"sha256":"84d3ff87e346ff1b548c870f1b4d6bd76f2fccc435ebe03c35347b785818fb65"},
+    {"id":"settlements-europe-core","path":"browser-shards/europe-core.codepoint-trie.json.br","byteSize":5804587,"sha256":"d8ec7596850f23fa6dea67e00acfb7c562365d78536f017b4c93891630bf89bd"},
+    {"id":"settlements-europe-coastal","path":"browser-shards/europe-coastal.codepoint-trie.json.br","byteSize":5485256,"sha256":"b9d5d502d07fe9c0eaccc9cf93a8f92d3378b30245167ad6a5739f88f0de4785"},
+    {"id":"settlement-search-shard-receipt","path":"browser-shards/settlement-browser-search-shards.receipt.json","byteSize":2182,"sha256":"918bc9fbf700b69e9ec726e9f953f2a5c7a9ab5a1094a7faf9477c2d07de6333"},
+    {"id":"settlement-performance-queries","path":"performance-queries.json","byteSize":934,"sha256":"5d3cef3fac1399b1d8d51fd8f18f01a55d0aa05b27ebcd2796a0ab4b52d36040"},
+    {"id":"settlement-node-worker-diagnostic","path":"browser-worker-performance/browser-worker-performance.json","byteSize":9293,"sha256":"228cd2e6e7de8f6660a334978262d2a5010c6a12e67738125ff7b426e7c99517"}
+  ],
+  "counts": {
+    "normalizedPlaces": 4988582,
+    "classifiedPlaces": 701881,
+    "europeCoreRecords": 91190,
+    "europeCoastalRecords": 137944,
+    "geoparquetRows": 701881,
+    "projectionRecords": 701881
+  },
+  "reproducibility": {
+    "catalogueBuildDurationSeconds": 10480.625883,
+    "cataloguePeakRssBytes": 4805779456,
+    "geoparquetByteForByteRebuild": true,
+    "projectionByteForByteReplay": true
+  },
+  "diagnostic": {
+    "profileId": "settlement-node-worker-reference-v1",
+    "deterministicIdentity": "36d21fd8dc303f523e5a19cb00c789804dd2a42ed9c15ba3c3d1cddff56083e9",
+    "executionOutcome": "pass",
+    "querySetSha256": "5d3cef3fac1399b1d8d51fd8f18f01a55d0aa05b27ebcd2796a0ab4b52d36040",
+    "querySetResultCountsSha256": "d36d0aa2bd9cbb4b78fd15a23a0cc1c2e8971f9d7ec4dd04837012d037e64455",
+    "queryCount": 20,
+    "buildP95Milliseconds": 438041.932625,
+    "initializationP95Milliseconds": 141054.286292,
+    "queryP95Milliseconds": 7.426417,
+    "peakObservedWorkerBytes": 2158799048,
+    "browserRuntimeMeasured": false,
+    "acceptedBrowserBudgetOutcome": "not-measured"
+  },
+  "rightsDisposition": {
+    "authority": "project-owner",
+    "status": "conditionally-approved",
+    "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/298#issuecomment-5267891419"
+  },
+  "claims": {
+    "browserReference": false,
+    "candidateBound": false,
+    "immutableRetention": false,
+    "production": false,
+    "publication": false,
+    "scientificApproval": false,
+    "signing": false
+  },
+  "blockingItems": [
+    "candidate-wide-validation-pending",
+    "external-immutable-retention-pending",
+    "production-browser-zero-runtime-dependency-proof-unavailable",
+    "real-browser-initialization-budget-not-measured",
+    "real-browser-query-budget-not-measured",
+    "real-browser-worker-memory-not-measured"
+  ]
+}
