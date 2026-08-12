@@ -12,6 +12,11 @@ from .provenance import (
     generate_provenance_statement,
     validate_provenance_statement,
 )
+from .qa_execution import (
+    CandidateQaArtifactResult,
+    CandidateQaExecution,
+    execute_candidate_qa,
+)
 from .validator import (
     CandidateContractError,
     CandidateSummary,
@@ -26,10 +31,13 @@ __all__ = [
     "CandidateAssemblySummary",
     "CandidateContractError",
     "CandidateByteSummary",
+    "CandidateQaArtifactResult",
+    "CandidateQaExecution",
     "CandidateSummary",
     "ProvenanceContractError",
     "assemble_candidate_fixture",
     "canonical_provenance_bytes",
+    "execute_candidate_qa",
     "generate_provenance_statement",
     "load_candidate",
     "load_candidate_bytes",
