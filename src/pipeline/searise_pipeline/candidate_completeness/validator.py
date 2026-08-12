@@ -110,6 +110,21 @@ def load_candidate(path: Path) -> dict[str, Any]:
     return _load_json(path)
 
 
+def load_candidate_bytes(raw: bytes) -> dict[str, Any]:
+    """Load one bounded caller-supplied strict UTF-8 candidate JSON object."""
+    try:
+        document = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_strict_object,
+            parse_constant=_reject_nonstandard_constant,
+        )
+    except (RecursionError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        _fail("candidate-json", f"cannot decode strict UTF-8 candidate JSON: {exc}")
+    if not isinstance(document, dict):
+        _fail("candidate-json", "candidate JSON root must be an object")
+    return document
+
+
 def _validator(contract_root: Path) -> Draft202012Validator:
     release_schema = _load_json(contract_root.parents[1] / "release" / "v1" / "defs.schema.json")
     candidate_schema = _load_json(contract_root / "candidate.schema.json")
