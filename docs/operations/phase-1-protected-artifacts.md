@@ -21,7 +21,15 @@ workflow path and name, `master`, exact source SHA and run ID, first attempt,
 `workflow_dispatch`, completed/success state, no pull requests, and one exact
 unexpired artifact. Its name, numeric ID, byte size, SHA-256 digest, API URLs,
 repository IDs, branch, source SHA, and workflow-run binding must all agree.
-The emitted receipt is canonical JSON, created without overwrite, and carries
+The emitted receipt is canonical JSON, completed and synchronized under a
+bounded private same-directory partial name, re-read through its held
+descriptor, and exposed only by an atomic no-overwrite hard-link operation at
+mode `0400`. The private link is ownership-checked and removed before the
+directory is durably synchronized; the durable directory sync and final
+descriptor/path checks are the success boundary. A write, synchronization,
+promotion, cleanup, or ownership failure rolls back only the implementation's
+inode through a private quarantine and never deletes racing bytes. Partial
+receipt bytes are never exposed at the destination. The receipt carries
 explicit false production, publication, and scientific-approval claims.
 
 After downloading the exact artifact ZIP by numeric artifact ID, extract it
@@ -65,4 +73,9 @@ private, incomplete destination for inspection and must never be reused.
 
 None of these commands signs bytes or establishes production readiness,
 publication, scientific approval, protected-environment approval, or public
-readback.
+readback. Their success records are canonical single-line JSON with exact run,
+artifact, digest, byte-size, and output identity where applicable, plus the
+three false claims. Output is explicitly flushed as a best-effort diagnostic
+after the operation commits: a closed or failed stdout cannot turn committed
+receipt or extraction bytes into a false nonzero result that invites an unsafe
+retry.

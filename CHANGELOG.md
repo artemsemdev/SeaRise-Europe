@@ -35,7 +35,8 @@ All notable changes to this project will be documented in this file.
   success is returned.
 - Added a standard-library-only protected-workflow artifact boundary that
   atomically binds the exact successful controlled `master` run to its complete
-  GitHub artifact inventory, emits an immutable canonical authority receipt,
+  GitHub artifact inventory, publishes its immutable canonical authority receipt
+  through a private same-directory partial and atomic no-overwrite promotion,
   and safely streams distinct candidate and evidence ZIP inventories without
   following links or making production, publication, or scientific claims.
 - Added deterministic pre-sign provenance for validated real-source controlled
