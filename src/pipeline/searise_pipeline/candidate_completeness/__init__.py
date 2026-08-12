@@ -6,6 +6,10 @@ from .assembler import (
     assemble_candidate_fixture,
 )
 from .byte_gate import CandidateByteSummary, validate_candidate_root
+from .production_assembler import (
+    ProductionCandidateMetadata,
+    assemble_production_candidate,
+)
 from .provenance import (
     ProvenanceContractError,
     canonical_provenance_bytes,
@@ -39,7 +43,9 @@ __all__ = [
     "CandidateSummary",
     "ProvenanceContractError",
     "PreGateQaExecution",
+    "ProductionCandidateMetadata",
     "assemble_candidate_fixture",
+    "assemble_production_candidate",
     "canonical_provenance_bytes",
     "build_pre_gate_report",
     "execute_candidate_qa",

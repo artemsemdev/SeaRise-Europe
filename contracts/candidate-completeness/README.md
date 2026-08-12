@@ -32,6 +32,19 @@ shared JSON/Markdown gate-report contract. The report remains automation-only
 and non-promoting; later owner and supply-chain gates cannot be inferred from a
 successful pre-terminal validation.
 
+`assemble_production_candidate` consumes a directory containing exactly those
+51 release-relative input paths. It copies each bounded, stable regular file
+into a private candidate stage, executes pre-terminal QA, generates both gate
+reports, writes and verifies the 53-subject checksum inventory, and writes
+`manifest.json` last. The sealed 54-artifact tree is then byte-gated and routed
+through the complete matrix again before an exclusive, durable rename exposes
+the immutable output name. Any non-pass validator disposition, extra or missing
+input, changed byte, terminal-report defect, or final byte-gate failure leaves
+no candidate at the requested output path. The assembler assigns the
+`real-source` provenance class but deliberately keeps publication false; its
+dispatcher must contain the authoritative production validators described by
+the QA matrix.
+
 `scripts/release/validate_candidate_bytes.py` applies the read-only byte gate
 to an assembled candidate root. It opens the root and descendants without
 following symlinks, requires exactly 54 single-link regular files plus
