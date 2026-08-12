@@ -579,6 +579,49 @@ def test_quality_and_architecture_evidence_fail_closed() -> None:
     ) >= 2
 
 
+def test_architecture_verification_links_are_exact_and_post_finalization() -> None:
+    validator = _public_contract_validator("architecture-evidence.schema.json")
+    synthetic = json.loads(
+        (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "architecture-evidence.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    real_source = json.loads(
+        (
+            PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "architecture-evidence-real-source.json"
+        ).read_text(encoding="utf-8")
+    )
+    expected = [
+        "supply-chain/receipts/cryptographic-verification.json",
+        "supply-chain/receipts/public-readback.json",
+        "supply-chain/retention-receipt.json",
+    ]
+
+    validator.validate(synthetic)
+    validator.validate(real_source)
+    assert "verificationArtifacts" not in synthetic
+    assert real_source["verificationArtifacts"] == expected
+
+    invalid_documents = []
+    missing = copy.deepcopy(real_source)
+    missing.pop("verificationArtifacts")
+    invalid_documents.append(missing)
+    for replacement in (
+        expected[:2],
+        [*expected, "supply-chain/receipts/unreviewed.json"],
+        [expected[1], expected[0], expected[2]],
+        ["../supply-chain/receipts/cryptographic-verification.json", *expected[1:]],
+    ):
+        invalid = copy.deepcopy(real_source)
+        invalid["verificationArtifacts"] = replacement
+        invalid_documents.append(invalid)
+    assert all(list(validator.iter_errors(document)) for document in invalid_documents)
+
+    manifest = json.loads((PUBLIC_RELEASE_FIXTURE / "manifest.json").read_text(encoding="utf-8"))
+    pre_sign_inventory = {artifact["path"] for artifact in manifest["artifacts"]}
+    assert pre_sign_inventory.isdisjoint(expected)
+
+
 def test_release_pointer_rejects_origins_and_unsafe_cache_policy() -> None:
     document = json.loads(
         (PUBLIC_CONTRACT_DIR / "fixtures" / "valid" / "release-pointer.json").read_text(
