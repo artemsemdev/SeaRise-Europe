@@ -46,8 +46,9 @@ points for one place. The browser boundary deliberately rounds these upward to
 256 code points per name, 1,024 alternates, and 16,384 aggregate name code
 points per record. A query is limited to 256 source and 1,024 normalized code
 points. Full-name exact, qualified-context, prefix, and Unicode-code-point
-Levenshtein-distance-two retrieval shares the ranker's normalization and may
-hand at most 128 candidates to ranking. Trie cells, edges, and postings share a
+Levenshtein-distance-two retrieval shares the ranker's normalization and hands
+at most the globally best 128 candidates under that exact rank order to the
+public helper. Trie cells, edges, and postings share a
 250,000-unit traversal-work limit before any unbounded match map can form, and
 the public search helper returns at most 100 results. Source spelling is checked
 against the producer-emitted NFC

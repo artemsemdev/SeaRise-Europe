@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 import { Index } from "flexsearch";
 import MiniSearch from "minisearch";
 import {
+  compareRankedCandidates,
   hasQualifiedSearchContext,
   normalizeSearchText,
   searchFuzzyAllowance,
   tokenizeSearchText,
 } from "./search";
+import type { RankedCandidateDocument, SearchMatchKey } from "./search";
 import type { CandidateAdapter, CandidateDocument, EngineDescriptor, EvaluationIdentity } from "./types";
 
 const FORMAT_VERSION = "search-evaluation-index-v1";
@@ -116,7 +118,7 @@ export const miniSearchAdapter: CandidateAdapter = {
 export const BOUNDED_SEARCH_WORK_LIMIT = 250_000;
 export const MAX_NORMALIZED_SEARCH_CODE_POINTS = 1_024;
 const BOUNDED_OPTIONS_SHA256 = sha256(
-  "searise-codepoint-trie-1.0.0|full-name-codepoints|qualified-context|prefix|levenshtein-max-2|work=250000",
+  "searise-codepoint-trie-1.0.0|full-name-codepoints|qualified-context|prefix|levenshtein-max-2|global-rank-cap|work=250000",
 );
 
 type TrieEntry = [string, number[]];
@@ -212,11 +214,52 @@ function spend(work: Work, amount = 1): void {
   }
 }
 
+type BestCandidates = {
+  byOrdinal: Map<number, RankedCandidateDocument>;
+  limit: number;
+  values: RankedCandidateDocument[];
+};
+
+function insertCandidate(best: BestCandidates, candidate: RankedCandidateDocument): void {
+  let low = 0;
+  let high = best.values.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (compareRankedCandidates(candidate, best.values[middle]) < 0) high = middle;
+    else low = middle + 1;
+  }
+  best.values.splice(low, 0, candidate);
+  best.byOrdinal.set(candidate.document.ordinal, candidate);
+}
+
+function offerCandidate(
+  best: BestCandidates, document: CandidateDocument, match: SearchMatchKey,
+): void {
+  const candidate = { document, match };
+  const existing = best.byOrdinal.get(document.ordinal);
+  if (existing) {
+    if (compareRankedCandidates(candidate, existing) >= 0) return;
+    const index = best.values.indexOf(existing);
+    if (index < 0) throw new Error("bounded search candidate set is inconsistent");
+    best.values.splice(index, 1);
+    best.byOrdinal.delete(document.ordinal);
+    insertCandidate(best, candidate);
+    return;
+  }
+  if (best.values.length >= best.limit) {
+    const worst = best.values.at(-1)!;
+    if (compareRankedCandidates(candidate, worst) >= 0) return;
+    best.values.pop();
+    best.byOrdinal.delete(worst.document.ordinal);
+  }
+  insertCandidate(best, candidate);
+}
+
 function addOrdinals(
   runtime: TrieRuntime,
   ordinals: readonly number[],
-  accepted: Set<number>,
-  limit: number,
+  best: BestCandidates,
+  match: SearchMatchKey | ((document: CandidateDocument) => SearchMatchKey),
   work: Work,
   predicate?: (document: CandidateDocument) => boolean,
 ): void {
@@ -224,21 +267,21 @@ function addOrdinals(
     spend(work);
     const document = runtime.documents.get(ordinal);
     if (!document) throw new Error("bounded search posting has no document");
-    if ((!predicate || predicate(document)) && accepted.size < limit) accepted.add(ordinal);
-    if (accepted.size >= limit) return;
+    if (!predicate || predicate(document)) {
+      offerCandidate(best, document, typeof match === "function" ? match(document) : match);
+    }
   }
 }
 
 function addPrefix(
-  runtime: TrieRuntime, node: TrieNode, accepted: Set<number>, limit: number, work: Work,
+  runtime: TrieRuntime, node: TrieNode, best: BestCandidates, work: Work,
 ): void {
-  if (accepted.size >= limit) return;
-  addOrdinals(runtime, node.ordinals, accepted, limit, work);
+  addOrdinals(runtime, node.ordinals, best, [2, 0], work);
   const children = node.children.values();
-  for (let item = children.next(); !item.done && accepted.size < limit; item = children.next()) {
+  for (let item = children.next(); !item.done; item = children.next()) {
     const child = item.value;
     spend(work);
-    addPrefix(runtime, child, accepted, limit, work);
+    addPrefix(runtime, child, best, work);
   }
 }
 
@@ -255,12 +298,11 @@ function fuzzyWalk(
   maximum: number,
   depth: number,
   previous: DistanceRow,
-  accepted: Set<number>,
-  limit: number,
+  best: BestCandidates,
   work: Work,
 ): void {
   const children = node.children.entries();
-  for (let item = children.next(); !item.done && accepted.size < limit; item = children.next()) {
+  for (let item = children.next(); !item.done; item = children.next()) {
     const [point, child] = item.value;
     const nextDepth = depth + 1;
     const first = Math.max(0, nextDepth - maximum);
@@ -278,10 +320,11 @@ function fuzzyWalk(
       minimum = Math.min(minimum, distance);
     }
     if (minimum > maximum) continue;
-    if (rowValue(current, query.length, maximum + 1) <= maximum) {
-      addOrdinals(runtime, child.ordinals, accepted, limit, work);
+    const distance = rowValue(current, query.length, maximum + 1);
+    if (distance <= maximum) {
+      addOrdinals(runtime, child.ordinals, best, [3, distance], work);
     }
-    fuzzyWalk(runtime, child, query, maximum, nextDepth, current, accepted, limit, work);
+    fuzzyWalk(runtime, child, query, maximum, nextDepth, current, best, work);
   }
 }
 
@@ -293,7 +336,7 @@ function boundedTrieSearch(runtime: TrieRuntime, rawQuery: string, limit: number
   if (points.length > MAX_NORMALIZED_SEARCH_CODE_POINTS) {
     throw new Error("bounded search query has an invalid normalized length");
   }
-  const accepted = new Set<number>();
+  const best: BestCandidates = { byOrdinal: new Map(), limit, values: [] };
   const work: Work = { value: 0 };
   let node: TrieNode | undefined = runtime.root;
   let prefix = "";
@@ -307,29 +350,32 @@ function boundedTrieSearch(runtime: TrieRuntime, rawQuery: string, limit: number
       qualified.push({ name: prefix, node });
     }
   }
-  if (node) addOrdinals(runtime, node.ordinals, accepted, limit, work);
+  if (node) {
+    addOrdinals(runtime, node.ordinals, best, ({ record }) =>
+      [normalizeSearchText(record.displayName) === query ? 0 : 1, 0], work);
+  }
   for (const item of qualified) {
-    if (accepted.size >= limit) break;
-    addOrdinals(runtime, item.node.ordinals, accepted, limit, work, ({ record }) =>
-      hasQualifiedSearchContext(query, item.name, record));
+    addOrdinals(runtime, item.node.ordinals, best, ({ record }) =>
+      [normalizeSearchText(record.displayName) === item.name ? 0 : 1, 0], work,
+    ({ record }) => hasQualifiedSearchContext(query, item.name, record));
   }
   if (node) {
     const children = node.children.values();
-    for (let item = children.next(); !item.done && accepted.size < limit; item = children.next()) {
+    for (let item = children.next(); !item.done; item = children.next()) {
       spend(work);
-      addPrefix(runtime, item.value, accepted, limit, work);
+      addPrefix(runtime, item.value, best, work);
     }
   }
   const maximum = searchFuzzyAllowance(query);
-  if (maximum && accepted.size < limit) {
+  if (maximum) {
     const first = Math.max(0, -maximum);
     const last = Math.min(points.length, maximum);
     fuzzyWalk(runtime, runtime.root, points, maximum, 0, {
       first,
       values: Array.from({ length: last - first + 1 }, (_, index) => first + index),
-    }, accepted, limit, work);
+    }, best, work);
   }
-  return Array.from(accepted);
+  return best.values.map(({ document }) => document.ordinal);
 }
 
 export const boundedTrieAdapter: CandidateAdapter = {

@@ -357,6 +357,52 @@ describe("receipt-bound browser search shards", () => {
       .map(({ placeId }) => placeId)).toEqual(["geonames:1149"]);
   });
 
+  it("applies the candidate cap after global qualified-match ranking", () => {
+    const records = [
+      ...Array.from({ length: 128 }, (_, index) => ({
+        placeId: `synthetic:${index + 1}`, displayName: "New", searchNames: [],
+        countryCode: "US", admin1Name: "York", population: 1, featureCode: "PPL",
+        distanceToCoastMeters: 1, isCoastal: false,
+      })),
+      {
+        placeId: "synthetic:1000", displayName: "New York", searchNames: [],
+        countryCode: "US", admin1Name: "Other", population: 1_000_000, featureCode: "PPL",
+        distanceToCoastMeters: 1, isCoastal: false,
+      },
+    ];
+    const documents = prepareCandidateDocuments(records);
+    const index = boundedTrieAdapter.build(documents, {
+      evaluationId: "bounded-audit", shardId: "qualified",
+    });
+    const matches = boundedTrieAdapter.search(index, "new york us", 128)
+      .map((ordinal) => documents.find((document) => document.ordinal === ordinal)!);
+    expect(matches).toHaveLength(128);
+    expect(rankDocuments("new york us", matches)[0].record.placeId).toBe("synthetic:1000");
+  });
+
+  it("applies the candidate cap after global full-name fuzzy ranking", () => {
+    const records = [
+      ...Array.from({ length: 128 }, (_, index) => ({
+        placeId: `synthetic:${index + 1}`, displayName: "llmmmmmm", searchNames: [],
+        countryCode: "AA", admin1Name: null, population: 1, featureCode: "PPL",
+        distanceToCoastMeters: 1, isCoastal: false,
+      })),
+      {
+        placeId: "synthetic:1000", displayName: "lmmmmmmm", searchNames: [],
+        countryCode: "AA", admin1Name: null, population: 1_000_000, featureCode: "PPL",
+        distanceToCoastMeters: 1, isCoastal: false,
+      },
+    ];
+    const documents = prepareCandidateDocuments(records);
+    const index = boundedTrieAdapter.build(documents, {
+      evaluationId: "bounded-audit", shardId: "fuzzy-rank",
+    });
+    const matches = boundedTrieAdapter.search(index, "mmmmmmmm", 128)
+      .map((ordinal) => documents.find((document) => document.ordinal === ordinal)!);
+    expect(matches).toHaveLength(128);
+    expect(rankDocuments("mmmmmmmm", matches)[0].record.placeId).toBe("synthetic:1000");
+  });
+
   it("bounds fuzzy term traversal before an unbounded match map can materialize", () => {
     const characters = Array.from({ length: 501 }, (_, index) => String.fromCodePoint(0x4e00 + index));
     const searchNames: string[] = [];

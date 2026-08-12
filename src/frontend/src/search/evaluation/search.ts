@@ -88,7 +88,14 @@ export function hasQualifiedSearchContext(
   return tokenizeSearchText(query.slice(name.length)).every((term) => context.has(term));
 }
 
-function matchKey(query: string, record: SearchDocument): [number, number] {
+export type SearchMatchKey = readonly [number, number];
+
+export type RankedCandidateDocument = {
+  document: CandidateDocument;
+  match: SearchMatchKey;
+};
+
+function matchKey(query: string, record: SearchDocument): SearchMatchKey {
   const canonical = normalizeSearchText(record.displayName);
   const alternates = record.searchNames.map(normalizeSearchText).filter((name) => name !== canonical);
   const qualified = (name: string) => query === name || hasQualifiedSearchContext(query, name, record);
@@ -106,17 +113,23 @@ function matchKey(query: string, record: SearchDocument): [number, number] {
   return distance <= allowance ? [3, distance] : [4, distance];
 }
 
+export function compareRankedCandidates(
+  left: RankedCandidateDocument, right: RankedCandidateDocument,
+): number {
+  return left.match[0] - right.match[0]
+    || left.match[1] - right.match[1]
+    || (right.document.record.population ?? -1) - (left.document.record.population ?? -1)
+    || (ADMIN_PRIORITY[right.document.record.featureCode] ?? 0)
+      - (ADMIN_PRIORITY[left.document.record.featureCode] ?? 0)
+    || left.document.record.distanceToCoastMeters - right.document.record.distanceToCoastMeters
+    || compareId(left.document.record.placeId, right.document.record.placeId);
+}
+
 export function rankDocuments(queryText: string, documents: readonly CandidateDocument[]): CandidateDocument[] {
   const query = normalizeSearchText(queryText);
   if (!query) return [];
   return documents.map((document) => ({ document, match: matchKey(query, document.record) }))
     .filter(({ match }) => match[0] < 4)
-    .sort((left, right) => left.match[0] - right.match[0]
-      || left.match[1] - right.match[1]
-      || (right.document.record.population ?? -1) - (left.document.record.population ?? -1)
-      || (ADMIN_PRIORITY[right.document.record.featureCode] ?? 0)
-        - (ADMIN_PRIORITY[left.document.record.featureCode] ?? 0)
-      || left.document.record.distanceToCoastMeters - right.document.record.distanceToCoastMeters
-      || compareId(left.document.record.placeId, right.document.record.placeId))
+    .sort(compareRankedCandidates)
     .map(({ document }) => document);
 }
