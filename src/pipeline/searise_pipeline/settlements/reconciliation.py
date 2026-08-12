@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import heapq
+import os
 import re
 from collections import Counter
 from contextlib import ExitStack, closing, contextmanager
@@ -570,6 +571,15 @@ def _build_from_snapshots(
     return report
 
 
+def _close_after_commit(descriptor: int) -> None:
+    """Best-effort close that cannot reverse an already committed report."""
+
+    try:
+        os.close(descriptor)
+    except BaseException:
+        pass
+
+
 def build_settlement_reconciliation_report(
     catalogue_database: Path,
     catalogue_receipt: Path,
@@ -584,62 +594,99 @@ def build_settlement_reconciliation_report(
 
     if type(data_release_id) is not str or _RELEASE_ID.fullmatch(data_release_id) is None:
         raise SettlementReconciliationError("data release id is invalid")
+    stack = ExitStack()
+    output_directory = private = expected = commit_directory = None
+    private_name = ""
+    owned: list[tuple] = []
+    private_cleaned = promoted = committed = False
+    commit_descriptor = -1
     try:
-        with ExitStack() as stack:
-            output_directory = stack.enter_context(
-                authority._open_directory_path(output.parent, "reconciliation output directory")
+        output_directory = stack.enter_context(
+            authority._open_directory_path(output.parent, "reconciliation output directory")
+        )
+        authority._assert_secure_work_directory(output_directory)
+        if not publication._absent(output_directory, output.name):
+            raise SettlementReconciliationError(
+                "reconciliation output exists; overwrite is refused"
             )
-            authority._assert_secure_work_directory(output_directory)
-            if not publication._absent(output_directory, output.name):
+        private_name, private = authority._create_private(output_directory)
+        authority._stack_close(stack, private.descriptor)
+        with _snapshots(
+            {
+                "catalogue.duckdb": catalogue_database,
+                "catalogue-receipt.json": catalogue_receipt,
+                "spatial.duckdb": spatial_database,
+                "spatial-receipt.json": spatial_receipt,
+            },
+            work_dir,
+        ) as (root, assets):
+            report = _build_from_snapshots(root, assets, data_release_id)
+        publication._write_owned(private, output.name, _canonical(report), owned)
+        with authority._open_asset(
+            private, PurePosixPath(output.name), "staged reconciliation report"
+        ) as staged:
+            expected = staged
+            publication._fsync_asset(staged)
+            publication._fsync_directory(private)
+            publication._link_no_overwrite(private, output.name, output_directory)
+            promoted = True
+            publication._fsync_directory(output_directory)
+            publication._assert_binding(output_directory, output.name, staged)
+            authority._assert_directory(output_directory)
+        authority._remove_private(output_directory, private_name, private, tuple(owned), ())
+        private_cleaned = True
+        publication._fsync_directory(output_directory)
+        authority._assert_directory(output_directory)
+        commit_descriptor = os.dup(output_directory.descriptor)
+        commit_directory = output_directory._replace(descriptor=commit_descriptor)
+        stack.close()
+        with authority._open_directory_path(
+            output.parent, "final reconciliation output directory"
+        ) as final_directory:
+            if (final_directory.device, final_directory.inode) != (
+                commit_directory.device,
+                commit_directory.inode,
+            ):
                 raise SettlementReconciliationError(
-                    "reconciliation output exists; overwrite is refused"
+                    "reconciliation output directory identity changed"
                 )
-            private_name, private = authority._create_private(output_directory)
-            authority._stack_close(stack, private.descriptor)
-            owned: list[tuple] = []
-            staged = None
-            promoted = False
-            primary: BaseException | None = None
-            try:
-                with _snapshots(
-                    {
-                        "catalogue.duckdb": catalogue_database,
-                        "catalogue-receipt.json": catalogue_receipt,
-                        "spatial.duckdb": spatial_database,
-                        "spatial-receipt.json": spatial_receipt,
-                    },
-                    work_dir,
-                ) as (root, assets):
-                    report = _build_from_snapshots(root, assets, data_release_id)
-                publication._write_owned(private, output.name, _canonical(report), owned)
-                with authority._open_asset(
-                    private, PurePosixPath(output.name), "staged reconciliation report"
-                ) as staged:
-                    publication._fsync_asset(staged)
-                    publication._fsync_directory(private)
-                    publication._link_no_overwrite(private, output.name, output_directory)
-                    promoted = True
-                    publication._fsync_directory(output_directory)
-                    publication._assert_binding(output_directory, output.name, staged)
-                    authority._assert_directory(output_directory)
-                return report
-            except BaseException as exc:
-                primary = exc
-                if promoted and staged is not None:
-                    publication._rollback_publication(
-                        exc, output_directory, private, [(output.name, staged)]
-                    )
-                raise
-            finally:
-                try:
-                    authority._remove_private(
-                        output_directory, private_name, private, tuple(owned), ()
-                    )
-                except BaseException as cleanup:
-                    if primary is None:
-                        raise
-                    authority._note_cleanup(primary, cleanup)
+            with authority._open_asset(
+                final_directory, PurePosixPath(output.name), "reconciliation output"
+            ) as published:
+                if (
+                    (published.device, published.inode) != (expected.device, expected.inode)
+                    or published.size != expected.size
+                    or published.sha256 != expected.sha256
+                ):
+                    raise SettlementReconciliationError("reconciliation output identity changed")
+        committed = True
+        _close_after_commit(commit_descriptor)
+        commit_descriptor = -1
+        return report
     except BaseException as primary:
+        if committed:
+            if commit_descriptor >= 0:
+                _close_after_commit(commit_descriptor)
+            return report
+        rollback = commit_directory or output_directory
+        if promoted and expected is not None and rollback is not None:
+            publication._rollback_publication(
+                primary, rollback, rollback, [(output.name, expected)]
+            )
+        if private is not None and output_directory is not None and not private_cleaned:
+            try:
+                authority._remove_private(output_directory, private_name, private, tuple(owned), ())
+            except BaseException as cleanup:
+                authority._note_cleanup(primary, cleanup)
+        try:
+            stack.close()
+        except BaseException as cleanup:
+            authority._note_cleanup(primary, cleanup)
+        if commit_descriptor >= 0:
+            try:
+                os.close(commit_descriptor)
+            except BaseException as cleanup:
+                authority._note_cleanup(primary, cleanup)
         if isinstance(primary, SettlementReconciliationError):
             raise
         if isinstance(primary, Exception):

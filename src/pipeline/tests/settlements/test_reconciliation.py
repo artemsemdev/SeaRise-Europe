@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import importlib.util
+import os
 from datetime import date
 from pathlib import Path
 
@@ -276,6 +277,10 @@ def _build(tmp_path: Path, name: str = "report.json") -> tuple[dict, Path, tuple
     return report, output, inputs
 
 
+def _residue(root: Path) -> list[Path]:
+    return sorted(root.rglob(".spatial-assets-*"))
+
+
 def _resign(document: dict) -> None:
     document["deterministicIdentity"] = reconciliation._unsigned_identity(document)
 
@@ -330,6 +335,160 @@ def test_report_bytes_are_deterministic_and_overwrite_is_refused(tmp_path: Path)
         reconciliation.build_settlement_reconciliation_report(
             *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
         )
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["link", "post-link-fsync", "binding", "post-cleanup-fsync"],
+)
+def test_publication_failures_roll_back_owned_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    inputs = _fixture(tmp_path)
+    output = tmp_path / "report.json"
+    if failure == "link":
+        monkeypatch.setattr(
+            reconciliation.publication,
+            "_link_no_overwrite",
+            lambda *_args: (_ for _ in ()).throw(OSError("injected link failure")),
+        )
+    elif failure == "binding":
+        monkeypatch.setattr(
+            reconciliation.publication,
+            "_assert_binding",
+            lambda *_args: (_ for _ in ()).throw(OSError("injected binding failure")),
+        )
+    else:
+        sync = reconciliation.publication._fsync_directory
+        output_syncs = 0
+        fail_on = 1 if failure == "post-link-fsync" else 2
+
+        def fail_sync(directory) -> None:  # type: ignore[no-untyped-def]
+            nonlocal output_syncs
+            if directory.label == "reconciliation output directory":
+                output_syncs += 1
+                if output_syncs == fail_on:
+                    raise OSError(f"injected {failure} failure")
+            sync(directory)
+
+        monkeypatch.setattr(reconciliation.publication, "_fsync_directory", fail_sync)
+
+    with pytest.raises(reconciliation.SettlementReconciliationError, match="injected"):
+        reconciliation.build_settlement_reconciliation_report(
+            *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
+        )
+
+    assert not output.exists()
+    assert _residue(tmp_path) == []
+
+
+def test_private_cleanup_failure_before_commit_rolls_back_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs = _fixture(tmp_path)
+    output = tmp_path / "report.json"
+    cleanup = reconciliation.authority._remove_private
+
+    def fail_after_cleanup(*args: object) -> None:
+        cleanup(*args)
+        if args[0].label == "reconciliation output directory":  # type: ignore[attr-defined]
+            raise OSError("injected private cleanup failure")
+
+    monkeypatch.setattr(reconciliation.authority, "_remove_private", fail_after_cleanup)
+    with pytest.raises(reconciliation.SettlementReconciliationError, match="private cleanup"):
+        reconciliation.build_settlement_reconciliation_report(
+            *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
+        )
+
+    assert not output.exists()
+    assert _residue(tmp_path) == []
+
+
+def test_racing_replacement_before_binding_is_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs = _fixture(tmp_path)
+    output = tmp_path / "report.json"
+    foreign = tmp_path / "foreign.json"
+    foreign.write_bytes(b"foreign output\n")
+    sync = reconciliation.publication._fsync_directory
+    output_syncs = 0
+
+    def replace_after_link(directory) -> None:  # type: ignore[no-untyped-def]
+        nonlocal output_syncs
+        sync(directory)
+        if directory.label == "reconciliation output directory":
+            output_syncs += 1
+            if output_syncs == 1:
+                os.replace(foreign, output)
+
+    monkeypatch.setattr(reconciliation.publication, "_fsync_directory", replace_after_link)
+    with pytest.raises(reconciliation.SettlementReconciliationError, match="identity changed"):
+        reconciliation.build_settlement_reconciliation_report(
+            *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
+        )
+
+    assert output.read_bytes() == b"foreign output\n"
+    assert _residue(tmp_path) == []
+
+
+def test_racing_replacement_after_cleanup_fails_before_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs = _fixture(tmp_path)
+    output = tmp_path / "report.json"
+    foreign = tmp_path / "foreign.json"
+    foreign.write_bytes(b"foreign output\n")
+    cleanup = reconciliation.authority._remove_private
+
+    def replace_after_cleanup(*args: object) -> None:
+        cleanup(*args)
+        if args[0].label == "reconciliation output directory":  # type: ignore[attr-defined]
+            os.replace(foreign, output)
+
+    monkeypatch.setattr(reconciliation.authority, "_remove_private", replace_after_cleanup)
+    with pytest.raises(reconciliation.SettlementReconciliationError, match="identity changed"):
+        reconciliation.build_settlement_reconciliation_report(
+            *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
+        )
+
+    assert output.read_bytes() == b"foreign output\n"
+    assert _residue(tmp_path) == []
+
+
+def test_commit_descriptor_close_failure_cannot_reverse_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs = _fixture(tmp_path)
+    output = tmp_path / "report.json"
+    duplicate = reconciliation.os.dup
+    close = reconciliation.os.close
+    commit_descriptor = -1
+
+    def record_duplicate(descriptor: int) -> int:
+        nonlocal commit_descriptor
+        commit_descriptor = duplicate(descriptor)
+        return commit_descriptor
+
+    def fail_commit_close(descriptor: int) -> None:
+        if descriptor == commit_descriptor:
+            raise OSError("injected post-commit close failure")
+        close(descriptor)
+
+    monkeypatch.setattr(reconciliation.os, "dup", record_duplicate)
+    monkeypatch.setattr(reconciliation.os, "close", fail_commit_close)
+    try:
+        report = reconciliation.build_settlement_reconciliation_report(
+            *inputs[:4], output, data_release_id=RELEASE_ID, work_dir=inputs[4]
+        )
+    finally:
+        if commit_descriptor >= 0:
+            close(commit_descriptor)
+
+    assert output.read_bytes() == _canonical(report)
+    assert _residue(tmp_path) == []
 
 
 @pytest.mark.parametrize(

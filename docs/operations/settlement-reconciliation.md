@@ -25,6 +25,13 @@ sync. The implementation streams rows in numeric GeoNames order, merges the
 two spatial decision tables with bounded lookahead, disables DuckDB spill, and
 caps distinct dimension keys.
 
+Success is committed only after private staging cleanup, a second output-parent
+sync, closure of the original directory authority, and a fresh pathname,
+inode, size, and SHA-256 check. Failures before that point roll back only the
+owned output inode and preserve a racing foreign replacement. Descriptor
+cleanup after that point is best-effort and cannot turn durable success into a
+false failure.
+
 ## Reading the flow
 
 The record flow is intentionally two-stage:
