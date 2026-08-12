@@ -24,7 +24,7 @@ def test_production_inventory_is_exact_and_non_promotional() -> None:
     assert inventory["localHandoffRoot"] == "local-data/phase-1"
 
     artifacts = inventory["artifacts"]
-    assert len(artifacts) == 17
+    assert len(artifacts) == 18
     assert len({item["id"] for item in artifacts}) == len(artifacts)
     assert len({item["path"] for item in artifacts}) == len(artifacts)
     for artifact in artifacts:
@@ -42,8 +42,15 @@ def test_production_inventory_is_exact_and_non_promotional() -> None:
     assert inventory["diagnostic"]["executionOutcome"] == "pass"
     assert inventory["diagnostic"]["browserRuntimeMeasured"] is False
     assert inventory["diagnostic"]["acceptedBrowserBudgetOutcome"] == "not-measured"
+    browser = inventory["browserRuntime"]
+    assert browser["gateOutcome"] == "pass"
+    assert browser["initializationP95Milliseconds"] < 1_000
+    assert browser["queryP95Milliseconds"] < 50
+    assert browser["peakObservedWorkerBytes"] > 0
+    assert browser["queryTransmissionOutcome"] == "pass"
+    assert browser["crossOriginIsolated"] is True
     assert inventory["claims"] == {
-        "browserReference": False,
+        "browserReference": True,
         "candidateBound": False,
         "immutableRetention": False,
         "production": False,

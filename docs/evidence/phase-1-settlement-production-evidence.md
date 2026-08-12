@@ -2,8 +2,9 @@
 
 > **Issue:** [#298](https://github.com/artemsemdev/SeaRise-Europe/issues/298)
 >
-> **Disposition:** exact local production bytes and Node-worker diagnostics are
-> retained; browser-runtime and candidate publication gates remain blocked.
+> **Disposition:** exact local production bytes, Node-worker diagnostics, and
+> accepted Chromium reference evidence are retained; application integration
+> and candidate publication gates remain blocked.
 
 The machine-readable
 [`phase-1-settlement-production-inventory.json`](phase-1-settlement-production-inventory.json)
@@ -29,6 +30,15 @@ are retained outside Git under `local-data/phase-1/` as documented in the
   validated with identity
   `36d21fd8dc303f523e5a19cb00c789804dd2a42ed9c15ba3c3d1cddff56083e9`.
   Its 600 warmed query observations have p95 7.426417 ms.
+- The release-bound Web Worker ran in headless Chromium 151 on the documented
+  Apple M1 Max reference host. Five fresh core initializations produced p95
+  618.91 ms against the 1,000 ms target; 200 warmed production-query
+  observations produced p95 5.33 ms against the 50 ms target. Dedicated
+  worker-isolate CDP telemetry recorded 753,232,781 peak observed bytes. The
+  intercepted network inventory contains only the page, worker module, and two
+  static shards, with no query transmission. The canonical local report is
+  `browser-worker-performance/browser-worker-performance.chromium.json`,
+  SHA-256 `8491c032d1ebc7a904416aa1036cf0c4df52ef2b424fcacc7eb5a431543cfa0c`.
 
 ## Rights disposition
 
@@ -42,12 +52,12 @@ production claims false.
 
 ## Remaining stop conditions
 
-The Node-worker profile is diagnostic and is not the accepted browser/mobile
-profile. Browser initialization, browser query p95, and browser worker memory
-remain `not-measured`. The production browser path and zero-query-leakage proof
-depend on [#56](https://github.com/artemsemdev/SeaRise-Europe/issues/56), which
-is still open. Candidate-wide QA, protected signing/readback, and external
-immutable co-retention also remain separate required gates.
+The Chromium reference profile now satisfies the Phase 1 initialization,
+query-p95, worker-memory reporting, responsiveness, and zero-query-leakage
+requirements. The full application still has to replace its retiring runtime
+geocoder with this worker protocol before [#56](https://github.com/artemsemdev/SeaRise-Europe/issues/56)
+can close. Candidate-wide QA, protected signing/readback, and external immutable
+co-retention also remain separate required gates.
 
 This record is durable repository evidence for exact identities; it does not
 promote the local handoff directory into immutable storage and does not close

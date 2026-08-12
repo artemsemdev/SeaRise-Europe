@@ -34,7 +34,8 @@
     {"id":"settlements-europe-coastal","path":"browser-shards/europe-coastal.codepoint-trie.json.br","byteSize":5485256,"sha256":"b9d5d502d07fe9c0eaccc9cf93a8f92d3378b30245167ad6a5739f88f0de4785"},
     {"id":"settlement-search-shard-receipt","path":"browser-shards/settlement-browser-search-shards.receipt.json","byteSize":2182,"sha256":"918bc9fbf700b69e9ec726e9f953f2a5c7a9ab5a1094a7faf9477c2d07de6333"},
     {"id":"settlement-performance-queries","path":"performance-queries.json","byteSize":934,"sha256":"5d3cef3fac1399b1d8d51fd8f18f01a55d0aa05b27ebcd2796a0ab4b52d36040"},
-    {"id":"settlement-node-worker-diagnostic","path":"browser-worker-performance/browser-worker-performance.json","byteSize":9293,"sha256":"228cd2e6e7de8f6660a334978262d2a5010c6a12e67738125ff7b426e7c99517"}
+    {"id":"settlement-node-worker-diagnostic","path":"browser-worker-performance/browser-worker-performance.json","byteSize":9293,"sha256":"228cd2e6e7de8f6660a334978262d2a5010c6a12e67738125ff7b426e7c99517"},
+    {"id":"settlement-chromium-worker-evidence","path":"browser-worker-performance/browser-worker-performance.chromium.json","byteSize":4575,"sha256":"8491c032d1ebc7a904416aa1036cf0c4df52ef2b424fcacc7eb5a431543cfa0c"}
   ],
   "counts": {
     "normalizedPlaces": 4988582,
@@ -64,13 +65,29 @@
     "browserRuntimeMeasured": false,
     "acceptedBrowserBudgetOutcome": "not-measured"
   },
+  "browserRuntime": {
+    "profileId": "settlement-production-browser-worker-performance-v1",
+    "browser": "Chromium 151.0.7922.34",
+    "referenceHost": "Apple M1 Max, macOS 25.5.0, 64 GiB",
+    "deterministicIdentity": "af39b9913228452464454e878a303f534e9fc573a2fa58b413e05c9c1b8b928f",
+    "gateOutcome": "pass",
+    "querySetSha256": "5d3cef3fac1399b1d8d51fd8f18f01a55d0aa05b27ebcd2796a0ab4b52d36040",
+    "initializationSampleCount": 5,
+    "initializationP95Milliseconds": 618.91,
+    "querySampleCount": 200,
+    "queryP95Milliseconds": 5.33,
+    "peakObservedWorkerBytes": 753232781,
+    "memoryMetric": "Chrome DevTools Protocol Runtime.getHeapUsage on the dedicated worker isolate",
+    "crossOriginIsolated": true,
+    "queryTransmissionOutcome": "pass"
+  },
   "rightsDisposition": {
     "authority": "project-owner",
     "status": "conditionally-approved",
     "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/298#issuecomment-5267891419"
   },
   "claims": {
-    "browserReference": false,
+    "browserReference": true,
     "candidateBound": false,
     "immutableRetention": false,
     "production": false,
@@ -81,9 +98,6 @@
   "blockingItems": [
     "candidate-wide-validation-pending",
     "external-immutable-retention-pending",
-    "production-browser-zero-runtime-dependency-proof-unavailable",
-    "real-browser-initialization-budget-not-measured",
-    "real-browser-query-budget-not-measured",
-    "real-browser-worker-memory-not-measured"
+    "production-browser-application-integration-pending"
   ]
 }

@@ -29,6 +29,10 @@ All notable changes to this project will be documented in this file.
   dispatches every schema-selected artifact in manifest order, retains explicit
   pass, fail, and not-measured dispositions, and rejects candidate mutation
   during validation before any release eligibility can be reported.
+- Added a release-bound settlement Web Worker and Chromium evidence harness
+  with core-first loading, monotonic query tokens, bounded search, static-only
+  networking, worker-isolate memory telemetry, and accepted production-scale
+  initialization and query budget checks.
 - Added a version-selected candidate QA routing matrix and explicit-outcome
   dispatcher that cover every v2 artifact role, media type, and content
   encoding and fail closed on missing, duplicate, unsorted, unknown, or
