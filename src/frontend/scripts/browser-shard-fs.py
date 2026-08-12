@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import json
 import os
@@ -66,6 +67,9 @@ def open_root(path: Path) -> int:
             child = os.open(part, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = child
+        metadata = os.fstat(descriptor)
+        if metadata.st_uid != os.geteuid() or stat.S_IMODE(metadata.st_mode) & 0o022:
+            fail("browser shard output root must be owner-controlled")
         return descriptor
     except Exception:
         os.close(descriptor)
@@ -121,8 +125,8 @@ def read_exact(stream: BinaryIO, size: int, expected_sha256: str) -> bytes:
     return b"".join(chunks)
 
 
-def read_file(root: int, item: dict[str, object]) -> bytes:
-    name, size, expected = str(item["name"]), int(item["size"]), str(item["sha256"])
+def open_file(root: int, item: dict[str, object]) -> tuple[int, os.stat_result]:
+    name, size = str(item["name"]), int(item["size"])
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     flags |= getattr(os, "O_NONBLOCK", 0)
     descriptor = os.open(name, flags, dir_fd=root)
@@ -136,26 +140,164 @@ def read_file(root: int, item: dict[str, object]) -> bytes:
             or identity(before) != identity(linked)
         ):
             fail("browser shard set contains an unsafe file")
-        with os.fdopen(os.dup(descriptor), "rb", closefd=True) as stream:
-            raw = read_exact(stream, size, expected)
-        after = os.fstat(descriptor)
-        linked = os.stat(name, dir_fd=root, follow_symlinks=False)
-        if identity(before) != identity(after) or identity(after) != identity(linked):
-            fail("browser shard set changed while read")
-        return raw
-    finally:
+        return descriptor, before
+    except Exception:
         os.close(descriptor)
+        raise
+
+
+def read_opened(
+    descriptor: int, item: dict[str, object], before: os.stat_result
+) -> bytes:
+    chunks: list[bytes] = []
+    digest = hashlib.sha256()
+    size = int(item["size"])
+    offset = 0
+    while offset < size:
+        chunk = os.pread(descriptor, min(READ_SIZE, size - offset), offset)
+        if not chunk:
+            fail("browser shard helper payload ended early")
+        chunks.append(chunk)
+        digest.update(chunk)
+        offset += len(chunk)
+    if digest.hexdigest() != item["sha256"]:
+        fail("browser shard helper payload hash differs")
+    if identity(os.fstat(descriptor)) != identity(before):
+        fail("browser shard set changed while read")
+    return b"".join(chunks)
+
+
+def assert_opened(
+    root: int, item: dict[str, object], descriptor: int, before: os.stat_result
+) -> None:
+    after = os.fstat(descriptor)
+    linked = os.stat(str(item["name"]), dir_fd=root, follow_symlinks=False)
+    if identity(before) != identity(after) or identity(after) != identity(linked):
+        fail("browser shard set changed before its linearization point")
+
+
+def rename_no_overwrite(root: int, source: str, target: str) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename, flag = libc.renameatx_np, 4
+    elif sys.platform.startswith("linux"):
+        rename, flag = libc.renameat2, 1
+    else:
+        fail("exclusive browser shard quarantine is unsupported")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    if rename(root, os.fsencode(source), root, os.fsencode(target), flag) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), source)
+
+
+def exchange(root: int, left: str, right: str) -> None:
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        rename = libc.renameatx_np
+    elif sys.platform.startswith("linux"):
+        rename = libc.renameat2
+    else:
+        fail("atomic browser shard exchange is unsupported")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    if rename(root, os.fsencode(left), root, os.fsencode(right), 2) != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), left)
 
 
 def remove_owned(root: int, name: str, expected: os.stat_result) -> bool:
     try:
-        current = os.stat(name, dir_fd=root, follow_symlinks=False)
-        if node(current) != node(expected):
-            return False
-        os.unlink(name, dir_fd=root)
-        return True
+        os.stat(name, dir_fd=root, follow_symlinks=False)
     except FileNotFoundError:
         return True
+    retained = f".search-shard-rollback-{secrets.token_hex(16)}"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(retained, flags, 0o600, dir_fd=root)
+    try:
+        placeholder = os.fstat(descriptor)
+        try:
+            exchange(root, name, retained)
+        except FileNotFoundError:
+            return True
+        moved = os.stat(retained, dir_fd=root, follow_symlinks=False)
+        replacement = os.stat(name, dir_fd=root, follow_symlinks=False)
+        owned = node(moved) == node(expected) and stat.S_ISREG(moved.st_mode)
+        placeholder_retained = node(replacement) == node(placeholder)
+        if not owned or not placeholder_retained:
+            try:
+                exchange(root, name, retained)
+            except OSError:
+                pass
+            return False
+        isolated = f".search-shard-placeholder-{secrets.token_hex(16)}"
+        rename_no_overwrite(root, name, isolated)
+        moved_placeholder = os.stat(isolated, dir_fd=root, follow_symlinks=False)
+        if node(moved_placeholder) == node(placeholder):
+            return True
+        try:
+            rename_no_overwrite(root, isolated, name)
+        except OSError:
+            pass
+        return False
+    finally:
+        os.close(descriptor)
+
+
+def close_all(opened: list[tuple[dict[str, object], int, os.stat_result]]) -> None:
+    primary = None
+    for _, descriptor, _ in reversed(opened):
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            primary = primary or error
+    if primary is not None:
+        raise primary
+
+
+def coherent_read(
+    root: int, output: Path, artifacts: list[dict[str, object]], *, receipt_first: bool
+) -> list[bytes]:
+    opened: list[tuple[dict[str, object], int, os.stat_result]] = []
+    try:
+        for item in artifacts:
+            descriptor, before = open_file(root, item)
+            opened.append((item, descriptor, before))
+        receipt = (
+            read_opened(opened[2][1], artifacts[2], opened[2][2])
+            if receipt_first
+            else None
+        )
+        shards = [
+            read_opened(opened[index][1], artifacts[index], opened[index][2])
+            for index in range(2)
+        ]
+        final_receipt = read_opened(opened[2][1], artifacts[2], opened[2][2])
+        if receipt is not None and receipt != final_receipt:
+            fail("browser shard receipt changed before consumer handoff")
+        for item, descriptor, before in opened:
+            assert_opened(root, item, descriptor, before)
+        if not same_root(output, root):
+            fail(
+                "browser shard output directory changed before its linearization point"
+            )
+        for item, descriptor, before in opened:
+            assert_opened(root, item, descriptor, before)
+        return [*shards, final_receipt]
+    finally:
+        close_all(opened)
 
 
 def publish(
@@ -175,6 +317,17 @@ def publish(
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
             descriptor = os.open(temporary, flags, 0o600, dir_fd=root)
             try:
+                try:
+                    metadata = os.fstat(descriptor)
+                except BaseException:
+                    metadata = os.fstat(descriptor)
+                    staged.append((temporary, final, metadata))
+                    raise
+                staged.append((temporary, final, metadata))
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    fail(
+                        "staged browser shard is not an owned single-link regular file"
+                    )
                 digest = hashlib.sha256()
                 remaining = int(item["size"])
                 while remaining:
@@ -193,28 +346,20 @@ def publish(
                     fail("browser shard helper payload hash differs")
                 os.fsync(descriptor)
                 metadata = os.fstat(descriptor)
+                staged[-1] = (temporary, final, metadata)
             finally:
                 os.close(descriptor)
-            staged.append((temporary, final, metadata))
         if stream.read(1):
             fail("browser shard helper payload has trailing bytes")
         for temporary, final, metadata in staged[:2]:
-            os.link(temporary, final, src_dir_fd=root, dst_dir_fd=root, follow_symlinks=False)
+            rename_no_overwrite(root, temporary, final)
             promoted.append((final, metadata))
-        for temporary, _, metadata in staged[:2]:
-            if not remove_owned(root, temporary, metadata):
-                fail("foreign staged browser shard was preserved")
         os.fsync(root)
         temporary, final, metadata = staged[2]
-        os.link(temporary, final, src_dir_fd=root, dst_dir_fd=root, follow_symlinks=False)
+        rename_no_overwrite(root, temporary, final)
         promoted.append((final, metadata))
-        if not remove_owned(root, temporary, metadata):
-            fail("foreign staged browser shard was preserved")
         os.fsync(root)
-        for item in artifacts:
-            read_file(root, item)
-        if not same_root(output, root):
-            fail("browser shard output directory changed during publication")
+        coherent_read(root, output, artifacts, receipt_first=False)
     except Exception:
         for final, metadata in reversed(promoted):
             remove_owned(root, final, metadata)
@@ -232,13 +377,8 @@ def same_root(path: Path, root: int) -> bool:
         os.close(reopened)
 
 
-def read_set(
-    root: int, output: Path, artifacts: list[dict[str, object]]
-) -> bytes:
-    receipt = read_file(root, artifacts[2])
-    shards = [read_file(root, item) for item in artifacts[:2]]
-    if read_file(root, artifacts[2]) != receipt or not same_root(output, root):
-        fail("browser shard set changed before consumer handoff")
+def read_set(root: int, output: Path, artifacts: list[dict[str, object]]) -> bytes:
+    shards = coherent_read(root, output, artifacts, receipt_first=True)[:2]
     return b"".join(shards)
 
 

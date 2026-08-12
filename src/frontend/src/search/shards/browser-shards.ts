@@ -39,7 +39,11 @@ const SHARD_SET_FORMAT_VERSION = "settlement-browser-search-shard-set-v1";
 const SHARD_ORDER = ["europe-core", "europe-coastal"] as const;
 const FS_HELPER = join(process.cwd(), "scripts", "browser-shard-fs.py");
 const MAX_QUERY_CODE_POINTS = 256;
-const MAX_SEARCH_CANDIDATES = 10_000;
+const MAX_SEARCH_CANDIDATES = 128;
+const MAX_SEARCH_RESULTS = 100;
+const MAX_NAME_CODE_POINTS = 256;
+const MAX_ALTERNATE_NAMES = 1_024;
+const MAX_RECORD_NAME_CODE_POINTS = 16_384;
 const RUNTIME = {
   brotli: "1.2.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.2.12",
 } as const;
@@ -53,6 +57,54 @@ const FALSE_CLAIMS = [
   "signingClaim",
 ] as const;
 const ADMIN_FEATURE_CODES = new Set(["PPLC", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5"]);
+const INCLUDED_FEATURE_CODES = new Set([
+  "PPL", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPLA5", "PPLC", "PPLF", "PPLG", "PPLL", "PPLR",
+]);
+const DATA_PROVENANCE_CLASSES = new Set(["real-source", "synthetic-fixture"]);
+const SCRIPT_CODES = new Set([
+  "Arab", "Armn", "Beng", "Cyrl", "Deva", "Geor", "Grek", "Gujr", "Guru", "Hang", "Hani",
+  "Hebr", "Hira", "Jpan", "Kana", "Knda", "Kore", "Laoo", "Latn", "Mlym", "Mymr", "Sinh",
+  "Taml", "Telu", "Thai", "Tibt",
+]);
+const SCRIPT_MATCHERS: ReadonlyArray<readonly [string, RegExp]> = [
+  ["Arab", new RegExp("\\p{Script=Arabic}", "u")],
+  ["Armn", new RegExp("\\p{Script=Armenian}", "u")],
+  ["Beng", new RegExp("\\p{Script=Bengali}", "u")],
+  ["Cyrl", new RegExp("\\p{Script=Cyrillic}", "u")],
+  ["Deva", new RegExp("\\p{Script=Devanagari}", "u")],
+  ["Geor", new RegExp("\\p{Script=Georgian}", "u")],
+  ["Grek", new RegExp("\\p{Script=Greek}", "u")],
+  ["Gujr", new RegExp("\\p{Script=Gujarati}", "u")],
+  ["Guru", new RegExp("\\p{Script=Gurmukhi}", "u")],
+  ["Hang", new RegExp("\\p{Script=Hangul}", "u")],
+  ["Hani", new RegExp("\\p{Script=Han}", "u")],
+  ["Hebr", new RegExp("\\p{Script=Hebrew}", "u")],
+  ["Hira", new RegExp("\\p{Script=Hiragana}", "u")],
+  ["Kana", new RegExp("\\p{Script=Katakana}", "u")],
+  ["Knda", new RegExp("\\p{Script=Kannada}", "u")],
+  ["Laoo", new RegExp("\\p{Script=Lao}", "u")],
+  ["Latn", new RegExp("\\p{Script=Latin}", "u")],
+  ["Mlym", new RegExp("\\p{Script=Malayalam}", "u")],
+  ["Mymr", new RegExp("\\p{Script=Myanmar}", "u")],
+  ["Sinh", new RegExp("\\p{Script=Sinhala}", "u")],
+  ["Taml", new RegExp("\\p{Script=Tamil}", "u")],
+  ["Telu", new RegExp("\\p{Script=Telugu}", "u")],
+  ["Thai", new RegExp("\\p{Script=Thai}", "u")],
+  ["Tibt", new RegExp("\\p{Script=Tibetan}", "u")],
+];
+const LETTER = new RegExp("\\p{L}", "u");
+const ALL_COUNTRIES_LINEAGE = {
+  asset_id: "all-countries", source_file: "allCountries.txt", source_release: "2026-08-10",
+  source_sha256: "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8",
+} as const;
+const ADMIN1_LINEAGE = {
+  asset_id: "admin1-codes-ascii", source_file: "admin1CodesASCII.txt", source_release: "2026-08-10",
+  source_sha256: "34784457b76b988a669dff7c3e4b104e4902c0875643cff019281ac79dfa2992",
+} as const;
+const ALTERNATE_LINEAGE = {
+  asset_id: "alternate-names-v2", source_file: "alternateNamesV2.txt", source_release: "2026-08-10",
+  source_sha256: "63453d348543a363bbd33a461c41e769de59d293c3fd62ca408eb3e2b0b47612",
+} as const;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 export interface ShardLimits {
@@ -112,8 +164,11 @@ export type BrowserShard = {
   compression: { algorithm: "brotli"; mode: "text"; quality: 11 };
   runtime: typeof RUNTIME;
   ranking: {
+    candidateLimit: 128;
+    fuzzyDistance: "banded-levenshtein-max-2-v1";
     normalizationVersion: "unicode-nfkd-lowercase-v1";
     orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1";
+    resultLimit: 100;
   };
   merge: {
     order: readonly ["europe-core", "europe-coastal"];
@@ -121,6 +176,13 @@ export type BrowserShard = {
     resultOrder: "core-results-then-unseen-coastal-results";
   };
 };
+
+type BrowserShardRuntime = {
+  byOrdinal: Map<number, CandidateDocument>;
+  index: unknown;
+  records: Map<string, BrowserSearchRecord>;
+};
+const VALIDATED_RUNTIMES = new WeakMap<BrowserShard, BrowserShardRuntime>();
 
 export class BrowserShardError extends Error {}
 
@@ -265,6 +327,52 @@ function nullableText(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function boundedText(value: unknown, label: string, nullable = false): value is string | null {
+  if (nullable && value === null) return true;
+  if (typeof value !== "string" || !value || Array.from(value).length > MAX_NAME_CODE_POINTS
+      || value !== value.normalize("NFC")) fail(`${label} is not bounded canonical text`);
+  normalizeSearchText(value);
+  return true;
+}
+
+function calendarDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function detectedScript(value: string): string | null {
+  const scripts = new Set<string>();
+  for (const point of value.normalize("NFC")) {
+    if (!LETTER.test(point)) continue;
+    const matched = SCRIPT_MATCHERS.find(([, expression]) => expression.test(point));
+    if (matched) scripts.add(matched[0]);
+  }
+  const values = Array.from(scripts);
+  if (values.every((code) => ["Hani", "Hira", "Kana"].includes(code)) && scripts.size > 1) {
+    return "Jpan";
+  }
+  if (values.every((code) => ["Hani", "Hang"].includes(code)) && scripts.size > 1) {
+    return "Kore";
+  }
+  return scripts.size === 1 ? values[0] : null;
+}
+
+function nameMetadata(value: unknown, canonicalName: boolean): value is Record<string, unknown> {
+  if (!exactKeys(value, ["language", "script", "value"])) return false;
+  boundedText(value.value, "search projection name");
+  if (canonicalName ? value.language !== null
+    : !(value.language === null || (typeof value.language === "string" && /^[a-z]{2,3}$/.test(value.language)))) {
+    return false;
+  }
+  return (value.script === null || (typeof value.script === "string" && SCRIPT_CODES.has(value.script)))
+    && value.script === detectedScript(value.value as string);
+}
+
+function exactLineage(item: Record<string, unknown>, expected: Record<string, string>): boolean {
+  return Object.entries(expected).every(([name, value]) => item[name] === value);
+}
+
 function headerFrom(raw: Buffer): ProjectionHeader {
   const value = parseJsonLine(raw, "search projection header");
   const keys = [
@@ -278,7 +386,8 @@ function headerFrom(raw: Buffer): ProjectionHeader {
       || value.normalizationVersion !== "settlement-normalization-v2"
       || value.publicationEligible !== false
       || typeof value.dataProvenanceClass !== "string"
-      || typeof value.geometryStatus !== "string"
+      || !DATA_PROVENANCE_CLASSES.has(value.dataProvenanceClass)
+      || value.geometryStatus !== "selected-scope-approximation"
       || FALSE_CLAIMS.some((claim) => value[claim] !== false)
       || !exactKeys(value.source, [
         "spatialCandidateIdentity", "spatialDatabaseSha256", "spatialReceiptSha256",
@@ -287,7 +396,9 @@ function headerFrom(raw: Buffer): ProjectionHeader {
   assertSha(value.source.spatialCandidateIdentity, "spatial candidate identity");
   assertSha(value.source.spatialDatabaseSha256, "spatial database identity");
   assertSha(value.source.spatialReceiptSha256, "spatial receipt identity");
-  if (typeof value.source.spatialStageSchemaVersion !== "string") fail("spatial stage version differs");
+  if (value.source.spatialStageSchemaVersion !== "spatial-classification-stage-v1") {
+    fail("spatial stage version differs");
+  }
   return value as ProjectionHeader;
 }
 
@@ -306,7 +417,7 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
     "sourceUpdatedAt", "spatialClassification",
   ];
   if (!exactKeys(value, keys) || value.kind !== PROJECTION_DOCUMENT
-      || !exactKeys(value.canonicalName, ["language", "script", "value"])
+      || !nameMetadata(value.canonicalName, true)
       || !exactKeys(value.location, ["latitude", "longitude"])
       || !exactKeys(value.spatialClassification, [
         "catalogMembership", "distanceToShorelineMeters", "isCoastal",
@@ -314,9 +425,13 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
   const id = numericPlaceId(value.placeId);
   if (id <= previous) fail("search projection placeIds are not strictly ordered");
   const names = value.alternateNames;
-  if (!Array.isArray(names) || names.some((item) => !exactKeys(item, ["language", "script", "value"])
-      || typeof item.value !== "string" || !nullableText(item.language) || !nullableText(item.script))) {
+  if (!Array.isArray(names) || names.length > MAX_ALTERNATE_NAMES
+      || names.some((item) => !nameMetadata(item, false))) {
     fail("search projection alternate names differ");
+  }
+  const alternateValues = names.map((item) => item.value as string);
+  if (new Set(alternateValues).size !== alternateValues.length) {
+    fail("search projection alternate names are not unique");
   }
   const memberships = value.spatialClassification.catalogMembership;
   if (!Array.isArray(memberships)
@@ -337,29 +452,48 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
   const lineageKeys = [
     "asset_id", "source_file", "source_line", "source_record_id", "source_release", "source_sha256",
   ];
-  if (typeof value.canonicalName.value !== "string"
-      || !nullableText(value.canonicalName.language) || !nullableText(value.canonicalName.script)
-      || typeof value.sourceSpelling !== "string" || typeof value.asciiName !== "string"
+  const lineage = value.lineage;
+  const firstLineage = Array.isArray(lineage) ? lineage[0] : undefined;
+  const hasAdminLineage = Array.isArray(lineage) && lineage.length > 1
+    && exactKeys(lineage[1], lineageKeys) && exactLineage(lineage[1], ADMIN1_LINEAGE);
+  const alternateLineage = Array.isArray(lineage) ? lineage.slice(hasAdminLineage ? 2 : 1) : [];
+  const lineageIdentities = Array.isArray(lineage)
+    ? lineage.map((item) => canonical(item)) : [];
+  if (value.canonicalName.value !== value.sourceSpelling
+      || !boundedText(value.sourceSpelling, "search projection source spelling")
+      || !boundedText(value.asciiName, "search projection ASCII name")
       || typeof value.countryCode !== "string" || !/^[A-Z]{2}$/.test(value.countryCode)
       || !nullableText(value.admin1Code)
-      || (typeof value.admin1Code === "string" && !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value.admin1Code))
-      || !(value.admin1Name === null || typeof value.admin1Name === "string")
-      || typeof featureCode !== "string" || !/^[A-Z][A-Z0-9]*$/.test(featureCode)
-      || typeof value.sourceUpdatedAt !== "string"
-      || !/^\d{4}-\d{2}-\d{2}$/.test(value.sourceUpdatedAt)
-      || !Array.isArray(value.lineage) || !value.lineage.length
-      || value.lineage.some((item) => !exactKeys(item, lineageKeys)
+      || (typeof value.admin1Code === "string"
+        && (!value.admin1Code || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value.admin1Code)))
+      || !boundedText(value.admin1Name, "search projection admin1 name", true)
+      || (value.admin1Name !== null && (value.admin1Code === null || !hasAdminLineage))
+      || typeof featureCode !== "string" || !INCLUDED_FEATURE_CODES.has(featureCode)
+      || !calendarDate(value.sourceUpdatedAt)
+      || !Array.isArray(lineage) || !lineage.length
+      || lineage.some((item) => !exactKeys(item, lineageKeys)
         || typeof item.asset_id !== "string" || typeof item.source_file !== "string"
         || typeof item.source_release !== "string" || typeof item.source_sha256 !== "string"
         || !/^[0-9a-f]{64}$/.test(item.source_sha256)
         || !Number.isSafeInteger(item.source_line) || (item.source_line as number) < 1
         || !Number.isSafeInteger(item.source_record_id) || (item.source_record_id as number) < 1)
+      || !exactKeys(firstLineage, lineageKeys) || !exactLineage(firstLineage, ALL_COUNTRIES_LINEAGE)
+      || BigInt(firstLineage.source_record_id as number) !== id
+      || (value.admin1Name === null && hasAdminLineage)
+      || alternateLineage.length !== names.length
+      || alternateLineage.some((item) => !exactKeys(item, lineageKeys)
+        || !exactLineage(item, ALTERNATE_LINEAGE))
+      || new Set(lineageIdentities).size !== lineageIdentities.length
       || !(population === null || (Number.isSafeInteger(population) && (population as number) >= 0))
       || typeof latitude !== "number" || latitude < -90 || latitude > 90
       || typeof longitude !== "number" || longitude < -180 || longitude > 180
       || !Number.isSafeInteger(distance) || (distance as number) < 0) {
     fail("search projection document values differ");
   }
+  const namePoints = ([(value.canonicalName.value as string), value.sourceSpelling as string,
+    value.asciiName as string, ...alternateValues, (value.admin1Name ?? "") as string])
+    .reduce<number>((total, item) => total + Array.from(item).length, 0);
+  if (namePoints > MAX_RECORD_NAME_CODE_POINTS) fail("search projection names exceed their record limit");
   const searchNames = Array.from(new Set([
     value.sourceSpelling,
     value.asciiName,
@@ -372,7 +506,7 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
     memberships: memberships as ShardId[],
     record: {
       placeId: value.placeId as string,
-      displayName: value.canonicalName.value,
+      displayName: value.canonicalName.value as string,
       searchNames,
       countryCode: value.countryCode,
       admin1Name: value.admin1Name as string | null,
@@ -501,8 +635,11 @@ function shardRaw(projection: ParsedProjection, shardId: ShardId, limits: Readon
     compression: { algorithm: "brotli", mode: "text", quality: 11 },
     runtime: RUNTIME,
     ranking: {
+      candidateLimit: MAX_SEARCH_CANDIDATES,
+      fuzzyDistance: "banded-levenshtein-max-2-v1",
       normalizationVersion: "unicode-nfkd-lowercase-v1",
       orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
+      resultLimit: MAX_SEARCH_RESULTS,
     },
     merge: {
       order: SHARD_ORDER,
@@ -632,8 +769,11 @@ export function decodeBrowserShard(
       || canonical(value.compression) !== canonical({ algorithm: "brotli", mode: "text", quality: 11 })
       || canonical(value.runtime) !== canonical(RUNTIME)
       || canonical(value.ranking) !== canonical({
+        candidateLimit: MAX_SEARCH_CANDIDATES,
+        fuzzyDistance: "banded-levenshtein-max-2-v1",
         normalizationVersion: "unicode-nfkd-lowercase-v1",
         orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
+        resultLimit: MAX_SEARCH_RESULTS,
       })
       || canonical(value.merge) !== canonical({
         order: SHARD_ORDER, deduplicateBy: "placeId",
@@ -643,11 +783,13 @@ export function decodeBrowserShard(
         "projectionSha256", "spatialCandidateIdentity", "spatialDatabaseSha256",
         "spatialReceiptSha256", "spatialStageSchemaVersion",
       ]) || value.source.projectionSchemaVersion !== PROJECTION_SCHEMA_VERSION
-      || typeof value.source.spatialStageSchemaVersion !== "string"
+      || value.source.spatialStageSchemaVersion !== "spatial-classification-stage-v1"
       || Object.entries(value.source).some(([name, item]) =>
         name !== "projectionSchemaVersion" && name !== "spatialStageSchemaVersion"
           && (typeof item !== "string" || !/^[0-9a-f]{64}$/.test(item))
-      ) || typeof value.dataProvenanceClass !== "string" || typeof value.geometryStatus !== "string"
+      ) || typeof value.dataProvenanceClass !== "string"
+      || !DATA_PROVENANCE_CLASSES.has(value.dataProvenanceClass)
+      || value.geometryStatus !== "selected-scope-approximation"
       || !Array.isArray(value.records) || value.recordCount !== value.records.length
       || !Number.isSafeInteger(value.recordCount) || (value.recordCount as number) > limits.maxRecords) {
     fail("search shard format, engine, claims, or merge contract differs");
@@ -664,19 +806,25 @@ export function decodeBrowserShard(
   let previous = BigInt(0);
   shard.records.forEach((record, index) => {
     const numericId = numericPlaceId(record.placeId);
-    if (record.ordinal !== index + 1 || typeof record.displayName !== "string"
+    if (record.ordinal !== index + 1
+        || !boundedText(record.displayName, "search shard display name")
         || !Array.isArray(record.searchNames)
-        || record.searchNames.some((name) => typeof name !== "string")
-        || typeof record.countryCode !== "string"
-        || !(record.admin1Name === null || typeof record.admin1Name === "string")
+        || record.searchNames.length > MAX_ALTERNATE_NAMES + 2
+        || record.searchNames.some((name) => !boundedText(name, "search shard search name"))
+        || new Set(record.searchNames).size !== record.searchNames.length
+        || typeof record.countryCode !== "string" || !/^[A-Z]{2}$/.test(record.countryCode)
+        || !boundedText(record.admin1Name, "search shard admin1 name", true)
         || !(record.population === null
           || (Number.isSafeInteger(record.population) && record.population >= 0))
-        || typeof record.featureCode !== "string"
+        || typeof record.featureCode !== "string" || !INCLUDED_FEATURE_CODES.has(record.featureCode)
         || !Number.isSafeInteger(record.distanceToCoastMeters)
         || record.distanceToCoastMeters < 0 || typeof record.isCoastal !== "boolean"
         || typeof record.latitude !== "number" || record.latitude < -90 || record.latitude > 90
         || numericId <= previous || typeof record.longitude !== "number" || record.longitude < -180
         || record.longitude > 180) fail("search shard record values differ");
+    const namePoints = [record.displayName, ...record.searchNames, record.admin1Name ?? ""]
+      .reduce((total, item) => total + Array.from(item).length, 0);
+    if (namePoints > MAX_RECORD_NAME_CODE_POINTS) fail("search shard names exceed their record limit");
     previous = numericId;
   });
   if (sha256(canonical(shard.records)) !== shard.recordsSha256) fail("search shard record hash differs");
@@ -694,9 +842,14 @@ export function decodeBrowserShard(
     miniSearchAdapter.serialize(miniSearchAdapter.build(documents, identity))
   );
   if (!actualIndex.equals(expectedIndex)) fail("search shard index differs from its exact records");
-  miniSearchAdapter.deserialize(
+  const index = miniSearchAdapter.deserialize(
     actualIndex, documents, identity,
   );
+  VALIDATED_RUNTIMES.set(shard, {
+    byOrdinal: new Map(documents.map((document) => [document.ordinal, document])),
+    index,
+    records: new Map(shard.records.map(({ ordinal: _, ...record }) => [record.placeId, record])),
+  });
   return shard;
 }
 
@@ -752,22 +905,21 @@ export function loadBrowserSearchShards(
 
 export function searchBrowserShard(shard: BrowserShard, query: string): BrowserSearchRecord[] {
   if (Array.from(query).length > MAX_QUERY_CODE_POINTS) fail("browser search query exceeds its limit");
-  const documents = candidateDocuments(shard);
-  const records = new Map(shard.records.map((record) => [record.placeId, record]));
-  const restored = miniSearchAdapter.deserialize(
-    Buffer.from(shard.indexBase64, "base64"), documents,
-    { evaluationId: "browser-search-shard-v1", shardId: shard.shardId },
-  );
-  const byOrdinal = new Map(documents.map((document) => [document.ordinal, document]));
-  const matches = miniSearchAdapter.search(restored, query, Math.min(documents.length, MAX_SEARCH_CANDIDATES))
-    .map((ordinal) => byOrdinal.get(ordinal)).filter((item): item is CandidateDocument => item !== undefined);
-  return rankDocuments(query, matches).map(({ record }) => records.get(record.placeId)!);
+  const runtime = VALIDATED_RUNTIMES.get(shard);
+  if (!runtime) fail("browser search shard was not validated by its decoder");
+  const matches = miniSearchAdapter.search(runtime.index, query, MAX_SEARCH_CANDIDATES)
+    .map((ordinal) => runtime.byOrdinal.get(ordinal))
+    .filter((item): item is CandidateDocument => item !== undefined);
+  return rankDocuments(query, matches).slice(0, MAX_SEARCH_RESULTS)
+    .map(({ record }) => runtime.records.get(record.placeId)!);
 }
 
 export function mergeCoreFirst<T extends { placeId: string }>(
   core: readonly T[], coastal: readonly T[], limit: number
 ): T[] {
   positiveLimit(limit, "merge result limit");
+  if (limit > MAX_SEARCH_RESULTS || core.length > MAX_SEARCH_RESULTS
+      || coastal.length > MAX_SEARCH_RESULTS) fail("browser merge exceeds its result cap");
   const result: T[] = [];
   const seen = new Set<string>();
   for (const [label, values] of [["core", core], ["coastal", coastal]] as const) {

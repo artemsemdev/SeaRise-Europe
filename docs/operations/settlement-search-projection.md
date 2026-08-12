@@ -33,6 +33,21 @@ deterministic rank and deduplicating solely by `placeId`. Package,
 serialization, runtime, format, source, ordering, membership, record, index, or
 compressed-byte drift fails closed. Projection, line, record, raw shard,
 compressed shard, query, and search-candidate limits are hard upper bounds.
+The parser also retains the producer's exact source identities, lineage order,
+calendar dates, feature-code set, source/canonical-name relationship,
+language/script metadata, geometry status, and spatial-stage version. Empty
+membership remains valid for an internal audit record, but such a record is not
+written to either browser shard.
+
+The pinned 2026-08-10 source scan observed maximum source/ASCII and alternate
+name lengths of 180 and 200 Unicode code points, respectively, at most 835
+alternate rows for one place, and at most 7,354 aggregate alternate-name code
+points for one place. The browser boundary deliberately rounds these upward to
+256 code points per name, 1,024 alternates, and 16,384 aggregate name code
+points per record. A query is limited to 256 code points, MiniSearch may hand at
+most 128 candidates to bounded edit-distance ranking, and the public search helper
+returns at most 100 results. These are versioned safety bounds, not claims about
+GeoNames completeness.
 
 ```bash
 cd src/frontend
@@ -44,17 +59,24 @@ node --import tsx scripts/build-settlement-search-shards.ts validate \
 
 On macOS or Linux with Python 3.9 or newer, the builder performs stable
 descriptor-bound reads, bounded Brotli decompression, exclusive descriptor-
-relative staging, and no-overwrite promotion through a held output directory.
-It syncs both final single-link shards before linking and syncing
+relative staging, and no-overwrite promotion through a held owner-controlled
+output directory.
+It syncs both final single-link shards before atomically promoting and syncing
 `settlement-browser-search-shards.receipt.json` as the canonical completion
-marker. Failures remove only owned inodes through the held descriptor and sync
-the rollback; a replacement path or foreign inode is never removed.
+marker. Cleanup never unlinks a pathname: it uses atomic exchange with a held,
+owned placeholder and retains owned artifacts under high-entropy diagnostic
+hidden names. A replacement or collision is restored or retained under another
+diagnostic hidden name; a foreign inode is never deleted. Every created staging
+entry is registered before payload I/O, so write, hash, sync, metadata, or close
+failure leaves at most bounded diagnostic residue and no owned public final name.
 
 Consumers must treat the set as absent until that exact receipt exists. Use
 `loadBrowserSearchShards` for the receipt-gated handoff: it opens the output root
 component by component without following symlinks, reads the receipt first,
 reads both exact single-link shards through that descriptor, rereads the receipt
-last, rechecks the root, and returns the held bytes with their decoded shards.
+last, then performs a final all-descriptor, all-path, and output-root identity
+pass. Successful publication and loading are point-in-time linearized at that
+final pass; they are not a lease on paths after the function returns.
 Downstream code must use those returned objects rather than reopen artifact
 paths. These candidate shards do not provide the Web Worker, production-scale
 benchmarks, or publication approval required by the consumer frontend issue.

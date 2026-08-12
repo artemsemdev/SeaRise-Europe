@@ -7,7 +7,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { miniSearchAdapter } from "../evaluation/adapters";
+import { prepareCandidateDocuments, rankDocuments } from "../evaluation/search";
 import {
   BrowserShardError,
   DEFAULT_SHARD_LIMITS,
@@ -53,6 +55,27 @@ function build(): { output: string; core: Buffer; coastal: Buffer } {
   };
 }
 
+function projectionFrom(
+  mutate: (header: Record<string, unknown>, documents: Array<Record<string, any>>) => void,
+): { projection: string; output: string } {
+  const values = readFileSync(fixture, "utf8").trimEnd().split("\n").map((line) => JSON.parse(line));
+  const header = values[0] as Record<string, unknown>;
+  const documents = values.slice(1, -1) as Array<Record<string, any>>;
+  mutate(header, documents);
+  const lines = documents.map((document) => canonicalJson(document));
+  const documentsSha256 = digest(lines.map((line) => `${line}\n`).join(""));
+  const footer = {
+    deterministicIdentity: digest(`${canonicalJson({
+      documentsSha256, header, recordCount: documents.length,
+    })}\n`), documentsSha256, kind: "settlement-search-projection-footer",
+    recordCount: documents.length,
+  };
+  const root = temporary(); const projection = join(root, "projection.ndjson");
+  const output = join(root, "output"); mkdirSync(output);
+  writeFileSync(projection, `${[canonicalJson(header), ...lines, canonicalJson(footer)].join("\n")}\n`);
+  return { projection, output };
+}
+
 describe("receipt-bound browser search shards", () => {
   it("builds deterministic Brotli MiniSearch shards with exact false claims", () => {
     const first = build();
@@ -94,7 +117,36 @@ describe("receipt-bound browser search shards", () => {
       .toEqual(["geonames:104"]);
     expect(() => mergeCoreFirst([...coreMatches, ...coreMatches], coastalMatches, 5))
       .toThrow(/core results contain a duplicate/);
+    expect(() => mergeCoreFirst(coreMatches, coastalMatches, 101)).toThrow(/result cap/);
     expect(() => searchBrowserShard(core, "x".repeat(257))).toThrow(/query exceeds/);
+  });
+
+  it("reuses decoded runtime state and rejects unvalidated structural copies", () => {
+    const built = build();
+    const core = decodeBrowserShard(built.core, "europe-core");
+    const deserialize = vi.spyOn(miniSearchAdapter, "deserialize");
+    const prepare = vi.spyOn(miniSearchAdapter, "build");
+    try {
+      expect(searchBrowserShard(core, "alpha")).toHaveLength(1);
+      expect(searchBrowserShard(core, "charlie")).toHaveLength(1);
+      expect(deserialize).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
+      expect(() => searchBrowserShard(structuredClone(core), "alpha")).toThrow(/not validated/);
+    } finally {
+      deserialize.mockRestore(); prepare.mockRestore();
+    }
+  });
+
+  it("bounds fuzzy distance work for many long alternate names", () => {
+    const candidates = prepareCandidateDocuments(Array.from({ length: 100 }, (_, index) => ({
+      placeId: `synthetic:${index + 100}`,
+      displayName: `${"q".repeat(250)}${index}`,
+      searchNames: Array.from({ length: 64 }, (_, alternate) =>
+        `${"z".repeat(248)}${String(alternate).padStart(2, "0")}`),
+      countryCode: "AA", admin1Name: null, population: 1, featureCode: "PPL",
+      distanceToCoastMeters: 1, isCoastal: false,
+    })));
+    expect(rankDocuments("x".repeat(250), candidates)).toEqual([]);
   });
 
   it("hands receipt-gated decoded bytes to the consumer without reopening paths", () => {
@@ -168,9 +220,109 @@ describe("receipt-bound browser search shards", () => {
       const root = temporary(); const projection = join(root, "projection.ndjson");
       const output = join(root, "output"); mkdirSync(output);
       writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
-      expect(() => buildBrowserSearchShards(projection, output)).toThrow(/document values/);
+      expect(() => buildBrowserSearchShards(projection, output)).toThrow(/document (fields|values)/);
     }
   );
+
+  it.each([
+    "calendar-date", "feature-code", "empty-ascii", "empty-admin", "duplicate-alternate",
+    "canonical-language", "script", "source-spelling", "first-lineage-id", "lineage-pin",
+    "lineage-order", "missing-alternate-lineage", "provenance", "geometry", "stage-version",
+  ])("rejects producer-impossible or public-contract-invalid %s semantics", (mutation) => {
+    const { projection, output } = projectionFrom((header, documents) => {
+      const document = documents[0];
+      if (mutation === "calendar-date") document.sourceUpdatedAt = "2026-99-99";
+      if (mutation === "feature-code") document.featureCode = "PPLX";
+      if (mutation === "empty-ascii") document.asciiName = "";
+      if (mutation === "empty-admin") document.admin1Name = "";
+      if (mutation === "duplicate-alternate") {
+        document.alternateNames.push(structuredClone(document.alternateNames[0]));
+        document.lineage.push({ ...document.lineage.at(-1), source_line: 9101, source_record_id: 9101 });
+      }
+      if (mutation === "canonical-language") document.canonicalName.language = "en";
+      if (mutation === "script") document.canonicalName.script = "Cyrl";
+      if (mutation === "source-spelling") document.sourceSpelling = "Different";
+      if (mutation === "first-lineage-id") document.lineage[0].source_record_id = 999;
+      if (mutation === "lineage-pin") document.lineage[0].source_sha256 = "0".repeat(64);
+      if (mutation === "lineage-order") [document.lineage[0], document.lineage[1]] = [
+        document.lineage[1], document.lineage[0],
+      ];
+      if (mutation === "missing-alternate-lineage") document.lineage.pop();
+      if (mutation === "provenance") header.dataProvenanceClass = "unknown";
+      if (mutation === "geometry") header.geometryStatus = "canonical";
+      if (mutation === "stage-version") {
+        (header.source as Record<string, unknown>).spatialStageSchemaVersion = "unknown";
+      }
+    });
+    expect(() => buildBrowserSearchShards(projection, output)).toThrow(BrowserShardError);
+    expect(() => statSync(join(output, SHARD_FILENAMES["europe-core"]))).toThrow();
+  });
+
+  it("preserves an intentional empty internal-audit membership", () => {
+    const { projection, output } = projectionFrom((_header, documents) => {
+      documents[0].population = null;
+      documents[0].spatialClassification.catalogMembership = [];
+    });
+    expect(() => buildBrowserSearchShards(projection, output)).not.toThrow();
+  });
+
+  it.each(["single-name", "alternate-count", "record-names"])(
+    "enforces the corpus-derived %s resource bound", (mutation) => {
+      const { projection, output } = projectionFrom((_header, documents) => {
+        const document = documents[0];
+        if (mutation === "single-name") {
+          document.sourceSpelling = "A".repeat(257);
+          document.canonicalName.value = document.sourceSpelling;
+          document.asciiName = document.sourceSpelling;
+        } else {
+          const count = mutation === "alternate-count" ? 1025 : 65;
+          document.alternateNames = Array.from({ length: count }, (_, index) => ({
+            language: "en", script: "Latn", value: `${"A".repeat(250)}${String(index).padStart(6, "0")}`,
+          }));
+          document.lineage = [document.lineage[0], document.lineage[1],
+            ...Array.from({ length: count }, (_, index) => ({
+              ...document.lineage[2], source_line: 20_000 + index, source_record_id: 20_000 + index,
+            }))];
+        }
+      });
+      expect(() => buildBrowserSearchShards(projection, output)).toThrow(/limit|bounded|alternate/);
+    }
+  );
+
+  it("caps returned results independently of the candidate-search cap", () => {
+    const { projection, output } = projectionFrom((_header, documents) => {
+      const template = documents[0];
+      documents.splice(0, documents.length, ...Array.from({ length: 101 }, (_, index) => {
+        const id = 1000 + index;
+        const document = structuredClone(template);
+        document.placeId = `geonames:${id}`;
+        document.sourceSpelling = `Common Place ${id}`;
+        document.canonicalName.value = document.sourceSpelling;
+        document.asciiName = document.sourceSpelling;
+        document.alternateNames = [];
+        document.lineage = [{
+          ...document.lineage[0], source_line: id, source_record_id: id,
+        }, { ...document.lineage[1], source_line: id + 10_000, source_record_id: id + 10_000 }];
+        return document;
+      }));
+    });
+    buildBrowserSearchShards(projection, output);
+    const loaded = loadBrowserSearchShards(projection, output);
+    expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
+  });
+
+  it("applies public-contract value checks when decoding standalone shards", () => {
+    const built = build();
+    for (const mutation of ["feature", "provenance"] as const) {
+      const value = JSON.parse(brotliDecompressSync(built.core).toString("utf8"));
+      if (mutation === "feature") {
+        value.records[0].featureCode = "PPLX";
+        value.recordsSha256 = digest(canonicalJson(value.records));
+      } else value.dataProvenanceClass = "unknown";
+      expect(() => decodeBrowserShard(canonicalBrotli(Buffer.from(canonicalJson(value))), "europe-core"))
+        .toThrow(BrowserShardError);
+    }
+  });
 
   it.each([[50, "50.0"], [0.00001, "1e-05"]])(
     "accepts producer-canonical coordinate %s encoded as %s", (coordinate, encoded) => {
