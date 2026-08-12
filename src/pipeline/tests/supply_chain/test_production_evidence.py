@@ -9,6 +9,7 @@ import os
 import runpy
 import shutil
 from pathlib import Path, PurePosixPath
+from types import SimpleNamespace
 from typing import Mapping
 
 import pytest
@@ -108,8 +109,14 @@ def test_finalizes_real_source_evidence_with_only_preverification_nonclaims(tmp_
     evidence = tmp_path / "evidence"
     envelope = _load(evidence / "evidence-envelope.json")
     provenance = _load(evidence / "provenance.intoto.jsonl")
+    published = {
+        PurePosixPath(path.relative_to(evidence).as_posix()): path.read_bytes()
+        for path in evidence.rglob("*")
+        if path.is_file()
+    }
 
     assert summary.evidence_root == evidence.absolute()
+    assert summary.evidence_sha256 == production_evidence._evidence_sha256(published)
     assert summary.sbom_count == 10
     assert envelope["dataProvenanceClass"] == "real-source"
     assert envelope["verification"] == {
@@ -550,10 +557,9 @@ def test_complete_stage_tree_revalidation_rejects_late_mutation(
             )
             os.close(descriptor)
         else:
-            os.unlink(logical.name, dir_fd=stage_descriptor)
             if mutation == "replacement":
                 descriptor = os.open(
-                    logical.name,
+                    ".distinct-replacement",
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL,
                     0o400,
                     dir_fd=stage_descriptor,
@@ -567,6 +573,14 @@ def test_complete_stage_tree_revalidation_rejects_late_mutation(
                     os.fsync(descriptor)
                 finally:
                     os.close(descriptor)
+                os.replace(
+                    ".distinct-replacement",
+                    logical.name,
+                    src_dir_fd=stage_descriptor,
+                    dst_dir_fd=stage_descriptor,
+                )
+            else:
+                os.unlink(logical.name, dir_fd=stage_descriptor)
         original(
             parent,
             parent_identity,
@@ -592,7 +606,7 @@ def test_complete_stage_tree_revalidation_rejects_late_mutation(
     assert not (tmp_path / "evidence").exists()
 
 
-@pytest.mark.parametrize("mutation", ["extra", "missing", "replacement"])
+@pytest.mark.parametrize("mutation", ["extra", "missing", "replacement", "root-mode"])
 def test_complete_published_tree_revalidation_rejects_post_rename_mutation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -606,19 +620,25 @@ def test_complete_published_tree_revalidation_rejects_post_rename_mutation(
         original(parent, source, destination)
         if destination != output.name:
             return
+        if mutation == "root-mode":
+            os.chmod(output, 0o755)
+            return
         if mutation == "extra":
             (output / "foreign-after-rename").write_text("unvalidated", encoding="utf-8")
             os.chmod(output / "foreign-after-rename", 0o400)
             return
         target = output / "manifest.sigstore.json"
         raw = target.read_bytes()
-        target.unlink()
         if mutation == "replacement":
-            target.write_bytes(raw)
-            target.chmod(0o400)
+            replacement = tmp_path / "distinct-replacement"
+            replacement.write_bytes(raw)
+            replacement.chmod(0o400)
+            replacement.replace(target)
+        else:
+            target.unlink()
 
     monkeypatch.setattr(production_evidence, "_rename_exclusive", mutate)
-    with pytest.raises(SupplyChainContractError, match="evidence tree"):
+    with pytest.raises(SupplyChainContractError, match="evidence"):
         finalize_production_evidence(
             candidate,
             repository_root=ROOT,
@@ -632,6 +652,104 @@ def test_complete_published_tree_revalidation_rejects_post_rename_mutation(
         len([path for path in tmp_path.iterdir() if path.name.startswith(".evidence-incomplete-")])
         == 1
     )
+
+
+def test_bounded_descriptor_enumeration_stops_before_unbounded_materialization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    yielded = 0
+
+    class Entries:
+        def __enter__(self) -> Entries:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def __iter__(self):  # type: ignore[no-untyped-def]
+            nonlocal yielded
+            for index in range(10_000):
+                yielded += 1
+                yield SimpleNamespace(name=f"entry-{index}")
+
+    descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    monkeypatch.setattr(production_evidence.os, "scandir", lambda _descriptor: Entries())
+    try:
+        with pytest.raises(SupplyChainContractError, match="entry limit"):
+            production_evidence._bounded_names(descriptor, maximum=3, label="probe")
+    finally:
+        os.close(descriptor)
+    assert yielded == 4
+
+
+def test_enumeration_memory_failure_is_a_contract_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+
+    def fail(_descriptor: int) -> object:
+        raise MemoryError("injected bounded enumeration failure")
+
+    monkeypatch.setattr(production_evidence.os, "scandir", fail)
+    try:
+        with pytest.raises(SupplyChainContractError, match="bounded evidence tree"):
+            production_evidence._bounded_names(descriptor, maximum=1, label="evidence tree")
+    finally:
+        os.close(descriptor)
+
+
+def test_owned_final_path_is_quarantined_without_parent_scan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "evidence"
+    output.mkdir(mode=0o700)
+    parent = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    expected = os.stat(output, follow_symlinks=False)
+    monkeypatch.setattr(
+        production_evidence,
+        "_bounded_names",
+        lambda *_args, **_kwargs: pytest.fail("owned final path must not scan its parent"),
+    )
+    try:
+        residue = production_evidence._move_owned_to_residue(parent, expected, output.name)
+    finally:
+        os.close(parent)
+    assert residue is not None
+    assert not output.exists()
+    assert (tmp_path / residue).is_dir()
+
+
+def test_replacement_after_publish_is_rejected_and_foreign_path_is_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path / "inputs")
+    output = (tmp_path / "evidence").absolute()
+    owned = tmp_path / "owned-after-publish"
+    original = production_evidence._publish
+
+    def replace(*args: object) -> None:
+        original(*args)  # type: ignore[arg-type]
+        output.rename(owned)
+        output.mkdir(mode=0o700)
+        (output / "foreign").write_text("preserve", encoding="utf-8")
+
+    monkeypatch.setattr(production_evidence, "_publish", replace)
+    with pytest.raises(SupplyChainContractError, match="durable checkpoint"):
+        finalize_production_evidence(
+            candidate,
+            repository_root=ROOT,
+            controlled_build_run_id=RUN_ID,
+            manifest_bundle=manifest_bundle.absolute(),
+            provenance_bundle=provenance_bundle.absolute(),
+            output_root=output,
+        )
+    assert (output / "foreign").read_text(encoding="utf-8") == "preserve"
+    assert not owned.exists()
+    residues = [
+        path for path in tmp_path.iterdir() if path.name.startswith(".evidence-incomplete-")
+    ]
+    assert len(residues) == 1
+    assert (residues[0] / "evidence-envelope.json").is_file()
 
 
 @pytest.mark.parametrize("foreign_replacement", [False, True])

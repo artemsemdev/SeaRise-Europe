@@ -59,14 +59,17 @@ _MAX_DEPENDENCY_BYTES = 16 * 1024 * 1024
 _MAX_SBOM_BYTES = 8 * 1024 * 1024
 _MAX_TOTAL_READ_BYTES = 128 * 1024 * 1024
 _MAX_DISCOVERY_ENTRIES = 100_000
+_MAX_DEPENDENCY_PATHS = 256
+_MAX_QUARANTINE_ENTRIES = 4_096
 
 
 @dataclass(frozen=True)
 class ProductionEvidenceSummary:
-    """Exact immutable evidence published without outcome claims."""
+    """Evidence identity committed at the durable publication checkpoint."""
 
     candidate_id: str
     evidence_root: Path
+    evidence_sha256: str
     provenance_sha256: str
     sbom_count: int
 
@@ -87,7 +90,10 @@ class _TreeRecord:
     device: int
     inode: int
     mode: int
+    links: int
     size: int
+    modified_ns: int
+    changed_ns: int
     sha256: str | None
 
 
@@ -113,9 +119,37 @@ def _same(left: os.stat_result, right: os.stat_result) -> bool:
     return (left.st_dev, left.st_ino, left.st_mode) == (right.st_dev, right.st_ino, right.st_mode)
 
 
+def _same_inode(left: os.stat_result, right: os.stat_result) -> bool:
+    return (left.st_dev, left.st_ino) == (right.st_dev, right.st_ino)
+
+
 def _same_file(left: os.stat_result, right: os.stat_result) -> bool:
-    fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+    fields = (
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_nlink",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+    )
     return all(getattr(left, field) == getattr(right, field) for field in fields)
+
+
+def _bounded_names(directory: int, *, maximum: int, label: str) -> tuple[str, ...]:
+    """Stream at most ``maximum`` descriptor-bound names, then sort that bounded set."""
+    names: list[str] = []
+    try:
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if len(names) >= maximum:
+                    _fail(f"{label} entry limit exceeded")
+                names.append(entry.name)
+        return tuple(sorted(names))
+    except SupplyChainContractError:
+        raise
+    except (MemoryError, OSError, OverflowError) as exc:
+        raise SupplyChainContractError(f"could not enumerate bounded {label}") from exc
 
 
 def _logical(value: object, label: str) -> PurePosixPath:
@@ -309,16 +343,13 @@ def _discover_source_dependencies(
         if not stat.S_ISDIR(before.st_mode):
             _fail("repository discovery root must remain a directory")
         records[prefix] = _source_record(before)
-        try:
-            names = sorted(os.listdir(directory))
-        except OSError as exc:
-            raise SupplyChainContractError(
-                "could not enumerate descriptor-bound repository discovery"
-            ) from exc
+        names = _bounded_names(
+            directory,
+            maximum=_MAX_DISCOVERY_ENTRIES - visited,
+            label="repository discovery",
+        )
+        visited += len(names)
         for name in names:
-            visited += 1
-            if visited > _MAX_DISCOVERY_ENTRIES:
-                _fail("repository discovery entry limit exceeded")
             logical = _logical(PurePosixPath(*prefix, name).as_posix(), "repository discovery")
             if name in _IGNORED_DEPENDENCY_PARTS:
                 continue
@@ -351,6 +382,8 @@ def _discover_source_dependencies(
                 if not stat.S_ISREG(linked.st_mode):
                     _fail(f"dependency input must be a regular file: {logical}")
                 discovered.append(logical)
+                if len(discovered) > _MAX_DEPENDENCY_PATHS:
+                    _fail("repository dependency path limit exceeded")
                 records[child_path] = _source_record(linked)
         after = os.fstat(directory)
         if not _same_file(before, after):
@@ -417,7 +450,9 @@ def _repository_snapshots(
             if _component_for_input(logical) != component_id or _role_for_input(logical) != role:
                 _fail(f"dependency input classification is invalid: {logical}")
         dependency_paths = tuple(record[2] for record in dependency_records)
-        if len(dependency_paths) > 256 or len(dependency_paths) != len(set(dependency_paths)):
+        if len(dependency_paths) > _MAX_DEPENDENCY_PATHS or len(dependency_paths) != len(
+            set(dependency_paths)
+        ):
             _fail("dependency input inventory contains an unsafe path count or duplicate")
         discovered, source_baseline = _discover_source_dependencies(descriptor)
         if discovered != tuple(sorted(dependency_paths)):
@@ -477,6 +512,14 @@ def _repository_snapshots(
 
 def _descriptor(path: str, raw: bytes, **fields: object) -> dict[str, object]:
     return {"path": path, "sha256": _sha256(raw), "byteSize": len(raw), **fields}
+
+
+def _evidence_sha256(files: Mapping[PurePosixPath, bytes]) -> str:
+    inventory = [
+        _descriptor(logical.as_posix(), files[logical])
+        for logical in sorted(files, key=lambda item: item.as_posix())
+    ]
+    return _sha256(canonical_provenance_bytes({"files": inventory}))
 
 
 def _envelope(
@@ -635,7 +678,10 @@ def _record(value: os.stat_result, kind: str, sha256: str | None = None) -> _Tre
         device=value.st_dev,
         inode=value.st_ino,
         mode=value.st_mode,
+        links=value.st_nlink,
         size=value.st_size,
+        modified_ns=value.st_mtime_ns,
+        changed_ns=value.st_ctime_ns,
         sha256=sha256,
     )
 
@@ -645,6 +691,7 @@ def _validate_tree(
     expected: Mapping[PurePosixPath, bytes],
     *,
     baseline: Mapping[tuple[str, ...], _TreeRecord] | None = None,
+    allow_root_rename: bool = False,
 ) -> Mapping[tuple[str, ...], _TreeRecord]:
     expected_files = {tuple(logical.parts): raw for logical, raw in expected.items()}
     if len(expected_files) != len(expected):
@@ -664,10 +711,13 @@ def _validate_tree(
             for parts in (*expected_directories, *expected_files)
             if len(parts) == len(prefix) + 1 and parts[: len(prefix)] == prefix
         }
-        try:
-            actual_names = set(os.listdir(directory))
-        except OSError as exc:
-            raise SupplyChainContractError("could not enumerate descriptor-bound evidence") from exc
+        actual_names = set(
+            _bounded_names(
+                directory,
+                maximum=len(expected_names),
+                label="evidence tree",
+            )
+        )
         if actual_names != expected_names:
             _fail("evidence tree contains a foreign or missing entry")
         for name in sorted(expected_names):
@@ -726,8 +776,28 @@ def _validate_tree(
                 os.close(child)
 
     walk(root, ())
-    if baseline is not None and records != baseline:
-        _fail("evidence tree device, inode, mode, size, or SHA-256 changed")
+    if baseline is not None:
+        comparable = records
+        if allow_root_rename and () in records and () in baseline:
+            comparable = dict(records)
+            current_root = records[()]
+            original_root = baseline[()]
+            comparable[()] = _TreeRecord(
+                kind=current_root.kind,
+                device=current_root.device,
+                inode=current_root.inode,
+                mode=current_root.mode,
+                links=current_root.links,
+                size=current_root.size,
+                modified_ns=original_root.modified_ns,
+                changed_ns=original_root.changed_ns,
+                sha256=current_root.sha256,
+            )
+        if comparable != baseline:
+            _fail(
+                "evidence tree device, inode, mode, link count, size, timestamps, or SHA-256 "
+                "changed"
+            )
     return records
 
 
@@ -751,6 +821,33 @@ def _rename_exclusive(parent: int, source: str, destination: str) -> None:
         if error == 17:
             _fail("output evidence root already exists")
         raise OSError(error, os.strerror(error))
+
+
+def _require_published_tree(
+    parent: int,
+    expected_stage: os.stat_result,
+    stage_descriptor: int,
+    expected_tree: Mapping[PurePosixPath, bytes],
+    baseline: Mapping[tuple[str, ...], _TreeRecord],
+    output_name: str,
+) -> None:
+    try:
+        published = os.stat(output_name, dir_fd=parent, follow_symlinks=False)
+    except OSError as exc:
+        raise SupplyChainContractError(
+            "published evidence pathname is unavailable at the durable checkpoint"
+        ) from exc
+    if not _same(expected_stage, published):
+        _fail("published evidence directory identity changed at the durable checkpoint")
+    _validate_tree(
+        stage_descriptor,
+        expected_tree,
+        baseline=baseline,
+        allow_root_rename=True,
+    )
+    published = os.stat(output_name, dir_fd=parent, follow_symlinks=False)
+    if not _same(expected_stage, published):
+        _fail("published evidence directory was replaced after tree validation")
 
 
 def _publish(
@@ -778,19 +875,20 @@ def _publish(
     except OSError as exc:
         raise SupplyChainContractError("could not publish immutable evidence root") from exc
     try:
-        published = os.stat(output_name, dir_fd=parent, follow_symlinks=False)
-        if not _same(expected_stage, published):
-            _fail("published evidence directory identity changed before parent fsync")
-        _validate_tree(stage_descriptor, expected_tree, baseline=baseline)
-        published = os.stat(output_name, dir_fd=parent, follow_symlinks=False)
-        if not _same(expected_stage, published):
-            _fail("published evidence directory was replaced after tree validation")
+        _require_published_tree(
+            parent,
+            expected_stage,
+            stage_descriptor,
+            expected_tree,
+            baseline,
+            output_name,
+        )
         os.fsync(parent)
+        published = os.stat(output_name, dir_fd=parent, follow_symlinks=False)
+        if not _same(expected_stage, published):
+            _fail("published evidence directory changed after parent fsync")
     except Exception as primary:
-        try:
-            _move_owned_to_residue(parent, expected_stage)
-        except Exception:
-            pass
+        _quarantine_failed_publication(parent, expected_stage, output_name)
         if isinstance(primary, SupplyChainContractError):
             raise
         raise SupplyChainContractError(
@@ -798,16 +896,30 @@ def _publish(
         ) from primary
 
 
-def _move_owned_to_residue(parent: int, expected: os.stat_result) -> str | None:
-    owned = []
-    for name in os.listdir(parent):
+def _owned_name(parent: int, expected: os.stat_result, names: tuple[str, ...]) -> str | None:
+    owned: list[str] = []
+    for name in names:
         try:
             current = os.stat(name, dir_fd=parent, follow_symlinks=False)
         except FileNotFoundError:
             continue
-        if _same(expected, current):
+        if _same_inode(expected, current):
             owned.append(name)
-    if len(owned) != 1:
+            if len(owned) > 1:
+                return None
+    return owned[0] if owned else None
+
+
+def _move_owned_to_residue(parent: int, expected: os.stat_result, output_name: str) -> str | None:
+    owned_name = _owned_name(parent, expected, (output_name,))
+    if owned_name is None:
+        names = _bounded_names(
+            parent,
+            maximum=_MAX_QUARANTINE_ENTRIES,
+            label="publication quarantine",
+        )
+        owned_name = _owned_name(parent, expected, names)
+    if owned_name is None:
         return None
     for _ in range(128):
         residue = f".evidence-incomplete-{secrets.token_hex(16)}"
@@ -815,13 +927,13 @@ def _move_owned_to_residue(parent: int, expected: os.stat_result) -> str | None:
             os.stat(residue, dir_fd=parent, follow_symlinks=False)
         except FileNotFoundError:
             try:
-                _rename_exclusive(parent, owned[0], residue)
+                _rename_exclusive(parent, owned_name, residue)
             except SupplyChainContractError:
                 continue
             moved = os.stat(residue, dir_fd=parent, follow_symlinks=False)
-            if not _same(expected, moved):
+            if not _same_inode(expected, moved):
                 try:
-                    _rename_exclusive(parent, residue, owned[0])
+                    _rename_exclusive(parent, residue, owned_name)
                     os.fsync(parent)
                 except Exception:
                     pass
@@ -829,6 +941,19 @@ def _move_owned_to_residue(parent: int, expected: os.stat_result) -> str | None:
             os.fsync(parent)
             return residue
     return None
+
+
+def _quarantine_failed_publication(parent: int, expected: os.stat_result, output_name: str) -> None:
+    cleanup_error: Exception | None = None
+    try:
+        _move_owned_to_residue(parent, expected, output_name)
+    except Exception as exc:
+        cleanup_error = exc
+    owned_at_output = _owned_name(parent, expected, (output_name,))
+    if owned_at_output is not None:
+        raise SupplyChainContractError(
+            "failed evidence publication could not be quarantined from the final pathname"
+        ) from cleanup_error
 
 
 def _output_parent(output_root: Path) -> int:
@@ -854,7 +979,11 @@ def finalize_production_evidence(
     provenance_bundle: Path,
     output_root: Path,
 ) -> ProductionEvidenceSummary:
-    """Finalize exact evidence from injected bundles without outcome claims."""
+    """Commit exact evidence at one durable pathname checkpoint without outcome claims.
+
+    The returned content digest remains authoritative if a same-user actor later
+    displaces the pathname; consumers must revalidate the path against that digest.
+    """
     if (
         len(controlled_build_run_id.encode("utf-8")) > _MAX_RUN_ID_BYTES
         or _RUN_ID.fullmatch(controlled_build_run_id) is None
@@ -960,6 +1089,7 @@ def finalize_production_evidence(
                 **{PurePosixPath(logical): raw for logical, raw in sboms.items()},
                 _ENVELOPE: envelope_raw,
             }
+            evidence_sha256 = _evidence_sha256(stage_files)
             stage_name, stage_descriptor, stage_identity = _new_stage(output_parent)
             try:
                 for logical, raw in stage_files.items():
@@ -977,6 +1107,26 @@ def finalize_production_evidence(
                     stage_name,
                     output_root.name,
                 )
+                try:
+                    _require_published_tree(
+                        output_parent,
+                        stage_identity,
+                        stage_descriptor,
+                        stage_files,
+                        stage_baseline,
+                        output_root.name,
+                    )
+                except Exception as primary:
+                    _quarantine_failed_publication(
+                        output_parent,
+                        stage_identity,
+                        output_root.name,
+                    )
+                    if isinstance(primary, SupplyChainContractError):
+                        raise
+                    raise SupplyChainContractError(
+                        "published evidence changed before the durable result checkpoint"
+                    ) from primary
             finally:
                 os.close(stage_descriptor)
     finally:
@@ -984,6 +1134,7 @@ def finalize_production_evidence(
     return ProductionEvidenceSummary(
         candidate_id=str(manifest["candidateId"]),
         evidence_root=output_root,
+        evidence_sha256=evidence_sha256,
         provenance_sha256=_sha256(provenance_raw),
         sbom_count=len(_SBOM_PATHS),
     )
