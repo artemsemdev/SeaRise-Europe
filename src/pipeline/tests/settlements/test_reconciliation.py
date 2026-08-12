@@ -294,10 +294,29 @@ def _load_cli():  # type: ignore[no-untyped-def]
 
 
 def test_report_reconciles_distinct_stage_outcomes_and_matches_golden(tmp_path: Path) -> None:
-    report, output, _ = _build(tmp_path)
+    report, output, inputs = _build(tmp_path)
+    golden = source_stage._strict_json(GOLDEN.read_bytes(), "golden")
 
     assert output.read_bytes() == _canonical(report)
-    assert report == source_stage._strict_json(GOLDEN.read_bytes(), "golden")
+    for key, database in (("catalogue", inputs[0]), ("spatial", inputs[2])):
+        binding = report["sourceBindings"][key]
+        assert binding["databaseByteSize"] == database.stat().st_size
+        assert binding["databaseSha256"] == hashlib.sha256(database.read_bytes()).hexdigest()
+
+    # DuckDB's physical file representation may differ between supported
+    # platforms even when the canonical table contents and stage identities are
+    # identical. Keep the golden contract platform-neutral while independently
+    # proving that the emitted physical bindings match the exact input bytes.
+    comparable = copy.deepcopy(report)
+    for key in ("catalogue", "spatial"):
+        comparable["sourceBindings"][key]["databaseByteSize"] = golden[
+            "sourceBindings"
+        ][key]["databaseByteSize"]
+        comparable["sourceBindings"][key]["databaseSha256"] = golden[
+            "sourceBindings"
+        ][key]["databaseSha256"]
+    _resign(comparable)
+    assert comparable == golden
     assert report["recordFlow"] == {
         "sourcePlaceRows": 4,
         "catalogueAccepted": 3,
