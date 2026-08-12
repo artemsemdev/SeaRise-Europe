@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[4]
 INVENTORY = ROOT / "docs/evidence/phase-1-settlement-production-inventory.json"
 SOURCE_LOCK = ROOT / "src/pipeline/sources/source-lock.phase-1-settlements.json"
