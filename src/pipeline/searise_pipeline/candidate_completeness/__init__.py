@@ -1,5 +1,10 @@
 """Offline validation for the Phase 1 pre-sign candidate contract."""
 
+from .assembler import (
+    CandidateAssemblyError,
+    CandidateAssemblySummary,
+    assemble_candidate_fixture,
+)
 from .byte_gate import CandidateByteSummary, validate_candidate_root
 from .provenance import (
     ProvenanceContractError,
@@ -17,10 +22,13 @@ from .validator import (
 )
 
 __all__ = [
+    "CandidateAssemblyError",
+    "CandidateAssemblySummary",
     "CandidateContractError",
     "CandidateByteSummary",
     "CandidateSummary",
     "ProvenanceContractError",
+    "assemble_candidate_fixture",
     "canonical_provenance_bytes",
     "generate_provenance_statement",
     "load_candidate",

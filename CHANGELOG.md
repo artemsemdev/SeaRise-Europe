@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a deterministic complete-candidate fixture assembler that verifies 50
+  explicit synthetic inputs, generates the terminal gate reports and checksum
+  inventory, writes the manifest last, runs the independent byte gate, and
+  exclusively promotes a read-only 53-artifact candidate without making
+  production, scientific, format-validity, or publication claims.
 - Added a read-only, descriptor-bound Phase 1 candidate byte gate that requires
   the exact 53-artifact inventory with no extra entries, streams and verifies
   declared sizes and SHA-256 values, reconstructs checksum content, and rejects
@@ -19,6 +24,10 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Hardened complete-candidate assembly with inode-bound private staging,
+  foreign-preserving bounded quarantine rollback, an owner-controlled isolated
+  runner boundary, and a coherent point-in-time final tree-identity pass before
+  success is returned.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.
