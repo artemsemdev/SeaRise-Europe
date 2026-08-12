@@ -25,6 +25,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added release v2 attribution and build-receipt contracts that cover the
+  settlement search receipt role introduced by the 54-artifact candidate
+  contract while leaving the published release v1 contracts immutable.
+
 - Added a candidate-wide QA executor that byte-gates the complete manifest,
   dispatches every schema-selected artifact in manifest order, retains explicit
   pass, fail, and not-measured dispositions, and rejects candidate mutation
