@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Required real-source architecture evidence to expose the exact cryptographic,
+  public-readback, and local-handoff receipt links while keeping those
+  post-finalization records outside the pre-sign manifest inventory.
 - Extended settlement browser-worker evidence to pass explicit spatial source,
   validation-workspace, and release authorities through the v4 shard builder,
   loader, and worker decoder while retaining byte-exact v3 fixture validation.

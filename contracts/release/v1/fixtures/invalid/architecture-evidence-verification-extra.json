@@ -1,0 +1,33 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/architecture-evidence.schema.json",
+  "schemaVersion": "1.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260812-0123456789ab",
+  "dataProvenanceClass": "real-source",
+  "codeRevision": "0123456789abcdef0123456789abcdef01234567",
+  "generatedAt": "2026-08-12T12:03:00Z",
+  "verificationArtifacts": [
+    "supply-chain/receipts/cryptographic-verification.json",
+    "supply-chain/receipts/public-readback.json",
+    "supply-chain/retention-receipt.json",
+    "supply-chain/receipts/unreviewed.json"
+  ],
+  "runtime": {
+    "applicationApiCalls": 0,
+    "prohibitedRoutes": ["/assess", "/geocode", "/config"],
+    "scientificLookupArtifact": "projection-analysis-cog"
+  },
+  "privacy": {
+    "searchSentToProjectServer": false,
+    "coordinatesSentToProjectServer": false
+  },
+  "measurements": [
+    {
+      "name": "cached-projection-lookup-p95",
+      "status": "passed",
+      "observed": 1.5,
+      "threshold": 100,
+      "unit": "ms",
+      "evidencePath": "evidence/browser-measurements.json"
+    }
+  ]
+}

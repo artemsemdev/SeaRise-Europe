@@ -41,6 +41,14 @@ The committed [complete release fixture](v1/fixtures/release/README.md) exercise
 the full manifest/STAC/artifact graph with real COG, PMTiles, and GeoParquet
 formats while remaining explicitly synthetic and pending owner disposition.
 
+Real-source architecture evidence exposes the exact ordered post-finalization
+verification links under `supply-chain/`: the cryptographic-verification
+receipt, public-readback receipt, and local handoff receipt. Synthetic fixtures
+may omit those links because they do not represent a completed verification
+chain. These paths are navigation metadata only: the receipts are created after
+candidate finalization and therefore must not be inserted into the pre-sign
+manifest, artifact inventory, or checksums.
+
 ## Version identities
 
 Three identities are intentionally independent:
