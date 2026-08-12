@@ -54,6 +54,16 @@ Every report keeps `browserReferenceClaim`, `productionClaim`,
 `engineSelectionClaim`, `ownerApprovalClaim`, `publicationClaim`, and
 `scientificApprovalClaim` false.
 
+## Published synthetic fixture
+
+The repository includes one representative synthetic worker run in
+`src/frontend/src/search/performance/fixtures/`. It binds the existing
+synthetic settlement projection to checked-in receipt-gated shard bytes and a
+canonical query set. It is schema- and identity-validated by the focused
+frontend test, but is not a production-scale measurement and makes no accepted
+browser/mobile budget claim. See that directory's `README.md` for its exact
+inputs, limitations, and revalidation command.
+
 ## Canonical query set
 
 The query set contains one to 100 unique, nonempty queries. Its provenance must

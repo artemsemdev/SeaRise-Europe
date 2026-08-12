@@ -18,6 +18,21 @@ import type {
 } from "./browser-worker-evidence";
 
 const projection = resolve(process.cwd(), "src/search/shards/fixtures/projection.synthetic.ndjson");
+const publishedFixtureRoot = resolve(process.cwd(), "src/search/performance/fixtures");
+const publishedFixtureOptions: PerformanceOptions = {
+  projectionPath: projection,
+  shardDirectory: join(publishedFixtureRoot, "browser-shards"),
+  querySetPath: join(publishedFixtureRoot, "performance-queries.synthetic.json"),
+  buildSamples: 1,
+  initializationSamples: 3,
+  querySamples: 3,
+  thresholds: {
+    buildP95Milliseconds: null,
+    initializationP95Milliseconds: null,
+    queryP95Milliseconds: null,
+    peakWorkerMemoryBytes: null,
+  },
+};
 let root: string;
 let shardDirectory: string;
 let querySetPath: string;
@@ -44,6 +59,29 @@ function recomputeIdentity(report: BrowserWorkerPerformanceReport): void {
 }
 
 describe("receipt-bound settlement browser worker performance evidence", () => {
+  it("validates the published representative synthetic worker fixture without budget claims", () => {
+    const report = readAndValidateBrowserWorkerPerformanceReport(
+      join(publishedFixtureRoot, "browser-worker-performance.synthetic.json"),
+      publishedFixtureOptions,
+    );
+    expect(report.provenance).toEqual({
+      dataProvenanceClass: "synthetic-fixture",
+      corpusScale: "synthetic-fixture",
+    });
+    expect(report.acceptedBrowserBudgetOutcome).toBe("not-measured");
+    expect(report.operatorThresholdOutcome).toBe("not-measured");
+    expect(report.claims).toEqual({
+      browserReferenceClaim: false,
+      engineSelectionClaim: false,
+      ownerApprovalClaim: false,
+      productionClaim: false,
+      publicationClaim: false,
+      scientificApprovalClaim: false,
+    });
+    expect(report.artifacts.totalShardRecords).toBe(4);
+    expect(report.artifacts.uniqueRecordCount).toBe(3);
+  });
+
   beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), "searise-worker-evidence-test-"));
     shardDirectory = join(root, "shards");
