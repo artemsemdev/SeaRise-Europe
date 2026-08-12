@@ -27,6 +27,10 @@ import {
 } from "./browser-shards";
 
 const fixture = resolve(process.cwd(), "src/search/shards/fixtures/projection.synthetic.ndjson");
+const spatialReceipt = resolve(
+  process.cwd(), "src/search/shards/fixtures/spatial-receipt.synthetic.json"
+);
+const dataReleaseId = "searise-europe-v1.0.0-20260812-0123456789ab";
 const temporary = () => mkdtempSync(join(tmpdir(), "searise-browser-shards-"));
 const canonicalBrotli = (raw: Buffer) => brotliCompressSync(raw, { params: {
   [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
@@ -59,7 +63,7 @@ function withRuntimeVersion<T>(
 
 function build(): { output: string; core: Buffer; coastal: Buffer } {
   const output = temporary();
-  buildBrowserSearchShards(fixture, output);
+  buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, output);
   return {
     output,
     core: readFileSync(join(output, SHARD_FILENAMES["europe-core"])),
@@ -94,12 +98,14 @@ describe("receipt-bound browser search shards", () => {
     const second = build();
     expect(first.core).toEqual(second.core);
     expect(first.coastal).toEqual(second.coastal);
-    expect(validateBrowserSearchShards(fixture, first.output)).toMatchObject({
+    expect(validateBrowserSearchShards(
+      fixture, spatialReceipt, dataReleaseId, first.output
+    )).toMatchObject({
       "europe-core": { recordCount: 2 },
       "europe-coastal": { recordCount: 2 },
     });
 
-    const core = decodeBrowserShard(first.core, "europe-core");
+    const core = decodeBrowserShard(first.core, "europe-core", dataReleaseId);
     expect(core.engine).toEqual({
       engineId: "searise-codepoint-trie", packageVersion: "1.0.0",
       serializationVersion: "codepoint-trie-json-v1",
@@ -109,7 +115,26 @@ describe("receipt-bound browser search shards", () => {
       zlib: "1.3.1-e00f703",
     });
     expect(core.source).toMatchObject({
-      spatialDatabaseSha256: "a".repeat(64), spatialReceiptSha256: "b".repeat(64),
+      spatialDatabaseSha256: "a".repeat(64),
+      spatialReceiptSha256: digest(readFileSync(spatialReceipt)),
+    });
+    expect(core).toMatchObject({
+      $schema:
+        "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json",
+      schemaVersion: "4.0.0",
+      formatVersion: "settlement-browser-search-shard-v2",
+      dataReleaseId,
+      artifactType: "settlement-browser-search-shard",
+      contentEncoding: "br",
+      catalogMembership: "europe-core",
+      normalizationVersion: "settlement-normalization-v2",
+      spatialIdentity: {
+        supportGeometry: { artifactId: "fixture-support", sha256: "1".repeat(64), version: "v1" },
+        coastalGeometry: { artifactId: "fixture-coastal", sha256: "2".repeat(64), version: "v1" },
+        shorelineGeometry: { artifactId: "fixture-shoreline", sha256: "3".repeat(64), version: "v1" },
+        predicate: "covers",
+        distanceMethodVersion: "epsg3035-planar-whole-meter-half-even-v1",
+      },
     });
     expect(core.records.map(({ placeId }) => placeId)).toEqual(["geonames:101", "geonames:104"]);
     expect([
@@ -121,15 +146,17 @@ describe("receipt-bound browser search shards", () => {
 
   it("rejects a nonofficial Node runtime library profile", () => {
     withRuntimeVersion("brotli", "1.2.0", () => {
-      expect(() => buildBrowserSearchShards(fixture, temporary()))
+      expect(() => buildBrowserSearchShards(
+        fixture, spatialReceipt, dataReleaseId, temporary()
+      ))
         .toThrow(/runtime brotli differs from its exact binding/);
     });
   });
 
   it("restores both indexes and merges core first without duplicate place IDs", () => {
     const built = build();
-    const core = decodeBrowserShard(built.core, "europe-core");
-    const coastal = decodeBrowserShard(built.coastal, "europe-coastal");
+    const core = decodeBrowserShard(built.core, "europe-core", dataReleaseId);
+    const coastal = decodeBrowserShard(built.coastal, "europe-coastal", dataReleaseId);
     expect(searchBrowserShard(core, "alpha alt").map(({ placeId }) => placeId))
       .toEqual(["geonames:101"]);
     const coreMatches = searchBrowserShard(core, "charlie");
@@ -144,7 +171,7 @@ describe("receipt-bound browser search shards", () => {
 
   it("reuses decoded runtime state and rejects unvalidated structural copies", () => {
     const built = build();
-    const core = decodeBrowserShard(built.core, "europe-core");
+    const core = decodeBrowserShard(built.core, "europe-core", dataReleaseId);
     const deserialize = vi.spyOn(boundedTrieAdapter, "deserialize");
     const prepare = vi.spyOn(boundedTrieAdapter, "build");
     try {
@@ -179,8 +206,10 @@ describe("receipt-bound browser search shards", () => {
       document.sourceSpelling = source; document.canonicalName = { language: null, script, value: canonical };
       document.asciiName = "Cafe"; document.admin1Name = "Exam\u0301ple";
     });
-    buildBrowserSearchShards(projection, output);
-    const record = loadBrowserSearchShards(projection, output).shards["europe-core"].shard.records[0];
+    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    const record = loadBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, output
+    ).shards["europe-core"].shard.records[0];
     expect(record.displayName).toBe(canonical);
     expect(record.admin1Name).toBe("Exaḿple");
   });
@@ -190,8 +219,10 @@ describe("receipt-bound browser search shards", () => {
       const document = documents[0];
       document.sourceSpelling = document.canonicalName.value = document.asciiName = "Springfield";
     });
-    buildBrowserSearchShards(projection, output);
-    const shard = loadBrowserSearchShards(projection, output).shards["europe-core"].shard;
+    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    const shard = loadBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, output
+    ).shards["europe-core"].shard;
     expect(searchBrowserShard(shard, "sprangfiold")[0]?.placeId).toBe("geonames:101");
   });
 
@@ -204,14 +235,18 @@ describe("receipt-bound browser search shards", () => {
       document.sourceSpelling = document.canonicalName.value = document.asciiName = name;
       document.canonicalName.script = null;
     });
-    buildBrowserSearchShards(projection, output);
-    const shard = loadBrowserSearchShards(projection, output).shards["europe-core"].shard;
+    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    const shard = loadBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, output
+    ).shards["europe-core"].shard;
     expect(searchBrowserShard(shard, query)[0]?.placeId).toBe("geonames:101");
   });
 
   it("hands receipt-gated decoded bytes to the consumer without reopening paths", () => {
     const built = build();
-    const loaded = loadBrowserSearchShards(fixture, built.output);
+    const loaded = loadBrowserSearchShards(
+      fixture, spatialReceipt, dataReleaseId, built.output
+    );
     writeFileSync(join(built.output, SHARD_FILENAMES["europe-core"]), "changed after handoff");
     writeFileSync(join(built.output, SHARD_RECEIPT_FILENAME), "changed after handoff");
     expect(loaded.shards["europe-core"].bytes).toEqual(built.core);
@@ -222,19 +257,43 @@ describe("receipt-bound browser search shards", () => {
   it("rejects a symlinked output root at the consumer handoff", () => {
     const built = build(); const alias = join(temporary(), "artifact-set");
     symlinkSync(built.output, alias);
-    expect(() => loadBrowserSearchShards(fixture, alias)).toThrow(/filesystem helper failed/);
+    expect(() => loadBrowserSearchShards(
+      fixture, spatialReceipt, dataReleaseId, alias
+    )).toThrow(/filesystem helper failed/);
+  });
+
+  it("rejects cross-release and cross-source authority drift", () => {
+    const built = build();
+    expect(() => loadBrowserSearchShards(
+      fixture, spatialReceipt, "searise-europe-v1.0.1-20260812-0123456789ab", built.output
+    )).toThrow(/exact projection, receipt, or release|unsafe/);
+    expect(() => decodeBrowserShard(
+      built.core, "europe-core", "searise-europe-v1.0.1-20260812-0123456789ab"
+    )).toThrow(/format/);
+    const root = temporary();
+    const changedReceipt = join(root, "spatial-receipt.json");
+    writeFileSync(changedReceipt, readFileSync(spatialReceipt).toString("utf8").replace(
+      '"fixture-support"', '"different-support"'
+    ));
+    expect(() => buildBrowserSearchShards(
+      fixture, changedReceipt, dataReleaseId, root
+    )).toThrow(/receipt authority differs/);
   });
 
   it("rejects incompatible shard format and changed exact bytes", () => {
     const built = build();
     const raw = brotliDecompressSync(built.core).toString("utf8");
     const incompatible = canonicalBrotli(Buffer.from(raw.replace(
-      "settlement-browser-search-shard-v1", "settlement-browser-search-shard-v2"
+      "settlement-browser-search-shard-v2", "settlement-browser-search-shard-v3"
     )));
-    expect(() => decodeBrowserShard(incompatible, "europe-core")).toThrow(/format/);
+    expect(() => decodeBrowserShard(
+      incompatible, "europe-core", dataReleaseId
+    )).toThrow(/format/);
 
     writeFileSync(join(built.output, SHARD_FILENAMES["europe-core"]), incompatible);
-    expect(() => validateBrowserSearchShards(fixture, built.output)).toThrow(/unsafe|exact projection/);
+    expect(() => validateBrowserSearchShards(
+      fixture, spatialReceipt, dataReleaseId, built.output
+    )).toThrow(/unsafe|exact projection/);
   });
 
   it.each(["duplicate", "reordered", "footer", "schema", "noncanonical", "duplicate-key"])(
@@ -253,7 +312,9 @@ describe("receipt-bound browser search shards", () => {
       const output = join(root, "output");
       mkdirSync(output);
       writeFileSync(projection, `${lines.join("\n")}\n`);
-      expect(() => buildBrowserSearchShards(projection, output)).toThrow(BrowserShardError);
+      expect(() => buildBrowserSearchShards(
+        projection, spatialReceipt, dataReleaseId, output
+      )).toThrow(BrowserShardError);
       expect(() => statSync(join(output, SHARD_FILENAMES["europe-core"]))).toThrow();
     }
   );
@@ -279,7 +340,9 @@ describe("receipt-bound browser search shards", () => {
       const root = temporary(); const projection = join(root, "projection.ndjson");
       const output = join(root, "output"); mkdirSync(output);
       writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
-      expect(() => buildBrowserSearchShards(projection, output)).toThrow(/document (fields|values)/);
+      expect(() => buildBrowserSearchShards(
+        projection, spatialReceipt, dataReleaseId, output
+      )).toThrow(/document (fields|values)/);
     }
   );
 
@@ -314,7 +377,9 @@ describe("receipt-bound browser search shards", () => {
         (header.source as Record<string, unknown>).spatialStageSchemaVersion = "unknown";
       }
     });
-    expect(() => buildBrowserSearchShards(projection, output)).toThrow(BrowserShardError);
+    expect(() => buildBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, output
+    )).toThrow(BrowserShardError);
     expect(() => statSync(join(output, SHARD_FILENAMES["europe-core"]))).toThrow();
   });
 
@@ -323,7 +388,9 @@ describe("receipt-bound browser search shards", () => {
       documents[0].population = null;
       documents[0].spatialClassification.catalogMembership = [];
     });
-    expect(() => buildBrowserSearchShards(projection, output)).not.toThrow();
+    expect(() => buildBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, output
+    )).not.toThrow();
   });
 
   it.each(["single-name", "alternate-count", "record-names"])(
@@ -345,7 +412,9 @@ describe("receipt-bound browser search shards", () => {
             }))];
         }
       });
-      expect(() => buildBrowserSearchShards(projection, output)).toThrow(/limit|bounded|alternate/);
+      expect(() => buildBrowserSearchShards(
+        projection, spatialReceipt, dataReleaseId, output
+      )).toThrow(/limit|bounded|alternate/);
     }
   );
 
@@ -366,8 +435,10 @@ describe("receipt-bound browser search shards", () => {
         return document;
       }));
     });
-    buildBrowserSearchShards(projection, output);
-    const loaded = loadBrowserSearchShards(projection, output);
+    buildBrowserSearchShards(projection, spatialReceipt, dataReleaseId, output);
+    const loaded = loadBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, output
+    );
     expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
     expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common rare")
       .map(({ placeId }) => placeId)).toEqual(["geonames:1149"]);
@@ -447,7 +518,9 @@ describe("receipt-bound browser search shards", () => {
         value.records[0].featureCode = "PPLX";
         value.recordsSha256 = digest(canonicalJson(value.records));
       } else value.dataProvenanceClass = "unknown";
-      expect(() => decodeBrowserShard(canonicalBrotli(Buffer.from(canonicalJson(value))), "europe-core"))
+      expect(() => decodeBrowserShard(
+        canonicalBrotli(Buffer.from(canonicalJson(value))), "europe-core", dataReleaseId
+      ))
         .toThrow(BrowserShardError);
     }
   });
@@ -469,7 +542,9 @@ describe("receipt-bound browser search shards", () => {
       const root = temporary(); const projection = join(root, "projection.ndjson");
       const output = join(root, "output"); mkdirSync(output);
       writeFileSync(projection, `${[JSON.stringify(header), ...lines, JSON.stringify(footer)].join("\n")}\n`);
-      expect(() => buildBrowserSearchShards(projection, output)).not.toThrow();
+      expect(() => buildBrowserSearchShards(
+        projection, spatialReceipt, dataReleaseId, output
+      )).not.toThrow();
     }
   );
 
@@ -477,21 +552,25 @@ describe("receipt-bound browser search shards", () => {
     const root = temporary();
     const linked = join(root, "projection.ndjson");
     symlinkSync(fixture, linked);
-    expect(() => buildBrowserSearchShards(linked, root)).toThrow(/non-symlink/);
-    expect(() => buildBrowserSearchShards(fixture, root, {
+    expect(() => buildBrowserSearchShards(
+      linked, spatialReceipt, dataReleaseId, root
+    )).toThrow(/non-symlink/);
+    expect(() => buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, root, {
       ...DEFAULT_SHARD_LIMITS,
       maxProjectionBytes: statSync(fixture).size - 1,
     })).toThrow(/bounded|byte limit/);
-    expect(() => buildBrowserSearchShards(fixture, root, {
+    expect(() => buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, root, {
       ...DEFAULT_SHARD_LIMITS, maxRecords: DEFAULT_SHARD_LIMITS.maxRecords + 1,
     })).toThrow(/hard cap/);
-    expect(() => buildBrowserSearchShards(fixture, root, {
+    expect(() => buildBrowserSearchShards(fixture, spatialReceipt, dataReleaseId, root, {
       maxRecords: 3,
     } as typeof DEFAULT_SHARD_LIMITS)).toThrow(/limit fields/);
 
     const existing = join(root, SHARD_FILENAMES["europe-core"]);
     writeFileSync(existing, "preserve");
-    expect(() => buildBrowserSearchShards(fixture, root)).toThrow(/overwrite/);
+    expect(() => buildBrowserSearchShards(
+      fixture, spatialReceipt, dataReleaseId, root
+    )).toThrow(/overwrite/);
     expect(readFileSync(existing, "utf8")).toBe("preserve");
     expect(() => statSync(join(root, SHARD_FILENAMES["europe-coastal"]))).toThrow();
   });
@@ -506,7 +585,9 @@ describe("receipt-bound browser search shards", () => {
         const altered = Buffer.from(bytes); altered[10] ^= 1; writeFileSync(projection, altered);
         writeFileSync(projection, bytes); fs.utimesSync(projection, new Date(), new Date(Date.now() + 1000)); }
       return length;
-    } }, () => expect(() => buildBrowserSearchShards(projection, join(root, "source-output")))
+    } }, () => expect(() => buildBrowserSearchShards(
+      projection, spatialReceipt, dataReleaseId, join(root, "source-output")
+    ))
       .toThrow(/changed while read/));
   });
 
@@ -524,11 +605,15 @@ describe("receipt-bound browser search shards", () => {
       [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
       [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
     } });
-    expect(() => decodeBrowserShard(alternate, "europe-core")).toThrow(/canonical quality-11/);
+    expect(() => decodeBrowserShard(
+      alternate, "europe-core", dataReleaseId
+    )).toThrow(/canonical quality-11/);
     const value = JSON.parse(raw.toString("utf8")); value.records.reverse();
     value.records.forEach((record: { ordinal: number }, index: number) => { record.ordinal = index + 1; });
     value.recordsSha256 = createHash("sha256").update(JSON.stringify(value.records)).digest("hex");
-    expect(() => decodeBrowserShard(canonicalBrotli(Buffer.from(JSON.stringify(value))), "europe-core"))
+    expect(() => decodeBrowserShard(
+      canonicalBrotli(Buffer.from(JSON.stringify(value))), "europe-core", dataReleaseId
+    ))
       .toThrow(/record values differ/);
 
     const tampered = JSON.parse(raw.toString("utf8"));
@@ -536,7 +621,7 @@ describe("receipt-bound browser search shards", () => {
     envelope.payload.entries[0][0] = "zzzz";
     tampered.indexBase64 = Buffer.from(JSON.stringify(envelope)).toString("base64");
     expect(() => decodeBrowserShard(
-      canonicalBrotli(Buffer.from(JSON.stringify(tampered))), "europe-core"
+      canonicalBrotli(Buffer.from(JSON.stringify(tampered))), "europe-core", dataReleaseId
     )).toThrow(/index differs from its exact records/);
   });
 
@@ -546,7 +631,8 @@ describe("receipt-bound browser search shards", () => {
     for (const command of ["build", "validate"]) {
       const result = spawnSync(process.execPath, [
         "--import", "tsx", script, command,
-        "--projection", fixture, "--output-dir", output,
+        "--projection", fixture, "--spatial-receipt", spatialReceipt,
+        "--data-release-id", dataReleaseId, "--output-dir", output,
       ], { encoding: "utf8" });
       expect(result.status, result.stderr).toBe(0);
       expect(JSON.parse(result.stdout)).toHaveProperty("europe-core");

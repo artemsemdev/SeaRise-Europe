@@ -25,6 +25,13 @@ byte-identical quality-11 Brotli text compression. The envelopes bind
 the exact projection byte hash, projection footer identity, spatial database,
 spatial receipt, and spatial candidate. They retain false production, signing,
 publication, owner, scientific, hazard, and canonical-geometry claims.
+Each compressed payload implements the public settlement v4 search contract,
+without altering the fixture-only v3 envelope. The caller must provide the
+exact canonical spatial receipt and an explicit `dataReleaseId`. The builder
+verifies the receipt byte hash and candidate identity already bound by the
+projection, derives the three geometry identities from that authority, and
+places the same release, provenance, spatial, source, engine, runtime, ranking,
+merge, and compression identities in both shards and the receipt-last set.
 
 Projection input must be canonical, duplicate-free NDJSON with the exact nested
 name, location, lineage, and spatial-classification shapes. Records remain in
@@ -60,9 +67,15 @@ not claims about GeoNames completeness.
 ```bash
 cd src/frontend
 node --import tsx scripts/build-settlement-search-shards.ts build \
-  --projection /absolute/search-projection.ndjson --output-dir /private/output
+  --projection /absolute/search-projection.ndjson \
+  --spatial-receipt /absolute/spatial-stage.receipt.json \
+  --data-release-id searise-europe-v1.0.0-20260812-0123456789ab \
+  --output-dir /private/output
 node --import tsx scripts/build-settlement-search-shards.ts validate \
-  --projection /absolute/search-projection.ndjson --output-dir /private/output
+  --projection /absolute/search-projection.ndjson \
+  --spatial-receipt /absolute/spatial-stage.receipt.json \
+  --data-release-id searise-europe-v1.0.0-20260812-0123456789ab \
+  --output-dir /private/output
 ```
 
 On macOS or Linux with Python 3.9 or newer, the builder performs stable
@@ -94,7 +107,8 @@ last, then performs a final all-descriptor, all-path, and output-root identity
 pass. Successful publication and loading are point-in-time linearized at that
 final pass; they are not a lease on paths after the function returns.
 Downstream code must use those returned objects rather than reopen artifact
-paths. These candidate shards do not provide the Web Worker, production-scale
+paths. Supplying a different release ID or receipt produces a different exact
+set and cannot validate an existing set. These artifacts do not provide the Web Worker, production-scale
 benchmarks, or publication approval required by the consumer frontend issue.
 
 The [settlement browser-worker performance harness](settlement-browser-worker-performance.md)
