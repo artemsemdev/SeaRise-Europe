@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import stat
 from contextlib import ExitStack, closing, contextmanager
 from pathlib import Path, PurePosixPath
@@ -66,6 +67,9 @@ _GEOMETRY_KEYS = {
     "geometries",
 }
 _GEOMETRY_ITEM_KEYS = {"role", "id", "version", "path", "sha256", "predicate"}
+_DATA_RELEASE_ID = re.compile(
+    r"searise-europe-v[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}-[a-f0-9]{12}"
+)
 
 
 class SearchProjectionError(ValueError):
@@ -376,6 +380,23 @@ def _header(
     }
 
 
+def _spatial_identity(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    geometries = candidate["geometry"]["geometries"]
+    identity = {
+        f"{item['role']}Geometry": {
+            "artifactId": item["id"],
+            "version": item["version"],
+            "sha256": item["sha256"],
+        }
+        for item in geometries
+    }
+    return {
+        **identity,
+        "predicate": "covers",
+        "distanceMethodVersion": "epsg3035-planar-whole-meter-half-even-v1",
+    }
+
+
 def _footer(header: Mapping[str, Any], count: int, digest: str) -> dict[str, Any]:
     value = {"header": header, "recordCount": count, "documentsSha256": digest}
     return {
@@ -539,59 +560,137 @@ def serialize_search_projection(
         raise
 
 
+def _validate_snapshot(
+    root: Path, assets: Mapping[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    candidate, receipt_sha256 = _candidate(assets["spatial-receipt.json"])
+    duckdb, _ = source_stage._load_tools()
+    with duckdb.connect(str(root / "spatial.duckdb"), read_only=True) as connection:
+        _configure_connection(connection)
+        _validate_source(connection, candidate)
+        expected_header = _header(candidate, assets["spatial.duckdb"].sha256, receipt_sha256)
+        lines = _asset_lines(assets["search-projection.ndjson"], "search projection")
+        try:
+            header = _strict_line(next(lines), "search projection header")
+        except StopIteration as exc:
+            raise SearchProjectionError("search projection is empty") from exc
+        if header != expected_header:
+            raise SearchProjectionError("search projection source binding or claims differ")
+        count, digest = 0, hashlib.sha256()
+        for _, expected in _spatial_documents(connection):
+            try:
+                raw = next(lines)
+            except StopIteration as exc:
+                raise SearchProjectionError("search projection is truncated") from exc
+            actual = _strict_line(raw, f"search projection document {count + 1}")
+            if actual != expected:
+                raise SearchProjectionError("search projection differs from exact spatial source")
+            digest.update(raw + b"\n")
+            count += 1
+        try:
+            footer = _strict_line(next(lines), "search projection footer")
+        except StopIteration as exc:
+            raise SearchProjectionError("search projection footer is missing") from exc
+        if next(lines, None) is not None:
+            raise SearchProjectionError("search projection has trailing records")
+        if footer != _footer(header, count, digest.hexdigest()):
+            raise SearchProjectionError("search projection footer differs")
+        _assert_no_spill(connection)
+        return footer, candidate
+
+
+@contextmanager
+def _validated_snapshot(
+    spatial_database: Path, spatial_receipt: Path, projection: Path, work_dir: Path
+) -> Iterator[tuple[dict[str, Any], dict[str, Any], Mapping[str, Any]]]:
+    with _snapshots(
+        {
+            "spatial.duckdb": spatial_database,
+            "spatial-receipt.json": spatial_receipt,
+            "search-projection.ndjson": projection,
+        },
+        work_dir,
+    ) as (root, assets):
+        footer, candidate = _validate_snapshot(root, assets)
+        yield footer, candidate, assets
+
+
 def validate_search_projection(
     spatial_database: Path, spatial_receipt: Path, projection: Path, *, work_dir: Path
 ) -> dict[str, Any]:
     """Stream-validate an NDJSON projection against its exact spatial source pair."""
 
     try:
-        with _snapshots(
-            {
-                "spatial.duckdb": spatial_database,
-                "spatial-receipt.json": spatial_receipt,
-                "search-projection.ndjson": projection,
-            },
-            work_dir,
-        ) as (root, assets):
-            candidate, receipt_sha256 = _candidate(assets["spatial-receipt.json"])
-            duckdb, _ = source_stage._load_tools()
-            with duckdb.connect(str(root / "spatial.duckdb"), read_only=True) as connection:
-                _configure_connection(connection)
-                _validate_source(connection, candidate)
-                expected_header = _header(
-                    candidate, assets["spatial.duckdb"].sha256, receipt_sha256
-                )
-                lines = _asset_lines(assets["search-projection.ndjson"], "search projection")
-                try:
-                    header = _strict_line(next(lines), "search projection header")
-                except StopIteration as exc:
-                    raise SearchProjectionError("search projection is empty") from exc
-                if header != expected_header:
-                    raise SearchProjectionError("search projection source binding or claims differ")
-                count, digest = 0, hashlib.sha256()
-                for _, expected in _spatial_documents(connection):
-                    try:
-                        raw = next(lines)
-                    except StopIteration as exc:
-                        raise SearchProjectionError("search projection is truncated") from exc
-                    actual = _strict_line(raw, f"search projection document {count + 1}")
-                    if actual != expected:
-                        raise SearchProjectionError(
-                            "search projection differs from exact spatial source"
-                        )
-                    digest.update(raw + b"\n")
-                    count += 1
-                try:
-                    footer = _strict_line(next(lines), "search projection footer")
-                except StopIteration as exc:
-                    raise SearchProjectionError("search projection footer is missing") from exc
-                if next(lines, None) is not None:
-                    raise SearchProjectionError("search projection has trailing records")
-                expected_footer = _footer(header, count, digest.hexdigest())
-                if footer != expected_footer:
-                    raise SearchProjectionError("search projection footer differs")
-                _assert_no_spill(connection)
-                return footer
+        with _validated_snapshot(
+            spatial_database, spatial_receipt, projection, work_dir
+        ) as (footer, _, _):
+            return footer
+    except SearchProjectionError:
+        raise
+    except Exception as exc:
+        raise SearchProjectionError(f"search projection validation failed: {exc}") from exc
+
+
+def validated_search_projection_authority(
+    spatial_database: Path,
+    spatial_receipt: Path,
+    projection: Path,
+    data_release_id: str,
+    *,
+    work_dir: Path,
+) -> dict[str, Any]:
+    """Return a canonical authority only after exact descriptor-safe source replay."""
+
+    if _DATA_RELEASE_ID.fullmatch(data_release_id) is None:
+        raise SearchProjectionError("data release ID does not match the public contract")
+    try:
+        with _validated_snapshot(
+            spatial_database, spatial_receipt, projection, work_dir
+        ) as (footer, candidate, assets):
+            header = _header(
+                candidate,
+                assets["spatial.duckdb"].sha256,
+                assets["spatial-receipt.json"].sha256,
+            )
+            source = {
+                "projectionDeterministicIdentity": footer["deterministicIdentity"],
+                "projectionDocumentsSha256": footer["documentsSha256"],
+                "projectionSchemaVersion": SEARCH_PROJECTION_SCHEMA_VERSION,
+                "projectionSha256": assets["search-projection.ndjson"].sha256,
+                **header["source"],
+            }
+            authority_receipt = {
+                "$schema": (
+                    "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/"
+                    "search-artifact.schema.json"
+                ),
+                "schemaVersion": "4.0.0",
+                "formatVersion": "settlement-search-projection-authority-v1",
+                "artifactType": "settlement-search-projection-authority",
+                "complete": True,
+                "dataReleaseId": data_release_id,
+                "dataProvenanceClass": candidate["geometry"]["dataProvenanceClass"],
+                "projectionByteSize": assets["search-projection.ndjson"].size,
+                "projectionSha256": assets["search-projection.ndjson"].sha256,
+                "projectionDeterministicIdentity": footer["deterministicIdentity"],
+                "projectionDocumentsSha256": footer["documentsSha256"],
+                "recordCount": footer["recordCount"],
+                "source": source,
+                "spatialIdentity": _spatial_identity(candidate),
+                **{name: False for name in _PROJECTION_FALSE_CLAIMS},
+                "publicationEligible": False,
+                "validator": {
+                    "validatorId": (
+                        "searise_pipeline.settlements.search_projection."
+                        "validate_search_projection"
+                    ),
+                    "version": "1",
+                },
+            }
+            return {
+                **authority_receipt,
+                "deterministicIdentity": hashlib.sha256(_canonical(authority_receipt)).hexdigest(),
+            }
     except SearchProjectionError:
         raise
     except Exception as exc:

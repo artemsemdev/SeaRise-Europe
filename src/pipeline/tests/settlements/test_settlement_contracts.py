@@ -515,6 +515,7 @@ def test_settlement_v4_public_search_schema_and_goldens_are_valid() -> None:
     assert [path.name for path in paths] == [
         "settlement-browser-search-shard-set-receipt.json",
         "settlement-browser-search-shard.json",
+        "settlement-search-projection-authority.json",
     ]
     for path in paths:
         _fixture_validator(path).validate(_read(path))

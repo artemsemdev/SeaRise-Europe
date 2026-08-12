@@ -20,6 +20,9 @@ merge, and Brotli semantics consumed by the browser loader. Unknown versions,
 engines, source receipts, release IDs, and set members fail closed. Its checked-
 in examples and implementation retain false production, approval, signing, and
 publication claims.
+The v4 projection-authority receipt can be emitted only after the pinned Python
+validator replays the canonical projection against its exact descriptor-safe
+spatial database and receipt snapshots.
 
 Compatibility is version-aware, not wire-level substitution. A v3 document
 does not validate against a v2 schema, and a v2-only consumer must reject it

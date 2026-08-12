@@ -4,7 +4,8 @@
   "title": "SeaRise Europe public settlement browser search artifacts v4",
   "oneOf": [
     { "$ref": "#/$defs/shard" },
-    { "$ref": "#/$defs/receipt" }
+    { "$ref": "#/$defs/receipt" },
+    { "$ref": "#/$defs/projectionAuthority" }
   ],
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
@@ -233,6 +234,53 @@
           "minItems": 2,
           "maxItems": 2
         }
+      }
+    },
+    "projectionAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema", "schemaVersion", "formatVersion", "artifactType", "complete",
+        "dataReleaseId", "dataProvenanceClass", "projectionByteSize",
+        "projectionSha256", "projectionDeterministicIdentity",
+        "projectionDocumentsSha256", "recordCount", "source", "spatialIdentity",
+        "canonicalGeometryClaim", "hazardExtentClaim", "scientificApprovalClaim",
+        "ownerApprovalClaim", "productionClaim", "publicationClaim",
+        "publicationEligible", "signingClaim", "validator", "deterministicIdentity"
+      ],
+      "properties": {
+        "$schema": { "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/settlements/v4/search-artifact.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "formatVersion": { "const": "settlement-search-projection-authority-v1" },
+        "artifactType": { "const": "settlement-search-projection-authority" },
+        "complete": { "const": true },
+        "dataReleaseId": { "$ref": "#/$defs/dataReleaseId" },
+        "dataProvenanceClass": { "enum": ["real-source", "synthetic-fixture"] },
+        "projectionByteSize": { "type": "integer", "minimum": 1 },
+        "projectionSha256": { "$ref": "#/$defs/sha256" },
+        "projectionDeterministicIdentity": { "$ref": "#/$defs/sha256" },
+        "projectionDocumentsSha256": { "$ref": "#/$defs/sha256" },
+        "recordCount": { "type": "integer", "minimum": 0 },
+        "source": { "$ref": "#/$defs/source" },
+        "spatialIdentity": { "$ref": "#/$defs/spatialIdentity" },
+        "canonicalGeometryClaim": { "const": false },
+        "hazardExtentClaim": { "const": false },
+        "scientificApprovalClaim": { "const": false },
+        "ownerApprovalClaim": { "const": false },
+        "productionClaim": { "const": false },
+        "publicationClaim": { "const": false },
+        "publicationEligible": { "const": false },
+        "signingClaim": { "const": false },
+        "validator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["validatorId", "version"],
+          "properties": {
+            "validatorId": { "const": "searise_pipeline.settlements.search_projection.validate_search_projection" },
+            "version": { "const": "1" }
+          }
+        },
+        "deterministicIdentity": { "$ref": "#/$defs/sha256" }
       }
     }
   }
