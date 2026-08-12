@@ -36,7 +36,9 @@ All notable changes to this project will be documented in this file.
   authority now validates the exact 51-artifact pre-terminal snapshot before
   gate reports, checksums, and the manifest exist, then renders deterministic
   JSON and Markdown checks grouped by authoritative validator and exact evidence
-  hashes without making a publication claim.
+  hashes without making a publication claim. A manifest-last production
+  assembler now seals those inputs into the complete 54-artifact candidate and
+  reruns the byte gate and full validator matrix before exclusive publication.
 - Added a release-bound settlement Web Worker and Chromium evidence harness
   with core-first loading, monotonic query tokens, bounded search, static-only
   networking, worker-isolate memory telemetry, and accepted production-scale
