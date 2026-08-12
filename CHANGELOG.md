@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added receipt-bound, bounded-memory settlement reconciliation evidence that
+  separates pre-spatial catalogue rejections from classified and
+  spatial-rejected normalized records, reports decision-split quality
+  dimensions, and fails closed on arithmetic, ordering, identity, or claim
+  drift without making a production or publication claim.
+- Added a checked-in representative synthetic settlement browser-worker report
+  with exact shard and query identities, deterministic validation, and explicit
+  non-production and no-accepted-browser-budget status.
+- Added a receipt-bound settlement search performance harness that measures
+  exact raw/compressed shard sizes, record counts, deterministic build and Node
+  worker initialization/query distributions, and observed worker memory while
+  preserving explicit browser, production, owner, scientific, and publication
+  nonclaims.
 - Added a deterministic complete-candidate fixture assembler that verifies 50
   explicit synthetic inputs, generates the terminal gate reports and checksum
   inventory, writes the manifest last, runs the independent byte gate, and
@@ -21,6 +34,12 @@ All notable changes to this project will be documented in this file.
   versioned release checksum asset, with fail-closed local validation and
   build-plane SBOM coverage. Signing remains blocked on the reviewed evidence
   finalizer and protected workflow.
+
+### Fixed
+
+- Replaced full-corpus settlement reconciliation sorts with single-pass,
+  order-checking stage scans so production evidence remains within the 1 GiB
+  no-spill memory boundary.
 
 ### Security
 
@@ -326,6 +345,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Closed settlement reconciliation rejection reasons to the reviewed stage
+  vocabularies and prevented reserved DuckDB WAL output names from reaching staging.
 - Corrected the immutable full-source contract to match the official
   `alternateNamesV2.zip` member order while retaining path-based member staging.
 - Hardened normalized-catalogue validation with exact source replay, reconciled
