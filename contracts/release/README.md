@@ -36,8 +36,13 @@ The `v1` path and every schema's `$id` identify schema version `1.0.0`.
 [`v2/defs.schema.json`](v2/defs.schema.json) is the closed successor definition
 set used by the candidate-completeness v2 contract. It adds the explicit
 settlement search shard-set receipt role without changing the published v1
-bytes or validation meaning. No v2 release manifest is defined by this scoped
-successor; v1 release documents continue to validate only against v1 schemas.
+bytes or validation meaning. The version-selected
+[`v2/attribution.schema.json`](v2/attribution.schema.json) and
+[`v2/build-receipt.schema.json`](v2/build-receipt.schema.json) use that role
+authority so the 54-artifact candidate can record rights and exact build
+outputs for its receipt-last settlement search inventory. No v2 release
+manifest is defined by this scoped successor; v1 release documents continue to
+validate only against v1 schemas.
 
 JSON Schema validation proves individual document shape. The Python public
 contract validator additionally proves cross-document release identity,
