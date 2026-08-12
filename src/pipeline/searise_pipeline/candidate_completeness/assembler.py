@@ -805,20 +805,45 @@ def _rollback_owned_promotion(
     stage_identity = _directory_identity(os.fstat(stage))
     if not _entry_matches(parent, output_name, stage_identity):
         return None
-    public_quarantine, placeholder, placeholder_identity = _reserve_owned_directory(
-        parent, ".candidate-rollback-", 0o700
-    )
+    public_quarantine: str | None = None
+    placeholder = -1
+    placeholder_identity: tuple[int, int] | None = None
     exchanged = False
     # Darwin's exclusive rename rejects a mode-0555 directory. Exchanging the
     # final with an exact owned empty slot moves it away without thawing it and
     # cannot overwrite an existing entry.
     last_error: OSError | None = None
     try:
+        try:
+            public_quarantine, placeholder, placeholder_identity = _reserve_owned_directory(
+                parent, ".candidate-rollback-", 0o700
+            )
+        except (CandidateAssemblyError, OSError) as exc:
+            raise CandidateAssemblyError(
+                "assembly-rollback",
+                "owned failed candidate remains at the public output because rollback "
+                "slot reservation failed",
+            ) from exc
         for _ in range(1024):
-            if not _entry_matches(parent, output_name, stage_identity):
+            try:
+                stage_matches = _entry_matches(parent, output_name, stage_identity)
+                slot_matches = _entry_matches(
+                    parent, public_quarantine, placeholder_identity
+                )
+            except OSError as exc:
+                raise CandidateAssemblyError(
+                    "assembly-rollback",
+                    "owned failed candidate remains at the public output because rollback "
+                    "authority could not be inspected",
+                ) from exc
+            if not stage_matches:
                 return None
-            if not _entry_matches(parent, public_quarantine, placeholder_identity):
-                return None
+            if not slot_matches:
+                raise CandidateAssemblyError(
+                    "assembly-rollback",
+                    "owned failed candidate remains at the public output because rollback "
+                    "slot identity differs",
+                )
             try:
                 _rename_exchange(parent, output_name, parent, public_quarantine)
             except OSError as exc:
@@ -857,16 +882,22 @@ def _rollback_owned_promotion(
         _sync_rename_parents(parent, temporary)
         return rollback_name
     finally:
-        if not exchanged and _entry_matches(parent, public_quarantine, placeholder_identity):
+        if (
+            not exchanged
+            and public_quarantine is not None
+            and placeholder_identity is not None
+        ):
             try:
-                os.rmdir(public_quarantine, dir_fd=parent)
-                _sync_directory(parent)
+                if _entry_matches(parent, public_quarantine, placeholder_identity):
+                    os.rmdir(public_quarantine, dir_fd=parent)
+                    _sync_directory(parent)
             except OSError:
                 pass
-        try:
-            os.close(placeholder)
-        except OSError:
-            pass
+        if placeholder >= 0:
+            try:
+                os.close(placeholder)
+            except OSError:
+                pass
 
 
 def _final_publication_gate(

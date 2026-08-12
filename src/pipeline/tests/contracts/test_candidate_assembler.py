@@ -663,6 +663,37 @@ def test_persistent_rollback_failure_preserves_primary_error_and_reports_residue
     assert list(tmp_path.glob(".candidate-rollback-*")) == []
 
 
+def test_rollback_slot_reservation_denial_reports_explicit_public_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_gate = assembler.validate_candidate_root
+    real_reserve = assembler._reserve_owned_directory
+    gate_calls = 0
+
+    def fail_final(root: int, **kwargs: object):  # type: ignore[no-untyped-def]
+        nonlocal gate_calls
+        gate_calls += 1
+        if gate_calls == 2:
+            raise assembler.CandidateContractError("candidate-changed", "primary failure")
+        return real_gate(root, **kwargs)
+
+    def deny(parent: int, prefix: str, mode: int):  # type: ignore[no-untyped-def]
+        if prefix == ".candidate-rollback-":
+            raise PermissionError("rollback slot reservation denied")
+        return real_reserve(parent, prefix, mode)
+
+    monkeypatch.setattr(assembler, "validate_candidate_root", fail_final)
+    monkeypatch.setattr(assembler, "_reserve_owned_directory", deny)
+    with pytest.raises(CandidateAssemblyError) as caught:
+        assemble_candidate_fixture(RECEIPT, tmp_path / "candidate")
+    assert caught.value.code == "foreign-replacement"
+    assert caught.value.cleanup_error is not None
+    assert caught.value.cleanup_error.startswith("assembly-rollback:")
+    assert "slot reservation failed" in caught.value.cleanup_error
+    assert (tmp_path / "candidate/manifest.json").is_file()
+    assert list(tmp_path.glob(".candidate-rollback-*")) == []
+
+
 def test_post_promotion_fchmod_failure_moves_candidate_away_before_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
