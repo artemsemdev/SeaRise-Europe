@@ -221,6 +221,14 @@ def _descriptor_has_exact_bytes(descriptor: int, content: bytes) -> bool:
     return os.pread(descriptor, 1, len(content)) == b""
 
 
+def _close_quietly(descriptor: int) -> None:
+    """Best-effort cleanup that cannot reverse a durable publication outcome."""
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+
+
 def write_new_immutable_bytes(
     output_path: Path,
     content: bytes,
@@ -321,18 +329,9 @@ def write_new_immutable_bytes(
         raise
     finally:
         if partial_descriptor >= 0:
-            try:
-                os.close(partial_descriptor)
-            except OSError:
-                pass
-        try:
-            os.close(parent)
-        except OSError:
-            pass
-        try:
-            os.close(anchor)
-        except OSError:
-            pass
+            _close_quietly(partial_descriptor)
+        _close_quietly(parent)
+        _close_quietly(anchor)
 
 
 def write_new_sbom(output_path: Path, content: bytes) -> None:
