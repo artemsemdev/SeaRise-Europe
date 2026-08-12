@@ -28,7 +28,14 @@ addresses; the hook connects to a pinned resolved address and rejects peer drift
 Responses must be direct `200` identity-encoded bodies and complete within the
 30-second per-subject deadline. The local and remote subjects are limited to 8
 MiB each. The receipt path must have an existing symlink-free parent and must not
-already exist.
+already exist. Keep that parent outside the candidate, evidence, and repository
+roots; the hook rejects descriptor ancestry overlap and any existing alias before
+rerunning cryptographic verification.
+
+On success the command writes one canonical JSON line to standard output with
+the candidate, data release, controlled run, receipt path, receipt SHA-256, and
+subject count. A closed output stream cannot reverse an already durable receipt;
+the receipt bytes remain the authoritative success record.
 
 The canonical receipt proves that the public bytes matched subjects whose
 Cosign bundles were reverified for the pinned repository workflow and issuer by

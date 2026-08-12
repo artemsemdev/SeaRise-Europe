@@ -22,7 +22,7 @@ from typing import Any, Callable, Iterable, Mapping, NoReturn, Sequence
 
 from .candidate_evidence import _open_root
 from .contracts import SupplyChainContractError, _validate_schema
-from .sbom import write_new_sbom
+from .sbom import write_new_immutable_bytes
 from .sigstore_verifier import verify_candidate_evidence_cryptographically
 
 _SCHEMA_URI = (
@@ -42,6 +42,12 @@ class PublicReadbackVerification:
 
     receipt: Mapping[str, Any]
     receipt_bytes: bytes
+
+
+@dataclass(frozen=True)
+class _ReceiptBoundary:
+    parent_inode: tuple[int, int]
+    protected_root_inodes: frozenset[tuple[int, int]]
 
 
 def _fail(message: str) -> NoReturn:
@@ -430,10 +436,85 @@ def _fetch(url: str, expected_size: int) -> bytes:
         connection.close()
 
 
-def _write_new(path: Path, raw: bytes) -> None:
+def _inode(value: os.stat_result) -> tuple[int, int]:
+    return value.st_dev, value.st_ino
+
+
+def _has_ancestor(directory: int, protected: frozenset[tuple[int, int]]) -> bool:
+    cursor = os.dup(directory)
+    flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        while True:
+            current = _inode(os.fstat(cursor))
+            if current in protected:
+                return True
+            parent = os.open("..", flags, dir_fd=cursor)
+            parent_inode = _inode(os.fstat(parent))
+            if parent_inode == current:
+                os.close(parent)
+                return False
+            os.close(cursor)
+            cursor = parent
+    finally:
+        try:
+            os.close(cursor)
+        except OSError:
+            pass
+
+
+def _receipt_boundary(path: Path, protected_roots: Sequence[Path]) -> _ReceiptBoundary:
     if not path.is_absolute() or ".." in path.parts or not path.name:
         _fail("public readback receipt path must be absolute and canonical")
-    write_new_sbom(path, raw)
+    parent = _open_root(path.parent, "public readback receipt parent")
+    roots: list[int] = []
+    try:
+        for root in protected_roots:
+            roots.append(_open_root(root, "protected readback input"))
+        protected = frozenset(_inode(os.fstat(root)) for root in roots)
+        try:
+            if _has_ancestor(parent, protected):
+                _fail("public readback receipt parent overlaps a protected input root")
+        except OSError as exc:
+            raise SupplyChainContractError(
+                "public readback receipt ancestry could not be inspected"
+            ) from exc
+        try:
+            os.stat(path.name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise SupplyChainContractError(
+                "public readback receipt identity could not be inspected"
+            ) from exc
+        else:
+            _fail("public readback receipt path already exists or aliases an input")
+        return _ReceiptBoundary(
+            parent_inode=_inode(os.fstat(parent)),
+            protected_root_inodes=protected,
+        )
+    finally:
+        for root in roots:
+            try:
+                os.close(root)
+            except OSError:
+                pass
+        try:
+            os.close(parent)
+        except OSError:
+            pass
+
+
+def _write_new(path: Path, raw: bytes, boundary: _ReceiptBoundary) -> None:
+    write_new_immutable_bytes(
+        path,
+        raw,
+        label="public readback receipt",
+        mode=0o400,
+        partial_prefix=".searise-public-readback-",
+        required_parent_inode=boundary.parent_inode,
+        forbidden_ancestor_inodes=boundary.protected_root_inodes,
+    )
 
 
 def _verify_public_signed_subjects(
@@ -453,6 +534,11 @@ def _verify_public_signed_subjects(
     clock: Callable[[], datetime],
     reviewed_origins: Iterable[str],
 ) -> PublicReadbackVerification:
+    receipt_boundary = (
+        _receipt_boundary(receipt_path, (candidate_root, evidence_root, repository_root))
+        if receipt_path is not None
+        else None
+    )
     verification = verify_candidate_evidence_cryptographically(
         candidate_root,
         evidence_root,
@@ -515,8 +601,8 @@ def _verify_public_signed_subjects(
     }
     _validate_schema(document, "public-readback-verification-receipt.schema.json")
     raw = _canonical(document)
-    if receipt_path is not None:
-        _write_new(receipt_path, raw)
+    if receipt_path is not None and receipt_boundary is not None:
+        _write_new(receipt_path, raw, receipt_boundary)
     return PublicReadbackVerification(receipt=document, receipt_bytes=raw)
 
 

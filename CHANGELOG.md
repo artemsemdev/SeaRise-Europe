@@ -48,7 +48,9 @@ All notable changes to this project will be documented in this file.
   verification before proving public manifest and provenance bytes exactly
   match the signed subjects, with a canonical non-approval audit receipt.
   Retrieval is restricted to reviewed origins, entirely public DNS answers,
-  pinned TLS peers, direct responses, and an enforced per-subject deadline.
+  pinned TLS peers, direct responses, and an enforced per-subject deadline;
+  descriptor-bound output isolation prevents the receipt from mutating verified
+  inputs, and post-commit output failures cannot reverse durable success.
 - Added deterministic pre-sign provenance for validated real-source controlled
   candidates, with explicit nonclaims for cryptographic verification,
   production, publication, scientific approval, signing, and environment approval.

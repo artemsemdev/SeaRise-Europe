@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import http.client
+import importlib.util
 import inspect
 import json
+import os
 import socket
 import ssl
 import threading
@@ -21,6 +23,16 @@ import searise_pipeline.supply_chain.public_readback as readback
 from searise_pipeline.supply_chain import SupplyChainContractError
 from tests.supply_chain.test_candidate_evidence_pair import ROOT, _load, _pair
 from tests.supply_chain.test_sigstore_verifier import RUN_ID, _production_envelope, _tool
+
+CLI_PATH = ROOT / "scripts/release/verify_public_signed_subjects.py"
+
+
+def _cli() -> Any:
+    spec = importlib.util.spec_from_file_location("verify_public_signed_subjects_cli", CLI_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _verify(
@@ -76,6 +88,7 @@ def test_reverifies_signatures_and_emits_schema_valid_public_receipt(tmp_path: P
         ).encode()
     )
     assert (tmp_path / "public-readback.json").read_bytes() == result.receipt_bytes
+    assert (tmp_path / "public-readback.json").stat().st_mode & 0o777 == 0o400
     assert document["observedAt"] == "2026-08-12T02:00:00Z"
     assert [item["path"] for item in document["subjects"]] == [
         "manifest.json",
@@ -508,8 +521,229 @@ def test_relative_receipt_path_is_rejected_without_publication(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     with pytest.raises(SupplyChainContractError, match="absolute and canonical"):
-        readback._write_new(Path("public-readback.json"), b"{}\n")
+        readback._receipt_boundary(Path("public-readback.json"), ())
     assert not (tmp_path / "public-readback.json").exists()
+
+
+@pytest.mark.parametrize("protected_name", ["candidate", "evidence", "repository"])
+def test_receipt_below_protected_root_fails_before_verification_without_residue(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    protected_name: str,
+) -> None:
+    roots = {name: tmp_path / name for name in ("candidate", "evidence", "repository")}
+    for root in roots.values():
+        root.mkdir()
+    parent = roots[protected_name] / "audit"
+    parent.mkdir()
+    receipt = parent / "public-readback.json"
+    invoked = False
+
+    def unexpected_verification(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal invoked
+        invoked = True
+        raise AssertionError("cryptographic verification must not run")
+
+    monkeypatch.setattr(
+        readback,
+        "verify_candidate_evidence_cryptographically",
+        unexpected_verification,
+    )
+    with pytest.raises(SupplyChainContractError, match="overlaps a protected input root"):
+        readback._verify_public_signed_subjects(
+            roots["candidate"],
+            roots["evidence"],
+            repository_root=roots["repository"],
+            controlled_build_run_id="1",
+            cosign_executable=tmp_path / "cosign",
+            cosign_tool_lock=tmp_path / "cosign-lock.json",
+            trusted_cosign_tool_lock_sha256="0" * 64,
+            expected_origin="https://downloads.example.test",
+            manifest_url="https://downloads.example.test/r/manifest.json",
+            provenance_url="https://downloads.example.test/r/provenance.intoto.jsonl",
+            receipt_path=receipt,
+            fetch=lambda _url, _size: b"",
+            clock=lambda: datetime(2026, 8, 12, tzinfo=timezone.utc),
+            reviewed_origins={"https://downloads.example.test"},
+        )
+
+    assert not invoked
+    assert list(parent.iterdir()) == []
+
+
+def test_receipt_path_cannot_alias_a_verified_input_before_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "candidate"
+    evidence = tmp_path / "evidence"
+    repository = tmp_path / "repository"
+    for root in (candidate, evidence, repository):
+        root.mkdir()
+    manifest = candidate / "manifest.json"
+    manifest.write_bytes(b"preserve exact candidate bytes\n")
+    audit = tmp_path / "audit"
+    audit.mkdir()
+    receipt = audit / "public-readback.json"
+    os.link(manifest, receipt)
+    invoked = False
+
+    def unexpected_verification(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal invoked
+        invoked = True
+        raise AssertionError("cryptographic verification must not run")
+
+    monkeypatch.setattr(
+        readback,
+        "verify_candidate_evidence_cryptographically",
+        unexpected_verification,
+    )
+    with pytest.raises(SupplyChainContractError, match="already exists or aliases"):
+        readback._verify_public_signed_subjects(
+            candidate,
+            evidence,
+            repository_root=repository,
+            controlled_build_run_id="1",
+            cosign_executable=tmp_path / "cosign",
+            cosign_tool_lock=tmp_path / "cosign-lock.json",
+            trusted_cosign_tool_lock_sha256="0" * 64,
+            expected_origin="https://downloads.example.test",
+            manifest_url="https://downloads.example.test/r/manifest.json",
+            provenance_url="https://downloads.example.test/r/provenance.intoto.jsonl",
+            receipt_path=receipt,
+            fetch=lambda _url, _size: b"",
+            clock=lambda: datetime(2026, 8, 12, tzinfo=timezone.utc),
+            reviewed_origins={"https://downloads.example.test"},
+        )
+
+    assert not invoked
+    assert manifest.read_bytes() == b"preserve exact candidate bytes\n"
+    assert receipt.read_bytes() == b"preserve exact candidate bytes\n"
+
+
+def test_receipt_parent_swap_after_preflight_cannot_redirect_publication(tmp_path: Path) -> None:
+    candidate = tmp_path / "candidate"
+    evidence = tmp_path / "evidence"
+    repository = tmp_path / "repository"
+    audit = tmp_path / "audit"
+    for root in (candidate, evidence, repository, audit):
+        root.mkdir()
+    receipt = audit / "public-readback.json"
+    boundary = readback._receipt_boundary(receipt, (candidate, evidence, repository))
+    moved = tmp_path / "moved-audit"
+    audit.rename(moved)
+    audit.mkdir()
+
+    with pytest.raises(SupplyChainContractError, match="reviewed identity"):
+        readback._write_new(receipt, b"{}\n", boundary)
+
+    assert list(audit.iterdir()) == []
+    assert list(moved.iterdir()) == []
+
+
+def test_cli_emits_exact_machine_readable_success_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cli = _cli()
+    receipt = tmp_path / "public-readback.json"
+    receipt_bytes = b'{"receipt":"exact"}\n'
+    result = readback.PublicReadbackVerification(
+        receipt={
+            "candidateId": "candidate-test",
+            "controlledBuildRunId": "123",
+            "dataReleaseId": "searise-europe-v0.1.0-20260812-0123456789ab",
+            "subjects": [{"path": "manifest.json"}, {"path": "provenance.intoto.jsonl"}],
+        },
+        receipt_bytes=receipt_bytes,
+    )
+    monkeypatch.setattr(cli, "verify_public_signed_subjects", lambda *_args, **_kwargs: result)
+
+    assert cli.main(_cli_args(receipt)) == 0
+
+    expected = {
+        "candidateId": "candidate-test",
+        "controlledBuildRunId": "123",
+        "dataReleaseId": "searise-europe-v0.1.0-20260812-0123456789ab",
+        "receiptPath": str(receipt),
+        "receiptSha256": hashlib.sha256(receipt_bytes).hexdigest(),
+        "status": "verified",
+        "subjectCount": 2,
+    }
+    assert capsys.readouterr().out == json.dumps(
+        expected, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ) + "\n"
+
+
+def _cli_args(receipt: Path) -> list[str]:
+    return [
+        "--candidate-root",
+        "/candidate",
+        "--evidence-root",
+        "/evidence",
+        "--repository-root",
+        "/repository",
+        "--controlled-build-run-id",
+        "123",
+        "--cosign-executable",
+        "/tools/cosign",
+        "--cosign-tool-lock",
+        "/tools/cosign-lock.json",
+        "--trusted-cosign-tool-lock-sha256",
+        "0" * 64,
+        "--expected-origin",
+        "https://artemsemdev.github.io",
+        "--manifest-url",
+        "https://artemsemdev.github.io/release/manifest.json",
+        "--provenance-url",
+        "https://artemsemdev.github.io/release/provenance.intoto.jsonl",
+        "--receipt",
+        str(receipt),
+    ]
+
+
+@pytest.mark.parametrize("failure", ["write", "flush"])
+def test_cli_stdout_failure_cannot_reverse_durable_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+) -> None:
+    cli = _cli()
+    committed = False
+    result = readback.PublicReadbackVerification(
+        receipt={
+            "candidateId": "candidate-test",
+            "controlledBuildRunId": "123",
+            "dataReleaseId": "searise-europe-v0.1.0-20260812-0123456789ab",
+            "subjects": [{}, {}],
+        },
+        receipt_bytes=b"{}\n",
+    )
+
+    def verify(*_args: Any, **_kwargs: Any) -> readback.PublicReadbackVerification:
+        nonlocal committed
+        committed = True
+        return result
+
+    class ClosedStdout:
+        @staticmethod
+        def write(value: str) -> int:
+            if failure == "write":
+                raise BrokenPipeError("closed stdout")
+            return len(value)
+
+        @staticmethod
+        def flush() -> None:
+            if failure == "flush":
+                raise BrokenPipeError("closed stdout")
+
+    monkeypatch.setattr(cli, "verify_public_signed_subjects", verify)
+    with monkeypatch.context() as scoped:
+        scoped.setattr(cli.sys, "stdout", ClosedStdout())
+        assert cli.main(_cli_args(tmp_path / "public-readback.json")) == 0
+
+    assert committed
 
 
 def test_naive_observation_instant_is_rejected(tmp_path: Path) -> None:

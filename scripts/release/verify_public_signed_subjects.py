@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import os
 import sys
 from pathlib import Path
 
 from searise_pipeline.supply_chain import (
+    PublicReadbackVerification,
     SupplyChainContractError,
     verify_public_signed_subjects,
 )
@@ -28,6 +32,34 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _silence_stdout() -> None:
+    sys.stdout = None  # type: ignore[assignment]
+    try:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    except OSError:
+        pass
+
+
+def _emit_success(result: PublicReadbackVerification, receipt_path: Path) -> None:
+    try:
+        receipt = result.receipt
+        receipt_bytes = result.receipt_bytes
+        document = {
+            "candidateId": receipt["candidateId"],
+            "controlledBuildRunId": receipt["controlledBuildRunId"],
+            "dataReleaseId": receipt["dataReleaseId"],
+            "receiptPath": str(receipt_path),
+            "receiptSha256": hashlib.sha256(receipt_bytes).hexdigest(),
+            "status": "verified",
+            "subjectCount": len(receipt["subjects"]),
+        }
+        output = json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        sys.stdout.write(output + "\n")
+        sys.stdout.flush()
+    except (AttributeError, KeyError, OSError, TypeError, ValueError):
+        _silence_stdout()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
@@ -47,10 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, SupplyChainContractError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print(
-        f"verified {len(result.receipt['subjects'])} public signed subjects; "
-        "production, publication approval, and scientific approval not claimed"
-    )
+    _emit_success(result, args.receipt)
     return 0
 
 
