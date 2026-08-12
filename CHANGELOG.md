@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   spatial-rejected normalized records, reports decision-split quality
   dimensions, and fails closed on arithmetic, ordering, identity, or claim
   drift without making a production or publication claim.
+- Added a checked-in representative synthetic settlement browser-worker report
+  with exact shard and query identities, deterministic validation, and explicit
+  non-production and no-accepted-browser-budget status.
 - Added a receipt-bound settlement search performance harness that measures
   exact raw/compressed shard sizes, record counts, deterministic build and Node
   worker initialization/query distributions, and observed worker memory while
