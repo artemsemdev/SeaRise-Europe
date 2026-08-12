@@ -197,63 +197,15 @@ def rename_no_overwrite(root: int, source: str, target: str) -> None:
         raise OSError(code, os.strerror(code), source)
 
 
-def exchange(root: int, left: str, right: str) -> None:
-    libc = ctypes.CDLL(None, use_errno=True)
-    if sys.platform == "darwin":
-        rename = libc.renameatx_np
-    elif sys.platform.startswith("linux"):
-        rename = libc.renameat2
-    else:
-        fail("atomic browser shard exchange is unsupported")
-    rename.argtypes = (
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_int,
-        ctypes.c_char_p,
-        ctypes.c_uint,
-    )
-    rename.restype = ctypes.c_int
-    if rename(root, os.fsencode(left), root, os.fsencode(right), 2) != 0:
-        code = ctypes.get_errno()
-        raise OSError(code, os.strerror(code), left)
-
-
 def remove_owned(root: int, name: str, expected: os.stat_result) -> bool:
+    """Atomically quarantine one pathname without ever restoring it publicly."""
+    retained = f".search-shard-quarantine-{secrets.token_hex(16)}"
     try:
-        os.stat(name, dir_fd=root, follow_symlinks=False)
+        rename_no_overwrite(root, name, retained)
     except FileNotFoundError:
         return True
-    retained = f".search-shard-rollback-{secrets.token_hex(16)}"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(retained, flags, 0o600, dir_fd=root)
-    try:
-        placeholder = os.fstat(descriptor)
-        try:
-            exchange(root, name, retained)
-        except FileNotFoundError:
-            return True
-        moved = os.stat(retained, dir_fd=root, follow_symlinks=False)
-        replacement = os.stat(name, dir_fd=root, follow_symlinks=False)
-        owned = node(moved) == node(expected) and stat.S_ISREG(moved.st_mode)
-        placeholder_retained = node(replacement) == node(placeholder)
-        if not owned or not placeholder_retained:
-            try:
-                exchange(root, name, retained)
-            except OSError:
-                pass
-            return False
-        isolated = f".search-shard-placeholder-{secrets.token_hex(16)}"
-        rename_no_overwrite(root, name, isolated)
-        moved_placeholder = os.stat(isolated, dir_fd=root, follow_symlinks=False)
-        if node(moved_placeholder) == node(placeholder):
-            return True
-        try:
-            rename_no_overwrite(root, isolated, name)
-        except OSError:
-            pass
-        return False
-    finally:
-        os.close(descriptor)
+    moved = os.stat(retained, dir_fd=root, follow_symlinks=False)
+    return node(moved) == node(expected) and stat.S_ISREG(moved.st_mode)
 
 
 def close_all(opened: list[tuple[dict[str, object], int, os.stat_result]]) -> None:
@@ -313,6 +265,8 @@ def publish(
                 fail("browser shard output exists; overwrite is refused")
             except FileNotFoundError:
                 pass
+        for item in artifacts:
+            final = str(item["name"])
             temporary = f".search-shard-{secrets.token_hex(16)}"
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
             descriptor = os.open(temporary, flags, 0o600, dir_fd=root)

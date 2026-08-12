@@ -16,7 +16,7 @@ import {
   brotliDecompressSync,
   constants as zlibConstants,
 } from "node:zlib";
-import { miniSearchAdapter } from "../evaluation/adapters";
+import { MINI_SEARCH_POSTING_VISIT_LIMIT, miniSearchAdapter } from "../evaluation/adapters";
 import {
   normalizeSearchText,
   prepareCandidateDocuments,
@@ -66,33 +66,6 @@ const SCRIPT_CODES = new Set([
   "Hebr", "Hira", "Jpan", "Kana", "Knda", "Kore", "Laoo", "Latn", "Mlym", "Mymr", "Sinh",
   "Taml", "Telu", "Thai", "Tibt",
 ]);
-const SCRIPT_MATCHERS: ReadonlyArray<readonly [string, RegExp]> = [
-  ["Arab", new RegExp("\\p{Script=Arabic}", "u")],
-  ["Armn", new RegExp("\\p{Script=Armenian}", "u")],
-  ["Beng", new RegExp("\\p{Script=Bengali}", "u")],
-  ["Cyrl", new RegExp("\\p{Script=Cyrillic}", "u")],
-  ["Deva", new RegExp("\\p{Script=Devanagari}", "u")],
-  ["Geor", new RegExp("\\p{Script=Georgian}", "u")],
-  ["Grek", new RegExp("\\p{Script=Greek}", "u")],
-  ["Gujr", new RegExp("\\p{Script=Gujarati}", "u")],
-  ["Guru", new RegExp("\\p{Script=Gurmukhi}", "u")],
-  ["Hang", new RegExp("\\p{Script=Hangul}", "u")],
-  ["Hani", new RegExp("\\p{Script=Han}", "u")],
-  ["Hebr", new RegExp("\\p{Script=Hebrew}", "u")],
-  ["Hira", new RegExp("\\p{Script=Hiragana}", "u")],
-  ["Kana", new RegExp("\\p{Script=Katakana}", "u")],
-  ["Knda", new RegExp("\\p{Script=Kannada}", "u")],
-  ["Laoo", new RegExp("\\p{Script=Lao}", "u")],
-  ["Latn", new RegExp("\\p{Script=Latin}", "u")],
-  ["Mlym", new RegExp("\\p{Script=Malayalam}", "u")],
-  ["Mymr", new RegExp("\\p{Script=Myanmar}", "u")],
-  ["Sinh", new RegExp("\\p{Script=Sinhala}", "u")],
-  ["Taml", new RegExp("\\p{Script=Tamil}", "u")],
-  ["Telu", new RegExp("\\p{Script=Telugu}", "u")],
-  ["Thai", new RegExp("\\p{Script=Thai}", "u")],
-  ["Tibt", new RegExp("\\p{Script=Tibetan}", "u")],
-];
-const LETTER = new RegExp("\\p{L}", "u");
 const ALL_COUNTRIES_LINEAGE = {
   asset_id: "all-countries", source_file: "allCountries.txt", source_release: "2026-08-10",
   source_sha256: "4217bcadfce0d86d7f39244259dbbb96e5d1a610faedc3b4761bb96dcc492bf8",
@@ -168,6 +141,7 @@ export type BrowserShard = {
     fuzzyDistance: "banded-levenshtein-max-2-v1";
     normalizationVersion: "unicode-nfkd-lowercase-v1";
     orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1";
+    postingVisitLimit: 250000;
     resultLimit: 100;
   };
   merge: {
@@ -335,27 +309,21 @@ function boundedText(value: unknown, label: string, nullable = false): value is 
   return true;
 }
 
-function calendarDate(value: unknown): value is string {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+function boundedSourceText(value: unknown, label: string): value is string;
+function boundedSourceText(value: unknown, label: string, nullable: true): value is string | null;
+function boundedSourceText(value: unknown, label: string, nullable = false): value is string | null {
+  if (nullable && value === null) return true;
+  if (typeof value !== "string" || !value || Array.from(value).length > MAX_NAME_CODE_POINTS) {
+    fail(`${label} is not bounded source text`);
+  }
+  normalizeSearchText(value);
+  return true;
 }
 
-function detectedScript(value: string): string | null {
-  const scripts = new Set<string>();
-  for (const point of value.normalize("NFC")) {
-    if (!LETTER.test(point)) continue;
-    const matched = SCRIPT_MATCHERS.find(([, expression]) => expression.test(point));
-    if (matched) scripts.add(matched[0]);
-  }
-  const values = Array.from(scripts);
-  if (values.every((code) => ["Hani", "Hira", "Kana"].includes(code)) && scripts.size > 1) {
-    return "Jpan";
-  }
-  if (values.every((code) => ["Hani", "Hang"].includes(code)) && scripts.size > 1) {
-    return "Kore";
-  }
-  return scripts.size === 1 ? values[0] : null;
+function calendarDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^(?!0000)\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function nameMetadata(value: unknown, canonicalName: boolean): value is Record<string, unknown> {
@@ -365,8 +333,7 @@ function nameMetadata(value: unknown, canonicalName: boolean): value is Record<s
     : !(value.language === null || (typeof value.language === "string" && /^[a-z]{2,3}$/.test(value.language)))) {
     return false;
   }
-  return (value.script === null || (typeof value.script === "string" && SCRIPT_CODES.has(value.script)))
-    && value.script === detectedScript(value.value as string);
+  return value.script === null || (typeof value.script === "string" && SCRIPT_CODES.has(value.script));
 }
 
 function exactLineage(item: Record<string, unknown>, expected: Record<string, string>): boolean {
@@ -459,14 +426,14 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
   const alternateLineage = Array.isArray(lineage) ? lineage.slice(hasAdminLineage ? 2 : 1) : [];
   const lineageIdentities = Array.isArray(lineage)
     ? lineage.map((item) => canonical(item)) : [];
-  if (value.canonicalName.value !== value.sourceSpelling
-      || !boundedText(value.sourceSpelling, "search projection source spelling")
-      || !boundedText(value.asciiName, "search projection ASCII name")
+  if (!boundedSourceText(value.sourceSpelling, "search projection source spelling")
+      || value.canonicalName.value !== value.sourceSpelling.normalize("NFC")
+      || !boundedSourceText(value.asciiName, "search projection ASCII name")
       || typeof value.countryCode !== "string" || !/^[A-Z]{2}$/.test(value.countryCode)
       || !nullableText(value.admin1Code)
       || (typeof value.admin1Code === "string"
         && (!value.admin1Code || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value.admin1Code)))
-      || !boundedText(value.admin1Name, "search projection admin1 name", true)
+      || !boundedSourceText(value.admin1Name, "search projection admin1 name", true)
       || (value.admin1Name !== null && (value.admin1Code === null || !hasAdminLineage))
       || typeof featureCode !== "string" || !INCLUDED_FEATURE_CODES.has(featureCode)
       || !calendarDate(value.sourceUpdatedAt)
@@ -495,8 +462,8 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
     .reduce<number>((total, item) => total + Array.from(item).length, 0);
   if (namePoints > MAX_RECORD_NAME_CODE_POINTS) fail("search projection names exceed their record limit");
   const searchNames = Array.from(new Set([
-    value.sourceSpelling,
-    value.asciiName,
+    value.sourceSpelling.normalize("NFC"),
+    value.asciiName.normalize("NFC"),
     ...names.map((item) => item.value),
   ] as string[]));
   [value.canonicalName.value, ...searchNames, value.countryCode, value.admin1Name ?? ""]
@@ -509,7 +476,7 @@ function projectionDocument(raw: Buffer, previous: bigint): { id: bigint; member
       displayName: value.canonicalName.value as string,
       searchNames,
       countryCode: value.countryCode,
-      admin1Name: value.admin1Name as string | null,
+      admin1Name: value.admin1Name === null ? null : value.admin1Name.normalize("NFC"),
       population: population as number | null,
       featureCode,
       distanceToCoastMeters: distance as number,
@@ -639,6 +606,7 @@ function shardRaw(projection: ParsedProjection, shardId: ShardId, limits: Readon
       fuzzyDistance: "banded-levenshtein-max-2-v1",
       normalizationVersion: "unicode-nfkd-lowercase-v1",
       orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
+      postingVisitLimit: MINI_SEARCH_POSTING_VISIT_LIMIT,
       resultLimit: MAX_SEARCH_RESULTS,
     },
     merge: {
@@ -773,6 +741,7 @@ export function decodeBrowserShard(
         fuzzyDistance: "banded-levenshtein-max-2-v1",
         normalizationVersion: "unicode-nfkd-lowercase-v1",
         orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1",
+        postingVisitLimit: MINI_SEARCH_POSTING_VISIT_LIMIT,
         resultLimit: MAX_SEARCH_RESULTS,
       })
       || canonical(value.merge) !== canonical({

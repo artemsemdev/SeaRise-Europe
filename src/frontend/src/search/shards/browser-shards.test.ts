@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { brotliCompressSync, brotliDecompressSync, constants as zlibConstants } from "node:zlib";
+import MiniSearch from "minisearch";
 import { describe, expect, it, vi } from "vitest";
 import { miniSearchAdapter } from "../evaluation/adapters";
 import { prepareCandidateDocuments, rankDocuments } from "../evaluation/search";
@@ -149,6 +150,31 @@ describe("receipt-bound browser search shards", () => {
     expect(rankDocuments("x".repeat(250), candidates)).toEqual([]);
   });
 
+  it.each([
+    ["Cafe\u0301", "Café", "Latn"],
+    ["東京ー", "東京ー", "Jpan"],
+  ])("consumes producer-emitted source and script metadata for %s", (source, canonical, script) => {
+    const { projection, output } = projectionFrom((_header, documents) => {
+      const document = documents[0];
+      document.sourceSpelling = source; document.canonicalName = { language: null, script, value: canonical };
+      document.asciiName = "Cafe"; document.admin1Name = "Exam\u0301ple";
+    });
+    buildBrowserSearchShards(projection, output);
+    const record = loadBrowserSearchShards(projection, output).shards["europe-core"].shard.records[0];
+    expect(record.displayName).toBe(canonical);
+    expect(record.admin1Name).toBe("Exaḿple");
+  });
+
+  it("retrieves an advertised two-edit fuzzy match", () => {
+    const { projection, output } = projectionFrom((_header, documents) => {
+      const document = documents[0];
+      document.sourceSpelling = document.canonicalName.value = document.asciiName = "Springfield";
+    });
+    buildBrowserSearchShards(projection, output);
+    const shard = loadBrowserSearchShards(projection, output).shards["europe-core"].shard;
+    expect(searchBrowserShard(shard, "sprangfiold")[0]?.placeId).toBe("geonames:101");
+  });
+
   it("hands receipt-gated decoded bytes to the consumer without reopening paths", () => {
     const built = build();
     const loaded = loadBrowserSearchShards(fixture, built.output);
@@ -225,13 +251,14 @@ describe("receipt-bound browser search shards", () => {
   );
 
   it.each([
-    "calendar-date", "feature-code", "empty-ascii", "empty-admin", "duplicate-alternate",
+    "calendar-date", "year-zero", "feature-code", "empty-ascii", "empty-admin", "duplicate-alternate",
     "canonical-language", "script", "source-spelling", "first-lineage-id", "lineage-pin",
     "lineage-order", "missing-alternate-lineage", "provenance", "geometry", "stage-version",
   ])("rejects producer-impossible or public-contract-invalid %s semantics", (mutation) => {
     const { projection, output } = projectionFrom((header, documents) => {
       const document = documents[0];
       if (mutation === "calendar-date") document.sourceUpdatedAt = "2026-99-99";
+      if (mutation === "year-zero") document.sourceUpdatedAt = "0000-01-01";
       if (mutation === "feature-code") document.featureCode = "PPLX";
       if (mutation === "empty-ascii") document.asciiName = "";
       if (mutation === "empty-admin") document.admin1Name = "";
@@ -240,7 +267,7 @@ describe("receipt-bound browser search shards", () => {
         document.lineage.push({ ...document.lineage.at(-1), source_line: 9101, source_record_id: 9101 });
       }
       if (mutation === "canonical-language") document.canonicalName.language = "en";
-      if (mutation === "script") document.canonicalName.script = "Cyrl";
+      if (mutation === "script") document.canonicalName.script = "Unknown";
       if (mutation === "source-spelling") document.sourceSpelling = "Different";
       if (mutation === "first-lineage-id") document.lineage[0].source_record_id = 999;
       if (mutation === "lineage-pin") document.lineage[0].source_sha256 = "0".repeat(64);
@@ -289,10 +316,10 @@ describe("receipt-bound browser search shards", () => {
     }
   );
 
-  it("caps returned results independently of the candidate-search cap", () => {
+  it("caps engine materialization before the public result cap", () => {
     const { projection, output } = projectionFrom((_header, documents) => {
       const template = documents[0];
-      documents.splice(0, documents.length, ...Array.from({ length: 101 }, (_, index) => {
+      documents.splice(0, documents.length, ...Array.from({ length: 150 }, (_, index) => {
         const id = 1000 + index;
         const document = structuredClone(template);
         document.placeId = `geonames:${id}`;
@@ -308,7 +335,15 @@ describe("receipt-bound browser search shards", () => {
     });
     buildBrowserSearchShards(projection, output);
     const loaded = loadBrowserSearchShards(projection, output);
-    expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
+    const original = MiniSearch.prototype.search; let materialized = 0;
+    const search = vi.spyOn(MiniSearch.prototype, "search").mockImplementation(function (this: MiniSearch, ...args) {
+      const results = original.apply(this, args); materialized = Math.max(materialized, results.length);
+      return results;
+    });
+    try {
+      expect(searchBrowserShard(loaded.shards["europe-core"].shard, "common")).toHaveLength(100);
+      expect(materialized).toBe(128);
+    } finally { search.mockRestore(); }
   });
 
   it("applies public-contract value checks when decoding standalone shards", () => {

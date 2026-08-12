@@ -68,6 +68,7 @@ function built(value: unknown): BuiltIndex {
 
 type MiniDocument = { id: number; terms: string };
 const MINI_OPTIONS_SHA256 = sha256("minisearch-7.2.0|fields=terms|id=id|tokenize=unicode-v1|process=identity|store=none");
+export const MINI_SEARCH_POSTING_VISIT_LIMIT = 250_000;
 function miniOptions() {
   return {
     fields: ["terms"], idField: "id", storeFields: [],
@@ -98,9 +99,25 @@ export const miniSearchAdapter: CandidateAdapter = {
     return { binding: expected, index: MiniSearch.loadJSON<MiniDocument>(payload, miniOptions()) };
   },
   search(value, query, limit) {
-    const fuzzy = Array.from(normalizeSearchText(query)).length < 4 ? false : 1;
-    return (built(value).index as MiniSearch<MiniDocument>).search(query, { prefix: true, fuzzy, combineWith: "AND" })
-      .slice(0, limit).map((result) => Number(result.id));
+    if (!Number.isSafeInteger(limit) || limit < 1) throw new Error("MiniSearch candidate limit is invalid");
+    const length = Array.from(normalizeSearchText(query)).length;
+    const fuzzy = length < 4 ? false : length < 8 ? 1 : 2;
+    const accepted = new Set<unknown>();
+    let postingVisits = 0;
+    const results = (built(value).index as MiniSearch<MiniDocument>).search(query, {
+      prefix: true, fuzzy, maxFuzzy: 2, combineWith: "AND",
+      boostDocument: (id) => {
+        if (++postingVisits > MINI_SEARCH_POSTING_VISIT_LIMIT) {
+          throw new Error("MiniSearch query exceeds its posting-visit limit");
+        }
+        if (accepted.has(id)) return 1;
+        if (accepted.size >= limit) return 0;
+        accepted.add(id);
+        return 1;
+      },
+    });
+    if (results.length > limit) throw new Error("MiniSearch materialized too many candidates");
+    return results.map((result) => Number(result.id));
   },
 };
 

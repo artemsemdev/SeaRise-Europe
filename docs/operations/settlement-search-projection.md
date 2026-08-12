@@ -45,9 +45,12 @@ alternate rows for one place, and at most 7,354 aggregate alternate-name code
 points for one place. The browser boundary deliberately rounds these upward to
 256 code points per name, 1,024 alternates, and 16,384 aggregate name code
 points per record. A query is limited to 256 code points, MiniSearch may hand at
-most 128 candidates to bounded edit-distance ranking, and the public search helper
-returns at most 100 results. These are versioned safety bounds, not claims about
-GeoNames completeness.
+most 128 candidates to bounded edit-distance-two ranking, MiniSearch posting
+evaluation fails closed after 250,000 visits, and the public search helper returns
+at most 100 results. Source spelling is checked against the producer-emitted NFC
+canonical spelling; producer-emitted script metadata is consumed without a
+second, runtime-divergent Unicode classifier. These are versioned safety bounds,
+not claims about GeoNames completeness.
 
 ```bash
 cd src/frontend
@@ -61,14 +64,15 @@ On macOS or Linux with Python 3.9 or newer, the builder performs stable
 descriptor-bound reads, bounded Brotli decompression, exclusive descriptor-
 relative staging, and no-overwrite promotion through a held owner-controlled
 output directory.
-It syncs both final single-link shards before atomically promoting and syncing
+It preflights the complete three-name inventory before payload I/O, then syncs
+both final single-link shards before atomically promoting and syncing
 `settlement-browser-search-shards.receipt.json` as the canonical completion
-marker. Cleanup never unlinks a pathname: it uses atomic exchange with a held,
-owned placeholder and retains owned artifacts under high-entropy diagnostic
-hidden names. A replacement or collision is restored or retained under another
-diagnostic hidden name; a foreign inode is never deleted. Every created staging
-entry is registered before payload I/O, so write, hash, sync, metadata, or close
-failure leaves at most bounded diagnostic residue and no owned public final name.
+marker. Cleanup never unlinks or restores a pathname: one atomic no-overwrite
+rename quarantines whatever inode occupies an owned name under a high-entropy
+diagnostic name. A foreign inode is preserved and no helper placeholder ever
+occupies a public final name. Every created staging entry is registered before
+payload I/O, so one invocation leaves at most one diagnostic entry per staged or
+promoted artifact; retries against an unchanged existing final name stage nothing.
 
 Consumers must treat the set as absent until that exact receipt exists. Use
 `loadBrowserSearchShards` for the receipt-gated handoff: it opens the output root

@@ -246,7 +246,7 @@ def early_failure_cleanup() -> None:
             browser_fs.os.fstat = original_fstat
             browser_fs.os.close = original_close
             original_close(root)
-        assert_hidden_residue(output, 2)
+        assert_hidden_residue(output, 1)
 
 
 def foreign_cleanup_race() -> None:
@@ -256,145 +256,49 @@ def foreign_cleanup_race() -> None:
     os.write(owned, b"owned")
     expected = os.fstat(owned)
     os.close(owned)
-    os.unlink("owned", dir_fd=root)
-    foreign = os.open("owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root)
-    os.write(foreign, b"foreign")
-    os.close(foreign)
-    assert not browser_fs.remove_owned(root, "owned", expected)
-    assert (output / "owned").read_bytes() == b"foreign"
-    os.close(root)
+    original_rename = browser_fs.rename_no_overwrite
+    replaced = False
 
-
-def foreign_restore_collision() -> None:
-    output = Path(tempfile.mkdtemp(prefix="browser-shard-foreign-collision-"))
-    root = browser_fs.open_root(output)
-    original_owned = os.open(
-        "owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root
-    )
-    expected = os.fstat(original_owned)
-    os.close(original_owned)
-    os.unlink("owned", dir_fd=root)
-    foreign = os.open("owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root)
-    os.write(foreign, b"foreign")
-    os.close(foreign)
-    original = browser_fs.exchange
-    exchanges = 0
-
-    def collide(descriptor: int, left: str, right: str) -> None:
-        nonlocal exchanges
-        original(descriptor, left, right)
-        exchanges += 1
-        if exchanges == 1:
-            os.unlink(left, dir_fd=descriptor)
-            blocker = os.open(
-                left, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=descriptor
-            )
-            os.write(blocker, b"blocker")
-            os.close(blocker)
-
-    browser_fs.exchange = collide
-    try:
-        assert not browser_fs.remove_owned(root, "owned", expected)
-    finally:
-        browser_fs.exchange = original
-        os.close(root)
-    assert (output / "owned").read_bytes() == b"foreign"
-    assert any(
-        path.read_bytes() == b"blocker"
-        for path in output.iterdir()
-        if path.name != "owned"
-    )
-
-
-def replacement_after_placeholder_stat() -> None:
-    output = Path(tempfile.mkdtemp(prefix="browser-shard-placeholder-race-"))
-    root = browser_fs.open_root(output)
-    owned = os.open("owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root)
-    expected = os.fstat(owned)
-    os.close(owned)
-    original = browser_fs.os.stat
-    swapped = False
-    owned_stats = 0
-
-    def swap_after_stat(
-        path: object, *args: object, **kwargs: object
-    ) -> os.stat_result:
-        nonlocal swapped
-        nonlocal owned_stats
-        result = original(path, *args, **kwargs)
-        if path == "owned":
-            owned_stats += 1
-        if path == "owned" and owned_stats == 2 and not swapped:
-            swapped = True
-            os.unlink("owned", dir_fd=root)
+    def replace_before_quarantine(descriptor: int, source: str, target: str) -> None:
+        nonlocal replaced
+        if source == "owned" and not replaced:
+            replaced = True
+            os.rename("owned", "attacker-held-owned", src_dir_fd=root, dst_dir_fd=root)
             foreign = os.open(
                 "owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root
             )
             os.write(foreign, b"foreign")
             os.close(foreign)
-        return result
-
-    browser_fs.os.stat = swap_after_stat
-    try:
-        assert not browser_fs.remove_owned(root, "owned", expected)
-    finally:
-        browser_fs.os.stat = original
-        os.close(root)
-    assert swapped and (output / "owned").read_bytes() == b"foreign"
-
-
-def replacement_restore_collision() -> None:
-    output = Path(tempfile.mkdtemp(prefix="browser-shard-restore-collision-"))
-    root = browser_fs.open_root(output)
-    owned = os.open("owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root)
-    expected = os.fstat(owned)
-    os.close(owned)
-    original_stat = browser_fs.os.stat
-    original_rename = browser_fs.rename_no_overwrite
-    owned_stats = 0
-    isolated_move = False
-
-    def swap_after_stat(
-        path: object, *args: object, **kwargs: object
-    ) -> os.stat_result:
-        nonlocal owned_stats
-        result = original_stat(path, *args, **kwargs)
-        if path == "owned":
-            owned_stats += 1
-            if owned_stats == 2:
-                os.unlink("owned", dir_fd=root)
-                foreign = os.open(
-                    "owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root
-                )
-                os.write(foreign, b"foreign")
-                os.close(foreign)
-        return result
-
-    def collide(descriptor: int, source: str, target: str) -> None:
-        nonlocal isolated_move
         original_rename(descriptor, source, target)
-        if source == "owned" and target.startswith(".search-shard-placeholder-"):
-            isolated_move = True
-            blocker = os.open(
-                "owned", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=root
-            )
-            os.write(blocker, b"blocker")
-            os.close(blocker)
 
-    browser_fs.os.stat = swap_after_stat
-    browser_fs.rename_no_overwrite = collide
+    browser_fs.rename_no_overwrite = replace_before_quarantine
     try:
         assert not browser_fs.remove_owned(root, "owned", expected)
     finally:
-        browser_fs.os.stat = original_stat
         browser_fs.rename_no_overwrite = original_rename
         os.close(root)
-    assert isolated_move and (output / "owned").read_bytes() == b"blocker"
-    assert any(
-        path.read_bytes() == b"foreign"
-        for path in output.iterdir()
-        if path.name != "owned"
-    )
+    assert replaced and not (output / "owned").exists()
+    assert (output / "attacker-held-owned").read_bytes() == b"owned"
+    assert any(path.read_bytes() == b"foreign" for path in output.iterdir())
+
+
+def existing_outputs_do_not_stage_on_retry() -> None:
+    artifacts, payload = inventory()
+    for existing in browser_fs.NAMES:
+        output = Path(tempfile.mkdtemp(prefix="browser-shard-existing-"))
+        (output / existing).write_bytes(b"foreign")
+        before = {path.name: path.read_bytes() for path in output.iterdir()}
+        for _ in range(3):
+            root = browser_fs.open_root(output)
+            try:
+                expect_failure(
+                    lambda: browser_fs.publish(
+                        root, output, artifacts, io.BytesIO(payload)
+                    )
+                )
+            finally:
+                os.close(root)
+            assert {path.name: path.read_bytes() for path in output.iterdir()} == before
 
 
 def final_identity_pass() -> None:
@@ -426,7 +330,7 @@ def final_identity_pass() -> None:
         browser_fs.read_opened = original
         os.close(root)
     assert changed
-    assert_hidden_residue(output, 12)
+    assert_hidden_residue(output, 3)
 
 
 def final_link_replacement() -> None:
@@ -459,11 +363,9 @@ def final_link_replacement() -> None:
     finally:
         browser_fs.rename_no_overwrite = original
         os.close(root)
-    assert replaced and (output / browser_fs.NAMES[0]).read_bytes() == b"foreign"
-    assert all(
-        path.name == browser_fs.NAMES[0] or path.name.startswith(".search-shard-")
-        for path in output.iterdir()
-    )
+    assert replaced and not any((output / name).exists() for name in browser_fs.NAMES)
+    assert all(path.name.startswith(".search-shard-") for path in output.iterdir())
+    assert any(path.read_bytes() == b"foreign" for path in output.iterdir())
 
 
 publication_phases()
@@ -473,9 +375,7 @@ receipt_recheck()
 displaced_read()
 early_failure_cleanup()
 foreign_cleanup_race()
-foreign_restore_collision()
-replacement_after_placeholder_stat()
-replacement_restore_collision()
+existing_outputs_do_not_stage_on_retry()
 final_identity_pass()
 final_link_replacement()
 print("browser shard filesystem adversarial checks passed")
