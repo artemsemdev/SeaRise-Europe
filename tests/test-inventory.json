@@ -151,7 +151,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-12T08:54:00+02:00",
       "reference": "src/pipeline/tests/supply_chain/test_evidence_retention.py",
-      "environment": "macOS arm64; Python 3.9.6; 9 deterministic immutable-handoff, receipt-binding, no-overwrite, and failure-injection tests passed over isolated synthetic candidate evidence"
+      "environment": "macOS arm64; Python 3.9.6; 19 deterministic local-handoff, public validation, exact-byte authority, race, no-overwrite, and failure-injection tests passed in 235.57 seconds over isolated synthetic and real byte-gated candidate evidence"
     },
     "local-2026-08-11-real-python-graphs": {
       "kind": "local-measurement",
@@ -589,11 +589,11 @@
       "id": "pipeline-supply-chain-contract",
       "layer": "security",
       "owner": "security",
-      "purpose": "Keep signed-candidate evidence, immutable release-lifetime retention, deterministic CycloneDX generation, reviewed Python graph authority, and dependency exceptions fail-closed.",
-      "sourcePaths": ["contracts/supply-chain/**", "scripts/release/retain_release_evidence.py", "scripts/release/validate_build_plane_sbom.py", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
-      "changedPaths": ["contracts/supply-chain/**", "scripts/release/retain_release_evidence.py", "scripts/release/validate_build_plane_sbom.py", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
+      "purpose": "Keep signed-candidate evidence, exact local release-evidence handoffs, deterministic CycloneDX generation, reviewed Python graph authority, and dependency exceptions fail-closed.",
+      "sourcePaths": ["contracts/supply-chain/**", "scripts/release/retain_release_evidence.py", "scripts/release/validate_release_evidence_retention.py", "scripts/release/validate_build_plane_sbom.py", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
+      "changedPaths": ["contracts/supply-chain/**", "scripts/release/retain_release_evidence.py", "scripts/release/validate_release_evidence_retention.py", "scripts/release/validate_build_plane_sbom.py", "scripts/release/validate_supply_chain_contract.py", "src/pipeline/searise_pipeline/supply_chain/**", "src/pipeline/tests/supply_chain/**"],
       "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent signed-subject, pinned-identity, SBOM, exception-expiry, cryptographic-verification, public-readback, and immutable release-retention boundary." },
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent signed-subject, pinned-identity, SBOM, exception-expiry, cryptographic-verification, public-readback, and exact local evidence-handoff boundary." },
       "commands": { "focused": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests/supply_chain -q", "full": "PYTHONPATH=src/pipeline python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-11-real-python-graphs", "scope": "focused-suite" },

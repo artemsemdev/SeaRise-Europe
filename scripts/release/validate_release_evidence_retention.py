@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build one exact local no-overwrite supply-chain evidence handoff."""
+"""Validate one exact local release evidence handoff without external policy claims."""
 
 from __future__ import annotations
 
@@ -11,28 +11,16 @@ from pathlib import Path
 
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
-    retain_release_evidence,
+    validate_release_evidence_retention,
 )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--candidate-root", type=Path, required=True)
-    parser.add_argument("--evidence-root", type=Path, required=True)
-    parser.add_argument("--cryptographic-receipt", type=Path, required=True)
-    parser.add_argument("--public-readback-receipt", type=Path, required=True)
-    parser.add_argument("--repository-root", type=Path, required=True)
-    parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--retention-root", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        result = retain_release_evidence(
-            args.candidate_root,
-            args.evidence_root,
-            args.cryptographic_receipt,
-            args.public_readback_receipt,
-            args.output_root,
-            repository_root=args.repository_root,
-        )
+        result = validate_release_evidence_retention(args.retention_root)
     except (OSError, SupplyChainContractError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
