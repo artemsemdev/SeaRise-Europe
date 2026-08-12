@@ -18,7 +18,13 @@ from . import search_projection as projection
 from . import spatial_asset_authority as authority
 from . import spatial_classification_stage as spatial_stage
 from . import spatial_stage_runner as publication
-from .catalogue import REJECTION_PRECEDENCE, CataloguePlace, CatalogueRejection
+from .catalogue import (
+    REJECTION_PRECEDENCE,
+    CatalogueContextNotice,
+    CataloguePlace,
+    CatalogueRejection,
+)
+from .spatial_classification import CORE_CAPITAL_FEATURE_CODES
 
 RECONCILIATION_SCHEMA_VERSION = "1.0.0"
 RECONCILIATION_SCHEMA_ID = (
@@ -44,7 +50,7 @@ PLACE_DIMENSIONS = (
 )
 NAME_DIMENSIONS = ("languages", "scripts")
 MAX_DIMENSION_KEYS = 8192
-RECONCILIATION_MEMORY_LIMIT = "4GiB"
+RECONCILIATION_MEMORY_LIMIT = source_stage.MEMORY_LIMIT
 CATALOGUE_REJECTION_REASONS = frozenset(REJECTION_PRECEDENCE)
 SPATIAL_REJECTION_REASONS = frozenset({"outside-support"})
 
@@ -88,10 +94,8 @@ def _assert_connection_limits(connection: Any) -> None:
         "SELECT current_setting('threads'), current_setting('memory_limit'), "
         "current_setting('temp_directory')"
     ).fetchone()
-    if actual != (1, "4.0 GiB", ""):
-        raise SettlementReconciliationError(
-            "reconciliation DuckDB limits were not retained"
-        )
+    if actual != (1, "1.0 GiB", ""):
+        raise SettlementReconciliationError("reconciliation DuckDB limits were not retained")
 
 
 def _configure_connection(connection: Any) -> None:
@@ -101,6 +105,50 @@ def _configure_connection(connection: Any) -> None:
     connection.execute(f"SET memory_limit='{RECONCILIATION_MEMORY_LIMIT}'")
     connection.execute("SET temp_directory=''")
     _assert_connection_limits(connection)
+
+
+def _ordered_rows(
+    connection: Any,
+    table: str,
+    columns: str,
+) -> Iterator[tuple[Any, ...]]:
+    """Stream deterministic stage storage order and reject any physical drift."""
+
+    previous = 0
+    with closing(connection.cursor()) as cursor:
+        cursor.execute(f"SELECT {columns} FROM {table}")
+        for row in catalogue_stage._rows(cursor, catalogue_stage.MAX_BATCH_ROWS):
+            geoname_id = row[0]
+            if type(geoname_id) is not int or geoname_id <= previous:
+                raise SettlementReconciliationError(
+                    f"{table} storage keys are duplicate or unordered"
+                )
+            previous = geoname_id
+            yield row
+
+
+def _catalogue_logical_hash(connection: Any, table: str) -> str:
+    if table in catalogue_stage._COUNT_TABLES:
+        return catalogue_stage._logical_hash(connection, table)
+    columns = "geoname_id, place_id, document"
+    kinds = {
+        "catalogue_places": CataloguePlace,
+        "catalogue_rejections": CatalogueRejection,
+        "catalogue_context_notices": CatalogueContextNotice,
+    }
+    if table != "catalogue_places":
+        columns = "geoname_id, place_id, reason, document"
+    digest = hashlib.sha256()
+    for row in _ordered_rows(connection, table, columns):
+        item = catalogue_stage._document(kinds[table], row[-1], f"{table} document")
+        geoname_id, place_id = row[:2]
+        identifier = item.id if table == "catalogue_places" else item.place_id
+        if identifier != place_id or place_id != f"geonames:{geoname_id}":
+            raise SettlementReconciliationError(f"{table} keys differ from canonical JSON")
+        if table != "catalogue_places" and item.reason != row[2]:
+            raise SettlementReconciliationError(f"{table} reason differs from canonical JSON")
+        digest.update(row[-1].encode("utf-8") + b"\n")
+    return digest.hexdigest()
 
 
 def _canonical(value: object) -> bytes:
@@ -145,7 +193,21 @@ def _catalogue_authority(
         or set(candidate["counts"]) != _CATALOGUE_COUNT_KEYS
     ):
         raise SettlementReconciliationError("catalogue candidate identity differs")
-    stage_binding = spatial_stage._catalogue_authority(connection, receipt)
+    catalogue_stage._validate_receipt(candidate, receipt)
+    catalogue_stage._validate_schema(connection)
+    tables = {**catalogue_stage._DOCUMENT_TABLES, **catalogue_stage._COUNT_TABLES}
+    for table, count_name in tables.items():
+        count = source_stage._first_scalar(connection, f"SELECT count(*) FROM {table}")
+        if count != candidate["counts"][count_name]:
+            raise SettlementReconciliationError(f"catalogue authority {table} count differs")
+        if _catalogue_logical_hash(connection, table) != candidate["logicalHashes"][count_name]:
+            raise SettlementReconciliationError(f"catalogue authority {table} hash differs")
+    stage_binding = {
+        "receiptSha256": hashlib.sha256(raw).hexdigest(),
+        "stageSchemaVersion": candidate["catalogueStageSchemaVersion"],
+        "deterministicIdentity": candidate["deterministicIdentity"],
+        "normalizedPlacesSha256": candidate["logicalHashes"]["normalizedPlaces"],
+    }
     return (
         candidate,
         {
@@ -184,11 +246,10 @@ def _reject_reserved_output(
             source_directory = stack.enter_context(
                 authority._open_directory_path(database.parent, f"{label} source directory")
             )
-            if (
-                (source_directory.device, source_directory.inode)
-                == (output_directory.device, output_directory.inode)
-                and output_name == f"{database.name}.wal"
-            ):
+            if (source_directory.device, source_directory.inode) == (
+                output_directory.device,
+                output_directory.inode,
+            ) and output_name == f"{database.name}.wal":
                 raise SettlementReconciliationError(
                     f"reconciliation output collides with the reserved {label} DuckDB WAL"
                 )
@@ -262,32 +323,124 @@ def _buckets(counters: Mapping[str, Counter[str]]) -> list[dict[str, Any]]:
 def _catalogue_rejections(connection: Any) -> Counter[str]:
     counts: Counter[str] = Counter()
     previous = 0
-    with closing(connection.cursor()) as cursor:
-        cursor.execute(
-            "SELECT geoname_id, place_id, reason, document "
-            "FROM catalogue_rejections ORDER BY geoname_id"
-        )
-        for geoname_id, place_id, reason, raw in catalogue_stage._rows(
-            cursor, catalogue_stage.MAX_BATCH_ROWS
+    for geoname_id, place_id, reason, raw in _ordered_rows(
+        connection,
+        "catalogue_rejections",
+        "geoname_id, place_id, reason, document",
+    ):
+        item = catalogue_stage._document(CatalogueRejection, raw, "catalogue rejection")
+        if (
+            type(geoname_id) is not int
+            or geoname_id <= previous
+            or place_id != f"geonames:{geoname_id}"
+            or item.place_id != place_id
+            or item.reason != reason
         ):
-            item = catalogue_stage._document(CatalogueRejection, raw, "catalogue rejection")
-            if (
-                type(geoname_id) is not int
-                or geoname_id <= previous
-                or place_id != f"geonames:{geoname_id}"
-                or item.place_id != place_id
-                or item.reason != reason
-            ):
-                raise SettlementReconciliationError(
-                    "catalogue rejection keys are duplicate, unordered, or drifted"
-                )
-            previous = geoname_id
-            _increment(counts, reason)
+            raise SettlementReconciliationError(
+                "catalogue rejection keys are duplicate, unordered, or drifted"
+            )
+        previous = geoname_id
+        _increment(counts, reason)
     return counts
 
 
+def _catalogue_places(connection: Any) -> Iterator[CataloguePlace]:
+    for geoname_id, place_id, raw in _ordered_rows(
+        connection, "catalogue_places", "geoname_id, place_id, document"
+    ):
+        place = catalogue_stage._document(CataloguePlace, raw, "catalogue place")
+        if (
+            place.id != place_id
+            or place_id != f"geonames:{geoname_id}"
+            or not place.lineage
+            or place.lineage[0].source_record_id != geoname_id
+        ):
+            raise SettlementReconciliationError("catalogue place keys or lineage drifted")
+        yield place
+
+
+def _spatial_documents(connection: Any) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
+    for geoname_id, place_id, raw in _ordered_rows(
+        connection, "spatial_places", "geoname_id, place_id, document"
+    ):
+        document = source_stage._strict_json(raw, "spatial place document")
+        if (
+            type(document) is not dict
+            or source_stage._canonical_json(document) != raw
+            or set(document)
+            != {
+                "catalogMembership",
+                "coastalCovers",
+                "distanceToShorelineMeters",
+                "place",
+                "supportCovers",
+            }
+            or document["supportCovers"] is not True
+        ):
+            raise SettlementReconciliationError("spatial place document fields differ")
+        place = catalogue_stage._decode(CataloguePlace, document["place"], "spatial place")
+        expected_core = (place.population is not None and place.population >= 500) or (
+            place.feature_code in CORE_CAPITAL_FEATURE_CODES
+        )
+        expected_memberships = (["europe-core"] if expected_core else []) + (
+            ["europe-coastal"] if document["coastalCovers"] else []
+        )
+        if (
+            place.id != place_id
+            or place_id != f"geonames:{geoname_id}"
+            or not place.lineage
+            or place.lineage[0].source_record_id != geoname_id
+            or type(document["coastalCovers"]) is not bool
+            or type(document["distanceToShorelineMeters"]) is not int
+            or document["distanceToShorelineMeters"] < 0
+            or document["catalogMembership"] != expected_memberships
+        ):
+            raise SettlementReconciliationError("spatial place keys, ordering, or values differ")
+        yield document, projection._projection_document(place, document)
+
+
+def _validate_spatial_source(connection: Any, candidate: Mapping[str, Any]) -> None:
+    spatial_stage._validate_schema(connection)
+    counts = dict.fromkeys(projection._COUNT_KEYS, 0)
+    hashes = {"classifiedPlaces": hashlib.sha256(), "spatialRejections": hashlib.sha256()}
+    for spatial, _ in _spatial_documents(connection):
+        counts["normalizedPlaces"] += 1
+        counts["classifiedPlaces"] += 1
+        counts["europeCoreMemberships"] += int("europe-core" in spatial["catalogMembership"])
+        counts["europeCoastalMemberships"] += int(spatial["coastalCovers"])
+        hashes["classifiedPlaces"].update(
+            source_stage._canonical_json(spatial).encode("utf-8") + b"\n"
+        )
+    for geoname_id, place_id, reason, raw in _ordered_rows(
+        connection,
+        "spatial_rejections",
+        "geoname_id, place_id, reason, document",
+    ):
+        document = source_stage._strict_json(raw, "spatial rejection document")
+        if (
+            type(document) is not dict
+            or source_stage._canonical_json(document) != raw
+            or place_id != f"geonames:{geoname_id}"
+            or reason != "outside-support"
+            or document
+            != {"lineage": document.get("lineage"), "placeId": place_id, "reason": reason}
+            or type(document["lineage"]) is not list
+            or not document["lineage"]
+        ):
+            raise SettlementReconciliationError(
+                "spatial rejection keys, ordering, or values differ"
+            )
+        counts["normalizedPlaces"] += 1
+        counts["spatialRejections"] += 1
+        counts["outsideSupportRejections"] += 1
+        hashes["spatialRejections"].update(raw.encode("utf-8") + b"\n")
+    observed_hashes = {key: value.hexdigest() for key, value in hashes.items()}
+    if candidate["counts"] != counts or candidate["logicalHashes"] != observed_hashes:
+        raise SettlementReconciliationError("spatial database differs from its exact receipt")
+
+
 def _classified(connection: Any) -> Iterator[tuple[int, str, str, Any]]:
-    for spatial, projected in projection._spatial_documents(connection):
+    for spatial, projected in _spatial_documents(connection):
         place_id = projected["placeId"]
         yield (
             int(place_id.removeprefix("geonames:")),
@@ -301,8 +454,10 @@ def _classified(connection: Any) -> Iterator[tuple[int, str, str, Any]]:
 
 
 def _rejected(connection: Any) -> Iterator[tuple[int, str, str, Any]]:
-    for geoname_id, place_id, reason, raw in spatial_stage._stored_rows(
-        connection, "spatial_rejections"
+    for geoname_id, place_id, reason, raw in _ordered_rows(
+        connection,
+        "spatial_rejections",
+        "geoname_id, place_id, reason, document",
     ):
         document = source_stage._strict_json(raw, "spatial rejection document")
         if (
@@ -333,7 +488,7 @@ def _reconcile(
     spatial_rejections: Counter[str] = Counter()
     missing = object()
     classified = rejected = 0
-    places = spatial_stage._catalogue_places(catalogue)
+    places = _catalogue_places(catalogue)
     decisions = _spatial_decisions(spatial)
     for place, decision in zip_longest(places, decisions, fillvalue=missing):
         if place is missing or decision is missing:
@@ -593,7 +748,7 @@ def _build_from_snapshots(
             spatial_candidate, spatial_receipt_sha = projection._candidate(
                 assets["spatial-receipt.json"]
             )
-            projection._validate_source(spatial, spatial_candidate)
+            _validate_spatial_source(spatial, spatial_candidate)
             if spatial_candidate["inputCatalogue"] != catalogue_stage_binding:
                 raise SettlementReconciliationError(
                     "spatial candidate input catalogue binding differs"

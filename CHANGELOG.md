@@ -34,9 +34,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Raised the bounded, no-spill settlement reconciliation memory profile to
-  support full-source ordered scans that cannot complete under the projection
-  serializer's smaller 1 GiB limit.
+- Replaced full-corpus settlement reconciliation sorts with single-pass,
+  order-checking stage scans so production evidence remains within the 1 GiB
+  no-spill memory boundary.
 
 ### Security
 

@@ -309,12 +309,12 @@ def test_report_reconciles_distinct_stage_outcomes_and_matches_golden(tmp_path: 
     # proving that the emitted physical bindings match the exact input bytes.
     comparable = copy.deepcopy(report)
     for key in ("catalogue", "spatial"):
-        comparable["sourceBindings"][key]["databaseByteSize"] = golden[
-            "sourceBindings"
-        ][key]["databaseByteSize"]
-        comparable["sourceBindings"][key]["databaseSha256"] = golden[
-            "sourceBindings"
-        ][key]["databaseSha256"]
+        comparable["sourceBindings"][key]["databaseByteSize"] = golden["sourceBindings"][key][
+            "databaseByteSize"
+        ]
+        comparable["sourceBindings"][key]["databaseSha256"] = golden["sourceBindings"][key][
+            "databaseSha256"
+        ]
     _resign(comparable)
     assert comparable == golden
     assert report["recordFlow"] == {
@@ -348,14 +348,26 @@ def test_reconciliation_connection_has_a_bounded_full_corpus_memory_profile() ->
         assert connection.execute(
             "SELECT current_setting('threads'), current_setting('memory_limit'), "
             "current_setting('temp_directory')"
-        ).fetchone() == (1, "4.0 GiB", "")
+        ).fetchone() == (1, "1.0 GiB", "")
 
-        connection.execute("SET memory_limit='1GB'")
+        connection.execute("SET memory_limit='512MiB'")
         with pytest.raises(
             reconciliation.SettlementReconciliationError,
             match="limits were not retained",
         ):
             reconciliation._assert_connection_limits(connection)
+
+
+def test_reconciliation_rejects_unordered_physical_stage_rows() -> None:
+    with duckdb.connect(":memory:") as connection:
+        connection.execute("CREATE TABLE records(geoname_id UBIGINT, place_id VARCHAR)")
+        connection.execute("INSERT INTO records VALUES (2, 'geonames:2'), (1, 'geonames:1')")
+
+        with pytest.raises(
+            reconciliation.SettlementReconciliationError,
+            match="storage keys are duplicate or unordered",
+        ):
+            list(reconciliation._ordered_rows(connection, "records", "geoname_id, place_id"))
 
 
 def test_report_bytes_are_deterministic_and_overwrite_is_refused(tmp_path: Path) -> None:
@@ -386,9 +398,7 @@ def test_reserved_database_wal_output_is_rejected_before_staging(
     monkeypatch.setattr(
         reconciliation.authority,
         "_create_private",
-        lambda *_args: (_ for _ in ()).throw(
-            AssertionError("private staging must not be created")
-        ),
+        lambda *_args: (_ for _ in ()).throw(AssertionError("private staging must not be created")),
     )
 
     with pytest.raises(
@@ -595,9 +605,7 @@ def test_semantic_validator_rejects_schema_valid_cross_field_drift(
 
 
 @pytest.mark.parametrize("ledger", ["catalogue", "spatial"])
-def test_semantic_validator_rejects_invented_rejection_reasons(
-    tmp_path: Path, ledger: str
-) -> None:
+def test_semantic_validator_rejects_invented_rejection_reasons(tmp_path: Path, ledger: str) -> None:
     report, _, _ = _build(tmp_path)
     changed = copy.deepcopy(report)
     changed["rejections"][ledger][0]["reason"] = f"invented-{ledger}-reason"
