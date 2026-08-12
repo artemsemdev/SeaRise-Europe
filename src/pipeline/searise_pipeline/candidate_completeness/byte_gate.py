@@ -13,6 +13,8 @@ from .validator import CandidateContractError, load_candidate_bytes, validate_ca
 
 _MANIFEST = PurePosixPath("manifest.json")
 _MAX_MANIFEST_BYTES = 8 * 1024 * 1024
+_MAX_ARTIFACT_BYTES = 64 * 1024 * 1024 * 1024
+_MAX_TOTAL_ARTIFACT_BYTES = 256 * 1024 * 1024 * 1024
 _READ_SIZE = 1024 * 1024
 _IDENTITY_FIELDS = (
     "st_dev",
@@ -120,14 +122,20 @@ def _inspect_tree(
         for parent, expected in sorted(tree.items(), key=lambda item: item[0].as_posix()):
             directory = _open_directory(root, parent)
             try:
-                actual = set(os.listdir(directory))
-                if actual != set(expected):
-                    missing = sorted(set(expected) - actual)
-                    extra = sorted(actual - set(expected))
+                missing = set(expected)
+                with os.scandir(directory) as entries:
+                    for entry in entries:
+                        if entry.name not in missing:
+                            _fail(
+                                "candidate-files",
+                                f"candidate tree has an unexpected entry at "
+                                f"{parent or '.'}: {entry.name!r}",
+                            )
+                        missing.remove(entry.name)
+                if missing:
                     _fail(
                         "candidate-files",
-                        f"candidate tree differs at {parent or '.'}: "
-                        f"missing={missing}, extra={extra}",
+                        f"candidate tree is missing entries at {parent or '.'}: {sorted(missing)}",
                     )
                 for name, kind in expected.items():
                     metadata = os.stat(name, dir_fd=directory, follow_symlinks=False)
@@ -241,6 +249,17 @@ def validate_candidate_root(candidate_root: Path) -> CandidateByteSummary:
         logical_artifacts = {_logical(item["path"]): item for item in artifacts}
         if len(logical_artifacts) != summary.artifact_count or _MANIFEST in logical_artifacts:
             _fail("candidate-files", "manifest and artifact paths must be distinct and exact")
+        oversized = [
+            logical.as_posix()
+            for logical, artifact in logical_artifacts.items()
+            if artifact["byteSize"] > _MAX_ARTIFACT_BYTES
+        ]
+        declared_artifact_bytes = sum(item["byteSize"] for item in artifacts)
+        if oversized or declared_artifact_bytes > _MAX_TOTAL_ARTIFACT_BYTES:
+            _fail(
+                "candidate-budget",
+                "candidate exceeds the 64 GiB per-artifact or 256 GiB total byte budget",
+            )
         expected_paths = set(logical_artifacts) | {_MANIFEST}
         tree = _expected_tree(expected_paths)
         baseline = _inspect_tree(root, tree)
@@ -277,6 +296,11 @@ def validate_candidate_root(candidate_root: Path) -> CandidateByteSummary:
                 _fail("candidate-changed", "candidate root changed during validation")
         finally:
             os.close(reopened)
+        # The start of this final pass is the documented linearization point.
+        # Later matching identities prove that no entry had drifted before that
+        # point; the result does not lease the mutable pathname after the pass.
+        if _inspect_tree(root, tree) != baseline:
+            _fail("candidate-changed", "candidate changed before byte-gate linearization")
         return CandidateByteSummary(
             candidate_id=summary.candidate_id,
             data_release_id=summary.data_release_id,

@@ -8,6 +8,7 @@ import json
 import os
 import runpy
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -112,6 +113,36 @@ def test_candidate_tree_requires_exact_files_and_no_extras(tmp_path: Path, mutat
     assert caught.value.code == "candidate-files"
 
 
+def test_unbounded_extra_directory_entries_fail_on_the_first_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, _ = _candidate(tmp_path)
+
+    class EndlessEntries:
+        yielded = 0
+
+        def __enter__(self) -> EndlessEntries:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def __iter__(self) -> EndlessEntries:
+            return self
+
+        def __next__(self) -> SimpleNamespace:
+            self.yielded += 1
+            return SimpleNamespace(name=f"untracked-{self.yielded}")
+
+    entries = EndlessEntries()
+    monkeypatch.setattr(byte_gate.os, "scandir", lambda _descriptor: entries)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "candidate-files"
+    assert entries.yielded == 1
+    assert len(str(caught.value)) < 256
+
+
 @pytest.mark.parametrize("field", ["byteSize", "sha256"])
 def test_declared_size_and_sha256_bind_exact_artifact_bytes(tmp_path: Path, field: str) -> None:
     root, candidate, _ = _candidate(tmp_path)
@@ -128,6 +159,20 @@ def test_declared_size_and_sha256_bind_exact_artifact_bytes(tmp_path: Path, fiel
     with pytest.raises(CandidateContractError) as caught:
         validate_candidate_root(root)
     assert caught.value.code == "artifact-bytes"
+
+
+@pytest.mark.parametrize("budget", ["artifact", "total"])
+def test_declared_byte_budget_is_bounded_before_artifact_reads(tmp_path: Path, budget: str) -> None:
+    root, candidate, _ = _candidate(tmp_path)
+    if budget == "artifact":
+        candidate["artifacts"][0]["byteSize"] = 64 * 1024**3 + 1
+    else:
+        for artifact in candidate["artifacts"]:
+            artifact["byteSize"] = 5 * 1024**3
+    _write_manifest(root, candidate)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "candidate-budget"
 
 
 @pytest.mark.parametrize("field,value", [("role", "checksums"), ("mediaType", "text/plain")])
@@ -160,6 +205,22 @@ def test_intermediate_symlink_cannot_escape_candidate_root(tmp_path: Path) -> No
     outside = tmp_path / "outside-config"
     (root / "config").replace(outside)
     (root / "config").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "candidate-files"
+
+
+@pytest.mark.parametrize("kind", ["symlink", "fifo"])
+def test_final_artifact_symlink_or_special_file_is_rejected(tmp_path: Path, kind: str) -> None:
+    root, candidate, _ = _candidate(tmp_path)
+    target = root / candidate["artifacts"][0]["path"]
+    if kind == "symlink":
+        outside = tmp_path / "outside-artifact.bin"
+        target.replace(outside)
+        target.symlink_to(outside)
+    else:
+        target.unlink()
+        os.mkfifo(target)
     with pytest.raises(CandidateContractError) as caught:
         validate_candidate_root(root)
     assert caught.value.code == "candidate-files"
@@ -199,6 +260,53 @@ def test_file_replacement_during_streaming_fails_closed(
     assert caught.value.code == "candidate-changed"
 
 
+def test_file_mutation_after_comparison_scan_fails_before_linearization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, candidate, _ = _candidate(tmp_path)
+    target = root / candidate["artifacts"][0]["path"]
+    real_inspect = byte_gate._inspect_tree
+    inspections = 0
+
+    def mutate_after_comparison(*args: object, **kwargs: object):
+        nonlocal inspections
+        identities = real_inspect(*args, **kwargs)
+        inspections += 1
+        if inspections == 2:
+            target.write_bytes(b"X" * target.stat().st_size)
+        return identities
+
+    monkeypatch.setattr(byte_gate, "_inspect_tree", mutate_after_comparison)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "candidate-changed"
+    assert inspections == 3
+
+
+def test_candidate_root_replacement_after_comparison_scan_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, _ = _candidate(tmp_path / "authority")
+    replacement, _, _ = _candidate(tmp_path / "replacement")
+    displaced = tmp_path / "displaced-authority"
+    real_inspect = byte_gate._inspect_tree
+    inspections = 0
+
+    def replace_after_comparison(*args: object, **kwargs: object):
+        nonlocal inspections
+        identities = real_inspect(*args, **kwargs)
+        inspections += 1
+        if inspections == 2:
+            root.replace(displaced)
+            replacement.replace(root)
+        return identities
+
+    monkeypatch.setattr(byte_gate, "_inspect_tree", replace_after_comparison)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "candidate-changed"
+
+
 def test_failure_never_repairs_or_rewrites_candidate(tmp_path: Path) -> None:
     root, candidate, _ = _candidate(tmp_path)
     target = root / candidate["artifacts"][0]["path"]
@@ -227,3 +335,52 @@ def test_manifest_must_be_present_only_after_all_53_artifacts(tmp_path: Path) ->
     assert caught.value.code == "artifact-bytes"
     _write_manifest(root, candidate)
     assert validate_candidate_root(root).artifact_count == 53
+
+
+@pytest.mark.parametrize(
+    ("mutation", "code"),
+    [
+        ("invalid-utf8", "candidate-json"),
+        ("duplicate-key", "candidate-json"),
+        ("oversized", "manifest-bytes"),
+    ],
+)
+def test_manifest_bytes_are_strict_and_bounded(tmp_path: Path, mutation: str, code: str) -> None:
+    root, _, _ = _candidate(tmp_path)
+    manifest = root / "manifest.json"
+    if mutation == "invalid-utf8":
+        manifest.write_bytes(b"\xff")
+    elif mutation == "duplicate-key":
+        manifest.write_bytes(b'{"candidateId":"one","candidateId":"two"}')
+    else:
+        os.truncate(manifest, 8 * 1024 * 1024 + 1)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == code
+
+
+@pytest.mark.parametrize("kind", ["symlink", "hard-link", "fifo"])
+def test_manifest_link_and_special_file_types_are_rejected(tmp_path: Path, kind: str) -> None:
+    root, _, _ = _candidate(tmp_path)
+    manifest = root / "manifest.json"
+    outside = tmp_path / "outside-manifest.json"
+    if kind == "symlink":
+        manifest.replace(outside)
+        manifest.symlink_to(outside)
+    elif kind == "hard-link":
+        os.link(manifest, outside)
+    else:
+        manifest.unlink()
+        os.mkfifo(manifest)
+    with pytest.raises(CandidateContractError) as caught:
+        validate_candidate_root(root)
+    assert caught.value.code == "artifact-bytes"
+
+
+def test_cli_reports_contract_failure_on_stderr(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["--candidate-root", str(tmp_path / "missing")]) == 2
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err.startswith("error: candidate-root:")

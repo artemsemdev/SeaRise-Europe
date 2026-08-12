@@ -16,14 +16,24 @@ The deterministic seal order is:
 5. pass the separate supply-chain evidence-envelope and signing gate before any
    publication.
 
-`scripts/release/validate_candidate_bytes.py` applies the immutable byte gate
+`scripts/release/validate_candidate_bytes.py` applies the read-only byte gate
 to an assembled candidate root. It opens the root and descendants without
 following symlinks, requires exactly 53 single-link regular files plus
 `manifest.json` and no other entries, streams every artifact, and verifies its
 declared byte size and SHA-256. It also reconstructs `checksums.txt` from the
 52 ordered checksum subjects and rejects any tree or file identity that changes
-during validation. The gate is read-only: it never repairs, replaces, or
-publishes candidate files.
+before the documented linearization point. The gate is read-only: it never
+repairs, replaces, or publishes candidate files.
+
+Directory inspection rejects the first unexpected entry without materializing
+an attacker-controlled directory listing. Declared content is limited to 64 GiB
+per artifact and 256 GiB for all 53 artifacts. Success is linearized at the end
+of the comparison pass and the start of the last identity pass over the root
+descriptor opened at entry. Matching identities observed during that last pass
+prove the tree had not drifted before this point. The result records that
+point-in-time observation; it is not a filesystem lease and does not make the
+caller's mutable pathname immutable. Keep the candidate offline and rerun the
+gate immediately before any independent consumer opens it.
 
 The manifest-last rule is a completeness boundary, not a filesystem timestamp
 claim. The byte gate requires terminal write sequence 54 in the contract and a
