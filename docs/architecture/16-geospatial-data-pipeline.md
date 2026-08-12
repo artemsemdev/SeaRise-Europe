@@ -177,7 +177,8 @@ DuckDB Spatial performs the reproducible joins:
 6. create `europe-core` and `europe-coastal` logical sets;
 7. reconcile accepted, duplicate, and rejected counts;
 8. write canonical `settlements.parquet` and deterministic serialized indexes;
-9. Brotli-compress `europe-core.index.br` and `europe-coastal.index.br`.
+9. Brotli-compress `europe-core.codepoint-trie.json.br` and
+   `europe-coastal.codepoint-trie.json.br`.
 
 The core set uses population >= 500 plus national/administrative capitals. The
 coastal set keeps every qualifying active place in the coastal zone, including

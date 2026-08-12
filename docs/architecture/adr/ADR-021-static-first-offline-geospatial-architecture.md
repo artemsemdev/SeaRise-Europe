@@ -232,8 +232,8 @@ releases/{dataReleaseId}/
 │   ├── coastal-analysis-zone.pmtiles
 │   └── boundaries.parquet
 ├── search/
-│   ├── europe-core.index.br
-│   ├── europe-coastal.index.br
+│   ├── europe-core.codepoint-trie.json.br
+│   ├── europe-coastal.codepoint-trie.json.br
 │   └── settlements.parquet
 ├── layers/
 │   ├── ssp1-26/{2030,2050,2100}.pmtiles
