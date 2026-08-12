@@ -365,7 +365,7 @@ jobs:
     needs:
       - intake
       - sign
-    if: ${{ needs.sign.result == 'success' }}
+    if: ${{ needs.sign.result == 'success' && github.run_attempt == 1 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -378,7 +378,10 @@ jobs:
     steps:
       - id: names
         name: Define immutable evidence identity
-        run: echo "evidence=phase-1-unverified-evidence-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]
+          echo "evidence=phase-1-unverified-evidence-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
 
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -468,13 +471,18 @@ jobs:
   verify:
     name: Independently verify freshly downloaded bytes
     needs: finalize
-    if: ${{ needs.finalize.result == 'success' }}
+    if: ${{ needs.finalize.result == 'success' && github.run_attempt == 1 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       actions: read
       contents: read
     steps:
+      - name: Reject rerun verification attempts
+        run: |
+          set -euo pipefail
+          [[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]
+
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 1

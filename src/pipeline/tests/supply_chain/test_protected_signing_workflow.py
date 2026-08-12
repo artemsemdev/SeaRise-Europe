@@ -59,6 +59,10 @@ def _assert_protected_policy(text: str) -> None:
             "artemsemdev/SeaRise-Europe/.github/workflows/phase-1-release-sign.yml@refs/heads/master"
             in job
         )
+    for job in (intake, sign, finalize, verify):
+        assert job.count('[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]') == 1
+    for job in (finalize, verify):
+        assert "github.run_attempt == 1" in job
 
     action_uses = re.findall(r"^\s*-?\s*uses:\s*(\S+)", text, re.MULTILINE)
     assert set(action_uses) == {CHECKOUT, SETUP_PYTHON, DOWNLOAD, UPLOAD}
@@ -136,11 +140,38 @@ def test_workflow_enforces_four_plane_least_privilege_and_exact_evidence() -> No
     _assert_protected_policy(WORKFLOW.read_text(encoding="utf-8"))
 
 
+@pytest.mark.parametrize("job_name", ["intake", "sign", "finalize", "verify"])
+def test_every_job_requires_exact_first_attempt_identity(job_name: str) -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    jobs = _jobs(text)
+    assertion = '[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]'
+    assert jobs[job_name].count(assertion) == 1
+
+    mutated_job = jobs[job_name].replace(assertion, "true", 1)
+    mutated = text.replace(jobs[job_name], mutated_job, 1)
+    with pytest.raises(AssertionError):
+        _assert_protected_policy(mutated)
+
+
+@pytest.mark.parametrize("job_name", ["finalize", "verify"])
+def test_downstream_job_gate_rejects_rerun_attempts(job_name: str) -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    jobs = _jobs(text)
+    assert jobs[job_name].count("github.run_attempt == 1") == 1
+
+    mutated_job = jobs[job_name].replace("github.run_attempt == 1", "true", 1)
+    mutated = text.replace(jobs[job_name], mutated_job, 1)
+    with pytest.raises(AssertionError):
+        _assert_protected_policy(mutated)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
         lambda text: text.replace("github.event.repository.fork == false", "true", 1),
         lambda text: text.replace("id-token: write", "id-token: read", 1),
+        lambda text: text.replace('[[ "${GITHUB_RUN_ATTEMPT}" == "1" ]]', "true", 1),
+        lambda text: text.replace("github.run_attempt == 1", "true", 1),
         lambda text: text.replace("github.repository_id == '1196432661'", "true", 1),
         lambda text: text.replace(
             "  workflow_dispatch:\n", "  pull_request:\n  workflow_dispatch:\n", 1
