@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Validate exact bytes of one assembled Phase 1 pre-sign candidate."""
 
 from __future__ import annotations
