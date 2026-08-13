@@ -4,11 +4,16 @@ import argparse
 import hashlib
 import io
 import json
+import sys
 import tarfile
 from pathlib import Path
 
 import pytest
-from scripts.release import package_phase1_production_inputs as module
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from scripts.release import package_phase1_production_inputs as module  # noqa: E402
 
 
 def _arguments(tmp_path: Path) -> argparse.Namespace:
