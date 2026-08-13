@@ -15,6 +15,7 @@ from searise_pipeline.candidate_completeness.production_binary_validators import
     BoundaryQaAuthority,
     ProductionBinaryQaAuthorities,
     ProjectionQaAuthority,
+    RetainedPmtilesAuthority,
     SettlementQaAuthority,
 )
 from searise_pipeline.candidate_completeness.production_validators import (
@@ -49,6 +50,22 @@ def _tools(args: argparse.Namespace) -> BoundaryVectorToolPaths:
     )
 
 
+def _retained(
+    root: Path,
+    candidate_subdirectory: str,
+    report: str,
+    check: str,
+    checksum_prefix: str = "",
+) -> RetainedPmtilesAuthority:
+    return RetainedPmtilesAuthority(
+        candidate_root=root / candidate_subdirectory,
+        checksums=root / "checksums.txt",
+        validation_report=root / report,
+        required_check=check,
+        checksum_prefix=checksum_prefix,
+    )
+
+
 def _dispatcher(args: argparse.Namespace):  # type: ignore[no-untyped-def]
     contract = _json(args.release_contract)
     source = load_source_fixture(
@@ -68,12 +85,33 @@ def _dispatcher(args: argparse.Namespace):  # type: ignore[no-untyped-def]
             tippecanoe_build_receipt=tools.tippecanoe_build_receipt,
             pmtiles_distribution_asset=tools.pmtiles_distribution_asset,
             platform=tools.platform,
+            retained_pmtiles=(
+                _retained(
+                    args.retained_ar6_root,
+                    ".",
+                    "build-evidence.json",
+                    "pmtilesStructureAndProperties",
+                )
+                if args.retained_ar6_root is not None
+                else None
+            ),
         ),
         boundary=BoundaryQaAuthority(
             contract=contract,
             support_geojson=args.support_geojson,
             coastal_geojson=args.coastal_geojson,
             tools=tools,
+            retained_pmtiles=(
+                _retained(
+                    args.retained_boundary_root,
+                    "candidate",
+                    "validation-report.json",
+                    "officialPmtilesIntegrity",
+                    "candidate/",
+                )
+                if args.retained_boundary_root is not None
+                else None
+            ),
         ),
         settlement=SettlementQaAuthority(
             spatial_receipt=args.authority_root
@@ -85,8 +123,8 @@ def _dispatcher(args: argparse.Namespace):  # type: ignore[no-untyped-def]
     return production_validator_dispatcher(
         ProductionQaAuthorities(
             binary=binary,
-            brotli=args.toolchain_root / "brotli",
-            brotli_sha256=BROTLI_LINUX_X86_64_SHA256,
+            brotli=args.brotli or args.toolchain_root / "brotli",
+            brotli_sha256=args.brotli_sha256,
             work_directory=args.work_root / "search",
         )
     )
@@ -122,6 +160,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--input-root", type=Path, required=True)
     parser.add_argument("--authority-root", type=Path, required=True)
     parser.add_argument("--toolchain-root", type=Path, required=True)
+    parser.add_argument("--retained-ar6-root", type=Path)
+    parser.add_argument("--retained-boundary-root", type=Path)
+    parser.add_argument("--brotli", type=Path)
+    parser.add_argument(
+        "--brotli-sha256", default=BROTLI_LINUX_X86_64_SHA256
+    )
     parser.add_argument("--work-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--candidate-id", required=True)

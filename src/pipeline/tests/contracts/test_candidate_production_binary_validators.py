@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -9,6 +12,7 @@ from searise_pipeline.candidate_completeness.production_binary_validators import
     BoundaryQaAuthority,
     ProductionBinaryQaAuthorities,
     ProjectionQaAuthority,
+    RetainedPmtilesAuthority,
     SettlementQaAuthority,
     production_binary_validator_registry,
 )
@@ -135,6 +139,53 @@ def test_expected_science_failure_is_an_explicit_failed_outcome(
     outcome = registry["release.projection-pmtiles"](request)
     assert outcome.status == "fail"
     assert outcome.code == "projection-pmtiles-invalid"
+
+
+def test_projection_pmtiles_can_use_exact_retained_validation(
+    tmp_path: Path,
+) -> None:
+    request = _request(
+        tmp_path / "current",
+        "layers/ssp2-45/2050.pmtiles",
+        "projection-visual-pmtiles",
+        "application/vnd.pmtiles",
+    )
+    retained_root = tmp_path / "retained"
+    retained = retained_root / "layers/ssp2-45/2050.pmtiles"
+    retained.parent.mkdir(parents=True)
+    retained.write_bytes(request.artifact_path.read_bytes())
+    digest = hashlib.sha256(retained.read_bytes()).hexdigest()
+    checksums = retained_root / "checksums.txt"
+    checksums.write_text(
+        f"{digest}  layers/ssp2-45/2050.pmtiles\n", encoding="utf-8"
+    )
+    report = retained_root / "build-evidence.json"
+    report.write_text(
+        json.dumps({"checks": {"pmtilesStructureAndProperties": True}}),
+        encoding="utf-8",
+    )
+    authorities = _authorities(tmp_path)
+    projection = replace(
+        authorities.projection,
+        retained_pmtiles=RetainedPmtilesAuthority(
+            candidate_root=retained_root,
+            checksums=checksums,
+            validation_report=report,
+            required_check="pmtilesStructureAndProperties",
+        ),
+    )
+    registry = production_binary_validator_registry(
+        ProductionBinaryQaAuthorities(
+            projection, authorities.boundary, authorities.settlement
+        )
+    )
+
+    assert registry["release.projection-pmtiles"](request).status == "pass"
+    report.write_text(
+        json.dumps({"checks": {"pmtilesStructureAndProperties": False}}),
+        encoding="utf-8",
+    )
+    assert registry["release.projection-pmtiles"](request).status == "fail"
 
 
 def test_boundary_routes_use_authoritative_boundary_role_ids(

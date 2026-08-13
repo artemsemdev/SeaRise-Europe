@@ -25,6 +25,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added local retained-evidence PMTiles validation so an exact final candidate
+  can be fully gated on Apple Silicon without executing pinned Linux x86_64
+  tooling under unstable emulation. Candidate bytes must match both the prior
+  validated artifact and its checksum/report authorities.
 - Added release v2 attribution and build-receipt contracts that cover the
   settlement search receipt role introduced by the 54-artifact candidate
   contract while leaving the published release v1 contracts immutable.
