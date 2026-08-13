@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from scripts.release import assemble_phase1_production_candidate as module
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(REPOSITORY_ROOT))
+
+from scripts.release import assemble_phase1_production_candidate as module  # noqa: E402
 
 
 def _arguments(tmp_path: Path) -> argparse.Namespace:
@@ -54,6 +59,10 @@ def _arguments(tmp_path: Path) -> argparse.Namespace:
         tippecanoe_build_receipt=tippecanoe_receipt,
         support_geojson=support,
         coastal_geojson=coastal,
+        retained_ar6_root=None,
+        retained_boundary_root=None,
+        brotli=None,
+        brotli_sha256=module.BROTLI_LINUX_X86_64_SHA256,
     )
 
 
