@@ -15,6 +15,7 @@ import searise_pipeline.release.pmtiles as pmtiles_module
 from searise_pipeline.release import (
     load_source_fixture,
     validate_vector_toolchain,
+    validate_visual_pmtiles,
     write_visual_pmtiles,
 )
 from searise_pipeline.science import ScienceContractError
@@ -369,6 +370,58 @@ def test_pmtiles_rejects_common_mode_metadata_tampering(
             pmtiles_distribution_asset_path=dummy,
             pmtiles_distribution_platform="test-platform",
         )
+
+
+def test_existing_visual_pmtiles_is_revalidated_against_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _real_source()
+    layer = source.layers[4]
+    release = contract()
+    archive = tmp_path / "existing.pmtiles"
+    archive.write_bytes(b"existing archive")
+    metadata = pmtiles_module._expected_metadata(source, layer, release)
+    specification = release["artifacts"]["pmtiles"]
+    header = {
+        "tile_compression": specification["tileCompression"],
+        "tile_type": specification["tileType"],
+        "minzoom": specification["minimumZoom"],
+        "maxzoom": specification["maximumZoom"],
+        "bounds": release["grid"]["bounds"],
+    }
+    expected_properties = pmtiles_module._expected_properties(source, layer)
+
+    def fake_run(command: list[str]) -> str:
+        if "--metadata" in command:
+            return json.dumps(metadata)
+        if "--header-json" in command:
+            return json.dumps(header)
+        return ""
+
+    monkeypatch.setattr(pmtiles_module, "validate_vector_toolchain", lambda **_kwargs: None)
+    monkeypatch.setattr(pmtiles_module, "_run", fake_run)
+    monkeypatch.setattr(
+        pmtiles_module,
+        "_decode_properties",
+        lambda *_args: (expected_properties, len(expected_properties)),
+    )
+    dummy = tmp_path / "unused"
+    evidence = validate_visual_pmtiles(
+        source,
+        layer,
+        archive,
+        contract=release,
+        tippecanoe_path=dummy,
+        decode_path=dummy,
+        pmtiles_path=dummy,
+        tippecanoe_source_archive_path=dummy,
+        tippecanoe_build_receipt_path=dummy,
+        pmtiles_distribution_asset_path=dummy,
+        pmtiles_distribution_platform="test-platform",
+    )
+
+    assert evidence.source_feature_count == len(expected_properties)
+    assert evidence.sha256 == _sha256(archive)
 
 
 def test_tippecanoe_gzip_headers_are_cross_platform_canonical(tmp_path: Path) -> None:

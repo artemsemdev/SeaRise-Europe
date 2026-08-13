@@ -28,6 +28,7 @@ from .pmtiles import (
     PmtilesEvidence,
     VectorToolchainEvidence,
     validate_vector_toolchain,
+    validate_visual_pmtiles,
     write_visual_pmtiles,
 )
 from .promotion import finalize_recovery_gate
@@ -66,6 +67,7 @@ __all__ = [
     "validate_analysis_cog",
     "validate_boundary_geoparquet",
     "validate_boundary_pmtiles",
+    "validate_visual_pmtiles",
     "validate_geoparquet",
     "validate_lookup_goldens",
     "validate_public_manifest",

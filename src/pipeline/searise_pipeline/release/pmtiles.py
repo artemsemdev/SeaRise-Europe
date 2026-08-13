@@ -547,6 +547,76 @@ def _decode_properties(
     return properties, fragments
 
 
+def validate_visual_pmtiles(
+    source: RegionalReleaseSource,
+    layer: RegionalLayer,
+    path: Path,
+    *,
+    contract: Mapping[str, Any],
+    tippecanoe_path: Path,
+    decode_path: Path,
+    pmtiles_path: Path,
+    tippecanoe_source_archive_path: Path,
+    tippecanoe_build_receipt_path: Path,
+    pmtiles_distribution_asset_path: Path,
+    pmtiles_distribution_platform: str,
+) -> PmtilesEvidence:
+    """Validate one existing archive against exact tools and source properties."""
+    validate_vector_toolchain(
+        tippecanoe_path=tippecanoe_path,
+        decode_path=decode_path,
+        pmtiles_path=pmtiles_path,
+        tippecanoe_source_archive_path=tippecanoe_source_archive_path,
+        tippecanoe_build_receipt_path=tippecanoe_build_receipt_path,
+        pmtiles_distribution_asset_path=pmtiles_distribution_asset_path,
+        pmtiles_distribution_platform=pmtiles_distribution_platform,
+        contract=contract,
+    )
+    specification = contract["artifacts"]["pmtiles"]
+    _run([str(pmtiles_path), "verify", str(path)])
+    try:
+        metadata = json.loads(
+            _run([str(pmtiles_path), "show", str(path), "--metadata"])
+        )
+        header = json.loads(
+            _run([str(pmtiles_path), "show", str(path), "--header-json"])
+        )
+    except json.JSONDecodeError as exc:
+        raise ScienceContractError("PMTiles metadata or header is malformed") from exc
+    prohibited = {"generator_options", "tilestats", "timestamp", "hostname", "host"}
+    if metadata != _expected_metadata(source, layer, contract) or prohibited.intersection(
+        metadata
+    ):
+        raise ScienceContractError("PMTiles metadata differs from the canonical allow-list")
+    expected_header = {
+        "tile_compression": specification["tileCompression"],
+        "tile_type": specification["tileType"],
+        "minzoom": specification["minimumZoom"],
+        "maxzoom": specification["maximumZoom"],
+        "bounds": contract["grid"]["bounds"],
+    }
+    if any(header.get(key) != value for key, value in expected_header.items()):
+        raise ScienceContractError("PMTiles header differs from the release contract")
+    actual_properties, fragments = _decode_properties(
+        decode_path,
+        path,
+        specification["maximumZoom"],
+        specification["layerId"],
+    )
+    expected_properties = _expected_properties(source, layer)
+    if actual_properties != expected_properties:
+        raise ScienceContractError("PMTiles decoded IDs or properties differ from source")
+    return PmtilesEvidence(
+        path=f"layers/{layer.scenario}/{layer.horizon}.pmtiles",
+        byte_size=path.stat().st_size,
+        sha256=_sha256(path),
+        source_feature_count=len(expected_properties),
+        decoded_fragment_count=fragments,
+        header=header,
+        metadata=metadata,
+    )
+
+
 def write_visual_pmtiles(
     source: RegionalReleaseSource,
     layer: RegionalLayer,
