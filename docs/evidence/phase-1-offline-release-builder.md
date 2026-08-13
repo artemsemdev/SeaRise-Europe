@@ -98,8 +98,9 @@ workstation at:
 ```
 
 The repository-relative location is `local-data/phase-1/`. After the exact AR6
-source and reviewed build artifacts were added, the complete local directory
-occupied 23,993,008 KiB (approximately 22.9 GiB) and contained:
+source, reviewed build artifacts, Linux validation toolchain, and deterministic
+production-input archive were added, the complete local directory occupied
+24,390,704 KiB (approximately 23.3 GiB) and contained:
 
 - the four hash-locked GeoNames source assets and captured response headers;
 - the normalized catalogue and spatial DuckDB databases with their receipts;
@@ -120,6 +121,9 @@ that are too large or inappropriate for Git. All are covered by the root
 | `ar6-regional-candidate/` | macOS ARM64 candidate artifact `8973969557` from protected validation run `31113582612`, source commit `c2ed9074624c7cfe61bf610a1a67f4303aca7580`; manifest SHA-256 `6fe1115ba80857a2dcdd39fefada92ec51122cd6f8e7a2704e20083dd3e616ac` |
 | `ar6-owner-decision/` | protected owner-decision artifact from run `31395573924`; the final gate records automated validation passed, owner approval, and the same manifest identity |
 | `boundary-candidate/` | four independently validated boundary GeoParquet/PMTiles files from run `31644862275`; local `checksums.txt` SHA-256 `255defa0e3391c8c367017e1cce13f7b621587df00c636eeed15913a895e467a` |
+| `production-candidate-inputs/` | exact 51-file pre-terminal production inventory assembled from the verified AR6, boundary, settlement, contract, STAC, rights, and receipt bytes |
+| `toolchain-linux/` | checksum-pinned Linux x86_64 Tippecanoe 2.79.0, PMTiles 1.31.2, Brotli 1.1.0, their reviewed distribution inputs, and licence files used by candidate QA |
+| `phase-1-production-inputs-v2.tar` | deterministic 198,809,600-byte controlled-build handoff produced by `scripts/release/package_phase1_production_inputs.py`; 62 files; SHA-256 `6f337837a66e661eed38cdfbf00c26a541e1916b1416c1aa8644eb15fda2225a` |
 | `geonames-sources/`, `catalogue/`, `spatial/`, `reconciliation/`, `geoparquet/`, `search-projection/`, `browser-shards/`, `browser-worker-performance/` | exact settlement source, intermediate, final, and Chromium evidence described by the production inventory |
 
 `local-data/` is intentionally ignored by the root `.gitignore`; these large
