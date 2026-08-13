@@ -34,6 +34,9 @@ All notable changes to this project will be documented in this file.
 - Added candidate-bound production validators for projection COG, GeoParquet,
   and PMTiles files, exact support and coastal boundary packages, and the
   descriptor-bound settlement GeoParquet spatial stage.
+- Added candidate-bound JSON validators for release contracts, exact rights
+  coverage, build-output inventory, STAC graph and asset identities, and the
+  settlement search shard-set receipt.
 
 - Added a candidate-wide QA executor that byte-gates the complete manifest,
   dispatches every schema-selected artifact in manifest order, retains explicit
