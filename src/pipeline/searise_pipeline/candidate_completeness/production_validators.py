@@ -15,7 +15,18 @@ from searise_pipeline.release.public_contracts import (
     validate_public_document,
 )
 
-from .qa_dispatch import ArtifactValidator, QaValidationOutcome, QaValidationRequest
+from .production_binary_validators import (
+    ProductionBinaryQaAuthorities,
+    production_binary_validator_registry,
+)
+from .qa_dispatch import (
+    ArtifactValidator,
+    QaValidationOutcome,
+    QaValidationRequest,
+    QaValidatorDispatcher,
+    with_terminal_validators,
+)
+from .search_shard_validator import search_shard_validator
 from .validator import CandidateContractError
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -51,6 +62,23 @@ _PUBLIC_SCHEMAS = {
     "release.stac.collection": (RELEASE_V1_SCHEMA_ROOT, "stac.schema.json"),
     "release.stac.item": (RELEASE_V1_SCHEMA_ROOT, "stac.schema.json"),
 }
+
+
+class ProductionQaAuthorities:
+    """Exact local authorities required to instantiate all production routes."""
+
+    def __init__(
+        self,
+        *,
+        binary: ProductionBinaryQaAuthorities,
+        brotli: Path,
+        brotli_sha256: str,
+        work_directory: Path,
+    ) -> None:
+        self.binary = binary
+        self.brotli = brotli
+        self.brotli_sha256 = brotli_sha256
+        self.work_directory = work_directory
 
 
 class _DuplicateKeyError(ValueError):
@@ -404,3 +432,21 @@ def production_json_validator_registry() -> dict[str, ArtifactValidator]:
     }
     validators["settlements.browser-search-receipt"] = _search_receipt
     return validators
+
+
+def production_validator_dispatcher(
+    authorities: ProductionQaAuthorities,
+) -> QaValidatorDispatcher:
+    """Construct the closed 54-artifact production dispatcher."""
+    validators = production_json_validator_registry()
+    binary = production_binary_validator_registry(authorities.binary)
+    overlap = sorted(set(validators) & set(binary))
+    if overlap:
+        _fail("qa-validator-registry", f"production validator overlap: {overlap}")
+    validators.update(binary)
+    validators["settlements.browser-search-shard"] = search_shard_validator(
+        brotli_path=authorities.brotli,
+        brotli_sha256=authorities.brotli_sha256,
+        work_directory=authorities.work_directory,
+    )
+    return QaValidatorDispatcher(with_terminal_validators(validators))
