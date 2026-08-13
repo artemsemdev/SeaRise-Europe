@@ -48,9 +48,9 @@ def _authorities(tmp_path: Path) -> ProductionBinaryQaAuthorities:
         tools=object(),  # type: ignore[arg-type]
     )
     settlement = SettlementQaAuthority(
-        spatial_database=tmp_path / "spatial.duckdb",
         spatial_receipt=tmp_path / "spatial.receipt.json",
         work_directory=tmp_path / "work",
+        spatial_database=tmp_path / "spatial.duckdb",
     )
     return ProductionBinaryQaAuthorities(projection, boundary, settlement)
 
@@ -162,3 +162,55 @@ def test_boundary_routes_use_authoritative_boundary_role_ids(
     assert registry["release.boundary-geoparquet.support"](support).status == "pass"
     assert registry["release.boundary-geoparquet.coastal"](coastal).status == "pass"
     assert roles == ["support-boundary", "coastal-boundary"]
+
+
+def test_settlement_route_accepts_exactly_one_authority_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed = []
+    monkeypatch.setattr(
+        subject,
+        "validate_retained_spatial_geoparquet",
+        lambda stream, receipt, artifact_receipt, *, work_dir: observed.append(
+            (receipt, artifact_receipt, work_dir)
+        ),
+    )
+    authorities = _authorities(tmp_path)
+    retained = SettlementQaAuthority(
+        spatial_receipt=authorities.settlement.spatial_receipt,
+        artifact_receipt=tmp_path / "settlements.receipt.json",
+        work_directory=authorities.settlement.work_directory,
+    )
+    registry = production_binary_validator_registry(
+        ProductionBinaryQaAuthorities(
+            authorities.projection, authorities.boundary, retained
+        )
+    )
+    request = _request(
+        tmp_path,
+        "search/settlements.parquet",
+        "settlement-geoparquet",
+        "application/vnd.apache.parquet",
+    )
+
+    assert registry["settlements.geoparquet"](request).status == "pass"
+    assert observed == [
+        (
+            retained.spatial_receipt,
+            retained.artifact_receipt,
+            retained.work_directory,
+        )
+    ]
+
+    invalid = SettlementQaAuthority(
+        spatial_receipt=retained.spatial_receipt,
+        artifact_receipt=retained.artifact_receipt,
+        spatial_database=tmp_path / "spatial.duckdb",
+        work_directory=retained.work_directory,
+    )
+    invalid_registry = production_binary_validator_registry(
+        ProductionBinaryQaAuthorities(
+            authorities.projection, authorities.boundary, invalid
+        )
+    )
+    assert invalid_registry["settlements.geoparquet"](request).status == "fail"

@@ -19,6 +19,7 @@ from searise_pipeline.release import (
 from searise_pipeline.science import ScienceContractError
 from searise_pipeline.settlements.spatial_geoparquet import (
     SpatialGeoParquetError,
+    validate_retained_spatial_geoparquet,
     validate_spatial_geoparquet,
 )
 
@@ -48,9 +49,10 @@ class BoundaryQaAuthority:
 
 @dataclass(frozen=True)
 class SettlementQaAuthority:
-    spatial_database: Path
     spatial_receipt: Path
     work_directory: Path
+    spatial_database: Path | None = None
+    artifact_receipt: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -208,12 +210,24 @@ def _settlement_geoparquet(authority: SettlementQaAuthority) -> ArtifactValidato
     def validate(request: QaValidationRequest) -> QaValidationOutcome:
         try:
             with request.artifact_path.open("rb") as stream:
-                validate_spatial_geoparquet(
-                    stream,
-                    authority.spatial_database,
-                    authority.spatial_receipt,
-                    work_dir=authority.work_directory,
-                )
+                if authority.spatial_database is not None and authority.artifact_receipt is None:
+                    validate_spatial_geoparquet(
+                        stream,
+                        authority.spatial_database,
+                        authority.spatial_receipt,
+                        work_dir=authority.work_directory,
+                    )
+                elif authority.artifact_receipt is not None and authority.spatial_database is None:
+                    validate_retained_spatial_geoparquet(
+                        stream,
+                        authority.spatial_receipt,
+                        authority.artifact_receipt,
+                        work_dir=authority.work_directory,
+                    )
+                else:
+                    raise SpatialGeoParquetError(
+                        "settlement QA requires exactly one full-replay or retained authority"
+                    )
         except (OSError, SpatialGeoParquetError) as exc:
             return _fail("settlement-geoparquet-invalid", exc)
         return _pass(
