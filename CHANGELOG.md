@@ -34,6 +34,9 @@ All notable changes to this project will be documented in this file.
 - Added candidate-bound production validators for projection COG, GeoParquet,
   and PMTiles files, exact support and coastal boundary packages, and the
   descriptor-bound settlement GeoParquet spatial stage.
+- Added a retained-evidence settlement GeoParquet authority that revalidates
+  exact artifact bytes, schema, row groups, spatial identity, and the canonical
+  full-replay receipt without transporting the multi-gigabyte DuckDB stage.
 - Added candidate-bound JSON validators for release contracts, exact rights
   coverage, build-output inventory, STAC graph and asset identities, and the
   settlement search shard-set receipt.

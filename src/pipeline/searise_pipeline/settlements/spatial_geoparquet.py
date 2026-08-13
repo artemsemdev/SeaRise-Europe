@@ -73,6 +73,12 @@ _CANDIDATE_KEYS = frozenset("spatialStageSchemaVersion logicalHashVersion public
 _COUNT_KEYS = frozenset("normalizedPlaces classifiedPlaces spatialRejections europeCoreMemberships europeCoastalMemberships outsideSupportRejections".split())  # noqa: E501
 _GEOMETRY_KEYS = frozenset("contractSha256 dataProvenanceClass geometryStatus publicationEligible geometries".split())  # noqa: E501
 _ITEM_KEYS = frozenset("role id version path sha256 predicate".split())
+_ARTIFACT_RECEIPT_KEYS = frozenset(
+    "schemaVersion materializationPerformed publicationEligible productionClaim "
+    "publicationClaim canonicalGeometryClaim hazardExtentClaim scientificApprovalClaim "
+    "ownerApprovalClaim signingClaim dataReleaseId source artifact rebuild "
+    "deterministicIdentity".split()
+)
 # fmt: on
 
 
@@ -578,6 +584,147 @@ def _validate_stream(
     )
 
 
+def _retained_receipt(
+    raw: bytes, authority: _Authority, parquet_hash: str, byte_size: int
+) -> tuple[str, str]:
+    try:
+        document = source_stage._strict_json(raw, "GeoParquet artifact receipt")
+    except Exception as exc:
+        raise SpatialGeoParquetError(f"GeoParquet artifact receipt is invalid: {exc}") from exc
+    if type(document) is not dict or raw != _canonical(document) + b"\n":
+        raise SpatialGeoParquetError("GeoParquet artifact receipt is not canonical JSON")
+    unsigned = {key: value for key, value in document.items() if key != "deterministicIdentity"}
+    false_claims = (
+        "productionClaim",
+        "publicationClaim",
+        "canonicalGeometryClaim",
+        "hazardExtentClaim",
+        "scientificApprovalClaim",
+        "ownerApprovalClaim",
+        "signingClaim",
+    )
+    source, artifact, rebuild = (
+        document.get("source"),
+        document.get("artifact"),
+        document.get("rebuild"),
+    )
+    if (
+        set(document) != _ARTIFACT_RECEIPT_KEYS
+        or document.get("schemaVersion") != 1
+        or document.get("materializationPerformed") is not True
+        or document.get("publicationEligible") is not False
+        or any(document.get(name) is not False for name in false_claims)
+        or document.get("deterministicIdentity")
+        != hashlib.sha256(_canonical(unsigned) + b"\n").hexdigest()
+        or type(source) is not dict
+        or set(source)
+        != {
+            "spatialDatabaseSha256",
+            "spatialReceiptSha256",
+            "spatialReceiptDeterministicIdentity",
+            "spatialCandidateDeterministicIdentity",
+        }
+        or source.get("spatialReceiptSha256") != authority.receipt_sha256
+        or source.get("spatialReceiptDeterministicIdentity") != authority.receipt_identity
+        or source.get("spatialCandidateDeterministicIdentity") != authority.candidate_identity
+        or type(artifact) is not dict
+        or set(artifact)
+        != {
+            "artifactEnvelopeSha256",
+            "byteSize",
+            "formatVersion",
+            "logicalRowsSha256",
+            "mediaType",
+            "rowCount",
+            "sha256",
+            "sourceRowsSha256",
+        }
+        or artifact.get("mediaType") != "application/vnd.apache.parquet"
+        or artifact.get("formatVersion") != "1.1.0"
+        or artifact.get("byteSize") != byte_size
+        or artifact.get("sha256") != parquet_hash
+        or artifact.get("rowCount") != authority.row_count
+        or artifact.get("sourceRowsSha256") != authority.source_hash
+        or not _HEX.fullmatch(artifact.get("logicalRowsSha256", ""))
+        or not _HEX.fullmatch(artifact.get("artifactEnvelopeSha256", ""))
+        or type(rebuild) is not dict
+        or rebuild
+        != {
+            "performed": True,
+            "byteForByteMatch": True,
+            "sha256": parquet_hash,
+            "serializer": "searise-settlement-geoparquet-v1",
+            "validationProtocol": "staged-and-published-descriptor-v1",
+        }
+    ):
+        raise SpatialGeoParquetError("GeoParquet artifact receipt differs from retained bytes")
+    release_id = document.get("dataReleaseId")
+    if type(release_id) is not str or not _RELEASE.fullmatch(release_id):
+        raise SpatialGeoParquetError("GeoParquet retained release identity differs")
+    return release_id, artifact["artifactEnvelopeSha256"]
+
+
+def _validate_retained_stream(
+    stream: BinaryIO, authority: _Authority, artifact_receipt: bytes
+) -> SpatialGeoParquetEvidence:
+    _, pa, pq = _tools()
+    parquet_hash = _stream_hash(stream)
+    stream.seek(0, 2)
+    byte_size = stream.tell()
+    stream.seek(0)
+    release_id, envelope_hash = _retained_receipt(
+        artifact_receipt, authority, parquet_hash, byte_size
+    )
+    try:
+        parquet = pq.ParquetFile(stream)
+        metadata = parquet.schema_arrow.metadata or {}
+        envelope = json.loads(metadata[b"searise:settlement"])
+    except (
+        OSError,
+        KeyError,
+        TypeError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        pa.ArrowException,
+    ) as exc:
+        raise SpatialGeoParquetError("GeoParquet schema or metadata is unreadable") from exc
+    if (
+        hashlib.sha256(_canonical(envelope)).hexdigest() != envelope_hash
+        or envelope.get("dataReleaseId") != release_id
+        or not parquet.schema_arrow.equals(_schema(release_id, authority, pa), check_metadata=True)
+    ):
+        raise SpatialGeoParquetError("GeoParquet retained schema or envelope differs")
+    expected_groups = [ROW_GROUP_SIZE] * (authority.row_count // ROW_GROUP_SIZE)
+    if authority.row_count % ROW_GROUP_SIZE:
+        expected_groups.append(authority.row_count % ROW_GROUP_SIZE)
+    groups = [parquet.metadata.row_group(index) for index in range(parquet.metadata.num_row_groups)]
+    if (
+        parquet.metadata.num_rows != authority.row_count
+        or [group.num_rows for group in groups] != expected_groups
+        or any(
+            group.column(index).compression != "ZSTD"
+            for group in groups
+            for index in range(group.num_columns)
+        )
+    ):
+        raise SpatialGeoParquetError("GeoParquet retained row groups or compression differ")
+    if _stream_hash(stream) != parquet_hash:
+        raise SpatialGeoParquetError("GeoParquet bytes changed during retained validation")
+    receipt_document = source_stage._strict_json(
+        artifact_receipt, "GeoParquet artifact receipt"
+    )
+    artifact = receipt_document["artifact"]
+    return SpatialGeoParquetEvidence(
+        authority.row_count,
+        authority.source_hash,
+        artifact["logicalRowsSha256"],
+        parquet_hash,
+        authority.receipt_sha256,
+        authority.candidate_identity,
+        envelope,
+    )
+
+
 def serialize_spatial_geoparquet(
     spatial_database: Path,
     spatial_receipt: Path,
@@ -628,3 +775,33 @@ def validate_spatial_geoparquet(
     """Validate GeoParquet against the exact descriptor-bound spatial pair."""
     with _source(spatial_database, spatial_receipt, work_dir) as (connection, authority):
         return _validate_stream(stream, connection, authority)
+
+
+def validate_retained_spatial_geoparquet(
+    stream: BinaryIO,
+    spatial_receipt: Path,
+    artifact_receipt: Path,
+    *,
+    work_dir: Path,
+) -> SpatialGeoParquetEvidence:
+    """Validate exact retained bytes against their full-replay receipts."""
+    try:
+        with ExitStack() as stack:
+            _, snapshots = stack.enter_context(
+                spatial_stage._validation_snapshots(
+                    {
+                        "spatial-receipt.json": spatial_receipt,
+                        "artifact-receipt.json": artifact_receipt,
+                    },
+                    work_dir,
+                )
+            )
+            authority = _receipt(
+                spatial_stage._read_asset(snapshots["spatial-receipt.json"])
+            )
+            retained = spatial_stage._read_asset(snapshots["artifact-receipt.json"])
+            return _validate_retained_stream(stream, authority, retained)
+    except SpatialGeoParquetError:
+        raise
+    except Exception as exc:
+        raise SpatialGeoParquetError(f"retained GeoParquet authority failed: {exc}") from exc
