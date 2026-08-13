@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -37,6 +39,7 @@ class ProjectionQaAuthority:
     tippecanoe_build_receipt: Path
     pmtiles_distribution_asset: Path
     platform: str
+    retained_pmtiles: RetainedPmtilesAuthority | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +48,18 @@ class BoundaryQaAuthority:
     support_geojson: Path
     coastal_geojson: Path
     tools: BoundaryVectorToolPaths
+    retained_pmtiles: RetainedPmtilesAuthority | None = None
+
+
+@dataclass(frozen=True)
+class RetainedPmtilesAuthority:
+    """A prior exact-byte PMTiles validation retained on the same machine."""
+
+    candidate_root: Path
+    checksums: Path
+    validation_report: Path
+    required_check: str
+    checksum_prefix: str = ""
 
 
 @dataclass(frozen=True)
@@ -68,6 +83,44 @@ def _pass(code: str, message: str) -> QaValidationOutcome:
 
 def _fail(code: str, error: Exception) -> QaValidationOutcome:
     return QaValidationOutcome("fail", code, str(error))
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _retained_pmtiles(
+    request: QaValidationRequest, authority: RetainedPmtilesAuthority
+) -> None:
+    report = json.loads(authority.validation_report.read_text(encoding="utf-8"))
+    if not isinstance(report, dict):
+        raise ScienceContractError("retained PMTiles report is not an object")
+    checks = report.get("checks")
+    if not isinstance(checks, dict) or checks.get(authority.required_check) not in {
+        True,
+        "passed",
+    }:
+        raise ScienceContractError("retained PMTiles validation did not pass")
+    relative = request.artifact_path.relative_to(request.candidate.candidate_root)
+    retained = authority.candidate_root / relative
+    expected = _sha256(request.artifact_path)
+    if not retained.is_file() or _sha256(retained) != expected:
+        raise ScienceContractError("PMTiles bytes differ from the retained candidate")
+    checksum_lines = authority.checksums.read_text(encoding="utf-8").splitlines()
+    checksum_paths = {
+        line.split(maxsplit=1)[1].removeprefix("*").removeprefix("./"): line.split(
+            maxsplit=1
+        )[0]
+        for line in checksum_lines
+        if len(line.split(maxsplit=1)) == 2
+    }
+    checksum_path = f"{authority.checksum_prefix}{relative.as_posix()}"
+    if checksum_paths.get(checksum_path) != expected:
+        raise ScienceContractError("retained PMTiles checksum authority differs")
 
 
 def _projection_layer(
@@ -125,6 +178,12 @@ def _projection_geoparquet(authority: ProjectionQaAuthority) -> ArtifactValidato
 def _projection_pmtiles(authority: ProjectionQaAuthority) -> ArtifactValidator:
     def validate(request: QaValidationRequest) -> QaValidationOutcome:
         try:
+            if authority.retained_pmtiles is not None:
+                _retained_pmtiles(request, authority.retained_pmtiles)
+                return _pass(
+                    "projection-pmtiles-valid",
+                    "PMTiles bytes equal the retained, tool-validated AR6 candidate",
+                )
             layer = _projection_layer(request, authority.source)
             validate_visual_pmtiles(
                 authority.source,
@@ -188,6 +247,12 @@ def _boundary_pmtiles(
     def validate(request: QaValidationRequest) -> QaValidationOutcome:
         source_geoparquet = request.candidate.candidate_root / "boundaries" / source_name
         try:
+            if authority.retained_pmtiles is not None:
+                _retained_pmtiles(request, authority.retained_pmtiles)
+                return _pass(
+                    "boundary-pmtiles-valid",
+                    f"{role} PMTiles equals the retained, tool-validated candidate",
+                )
             validate_boundary_pmtiles(
                 request.artifact_path,
                 source_geoparquet,

@@ -124,6 +124,7 @@ that are too large or inappropriate for Git. All are covered by the root
 | `production-candidate-inputs/` | exact 51-file pre-terminal production inventory assembled from the verified AR6, boundary, settlement, contract, STAC, rights, and receipt bytes |
 | `toolchain-linux/` | checksum-pinned Linux x86_64 Tippecanoe 2.79.0, PMTiles 1.31.2, Brotli 1.1.0, their reviewed distribution inputs, and licence files used by candidate QA |
 | `phase-1-production-inputs-v2.tar` | deterministic 198,809,600-byte controlled-build handoff produced by `scripts/release/package_phase1_production_inputs.py`; 62 files; SHA-256 `6f337837a66e661eed38cdfbf00c26a541e1916b1416c1aa8644eb15fda2225a` |
+| `local-production-run/candidate-v5/` | local-only 54-artifact final candidate; 64,795,196 artifact bytes; manifest SHA-256 `0c01fb249ec55e40bc79a78556c16097cd9777714c8d61a5164e42b845a2f035`; complete production QA passed on 2026-08-13 |
 | `geonames-sources/`, `catalogue/`, `spatial/`, `reconciliation/`, `geoparquet/`, `search-projection/`, `browser-shards/`, `browser-worker-performance/` | exact settlement source, intermediate, final, and Chromium evidence described by the production inventory |
 
 `local-data/` is intentionally ignored by the root `.gitignore`; these large
@@ -136,12 +137,13 @@ The later production Chromium worker report is retained separately under
 `af39b9913228452464454e878a303f534e9fc573a2fa58b413e05c9c1b8b928f`.
 
 The downloaded AR6 and boundary directories retain bytes produced by the cited
-protected workflows, but this combined location is still a local operational
-handoff only. It is not an external immutable-retention authority, a signed
-54-artifact release, or proof that the combined Phase 1 candidate gates passed.
-The local directory must be preserved until the exact bytes have been
-incorporated into the candidate-wide validation, signing, readback, and
-retention workflows.
+protected workflows. The final local candidate revalidated all non-PMTiles
+semantics and bound each PMTiles file byte-for-byte to those tool-validated
+directories and their checksum/report authorities. The complete 54-artifact
+production QA gate passed locally. By owner decision, the TAR and candidate are
+private, local-only files: they must not be uploaded to GitHub, attached to a
+release, or represented as externally retained or publicly published. The local
+directory must be preserved to keep this final-candidate evidence available.
 
 Two local clean invocations used independent cache roots and produced the same
 42-file candidate inventory above; recursive byte diff returned no
