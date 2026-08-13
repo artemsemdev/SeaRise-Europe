@@ -37,6 +37,8 @@ All notable changes to this project will be documented in this file.
 - Added candidate-bound JSON validators for release contracts, exact rights
   coverage, build-output inventory, STAC graph and asset identities, and the
   settlement search shard-set receipt.
+- Added checksum-pinned, bounded Brotli decoding for production settlement
+  search shards with schema, semantic, candidate, and shard-name binding.
 
 - Added a candidate-wide QA executor that byte-gates the complete manifest,
   dispatches every schema-selected artifact in manifest order, retains explicit
