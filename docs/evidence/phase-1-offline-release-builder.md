@@ -144,6 +144,9 @@ production QA gate passed locally. By owner decision, the TAR and candidate are
 private, local-only files: they must not be uploaded to GitHub, attached to a
 release, or represented as externally retained or publicly published. The local
 directory must be preserved to keep this final-candidate evidence available.
+The exact paths, historical execution environment, assembly command, validation
+procedure, and test ownership map are recorded in the
+[Phase 1 private final candidate runbook](../operations/phase-1-private-final-candidate.md).
 
 Two local clean invocations used independent cache roots and produced the same
 42-file candidate inventory above; recursive byte diff returned no
