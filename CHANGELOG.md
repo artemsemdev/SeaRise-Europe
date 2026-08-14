@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Bound private real-source candidates to reviewed STAC archive/member lineage,
+  an existing Git code revision, the exact local dependency lock, build
+  parameters, and pipeline identity. The superseded candidate with fixture
+  provenance is retained locally, and a corrected no-upload candidate is
+  derived and fully gated without rebuilding the heavy source artifacts. The
+  new lock is included in the reviewed dependency inventory and regenerated
+  build-plane CycloneDX SBOM.
+
 - Fixed bounded settlement search failing closed on the production europe-core
   and europe-coastal shards. The fuzzy walk opened every shallow trie subtree
   regardless of the query, so the multi-script alternate-name index exhausted

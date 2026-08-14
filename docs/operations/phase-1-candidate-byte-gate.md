@@ -1,6 +1,6 @@
 # Phase 1 candidate byte gate
 
-For the exact private real-source `candidate-v5`, including its local paths,
+For the exact private real-source `candidate-v7`, including its local paths,
 retained authorities, assembly history, and expected results, use the
 [Phase 1 private final candidate runbook](phase-1-private-final-candidate.md).
 
