@@ -6,12 +6,24 @@ from .assembler import (
     assemble_candidate_fixture,
 )
 from .byte_gate import CandidateByteSummary, validate_candidate_root
+from .production_assembler import (
+    ProductionCandidateMetadata,
+    assemble_production_candidate,
+)
 from .provenance import (
     ProvenanceContractError,
     canonical_provenance_bytes,
     generate_provenance_statement,
     validate_provenance_statement,
 )
+from .qa_execution import (
+    CandidateQaArtifactResult,
+    CandidateQaExecution,
+    PreGateQaExecution,
+    execute_candidate_qa,
+    execute_pre_gate_qa,
+)
+from .qa_report import build_pre_gate_report
 from .validator import (
     CandidateContractError,
     CandidateSummary,
@@ -26,10 +38,18 @@ __all__ = [
     "CandidateAssemblySummary",
     "CandidateContractError",
     "CandidateByteSummary",
+    "CandidateQaArtifactResult",
+    "CandidateQaExecution",
     "CandidateSummary",
     "ProvenanceContractError",
+    "PreGateQaExecution",
+    "ProductionCandidateMetadata",
     "assemble_candidate_fixture",
+    "assemble_production_candidate",
     "canonical_provenance_bytes",
+    "build_pre_gate_report",
+    "execute_candidate_qa",
+    "execute_pre_gate_qa",
     "generate_provenance_statement",
     "load_candidate",
     "load_candidate_bytes",

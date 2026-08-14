@@ -1,5 +1,9 @@
 # Phase 1 candidate byte gate
 
+For the exact private real-source `candidate-v5`, including its local paths,
+retained authorities, assembly history, and expected results, use the
+[Phase 1 private final candidate runbook](phase-1-private-final-candidate.md).
+
 Use the byte gate after all 54 Phase 1 candidate artifacts have been assembled
 and `manifest.json` has been written as the terminal completeness marker:
 

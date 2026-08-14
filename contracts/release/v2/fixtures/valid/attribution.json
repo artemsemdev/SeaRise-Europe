@@ -1,0 +1,28 @@
+{
+  "$schema": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/attribution.schema.json",
+  "schemaVersion": "2.0.0",
+  "dataReleaseId": "searise-europe-v1.0.0-20260812-0123456789ab",
+  "dataProvenanceClass": "real-source",
+  "records": [
+    {
+      "attributionId": "geonames-format-readme-2026-08-10",
+      "sourceId": "geonames/format-readme/2026-08-10",
+      "title": "GeoNames export format and licence notice",
+      "sourceUrl": "https://download.geonames.org/export/dump/readme.txt",
+      "sourceSha256": "b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5",
+      "licence": {
+        "spdxId": "CC-BY-4.0",
+        "name": "Creative Commons Attribution 4.0 International",
+        "url": "https://creativecommons.org/licenses/by/4.0/"
+      },
+      "attributionText": "GeoNames geographical database, https://www.geonames.org/.",
+      "redistribution": "allowed",
+      "appliesToRoles": [
+        "settlement-search-index",
+        "settlement-search-receipt",
+        "settlement-geoparquet",
+        "source-receipt"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,38 @@
 # Settlement browser-worker performance evidence
 
+## Accepted Chromium reference path
+
+`src/frontend/scripts/measure-production-browser-worker.mjs` builds the real
+browser worker with pinned esbuild, serves the exact receipt-bound Brotli
+shards from a cross-origin-isolated loopback origin, and runs the production
+query set in Playwright Chromium. The worker checks the decompressed release
+bytes against their SHA-256 authority before parsing and hydrates the already
+validated serialized trie without rebuilding it from every alternate name.
+
+The harness retains initialization and query distributions, main-thread timer
+gaps, the exact query-set and shard identities, all intercepted request paths,
+and worker-isolate heap plus backing-storage telemetry from Chrome DevTools
+Protocol `Runtime.getHeapUsage`. Query text remains inside the worker and is
+never included in a request or report. The report is canonical JSON with a
+validated content identity and fails if initialization p95 is not below 1,000
+ms, query p95 is not below 50 ms, memory is unmeasured, or any unexpected
+network request occurs.
+
+```bash
+cd src/frontend
+npm run measure:settlement-browser -- \
+  --shard-directory ../../local-data/phase-1/browser-shards \
+  --shard-receipt ../../local-data/phase-1/browser-shards/settlement-browser-search-shards.receipt.json \
+  --query-set ../../local-data/phase-1/performance-queries.json \
+  --data-release-id searise-europe-v1.0.0-20260812-939053bab621 \
+  --output ../../local-data/phase-1/browser-worker-performance/browser-worker-performance.chromium.json \
+  --initialization-samples 5 \
+  --query-samples 10
+```
+
+The historic Node harness below remains useful for deterministic producer
+diagnostics. Its measurements do not replace the accepted Chromium evidence.
+
 `src/frontend/scripts/measure-settlement-browser-worker.ts` measures the exact
 receipt-gated settlement search shards produced from a pinned search projection.
 It accepts the same small synthetic fixture used by contract tests and the same

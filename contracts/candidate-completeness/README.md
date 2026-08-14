@@ -18,6 +18,39 @@ The deterministic seal order is:
 5. pass the separate supply-chain evidence-envelope and signing gate before any
    publication.
 
+`execute_pre_gate_qa` enforces step 1 against the version-selected routing
+matrix. It requires the exact ordered 51-artifact v2 inventory, streams every
+single-link regular file through a no-follow descriptor before dispatch, and
+rehashes the complete snapshot after dispatch. Validators receive the candidate
+and release identities plus the peer-artifact root, while the manifest identity
+remains explicitly absent until the last-write seal exists. Any missing route,
+non-pass disposition, byte mismatch, or concurrent byte change blocks sealing.
+`build_pre_gate_report` deterministically groups those explicit outcomes by
+authoritative validator, preserves pass, fail, and `not-measured`, binds every
+check to release-relative artifact paths and SHA-256 identities, and renders the
+shared JSON/Markdown gate-report contract. The report remains automation-only
+and non-promoting; later owner and supply-chain gates cannot be inferred from a
+successful pre-terminal validation.
+
+`assemble_production_candidate` consumes a directory containing exactly those
+51 release-relative input paths. It copies each bounded, stable regular file
+into a private candidate stage, executes pre-terminal QA, generates both gate
+reports, writes and verifies the 53-subject checksum inventory, and writes
+`manifest.json` last. The sealed 54-artifact tree is then byte-gated and routed
+through the complete matrix again before an exclusive, durable rename exposes
+the immutable output name. Any non-pass validator disposition, extra or missing
+input, changed byte, terminal-report defect, or final byte-gate failure leaves
+no candidate at the requested output path. The assembler assigns the
+`real-source` provenance class but deliberately keeps publication false; its
+dispatcher must contain the authoritative production validators described by
+the QA matrix.
+
+The three terminal routes are repository-controlled: the JSON report is checked
+against the shared schema, semantics, and candidate binding; the Markdown bytes
+must equal the deterministic renderer output for that JSON; and `checksums.txt`
+must equal the manifest's ordered checksum subjects. Callers cannot replace
+these validators when composing a production registry.
+
 `scripts/release/validate_candidate_bytes.py` applies the read-only byte gate
 to an assembled candidate root. It opens the root and descendants without
 following symlinks, requires exactly 54 single-link regular files plus

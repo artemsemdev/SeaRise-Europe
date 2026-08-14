@@ -25,6 +25,54 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added local retained-evidence PMTiles validation so an exact final candidate
+  can be fully gated on Apple Silicon without executing pinned Linux x86_64
+  tooling under unstable emulation. Candidate bytes must match both the prior
+  validated artifact and its checksum/report authorities.
+- Added release v2 attribution and build-receipt contracts that cover the
+  settlement search receipt role introduced by the 54-artifact candidate
+  contract while leaving the published release v1 contracts immutable.
+- Added an authoritative validator for already-built projection PMTiles that
+  rechecks pinned tool identities, canonical metadata and headers, and decoded
+  source-property parity without rebuilding the archive.
+- Added candidate-bound production validators for projection COG, GeoParquet,
+  and PMTiles files, exact support and coastal boundary packages, and the
+  descriptor-bound settlement GeoParquet spatial stage.
+- Added a retained-evidence settlement GeoParquet authority that revalidates
+  exact artifact bytes, schema, row groups, spatial identity, and the canonical
+  full-replay receipt without transporting the multi-gigabyte DuckDB stage.
+- Added candidate-bound JSON validators for release contracts, exact rights
+  coverage, build-output inventory, STAC graph and asset identities, and the
+  settlement search shard-set receipt.
+- Added checksum-pinned, bounded Brotli decoding for production settlement
+  search shards with schema, semantic, candidate, and shard-name binding.
+
+- Added a candidate-wide QA executor that byte-gates the complete manifest,
+  dispatches every schema-selected artifact in manifest order, retains explicit
+  pass, fail, and not-measured dispositions, and rejects candidate mutation
+  during validation before any release eligibility can be reported. The same
+  authority now validates the exact 51-artifact pre-terminal snapshot before
+  gate reports, checksums, and the manifest exist, then renders deterministic
+  JSON and Markdown checks grouped by authoritative validator and exact evidence
+  hashes without making a publication claim. A manifest-last production
+  assembler now seals those inputs into the complete 54-artifact candidate and
+  reruns the byte gate and full validator matrix before exclusive publication.
+  Repository-controlled terminal validators independently verify the report
+  schema and binding, deterministic Markdown rendering, and checksum inventory.
+- Added a release-bound settlement Web Worker and Chromium evidence harness
+  with core-first loading, monotonic query tokens, bounded search, static-only
+  networking, worker-isolate memory telemetry, and accepted production-scale
+  initialization and query budget checks.
+- Added a version-selected candidate QA routing matrix and explicit-outcome
+  dispatcher that cover every v2 artifact role, media type, and content
+  encoding and fail closed on missing, duplicate, unsorted, unknown, or
+  unimplemented validator routes. Complete synthetic candidates now use the
+  shared release-gate schema and deterministic Markdown renderer, with explicit
+  targets, measurements, evidence hashes, and blocking unmeasured checks.
+- Added a durable Phase 1 settlement production inventory binding the verified
+  GeoNames, catalogue, spatial, GeoParquet, search, shard, query-set, and
+  Node-worker diagnostic identities while keeping browser and publication
+  claims explicitly blocked.
 - Added receipt-bound, bounded-memory settlement reconciliation evidence that
   separates pre-spatial catalogue rejections from classified and
   spatial-rejected normalized records, reports decision-split quality

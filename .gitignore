@@ -71,6 +71,9 @@ artifacts/
 tmp/
 .cache/
 
+# Local Phase 1 production evidence and large build intermediates
+local-data/
+
 # Claude local tooling files
 # Keep Claude machine-local state out of git by default.
 .claude/

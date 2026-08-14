@@ -96,6 +96,60 @@ def _serialize(
     return stream, evidence
 
 
+def _artifact_receipt(
+    path: Path,
+    stream: io.BytesIO,
+    evidence: module.SpatialGeoParquetEvidence,
+    spatial_receipt: Path,
+) -> None:
+    spatial = json.loads(spatial_receipt.read_text())
+    envelope = evidence.artifact_envelope
+    document = {
+        "schemaVersion": 1,
+        "materializationPerformed": True,
+        "publicationEligible": False,
+        "productionClaim": False,
+        "publicationClaim": False,
+        "canonicalGeometryClaim": False,
+        "hazardExtentClaim": False,
+        "scientificApprovalClaim": False,
+        "ownerApprovalClaim": False,
+        "signingClaim": False,
+        "dataReleaseId": RELEASE,
+        "source": {
+            "spatialDatabaseSha256": "f" * 64,
+            "spatialReceiptSha256": hashlib.sha256(spatial_receipt.read_bytes()).hexdigest(),
+            "spatialReceiptDeterministicIdentity": spatial["deterministicIdentity"],
+            "spatialCandidateDeterministicIdentity": spatial["candidate"][
+                "deterministicIdentity"
+            ],
+        },
+        "artifact": {
+            "mediaType": "application/vnd.apache.parquet",
+            "formatVersion": "1.1.0",
+            "byteSize": len(stream.getvalue()),
+            "sha256": evidence.parquet_sha256,
+            "rowCount": evidence.row_count,
+            "sourceRowsSha256": evidence.source_rows_sha256,
+            "logicalRowsSha256": evidence.logical_rows_sha256,
+            "artifactEnvelopeSha256": hashlib.sha256(
+                module._canonical(envelope)
+            ).hexdigest(),
+        },
+        "rebuild": {
+            "performed": True,
+            "byteForByteMatch": True,
+            "sha256": evidence.parquet_sha256,
+            "serializer": "searise-settlement-geoparquet-v1",
+            "validationProtocol": "staged-and-published-descriptor-v1",
+        },
+    }
+    document["deterministicIdentity"] = hashlib.sha256(
+        module._canonical(document) + b"\n"
+    ).hexdigest()
+    path.write_bytes(module._canonical(document) + b"\n")
+
+
 def test_deterministic_stream_binds_exact_receipt_and_full_v3_metadata(tmp_path: Path) -> None:
     paths = _fixture(tmp_path)
     first, evidence = _serialize(paths)
@@ -107,6 +161,48 @@ def test_deterministic_stream_binds_exact_receipt_and_full_v3_metadata(tmp_path:
     binding = json.loads(metadata[b"searise:spatial-receipt"])
     assert len(envelope["arrowFields"]) == 32 and envelope["publicationEligible"] is False and envelope["scientificApprovalClaim"] is False  # noqa: E501  # fmt: skip
     assert binding["receiptSha256"] == hashlib.sha256(paths[1].read_bytes()).hexdigest()
+
+
+def test_retained_validator_binds_exact_artifact_and_full_replay_receipts(
+    tmp_path: Path,
+) -> None:
+    paths = _fixture(tmp_path)
+    stream, evidence = _serialize(paths)
+    artifact_receipt = tmp_path / "artifact-receipt.json"
+    _artifact_receipt(artifact_receipt, stream, evidence, paths[1])
+
+    retained = module.validate_retained_spatial_geoparquet(
+        stream,
+        paths[1],
+        artifact_receipt,
+        work_dir=paths[2],
+    )
+
+    assert retained == evidence
+
+
+def test_retained_validator_rejects_receipt_or_artifact_mutation(tmp_path: Path) -> None:
+    paths = _fixture(tmp_path)
+    stream, evidence = _serialize(paths)
+    artifact_receipt = tmp_path / "artifact-receipt.json"
+    _artifact_receipt(artifact_receipt, stream, evidence, paths[1])
+    document = json.loads(artifact_receipt.read_text())
+    document["artifact"]["sha256"] = "0" * 64
+    document["deterministicIdentity"] = hashlib.sha256(
+        module._canonical(
+            {key: value for key, value in document.items() if key != "deterministicIdentity"}
+        )
+        + b"\n"
+    ).hexdigest()
+    artifact_receipt.write_bytes(module._canonical(document) + b"\n")
+
+    with pytest.raises(module.SpatialGeoParquetError, match="retained bytes"):
+        module.validate_retained_spatial_geoparquet(
+            stream,
+            paths[1],
+            artifact_receipt,
+            work_dir=paths[2],
+        )
 
 
 def test_validator_rejects_a_different_but_self_consistent_receipt(tmp_path: Path) -> None:

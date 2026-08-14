@@ -87,6 +87,67 @@ The complete synthetic
 validates against the checked-in operator receipt schema and shows the exact
 external shape without presenting diagnostic values as release evidence.
 
+## Local production-data handoff (2026-08-12)
+
+The production settlement inputs, intermediates, outputs, receipts, and the
+validated Node-worker diagnostic were retained on the project owner's local
+workstation at:
+
+```text
+~/Desktop/Github/SeaRise Europe/local-data/phase-1/
+```
+
+The repository-relative location is `local-data/phase-1/`. After the exact AR6
+source, reviewed build artifacts, Linux validation toolchain, and deterministic
+production-input archive were added, the complete local directory occupied
+24,390,704 KiB (approximately 23.3 GiB) and contained:
+
+- the four hash-locked GeoNames source assets and captured response headers;
+- the normalized catalogue and spatial DuckDB databases with their receipts;
+- the settlement reconciliation report;
+- the 701,881-row GeoParquet artifact and receipt;
+- the 701,881-record search projection;
+- both v4 Brotli browser shards and their receipt;
+- the production query set and validated Node-worker diagnostic report; and
+- private validation work directories used for read-only replay.
+
+The following subdirectories are the historical handoff authority for inputs
+that are too large or inappropriate for Git. All are covered by the root
+`local-data/` ignore rule:
+
+| Local path below `local-data/phase-1/` | Identity and origin |
+|---|---|
+| `ar6-source/ar6-regional-confidence.zip` | 9,243,771,601 bytes; SHA-256 `d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91`; exact IPCC AR6 archive selected by the audited source lock |
+| `ar6-regional-candidate/` | macOS ARM64 candidate artifact `8973969557` from protected validation run `31113582612`, source commit `c2ed9074624c7cfe61bf610a1a67f4303aca7580`; manifest SHA-256 `6fe1115ba80857a2dcdd39fefada92ec51122cd6f8e7a2704e20083dd3e616ac` |
+| `ar6-owner-decision/` | protected owner-decision artifact from run `31395573924`; the final gate records automated validation passed, owner approval, and the same manifest identity |
+| `boundary-candidate/` | four independently validated boundary GeoParquet/PMTiles files from run `31644862275`; local `checksums.txt` SHA-256 `255defa0e3391c8c367017e1cce13f7b621587df00c636eeed15913a895e467a` |
+| `production-candidate-inputs/` | exact 51-file pre-terminal production inventory assembled from the verified AR6, boundary, settlement, contract, STAC, rights, and receipt bytes |
+| `toolchain-linux/` | checksum-pinned Linux x86_64 Tippecanoe 2.79.0, PMTiles 1.31.2, Brotli 1.1.0, their reviewed distribution inputs, and licence files used by candidate QA |
+| `phase-1-production-inputs-v2.tar` | deterministic 198,809,600-byte controlled-build handoff produced by `scripts/release/package_phase1_production_inputs.py`; 62 files; SHA-256 `6f337837a66e661eed38cdfbf00c26a541e1916b1416c1aa8644eb15fda2225a` |
+| `local-production-run/candidate-v5/` | local-only 54-artifact final candidate; 64,795,196 artifact bytes; manifest SHA-256 `0c01fb249ec55e40bc79a78556c16097cd9777714c8d61a5164e42b845a2f035`; complete production QA passed on 2026-08-13 |
+| `geonames-sources/`, `catalogue/`, `spatial/`, `reconciliation/`, `geoparquet/`, `search-projection/`, `browser-shards/`, `browser-worker-performance/` | exact settlement source, intermediate, final, and Chromium evidence described by the production inventory |
+
+`local-data/` is intentionally ignored by the root `.gitignore`; these large
+bytes must not be committed. At verification time the GeoNames full scans had
+zero parser failures, the search projection reproduced byte-for-byte from the
+spatial database, and the diagnostic report validated with deterministic
+identity `36d21fd8dc303f523e5a19cb00c789804dd2a42ed9c15ba3c3d1cddff56083e9`.
+The later production Chromium worker report is retained separately under
+`browser-worker-performance/` with deterministic identity
+`af39b9913228452464454e878a303f534e9fc573a2fa58b413e05c9c1b8b928f`.
+
+The downloaded AR6 and boundary directories retain bytes produced by the cited
+protected workflows. The final local candidate revalidated all non-PMTiles
+semantics and bound each PMTiles file byte-for-byte to those tool-validated
+directories and their checksum/report authorities. The complete 54-artifact
+production QA gate passed locally. By owner decision, the TAR and candidate are
+private, local-only files: they must not be uploaded to GitHub, attached to a
+release, or represented as externally retained or publicly published. The local
+directory must be preserved to keep this final-candidate evidence available.
+The exact paths, historical execution environment, assembly command, validation
+procedure, and test ownership map are recorded in the
+[Phase 1 private final candidate runbook](../operations/phase-1-private-final-candidate.md).
+
 Two local clean invocations used independent cache roots and produced the same
 42-file candidate inventory above; recursive byte diff returned no
 differences. A third invocation using the first cache produced seven hits and
