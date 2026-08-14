@@ -341,7 +341,9 @@ def _component_for_input(path: PurePosixPath) -> str:
         return "pipeline-geoid-evaluator"
     if value in {"src/pipeline/pyproject.toml", "src/pipeline/requirements-pipeline.txt"}:
         return "pipeline-python-contributor"
-    if path.name.startswith("requirements-release"):
+    if path.name.startswith("requirements-release") or path.name.startswith(
+        "requirements-phase1-final-"
+    ):
         return "pipeline-python-release"
     if path.name.startswith("requirements-settlements-spatial"):
         return "settlement-spatial-python"

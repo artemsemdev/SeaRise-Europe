@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from searise_pipeline.candidate_completeness.production_binary_validators import
     SettlementQaAuthority,
 )
 from searise_pipeline.candidate_completeness.production_validators import (
+    ProductionBuildProvenanceAuthority,
     ProductionQaAuthorities,
     production_validator_dispatcher,
 )
@@ -34,6 +36,14 @@ def _json(path: Path) -> dict[str, object]:
     if not isinstance(value, dict):
         raise TypeError(f"JSON authority must be an object: {path}")
     return value
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _tools(args: argparse.Namespace) -> BoundaryVectorToolPaths:
@@ -126,6 +136,15 @@ def _dispatcher(args: argparse.Namespace):  # type: ignore[no-untyped-def]
             brotli=args.brotli or args.toolchain_root / "brotli",
             brotli_sha256=args.brotli_sha256,
             work_directory=args.work_root / "search",
+            provenance=ProductionBuildProvenanceAuthority(
+                code_revision=args.code_revision,
+                environment_lock_path=args.environment_lock.resolve()
+                .relative_to(Path(__file__).resolve().parents[2].resolve())
+                .as_posix(),
+                environment_lock_sha256=_sha256(args.environment_lock),
+                parameters_sha256=_sha256(args.build_parameters),
+                pipeline_identity_sha256=args.pipeline_identity_sha256,
+            ),
         )
     )
 
@@ -163,14 +182,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--retained-ar6-root", type=Path)
     parser.add_argument("--retained-boundary-root", type=Path)
     parser.add_argument("--brotli", type=Path)
-    parser.add_argument(
-        "--brotli-sha256", default=BROTLI_LINUX_X86_64_SHA256
-    )
+    parser.add_argument("--brotli-sha256", default=BROTLI_LINUX_X86_64_SHA256)
     parser.add_argument("--work-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--data-release-id", required=True)
     parser.add_argument("--generated-at", required=True)
+    parser.add_argument("--code-revision", required=True)
+    parser.add_argument("--environment-lock", type=Path, required=True)
+    parser.add_argument("--build-parameters", type=Path, required=True)
+    parser.add_argument("--pipeline-identity-sha256", required=True)
     parser.add_argument(
         "--release-contract",
         type=Path,
@@ -179,7 +200,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--source-fixture",
         type=Path,
-        default=root / "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
+        default=root
+        / "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
     )
     parser.add_argument(
         "--source-fixture-receipt",
@@ -192,7 +214,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--tippecanoe-build-receipt",
         type=Path,
-        default=root / "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json",
+        default=root
+        / "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json",
     )
     parser.add_argument(
         "--support-geojson",

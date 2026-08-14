@@ -123,6 +123,7 @@
       "coverage": "locked",
       "inputs": [
         { "path": "contracts/supply-chain/v1/python-graphs/release-runtime.json", "role": "manifest", "sha256": "86fc6d1a7446d338b607cff07c3403f46a38941b524337786fd6dc5c59a0150e" },
+        { "path": "src/pipeline/requirements-phase1-final-macos-x86_64.lock", "role": "lock", "sha256": "2988c24e76853ba8f87c3cc756325d5114386389b1548a0a034939473a7b80f0" },
         { "path": "src/pipeline/requirements-release-macos-arm64.lock", "role": "lock", "sha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75" },
         { "path": "src/pipeline/requirements-release.lock", "role": "lock", "sha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f" }
       ],
