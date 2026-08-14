@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, NoReturn
@@ -74,11 +75,25 @@ class ProductionQaAuthorities:
         brotli: Path,
         brotli_sha256: str,
         work_directory: Path,
+        provenance: ProductionBuildProvenanceAuthority,
     ) -> None:
         self.binary = binary
         self.brotli = brotli
         self.brotli_sha256 = brotli_sha256
         self.work_directory = work_directory
+        self.provenance = provenance
+
+
+@dataclass(frozen=True)
+class ProductionBuildProvenanceAuthority:
+    """Reviewed local identities that a production build receipt must match."""
+
+    code_revision: str
+    environment_lock_path: str
+    environment_lock_sha256: str
+    parameters_sha256: str
+    pipeline_identity_sha256: str
+    pipeline_version: str = "0.1.0"
 
 
 class _DuplicateKeyError(ValueError):
@@ -136,9 +151,7 @@ def _binding_outcome(
     request: QaValidationRequest, document: Mapping[str, Any]
 ) -> QaValidationOutcome | None:
     context = request.candidate
-    data_release_id = document.get(
-        "dataReleaseId", document.get("searise:data_release_id")
-    )
+    data_release_id = document.get("dataReleaseId", document.get("searise:data_release_id"))
     provenance_class = document.get(
         "dataProvenanceClass", document.get("searise:data_provenance_class")
     )
@@ -191,16 +204,12 @@ def _validate_rights(document: Mapping[str, Any]) -> QaValidationOutcome | None:
     inventory = _load_json(INVENTORY)
     required = inventory["requiredArtifacts"]
     expected_ids = {
-        attribution_id
-        for artifact in required
-        for attribution_id in artifact["attributionIds"]
+        attribution_id for artifact in required for attribution_id in artifact["attributionIds"]
     }
     records = document.get("records")
     if not isinstance(records, list):
         return QaValidationOutcome("fail", "rights-incomplete", "rights records are absent")
-    by_id = {
-        item.get("attributionId"): item for item in records if isinstance(item, Mapping)
-    }
+    by_id = {item.get("attributionId"): item for item in records if isinstance(item, Mapping)}
     if set(by_id) != expected_ids or len(by_id) != len(records):
         return QaValidationOutcome(
             "fail", "rights-incomplete", "rights identities differ from candidate inventory"
@@ -208,9 +217,8 @@ def _validate_rights(document: Mapping[str, Any]) -> QaValidationOutcome | None:
     for artifact in required:
         for attribution_id in artifact["attributionIds"]:
             record = by_id[attribution_id]
-            if (
-                record.get("redistribution") != "allowed"
-                or artifact["role"] not in record.get("appliesToRoles", [])
+            if record.get("redistribution") != "allowed" or artifact["role"] not in record.get(
+                "appliesToRoles", []
             ):
                 return QaValidationOutcome(
                     "fail",
@@ -220,19 +228,16 @@ def _validate_rights(document: Mapping[str, Any]) -> QaValidationOutcome | None:
     return None
 
 
-def _build_receipt_binding(document: Mapping[str, Any]) -> QaValidationOutcome | None:
+def _build_receipt_binding(
+    document: Mapping[str, Any],
+    authority: ProductionBuildProvenanceAuthority | None,
+) -> QaValidationOutcome | None:
     inventory = _load_json(INVENTORY)["requiredArtifacts"]
-    expected_paths = {
-        item["path"]
-        for item in inventory[:51]
-        if item["role"] != "build-receipt"
-    }
+    expected_paths = {item["path"] for item in inventory[:51] if item["role"] != "build-receipt"}
     outputs = document.get("outputs")
     if not isinstance(outputs, list):
         return QaValidationOutcome("fail", "build-output-binding", "outputs are absent")
-    observed_paths = {
-        item.get("path") for item in outputs if isinstance(item, Mapping)
-    }
+    observed_paths = {item.get("path") for item in outputs if isinstance(item, Mapping)}
     if len(outputs) != len(observed_paths) or observed_paths != expected_paths:
         return QaValidationOutcome(
             "fail",
@@ -243,20 +248,54 @@ def _build_receipt_binding(document: Mapping[str, Any]) -> QaValidationOutcome |
         item["path"] for item in inventory[:51] if item["role"] == "source-receipt"
     }
     source_receipts = document.get("sourceReceipts")
-    observed_receipts = {
-        item.get("path") for item in source_receipts if isinstance(item, Mapping)
-    } if isinstance(source_receipts, list) else set()
+    observed_receipts = (
+        {item.get("path") for item in source_receipts if isinstance(item, Mapping)}
+        if isinstance(source_receipts, list)
+        else set()
+    )
     if len(observed_receipts) != len(expected_receipts) or observed_receipts != expected_receipts:
         return QaValidationOutcome(
             "fail",
             "build-source-binding",
             "build source receipts differ from the required source inventory",
         )
+    if authority is None:
+        return None
+    expected_input = {
+        "path": "contracts/candidate-completeness/v2/required-artifacts.json",
+        "sha256": _sha256(INVENTORY),
+    }
+    expected_environment_lock = {
+        "path": authority.environment_lock_path,
+        "sha256": authority.environment_lock_sha256,
+    }
+    expected_tools = [
+        {
+            "name": "searise-pipeline",
+            "version": authority.pipeline_version,
+            "identitySha256": authority.pipeline_identity_sha256,
+        }
+    ]
+    if (
+        document.get("codeRevision") != authority.code_revision
+        or document.get("inputs") != [expected_input]
+        or not isinstance(document.get("environment"), Mapping)
+        or document["environment"].get("lock") != expected_environment_lock
+        or document.get("parametersSha256") != authority.parameters_sha256
+        or document.get("tools") != expected_tools
+    ):
+        return QaValidationOutcome(
+            "fail",
+            "build-provenance-binding",
+            "build provenance differs from the reviewed local authorities",
+        )
     return None
 
 
 def _stac_binding(
-    request: QaValidationRequest, document: Mapping[str, Any]
+    request: QaValidationRequest,
+    document: Mapping[str, Any],
+    projection_source: Any | None,
 ) -> QaValidationOutcome | None:
     release_id = request.candidate.data_release_id
     if request.selector.role == "stac-catalog":
@@ -277,15 +316,16 @@ def _stac_binding(
             for scenario in ("ssp1-26", "ssp2-45", "ssp5-85")
             for horizon in (2030, 2050, 2100)
         ]
-        observed_items = [
-            item.get("href")
-            for item in links
-            if isinstance(item, Mapping) and item.get("rel") == "item"
-        ] if isinstance(links, list) else []
-        if (
-            document.get("id") != f"{release_id}-projections"
-            or observed_items != expected_items
-        ):
+        observed_items = (
+            [
+                item.get("href")
+                for item in links
+                if isinstance(item, Mapping) and item.get("rel") == "item"
+            ]
+            if isinstance(links, list)
+            else []
+        )
+        if document.get("id") != f"{release_id}-projections" or observed_items != expected_items:
             return QaValidationOutcome(
                 "fail", "stac-binding", "STAC Collection identity or items differ"
             )
@@ -315,9 +355,7 @@ def _stac_binding(
     for key, expected_path in expected_paths.items():
         asset = assets.get(key)
         if not isinstance(asset, Mapping) or asset.get("href") != f"../../{expected_path}":
-            return QaValidationOutcome(
-                "fail", "stac-binding", f"STAC {key} path differs"
-            )
+            return QaValidationOutcome("fail", "stac-binding", f"STAC {key} path differs")
         path = _candidate_path(request, expected_path)
         try:
             if (
@@ -328,14 +366,32 @@ def _stac_binding(
                     "fail", "stac-binding", f"STAC {key} byte identity differs"
                 )
         except OSError:
+            return QaValidationOutcome("fail", "stac-binding", f"STAC {key} bytes cannot be read")
+    if projection_source is not None:
+        matching_layers = [
+            layer
+            for layer in projection_source.layers
+            if layer.scenario == scenario and layer.horizon == horizon
+        ]
+        if len(matching_layers) != 1 or (
+            properties.get("searise:source_archive_sha256") != projection_source.archive_sha256
+            or properties.get("searise:source_member_sha256") != matching_layers[0].member_sha256
+        ):
             return QaValidationOutcome(
-                "fail", "stac-binding", f"STAC {key} bytes cannot be read"
+                "fail",
+                "stac-source-binding",
+                "STAC source lineage differs from the reviewed projection authority",
             )
     return None
 
 
 def _public_validator(
-    validator_id: str, schema_directory: Path, schema_name: str
+    validator_id: str,
+    schema_directory: Path,
+    schema_name: str,
+    *,
+    provenance: ProductionBuildProvenanceAuthority | None,
+    projection_source: Any | None,
 ) -> ArtifactValidator:
     def validate(request: QaValidationRequest) -> QaValidationOutcome:
         document = _load_json(request.artifact_path)
@@ -355,11 +411,11 @@ def _public_validator(
             if rights is not None:
                 return rights
         if validator_id == "release.build-receipt":
-            build = _build_receipt_binding(document)
+            build = _build_receipt_binding(document, provenance)
             if build is not None:
                 return build
         if validator_id.startswith("release.stac."):
-            stac = _stac_binding(request, document)
+            stac = _stac_binding(request, document, projection_source)
             if stac is not None:
                 return stac
         references = _validate_references(request, document)
@@ -385,9 +441,7 @@ def _search_receipt(request: QaValidationRequest) -> QaValidationOutcome:
     if binding is not None:
         return binding
     try:
-        receipt_parent = request.artifact_path.relative_to(
-            request.candidate.candidate_root
-        ).parent
+        receipt_parent = request.artifact_path.relative_to(request.candidate.candidate_root).parent
     except ValueError:
         _fail("search-receipt-binding", "search receipt escapes the candidate")
     observed_paths: set[str] = set()
@@ -400,10 +454,7 @@ def _search_receipt(request: QaValidationRequest) -> QaValidationOutcome:
         observed_paths.add(logical)
         path = _candidate_path(request, logical)
         try:
-            if (
-                shard.get("byteSize") != path.stat().st_size
-                or shard.get("sha256") != _sha256(path)
-            ):
+            if shard.get("byteSize") != path.stat().st_size or shard.get("sha256") != _sha256(path):
                 return QaValidationOutcome(
                     "fail", "search-receipt-binding", "search shard bytes differ"
                 )
@@ -424,10 +475,20 @@ def _search_receipt(request: QaValidationRequest) -> QaValidationOutcome:
     )
 
 
-def production_json_validator_registry() -> dict[str, ArtifactValidator]:
+def production_json_validator_registry(
+    *,
+    provenance: ProductionBuildProvenanceAuthority | None = None,
+    projection_source: Any | None = None,
+) -> dict[str, ArtifactValidator]:
     """Return JSON validators that require schema, peer bytes, rights, and identity."""
     validators = {
-        validator_id: _public_validator(validator_id, schema_directory, schema_name)
+        validator_id: _public_validator(
+            validator_id,
+            schema_directory,
+            schema_name,
+            provenance=provenance,
+            projection_source=projection_source,
+        )
         for validator_id, (schema_directory, schema_name) in _PUBLIC_SCHEMAS.items()
     }
     validators["settlements.browser-search-receipt"] = _search_receipt
@@ -438,7 +499,10 @@ def production_validator_dispatcher(
     authorities: ProductionQaAuthorities,
 ) -> QaValidatorDispatcher:
     """Construct the closed 54-artifact production dispatcher."""
-    validators = production_json_validator_registry()
+    validators = production_json_validator_registry(
+        provenance=authorities.provenance,
+        projection_source=authorities.binary.projection.source,
+    )
     binary = production_binary_validator_registry(authorities.binary)
     overlap = sorted(set(validators) & set(binary))
     if overlap:

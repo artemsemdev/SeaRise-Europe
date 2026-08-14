@@ -44,6 +44,8 @@ def _arguments(tmp_path: Path) -> argparse.Namespace:
         (authority / name).write_text("{}")
     tippecanoe_receipt = tmp_path / "tippecanoe-receipt.json"
     tippecanoe_receipt.write_text("{}")
+    build_parameters = tmp_path / "build-parameters.json"
+    build_parameters.write_text("{}\n")
     return argparse.Namespace(
         input_root=tmp_path / "inputs",
         authority_root=authority,
@@ -53,6 +55,12 @@ def _arguments(tmp_path: Path) -> argparse.Namespace:
         candidate_id="candidate-phase-1-real-source-20260812-0123456789ab",
         data_release_id="searise-europe-v1.0.0-20260812-0123456789ab",
         generated_at="2026-08-13T00:00:00Z",
+        code_revision="d53ca2d26bf4e00ef8b32dad3847606dbbaec8f2",
+        environment_lock=(
+            REPOSITORY_ROOT / "src/pipeline/requirements-phase1-final-macos-x86_64.lock"
+        ),
+        build_parameters=build_parameters,
+        pipeline_identity_sha256="a" * 64,
         release_contract=contract,
         source_fixture=fixture,
         source_fixture_receipt=receipt,
@@ -91,6 +99,8 @@ def test_dispatcher_binds_exact_linux_and_retained_authorities(
     assert authorities.binary.settlement.artifact_receipt == (
         args.authority_root / "settlements.receipt.json"
     )
+    assert authorities.provenance.code_revision == args.code_revision
+    assert authorities.provenance.parameters_sha256 == module._sha256(args.build_parameters)
 
 
 def test_assemble_creates_private_workspaces_and_reports_identity(

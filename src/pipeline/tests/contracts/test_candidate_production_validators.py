@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from searise_pipeline.candidate_completeness.production_binary_validators import (
     BoundaryQaAuthority,
@@ -12,6 +13,7 @@ from searise_pipeline.candidate_completeness.production_binary_validators import
     SettlementQaAuthority,
 )
 from searise_pipeline.candidate_completeness.production_validators import (
+    ProductionBuildProvenanceAuthority,
     ProductionQaAuthorities,
     production_json_validator_registry,
     production_validator_dispatcher,
@@ -25,12 +27,38 @@ from searise_pipeline.candidate_completeness.qa_matrix import ArtifactSelector
 ROOT = Path(__file__).resolve().parents[4]
 FIXTURES = ROOT / "contracts/release/v1/fixtures/valid"
 RELEASE_ID = "searise-europe-v1.0.0-20260812-0123456789ab"
+CODE_REVISION = "d53ca2d26bf4e00ef8b32dad3847606dbbaec8f2"
+LOCK_SHA256 = "1" * 63 + "2"
+PARAMETERS_SHA256 = "2" * 63 + "3"
+PIPELINE_SHA256 = "3" * 63 + "4"
+
+
+def _provenance() -> ProductionBuildProvenanceAuthority:
+    return ProductionBuildProvenanceAuthority(
+        code_revision=CODE_REVISION,
+        environment_lock_path="src/pipeline/test.lock",
+        environment_lock_sha256=LOCK_SHA256,
+        parameters_sha256=PARAMETERS_SHA256,
+        pipeline_identity_sha256=PIPELINE_SHA256,
+    )
+
+
+def _projection_source() -> SimpleNamespace:
+    return SimpleNamespace(
+        archive_sha256="4" * 63 + "5",
+        layers=(
+            SimpleNamespace(
+                scenario="ssp2-45",
+                horizon=2050,
+                member_sha256="5" * 63 + "6",
+            ),
+        ),
+    )
 
 
 def _canonical(document: object) -> bytes:
     return (
-        json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        + "\n"
+        json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode()
 
 
@@ -51,6 +79,8 @@ def _request(
     *,
     role: str,
     validator_id: str,
+    provenance: ProductionBuildProvenanceAuthority | None = None,
+    projection_source: object | None = None,
 ) -> tuple[QaValidationRequest, object]:
     raw = path.read_bytes()
     request = QaValidationRequest(
@@ -60,7 +90,10 @@ def _request(
         declared_sha256=hashlib.sha256(raw).hexdigest(),
         candidate=_context(candidate),
     )
-    return request, production_json_validator_registry()[validator_id]
+    return request, production_json_validator_registry(
+        provenance=provenance,
+        projection_source=projection_source,
+    )[validator_id]
 
 
 def test_public_scenario_contract_requires_candidate_binding(tmp_path: Path) -> None:
@@ -139,6 +172,28 @@ def test_build_receipt_covers_exact_pre_terminal_inventory(tmp_path: Path) -> No
             source_receipts.append({"path": artifact["path"], "sha256": digest})
     document["outputs"] = outputs
     document["sourceReceipts"] = source_receipts
+    authority = _provenance()
+    document["codeRevision"] = authority.code_revision
+    document["environment"]["lock"] = {
+        "path": authority.environment_lock_path,
+        "sha256": authority.environment_lock_sha256,
+    }
+    document["inputs"] = [
+        {
+            "path": "contracts/candidate-completeness/v2/required-artifacts.json",
+            "sha256": hashlib.sha256(
+                (ROOT / "contracts/candidate-completeness/v2/required-artifacts.json").read_bytes()
+            ).hexdigest(),
+        }
+    ]
+    document["parametersSha256"] = authority.parameters_sha256
+    document["tools"] = [
+        {
+            "name": "searise-pipeline",
+            "version": authority.pipeline_version,
+            "identitySha256": authority.pipeline_identity_sha256,
+        }
+    ]
     path = tmp_path / "receipts/build.json"
     path.write_bytes(_canonical(document))
     request, validator = _request(
@@ -146,12 +201,18 @@ def test_build_receipt_covers_exact_pre_terminal_inventory(tmp_path: Path) -> No
         path,
         role="build-receipt",
         validator_id="release.build-receipt",
+        provenance=authority,
     )
     assert validator(request).status == "pass"
 
-    document["outputs"].pop()
+    removed_output = document["outputs"].pop()
     path.write_bytes(_canonical(document))
     assert validator(request).code == "build-output-binding"
+
+    document["outputs"].append(removed_output)
+    document["codeRevision"] = "f" * 40
+    path.write_bytes(_canonical(document))
+    assert validator(request).code == "build-provenance-binding"
 
 
 def test_rights_must_cover_every_inventory_attribution_and_role(tmp_path: Path) -> None:
@@ -210,8 +271,7 @@ def test_rights_must_cover_every_inventory_attribution_and_role(tmp_path: Path) 
 
 def test_search_receipt_resolves_shards_relative_to_its_directory(tmp_path: Path) -> None:
     fixture = (
-        ROOT
-        / "contracts/settlements/v4/fixtures/valid/"
+        ROOT / "contracts/settlements/v4/fixtures/valid/"
         "settlement-browser-search-shard-set-receipt.json"
     )
     document = json.loads(fixture.read_text())
@@ -257,6 +317,9 @@ def test_stac_item_binds_exact_candidate_asset_bytes(tmp_path: Path) -> None:
     document["searise:data_release_id"] = RELEASE_ID
     document["searise:data_provenance_class"] = "real-source"
     document["collection"] = f"{RELEASE_ID}-projections"
+    source = _projection_source()
+    document["properties"]["searise:source_archive_sha256"] = source.archive_sha256
+    document["properties"]["searise:source_member_sha256"] = source.layers[0].member_sha256
     path = tmp_path / f"stac/items/{scenario}-{horizon}.json"
     path.parent.mkdir(parents=True)
     path.write_bytes(_canonical(document))
@@ -265,12 +328,18 @@ def test_stac_item_binds_exact_candidate_asset_bytes(tmp_path: Path) -> None:
         path,
         role="stac-item",
         validator_id="release.stac.item",
+        projection_source=source,
     )
     assert validator(request).status == "pass"
 
     document["assets"]["analysis"]["file:size"] += 1
     path.write_bytes(_canonical(document))
     assert validator(request).code == "stac-binding"
+
+    document["assets"]["analysis"]["file:size"] -= 1
+    document["properties"]["searise:source_member_sha256"] = "6" * 64
+    path.write_bytes(_canonical(document))
+    assert validator(request).code == "stac-source-binding"
 
 
 def test_stac_catalog_and_collection_bind_the_exact_graph(tmp_path: Path) -> None:
@@ -292,13 +361,9 @@ def test_stac_catalog_and_collection_bind_the_exact_graph(tmp_path: Path) -> Non
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(_canonical(document))
-        request, validator = _request(
-            tmp_path, path, role=role, validator_id=validator_id
-        )
+        request, validator = _request(tmp_path, path, role=role, validator_id=validator_id)
         assert validator(request).status == "pass"
-        document["id"] = (
-            f"searise-europe-v1.0.0-20260812-ffffffffffff-{suffix}"
-        )
+        document["id"] = f"searise-europe-v1.0.0-20260812-ffffffffffff-{suffix}"
         path.write_bytes(_canonical(document))
         assert validator(request).code == "stac-binding"
 
@@ -334,6 +399,7 @@ def test_production_dispatcher_covers_the_complete_closed_matrix(tmp_path: Path)
             brotli=tmp_path / "brotli",
             brotli_sha256="0" * 64,
             work_directory=tmp_path / "search-work",
+            provenance=_provenance(),
         )
     )
     assert len(dispatcher.validator_ids) == 23
