@@ -231,9 +231,10 @@ def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
     )
     opentofu = _dependency_component(document, "deployment-opentofu")
 
-    assert len(discovered) == 46
+    assert len(discovered) == 49
     assert discovered == tuple(sorted(set(discovered)))
     assert set(recorded) == set(discovered)
+    assert {"package.json", "package-lock.json", "src/web/package.json"} <= set(discovered)
     assert document["inventoryKind"] == "dependency-defining-inputs"
     assert document["productionClaim"] is False
     assert (opentofu["releaseUse"], opentofu["coverage"], opentofu["inputs"]) == (

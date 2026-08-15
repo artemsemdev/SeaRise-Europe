@@ -333,6 +333,10 @@ def _component_for_input(path: PurePosixPath) -> str:
         return "release-signing-toolchain"
     if path.parts[:2] == ("src", "api"):
         return "api-nuget"
+    if (len(path.parts) == 1 and path.name in _NODE_INPUTS) or (
+        path.parts[:2] == ("src", "web") and path.name in _NODE_INPUTS
+    ):
+        return "frontend-npm"
     if path.parts[:2] == ("src", "frontend") and path.name in _NODE_INPUTS:
         return "frontend-npm"
     if path.parts[:2] == ("infra", "blob-seed"):
@@ -483,10 +487,37 @@ def validate_dependency_inventory(
         raise SupplyChainContractError(
             "every NuGet project must have one sibling packages.lock.json"
         )
-    npm_manifests = {Path(path).parent for path in discovered if path.endswith("/package.json")}
-    npm_locks = {Path(path).parent for path in discovered if path.endswith("/package-lock.json")}
-    if npm_manifests != npm_locks:
-        raise SupplyChainContractError("every npm manifest must have one sibling package-lock.json")
+    npm_manifests = {Path(path).parent for path in discovered if Path(path).name == "package.json"}
+    npm_locks = {Path(path).parent for path in discovered if Path(path).name == "package-lock.json"}
+    workspace_manifests = npm_manifests - npm_locks
+    if workspace_manifests:
+        root_manifest = load_json(repository_root / "package.json")
+        root_lock = load_json(repository_root / "package-lock.json")
+        workspaces = root_manifest.get("workspaces")
+        packages = root_lock.get("packages")
+        declared_workspaces = (
+            {
+                Path(value)
+                for value in workspaces
+                if isinstance(value, str) and value and "*" not in value
+            }
+            if isinstance(workspaces, list)
+            else set()
+        )
+        locked_workspaces = (
+            {Path(value) for value in packages if isinstance(value, str) and value}
+            if isinstance(packages, dict)
+            else set()
+        )
+        if (
+            Path(".") not in npm_locks
+            or workspace_manifests != declared_workspaces
+            or not workspace_manifests <= locked_workspaces
+        ):
+            raise SupplyChainContractError(
+                "every npm manifest must have one sibling package-lock.json "
+                "or one exact root workspace lock entry"
+            )
     tofu_inputs = [
         PurePosixPath(path) for path in discovered if _is_opentofu_input(PurePosixPath(path))
     ]
