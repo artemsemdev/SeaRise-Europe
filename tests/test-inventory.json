@@ -193,7 +193,7 @@
   "suites": [
     {
       "id": "static-web-shell",
-      "layer": "browser",
+      "layer": "e2e",
       "owner": "frontend",
       "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, build inventory, and zero legacy application API traffic.",
       "sourcePaths": ["src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts"],
@@ -202,7 +202,7 @@
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static-runtime shell and zero-API contract." },
       "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "committed synthetic fixture and Chromium desktop/mobile shell" },
+      "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Three Vitest cases and four Playwright cases passed locally; CI reruns the same immutable fixture scope." }
     },
     {
