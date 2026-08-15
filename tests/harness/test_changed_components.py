@@ -65,6 +65,16 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["pipeline"])
         self.assertFalse(outputs["compose"])
 
+    def test_static_web_change_routes_only_target_web_and_codeql(self) -> None:
+        outputs = classify_paths(["src/web/src/App.tsx"])
+
+        self.assertTrue(outputs["web"])
+        self.assertTrue(outputs["codeql_javascript"])
+        self.assertFalse(outputs["frontend"])
+        self.assertFalse(outputs["docker_frontend"])
+        self.assertFalse(outputs["api"])
+        self.assertFalse(outputs["compose"])
+
     def test_frontend_test_change_does_not_rebuild_image(self) -> None:
         outputs = classify_paths(
             ["src/frontend/src/__tests__/components/ResultPanel.test.tsx"]
@@ -158,6 +168,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["contracts/release/v1/manifest.schema.json"])
 
         self.assertTrue(outputs["frontend"])
+        self.assertTrue(outputs["web"])
         self.assertTrue(outputs["pipeline"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["release"])
@@ -195,7 +206,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         dispatch = workflow.split("permissions:", maxsplit=1)[0]
         changes = workflow.split("  changes:", maxsplit=1)[1].split(
-            "\n  frontend:", maxsplit=1
+            "\n  web:", maxsplit=1
         )[0]
         evidence = _workflow_job(
             workflow,
