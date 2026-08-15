@@ -53,10 +53,10 @@
   "excludedTargets": [
     {
       "lockPath": "src/api/SeaRise.Api.Tests/packages.lock.json",
-      "lockSha256": "6d5a6c24a9a68b8bd203cbd6560a983d63e544f086ea1a4b80775feee800d15e",
+      "lockSha256": "c016a30b88eb59f0a76196e807e7c226c8d3a25035fdf7161495200d5536051b",
       "projectKind": "test",
       "projectPath": "src/api/SeaRise.Api.Tests/SeaRise.Api.Tests.csproj",
-      "projectSha256": "713c3a8fdbb7a5e2ad76d275ce554b7a0363472a161215d65649ab00cd1d550c",
+      "projectSha256": "e8a3860d92f4a7e38dd6e701ca974cceb0b7cdb7954aedb5ce972de58d859e01",
       "reason": "Test project excluded from candidate production attachment.",
       "targetFramework": "net8.0"
     }

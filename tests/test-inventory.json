@@ -1,8 +1,14 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-12",
+  "updatedAt": "2026-08-16",
   "evidence": {
+    "local-2026-08-16-static-shell": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T00:29:00+02:00",
+      "reference": "src/web/src/App.test.tsx and src/web/tests/static-shell.spec.ts",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vite 8.2.1; Vitest 4.1.10; Chromium desktop/mobile; committed synthetic fixture"
+    },
     "ci-30949490661": {
       "kind": "github-actions",
       "observedAt": "2026-08-04T20:51:42Z",
@@ -185,6 +191,20 @@
     }
   },
   "suites": [
+    {
+      "id": "static-web-shell",
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, build inventory, and zero legacy application API traffic.",
+      "sourcePaths": ["src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts"],
+      "changedPaths": [".nvmrc", "package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent static-runtime shell and zero-API contract." },
+      "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Three Vitest cases and four Playwright cases passed locally; CI reruns the same immutable fixture scope." }
+    },
     {
       "id": "quality-inventory-harness",
       "layer": "contract",

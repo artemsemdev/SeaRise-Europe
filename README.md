@@ -18,9 +18,28 @@ data-product architecture.
 > methodology, or accepted architecture.
 
 > **Migration status:** ADR-021 was accepted on 2026-08-04. The repository still
-> contains the legacy distributed implementation while the static-first path is
-> built and scientifically validated. Current demo rasters are synthetic; this
-> is not yet a validated real-data release.
+> contains the legacy distributed implementation while the Phase 2 integration
+> branch builds and verifies its replacement. The React/Vite static shell now
+> runs from the committed synthetic fixture; this is not a public scientific
+> release. ADR-025 requires the legacy repository runtime to be removed after
+> equivalent-or-stronger target coverage exists.
+
+## Run the static application
+
+The clean-clone path needs Node 20.20.1 and no Docker, database, API, tile
+server, cloud key, or private candidate:
+
+```bash
+npm ci
+npm run web:check
+npm run web:serve
+```
+
+Open `http://127.0.0.1:4173/` or the direct architecture route at
+`http://127.0.0.1:4173/about/architecture/`. Browser smoke tests run with
+`npm run web:e2e` after Playwright Chromium is installed. The build copies only
+the committed synthetic release fixture; ignored Phase 1 candidate bytes are
+never discovered, bundled, or uploaded.
 
 ## Accepted architecture
 

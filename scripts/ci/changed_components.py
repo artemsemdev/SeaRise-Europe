@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 OUTPUTS = (
+    "web",
     "frontend",
     "api",
     "pipeline",
@@ -41,6 +42,14 @@ FRONTEND = (
     "src/pipeline/fixtures/ar6-regional-release/**",
     "contracts/**",
     "tests/fixtures/tdd/**",
+)
+
+WEB = (
+    ".nvmrc",
+    "package.json",
+    "package-lock.json",
+    "src/web/**",
+    "contracts/release/v1/**",
 )
 
 API = (
@@ -146,7 +155,7 @@ COMPOSE = (
     "src/api/SeaRise.Api/appsettings*.json",
 )
 
-CODEQL_JAVASCRIPT = ("src/frontend/**",)
+CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**")
 
 CODEQL_CSHARP = ("src/api/**",)
 
@@ -174,6 +183,7 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
         return {name: True for name in OUTPUTS}
 
     result = {
+        "web": any(_matches(path, WEB) for path in paths),
         "frontend": any(_matches(path, FRONTEND) for path in paths),
         "api": any(_matches(path, API) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
