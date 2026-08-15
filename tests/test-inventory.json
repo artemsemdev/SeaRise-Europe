@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-16",
   "evidence": {
+    "local-2026-08-16-static-release-domain": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T01:20:00+02:00",
+      "reference": "src/web/src/data/manifest-repository.test.ts and src/web/src/domain/url-state.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; AJV 8.20.0; Vitest 4.1.10; fast-check 4.9.0; committed synthetic fixture only"
+    },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T00:29:00+02:00",
@@ -191,6 +197,20 @@
     }
   },
   "suites": [
+    {
+      "id": "static-release-domain",
+      "layer": "contract",
+      "owner": "frontend",
+      "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, safe artifact URLs, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
+      "sourcePaths": ["src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
+      "changedPaths": ["src/web/**", "contracts/release/v1/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent static release/domain anti-corruption contract." },
+      "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-16-static-release-domain", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-three deterministic unit, contract, component, and 200-run property cases passed against the committed synthetic fixture." }
+    },
     {
       "id": "static-web-shell",
       "layer": "e2e",
