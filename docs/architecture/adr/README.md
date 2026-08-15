@@ -10,7 +10,8 @@ are active, amended, or superseded.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-021](ADR-021-static-first-offline-geospatial-architecture.md) | Accepted | Adopt the static-first offline geospatial architecture |
-| [ADR-024](ADR-024-ar6-regional-projection-contract.md) | Accepted; implementation blocked | Report source-native AR6 regional projection values without terrain exposure classification |
+| [ADR-024](ADR-024-ar6-regional-projection-contract.md) | Accepted; Phase 1 evidence complete | Report source-native AR6 regional projection values without terrain exposure classification |
+| [ADR-025](ADR-025-accelerated-static-runtime-cutover.md) | Accepted | Make the static application the only repository runtime in Phase 2; recover removed source through Git history |
 
 ## Superseded publication decisions
 

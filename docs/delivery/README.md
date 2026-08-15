@@ -1,8 +1,8 @@
 # Static-First Migration Plan
 
-> **Status:** Phase 0R approved; Phase 1 artifact-contract work in progress
-> **Last updated:** 2026-08-10
-> **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
+> **Status:** Phase 1 complete; Phase 2 static-only repository cutover in progress
+> **Last updated:** 2026-08-16
+> **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md) and [ADR-025](../architecture/adr/ADR-025-accelerated-static-runtime-cutover.md)
 
 ## Purpose
 
@@ -10,21 +10,24 @@ This is the only active technical delivery plan for SeaRise Europe. The former
 eight-epic Azure/backend plan was removed after ADR-021 replaced its target
 architecture.
 
-The repository is currently in a transition state:
+The Phase 2 branch starts from a transition state:
 
 - the checked-in application still implements the legacy Next.js, .NET,
   PostGIS, TiTiler, and Docker Compose stack;
 - the accepted target is a React/Vite static application backed by immutable
   browser-ready artifacts;
-- production migration has not started;
+- production migration has not started, but repository runtime removal is now
+  part of Phase 2 rather than production cutover;
 - the binary Phase 0 investigation ended without a publishable release;
 - ADR-024, #135 parity, trusted dual-platform #110 evidence, and the protected
-  owner `releaseDisposition=approved` are complete; Phase 1 is unlocked;
-- the current checked-in raster is demonstration data and must not be
-  represented as a production scientific release.
+  owner `releaseDisposition=approved` are complete;
+- Phase 1 contracts and private candidate validation are complete. Candidate-v7
+  remains ignored and local only; clean clones use the committed synthetic
+  release fixture.
 
-The old runtime remains only as a comparison baseline until parity and quality
-gates pass. New features must not increase its production footprint.
+ADR-025 makes the static application the only target repository runtime. The
+old runtime is removed through focused Phase 2 pull requests after replacement
+coverage passes; Git history is sufficient source recovery.
 
 ## Delivery principles
 
@@ -32,7 +35,8 @@ gates pass. New features must not increase its production footprint.
 2. Define and validate public artifact contracts before consuming them.
 3. Keep every change reviewable and independently testable.
 4. Maintain an executable local fixture release at every stage.
-5. Run old/new parity checks before deleting legacy components.
+5. Port equivalent-or-stronger behavior coverage before deleting each legacy
+   test or component.
 6. Publish no scientific layer without licence, checksum, provenance, and
    golden-point evidence.
 7. Prefer open-source tools and portable formats.
@@ -213,9 +217,10 @@ Exit evidence:
 - measured monthly usage fits the recorded cost model;
 - rollback is demonstrated, not merely documented.
 
-## Workstream 4 — legacy removal
+## Phase 2 workstream — repository legacy removal
 
-This work begins only when Workstreams 0–3 have passed their exit criteria.
+This work follows the relevant static target coverage in issues #54–#60. It
+does not wait for production cutover.
 
 - [ ] Remove the ASP.NET Core API and its tests/deployment definitions.
 - [ ] Remove PostgreSQL/PostGIS schema, seeds, and infrastructure.
@@ -223,7 +228,8 @@ This work begins only when Workstreams 0–3 have passed their exit criteria.
 - [ ] Remove runtime geocoder clients and Azure Maps secret/configuration.
 - [ ] Remove Next.js runtime configuration and unused server-state libraries.
 - [ ] Reduce Docker/local tooling to pipeline-only needs, if still useful.
-- [ ] Remove superseded Terraform and Azure deployment files.
+- [ ] Remove superseded repository deployment definitions while preserving
+  reusable static-delivery IaC.
 - [ ] Re-run secret, dependency, licence, link, and documentation audits.
 - [ ] Update repository structure diagrams to match the final filesystem.
 
@@ -233,6 +239,10 @@ Exit evidence:
 - build/test/deploy instructions use only the static architecture;
 - a new contributor can run the fixture app without Docker or cloud keys;
 - the public architecture page matches measured production behaviour.
+
+The deletion boundary is repository-only. Cloud resources, credentials,
+GitHub environments, secrets, and external storage are not deleted without a
+separate exact inventory and explicit owner authorization.
 
 ## Recommended pull-request sequence
 
@@ -246,13 +256,14 @@ Exit evidence:
 | 6 | Serialize and benchmark the Web Worker search index | 5 |
 | 7 | Produce/verify regional COG and PMTiles artifacts | 3, 4 |
 | 8 | Add STAC, checksums, provenance, and signing | 4, 7 |
-| 9 | Introduce the Vite static shell beside the legacy frontend | 4 |
+| 9 | Introduce the Vite static shell as the target application | 4 |
 | 10 | Add local search and boundary validation | 5–6, 9 |
 | 11 | Add exact projection lookup and map overlay | 7, 9 |
 | 12 | Add offline caching and architecture evidence page | 8, 10–11 |
 | 13 | Provision preview static hosting and R2 via OpenTofu | 8–9 |
 | 14 | Run parity, performance, accessibility, and cost gates | 10–13 |
-| 15 | Switch production and delete the legacy runtime | 14 |
+| 15 | Port replacement coverage and delete repository legacy runtime | 10–12 |
+| 16 | Switch production to a verified static app/release pair | 14–15 |
 
 ## Required pull-request evidence
 

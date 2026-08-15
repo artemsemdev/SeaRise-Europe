@@ -741,9 +741,14 @@ evidence and owner approval unlocked
 - Pass performance, accessibility, offline, and browser compatibility gates.
 - Produce a measured cost comparison.
 
-### Phase 4 — decommission
+### Phase 4 — decommission (sequence amended by ADR-025)
 
-Only after Phases 0–3 pass, remove:
+ADR-025 moves repository-code removal into Phase 2 after equivalent-or-stronger
+static target coverage passes. The list below is retained as the original
+decision record; production cutover and any external-resource retirement remain
+later operational actions.
+
+The superseded repository components are:
 
 - ASP.NET Core API projects and API deployment definitions;
 - PostgreSQL/PostGIS schema, seed, and managed-database infrastructure;
@@ -754,7 +759,8 @@ Only after Phases 0–3 pass, remove:
 - obsolete Docker Compose services and superseded technical documentation.
 
 Keep reusable scientific pipeline code, fixtures, golden tests, and source
-licence records. Deletion is a migration outcome, not a prerequisite.
+licence records. See ADR-025 for the current deletion and authorization
+boundary.
 
 ## 20. Consequences
 
