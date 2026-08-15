@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Pinned the legacy API test container dependency graph to SSH.NET 2026.0.0,
+  removing the high-severity recursive SCP path-traversal advisory from the
+  locked restore while that test runtime awaits Phase 2 removal.
+
 ### Fixed
 
 - Bound private real-source candidates to reviewed STAC archive/member lineage,
