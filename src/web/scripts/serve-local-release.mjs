@@ -17,6 +17,11 @@ if (!/^searise-europe-v\d+\.\d+\.\d+-\d{8}-[a-f0-9]{12}$/.test(expectedReleaseId
   throw new Error("Invalid release ID");
 }
 const allowedOrigin = new URL(appOrigin).origin;
+const parsedAppOrigin = new URL(allowedOrigin);
+if (parsedAppOrigin.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(parsedAppOrigin.hostname)) {
+  throw new Error("App origin must be a loopback HTTP origin");
+}
+if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) throw new Error("Invalid port");
 const releaseRoot = resolve(rootArgument);
 const manifest = JSON.parse(readFileSync(resolve(releaseRoot, "manifest.json"), "utf8"));
 if (manifest.dataReleaseId !== expectedReleaseId) throw new Error("Local manifest release ID mismatch");

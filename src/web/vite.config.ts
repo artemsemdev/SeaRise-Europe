@@ -22,8 +22,17 @@ export default defineConfig(({ command, mode }) => {
     "synthetic-fixture";
   const localManifestUrl =
     process.env.SEARISE_LOCAL_MANIFEST_URL ?? env.SEARISE_LOCAL_MANIFEST_URL;
+  if (!["synthetic-fixture", "private-engineering", "public-promoted"].includes(releaseDisposition)) {
+    throw new Error("Unsupported release disposition.");
+  }
   if (localManifestUrl && (command !== "serve" || releaseDisposition !== "private-engineering")) {
     throw new Error("A local manifest URL is allowed only for explicit private-engineering development.");
+  }
+  if (localManifestUrl) {
+    const localUrl = new URL(localManifestUrl);
+    if (localUrl.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(localUrl.hostname)) {
+      throw new Error("A private engineering manifest must be served from loopback over HTTP.");
+    }
   }
   if (releaseDisposition === "private-engineering" && !localManifestUrl) {
     throw new Error("Private engineering mode requires an explicit local manifest URL.");
