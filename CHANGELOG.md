@@ -44,6 +44,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the browser's pinned-manifest anti-corruption layer: generated
+  schema-derived TypeScript contracts, an immutable release context, exact
+  nine-combination and artifact-reference validation, origin-safe URLs,
+  release-scoped share state, bounded same-release startup retry, and a
+  technical-error vocabulary separate from the four scientific outcomes.
+
 - Added the React 19 and Vite 8 static application shell with two direct static
   routes, bundled fonts, honest synthetic-fixture identity, lazy architecture
   evidence, a measured build inventory, zero-API boundary checks, and desktop

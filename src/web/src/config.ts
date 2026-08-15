@@ -2,7 +2,7 @@ export const runtimeConfig = Object.freeze({
   appBuildId: __APP_BUILD_ID__,
   dataReleaseId: __DATA_RELEASE_ID__,
   releaseDisposition: __RELEASE_DISPOSITION__,
-  manifestUrl: `/releases/${__DATA_RELEASE_ID__}/manifest.json`,
+  manifestUrl: __MANIFEST_URL__,
 });
 
 export function releaseLabel(): string {

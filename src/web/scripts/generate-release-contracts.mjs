@@ -1,0 +1,226 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { resolve } from "node:path";
+
+const root = resolve(import.meta.dirname, "../../..");
+const contractRoot = resolve(root, "contracts/release/v1");
+const output = resolve(import.meta.dirname, "../src/contracts/generated/release-contract.ts");
+const schemaFiles = ["artifact.schema.json", "defs.schema.json", "manifest.schema.json"];
+const schemaSources = Object.fromEntries(
+  schemaFiles.map((name) => [name, readFileSync(resolve(contractRoot, name), "utf8")]),
+);
+const artifact = JSON.parse(schemaSources["artifact.schema.json"]);
+const defs = JSON.parse(schemaSources["defs.schema.json"]);
+const manifest = JSON.parse(schemaSources["manifest.schema.json"]);
+
+const literal = (value) => (typeof value === "string" ? JSON.stringify(value) : String(value));
+const union = (values) => values.map(literal).join(" | ");
+const tuple = (values) => `readonly [${values.map(literal).join(", ")}]`;
+const constTuple = (values) => `[${values.map(literal).join(", ")}] as const`;
+const definition = (name) => defs.$defs[name];
+const enumValues = (name) => definition(name).enum;
+const assertRequired = (schema, expected, name) => {
+  if (JSON.stringify(schema.required) !== JSON.stringify(expected)) {
+    throw new Error(`${name} structure changed; update the contract generator explicitly`);
+  }
+};
+assertRequired(manifest, [
+  "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass", "releaseAuthority",
+  "createdAt", "codeRevision", "previousReleaseId", "methodologyVersion", "defaults",
+  "publication", "sources", "contractArtifacts", "artifacts", "datasets",
+], "manifest.schema.json");
+assertRequired(artifact.$defs.common, [
+  "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass", "artifactId", "path",
+  "role", "mediaType", "byteSize", "sha256", "immutable", "scientificUse", "lineage", "rights",
+], "artifact.schema.json common artifact");
+const contractDigest = createHash("sha256")
+  .update(schemaFiles.map((name) => schemaSources[name]).join("\n"))
+  .digest("hex");
+
+const generated = `/**
+ * Generated from contracts/release/v1/{defs,manifest,artifact}.schema.json.
+ * Run \`npm run generate:contracts --workspace @searise/web\`; do not edit.
+ */
+
+export const RELEASE_CONTRACT_SOURCE_SHA256 = ${literal(contractDigest)};
+export type SchemaVersion = ${literal(definition("schemaVersion").const)};
+export const SCENARIO_IDS = ${constTuple(enumValues("scenarioId"))};
+export type ScenarioId = ${union(enumValues("scenarioId"))};
+export const HORIZON_YEARS = ${constTuple(enumValues("horizonYear"))};
+export type HorizonYear = ${union(enumValues("horizonYear"))};
+export const RESULT_STATES = ${constTuple(enumValues("resultState"))};
+export type ResultState = ${union(enumValues("resultState"))};
+export type DataProvenanceClass = ${union(enumValues("dataProvenanceClass"))};
+export type ArtifactRole = ${union(enumValues("artifactRole"))};
+export type MediaType = ${union(enumValues("mediaType"))};
+export type DataReleaseId = string;
+export type Sha256 = string;
+export type BoundingBox = readonly [number, number, number, number];
+
+export interface ReleaseAuthorityV1 {
+  readonly automatedValidation: "pending" | "passed" | "failed";
+  readonly releaseDisposition: "pending-owner" | "approved" | "rejected" | "blocked";
+  readonly dataProvenanceClass: DataProvenanceClass;
+  readonly statusDisclosureRequired: boolean;
+}
+
+export interface FileIdentityV1 {
+  readonly path: string;
+  readonly sha256: Sha256;
+}
+
+export interface ProjectionContextV1 {
+  readonly scenario: ScenarioId;
+  readonly horizon: HorizonYear;
+  readonly source: {
+    readonly sourceRelease: "20210809";
+    readonly archiveSha256: Sha256;
+    readonly memberSha256: Sha256;
+    readonly methodologyVersion: "ar6-regional-projection-v1";
+  };
+  readonly grid: {
+    readonly crs: "EPSG:4326";
+    readonly bounds: readonly [-30.5, 29.5, 45.5, 75.5];
+    readonly transform: readonly [1, 0, -30.5, 0, -1, 75.5];
+    readonly width: 76;
+    readonly height: 46;
+    readonly nativeResolutionDegrees: 1;
+    readonly nodata: -32768;
+  };
+  readonly values: {
+    readonly storedUnits: "mm";
+    readonly scaleToMetres: 0.001;
+    readonly baseline: "1995-2014 mean";
+    readonly quantiles: readonly [0.167, 0.5, 0.833];
+  };
+}
+
+interface CommonReleaseArtifactV1 {
+  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json";
+  readonly schemaVersion: SchemaVersion;
+  readonly dataReleaseId: DataReleaseId;
+  readonly dataProvenanceClass: DataProvenanceClass;
+  readonly artifactId: string;
+  readonly path: string;
+  readonly role: ArtifactRole;
+  readonly mediaType: MediaType;
+  readonly byteSize: number;
+  readonly sha256: Sha256;
+  readonly immutable: true;
+  readonly scientificUse: "exact-lookup" | "exact-analytics" | "visual-only" | "not-applicable";
+  readonly lineage: readonly FileIdentityV1[];
+  readonly rights: {
+    readonly attributionIds: readonly string[];
+    readonly redistribution: "allowed" | "conditional";
+  };
+  readonly spatialBounds?: BoundingBox | null;
+}
+
+export type ReleaseArtifactV1 =
+  | (CommonReleaseArtifactV1 & {
+      readonly role: "projection-analysis-cog";
+      readonly mediaType: "image/tiff; application=geotiff; profile=cloud-optimized";
+      readonly scientificUse: "exact-lookup";
+      readonly spatialBounds: BoundingBox;
+      readonly projectionContext: ProjectionContextV1;
+      readonly projectionMatrixContext?: never;
+    })
+  | (CommonReleaseArtifactV1 & {
+      readonly role: "projection-visual-pmtiles";
+      readonly mediaType: "application/vnd.pmtiles";
+      readonly scientificUse: "visual-only";
+      readonly spatialBounds: BoundingBox;
+      readonly projectionContext: ProjectionContextV1;
+      readonly projectionMatrixContext?: never;
+    })
+  | (CommonReleaseArtifactV1 & {
+      readonly role: "projection-geoparquet";
+      readonly mediaType: "application/vnd.apache.parquet";
+      readonly scientificUse: "exact-analytics";
+      readonly spatialBounds: BoundingBox;
+      readonly projectionContext?: never;
+      readonly projectionMatrixContext: ProjectionMatrixContextV1;
+    })
+  | (CommonReleaseArtifactV1 & {
+      readonly role: Exclude<ArtifactRole, "projection-analysis-cog" | "projection-visual-pmtiles" | "projection-geoparquet">;
+      readonly scientificUse: "not-applicable";
+      readonly projectionContext?: never;
+      readonly projectionMatrixContext?: never;
+    });
+
+export interface ProjectionMatrixContextV1 {
+  readonly scenarios: readonly ["ssp1-26", "ssp2-45", "ssp5-85"];
+  readonly horizons: readonly [2030, 2050, 2100];
+  readonly source: {
+    readonly sourceRelease: "20210809";
+    readonly archiveSha256: Sha256;
+    readonly members: readonly [
+      Readonly<{ scenario: "ssp1-26"; sha256: Sha256 }>,
+      Readonly<{ scenario: "ssp2-45"; sha256: Sha256 }>,
+      Readonly<{ scenario: "ssp5-85"; sha256: Sha256 }>,
+    ];
+    readonly methodologyVersion: "ar6-regional-projection-v1";
+  };
+  readonly grid: ProjectionContextV1["grid"];
+  readonly values: ProjectionContextV1["values"];
+}
+
+export interface ReleaseDatasetV1 {
+  readonly scenario: ScenarioId;
+  readonly horizon: HorizonYear;
+  readonly analysisArtifactId: string;
+  readonly visualArtifactId: string;
+  readonly analyticalArtifactId: "projection-matrix-geoparquet";
+  readonly stacItemArtifactId: string;
+}
+
+export interface ReleaseManifestV1 {
+  readonly $schema: ${literal(manifest.properties.$schema.const)};
+  readonly schemaVersion: SchemaVersion;
+  readonly dataReleaseId: DataReleaseId;
+  readonly dataProvenanceClass: DataProvenanceClass;
+  readonly releaseAuthority: ReleaseAuthorityV1;
+  readonly createdAt: string;
+  readonly codeRevision: string;
+  readonly previousReleaseId: DataReleaseId | null;
+  readonly methodologyVersion: "ar6-regional-projection-v1";
+  readonly defaults: { readonly scenario: "ssp2-45"; readonly horizon: 2050 };
+  readonly publication: {
+    readonly releasePath: string;
+    readonly cacheControl: "public, max-age=31536000, immutable";
+    readonly appendOnly: true;
+  };
+  readonly sources: readonly Readonly<{
+    sourceId: string;
+    sourceRelease: string;
+    archiveSha256: Sha256;
+    attributionId: string;
+    receiptArtifactId: string;
+  }>[];
+  readonly contractArtifacts: Readonly<{
+    scenarioConfig: string;
+    methodology: string;
+    attribution: string;
+    sourceReceipts: readonly string[];
+    buildReceipt: string;
+    searchRecords: string;
+    qualitySummary: string;
+    architectureEvidence: string;
+    stacCatalog: string;
+    stacCollection: string;
+    stacItems: readonly string[];
+    checksums: string;
+    provenance: string;
+    signature: string;
+  }>;
+  readonly artifacts: readonly ReleaseArtifactV1[];
+  readonly datasets: ${tuple(manifest.$defs.contractArtifacts.properties.stacItems.prefixItems.map((item) => item.const)).replace(/"stac-[^"]+"/g, "ReleaseDatasetV1")};
+}
+`;
+
+if (process.argv.includes("--check")) {
+  const current = readFileSync(output, "utf8");
+  if (current !== generated) throw new Error("Generated release contracts are stale");
+} else {
+  writeFileSync(output, generated);
+}

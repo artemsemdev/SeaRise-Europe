@@ -11,7 +11,7 @@ request-time application service. It must:
 
 - search European settlements locally and privately;
 - assess a coordinate from immutable, pinned data artifacts;
-- preserve exactly five scientifically meaningful result states;
+- preserve exactly four scientifically meaningful result states;
 - keep location, scenario, horizon, layer, legend, methodology, and release in
   sync;
 - remain useful after the core resources have been cached;
@@ -143,6 +143,15 @@ A malformed manifest, missing required scenario/horizon combination, or release
 ID mismatch is a technical startup error. The application must retain the
 shell, explain the problem, and provide a retry; it must not substitute an
 artifact from another release.
+
+The implemented `ManifestRepository` compiles the release v1 JSON Schemas,
+then applies identity, disposition, canonical 3 × 3 matrix, reference-role,
+media-type, path, and origin checks. It returns a deeply immutable
+`ReleaseContext`; feature code receives resolved artifact URLs and never
+constructs provider/storage paths. Generated TypeScript contracts are checked
+against the schemas on every static-target lint run. Fetch, range, decode,
+integrity, unsupported-browser, abort, schema, and identity failures form a
+separate exhaustive technical-error vocabulary.
 
 ## Search subsystem
 

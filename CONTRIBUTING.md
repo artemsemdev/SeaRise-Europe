@@ -50,7 +50,16 @@ npm run web:serve
 
 `web:serve` serves only the generated static output. Clean-clone builds copy the
 committed synthetic release fixture into that output; they never discover or
-copy the ignored private Phase 1 candidate.
+copy the ignored private Phase 1 candidate. The manifest is the only browser
+entry point for a data release. Regenerate schema-derived browser types after a
+contract change with `npm run generate:contracts --workspace @searise/web`;
+`web:check` fails if the committed generated file is stale.
+
+An operator may bind the ignored private candidate read-only for an explicit
+local test by following
+[`docs/operations/phase-2-private-release-binding.md`](docs/operations/phase-2-private-release-binding.md).
+That workflow serves the existing directory in place and is never part of a
+production build or CI.
 
 Run the checks relevant to the files you changed. Until #70 and #71 remove the
 legacy baseline, its focused compatibility commands remain:

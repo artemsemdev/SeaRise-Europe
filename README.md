@@ -84,7 +84,8 @@ Read the complete [accepted architecture decision](docs/architecture/adr/ADR-021
 
 - Three scenarios: SSP1-2.6, SSP2-4.5, and SSP5-8.5.
 - Three horizons: 2030, 2050, and 2100.
-- Five explicit result states, including out-of-scope and unavailable data.
+- Exactly four projection outcomes: `ProjectionAvailable`, `DataUnavailable`,
+  `OutOfScope`, and `UnsupportedGeography`; delivery failures are separate.
 - Local search over European places, including every active coastal settlement
   that qualifies in the pinned GeoNames snapshot.
 - A versioned coastal analysis boundary. The current checked-in 25 km geometry
@@ -117,7 +118,7 @@ range requests.
 | Legacy interactive application | Implemented with synthetic demo data |
 | Real IPCC/Copernicus end-to-end validation | Not complete; blocks publication |
 | GeoNames coastal settlement catalog | Planned |
-| Static React/Vite browser path | Planned |
+| Static React/Vite browser path | Shell and pinned release domain implemented on Phase 2 integration branch |
 | Cloudflare/OpenTofu deployment | Planned |
 | Legacy service removal | Gated on parity and release evidence |
 
