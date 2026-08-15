@@ -1,7 +1,7 @@
 # Architecture Decision Register
 
 > **Status:** Current
-> **Last reviewed:** 2026-08-06
+> **Last reviewed:** 2026-08-16
 
 This register contains only decisions that remain active in the accepted target
 architecture. [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
@@ -23,6 +23,7 @@ not as active guidance in this document.
 | ADR-021 | Adopt static-first offline geospatial architecture | **Accepted; product contract amended by ADR-024** | Offline build plane, immutable open artifacts, React/Vite browser runtime, local search/lookup, Cloudflare Static Assets + R2, and no runtime API/database/tile server. |
 | ADR-023 | Use an uncertainty-aware EGM2008 mean-water baseline | Superseded for publication by ADR-024 | Historical acquisition and no-go evidence is retained; its terrain-classification path cannot produce a release. |
 | ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; recovery gate approved** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. Trusted #110 evidence and the owner disposition opened Phase 1. |
+| ADR-025 | Accelerate repository cutover to the static runtime | **Accepted** | Phase 2 removes the superseded repository runtime after target coverage exists. Git history is the source rollback; external cloud cleanup still requires separate explicit approval. |
 
 ## Historical safety-gate decision
 
@@ -49,9 +50,9 @@ ADR-021 replaces the active use of these choices:
 | ADR-019 | Azure Maps geocoder | Pinned GeoNames catalogs and a prebuilt Web Worker search index |
 | ADR-020 | Azure Maps basemap | MapLibre with OpenFreeMap as non-authoritative visual context |
 
-These rows do not authorize keeping the old services during the final target
-state. The staged migration and parity gates in ADR-021 determine when their
-implementation may be removed.
+These rows do not authorize keeping the old services in the target state.
+ADR-025 amends the ADR-021 sequence: their repository implementation is removed
+during Phase 2 after equivalent-or-stronger static coverage exists.
 
 ## Decision rules
 

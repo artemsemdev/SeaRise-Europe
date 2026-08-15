@@ -24,6 +24,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Adopted an accelerated static-runtime cutover: Phase 2 now removes the
+  superseded repository runtime after equivalent-or-stronger target coverage
+  exists. Git history is the source rollback; private candidate bytes and
+  destructive external cloud cleanup remain outside this authorization.
+
 - Required real-source architecture evidence to expose the exact cryptographic,
   public-readback, and local-handoff receipt links while keeping those
   post-finalization records outside the pre-sign manifest inventory.
