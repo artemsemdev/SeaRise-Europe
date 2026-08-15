@@ -11,6 +11,7 @@
     "generate:contracts": "node scripts/generate-release-contracts.mjs",
     "check:contracts": "node scripts/generate-release-contracts.mjs --check",
     "dev": "vite",
+    "serve:local-release": "node scripts/serve-local-release.mjs",
     "lint": "eslint . && node scripts/check-boundaries.mjs && npm run check:contracts",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

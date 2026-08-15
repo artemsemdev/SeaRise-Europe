@@ -1,50 +1,75 @@
 import { cpSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import react from "@vitejs/plugin-react";
+import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
-const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const fixtureRoot = resolve(
   repositoryRoot,
   "contracts/release/v1/fixtures/release",
-  releaseId,
+  fixtureReleaseId,
 );
 
-export default defineConfig({
-  plugins: [
-    react(),
-    {
-      name: "committed-release-fixture",
-      closeBundle() {
-        const destination = resolve(import.meta.dirname, "dist/releases", releaseId);
-        rmSync(destination, { force: true, recursive: true });
-        mkdirSync(destination, { recursive: true });
-        cpSync(fixtureRoot, destination, { recursive: true });
+export default defineConfig(({ command, mode }) => {
+  const env = loadEnv(mode, repositoryRoot, "SEARISE_");
+  const releaseId =
+    process.env.SEARISE_DATA_RELEASE_ID ?? env.SEARISE_DATA_RELEASE_ID ?? fixtureReleaseId;
+  const releaseDisposition =
+    process.env.SEARISE_RELEASE_DISPOSITION ??
+    env.SEARISE_RELEASE_DISPOSITION ??
+    "synthetic-fixture";
+  const localManifestUrl =
+    process.env.SEARISE_LOCAL_MANIFEST_URL ?? env.SEARISE_LOCAL_MANIFEST_URL;
+  if (localManifestUrl && (command !== "serve" || releaseDisposition !== "private-engineering")) {
+    throw new Error("A local manifest URL is allowed only for explicit private-engineering development.");
+  }
+  if (releaseDisposition === "private-engineering" && !localManifestUrl) {
+    throw new Error("Private engineering mode requires an explicit local manifest URL.");
+  }
+  if (command === "build" && releaseDisposition === "private-engineering") {
+    throw new Error("Private engineering releases cannot be copied into a production build.");
+  }
+  const manifestUrl = localManifestUrl ?? `/releases/${releaseId}/manifest.json`;
+
+  return {
+    plugins: [
+      react(),
+      {
+        name: "committed-release-fixture",
+        closeBundle() {
+          if (releaseDisposition !== "synthetic-fixture" || releaseId !== fixtureReleaseId) return;
+          const destination = resolve(import.meta.dirname, "dist/releases", releaseId);
+          rmSync(destination, { force: true, recursive: true });
+          mkdirSync(destination, { recursive: true });
+          cpSync(fixtureRoot, destination, { recursive: true });
+        },
+      },
+    ],
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(process.env.SEARISE_APP_BUILD_ID ?? "local-fixture"),
+      __DATA_RELEASE_ID__: JSON.stringify(releaseId),
+      __RELEASE_DISPOSITION__: JSON.stringify(releaseDisposition),
+      __MANIFEST_URL__: JSON.stringify(manifestUrl),
+    },
+    build: {
+      target: "es2022",
+      sourcemap: true,
+      rollupOptions: {
+        input: {
+          index: resolve(import.meta.dirname, "index.html"),
+          architecture: resolve(import.meta.dirname, "about/architecture/index.html"),
+        },
       },
     },
-  ],
-  define: {
-    __APP_BUILD_ID__: JSON.stringify(process.env.SEARISE_APP_BUILD_ID ?? "local-fixture"),
-    __DATA_RELEASE_ID__: JSON.stringify(releaseId),
-    __RELEASE_DISPOSITION__: JSON.stringify("synthetic-fixture"),
-  },
-  build: {
-    target: "es2022",
-    sourcemap: true,
-    rollupOptions: {
-      input: {
-        index: resolve(import.meta.dirname, "index.html"),
-        architecture: resolve(import.meta.dirname, "about/architecture/index.html"),
+    test: {
+      environment: "jsdom",
+      setupFiles: ["./src/test/setup.ts"],
+      exclude: ["tests/**", "node_modules/**", "dist/**"],
+      coverage: {
+        reporter: ["text", "json-summary"],
       },
     },
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-    exclude: ["tests/**", "node_modules/**", "dist/**"],
-    coverage: {
-      reporter: ["text", "json-summary"],
-    },
-  },
+  };
 });

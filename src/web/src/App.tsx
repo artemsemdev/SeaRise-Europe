@@ -1,5 +1,6 @@
 import { lazy, Suspense, useId, useState } from "react";
 import { releaseLabel, runtimeConfig } from "./config";
+import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
 
@@ -24,7 +25,28 @@ function Header({ light = false }: { light?: boolean }) {
   );
 }
 
-function LandingPage() {
+function ReleaseStartup({ state, retry }: { state: ReleaseBootstrapState; retry: () => void }) {
+  if (state.phase === "loading") return <p className="release-startup">Validating pinned release…</p>;
+  if (state.phase === "ready") {
+    return (
+      <p className="release-startup ready">
+        Release contract ready · {state.context.manifest.datasets.length} exact combinations
+      </p>
+    );
+  }
+  return (
+    <div className="release-startup error" role="alert">
+      <strong>Pinned release unavailable.</strong> {state.error.message}
+      {canRetryRelease(state) ? (
+        <button type="button" onClick={retry}>Retry pinned release</button>
+      ) : (
+        <span> Retry limit reached; reload after checking the connection.</span>
+      )}
+    </div>
+  );
+}
+
+function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry: () => void }) {
   const hintId = useId();
   const [place, setPlace] = useState("");
   const [status, setStatus] = useState("Place search loads locally in the next Phase 2 slice.");
@@ -44,6 +66,7 @@ function LandingPage() {
             Explore IPCC AR6 regional relative sea-level projections for European
             settlements. Values are regional—not predictions of flooding or property risk.
           </p>
+          <ReleaseStartup state={release} retry={retry} />
           <form
             className="search-shell"
             role="search"
@@ -112,6 +135,7 @@ function LandingPage() {
 
 export default function App() {
   const architecture = window.location.pathname.replace(/\/+$/, "") === "/about/architecture";
+  const [release, retryRelease] = useReleaseContext();
 
   return (
     <div className="app-shell">
@@ -122,7 +146,7 @@ export default function App() {
           <ArchitecturePage />
         </Suspense>
       ) : (
-        <LandingPage />
+        <LandingPage release={release} retry={retryRelease} />
       )}
       <footer>
         <span>SeaRise Europe</span>

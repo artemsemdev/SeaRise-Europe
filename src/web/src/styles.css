@@ -135,6 +135,10 @@ a { color: inherit; }
 .search-control button:focus-visible, a:focus-visible { outline: 3px solid #f5c66b; outline-offset: 3px; }
 .search-hint, .status { margin: 0.75rem 1.25rem 0; color: rgb(255 255 255 / 74%); font-size: 0.78rem; }
 .status { min-height: 1.2rem; color: #b8eee7; }
+.release-startup { margin: 0 0 1rem; font-size: 0.82rem; color: rgb(255 255 255 / 78%); }
+.release-startup.ready { color: #d0ebdf; }
+.release-startup.error { max-width: 42rem; padding: 0.75rem 0.9rem; border: 1px solid rgb(255 219 202 / 60%); background: rgb(82 24 16 / 72%); }
+.release-startup button { margin-left: 0.6rem; border: 1px solid currentcolor; border-radius: 999px; padding: 0.35rem 0.7rem; color: inherit; background: transparent; font: inherit; cursor: pointer; }
 .scope-card {
   position: absolute;
   z-index: 2;

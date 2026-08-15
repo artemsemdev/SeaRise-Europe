@@ -1,10 +1,21 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import fixture from "../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      new Response(JSON.stringify(fixture), { headers: { "content-type": "application/json" } }),
+    ),
+  );
+});
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   window.history.replaceState({}, "", "/");
 });
 
@@ -36,5 +47,26 @@ describe("static application shell", () => {
       await screen.findByRole("heading", { level: 1, name: /static-first, release-scoped/i }),
     ).toBeVisible();
     expect(screen.getByText(/no application backend, database, tile server/i)).toBeVisible();
+  });
+
+  it("validates the pinned fixture and reports all nine combinations", async () => {
+    render(<App />);
+    expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: expect.stringContaining(`/releases/${fixture.dataReleaseId}/manifest.json`) }),
+      expect.objectContaining({ credentials: "omit" }),
+    );
+  });
+
+  it("bounds manual retries without substituting another release", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 503 })));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: /retry pinned release/i }));
+    await user.click(await screen.findByRole("button", { name: /retry pinned release/i }));
+
+    expect(await screen.findByText(/retry limit reached/i)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /retry pinned release/i })).not.toBeInTheDocument();
   });
 });
