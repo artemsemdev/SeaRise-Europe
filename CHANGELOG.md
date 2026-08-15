@@ -38,6 +38,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the React 19 and Vite 8 static application shell with two direct static
+  routes, bundled fonts, honest synthetic-fixture identity, lazy architecture
+  evidence, a measured build inventory, zero-API boundary checks, and desktop
+  and mobile Chromium accessibility smoke tests.
+
 - Added local retained-evidence PMTiles validation so an exact final candidate
   can be fully gated on Apple Silicon without executing pinned Linux x86_64
   tooling under unstable emulation. Candidate bytes must match both the prior

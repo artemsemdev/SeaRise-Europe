@@ -38,8 +38,22 @@ Use the repository pull request template and include:
 
 ## Local verification
 
-Run the checks relevant to the files you changed. The current legacy baseline
-uses:
+The static application is the authoritative target workflow. From the
+repository root:
+
+```bash
+npm ci
+npm run web:check
+npm run web:e2e
+npm run web:serve
+```
+
+`web:serve` serves only the generated static output. Clean-clone builds copy the
+committed synthetic release fixture into that output; they never discover or
+copy the ignored private Phase 1 candidate.
+
+Run the checks relevant to the files you changed. Until #70 and #71 remove the
+legacy baseline, its focused compatibility commands remain:
 
 ```bash
 # Frontend
