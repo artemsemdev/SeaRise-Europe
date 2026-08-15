@@ -13,21 +13,48 @@ export type ReleaseDisposition =
   | "private-engineering"
   | "public-promoted";
 
-export type TechnicalErrorCode =
-  | "SchemaInvalid"
-  | "ReleaseIdentityMismatch"
-  | "FetchFailed"
-  | "RangeUnsupported"
-  | "DecodeFailed"
-  | "IntegrityFailed"
-  | "UnsupportedBrowser"
-  | "Aborted";
+export const TECHNICAL_ERROR_CODES = [
+  "SchemaInvalid",
+  "ReleaseIdentityMismatch",
+  "FetchFailed",
+  "RangeUnsupported",
+  "DecodeFailed",
+  "IntegrityFailed",
+  "UnsupportedBrowser",
+  "Aborted",
+] as const;
+export type TechnicalErrorCode = (typeof TECHNICAL_ERROR_CODES)[number];
+
+export type GeographyClassification =
+  | "OutsideEurope"
+  | "InEuropeOutsideCoastalZone"
+  | "InEuropeAndCoastalZone";
 
 export interface TechnicalError {
   readonly kind: "technical-error";
   readonly code: TechnicalErrorCode;
   readonly message: string;
   readonly recoverable: boolean;
+}
+
+const TECHNICAL_ERROR_PRESENTATION: Readonly<
+  Record<TechnicalErrorCode, Readonly<{ title: string; guidance: string }>>
+> = Object.freeze({
+  SchemaInvalid: { title: "Release contract invalid", guidance: "Use a complete reviewed release." },
+  ReleaseIdentityMismatch: { title: "Release identity mismatch", guidance: "Use the release pinned by this application build." },
+  FetchFailed: { title: "Release delivery unavailable", guidance: "Check the connection and retry the same release." },
+  RangeUnsupported: { title: "Byte ranges unavailable", guidance: "Use a host that preserves range requests." },
+  DecodeFailed: { title: "Release data unreadable", guidance: "Retry only if delivery may have been interrupted." },
+  IntegrityFailed: { title: "Release integrity check failed", guidance: "Do not use or substitute these artifacts." },
+  UnsupportedBrowser: { title: "Browser capability unavailable", guidance: "Use a current supported browser." },
+  Aborted: { title: "Operation cancelled", guidance: "No scientific outcome was produced." },
+});
+
+export function technicalErrorPresentation(error: TechnicalError): Readonly<{
+  title: string;
+  guidance: string;
+}> {
+  return TECHNICAL_ERROR_PRESENTATION[error.code];
 }
 
 export class TechnicalFailure extends Error {

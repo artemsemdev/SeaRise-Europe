@@ -1,5 +1,6 @@
 import { lazy, Suspense, useId, useState } from "react";
 import { releaseLabel, runtimeConfig } from "./config";
+import { technicalErrorPresentation } from "./domain/release";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
@@ -34,9 +35,10 @@ function ReleaseStartup({ state, retry }: { state: ReleaseBootstrapState; retry:
       </p>
     );
   }
+  const presentation = technicalErrorPresentation(state.error);
   return (
     <div className="release-startup error" role="alert">
-      <strong>Pinned release unavailable.</strong> {state.error.message}
+      <strong>{presentation.title}.</strong> {state.error.message} {presentation.guidance}
       {canRetryRelease(state) ? (
         <button type="button" onClick={retry}>Retry pinned release</button>
       ) : (

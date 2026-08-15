@@ -209,7 +209,7 @@
       "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-16-static-release-domain", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-three deterministic unit, contract, component, and 200-run property cases passed against the committed synthetic fixture." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-six deterministic unit, contract, component, and 200-run property cases passed against the committed synthetic fixture." }
     },
     {
       "id": "static-web-shell",
