@@ -11,6 +11,8 @@ const forbidden = [
   { label: "legacy configuration endpoint", pattern: /["'`]\/[^"'`]*config(?:[/?"'`]|$)/ },
   { label: "private candidate path", pattern: /candidate-v7|local-data\/phase-1/i },
   { label: "provider SDK", pattern: /@azure\/|azure-maps|nominatim/i },
+  { label: "unsafe HTML injection", pattern: /dangerouslySetInnerHTML/ },
+  { label: "backend request identity", pattern: /\brequestId\b/ },
 ];
 
 function files(directory) {
@@ -23,11 +25,22 @@ function files(directory) {
 }
 
 const violations = [];
-for (const path of files(sourceRoot)) {
+const sourceFiles = files(sourceRoot);
+for (const path of sourceFiles) {
   const text = readFileSync(path, "utf8");
   for (const rule of forbidden) {
     if (rule.pattern.test(text)) {
       violations.push(`${relative(root, path)}: ${rule.label}`);
+    }
+  }
+  if (path.includes(`${join("src", "domain")}`)) {
+    const domainRules = [
+      { label: "framework import in target domain", pattern: /(?:from|import\()\s*["'](?:react|maplibre-gl|next|zustand)(?:\/|["'])/ },
+      { label: "network access in target domain", pattern: /\bfetch\s*\(/ },
+      { label: "provider import in target domain", pattern: /(?:from|import\()\s*["'][^"']*(?:azure|nominatim)/i },
+    ];
+    for (const rule of domainRules) {
+      if (rule.pattern.test(text)) violations.push(`${relative(root, path)}: ${rule.label}`);
     }
   }
 }
@@ -36,4 +49,4 @@ if (violations.length > 0) {
   throw new Error(`Static target boundary violations:\n${violations.join("\n")}`);
 }
 
-console.log(`validated static target boundaries across ${files(sourceRoot).length} files`);
+console.log(`validated static target boundaries across ${sourceFiles.length} files`);
