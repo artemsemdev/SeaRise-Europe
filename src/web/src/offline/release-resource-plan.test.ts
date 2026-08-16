@@ -110,6 +110,54 @@ function privateContext(source: ReleaseContext): ReleaseContext {
   });
 }
 
+function withBoundaryPmtiles(source: ReleaseContext): ReleaseContext {
+  const artifacts = { ...source.artifacts } as Record<string, ResolvedArtifact>;
+  const additions: ResolvedArtifact[] = [];
+  for (const definition of [
+    {
+      sourceId: "europe-support-geoparquet",
+      artifactId: "support-boundary-pmtiles",
+      path: "boundaries/europe.pmtiles",
+      sha256: "b".repeat(64),
+    },
+    {
+      sourceId: "coastal-analysis-zone-geoparquet",
+      artifactId: "coastal-boundary-pmtiles",
+      path: "boundaries/coastal-analysis-zone.pmtiles",
+      sha256: "c".repeat(64),
+    },
+  ] as const) {
+    const sourceArtifact = source.artifact(definition.sourceId);
+    const addition = {
+      ...sourceArtifact,
+      artifactId: definition.artifactId,
+      path: definition.path,
+      mediaType: "application/vnd.pmtiles",
+      scientificUse: "not-applicable",
+      byteSize: 128,
+      sha256: definition.sha256,
+      url: new URL(definition.path, new URL("./", source.manifestUrl)).href,
+    } as unknown as ResolvedArtifact;
+    artifacts[addition.artifactId] = addition;
+    additions.push(addition);
+  }
+  const manifestAdditions = additions.map((addition) => {
+    const artifact = { ...addition } as Record<string, unknown>;
+    delete artifact.url;
+    return artifact as unknown as BrowserReleaseManifestV2["artifacts"][number];
+  });
+  return new ReleaseContext({
+    manifest: {
+      ...source.manifest,
+      artifacts: [...source.manifest.artifacts, ...manifestAdditions],
+    } as BrowserReleaseManifestV2,
+    manifestUrl: source.manifestUrl,
+    disposition: source.disposition,
+    artifacts,
+    datasets: { ...source.datasets },
+  });
+}
+
 function relabeledPmtilesContext(source: ReleaseContext): ReleaseContext {
   const artifactId = "projection-ssp2-45-2050-pmtiles";
   const path = "config/visual-context.json";
@@ -325,6 +373,42 @@ describe("deterministic release resource plan", () => {
         ? route.storage === "network-only"
         : route.storage === "memory-only",
     )).toBe(true);
+  });
+
+  it("keeps canonical boundary PMTiles network-only in public, private, and local Candidate plans", async () => {
+    const publicRelease = withBoundaryPmtiles(await context());
+    const cases = [
+      { context: publicRelease, authority: appAuthority(), localCandidate: false },
+      { context: publicRelease, authority: appAuthority(), localCandidate: true },
+      {
+        context: withBoundaryPmtiles(privateContext(await context())),
+        authority: appAuthority("private-engineering"),
+        localCandidate: false,
+      },
+    ];
+
+    for (const testCase of cases) {
+      const plan = await createVerifiedReleaseResourcePlan({
+        context: testCase.context,
+        appAuthority: testCase.authority,
+        rangeIntegrityBytes: await indexBytes(),
+        localCandidate: testCase.localCandidate,
+      });
+      const boundaryPmtiles = plan.routes.filter((route) =>
+        route.kind === "network-only" &&
+        ["support-boundary-pmtiles", "coastal-boundary-pmtiles"].includes(route.identity.artifactId));
+      expect(boundaryPmtiles).toHaveLength(2);
+      expect(boundaryPmtiles.every((route) =>
+        route.storage === "network-only" && route.requestCache === "no-store" &&
+        route.reason === "visual-pmtiles"
+      )).toBe(true);
+      expect(plan.routes.some((route) =>
+        route.kind === "complete-resource" && route.authority.path.endsWith(".pmtiles")
+      )).toBe(false);
+      expect(plan.routes.some((route) =>
+        route.kind === "analysis-cog-ranges" && route.identity.path.endsWith(".pmtiles")
+      )).toBe(false);
+    }
   });
 
   it("fails closed on release, URL, role, MIME, and manifest identity masquerades", async () => {

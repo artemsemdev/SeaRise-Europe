@@ -100,7 +100,29 @@ function boundaryIdentity(
     artifact.mediaType === "application/vnd.apache.parquet";
   const geojson = artifact.path === `boundaries/${basename}.geojson` &&
     artifact.mediaType === "application/geo+json";
-  return (parquet || geojson) && artifact.scientificUse === "not-applicable";
+  const pmtiles = artifact.path === `boundaries/${basename}.pmtiles` &&
+    artifact.mediaType === "application/vnd.pmtiles";
+  return (parquet || geojson || pmtiles) && artifact.scientificUse === "not-applicable";
+}
+
+function pmtilesLike(artifact: ResolvedArtifact): boolean {
+  return artifact.mediaType === "application/vnd.pmtiles" ||
+    artifact.path.endsWith(".pmtiles") || artifact.artifactId.endsWith("-pmtiles");
+}
+
+function assertCanonicalBoundarySet(
+  artifacts: readonly ResolvedArtifact[],
+  role: "support-boundary" | "coastal-boundary",
+): void {
+  const boundary = artifacts.filter((artifact) => artifact.role === role);
+  const complete = boundary.filter((artifact) => !pmtilesLike(artifact));
+  const visual = boundary.filter(pmtilesLike);
+  if (
+    complete.length !== 1 || visual.length > 1 ||
+    boundary.length !== complete.length + visual.length
+  ) {
+    throw technical(`The release must contain one canonical ${role} resource and at most one PMTiles companion.`);
+  }
 }
 
 function projectionIdentity(
@@ -126,11 +148,12 @@ function assertCanonicalPersistedSemantics(
   const counts = new Map<ArtifactRole, number>();
   for (const artifact of artifacts) counts.set(artifact.role, (counts.get(artifact.role) ?? 0) + 1);
   for (const role of [
-    "methodology", "source-attribution", "support-boundary", "coastal-boundary",
-    "source-grid-identity", "range-integrity-index",
+    "methodology", "source-attribution", "source-grid-identity", "range-integrity-index",
   ] as const) {
     if (counts.get(role) !== 1) throw technical(`The release must contain exactly one canonical ${role} resource.`);
   }
+  assertCanonicalBoundarySet(artifacts, "support-boundary");
+  assertCanonicalBoundarySet(artifacts, "coastal-boundary");
   if (counts.get("settlement-search-index") !== 2) {
     throw technical("The release must contain exactly two canonical settlement search shards.");
   }
@@ -270,13 +293,18 @@ function wholeAuthority(
 }
 
 function assertPmtiles(artifact: ResolvedArtifact): void {
-  if (
-    artifact.mediaType !== "application/vnd.pmtiles" ||
-    artifact.scientificUse !== "visual-only" ||
-    !/^layers\/(ssp1-26|ssp2-45|ssp5-85)\/(2030|2050|2100)\.pmtiles$/u.test(artifact.path)
-  ) {
-    throw technical(`Artifact ${artifact.artifactId} masquerades as visual PMTiles.`);
-  }
+  const projection = artifact.role === "projection-visual-pmtiles" &&
+    artifact.mediaType === "application/vnd.pmtiles" && artifact.scientificUse === "visual-only" &&
+    /^layers\/(ssp1-26|ssp2-45|ssp5-85)\/(2030|2050|2100)\.pmtiles$/u.test(artifact.path);
+  const supportBoundary = artifact.role === "support-boundary" &&
+    artifact.artifactId === "support-boundary-pmtiles" &&
+    artifact.path === "boundaries/europe.pmtiles";
+  const coastalBoundary = artifact.role === "coastal-boundary" &&
+    artifact.artifactId === "coastal-boundary-pmtiles" &&
+    artifact.path === "boundaries/coastal-analysis-zone.pmtiles";
+  const boundary = (supportBoundary || coastalBoundary) &&
+    artifact.mediaType === "application/vnd.pmtiles" && artifact.scientificUse === "not-applicable";
+  if (!projection && !boundary) throw technical(`Artifact ${artifact.artifactId} masquerades as visual PMTiles.`);
 }
 
 export async function createVerifiedReleaseResourcePlan(input: Readonly<{
@@ -315,7 +343,7 @@ export async function createVerifiedReleaseResourcePlan(input: Readonly<{
         ranges: Object.freeze([...ranges]),
       });
     }
-    if (artifact.role === "projection-visual-pmtiles") {
+    if (pmtilesLike(artifact)) {
       assertPmtiles(artifact);
       return Object.freeze({
         kind: "network-only",
