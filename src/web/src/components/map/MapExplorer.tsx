@@ -27,22 +27,18 @@ interface MapExplorerProps {
 }
 
 export default function MapExplorer({ context, selection, onSelection }: MapExplorerProps) {
-  const [visualScenario, setVisualScenario] = useState<ScenarioId>(context.defaults.scenario);
-  const [visualHorizon, setVisualHorizon] = useState<HorizonYear>(context.defaults.horizon);
   const [band, setBand] = useState<VisualBand>("central");
-  const scenario = selection?.scenario ?? visualScenario;
-  const horizon = selection?.horizon ?? visualHorizon;
+  const scenario = selection?.scenario ?? context.defaults.scenario;
+  const horizon = selection?.horizon ?? context.defaults.horizon;
   const layers = useMemo(
     () => resolveMapLayers(context, scenario, horizon),
     [context, scenario, horizon],
   );
   const selectScenario = (nextScenario: ScenarioId) => {
     if (selection) onSelection(Object.freeze({ ...selection, scenario: nextScenario }));
-    else setVisualScenario(nextScenario);
   };
   const selectHorizon = (nextHorizon: HorizonYear) => {
     if (selection) onSelection(Object.freeze({ ...selection, horizon: nextHorizon }));
-    else setVisualHorizon(nextHorizon);
   };
 
   return (
@@ -54,16 +50,21 @@ export default function MapExplorer({ context, selection, onSelection }: MapExpl
           This map shows the selected release’s source-native cells. It is a visual aid only:
           exact values come from the analysis artifact, never from colour or rendered pixels.
         </p>
+        {!selection ? (
+          <p className="map-preview-status" role="status">
+            Default release preview — not an accepted scientific result. Select a point before using scenario or horizon controls.
+          </p>
+        ) : null}
         <div className="map-controls" aria-label="Visual layer selection">
           <label>
             Scenario
-            <select value={scenario} onChange={(event) => selectScenario(event.target.value as ScenarioId)}>
+            <select disabled={!selection} value={scenario} onChange={(event) => selectScenario(event.target.value as ScenarioId)}>
               {SCENARIO_IDS.map((value) => <option key={value}>{value}</option>)}
             </select>
           </label>
           <label>
             Horizon
-            <select value={horizon} onChange={(event) => selectHorizon(Number(event.target.value) as HorizonYear)}>
+            <select disabled={!selection} value={horizon} onChange={(event) => selectHorizon(Number(event.target.value) as HorizonYear)}>
               {HORIZON_YEARS.map((value) => <option key={value}>{value}</option>)}
             </select>
           </label>
@@ -84,13 +85,17 @@ export default function MapExplorer({ context, selection, onSelection }: MapExpl
           ))}
         </fieldset>
         <div className="map-text-alternative" aria-label="Map text alternative">
-          <strong>{scenario} · {horizon} · {BAND_LABELS[band]}</strong>
+          <strong>{selection ? "Accepted result visualization" : "Default non-result preview"} · {scenario} · {horizon} · {BAND_LABELS[band]}</strong>
           <span>Artifact: {layers.projection.artifactId}</span>
           <span>Source grid: outlined 1° cells; darker colour represents a larger visual value.</span>
-          <span>All three quantile labels remain available in text; colour is not the only key.</span>
+          <span>{selection ? "All three quantile labels remain available in text; colour is not the only key." : "No result marker or result legend is shown for this preview."}</span>
           {selection?.location.kind === "coordinate" ? (
             <span>
               Selected coordinate: {selection.location.coordinates.latitude.toFixed(4)}, {selection.location.coordinates.longitude.toFixed(4)}.
+            </span>
+          ) : selection?.location.kind === "settlement" ? (
+            <span>
+              Selected settlement {selection.location.placeId}: {selection.location.coordinates.latitude.toFixed(4)}, {selection.location.coordinates.longitude.toFixed(4)}.
             </span>
           ) : (
             <span>Select a coordinate on the map or continue without the map.</span>

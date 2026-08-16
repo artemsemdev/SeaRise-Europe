@@ -234,6 +234,12 @@ a { color: inherit; }
   padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 7vw, 8rem);
 }
 .map-copy > p:not(.eyebrow, .map-attribution) { color: var(--muted); line-height: 1.65; }
+.map-copy .map-preview-status {
+  padding: 0.75rem 0.9rem;
+  border-left: 4px solid #b07b1b;
+  background: #fff5d9;
+  color: #5d4515;
+}
 .map-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-top: 1.8rem; }
 .map-controls label { display: grid; gap: 0.45rem; color: var(--muted); font-size: 0.78rem; }
 .map-controls select {
