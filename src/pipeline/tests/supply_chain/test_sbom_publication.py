@@ -36,9 +36,9 @@ ANNOTATION = (
     / "valid.json"
 )
 TARGET = "linux-x86-64-cp311"
-NPM_LOCK = REPOSITORY_ROOT / "src/frontend/package-lock.json"
+NPM_LOCK = REPOSITORY_ROOT / "package-lock.json"
 NPM_ARTIFACT = REPOSITORY_ROOT / "contracts/supply-chain/v1/sboms/frontend-npm.cdx.json"
-NPM_LOGICAL_PATH = "src/frontend/package-lock.json"
+NPM_LOGICAL_PATH = "package-lock.json"
 
 
 def _partials(parent: Path) -> list[Path]:
@@ -135,10 +135,10 @@ def test_npm_cli_generates_and_validates_real_frontend_bytes(
     ]
 
     assert main(["npm-sbom", *common, "--output", str(output)]) == 0
-    assert "generated 597 npm components" in capsys.readouterr().out
+    assert "generated 339 npm components" in capsys.readouterr().out
     assert output.read_bytes() == NPM_ARTIFACT.read_bytes()
     assert main(["npm-sbom-validate", *common, "--sbom", str(output)]) == 0
-    assert "validated 597 npm components" in capsys.readouterr().out
+    assert "validated 339 npm components" in capsys.readouterr().out
 
 
 def test_parent_inode_swap_fails_without_publishing_to_either_directory(
