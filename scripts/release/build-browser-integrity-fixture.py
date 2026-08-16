@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import shutil
@@ -18,6 +19,9 @@ from searise_pipeline.release import (
     write_range_integrity_index,
     write_source_grid,
 )
+from searise_pipeline.release.boundary_geoparquet import (
+    _write_browser_fixture_boundary_geoparquet,
+)
 
 REPOSITORY_ROOT = Path(__file__).parents[2]
 RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09"
@@ -29,6 +33,22 @@ OVERLAY_ROOT = (
 MULTICHUNK_ARTIFACT_ID = "projection-ssp2-45-2050-cog"
 RANGE_CHUNK_SIZE = 65_536
 LATER_CHUNK_GAP_SIZE = 3 * RANGE_CHUNK_SIZE
+NODATA_CONTROL_PATH = (
+    REPOSITORY_ROOT
+    / "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json"
+)
+BOUNDARY_ARROW_SCHEMAS_PATH = (
+    REPOSITORY_ROOT
+    / "src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json"
+)
+BOUNDARY_SOURCES = {
+    "support-boundary": REPOSITORY_ROOT / "data/geometry/europe.geojson",
+    "coastal-boundary": REPOSITORY_ROOT / "data/geometry/coastal_analysis_zone.geojson",
+}
+BOUNDARY_OUTPUTS = {
+    "support-boundary": OVERLAY_ROOT / "boundaries/europe.parquet",
+    "coastal-boundary": OVERLAY_ROOT / "boundaries/coastal-analysis-zone.parquet",
+}
 
 
 def _read_json(path: Path) -> dict[str, object]:
@@ -128,6 +148,60 @@ def _write_later_chunk_cog(source: Path, target: Path) -> None:
         )
 
 
+def _validate_nodata_control(
+    control: dict[str, object],
+    cogs: list[dict[str, object]],
+) -> None:
+    """Prove the browser-only control is the same nodata cell in all 27 bands."""
+    evidence = control["sourceGridEvidence"]
+    if not isinstance(evidence, dict):
+        raise TypeError("The browser nodata control has no source-grid evidence")
+    expected_combinations = {
+        (item["scenario"], item["horizon"])
+        for item in evidence["scenarioHorizonCombinations"]
+    }
+    actual_combinations = {
+        (
+            item["projectionContext"]["scenario"],
+            item["projectionContext"]["horizon"],
+        )
+        for item in cogs
+    }
+    if actual_combinations != expected_combinations or len(cogs) != 9:
+        raise ValueError("The browser nodata control does not bind all nine COGs")
+
+    row = int(evidence["row"])
+    column = int(evidence["column"])
+    latitude = float(evidence["latitude"])
+    longitude = float(evidence["longitude"])
+    expected_values = list(evidence["expectedBandValuesForEveryCombination"])
+    with gzip.open(OVERLAY_ROOT / "analysis/source-grid.json.gz", "rt", encoding="utf-8") as stream:
+        source_grid = json.load(stream)
+    source_row = int(source_grid["height"]) - 1 - row
+    source_index = source_row * int(source_grid["width"]) + column
+    if (
+        source_grid["cogCellMapping"]
+        != {"sourceColumn": "cogColumn", "sourceRow": "height - 1 - cogRow"}
+        or source_grid["locationIds"][source_index] != evidence["locationId"]
+    ):
+        raise ValueError("The browser nodata control source-grid identity differs")
+
+    for item in cogs:
+        relative_path = str(item["path"])
+        overlay = OVERLAY_ROOT / relative_path
+        artifact = overlay if overlay.is_file() else PAYLOAD_ROOT / relative_path
+        with rasterio.open(artifact) as dataset:
+            if dataset.index(longitude, latitude) != (row, column):
+                raise ValueError(f"The browser nodata control moved in {relative_path}")
+            values = dataset.read(window=((row, row + 1), (column, column + 1)))[
+                :, 0, 0
+            ].tolist()
+            if dataset.nodata != evidence["storedNodata"] or values != expected_values:
+                raise ValueError(
+                    f"The browser nodata control is not nodata in all bands of {relative_path}"
+                )
+
+
 def main() -> None:
     """Write both scientific metadata artifacts using production writers."""
     contract = load_release_contract(
@@ -143,6 +217,14 @@ def main() -> None:
         OVERLAY_ROOT / "analysis/source-grid.json.gz",
         contract=contract,
     )
+    for role, source_path in BOUNDARY_SOURCES.items():
+        _write_browser_fixture_boundary_geoparquet(
+            source_path,
+            BOUNDARY_OUTPUTS[role],
+            role=role,
+            control_path=NODATA_CONTROL_PATH,
+            arrow_schema_path=BOUNDARY_ARROW_SCHEMAS_PATH,
+        )
 
     manifest = _read_json(PAYLOAD_ROOT / "manifest.json")
     artifacts = manifest.get("artifacts")
@@ -154,6 +236,7 @@ def main() -> None:
         PAYLOAD_ROOT / str(target["path"]),
         OVERLAY_ROOT / str(target["path"]),
     )
+    _validate_nodata_control(_read_json(NODATA_CONTROL_PATH), cogs)
     with tempfile.TemporaryDirectory(prefix="searise-browser-cogs-") as temporary:
         assembled_root = Path(temporary)
         identities = []

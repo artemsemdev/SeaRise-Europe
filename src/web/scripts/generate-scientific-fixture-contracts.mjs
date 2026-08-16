@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { inflateSync } from "node:zlib";
 import {
   assertChecksumInventory,
   canonicalChecksumText,
@@ -20,6 +21,14 @@ const overlayRoot = resolve(
   repositoryRoot,
   `contracts/release/v2/fixtures/browser-release/${RELEASE_ID}`,
 );
+const nodataControlPath =
+  "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json";
+const nodataControlBytes = readFileSync(resolve(repositoryRoot, nodataControlPath));
+const nodataControl = JSON.parse(nodataControlBytes.toString("utf8"));
+const boundaryArrowSchemasPath =
+  "src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json";
+const boundaryArrowSchemasBytes = readFileSync(resolve(repositoryRoot, boundaryArrowSchemasPath));
+const boundaryArrowSchemas = JSON.parse(boundaryArrowSchemasBytes.toString("utf8"));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const treeDigest = (root) => {
   const digest = createHash("sha256");
@@ -72,18 +81,40 @@ const boundaries = [
     artifactId: "europe-support-geoparquet",
     path: "boundaries/europe.parquet",
     role: "support-boundary",
-    spatialBounds: [-28.851018, 30.021175999999997, 40.173396, 74.53634699999999],
+    spatialBounds: [-28.851018, 30.021176, 44.001, 74.536347],
   },
   {
     artifactId: "coastal-analysis-zone-geoparquet",
     path: "boundaries/coastal-analysis-zone.parquet",
     role: "coastal-boundary",
-    spatialBounds: [-28.850986, 30.021210999999997, 38.314159, 74.536318],
+    spatialBounds: [-28.850986, 30.021211, 44.001, 74.536318],
   },
 ].map((boundary) => ({
   ...boundary,
   bytes: readFileSync(resolve(overlayRoot, boundary.path)),
 }));
+if (
+  nodataControl.controlId !== "browser-only-source-nodata-62n-44e" ||
+  nodataControl.fixtureRole !== "browser-only-adr-024-data-unavailable-control" ||
+  nodataControl.dataProvenanceClass !== "synthetic-fixture" ||
+  nodataControl.dataReleaseId !== RELEASE_ID
+) {
+  throw new Error("The browser-only nodata control identity differs from the pin");
+}
+if (
+  boundaryArrowSchemas.fixtureRole !== "browser-only-boundary-canonical-arrow-schemas" ||
+  boundaryArrowSchemas.encoding !== "base64-zlib" ||
+  Object.keys(boundaryArrowSchemas.schemas).sort().join(",") !==
+    "coastal-boundary,support-boundary"
+) {
+  throw new Error("The browser-only canonical Arrow schema identity differs from the pin");
+}
+for (const record of Object.values(boundaryArrowSchemas.schemas)) {
+  const decoded = inflateSync(Buffer.from(record.payload, "base64"));
+  if (decoded.length !== record.decodedLength || sha256(decoded) !== record.decodedSha256) {
+    throw new Error("The browser-only canonical Arrow schema payload differs from the pin");
+  }
+}
 
 const cogBodies = new Map();
 const cogArtifacts = v1Manifest.artifacts
@@ -134,6 +165,8 @@ const sbom = {
       .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
       .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
     ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
+    [nodataControlPath, nodataControlBytes],
+    [boundaryArrowSchemasPath, boundaryArrowSchemasBytes],
   ].map(([path, bytes]) => ({
     type: "data",
     name: path,
@@ -171,6 +204,22 @@ attribution.records.push({
     spdxId: "LicenseRef-Natural-Earth-Public-Domain",
     name: "Natural Earth public domain dedication",
     url: "https://www.naturalearthdata.com/about/terms-of-use/",
+  },
+  redistribution: "allowed",
+  appliesToRoles: ["support-boundary", "coastal-boundary"],
+});
+attribution.records.push({
+  attributionId: "browser-nodata-control-fixture",
+  sourceId: "searise-browser-nodata-control/v1",
+  title: "SeaRise Europe browser-only ADR-024 nodata control",
+  sourceUrl: "https://github.com/artemsemdev/SeaRise-Europe",
+  sourceSha256: sha256(nodataControlBytes),
+  attributionText:
+    "Synthetic browser-only DataUnavailable control; not production or public scientific evidence.",
+  licence: {
+    spdxId: "CC-BY-4.0",
+    name: "Creative Commons Attribution 4.0 International",
+    url: "https://creativecommons.org/licenses/by/4.0/",
   },
   redistribution: "allowed",
   appliesToRoles: ["support-boundary", "coastal-boundary"],
@@ -226,6 +275,16 @@ const derivationMaterials = [
   identity(
     "src/web/scripts/checksum-inventory.mjs",
     repositoryBytes("src/web/scripts/checksum-inventory.mjs"),
+  ),
+  identity(nodataControlPath, nodataControlBytes),
+  identity(boundaryArrowSchemasPath, boundaryArrowSchemasBytes),
+  identity(
+    "scripts/release/build-browser-integrity-fixture.py",
+    repositoryBytes("scripts/release/build-browser-integrity-fixture.py"),
+  ),
+  identity(
+    "src/pipeline/searise_pipeline/release/boundary_geoparquet.py",
+    repositoryBytes("src/pipeline/searise_pipeline/release/boundary_geoparquet.py"),
   ),
   ...overlayInputs,
 ].sort((left, right) => left.path.localeCompare(right.path));
@@ -362,7 +421,10 @@ for (const artifact of manifest.artifacts) {
   if (projectionLineage) artifact.lineage = projectionLineage;
 }
 const boundaryLineage = [
+  scriptIdentity("scripts/release/build-browser-integrity-fixture.py"),
   scriptIdentity("src/pipeline/searise_pipeline/release/boundary_geoparquet.py"),
+  identity(nodataControlPath, nodataControlBytes),
+  identity(boundaryArrowSchemasPath, boundaryArrowSchemasBytes),
   scriptIdentity("src/pipeline/sources/source-lock.phase-1-settlement-coastline.json"),
 ].sort((left, right) => left.path.localeCompare(right.path));
 const common = {
@@ -389,7 +451,10 @@ const additions = [
     sha256: sha256(boundary.bytes),
     spatialBounds: boundary.spatialBounds,
     lineage: boundaryLineage,
-    rights: { attributionIds: ["natural-earth-boundaries"], redistribution: "allowed" },
+    rights: {
+      attributionIds: ["browser-nodata-control-fixture", "natural-earth-boundaries"],
+      redistribution: "allowed",
+    },
   })),
   {
     ...common,

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "controlId": "browser-only-source-nodata-62n-44e",
+  "fixtureRole": "browser-only-adr-024-data-unavailable-control",
+  "dataProvenanceClass": "synthetic-fixture",
+  "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+  "purpose": "Exercise the complete static browser geography and exact COG lookup chain for DataUnavailable/source-value-nodata.",
+  "boundaryControl": {
+    "appliesToRoles": [
+      "support-boundary",
+      "coastal-boundary"
+    ],
+    "operation": "append-isolated-polygon",
+    "ring": [
+      [43.999, 61.999],
+      [44.001, 61.999],
+      [44.001, 62.001],
+      [43.999, 62.001],
+      [43.999, 61.999]
+    ],
+    "controlPoint": {
+      "latitude": 62.0,
+      "longitude": 44.0
+    },
+    "expectedClassification": "InEuropeAndCoastalZone"
+  },
+  "sourceGridEvidence": {
+    "locationId": 1002800440,
+    "latitude": 62.0,
+    "longitude": 44.0,
+    "row": 13,
+    "column": 74,
+    "storedNodata": -32768,
+    "requiredQuantiles": [0.167, 0.5, 0.833],
+    "scenarioHorizonCombinations": [
+      { "scenario": "ssp1-26", "horizon": 2030 },
+      { "scenario": "ssp1-26", "horizon": 2050 },
+      { "scenario": "ssp1-26", "horizon": 2100 },
+      { "scenario": "ssp2-45", "horizon": 2030 },
+      { "scenario": "ssp2-45", "horizon": 2050 },
+      { "scenario": "ssp2-45", "horizon": 2100 },
+      { "scenario": "ssp5-85", "horizon": 2030 },
+      { "scenario": "ssp5-85", "horizon": 2050 },
+      { "scenario": "ssp5-85", "horizon": 2100 }
+    ],
+    "expectedBandValuesForEveryCombination": [-32768, -32768, -32768],
+    "expectedOutcome": {
+      "resultState": "DataUnavailable",
+      "reason": "source-value-nodata",
+      "distanceKilometres": 0.0
+    }
+  },
+  "limitations": [
+    "This isolated polygon exists only in the committed v2 browser synthetic fixture.",
+    "It is not part of the audited Europe support or coastal source geometry.",
+    "It is not production, publication, hazard, flooding, inundation, terrain exposure, flood probability, or property-risk evidence.",
+    "It must never be added to a real-source release candidate."
+  ]
+}

@@ -7,12 +7,18 @@
     "supportArtifact": {
       "artifactId": "europe-support-geoparquet",
       "path": "boundaries/europe.parquet",
-      "sha256": "531c6042a33cf3be9bc3ea340b0e557cb66bafb34de7954db0d7e47be90d35a9"
+      "sha256": "d98d8b39e4aea1a9fe57371a73ae67b6548435771849711d1815e1d536558684"
     },
     "coastalArtifact": {
       "artifactId": "coastal-analysis-zone-geoparquet",
       "path": "boundaries/coastal-analysis-zone.parquet",
-      "sha256": "3ba4d5eaba24d1202482bc33fd64fde8ce54b7ff1dd1456990d3c8cfece43366"
+      "sha256": "e6960ce125d9619cf24007408dafc0406a6eb650e98d0a7ac0d6612c73185f6f"
+    },
+    "browserFixtureControl": {
+      "controlId": "browser-only-source-nodata-62n-44e",
+      "path": "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json",
+      "sha256": "55a3811d7c56879b5ac5cff6e0a868cd22a8a545305ddb718a9697244c431d2e",
+      "fixtureOnly": true
     }
   },
   "semantics": {
@@ -25,6 +31,15 @@
     ]
   },
   "cases": [
+    {
+      "id": "browser-only-nodata-control-interior",
+      "boundaryRole": "coastal",
+      "relation": "browser-fixture-control",
+      "coordinates": { "latitude": 62.0, "longitude": 44.0 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": true,
+      "expectedClassification": "InEuropeAndCoastalZone"
+    },
     {
       "id": "support-exterior-boundary",
       "boundaryRole": "support",
