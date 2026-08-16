@@ -21,6 +21,20 @@ export interface VerifiedRangeWrite {
   readonly identity: RangeIdentityV1;
   readonly bytes: ArrayBuffer;
 }
+export interface RangeAuthorityCatalogV1 {
+  readonly contractVersion: 1;
+  readonly identities: readonly RangeIdentityV1[];
+}
+export function createRangeAuthorityCatalog(identities: readonly RangeIdentityV1[]): RangeAuthorityCatalogV1 {
+  const validated = identities.map((identity) => validateRangeIdentity(identity));
+  const keys = new Set<string>();
+  for (const identity of validated) {
+    const key = authorityCatalogKey(identity);
+    if (keys.has(key)) throw new RangeStoreIntegrityError("Range authority catalog contains a duplicate identity.");
+    keys.add(key);
+  }
+  return Object.freeze({ contractVersion: 1, identities: Object.freeze(validated) });
+}
 export interface RangeInventoryV1 {
   readonly mode: "memory-only" | "persistent";
   readonly payloadBytes: number;
@@ -84,6 +98,17 @@ function rangeKey(identity: RangeIdentityV1): string {
   return JSON.stringify([artifactKey(identity), identity.interval.start, identity.interval.endExclusive,
     identity.authorizedIntervalSha256]);
 }
+function authorityCatalogKey(identity: RangeIdentityV1): string {
+  const authority = identity.authority;
+  return JSON.stringify([
+    identity.contractVersion, authority.contractVersion, authority.pair.contractVersion,
+    authority.pair.appBuildId, authority.pair.dataReleaseId, authority.artifactId,
+    authority.role, authority.canonicalUrl, authority.path, authority.mediaType,
+    authority.totalByteSize, authority.artifactSha256, authority.etag,
+    authority.integrityChunkSize, identity.interval.start, identity.interval.endExclusive,
+    identity.authorizedIntervalSha256,
+  ]);
+}
 function checkedIdentity(identity: RangeIdentityV1, expectedPair: AppReleasePairV1): RangeIdentityV1 {
   const validated = validateRangeIdentity(identity);
   if (!samePair(validated.authority.pair, expectedPair)) {
@@ -101,6 +126,33 @@ function checkedCogIdentity(identity: RangeIdentityV1, expectedPair: AppReleaseP
     throw new RangeStoreUnsupportedError("PMTiles is visual, network-only context and cannot enter a range store.");
   }
   const validated = checkedIdentity(identity, expectedPair);
+  return validated;
+}
+function catalogKeys(
+  input: RangeAuthorityCatalogV1,
+  expectedPair: AppReleasePairV1,
+): ReadonlySet<string> {
+  if (!input || input.contractVersion !== 1 || !Array.isArray(input.identities)) {
+    throw new RangeStoreIntegrityError("Range authority catalog is invalid.");
+  }
+  const keys = new Set<string>();
+  for (const item of input.identities) {
+    const identity = checkedCogIdentity(item, expectedPair);
+    const key = authorityCatalogKey(identity);
+    if (keys.has(key)) throw new RangeStoreIntegrityError("Range authority catalog contains a duplicate identity.");
+    keys.add(key);
+  }
+  return keys;
+}
+function checkedCatalogIdentity(
+  identity: RangeIdentityV1,
+  expectedPair: AppReleasePairV1,
+  approved: ReadonlySet<string>,
+): RangeIdentityV1 {
+  const validated = checkedCogIdentity(identity, expectedPair);
+  if (!approved.has(authorityCatalogKey(validated))) {
+    throw new RangeStoreIntegrityError("Range identity is absent from the trusted authority catalog.");
+  }
   return validated;
 }
 function requestedInterval(identity: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>) {
@@ -122,10 +174,11 @@ interface VerifiedAdmission {
 async function verifyAdmissions(
   writes: readonly VerifiedRangeWrite[],
   expectedPair: AppReleasePairV1,
+  approved: ReadonlySet<string>,
   subtle: SubtleCrypto,
 ): Promise<readonly VerifiedAdmission[]> {
   return Promise.all(writes.map(async ({ identity: input, bytes }) => {
-    const identity = checkedCogIdentity(input, expectedPair);
+    const identity = checkedCatalogIdentity(input, expectedPair, approved);
     if (bytes.byteLength !== identity.interval.endExclusive - identity.interval.start
       || await digest(bytes, subtle) !== identity.authorizedIntervalSha256) {
       throw new RangeStoreIntegrityError("Only exact release-authorized COG chunk bytes may enter a range store.");
@@ -162,14 +215,15 @@ function matches(record: StoredRange, identity: RangeIdentityV1): boolean {
 export class MemoryRangeStore implements RangeStore {
   readonly mode = "memory-only" as const;
   readonly #pair: AppReleasePairV1; readonly #budget: StorageBudgetV1; readonly #subtle: SubtleCrypto;
-  readonly #now: () => number;
+  readonly #now: () => number; readonly #approved: ReadonlySet<string>;
   readonly #entries = new Map<string, StoredRange>(); readonly #leases = new Map<string, ClientLeaseV1>();
   #sequence = 0; #active: AppReleasePairV1 | null = null; #previous: AppReleasePairV1 | null = null;
-  constructor(pair: AppReleasePairV1, budget: StorageBudgetV1, subtle: SubtleCrypto, now: () => number = Date.now) {
-    this.#pair = validateAppReleasePair(pair); this.#budget = validateStorageBudget(budget); this.#subtle = subtle; this.#now = now;
+  constructor(pair: AppReleasePairV1, budget: StorageBudgetV1, subtle: SubtleCrypto, approved: ReadonlySet<string>, now: () => number = Date.now) {
+    this.#pair = validateAppReleasePair(pair); this.#budget = validateStorageBudget(budget); this.#subtle = subtle;
+    this.#approved = approved; this.#now = now;
   }
   async readExactOrContaining(input: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
-    const identity = checkedCogIdentity(input, this.#pair); const interval = requestedInterval(identity, requested);
+    const identity = checkedCatalogIdentity(input, this.#pair, this.#approved); const interval = requestedInterval(identity, requested);
     const record = this.#entries.get(rangeKey(identity)); if (!record) return null;
     if (!matches(record, identity) || await digest(record.bytes, this.#subtle) !== record.authorizedIntervalSha256) {
       this.#entries.delete(record.key); throw new RangeStoreIntegrityError("Stored range bytes failed their authorized SHA-256 identity.");
@@ -181,7 +235,7 @@ export class MemoryRangeStore implements RangeStore {
     return (await this.putVerifiedBatch([{ identity: input, bytes }]))[0]!;
   }
   async putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]> {
-    const admissions = await verifyAdmissions(writes, this.#pair, this.#subtle);
+    const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle);
     if (admissions.length === 0) return Object.freeze([]);
 
     const unique = new Map<string, VerifiedAdmission>();
@@ -239,13 +293,15 @@ export class MemoryRangeStore implements RangeStore {
 }
 
 export interface RangeStoreBrowserApis { readonly indexedDB?: IDBFactory; readonly subtle: SubtleCrypto; readonly now?: () => number }
-export function createRangeStore(authorityInput: AppAuthorityV1, budget: StorageBudgetV1, apis: RangeStoreBrowserApis, localCandidate = false): RangeStore {
+export interface RangeStoreOptionsV1 { readonly localCandidate?: boolean; readonly catalog: RangeAuthorityCatalogV1 }
+export function createRangeStore(authorityInput: AppAuthorityV1, budget: StorageBudgetV1, apis: RangeStoreBrowserApis, options: RangeStoreOptionsV1): RangeStore {
   const authority = validateAppAuthority(authorityInput);
-  const eligibility = persistenceEligibility(authority, localCandidate);
+  const eligibility = persistenceEligibility(authority, options.localCandidate === true);
   const pair = pairFromAuthority(authority);
-  if (eligibility.mode === "memory-only") return new MemoryRangeStore(pair, budget, apis.subtle, apis.now);
+  const approved = catalogKeys(options.catalog, pair);
+  if (eligibility.mode === "memory-only") return new MemoryRangeStore(pair, budget, apis.subtle, approved, apis.now);
   if (!apis.indexedDB) throw new RangeStoreUnsupportedError("IndexedDB is unavailable for persistent range storage.");
-  return new IndexedDbRangeStore(eligibility, budget, apis);
+  return new IndexedDbRangeStore(eligibility, budget, approved, apis);
 }
 
 interface MetaRecord { key: "state"; rangeBytes: number; rangeEntries: number; nextSequence: number; activePair: AppReleasePairV1 | null; previousPair: AppReleasePairV1 | null }
@@ -258,11 +314,11 @@ function completed(transaction: IDBTransaction): Promise<void> { return new Prom
 class IndexedDbRangeStore implements RangeStore {
   readonly mode = "persistent" as const;
   readonly #pair: AppReleasePairV1; readonly #budget: StorageBudgetV1; readonly #idb: IDBFactory;
-  readonly #subtle: SubtleCrypto; readonly #now: () => number; #database: Promise<IDBDatabase> | null = null;
-  constructor(eligibility: PersistenceEligibilityV1, budget: StorageBudgetV1, apis: RangeStoreBrowserApis) {
+  readonly #subtle: SubtleCrypto; readonly #approved: ReadonlySet<string>; readonly #now: () => number; #database: Promise<IDBDatabase> | null = null;
+  constructor(eligibility: PersistenceEligibilityV1, budget: StorageBudgetV1, approved: ReadonlySet<string>, apis: RangeStoreBrowserApis) {
     this.#pair = assertPersistentEligibility(eligibility); this.#budget = validateStorageBudget(budget);
     if (!apis.indexedDB) throw new RangeStoreUnsupportedError("IndexedDB is unavailable.");
-    this.#idb = apis.indexedDB; this.#subtle = apis.subtle; this.#now = apis.now ?? Date.now;
+    this.#idb = apis.indexedDB; this.#subtle = apis.subtle; this.#approved = approved; this.#now = apis.now ?? Date.now;
   }
   #open(): Promise<IDBDatabase> {
     if (!this.#database) this.#database = new Promise((resolve, reject) => {
@@ -283,7 +339,7 @@ class IndexedDbRangeStore implements RangeStore {
   }
   async #meta(store: IDBObjectStore): Promise<MetaRecord> { return (await request(store.get("state")) as MetaRecord | undefined) ?? initialMeta(); }
   async readExactOrContaining(input: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
-    const identity = checkedCogIdentity(input, this.#pair);
+    const identity = checkedCatalogIdentity(input, this.#pair, this.#approved);
     const interval = requestedInterval(identity, requested); const database = await this.#open();
     const key = rangeKey(identity); const transaction = database.transaction(STORES.ranges, "readonly"); const done = completed(transaction);
     const record = await request(transaction.objectStore(STORES.ranges).get(key)) as StoredRange | undefined; await done;
@@ -312,7 +368,7 @@ class IndexedDbRangeStore implements RangeStore {
     return (await this.putVerifiedBatch([{ identity: input, bytes }]))[0]!;
   }
   async putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]> {
-    const admissions = await verifyAdmissions(writes, this.#pair, this.#subtle);
+    const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle);
     if (admissions.length === 0) return Object.freeze([]);
     const database = await this.#open(); const tx = database.transaction([STORES.meta, STORES.ranges, STORES.leases], "readwrite"); const done = completed(tx); let quota = false;
     try {

@@ -10,6 +10,7 @@ import {
   RangeStoreIntegrityError,
   RangeStoreQuotaError,
   RangeStoreUnsupportedError,
+  createRangeAuthorityCatalog,
   createRangeStore,
 } from "./range-store";
 
@@ -80,16 +81,20 @@ async function forgedVisualIdentity(input: {
     authorizedIntervalSha256: await hash(input.payload),
   };
 }
-function persistent(factory: IDBFactory, authority = app(), maximumBytes = 12, maximumEntries = 3, now = () => 1_000) {
-  return createRangeStore(authority, budget(maximumBytes, maximumEntries), { indexedDB: factory, subtle, now });
+function persistent(factory: IDBFactory, approved: readonly RangeIdentityV1[], authority = app(), maximumBytes = 12, maximumEntries = 3, now = () => 1_000) {
+  return createRangeStore(authority, budget(maximumBytes, maximumEntries), { indexedDB: factory, subtle, now }, {
+    catalog: createRangeAuthorityCatalog(approved),
+  });
 }
-function memory(authority = app(), maximumBytes = 12, maximumEntries = 3, now = () => 1_000) {
-  return createRangeStore(authority, budget(maximumBytes, maximumEntries), { subtle, now }, true);
+function memory(approved: readonly RangeIdentityV1[], authority = app(), maximumBytes = 12, maximumEntries = 3, now = () => 1_000) {
+  return createRangeStore(authority, budget(maximumBytes, maximumEntries), { subtle, now }, {
+    catalog: createRangeAuthorityCatalog(approved), localCandidate: true,
+  });
 }
-function storeFor(mode: "persistent" | "memory-only", factory: IDBFactory, maximumBytes = 12, maximumEntries = 3) {
+function storeFor(mode: "persistent" | "memory-only", factory: IDBFactory, approved: readonly RangeIdentityV1[], maximumBytes = 12, maximumEntries = 3) {
   return mode === "persistent"
-    ? persistent(factory, app(), maximumBytes, maximumEntries)
-    : memory(app(), maximumBytes, maximumEntries);
+    ? persistent(factory, approved, app(), maximumBytes, maximumEntries)
+    : memory(approved, app(), maximumBytes, maximumEntries);
 }
 async function rawRecords(factory: IDBFactory): Promise<Record<string, unknown>[]> {
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -108,7 +113,8 @@ describe("authoritative IndexedDB range store", () => {
   beforeEach(() => { factory = new IDBFactory(); });
 
   it("returns exact bytes or a copied slice from one containing authorized chunk", async () => {
-    const store = persistent(factory); const chunk = bytes(10, 20, 30, 40); const range = await identity({ payload: chunk });
+    const chunk = bytes(10, 20, 30, 40); const range = await identity({ payload: chunk });
+    const store = persistent(factory, [range]);
     await expect(store.putVerified(range, bytes(40, 30, 20, 10))).rejects.toBeInstanceOf(RangeStoreIntegrityError);
     await expect(store.putVerified(range, chunk)).resolves.toBe("stored");
     await expect(store.putVerified(range, chunk)).resolves.toBe("already-present");
@@ -118,13 +124,13 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("admits one release-authorized interval for every scenario and horizon combination", async () => {
-    const store = persistent(factory, app(), 36, 9);
     const values = CANONICAL_PROJECTIONS.map((_, index) => bytes(index + 1, index + 1, index + 1, index + 1));
     const ranges = await Promise.all(CANONICAL_PROJECTIONS.map((projection, index) => identity({
       projection,
       start: (index % 3) * 4,
       payload: values[index],
     })));
+    const store = persistent(factory, ranges, app(), 36, 9);
 
     await expect(store.putVerifiedBatch(ranges.map((range, index) => ({
       identity: range,
@@ -134,9 +140,10 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it.each(["persistent", "memory-only"] as const)("admits a verified multi-chunk batch atomically in %s mode", async (mode) => {
-    const store = storeFor(mode, factory); const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
+    const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
     const first = await identity({ payload: firstBytes });
     const second = await identity({ start: 4, payload: secondBytes });
+    const store = storeFor(mode, factory, [first, second]);
 
     await expect(store.putVerifiedBatch([
       { identity: first, bytes: firstBytes }, { identity: second, bytes: secondBytes },
@@ -146,11 +153,12 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it.each(["persistent", "memory-only"] as const)("rejects one invalid digest before mutating a %s batch", async (mode) => {
-    const store = storeFor(mode, factory); const retainedBytes = bytes(1, 1, 1, 1);
+    const retainedBytes = bytes(1, 1, 1, 1);
     const retained = await identity({ payload: retainedBytes });
-    await store.putVerified(retained, retainedBytes);
     const validBytes = bytes(2, 2, 2, 2); const valid = await identity({ projection: ["ssp1-26", "2030"], payload: validBytes });
     const expectedBytes = bytes(3, 3, 3, 3); const invalid = await identity({ projection: ["ssp5-85", "2100"], payload: expectedBytes });
+    const store = storeFor(mode, factory, [retained, valid, invalid]);
+    await store.putVerified(retained, retainedBytes);
 
     await expect(store.putVerifiedBatch([
       { identity: valid, bytes: validBytes }, { identity: invalid, bytes: bytes(9, 9, 9, 9) },
@@ -160,9 +168,10 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("aborts every staged write when IndexedDB fails in the middle of a batch", async () => {
-    const store = persistent(factory); const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
+    const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
     const first = await identity({ payload: firstBytes });
     const second = await identity({ start: 4, payload: secondBytes });
+    const store = persistent(factory, [first, second]);
     const originalPut = IDBObjectStore.prototype.put; let rangeWrites = 0;
     const put = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
       this: IDBObjectStore,
@@ -186,10 +195,13 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it.each(["persistent", "memory-only"] as const)("plans batch quota and deterministic LRU eviction before mutating %s storage", async (mode) => {
-    const store = storeFor(mode, factory, 12, 3);
     const values = [1, 2, 3, 4, 5].map((value) => bytes(value, value, value, value));
     const ranges = await Promise.all(values.map((payload, index) =>
       identity({ projection: CANONICAL_PROJECTIONS[index], payload })));
+    const sixBytes = bytes(6, 6, 6, 6); const sevenBytes = bytes(7, 7, 7, 7);
+    const six = await identity({ projection: CANONICAL_PROJECTIONS[6], payload: sixBytes });
+    const seven = await identity({ projection: CANONICAL_PROJECTIONS[7], payload: sevenBytes });
+    const store = storeFor(mode, factory, [...ranges, six, seven], 12, 3);
     await store.putVerifiedBatch(ranges.slice(0, 3).map((range, index) => ({ identity: range, bytes: values[index] })));
 
     await expect(store.putVerifiedBatch([
@@ -200,9 +212,6 @@ describe("authoritative IndexedDB range store", () => {
     ]);
 
     await store.setProtectedPairs(pair(), null);
-    const sixBytes = bytes(6, 6, 6, 6); const sevenBytes = bytes(7, 7, 7, 7);
-    const six = await identity({ projection: CANONICAL_PROJECTIONS[6], payload: sixBytes });
-    const seven = await identity({ projection: CANONICAL_PROJECTIONS[7], payload: sevenBytes });
     await expect(store.putVerifiedBatch([
       { identity: six, bytes: sixBytes }, { identity: seven, bytes: sevenBytes },
     ])).rejects.toBeInstanceOf(RangeStoreQuotaError);
@@ -212,20 +221,23 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("never assembles adjacent chunks and isolates every app/release/artifact authority", async () => {
-    const store = persistent(factory); const first = await identity({ payload: bytes(1, 2, 3, 4) });
+    const first = await identity({ payload: bytes(1, 2, 3, 4) });
     const second = await identity({ start: 4, payload: bytes(5, 6, 7, 8) });
+    const otherArtifact = await identity({ projection: ["ssp1-26", "2030"], payload: bytes(1, 2, 3, 4) });
+    const store = persistent(factory, [first, second, otherArtifact]);
     await store.putVerified(first, bytes(1, 2, 3, 4)); await store.putVerified(second, bytes(5, 6, 7, 8));
     await expect(store.readExactOrContaining(first, { start: 2, endExclusive: 6 })).rejects.toBeInstanceOf(RangeStoreIntegrityError);
     const otherRelease = await identity({ release: "release-b", payload: bytes(1, 2, 3, 4) });
     await expect(store.readExactOrContaining(otherRelease)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
     const otherBuild = await identity({ build: "build-b", payload: bytes(1, 2, 3, 4) });
     await expect(store.readExactOrContaining(otherBuild)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
-    const otherArtifact = await identity({ projection: ["ssp1-26", "2030"], payload: bytes(1, 2, 3, 4) });
     await expect(store.readExactOrContaining(otherArtifact)).resolves.toBeNull();
   });
 
   it.each(["persistent", "memory-only"] as const)("rejects visual and relabeled PMTiles with zero %s admission", async (mode) => {
-    const store = storeFor(mode, factory); const value = bytes(1, 2, 3, 4);
+    const value = bytes(1, 2, 3, 4);
+    const approved = await identity({ payload: bytes(4, 3, 2, 1) });
+    const store = storeFor(mode, factory, [approved]);
     const visual = await forgedVisualIdentity({ payload: value });
     const relabeled = await forgedVisualIdentity({ payload: value, relabelAsCog: true });
     await expect(store.putVerified(visual as RangeIdentityV1, value)).rejects.toBeInstanceOf(RangeStoreUnsupportedError);
@@ -236,8 +248,33 @@ describe("authoritative IndexedDB range store", () => {
     if (mode === "persistent") expect(await rawRecords(factory)).toEqual([]);
   });
 
+  it.each(["persistent", "memory-only"] as const)("fails closed when the trusted catalog is empty in %s mode", async (mode) => {
+    const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const store = storeFor(mode, factory, []);
+    await expect(store.putVerified(range, value)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.readExactOrContaining(range)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 0, entryCount: 0 });
+    if (mode === "persistent") expect(await rawRecords(factory)).toEqual([]);
+  });
+
+  it.each(["persistent", "memory-only"] as const)("rejects fully relabeled PMTiles bytes absent from the trusted %s catalog", async (mode) => {
+    const approvedBytes = bytes(1, 2, 3, 4); const pmtilesBytes = bytes(80, 77, 84, 105);
+    const approved = await identity({ payload: approvedBytes });
+    const fullyRelabeled = await identity({ payload: pmtilesBytes });
+    const catalog = createRangeAuthorityCatalog([approved]);
+    expect(Object.isFrozen(catalog)).toBe(true); expect(Object.isFrozen(catalog.identities)).toBe(true);
+    const store = mode === "persistent"
+      ? createRangeStore(app(), budget(), { indexedDB: factory, subtle }, { catalog })
+      : createRangeStore(app(), budget(), { subtle }, { catalog, localCandidate: true });
+    await expect(store.putVerified(fullyRelabeled, pmtilesBytes)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.readExactOrContaining(fullyRelabeled)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 0, entryCount: 0 });
+    if (mode === "persistent") expect(await rawRecords(factory)).toEqual([]);
+  });
+
   it("quarantines corrupt bytes and repairs accounting atomically", async () => {
-    const store = persistent(factory); const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const store = persistent(factory, [range]);
     await store.putVerified(range, value); const database = await new Promise<IDBDatabase>((resolve) => {
       const request = factory.open("searise-offline:v1", 1); request.onsuccess = () => resolve(request.result);
     });
@@ -249,11 +286,12 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("evicts deterministic unleased LRU and protects active and previous pairs", async () => {
-    const wide = persistent(factory); const one = await identity({ payload: bytes(1, 1, 1, 1) });
+    const one = await identity({ payload: bytes(1, 1, 1, 1) });
     const two = await identity({ payload: bytes(2, 2, 2, 2), projection: ["ssp1-26", "2030"] });
-    await wide.putVerified(one, bytes(1, 1, 1, 1)); await wide.putVerified(two, bytes(2, 2, 2, 2));
-    const tight = persistent(factory, app(), 8, 2); await tight.setProtectedPairs(pair("active-build", "active-release"), pair());
     const three = await identity({ payload: bytes(3, 3, 3, 3), projection: ["ssp5-85", "2100"] });
+    const wide = persistent(factory, [one, two, three]);
+    await wide.putVerified(one, bytes(1, 1, 1, 1)); await wide.putVerified(two, bytes(2, 2, 2, 2));
+    const tight = persistent(factory, [one, two, three], app(), 8, 2); await tight.setProtectedPairs(pair("active-build", "active-release"), pair());
     await expect(tight.putVerified(three, bytes(3, 3, 3, 3))).rejects.toBeInstanceOf(RangeStoreQuotaError);
     await tight.setProtectedPairs(null, null); await expect(tight.putVerified(three, bytes(3, 3, 3, 3))).resolves.toBe("stored");
     expect((await tight.inventory()).entries.map((entry) => entry.artifactId)).toEqual([
@@ -262,25 +300,28 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("prunes expired leases but preserves live leased pairs", async () => {
-    const firstStore = persistent(factory); const first = await identity({ payload: bytes(1, 1, 1, 1) });
+    const first = await identity({ payload: bytes(1, 1, 1, 1) });
+    const firstStore = persistent(factory, [first]);
     await firstStore.putVerified(first, bytes(1, 1, 1, 1));
     const lease = { contractVersion: 1, leaseId: "lease-a", pair: pair(), expiresAtEpochMs: 2_000, state: "active" } as const;
     await firstStore.acquireLease(lease);
     const secondApp = app("build-b", "release-b"); const second = await identity({ build: "build-b", release: "release-b", payload: bytes(2, 2, 2, 2) });
-    const beforeExpiry = persistent(factory, secondApp, 4, 1, () => 1_500);
+    const beforeExpiry = persistent(factory, [second], secondApp, 4, 1, () => 1_500);
     await expect(beforeExpiry.putVerified(second, bytes(2, 2, 2, 2))).rejects.toBeInstanceOf(RangeStoreQuotaError);
-    const afterExpiry = persistent(factory, secondApp, 4, 1, () => 2_001);
+    const afterExpiry = persistent(factory, [second], secondApp, 4, 1, () => 2_001);
     await expect(afterExpiry.putVerified(second, bytes(2, 2, 2, 2))).resolves.toBe("stored");
     expect((await afterExpiry.inventory()).entries[0].pair.dataReleaseId).toBe("release-b");
   });
 
   it("rolls back earlier eviction and counters when a quota transaction cannot fit", async () => {
-    const populate = persistent(factory, app(), 12, 3); const unprotected = await identity({ payload: bytes(1, 1, 1, 1) });
+    const unprotected = await identity({ payload: bytes(1, 1, 1, 1) });
     const protectedRange = await identity({ projection: ["ssp1-26", "2030"], payload: bytes(2, 2, 2, 2) });
+    const populate = persistent(factory, [unprotected, protectedRange], app(), 12, 3);
     await populate.putVerified(unprotected, bytes(1, 1, 1, 1)); await populate.putVerified(protectedRange, bytes(2, 2, 2, 2));
-    const nextApp = app("build-c", "release-c"); const nextStore = persistent(factory, nextApp, 4, 1);
-    await nextStore.setProtectedPairs(pair(), null);
+    const nextApp = app("build-c", "release-c");
     const oversized = await identity({ build: "build-c", release: "release-c", payload: bytes(3, 3, 3, 3), total: 8 });
+    const nextStore = persistent(factory, [oversized], nextApp, 4, 1);
+    await nextStore.setProtectedPairs(pair(), null);
     await expect(nextStore.putVerified(oversized, bytes(3, 3, 3, 3))).rejects.toBeInstanceOf(RangeStoreQuotaError);
     await expect(nextStore.inventory()).resolves.toMatchObject({ payloadBytes: 8, entryCount: 2 });
     expect((await nextStore.inventory()).entries.map((entry) => entry.artifactId)).toEqual([
@@ -289,19 +330,24 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("serializes concurrent admissions without exceeding byte or entry counters", async () => {
-    const left = persistent(factory, app(), 8, 2); const right = persistent(factory, app(), 8, 2);
     const projections = [["ssp1-26", "2030"], ["ssp2-45", "2050"], ["ssp5-85", "2100"]] as const;
     const ranges = await Promise.all([1, 2, 3].map((value, index) => identity({ projection: projections[index], payload: bytes(value, value, value, value) })));
+    const left = persistent(factory, ranges, app(), 8, 2); const right = persistent(factory, ranges, app(), 8, 2);
     await Promise.all(ranges.map((range, index) => (index % 2 ? right : left).putVerified(range, bytes(index + 1, index + 1, index + 1, index + 1))));
     await expect(left.inventory()).resolves.toMatchObject({ payloadBytes: 8, entryCount: 2 });
   });
 
   it("keeps private and local-candidate COG bytes in memory but rejects PMTiles without opening IndexedDB", async () => {
     const inaccessible = { open: () => { throw new Error("persistent API touched"); } } as unknown as IDBFactory;
-    const privateStore = createRangeStore(app("build-p", "release-p", "private-engineering"), budget(), { indexedDB: inaccessible, subtle });
-    const localStore = createRangeStore(app(), budget(), { indexedDB: inaccessible, subtle }, true);
-    expect(privateStore.mode).toBe("memory-only"); expect(localStore.mode).toBe("memory-only");
     const value = bytes(4, 3, 2, 1); const cog = await identity({ payload: value });
+    const privateCog = await identity({ build: "build-p", release: "release-p", payload: value });
+    const privateStore = createRangeStore(app("build-p", "release-p", "private-engineering"), budget(), { indexedDB: inaccessible, subtle }, {
+      catalog: createRangeAuthorityCatalog([privateCog]),
+    });
+    const localStore = createRangeStore(app(), budget(), { indexedDB: inaccessible, subtle }, {
+      catalog: createRangeAuthorityCatalog([cog]), localCandidate: true,
+    });
+    expect(privateStore.mode).toBe("memory-only"); expect(localStore.mode).toBe("memory-only");
     await expect(localStore.putVerified(cog, value)).resolves.toBe("stored");
     expect([...new Uint8Array((await localStore.readExactOrContaining(cog))!)]).toEqual([4, 3, 2, 1]);
     const visual = await forgedVisualIdentity({ payload: value });
@@ -314,7 +360,8 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("persists only the privacy allowlist and never a full URL", async () => {
-    const store = persistent(factory); const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const store = persistent(factory, [range]);
     await store.putVerified(range, value); const serialized = JSON.stringify(await rawRecords(factory));
     expect(serialized).not.toContain("https://"); expect(serialized).not.toContain("canonicalUrl");
     expect(serialized).not.toMatch(/query|latitude|longitude|placeLabel|clientId/i);
