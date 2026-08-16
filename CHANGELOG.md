@@ -57,6 +57,12 @@ All notable changes to this project will be documented in this file.
   preserves keyboard, text-alternative, attribution, range-request, and initial
   bundle gates.
 
+- Added a release-scoped static GeoNames search Worker with deterministic
+  normalization and ranking, core-first partial readiness, exact transport-byte
+  verification, pinned lazy Brotli decoding, private in-memory queries, and an
+  accessible keyboard combobox. Search failures remain technical errors and do
+  not expand the four scientific outcomes.
+
 - Added the browser's pinned-manifest anti-corruption layer: generated
   schema-derived TypeScript contracts, an immutable release context, exact
   nine-combination and artifact-reference validation, origin-safe URLs,
