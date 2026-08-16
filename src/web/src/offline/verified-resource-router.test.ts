@@ -212,7 +212,9 @@ async function harness(options: Readonly<{
     const artifact = fixtureManifestArtifact(path);
     const headers = new Headers({
       "accept-ranges": "bytes",
-      "cache-control": "no-store",
+      "cache-control": options.localCandidate
+        ? "private, no-store"
+        : "public, max-age=31536000, immutable",
       "content-type": artifact.mediaType,
       etag: `"sha256-${artifact.sha256}"`,
     });
@@ -427,12 +429,12 @@ describe("verified resource router", () => {
   it.each([
     ["HEAD MIME", "HEAD", "content-type"],
     ["HEAD ETag", "HEAD", "etag"],
-    ["HEAD no-store", "HEAD", "cache-control"],
+    ["HEAD cache authority", "HEAD", "cache-control"],
     ["206 Content-Range", "GET", "content-range"],
     ["206 length", "GET", "content-length"],
     ["206 MIME", "GET", "content-type"],
     ["206 ETag", "GET", "etag"],
-    ["206 no-store", "GET", "cache-control"],
+    ["206 cache authority", "GET", "cache-control"],
   ] as const)("fails technically when strict range delivery loses %s", async (_name, method, header) => {
     const test = await harness({
       mutateRangeResponse: async (response, init) => {

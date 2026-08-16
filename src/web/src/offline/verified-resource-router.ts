@@ -47,10 +47,6 @@ function abortIfNeeded(signal: AbortSignal): void {
   if (signal.aborted) throw technical("Aborted", "Verified resource admission was cancelled.", true);
 }
 
-function exactNoStore(value: string | null): boolean {
-  return value?.split(",").map((part) => part.trim().toLowerCase()).includes("no-store") === true;
-}
-
 function sameRangeIdentity(left: RangeIdentityV1, right: RangeIdentityV1): boolean {
   return left.authority.artifactId === right.authority.artifactId &&
     left.authority.canonicalUrl === right.authority.canonicalUrl &&
@@ -84,6 +80,7 @@ export class VerifiedResourceRouter {
   readonly #receiptStore: AdmissionReceiptStore;
   readonly #subtle: SubtleCrypto;
   readonly #fetchRange: typeof fetch;
+  readonly #cogResponseCacheControl: string;
   readonly #whole: readonly WholeResourceAuthorityV1[];
   readonly #assessmentSupport: readonly WholeResourceAuthorityV1[];
   readonly #ranges: readonly RangeIdentityV1[];
@@ -102,6 +99,9 @@ export class VerifiedResourceRouter {
     this.#receiptStore = options.receiptStore;
     this.#subtle = options.subtle;
     this.#fetchRange = options.fetchRange;
+    this.#cogResponseCacheControl = this.#releasePlan.persistence.mode === "memory-only"
+      ? "private, no-store"
+      : "public, max-age=31536000, immutable";
     const expectedMode = this.#releasePlan.persistence.mode;
     if (
       this.#wholeStore.mode !== expectedMode ||
@@ -297,7 +297,7 @@ export class VerifiedResourceRouter {
         head.headers.get("content-length") !== String(authority.totalByteSize) ||
         head.headers.get("content-type") !== authority.mediaType ||
         head.headers.get("etag") !== authority.etag ||
-        !exactNoStore(head.headers.get("cache-control"))
+        head.headers.get("cache-control") !== this.#cogResponseCacheControl
       ) {
         throw technical("RangeUnsupported", `COG HEAD identity for ${authority.artifactId} is inexact.`, true);
       }
@@ -336,7 +336,7 @@ export class VerifiedResourceRouter {
           response.headers.get("content-range") !== `bytes ${start}-${end}/${authority.totalByteSize}` ||
           response.headers.get("content-type") !== authority.mediaType ||
           response.headers.get("etag") !== authority.etag ||
-          !exactNoStore(response.headers.get("cache-control"))
+          response.headers.get("cache-control") !== this.#cogResponseCacheControl
         ) {
           throw technical("RangeUnsupported", `COG range identity for ${authority.artifactId} is inexact.`, true);
         }
