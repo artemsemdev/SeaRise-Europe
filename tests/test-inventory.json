@@ -9,6 +9,12 @@
       "reference": "src/web/src/application/assessment-controller.test.ts",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 17 deterministic controller cases over the committed synthetic release context"
     },
+    "local-2026-08-16-static-projection-panel": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T08:44:07+02:00",
+      "reference": "src/web/src/components/ProjectionPanel.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; 27 deterministic presentational cases over immutable in-memory projection tuples; no network, Candidate-v7, clock, worker, or local-only input"
+    },
     "local-2026-08-16-static-release-domain": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T01:20:00+02:00",
@@ -227,6 +233,20 @@
     }
   },
   "suites": [
+    {
+      "id": "static-projection-panel",
+      "layer": "component",
+      "owner": "frontend",
+      "purpose": "Keep all eleven projection phases, exactly four ADR-024 outcomes, verified release metadata and disposition, technical failure taxonomy, semantic three-by-three controls, updating old/new separation, source attribution, map text equivalents, limitations, and required exclusions accessible and fail closed.",
+      "sourcePaths": ["src/web/src/components/ProjectionPanel.tsx", "src/web/src/components/ProjectionPanel.css", "src/web/src/components/ProjectionPanel.test.tsx"],
+      "changedPaths": ["src/web/src/components/ProjectionPanel.tsx", "src/web/src/components/ProjectionPanel.css", "src/web/src/components/ProjectionPanel.test.tsx"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent accessible static projection-state and outcome presentation contract." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/components/ProjectionPanel.test.tsx", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-16-static-projection-panel", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-seven deterministic Testing Library cases use immutable in-memory selections, results, methodology, and callbacks; no timing, network, browser worker, Candidate-v7, or external service is involved." }
+    },
     {
       "id": "static-assessment-controller",
       "layer": "unit",
@@ -1198,6 +1218,7 @@
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/assessment-controller.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/ProjectionPanel.test.tsx", "suite": "static-projection-panel", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/render-token.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/SettlementSearch.test.tsx", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
