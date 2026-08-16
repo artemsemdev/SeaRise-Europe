@@ -1205,6 +1205,7 @@
     { "path": "src/web/src/data/map-layer-resolver.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/browser-overlay-evidence.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/manifest-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/data/methodology-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/projection-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/release.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },

@@ -136,6 +136,9 @@ writeOverlay("sbom/browser-integrity.cdx.json", sbomBytes);
 const attribution = JSON.parse(
   readFileSync(resolve(payloadRoot, "config/source-attribution.json"), "utf8"),
 );
+attribution.$schema =
+  "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/attribution.schema.json";
+attribution.schemaVersion = "2.0.0";
 const ipcc = attribution.records.find(
   (record) => record.attributionId === "ipcc-ar6-sl-projections-20210809",
 );
@@ -163,6 +166,8 @@ attribution.records.push({
 });
 const attributionBytes = compactJson(attribution);
 writeOverlay("config/source-attribution.json", attributionBytes);
+const methodologyBytes = readFileSync(resolve(payloadRoot, "config/methodology.json"));
+writeOverlay("config/methodology.json", methodologyBytes);
 
 const identity = (path, bytes) => ({ path, sha256: sha256(bytes) });
 const repositoryBytes = (path) => readFileSync(resolve(repositoryRoot, path));
@@ -200,6 +205,10 @@ const derivationMaterials = [
     v1ProvenanceBytes,
   ),
   identity(
+    `contracts/release/v1/fixtures/release/${RELEASE_ID}/config/methodology.json`,
+    methodologyBytes,
+  ),
+  identity(
     "src/web/scripts/generate-scientific-fixture-contracts.mjs",
     repositoryBytes("src/web/scripts/generate-scientific-fixture-contracts.mjs"),
   ),
@@ -207,6 +216,7 @@ const derivationMaterials = [
 ].sort((left, right) => left.path.localeCompare(right.path));
 const derivedOutputs = [
   identity("sbom/browser-integrity.cdx.json", sbomBytes),
+  identity("config/methodology.json", methodologyBytes),
   identity("config/source-attribution.json", attributionBytes),
 ].sort((left, right) => left.path.localeCompare(right.path));
 const derivationReceipt = {
@@ -414,8 +424,12 @@ const replaceArtifact = (artifactId, bytes) => {
 replaceArtifact("attribution", attributionBytes);
 manifest.artifacts.find((artifact) => artifact.artifactId === "attribution").lineage =
   derivationLineage;
+replaceArtifact("methodology", methodologyBytes);
+manifest.artifacts.find((artifact) => artifact.artifactId === "methodology").lineage =
+  derivationLineage;
 
 const replacements = new Map([
+  ["config/methodology.json", methodologyBytes],
   ["config/source-attribution.json", attributionBytes],
   ...cogArtifacts
     .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
