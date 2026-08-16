@@ -29,14 +29,16 @@ describe("static application shell", () => {
     expect(screen.getByRole("link", { name: /skip to content/i })).toHaveAttribute("href", "#main");
   });
 
-  it("keeps shell search text local and labels unfinished behavior", async () => {
+  it("keeps settlement query text local", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.type(screen.getByRole("textbox", { name: /find a city/i }), "Porto");
-    await user.click(screen.getByRole("button", { name: /explore/i }));
+    const input = await screen.findByRole("combobox", { name: /find a city/i });
+    await user.type(input, "Porto");
 
-    expect(screen.getByRole("status")).toHaveTextContent(/stayed in this browser/i);
+    expect(screen.getByText(/your text stays in this browser/i)).toBeVisible();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(vi.mocked(fetch).mock.calls)).not.toContain("Porto");
   });
 
   it("loads the architecture route as a separate lazy surface", async () => {
