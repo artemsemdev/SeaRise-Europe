@@ -7,6 +7,7 @@ import {
 } from "react";
 import { technicalErrorFrom } from "../data/manifest-repository";
 import type { ReleaseMethodology } from "../data/methodology-repository";
+import type { ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import type { ProjectionState } from "../domain/projection-state";
 import type { ReleaseContext, Selection, TechnicalError } from "../domain/release";
@@ -38,6 +39,7 @@ export interface AssessmentRuntimeView {
   readonly reset: () => void;
   readonly handleSearchLifecycle: (event: SearchLifecycleEvent) => void;
   readonly cancelSearch: () => void;
+  readonly searchArtifactTransport?: ArtifactTransport;
 }
 
 interface MethodologyRecord {
@@ -88,18 +90,27 @@ export function useAssessmentRuntime(
       return;
     }
 
-    const next = factory(context);
-    if (next.context !== context) {
-      next.controller.dispose();
-      throw new Error("The runtime factory returned a different ReleaseContext.");
-    }
     const controller = new AbortController();
     let current = true;
+    let next: BrowserRuntimeScope | null = null;
     // Runtime construction and publication deliberately happen after commit.
-    setRuntime(next);
-    void next.methodology.load(context, controller.signal).then(
+    void Promise.resolve().then(() => factory(context, controller.signal)).then((created) => {
+      if (created.context !== context) {
+        created.dispose?.();
+        if (!created.dispose) created.controller.dispose();
+        throw new Error("The runtime factory returned a different ReleaseContext.");
+      }
+      if (!current || controller.signal.aborted) {
+        created.dispose?.();
+        if (!created.dispose) created.controller.dispose();
+        return null;
+      }
+      next = created;
+      setRuntime(created);
+      return created.methodology.load(context, controller.signal);
+    }).then(
       (methodology) => {
-        if (!current || controller.signal.aborted) return;
+        if (!methodology || !current || controller.signal.aborted) return;
         const identityError = methodologyIdentityError(context, methodology);
         setMethodologyRecord({
           context,
@@ -132,7 +143,8 @@ export function useAssessmentRuntime(
     return () => {
       current = false;
       controller.abort("release context replaced or component unmounted");
-      next.controller.dispose();
+      next?.dispose?.();
+      if (next && !next.dispose) next.controller.dispose();
     };
   }, [context, factory]);
 
@@ -169,5 +181,14 @@ export function useAssessmentRuntime(
     active.controller.cancelSearch();
   }, [active]);
 
-  return { projection, methodology, select, retry, reset, handleSearchLifecycle, cancelSearch };
+  return {
+    projection,
+    methodology,
+    select,
+    retry,
+    reset,
+    handleSearchLifecycle,
+    cancelSearch,
+    searchArtifactTransport: active?.searchArtifactTransport,
+  };
 }

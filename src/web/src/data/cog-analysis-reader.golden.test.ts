@@ -22,6 +22,8 @@ import {
   responseBody,
 } from "../test/release-fixture";
 
+const COG_MEDIA_TYPE = "image/tiff; application=geotiff; profile=cloud-optimized";
+
 interface GoldenProjection {
   readonly scenario: "ssp1-26" | "ssp2-45" | "ssp5-85";
   readonly horizon: 2030 | 2050 | 2100;
@@ -255,7 +257,8 @@ function clonedRangeFetch(
     }
     if (init?.method === "HEAD") {
       return new Response(null, { status: 200, headers: {
-        "accept-ranges": "bytes", "content-length": String(bytes.byteLength), etag: etag(bytes),
+        "accept-ranges": "bytes", "cache-control": "no-store",
+        "content-length": String(bytes.byteLength), "content-type": COG_MEDIA_TYPE, etag: etag(bytes),
       } });
     }
     const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
@@ -266,8 +269,10 @@ function clonedRangeFetch(
     const body = bytes.slice(start, end + 1);
     return new Response(responseBody(body), { status: 206, headers: {
       "accept-ranges": "bytes",
+      "cache-control": "no-store",
       "content-length": String(body.byteLength),
       "content-range": `bytes ${start}-${end}/${bytes.byteLength}`,
+      "content-type": COG_MEDIA_TYPE,
       etag: etag(bytes),
     } });
   };
@@ -294,7 +299,9 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
         status: 200,
         headers: {
           "accept-ranges": "bytes",
+          "cache-control": "no-store",
           "content-length": String(bytes.byteLength),
+          "content-type": COG_MEDIA_TYPE,
           etag: etag(bytes),
         },
       });
@@ -314,9 +321,10 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
       status: 206,
       headers: {
         "accept-ranges": "bytes",
+        "cache-control": "no-store",
         "content-length": String(body.byteLength),
         "content-range": `bytes ${start}-${end}/${bytes.byteLength}`,
-        "content-type": "image/tiff",
+        "content-type": COG_MEDIA_TYPE,
         etag: etag(bytes),
       },
     });
@@ -529,7 +537,8 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
       }
       if (init?.method === "HEAD") {
         return new Response(null, { status: 200, headers: {
-          "accept-ranges": "bytes", "content-length": String(bytes.length), etag: etag(bytes),
+          "accept-ranges": "bytes", "cache-control": "no-store",
+          "content-length": String(bytes.length), "content-type": COG_MEDIA_TYPE, etag: etag(bytes),
         } });
       }
       const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
@@ -541,8 +550,10 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
         status: 206,
         headers: {
           "accept-ranges": "bytes",
+          "cache-control": "no-store",
           "content-length": String(body.length),
           "content-range": `bytes ${start}-${end}/${bytes.length}`,
+          "content-type": COG_MEDIA_TYPE,
           etag: etag(bytes),
         },
       });
@@ -879,8 +890,10 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
         status: 206,
         headers: {
           "accept-ranges": "bytes",
+          "cache-control": "no-store",
           "content-length": String(body.length),
           "content-range": `bytes ${start}-${end}/${bytes.length}`,
+          "content-type": COG_MEDIA_TYPE,
           etag: etag(fixtureBytes(fixtureArtifactPath(url))),
         },
       });

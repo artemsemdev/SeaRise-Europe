@@ -10,6 +10,14 @@ const projection = {
   byteSize: 624674,
   sha256: SHA,
 };
+const coreSearchIndex = {
+  artifactId: "settlements-europe-core",
+  role: "settlement-search-index",
+  path: "search/europe-core.codepoint-trie.json.br",
+  mediaType: "application/vnd.searise.search-index+json",
+  byteSize: 2118,
+  sha256: SHA,
+};
 
 describe("portable release HTTP delivery policy", () => {
   it("overrides generic immutable publication metadata for exact visual PMTiles", () => {
@@ -36,6 +44,35 @@ describe("portable release HTTP delivery policy", () => {
       cacheControl: "public, max-age=31536000, immutable",
       networkOnly: false,
     });
+  });
+
+  it.each([
+    coreSearchIndex,
+    {
+      ...coreSearchIndex,
+      artifactId: "settlements-europe-coastal",
+      path: "search/europe-coastal.codepoint-trie.json.br",
+      byteSize: 2025,
+    },
+  ])("serves exact manifest-bound search artifact identity with its contract MIME", (artifact) => {
+    expect(releaseDeliveryPolicy(artifact.path, artifact, artifact.byteSize)).toEqual({
+      cacheControl: "public, max-age=31536000, immutable",
+      contentType: "application/vnd.searise.search-index+json",
+      etag: `"sha256-${SHA}"`,
+      networkOnly: false,
+    });
+  });
+
+  it.each([
+    [{ ...coreSearchIndex, artifactId: "settlements-europe-coastal" }, coreSearchIndex.path],
+    [{ ...coreSearchIndex, role: "source-receipt" }, coreSearchIndex.path],
+    [{ ...coreSearchIndex, mediaType: "application/octet-stream" }, coreSearchIndex.path],
+    [{ ...coreSearchIndex, path: "search/copied.codepoint-trie.json.br" }, "search/copied.codepoint-trie.json.br"],
+    [undefined, coreSearchIndex.path],
+  ])("fails closed before assigning search MIME to a non-authoritative Brotli identity %#", (artifact, path) => {
+    expect(() => releaseDeliveryPolicy(path, artifact, artifact?.byteSize)).toThrow(
+      /exact manifest artifact role, identity, media type, and path/,
+    );
   });
 
   it.each([

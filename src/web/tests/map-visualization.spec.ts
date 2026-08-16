@@ -105,6 +105,15 @@ test("all nine release selections resolve without mixing visual artifact identit
       (await (await caches.open(name)).keys()).map((request) => request.url)))).flat();
     const structuralTokens: string[] = [];
     let binaryValueCount = 0;
+    const binaryRecords: Array<{
+      database: string;
+      store: string;
+      artifactId: unknown;
+      path: unknown;
+      role: unknown;
+      mediaType: unknown;
+      binaryValueCount: number;
+    }> = [];
     const inspect = (value: unknown, seen = new WeakSet<object>()): void => {
       if (typeof value === "string") {
         structuralTokens.push(value);
@@ -152,7 +161,25 @@ test("all nine release selections resolve without mixing visual artifact identit
           }),
         ]);
         for (const key of keys) inspect(key);
-        for (const value of values) inspect(value);
+        for (const value of values) {
+          const before = binaryValueCount;
+          inspect(value);
+          const recordBinaryValueCount = binaryValueCount - before;
+          if (recordBinaryValueCount > 0) {
+            const record = typeof value === "object" && value !== null
+              ? value as Record<string, unknown>
+              : {};
+            binaryRecords.push({
+              database: database.name,
+              store: storeName,
+              artifactId: record.artifactId,
+              path: record.path,
+              role: record.role,
+              mediaType: record.mediaType,
+              binaryValueCount: recordBinaryValueCount,
+            });
+          }
+        }
       }
       opened.close();
     }
@@ -160,6 +187,7 @@ test("all nine release selections resolve without mixing visual artifact identit
       cacheUrls,
       structuralTokens,
       binaryValueCount,
+      binaryRecords,
       webStorageEntries: [localStorage, sessionStorage].flatMap((storage) =>
         Array.from({ length: storage.length }, (_, index) => {
           const key = storage.key(index) ?? "";
@@ -180,7 +208,26 @@ test("all nine release selections resolve without mixing visual artifact identit
       expect(persistentAuthority).not.toContain(`projection-${scenario}-${horizon}-pmtiles`);
     }
   }
-  expect(persistence.binaryValueCount).toBe(0);
+  expect(persistence.binaryValueCount).toBeGreaterThan(0);
+  expect(persistence.binaryRecords.reduce(
+    (count, record) => count + record.binaryValueCount,
+    0,
+  )).toBe(persistence.binaryValueCount);
+  for (const record of persistence.binaryRecords) {
+    expect(record.database).toBe("searise-offline:v1");
+    expect(record.store).toBe("ranges");
+    const artifactMatch = /^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-cog$/.exec(
+      String(record.artifactId),
+    );
+    const pathMatch = /^analysis\/(ssp1-26|ssp2-45|ssp5-85)\/(2030|2050|2100)\.tif$/.exec(
+      String(record.path),
+    );
+    expect(artifactMatch).not.toBeNull();
+    expect(pathMatch).not.toBeNull();
+    expect(pathMatch?.slice(1)).toEqual(artifactMatch?.slice(1));
+    expect(record.role).toBe("projection-analysis-cog");
+    expect(record.mediaType).toBe("image/tiff; application=geotiff; profile=cloud-optimized");
+  }
 });
 
 test("basemap failure preserves release overlay, attribution, text, and coordinate selection", async ({ page }) => {

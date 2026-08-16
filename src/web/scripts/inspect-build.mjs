@@ -11,7 +11,10 @@ import {
   buildIdentityFile,
   validateBuildIdentity,
 } from "./build-identity.mjs";
-import { extractEmbeddedPrecachePayload } from "./service-worker-precache.mjs";
+import {
+  extractEmbeddedPrecachePayload,
+  rangeIntegrityBootstrapPath,
+} from "./service-worker-precache.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
@@ -138,6 +141,7 @@ const expectedPrecachePaths = [
   `/${applicationBuildIdentityFile}`,
   ...[...expectedPrecacheFiles].map((path) => `/${path}`),
   `/releases/${releaseId}/manifest.json`,
+  rangeIntegrityBootstrapPath(releaseId),
 ].sort();
 const precacheMediaTypes = Object.freeze({
   ".css": "text/css",
@@ -173,7 +177,8 @@ if (
   JSON.stringify(embedded.entries) !== JSON.stringify(expectedPrecacheEntries) ||
   embedded.precacheSetSha256 !== expectedPrecacheHash ||
   embedded.entries.some(({ path }) => path.startsWith("/about/") ||
-    (path.startsWith("/releases/") && path !== buildIdentity.manifestPath))
+    (path.startsWith("/releases/") && path !== buildIdentity.manifestPath &&
+      path !== rangeIntegrityBootstrapPath(releaseId)))
 ) throw new Error("Service worker embedded precache differs from the independent shell inventory");
 assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
 validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });

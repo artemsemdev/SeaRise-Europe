@@ -83,7 +83,29 @@ async function releasePlan(localCandidate: boolean): Promise<VerifiedReleaseReso
 }
 
 async function plan(localCandidate = true) {
-  return createAdmissionPlanIdentity({ releasePlan: await releasePlan(localCandidate), subtle });
+  const exact = await releasePlan(localCandidate);
+  return createAdmissionPlanIdentity({
+    releasePlan: exact,
+    wholeResources: exact.routes
+      .filter((route) => route.kind === "complete-resource")
+      .map((route) => route.authority),
+    rangeResources: exact.routes
+      .filter((route) => route.kind === "analysis-cog-ranges")
+      .flatMap((route) => route.ranges),
+    subtle,
+  });
+}
+
+async function subjectPlan(
+  wholeResources: readonly WholeResourceAuthorityV1[],
+  rangeResources: readonly RangeIdentityV1[] = [],
+) {
+  return createAdmissionPlanIdentity({
+    releasePlan: await releasePlan(true),
+    wholeResources,
+    rangeResources,
+    subtle,
+  });
 }
 
 async function resources(localCandidate = true) {
@@ -175,7 +197,6 @@ async function admit(
   options: Readonly<{
     wholeResources?: readonly WholeResourceAuthorityV1[];
     rangeWrites?: readonly Readonly<{ identity: RangeIdentityV1; bytes: ArrayBuffer }>[];
-    expectedPreviousReceiptSha256?: string | null;
     signal?: AbortSignal;
   }> = {},
 ) {
@@ -183,7 +204,6 @@ async function admit(
   const stores = admissionStores(identity.storageProfile);
   return coordinateVerifiedAdmission({
     plan: identity,
-    expectedPreviousReceiptSha256: options.expectedPreviousReceiptSha256 ?? null,
     wholeResources: options.wholeResources ?? exactResources.wholeResources,
     rangeWrites: options.rangeWrites ?? exactResources.rangeWrites,
     ...stores,
@@ -207,7 +227,10 @@ describe("verified coordinated-admission receipt v1", () => {
   it("rejects copied release plans and partial routed admission sets", async () => {
     const exactReleasePlan = await releasePlan(true);
     await expect(createAdmissionPlanIdentity({
-      releasePlan: { ...exactReleasePlan }, subtle,
+      releasePlan: { ...exactReleasePlan },
+      wholeResources: [],
+      rangeResources: [],
+      subtle,
     })).rejects.toMatchObject({ code: "AuthorityRejected" });
     const identity = await plan();
     const exactResources = await resources(true);
@@ -221,13 +244,64 @@ describe("verified coordinated-admission receipt v1", () => {
     })).rejects.toMatchObject({ code: "AuthorityRejected" });
     await expect(coordinateVerifiedAdmission({
       plan: { ...identity },
-      expectedPreviousReceiptSha256: null,
       ...exactResources,
       ...admissionStores(identity.storageProfile),
       receiptStore: store,
       subtle,
       signal: new AbortController().signal,
     })).rejects.toMatchObject({ code: "AuthorityRejected" });
+  });
+
+  it("rejects a forged subject even when it copies an otherwise canonical release authority", async () => {
+    const exactResources = await resources(true);
+    const forged = Object.freeze({
+      ...exactResources.wholeResources[0],
+      sha256: "b".repeat(64),
+      etag: `"sha256-${"b".repeat(64)}"`,
+    }) as WholeResourceAuthorityV1;
+    await expect(subjectPlan([forged])).rejects.toMatchObject({ code: "AuthorityRejected" });
+  });
+
+  it("keeps two valid subject receipts coexisting and rejects cross-subject gate confusion", async () => {
+    const exactResources = await resources(true);
+    const firstResource = exactResources.wholeResources[0]!;
+    const secondResource = exactResources.wholeResources[1]!;
+    const firstPlan = await subjectPlan([firstResource]);
+    const secondPlan = await subjectPlan([secondResource]);
+    expect(firstPlan.releaseRoutesSha256).toBe(secondPlan.releaseRoutesSha256);
+    expect(firstPlan.resourcePlanSha256).not.toBe(secondPlan.resourcePlanSha256);
+    const store = createAdmissionReceiptStore(app(), subtle, {
+      localCandidate: true,
+      nextOperationId: (() => { let value = 0; return () => `subject-${++value}`; })(),
+    });
+    const first = await coordinateVerifiedAdmission({
+      plan: firstPlan,
+      wholeResources: [firstResource],
+      rangeWrites: [],
+      ...admissionStores(firstPlan.storageProfile),
+      receiptStore: store,
+      subtle,
+      signal: new AbortController().signal,
+    });
+    const second = await coordinateVerifiedAdmission({
+      plan: secondPlan,
+      wholeResources: [secondResource],
+      rangeWrites: [],
+      ...admissionStores(secondPlan.storageProfile),
+      receiptStore: store,
+      subtle,
+      signal: new AbortController().signal,
+    });
+    await expect(store.accepted(firstPlan)).resolves.toMatchObject({
+      receiptSha256: first.gate.receiptSha256,
+    });
+    await expect(store.accepted(secondPlan)).resolves.toMatchObject({
+      receiptSha256: second.gate.receiptSha256,
+    });
+    await expect(assertAcceptedWholeResource(first.gate, secondResource, subtle))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(assertAcceptedWholeResource(second.gate, firstResource, subtle))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
   });
 
   it("publishes a memory-only receipt last and issues non-forgeable exact read gates", async () => {
@@ -251,7 +325,7 @@ describe("verified coordinated-admission receipt v1", () => {
     }, new AbortController().signal)).rejects.toMatchObject({ code: "AuthorityRejected" });
   });
 
-  it("preserves the prior accepted receipt across cancellation and compare-and-swap conflict", async () => {
+  it("preserves the prior accepted receipt across cancellation and repeated admission", async () => {
     const firstPlan = await plan();
     const store = createAdmissionReceiptStore(app(), subtle, { localCandidate: true, nextOperationId: () => "preserve" });
     const first = await admit(firstPlan, store);
@@ -262,10 +336,8 @@ describe("verified coordinated-admission receipt v1", () => {
     })).rejects.toMatchObject({
       code: "Aborted",
     });
-    await expect(admit(firstPlan, store, {
-      expectedPreviousReceiptSha256: "f".repeat(64),
-    })).rejects.toMatchObject({
-      code: "Conflict",
+    await expect(admit(firstPlan, store)).resolves.toMatchObject({
+      gate: { receiptSha256: first.gate.receiptSha256 },
     });
     await expect(store.accepted(firstPlan)).resolves.toMatchObject({ receiptSha256: first.gate.receiptSha256 });
   });
@@ -347,7 +419,6 @@ describe("verified coordinated-admission receipt v1", () => {
     });
     await expect(coordinateVerifiedAdmission({
       plan: identity,
-      expectedPreviousReceiptSha256: null,
       ...exactResources,
       ...stores,
       receiptStore: persistentReceipt,
@@ -399,7 +470,6 @@ describe("verified coordinated-admission receipt v1", () => {
     } satisfies typeof receipts;
     await coordinateVerifiedAdmission({
       plan: identity,
-      expectedPreviousReceiptSha256: null,
       ...exactResources,
       ...stores,
       receiptStore: loggedReceipts,
@@ -422,7 +492,6 @@ describe("verified coordinated-admission receipt v1", () => {
     const receipts = createAdmissionReceiptStore(app(), subtle, { localCandidate: true, nextOperationId: () => "failed" });
     await expect(coordinateVerifiedAdmission({
       plan: identity,
-      expectedPreviousReceiptSha256: null,
       ...exactResources,
       ...stores,
       receiptStore: receipts,
@@ -441,7 +510,6 @@ describe("verified coordinated-admission receipt v1", () => {
     const receipts = createAdmissionReceiptStore(app(), subtle, { localCandidate: true, nextOperationId: () => "readback" });
     await expect(coordinateVerifiedAdmission({
       plan: identity,
-      expectedPreviousReceiptSha256: null,
       ...exactResources,
       ...stores,
       receiptStore: receipts,
@@ -463,7 +531,6 @@ describe("verified coordinated-admission receipt v1", () => {
     const receipts = createAdmissionReceiptStore(app(), subtle, { localCandidate: true, nextOperationId: () => "cancelled" });
     await expect(coordinateVerifiedAdmission({
       plan: identity,
-      expectedPreviousReceiptSha256: null,
       ...exactResources,
       ...stores,
       receiptStore: receipts,
@@ -474,7 +541,7 @@ describe("verified coordinated-admission receipt v1", () => {
     await expect(receipts.accepted(identity)).resolves.toBeNull();
   });
 
-  it("serializes two persistent instances through receipt publication so a losing CAS cannot delete winner bytes", async () => {
+  it("serializes two persistent instances and retains the first operation's accepted bytes", async () => {
     const identity = await plan(false);
     const exactResources = await resources(false);
     const factory = new IDBFactory();
@@ -532,7 +599,6 @@ describe("verified coordinated-admission receipt v1", () => {
     const admission = (receiptStore: ReturnType<typeof createAdmissionReceiptStore>, store: WholeResourceStore) =>
       coordinateVerifiedAdmission({
         plan: identity,
-        expectedPreviousReceiptSha256: null,
         ...exactResources,
         wholeStore: store,
         rangeStore: receiptStore === firstReceipt ? firstStores.rangeStore : secondStores.rangeStore,
@@ -547,8 +613,7 @@ describe("verified coordinated-admission receipt v1", () => {
     ]);
 
     expect(winner.status).toBe("fulfilled");
-    expect(loser.status).toBe("rejected");
-    if (loser.status === "rejected") expect(loser.reason).toMatchObject({ code: "Conflict" });
+    expect(loser.status).toBe("fulfilled");
     expect(operations).toEqual(["winner-operation", "loser-operation"]);
     expect(owners.size).toBe(exactResources.wholeResources.length);
     expect(new Set(owners.values())).toEqual(new Set(["winner-operation"]));

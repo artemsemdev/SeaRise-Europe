@@ -10,6 +10,11 @@ export interface ReleaseDeliveryArtifact {
 export const RELEASE_DELIVERY_POLICY: Readonly<{
   contractVersion: number;
   defaultCacheControl: string;
+  searchIndex: Readonly<{
+    mediaType: string;
+    role: string;
+    identities: Readonly<Record<string, string>>;
+  }>;
 }>;
 
 export function releaseDeliveryPolicy(

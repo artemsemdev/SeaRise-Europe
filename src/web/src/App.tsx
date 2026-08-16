@@ -487,6 +487,7 @@ function LandingPageSession({
               inputRef={searchInputRef}
               clearToken={clearSearchToken}
               workerFactory={searchWorkerFactory}
+              artifactTransport={runtime.searchArtifactTransport}
               onSearchLifecycle={runtime.handleSearchLifecycle}
               onSelect={(record) => {
                 if (!context || !scopeReady) return;

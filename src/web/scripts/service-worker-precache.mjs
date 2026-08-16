@@ -6,6 +6,10 @@ import { applicationBuildIdentityFile } from "./application-build-identity.mjs";
 export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V3__";
 export const precacheAuthorityKind = "searise-shell-precache-v3";
 
+export function rangeIntegrityBootstrapPath(dataReleaseId) {
+  return `/releases/${dataReleaseId}/analysis/cog-range-integrity.json`;
+}
+
 const MEDIA_TYPES = Object.freeze({
   ".css": "text/css",
   ".html": "text/html",
@@ -55,6 +59,7 @@ export function shellPrecachePaths({ dist, viteManifest, dataReleaseId }) {
     `/${applicationBuildIdentityFile}`,
     ...[...files].map((path) => `/${path}`),
     `/releases/${dataReleaseId}/manifest.json`,
+    rangeIntegrityBootstrapPath(dataReleaseId),
   ].sort();
 }
 

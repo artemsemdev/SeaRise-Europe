@@ -308,6 +308,8 @@ async function resourceSet(
 
 export async function createAdmissionPlanIdentity(input: Readonly<{
   releasePlan: VerifiedReleaseResourcePlanV1;
+  wholeResources: readonly WholeResourceAuthorityV1[];
+  rangeResources: readonly RangeIdentityV1[];
   subtle: SubtleCrypto;
 }>): Promise<AdmissionPlanIdentityV1> {
   let releasePlan: VerifiedReleaseResourcePlanV1;
@@ -327,7 +329,7 @@ export async function createAdmissionPlanIdentity(input: Readonly<{
   }
   const expectedWholeStorage = profile.mode === "persistent" ? "cache-storage" : "memory-only";
   const expectedRangeStorage = profile.mode === "persistent" ? "indexeddb" : "memory-only";
-  const wholeResources = releasePlan.routes
+  const routedWholeResources = releasePlan.routes
     .filter((route) => route.kind === "complete-resource")
     .map((route) => {
       if (route.storage !== expectedWholeStorage) {
@@ -335,7 +337,7 @@ export async function createAdmissionPlanIdentity(input: Readonly<{
       }
       return route.authority;
     });
-  const rangeResources = releasePlan.routes
+  const routedRangeResources = releasePlan.routes
     .filter((route) => route.kind === "analysis-cog-ranges")
     .flatMap((route) => {
       if (route.storage !== expectedRangeStorage) {
@@ -343,17 +345,27 @@ export async function createAdmissionPlanIdentity(input: Readonly<{
       }
       return route.ranges;
     });
-  if (wholeResources.length === 0 || rangeResources.length === 0) {
-    throw new AdmissionReceiptError("AuthorityRejected", "Exact release admission cannot use an empty or partial routed resource set.");
+  if (input.wholeResources.length === 0 && input.rangeResources.length === 0) {
+    throw new AdmissionReceiptError("AuthorityRejected", "Exact release admission cannot use an empty subject resource set.");
   }
-  const whole = await resourceSet(await Promise.all(wholeResources.map(async (authority) => {
+  const routedWhole = await resourceSet(await Promise.all(routedWholeResources.map(async (authority) => ({
+    identitySha256: await wholeResourceIdentitySha256(authority, input.subtle),
+    byteSize: authority.byteSize,
+  }))), input.subtle);
+  const routedRanges = await resourceSet(await Promise.all(routedRangeResources.map(async (identity) => ({
+    identitySha256: await rangeIdentitySha256(identity, input.subtle),
+    byteSize: identity.interval.endExclusive - identity.interval.start,
+  }))), input.subtle);
+  const routedWholeIdentities = new Set(routedWhole.entries.map((resource) => resource.identitySha256));
+  const routedRangeIdentities = new Set(routedRanges.entries.map((resource) => resource.identitySha256));
+  const whole = await resourceSet(await Promise.all(input.wholeResources.map(async (authority) => {
     const validated = validateWholeResourceAuthority(authority);
     if (!samePair(pair, validated.pair)) {
       throw new AdmissionReceiptError("AuthorityRejected", "Whole resource belongs to another app/release pair.");
     }
     return { identitySha256: await wholeResourceIdentitySha256(validated, input.subtle), byteSize: validated.byteSize };
   })), input.subtle);
-  const ranges = await resourceSet(await Promise.all(rangeResources.map(async (identity) => {
+  const ranges = await resourceSet(await Promise.all(input.rangeResources.map(async (identity) => {
     const validated = validateRangeIdentity(identity);
     if (!samePair(pair, validated.authority.pair)) {
       throw new AdmissionReceiptError("AuthorityRejected", "Range resource belongs to another app/release pair.");
@@ -363,6 +375,15 @@ export async function createAdmissionPlanIdentity(input: Readonly<{
       byteSize: validated.interval.endExclusive - validated.interval.start,
     };
   })), input.subtle);
+  if (
+    whole.entries.some((resource) => !routedWholeIdentities.has(resource.identitySha256)) ||
+    ranges.entries.some((resource) => !routedRangeIdentities.has(resource.identitySha256))
+  ) {
+    throw new AdmissionReceiptError(
+      "AuthorityRejected",
+      "Admission subject resources must be exact members of the verified release route set.",
+    );
+  }
   const releaseRoutesSha256 = await digestJson(releasePlan.routes, input.subtle);
   const resourcePlanSha256 = await digestJson({
     contractVersion: 1,
@@ -578,14 +599,22 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
     if (!this.#locks) {
       throw new AdmissionReceiptError("StorageFailed", "A cross-context exclusive lock is required for persistent admission.");
     }
+    let operationFailure = false;
     try {
       return await this.#locks.request(
         `searise-offline:admission:${cacheNamespaces(this.pair).pairKey}`,
         { mode: "exclusive", signal },
-        execute,
+        async () => {
+          try {
+            return await execute();
+          } catch (error) {
+            operationFailure = true;
+            throw error;
+          }
+        },
       );
     } catch (error) {
-      if (error instanceof AdmissionReceiptError) throw error;
+      if (operationFailure || error instanceof AdmissionReceiptError) throw error;
       if (signal.aborted) throw abortFailure();
       throw new AdmissionReceiptError("StorageFailed", "Cross-context admission lock failed.", error);
     }
@@ -764,7 +793,6 @@ class IndexedDbAdmissionReceiptStore extends BaseReceiptStore {
  */
 export async function coordinateVerifiedAdmission(input: Readonly<{
   plan: AdmissionPlanIdentityV1;
-  expectedPreviousReceiptSha256: string | null;
   wholeResources: readonly WholeResourceAuthorityV1[];
   rangeWrites: readonly VerifiedRangeWrite[];
   wholeStore: WholeResourceStore;
@@ -812,6 +840,7 @@ export async function coordinateVerifiedAdmission(input: Readonly<{
   }
 
   return input.receiptStore.runExclusive(plan, input.signal, async (operation) => {
+    const previous = await input.receiptStore.accepted(plan);
     let rangeAdmission: RangeAdmissionV1 | undefined;
     let wholeAdmission: WholeResourceAdmissionV1 | undefined;
     let published = false;
@@ -846,7 +875,7 @@ export async function coordinateVerifiedAdmission(input: Readonly<{
       contractVersion: 1 as const,
       plan,
       operationId: operation,
-      expectedPreviousReceiptSha256: input.expectedPreviousReceiptSha256,
+      expectedPreviousReceiptSha256: previous?.receiptSha256 ?? null,
     });
     VERIFIED_PROOFS.add(proof);
     const gate = await input.receiptStore.publishLast(proof, input.signal);

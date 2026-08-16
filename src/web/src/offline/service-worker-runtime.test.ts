@@ -16,11 +16,13 @@ const resourceBodies = Object.freeze({
   "/": "<html>shell</html>",
   "/assets/app.js": "console.log('app');",
   [`/releases/${release}/manifest.json`]: '{"release":"release-a"}',
+  [`/releases/${release}/analysis/cog-range-integrity.json`]: '{"range":"sealed"}',
 });
 const resourceMediaTypes = Object.freeze({
   "/": "text/html",
   "/assets/app.js": "text/javascript",
   [`/releases/${release}/manifest.json`]: "application/json",
+  [`/releases/${release}/analysis/cog-range-integrity.json`]: "application/json",
 });
 const entries = Object.keys(resourceBodies).sort().map((path) => ({
   path,
@@ -136,10 +138,10 @@ describe("service worker shell runtime", () => {
   it("populates only a new exact-pair cache and reuses a byte-verified completed cache", async () => {
     const test = harness();
     await test.runtime.install();
-    expect(test.fetcher).toHaveBeenCalledTimes(3);
+    expect(test.fetcher).toHaveBeenCalledTimes(4);
     expect([...test.candidateStore()!.keys()]).toEqual(entries.map(({ path }) => `${origin}${path}`));
     await test.runtime.install();
-    expect(test.fetcher).toHaveBeenCalledTimes(3);
+    expect(test.fetcher).toHaveBeenCalledTimes(4);
     expect(test.deleted).toEqual([]);
   });
 
@@ -160,7 +162,7 @@ describe("service worker shell runtime", () => {
       await test.runtime.install();
 
       expect(test.deleted).toEqual([test.runtime.cacheName]);
-      expect(test.fetcher).toHaveBeenCalledTimes(3);
+      expect(test.fetcher).toHaveBeenCalledTimes(4);
       expect([...test.candidateStore()!.keys()]).toEqual(entries.map(({ path }) => `${origin}${path}`));
     },
   );
@@ -204,6 +206,41 @@ describe("service worker shell runtime", () => {
     expect(test.candidateStore()!.has(`${origin}/?scenario=ssp2-45`)).toBe(false);
   });
 
+  it("serves the exact build-bound range-integrity bootstrap with zero network after warm install", async () => {
+    const test = harness();
+    await test.runtime.install();
+    test.fetcher.mockClear();
+    const reloadRuntime = createServiceWorkerRuntime(embedded, {
+      origin,
+      caches: test.caches,
+      fetch: test.fetcher,
+      crypto: webcrypto,
+    });
+
+    const path = `/releases/${release}/analysis/cog-range-integrity.json`;
+    const response = await reloadRuntime.fetch(request(path));
+
+    expect(await response!.text()).toBe(resourceBodies[path]);
+    expect(test.fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a sibling range-integrity path from the sealed bootstrap authority", () => {
+    const siblingPath = `/releases/${release}/analysis/other-range-integrity.json`;
+    const siblingEntries = [...entries, {
+      path: siblingPath,
+      mediaType: "application/json",
+      byteSize: 2,
+      sha256: createHash("sha256").update("{}").digest("hex"),
+    }].sort((left, right) => left.path.localeCompare(right.path));
+    const siblingAuthority = { ...authority, entries: siblingEntries };
+    expect(() => harness(undefined, {
+      ...siblingAuthority,
+      precacheSetSha256: createHash("sha256")
+        .update(JSON.stringify(siblingAuthority))
+        .digest("hex"),
+    } as EmbeddedPrecacheV3)).toThrow(/outside the shell allowlist/);
+  });
+
   it.each(["mime", "hash"] as const)(
     "rejects and quarantines a post-install cached %s mutation",
     async (failure) => {
@@ -222,7 +259,7 @@ describe("service worker shell runtime", () => {
       expect(test.deleted).toEqual([test.runtime.cacheName]);
       expect(test.candidateStore()).toBeUndefined();
       expect(test.stores.get("unrelated-active-cache")?.has("safe")).toBe(true);
-      expect(test.fetcher).toHaveBeenCalledTimes(3);
+      expect(test.fetcher).toHaveBeenCalledTimes(4);
     },
   );
 
@@ -235,7 +272,7 @@ describe("service worker shell runtime", () => {
     const response = await test.runtime.fetch(request("/assets/app.js"))!;
 
     expect(await response.text()).toBe(resourceBodies["/assets/app.js"]);
-    expect(test.fetcher).toHaveBeenCalledTimes(4);
+    expect(test.fetcher).toHaveBeenCalledTimes(5);
     expect(await test.candidateStore()!.get(appUrl)!.text()).toBe(resourceBodies["/assets/app.js"]);
     expect(test.deleted).toEqual([]);
   });

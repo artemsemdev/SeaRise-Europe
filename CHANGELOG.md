@@ -6,6 +6,21 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the final verified browser resource router: exact public whole
+  resources are admitted only when requested through receipt-gated Cache
+  Storage, and only COG chunks needed by the selected read use no-store
+  requests with exact immutable public HEAD/206 authority and receipt-gated
+  range reads. Private
+  Candidates remain memory-only, and visual PMTiles remain network-only and
+  outside every application resource store. The COG reader now accepts an
+  injected range transport without changing scientific lookup behavior.
+
+- Added one exact app/release-bound range-integrity bootstrap resource to the
+  byte-sealed service-worker precache. Warm persistent reloads verify and read
+  that artifact with zero network fallback, while explicit private Candidate
+  validation routes all nine lookups and its technical-failure probe through
+  one memory-only production resource router.
+
 - Added receipt-gated coordinated browser storage primitives with exact
   verified-release route hashes, one release-disposition storage profile,
   receipt-last logical publication, cross-context exclusive admission,
@@ -21,7 +36,7 @@ All notable changes to this project will be documented in this file.
   memory, and leaves visual PMTiles network-only with `no-store`.
 
 - Added a release-pinned root service worker shell with a generated minimal
-  app/manifest precache, delayed public-static registration, private Candidate
+  app/manifest/range-integrity bootstrap precache, delayed public-static registration, private Candidate
   refusal, conservative lifecycle behavior, and exact worker identity checks.
 
 - Added a bounded authoritative IndexedDB range store for release-authorized
@@ -56,6 +71,12 @@ All notable changes to this project will be documented in this file.
   cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
 
 ### Changed
+
+- Routed production geography, methodology, settlement-index, and exact COG
+  reads through the verified resource router. Search shard bytes are verified
+  and admitted on the main thread before transfer to the Web Worker, persistent
+  adapters require service-worker identity plus Cache Storage, IndexedDB, and
+  Web Locks, and private Candidate sessions use memory-only adapters.
 
 - Replaced the URL-only application-shell precache with one immutable
   per-resource byte authority. Service-worker installation now verifies the
@@ -122,6 +143,14 @@ All notable changes to this project will be documented in this file.
   locked restore while that test runtime awaits Phase 2 removal.
 
 ### Fixed
+
+- Bound the committed Brotli settlement indexes to their exact manifest IDs,
+  roles, paths, and search-index media type so strict static preview can load
+  them without allowing generic `.br` MIME spoofing. Verified transport
+  integrity failures now retain their technical classification, recoverable
+  core-index failures replace the failed worker before retry, and the fallback
+  COG transport accepts the release contract's exact immutable public cache
+  authority while preserving private `no-store` delivery.
 
 - Bound every persisted COG range to an immutable trusted identity catalog,
   isolated lease IDs by app/release pair across the IndexedDB v1-to-v2

@@ -10,6 +10,14 @@
     ".tif": "image/tiff; application=geotiff; profile=cloud-optimized",
     ".txt": "text/plain"
   },
+  "searchIndex": {
+    "mediaType": "application/vnd.searise.search-index+json",
+    "role": "settlement-search-index",
+    "identities": {
+      "settlements-europe-core": "search/europe-core.codepoint-trie.json.br",
+      "settlements-europe-coastal": "search/europe-coastal.codepoint-trie.json.br"
+    }
+  },
   "visualPmtiles": {
     "cacheControl": "no-store",
     "mediaType": "application/vnd.pmtiles",

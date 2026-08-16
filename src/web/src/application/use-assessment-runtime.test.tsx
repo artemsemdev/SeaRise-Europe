@@ -146,8 +146,18 @@ function selected(context: ReleaseContext): Selection {
 }
 
 describe("static browser runtime adapter", () => {
-  it("wires the production runtime from the real static scientific classes", () => {
-    const runtime = createBrowserRuntime(firstContext);
+  it("wires the production runtime from the real static scientific classes through the verified router", async () => {
+    const close = vi.fn();
+    const runtime = await createBrowserRuntime(firstContext, new AbortController().signal, {
+      resourceRouter: {
+        artifactTransport: vi.fn(),
+        cogRangeTransport: {
+          validateDelivery: vi.fn(async () => undefined),
+          readExpandedRange: vi.fn(async () => new ArrayBuffer(0)),
+        },
+        close,
+      },
+    });
 
     expect(runtime.context).toBe(firstContext);
     expect(runtime.geography).toBeInstanceOf(StaticGeographyClassifier);
@@ -158,7 +168,8 @@ describe("static browser runtime adapter", () => {
       phase: "ready",
       release: { dataReleaseId: firstContext.dataReleaseId },
     });
-    runtime.controller.dispose();
+    runtime.dispose();
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("constructs once per context, keeps snapshots stable, and exposes every controller command", async () => {
