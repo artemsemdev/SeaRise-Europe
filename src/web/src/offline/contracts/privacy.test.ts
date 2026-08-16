@@ -24,8 +24,8 @@ const range = {
     pair,
     artifactId: "projection-ssp2-45-2050-cog",
     role: "projection-analysis-cog",
-    canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.tif",
-    path: "layers/ssp2-45/2050.tif",
+    canonicalUrl: "https://static.example/releases/release-a/analysis/ssp2-45/2050.tif",
+    path: "analysis/ssp2-45/2050.tif",
     mediaType: "image/tiff; application=geotiff; profile=cloud-optimized",
     totalByteSize: 65536,
     artifactSha256: DIGEST,
@@ -69,6 +69,25 @@ describe("offline persistence privacy contract v1", () => {
       byteLength: 16,
       lastAccessSequence: 8,
     })).toThrow(/length/);
+  });
+
+  it("rejects a persisted range whose COG role hides PMTiles identity", () => {
+    expect(() => validatePersistedOfflineRecord({
+      recordType: "range",
+      identity: {
+        ...range,
+        authority: {
+          ...range.authority,
+          artifactId: "projection-ssp2-45-2050-pmtiles",
+          canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.pmtiles",
+          path: "layers/ssp2-45/2050.pmtiles",
+          mediaType: "application/vnd.pmtiles",
+        },
+      },
+      state: "verified",
+      byteLength: 65536,
+      lastAccessSequence: 8,
+    })).toThrow(/exact analysis COG identity, path, and media type/);
   });
 
   it.each(PERSISTENCE_EXCLUSIONS_V1)("rejects excluded additional property %s", (property) => {

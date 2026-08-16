@@ -110,9 +110,9 @@ test("all nine release selections resolve without mixing visual artifact identit
         structuralTokens.push(value);
         return;
       }
-      if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+      if (value instanceof Blob || value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
         binaryValueCount += 1;
-        structuralTokens.push(`binary:${value.byteLength}`);
+        structuralTokens.push(`binary:${value instanceof Blob ? value.size : value.byteLength}`);
         return;
       }
       if (value === null || typeof value !== "object" || seen.has(value)) return;

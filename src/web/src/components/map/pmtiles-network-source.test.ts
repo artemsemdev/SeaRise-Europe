@@ -156,6 +156,7 @@ describe("network-only visual PMTiles source", () => {
           headers: {
             "cache-control": "no-store",
             "content-range": "bytes */8",
+            "content-type": "application/vnd.pmtiles",
             etag,
           },
         });
@@ -241,6 +242,7 @@ describe("network-only visual PMTiles source", () => {
         headers: {
           "cache-control": "no-store",
           "content-range": "bytes */8",
+          "content-type": "application/vnd.pmtiles",
           ...(responseEtag === null ? {} : {
             etag: responseEtag === "weak" ? `W/${expectedEtag(layer)}` : responseEtag,
           }),
@@ -248,6 +250,26 @@ describe("network-only visual PMTiles source", () => {
       }),
     });
     await expect(source.getBytes(0, 16_384)).rejects.toThrow(/short-archive length/);
+  });
+
+  it.each([
+    ["missing", null],
+    ["wrong", "application/octet-stream"],
+  ])("rejects a 416 response with %s PMTiles media type", async (_name, mediaType) => {
+    const projection = resolveMapLayers(await releaseContext(), "ssp2-45", 2050).projection;
+    const layer = { ...projection, byteSize: 8, sha256: "a".repeat(64) };
+    const source = new NetworkOnlyPmtilesSource(layer, {
+      fetch: async () => new Response(null, {
+        status: 416,
+        headers: {
+          "cache-control": "no-store",
+          "content-range": "bytes */8",
+          etag: expectedEtag(layer),
+          ...(mediaType === null ? {} : { "content-type": mediaType }),
+        },
+      }),
+    });
+    await expect(source.getBytes(0, 16_384)).rejects.toThrow(/media type/);
   });
 
   it.each([

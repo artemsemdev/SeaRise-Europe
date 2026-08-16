@@ -73,7 +73,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-16T16:30:00+02:00",
       "reference": "src/web/src/components/map/pmtiles-network-source.test.ts, src/web/tests/map-visualization.spec.ts, src/web/tests/static-shell.spec.ts, and src/web/scripts/inspect-build.mjs",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; Playwright 1.62.1 Chromium; Vite 8.2.1 production preview; 37 deterministic custom-Source cases, 7 portable delivery-policy cases, 455 full static-target tests, and 14 focused browser cases passed; nine exact visual identities, manifest-bound size/strong ETag, strict 200/206/416 handling, injected request inspection, real bounded PMTiles ranges, structural browser-persistence inspection with zero binary values, and emitted-source inspection; committed synthetic fixture only; no Candidate-v7, TAR, scientific lookup, or external storage"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; Playwright 1.62.1 Chromium; Vite 8.2.1 production preview; 39 deterministic custom-Source cases, 7 portable delivery-policy cases, 462 full static-target tests, and 14 focused browser cases passed; nine exact visual identities, manifest-bound size/strong ETag, strict 200/206/416 handling, injected request inspection, real bounded PMTiles ranges, browser inspection with zero Blob/ArrayBuffer/view values, and emitted-source inspection; committed synthetic fixture only; no Candidate-v7, TAR, scientific lookup, or external storage"
     },
     "local-2026-08-16-static-settlement-search": {
       "kind": "local-measurement",

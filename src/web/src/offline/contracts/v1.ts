@@ -15,6 +15,9 @@ export type CanonicalResourceUrl = string & { readonly __canonicalResourceUrl: u
 const SHA256_HEX = /^[0-9a-f]{64}$/u;
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$/u;
 const ETAG = /^"sha256-[0-9a-f]{64}"$/u;
+const COG_ARTIFACT_ID = /^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-cog$/u;
+const COG_PATH = /^analysis\/(ssp1-26|ssp2-45|ssp5-85)\/(2030|2050|2100)\.tif$/u;
+const COG_MEDIA_TYPE = "image/tiff; application=geotiff; profile=cloud-optimized";
 
 export class OfflineContractError extends TypeError {
   constructor(message: string) {
@@ -300,6 +303,17 @@ export function validateRangeArtifactAuthority(value: unknown): RangeArtifactAut
   if (record.contractVersion !== OFFLINE_CONTRACT_VERSION) fail("Unsupported offline contract version.");
   if (record.role !== "projection-analysis-cog") {
     fail("Range persistence is limited to integrity-authorized analysis COGs.");
+  }
+  const artifactMatch = typeof record.artifactId === "string"
+    ? COG_ARTIFACT_ID.exec(record.artifactId)
+    : null;
+  const pathMatch = typeof record.path === "string" ? COG_PATH.exec(record.path) : null;
+  if (
+    !artifactMatch || !pathMatch ||
+    artifactMatch[1] !== pathMatch[1] || artifactMatch[2] !== pathMatch[2] ||
+    record.mediaType !== COG_MEDIA_TYPE
+  ) {
+    fail("Range persistence requires the exact analysis COG identity, path, and media type.");
   }
   const artifactSha256 = sha256Hex(record.artifactSha256, "artifactSha256");
   const etag = validateRequiredEtag(record.etag, "etag");

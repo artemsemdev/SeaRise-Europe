@@ -28,9 +28,9 @@ const whole = (release = "release-a") => ({
   path: "docs/methodology.json", mediaType: "application/json", byteSize: 256, sha256: B, etag: `"sha256-${B}"`,
 } as const);
 const rangeAuthority = () => ({
-  contractVersion: 1, pair: pair(), artifactId: "projection-analysis-cog-ssp2-45-2050", role: "projection-analysis-cog",
-  canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.tif",
-  path: "layers/ssp2-45/2050.tif",
+  contractVersion: 1, pair: pair(), artifactId: "projection-ssp2-45-2050-cog", role: "projection-analysis-cog",
+  canonicalUrl: "https://static.example/releases/release-a/analysis/ssp2-45/2050.tif",
+  path: "analysis/ssp2-45/2050.tif",
   mediaType: "image/tiff; application=geotiff; profile=cloud-optimized",
   totalByteSize: 131100, artifactSha256: C, etag: `"sha256-${C}"`, integrityChunkSize: 65536,
 } as const);
@@ -108,6 +108,23 @@ describe("offline authority foundation v1", () => {
       path: "layers/ssp2-45/2050.pmtiles",
       mediaType: "application/vnd.pmtiles",
     })).toThrow(/integrity-authorized analysis COGs/);
+  });
+
+  it.each([
+    ["PMTiles artifact ID", { artifactId: "projection-ssp2-45-2050-pmtiles" }],
+    ["PMTiles path", {
+      canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.pmtiles",
+      path: "layers/ssp2-45/2050.pmtiles",
+    }],
+    ["PMTiles media type", { mediaType: "application/vnd.pmtiles" }],
+    ["mismatched scenario", {
+      canonicalUrl: "https://static.example/releases/release-a/analysis/ssp5-85/2050.tif",
+      path: "analysis/ssp5-85/2050.tif",
+    }],
+  ])("rejects role-labelled COG authority with substituted %s", (_name, mutation) => {
+    expect(() => validateRangeArtifactAuthority({ ...rangeAuthority(), ...mutation })).toThrow(
+      /exact analysis COG identity, path, and media type/,
+    );
   });
 
   it("requires an authorized complete chunk for an analysis COG", () => {

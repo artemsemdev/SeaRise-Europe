@@ -202,8 +202,7 @@ export class NetworkOnlyPmtilesSource implements Source {
       fail("PMTiles response escaped its exact release URL.");
     }
     noStorePolicy(response);
-    if (response.status === 416) return response;
-    if (response.status !== 200 && response.status !== 206) return response;
+    if (response.status !== 200 && response.status !== 206 && response.status !== 416) return response;
     const mediaType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
     if (mediaType !== PMTILES_MEDIA_TYPE) fail("PMTiles response has an unexpected media type.");
     return response;
