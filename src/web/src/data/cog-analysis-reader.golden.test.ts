@@ -1,9 +1,11 @@
 // @vitest-environment node
 
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReleaseManifestV1 } from "../contracts/generated/release-contract";
+import type { ReleaseManifestV2 } from "../contracts/generated/release-contract";
 import { ReleaseContext, type ResolvedArtifact } from "../domain/release";
 import { CogAnalysisArtifactReader } from "./cog-analysis-reader";
 import {
@@ -51,12 +53,41 @@ interface RangeCall {
   readonly size: number;
 }
 
+function sha256(bytes: Uint8Array): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 function cloneReleaseContext(
   source: ReleaseContext,
   dataReleaseId: string,
-  replacement: ResolvedArtifact,
-): ReleaseContext {
+  replacementBytes: Uint8Array,
+): { readonly context: ReleaseContext; readonly rangeIntegrityBytes: Uint8Array } {
   const targetId = "projection-ssp2-45-2050-cog";
+  const rangeId = "cog-range-integrity";
+  const replacementSha256 = sha256(replacementBytes);
+  const rangeIntegrity = JSON.parse(
+    new TextDecoder().decode(fixtureBytes("analysis/cog-range-integrity.json")),
+  ) as {
+    dataReleaseId: string;
+    artifacts: Array<{
+      artifactId: string;
+      byteSize: number;
+      sha256: string;
+      chunks: Array<{ start: number; endExclusive: number; sha256: string }>;
+    }>;
+  };
+  rangeIntegrity.dataReleaseId = dataReleaseId;
+  const rangeRecord = rangeIntegrity.artifacts.find((artifact) => artifact.artifactId === targetId);
+  if (!rangeRecord) throw new Error("missing fixture range identity");
+  rangeRecord.byteSize = replacementBytes.byteLength;
+  rangeRecord.sha256 = replacementSha256;
+  rangeRecord.chunks = [{
+    start: 0,
+    endExclusive: replacementBytes.byteLength,
+    sha256: replacementSha256,
+  }];
+  const rangeIntegrityBytes = new TextEncoder().encode(`${JSON.stringify(rangeIntegrity)}\n`);
+  const rangeIntegritySha256 = sha256(rangeIntegrityBytes);
   const releasePath = `releases/${dataReleaseId}`;
   const manifest = {
     ...source.manifest,
@@ -66,10 +97,12 @@ function cloneReleaseContext(
       ...artifact,
       dataReleaseId,
       ...(artifact.artifactId === targetId
-        ? { byteSize: replacement.byteSize, sha256: replacement.sha256 }
-        : {}),
+        ? { byteSize: replacementBytes.byteLength, sha256: replacementSha256 }
+        : artifact.artifactId === rangeId
+          ? { byteSize: rangeIntegrityBytes.byteLength, sha256: rangeIntegritySha256 }
+          : {}),
     })),
-  } as ReleaseManifestV1;
+  } as ReleaseManifestV2;
   const artifacts = Object.fromEntries(
     Object.values(source.artifacts).map((artifact) => {
       const next = {
@@ -77,19 +110,21 @@ function cloneReleaseContext(
         dataReleaseId,
         url: artifact.url.replace(source.dataReleaseId, dataReleaseId),
         ...(artifact.artifactId === targetId
-          ? { byteSize: replacement.byteSize, sha256: replacement.sha256 }
-          : {}),
+          ? { byteSize: replacementBytes.byteLength, sha256: replacementSha256 }
+          : artifact.artifactId === rangeId
+            ? { byteSize: rangeIntegrityBytes.byteLength, sha256: rangeIntegritySha256 }
+            : {}),
       } as ResolvedArtifact;
       return [next.artifactId, Object.freeze(next)];
     }),
   );
-  return new ReleaseContext({
+  return { context: new ReleaseContext({
     manifest,
     manifestUrl: source.manifestUrl.replace(source.dataReleaseId, dataReleaseId),
     disposition: source.disposition,
     artifacts,
     datasets: { ...source.datasets },
-  });
+  }), rangeIntegrityBytes };
 }
 
 function rangeFetch(calls: RangeCall[]): typeof fetch {
@@ -98,6 +133,22 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
     const url = new URL(input instanceof Request ? input.url : input.toString());
     const path = fixtureArtifactPath(url);
     const bytes = fixtureBytes(path);
+    if (path === "analysis/source-grid.json.gz" || path === "analysis/cog-range-integrity.json") {
+      return new Response(responseBody(bytes), {
+        status: 200,
+        headers: { "content-length": String(bytes.byteLength) },
+      });
+    }
+    if (init?.method === "HEAD") {
+      return new Response(null, {
+        status: 200,
+        headers: {
+          "accept-ranges": "bytes",
+          "content-length": String(bytes.byteLength),
+          etag: `"fixture-${bytes.byteLength}"`,
+        },
+      });
+    }
     const range = new Headers(init?.headers).get("range");
     const match = /^bytes=(\d+)-(\d+)$/.exec(range ?? "");
     if (!match) throw new Error(`full-file request prohibited for ${path}`);
@@ -113,12 +164,22 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
         "content-length": String(body.byteLength),
         "content-range": `bytes ${start}-${end}/${bytes.byteLength}`,
         "content-type": "image/tiff",
+        etag: `"fixture-${bytes.byteLength}"`,
       },
     });
   };
 }
 
 describe("exact AR6 COG reader cross-runtime goldens", () => {
+  it("uses the exact production source-grid contract and authoritative regional IDs", () => {
+    const document = JSON.parse(
+      gunzipSync(fixtureBytes("analysis/source-grid.json.gz")).toString("utf8"),
+    ) as { releaseContractId: string; locationIds: unknown[] };
+
+    expect(document.releaseContractId).toBe("ar6-europe-regional-release-v1");
+    expect(document.locationIds).toHaveLength(76 * 46);
+  });
+
   const rangeCalls: RangeCall[] = [];
 
   beforeEach(() => {
@@ -176,20 +237,27 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
     expect(rangeCalls.every((call) => call.size < 65_536)).toBe(true);
   });
 
-  it("does not reuse a decoded COG across immutable releases sharing one artifact ID", async () => {
+  it("rejects scenario/horizon substitution even when release and range hashes bind the wrong COG bytes", async () => {
     const firstContext = await fixtureReleaseContext();
-    const replacement = firstContext.artifact("projection-ssp5-85-2100-cog");
     const secondReleaseId = "searise-europe-v1.0.1-20260816-release-isolation";
-    const secondContext = cloneReleaseContext(firstContext, secondReleaseId, replacement);
-    const originalBytes = fixtureBytes("analysis/ssp2-45/2050.tif");
     const replacementBytes = fixtureBytes("analysis/ssp5-85/2100.tif");
-    const requestedReleases: string[] = [];
+    const cloned = cloneReleaseContext(firstContext, secondReleaseId, replacementBytes);
     vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
-      const bytes = url.pathname.includes(`/${secondReleaseId}/`)
-        ? replacementBytes
-        : originalBytes;
-      requestedReleases.push(url.pathname);
+      const path = url.pathname.split(`/${secondReleaseId}/`)[1];
+      const bytes = path === "analysis/source-grid.json.gz"
+        ? fixtureBytes(path)
+        : path === "analysis/cog-range-integrity.json"
+          ? cloned.rangeIntegrityBytes
+          : replacementBytes;
+      if (path === "analysis/source-grid.json.gz" || path === "analysis/cog-range-integrity.json") {
+        return new Response(responseBody(bytes), { status: 200 });
+      }
+      if (init?.method === "HEAD") {
+        return new Response(null, { status: 200, headers: {
+          "accept-ranges": "bytes", "content-length": String(bytes.length), etag: '"replacement"',
+        } });
+      }
       const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
       if (!match) throw new Error("range required");
       const start = Number(match[1]);
@@ -197,55 +265,22 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
       const body = bytes.slice(start, end + 1);
       return new Response(responseBody(body), {
         status: 206,
-        headers: { "content-range": `bytes ${start}-${end}/${bytes.length}` },
+        headers: {
+          "accept-ranges": "bytes",
+          "content-length": String(body.length),
+          "content-range": `bytes ${start}-${end}/${bytes.length}`,
+        },
       });
     });
     const reader = new CogAnalysisArtifactReader();
-    const coordinates = available[0].coordinates;
 
-    const first = await reader.lookup(
-      firstContext,
+    await expect(reader.lookup(
+      cloned.context,
       "ssp2-45",
       2050,
-      coordinates,
+      available[0].coordinates,
       new AbortController().signal,
-    );
-    const second = await reader.lookup(
-      secondContext,
-      "ssp2-45",
-      2050,
-      coordinates,
-      new AbortController().signal,
-    );
-    const firstGolden = available[0].projections.find(
-      (projection) => projection.scenario === "ssp2-45" && projection.horizon === 2050,
-    );
-    const secondGolden = available[0].projections.find(
-      (projection) => projection.scenario === "ssp5-85" && projection.horizon === 2100,
-    );
-    if (!firstGolden || !secondGolden) throw new Error("release-isolation goldens are incomplete");
-
-    expect(secondContext.dataset("ssp2-45", 2050).analysisArtifactId).toBe(
-      firstContext.dataset("ssp2-45", 2050).analysisArtifactId,
-    );
-    expect(secondContext.artifact("projection-ssp2-45-2050-cog").sha256).not.toBe(
-      firstContext.artifact("projection-ssp2-45-2050-cog").sha256,
-    );
-
-    expect(first).toMatchObject({
-      kind: "projection",
-      lowerMillimetres: firstGolden.lowerMillimetres,
-      medianMillimetres: firstGolden.centralMillimetres,
-      upperMillimetres: firstGolden.upperMillimetres,
-    });
-    expect(second).toMatchObject({
-      kind: "projection",
-      lowerMillimetres: secondGolden.lowerMillimetres,
-      medianMillimetres: secondGolden.centralMillimetres,
-      upperMillimetres: secondGolden.upperMillimetres,
-    });
-    expect(second).not.toEqual(first);
-    expect(requestedReleases.some((path) => path.includes(`/${secondReleaseId}/`))).toBe(true);
+    )).rejects.toMatchObject({ detail: { code: "IntegrityFailed" } });
   });
 
   it("returns source nodata without looking for a farther valid cell", async () => {
@@ -302,9 +337,13 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
   });
 
   it("rejects a host that substitutes full responses for ranges", async () => {
-    vi.stubGlobal("fetch", async (input: URL | RequestInfo) => {
+    const base = rangeFetch([]);
+    vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
-      return new Response(responseBody(fixtureBytes(fixtureArtifactPath(url))), { status: 200 });
+      if (new Headers(init?.headers).has("range")) {
+        return new Response(responseBody(fixtureBytes(fixtureArtifactPath(url))), { status: 200 });
+      }
+      return base(input, init);
     });
     const context = await fixtureReleaseContext();
     const reader = new CogAnalysisArtifactReader();
@@ -322,9 +361,13 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
 
   it("turns an aborted range request into a technical cancellation", async () => {
     const controller = new AbortController();
-    vi.stubGlobal("fetch", async () => {
-      controller.abort();
-      throw new DOMException("aborted", "AbortError");
+    const base = rangeFetch([]);
+    vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
+      if (new Headers(init?.headers).has("range")) {
+        controller.abort();
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 5));
+      }
+      return base(input, init);
     });
     const context = await fixtureReleaseContext();
     const reader = new CogAnalysisArtifactReader();
@@ -334,9 +377,42 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
     ).rejects.toMatchObject({ detail: { code: "Aborted" } });
   });
 
+  it("keeps a shared range resource alive when an earlier caller is superseded", async () => {
+    const firstController = new AbortController();
+    const base = rangeFetch([]);
+    vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
+      if (new Headers(init?.headers).has("range")) {
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
+      }
+      return base(input, init);
+    });
+    const context = await fixtureReleaseContext();
+    const reader = new CogAnalysisArtifactReader();
+    const first = reader.lookup(
+      context,
+      "ssp2-45",
+      2050,
+      available[0].coordinates,
+      firstController.signal,
+    );
+    const second = reader.lookup(
+      context,
+      "ssp2-45",
+      2050,
+      available[0].coordinates,
+      new AbortController().signal,
+    );
+    firstController.abort("superseded");
+
+    await expect(first).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    await expect(second).resolves.toMatchObject({ kind: "projection" });
+  });
+
   it("keeps missing and corrupt ranges in technical failure states", async () => {
     const context = await fixtureReleaseContext();
-    vi.stubGlobal("fetch", async () => new Response(null, { status: 416 }));
+    const base = rangeFetch([]);
+    vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) =>
+      new Headers(init?.headers).has("range") ? new Response(null, { status: 416 }) : base(input, init));
     await expect(
       new CogAnalysisArtifactReader().lookup(
         context,
@@ -349,6 +425,7 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
 
     vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : input.toString());
+      if (!new Headers(init?.headers).has("range")) return base(input, init);
       const bytes = Uint8Array.from(fixtureBytes(fixtureArtifactPath(url)));
       bytes[0] ^= 1;
       const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
@@ -358,7 +435,11 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
       const body = bytes.slice(start, end + 1);
       return new Response(responseBody(body), {
         status: 206,
-        headers: { "content-range": `bytes ${start}-${end}/${bytes.length}` },
+        headers: {
+          "accept-ranges": "bytes",
+          "content-length": String(body.length),
+          "content-range": `bytes ${start}-${end}/${bytes.length}`,
+        },
       });
     });
     await expect(
@@ -369,6 +450,6 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
         available[0].coordinates,
         new AbortController().signal,
       ),
-    ).rejects.toMatchObject({ detail: { code: "DecodeFailed" } });
+    ).rejects.toMatchObject({ detail: { code: "IntegrityFailed" } });
   });
 });

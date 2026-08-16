@@ -3,9 +3,9 @@ import {
   HORIZON_YEARS,
   SCENARIO_IDS,
   type HorizonYear,
-  type ReleaseArtifactV1,
-  type ReleaseDatasetV1,
-  type ReleaseManifestV1,
+  type ReleaseArtifactV2,
+  type ReleaseDatasetV2,
+  type ReleaseManifestV2,
   type ScenarioId,
 } from "../contracts/generated/release-contract";
 import validateManifest from "../contracts/generated/manifest-validator.mjs";
@@ -51,7 +51,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-function expectedDisposition(manifest: ReleaseManifestV1, expected: ReleaseDisposition): void {
+function expectedDisposition(manifest: ReleaseManifestV2, expected: ReleaseDisposition): void {
   const authority = manifest.releaseAuthority;
   if (expected === "synthetic-fixture" && manifest.dataProvenanceClass !== "synthetic-fixture") {
     throw technical("ReleaseIdentityMismatch", "A synthetic build must load a synthetic fixture release.");
@@ -76,7 +76,7 @@ function canonicalCombinations(): readonly (readonly [ScenarioId, HorizonYear])[
   );
 }
 
-function referencedArtifactIds(manifest: ReleaseManifestV1): readonly string[] {
+function referencedArtifactIds(manifest: ReleaseManifestV2): readonly string[] {
   const contracts = manifest.contractArtifacts;
   return [
     contracts.scenarioConfig,
@@ -84,6 +84,9 @@ function referencedArtifactIds(manifest: ReleaseManifestV1): readonly string[] {
     contracts.attribution,
     ...contracts.sourceReceipts,
     contracts.buildReceipt,
+    contracts.sourceGridIdentity,
+    contracts.rangeIntegrityIndex,
+    contracts.sbom,
     contracts.searchRecords,
     contracts.qualitySummary,
     contracts.architectureEvidence,
@@ -100,7 +103,7 @@ function referencedArtifactIds(manifest: ReleaseManifestV1): readonly string[] {
 function requireRole(
   artifacts: Readonly<Record<string, ResolvedArtifact>>,
   artifactId: string,
-  roles: readonly ReleaseArtifactV1["role"][],
+  roles: readonly ReleaseArtifactV2["role"][],
 ): void {
   if (!roles.includes(artifacts[artifactId]?.role)) {
     throw technical("SchemaInvalid", `Artifact ${artifactId} does not have its required release role.`);
@@ -108,7 +111,7 @@ function requireRole(
 }
 
 function resolveArtifactUrl(
-  artifact: ReleaseArtifactV1,
+  artifact: ReleaseArtifactV2,
   releaseRoot: URL,
   allowedOrigins: ReadonlySet<string>,
 ): string {
@@ -128,10 +131,10 @@ function resolveArtifactUrl(
 }
 
 function validateSemantics(
-  manifest: ReleaseManifestV1,
+  manifest: ReleaseManifestV2,
   manifestUrl: URL,
   allowedOrigins: ReadonlySet<string>,
-): { artifacts: Record<string, ResolvedArtifact>; datasets: Record<string, ReleaseDatasetV1> } {
+): { artifacts: Record<string, ResolvedArtifact>; datasets: Record<string, ReleaseDatasetV2> } {
   const expectedPath = `releases/${manifest.dataReleaseId}`;
   if (manifest.publication.releasePath !== expectedPath) {
     throw technical("ReleaseIdentityMismatch", "Manifest release path does not match its immutable release ID.");
@@ -168,6 +171,9 @@ function validateSemantics(
   requireRole(artifacts, contracts.attribution, ["source-attribution"]);
   for (const artifactId of contracts.sourceReceipts) requireRole(artifacts, artifactId, ["source-receipt"]);
   requireRole(artifacts, contracts.buildReceipt, ["build-receipt"]);
+  requireRole(artifacts, contracts.sourceGridIdentity, ["source-grid-identity"]);
+  requireRole(artifacts, contracts.rangeIntegrityIndex, ["range-integrity-index"]);
+  requireRole(artifacts, contracts.sbom, ["sbom"]);
   requireRole(artifacts, contracts.searchRecords, ["settlement-search-index", "settlement-geoparquet"]);
   requireRole(artifacts, contracts.qualitySummary, ["quality-summary"]);
   requireRole(artifacts, contracts.architectureEvidence, ["architecture-evidence"]);
@@ -197,7 +203,7 @@ function validateSemantics(
     }
   }
 
-  const datasets: Record<string, ReleaseDatasetV1> = Object.create(null);
+  const datasets: Record<string, ReleaseDatasetV2> = Object.create(null);
   const combinations = canonicalCombinations();
   for (const [index, [scenario, horizon]] of combinations.entries()) {
     const dataset = manifest.datasets[index];

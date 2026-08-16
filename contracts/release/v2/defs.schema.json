@@ -52,6 +52,9 @@
         "settlement-search-receipt",
         "settlement-geoparquet",
         "projection-analysis-cog",
+        "source-grid-identity",
+        "range-integrity-index",
+        "sbom",
         "projection-visual-pmtiles",
         "projection-geoparquet",
         "quality-summary",
@@ -68,6 +71,7 @@
     "mediaType": {
       "enum": [
         "application/json",
+        "application/gzip",
         "application/geo+json",
         "application/vnd.apache.parquet",
         "application/vnd.in-toto+json",

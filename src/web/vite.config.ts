@@ -6,9 +6,14 @@ import { defineConfig } from "vitest/config";
 
 const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
-const fixtureRoot = resolve(
+const fixturePayloadRoot = resolve(
   repositoryRoot,
   "contracts/release/v1/fixtures/release",
+  fixtureReleaseId,
+);
+const fixtureOverlayRoot = resolve(
+  repositoryRoot,
+  "contracts/release/v2/fixtures/browser-release",
   fixtureReleaseId,
 );
 
@@ -52,7 +57,8 @@ export default defineConfig(({ command, mode }) => {
           const destination = resolve(import.meta.dirname, "dist/releases", releaseId);
           rmSync(destination, { force: true, recursive: true });
           mkdirSync(destination, { recursive: true });
-          cpSync(fixtureRoot, destination, { recursive: true });
+          cpSync(fixturePayloadRoot, destination, { recursive: true });
+          cpSync(fixtureOverlayRoot, destination, { recursive: true });
         },
       },
     ],

@@ -7,7 +7,7 @@ import standaloneCode from "ajv/dist/standalone/index.js";
 import addFormats from "ajv-formats";
 
 const root = resolve(import.meta.dirname, "../../..");
-const contractRoot = resolve(root, "contracts/release/v1");
+const contractRoot = resolve(root, "contracts/release/v2");
 const output = resolve(import.meta.dirname, "../src/contracts/generated/release-contract.ts");
 const validatorOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.mjs");
 const validatorTypesOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.d.mts");
@@ -39,12 +39,16 @@ assertRequired(artifact.$defs.common, [
   "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass", "artifactId", "path",
   "role", "mediaType", "byteSize", "sha256", "immutable", "scientificUse", "lineage", "rights",
 ], "artifact.schema.json common artifact");
+const artifactSchemaId = artifact.$defs.common.properties.$schema.const;
+if (artifactSchemaId !== artifact.$id) {
+  throw new Error("artifact.schema.json must require its own canonical $id");
+}
 const contractDigest = createHash("sha256")
   .update(schemaFiles.map((name) => schemaSources[name]).join("\n"))
   .digest("hex");
 
 const generated = `/**
- * Generated from contracts/release/v1/{defs,manifest,artifact}.schema.json.
+ * Generated from contracts/release/v2/{defs,manifest,artifact}.schema.json.
  * Run \`npm run generate:contracts --workspace @searise/web\`; do not edit.
  */
 
@@ -63,19 +67,19 @@ export type DataReleaseId = string;
 export type Sha256 = string;
 export type BoundingBox = readonly [number, number, number, number];
 
-export interface ReleaseAuthorityV1 {
+export interface ReleaseAuthorityV2 {
   readonly automatedValidation: "pending" | "passed" | "failed";
   readonly releaseDisposition: "pending-owner" | "approved" | "rejected" | "blocked";
   readonly dataProvenanceClass: DataProvenanceClass;
   readonly statusDisclosureRequired: boolean;
 }
 
-export interface FileIdentityV1 {
+export interface FileIdentityV2 {
   readonly path: string;
   readonly sha256: Sha256;
 }
 
-export interface ProjectionContextV1 {
+export interface ProjectionContextV2 {
   readonly scenario: ScenarioId;
   readonly horizon: HorizonYear;
   readonly source: {
@@ -101,8 +105,8 @@ export interface ProjectionContextV1 {
   };
 }
 
-interface CommonReleaseArtifactV1 {
-  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json";
+interface CommonReleaseArtifactV2 {
+  readonly $schema: ${literal(artifactSchemaId)};
   readonly schemaVersion: SchemaVersion;
   readonly dataReleaseId: DataReleaseId;
   readonly dataProvenanceClass: DataProvenanceClass;
@@ -113,8 +117,8 @@ interface CommonReleaseArtifactV1 {
   readonly byteSize: number;
   readonly sha256: Sha256;
   readonly immutable: true;
-  readonly scientificUse: "exact-lookup" | "exact-analytics" | "visual-only" | "not-applicable";
-  readonly lineage: readonly FileIdentityV1[];
+  readonly scientificUse: "exact-lookup" | "exact-lookup-support" | "exact-analytics" | "visual-only" | "not-applicable";
+  readonly lineage: readonly FileIdentityV2[];
   readonly rights: {
     readonly attributionIds: readonly string[];
     readonly redistribution: "allowed" | "conditional";
@@ -122,39 +126,53 @@ interface CommonReleaseArtifactV1 {
   readonly spatialBounds?: BoundingBox | null;
 }
 
-export type ReleaseArtifactV1 =
-  | (CommonReleaseArtifactV1 & {
+export type ReleaseArtifactV2 =
+  | (CommonReleaseArtifactV2 & {
+      readonly role: "source-grid-identity";
+      readonly mediaType: "application/gzip";
+      readonly scientificUse: "exact-lookup-support";
+      readonly projectionContext?: never;
+      readonly projectionMatrixContext?: never;
+    })
+  | (CommonReleaseArtifactV2 & {
+      readonly role: "range-integrity-index";
+      readonly mediaType: "application/json";
+      readonly scientificUse: "exact-lookup-support";
+      readonly projectionContext?: never;
+      readonly projectionMatrixContext?: never;
+    })
+  | (CommonReleaseArtifactV2 & {
       readonly role: "projection-analysis-cog";
       readonly mediaType: "image/tiff; application=geotiff; profile=cloud-optimized";
       readonly scientificUse: "exact-lookup";
       readonly spatialBounds: BoundingBox;
-      readonly projectionContext: ProjectionContextV1;
+      readonly projectionContext: ProjectionContextV2;
       readonly projectionMatrixContext?: never;
     })
-  | (CommonReleaseArtifactV1 & {
+  | (CommonReleaseArtifactV2 & {
       readonly role: "projection-visual-pmtiles";
       readonly mediaType: "application/vnd.pmtiles";
       readonly scientificUse: "visual-only";
       readonly spatialBounds: BoundingBox;
-      readonly projectionContext: ProjectionContextV1;
+      readonly projectionContext: ProjectionContextV2;
       readonly projectionMatrixContext?: never;
     })
-  | (CommonReleaseArtifactV1 & {
+  | (CommonReleaseArtifactV2 & {
       readonly role: "projection-geoparquet";
       readonly mediaType: "application/vnd.apache.parquet";
       readonly scientificUse: "exact-analytics";
       readonly spatialBounds: BoundingBox;
       readonly projectionContext?: never;
-      readonly projectionMatrixContext: ProjectionMatrixContextV1;
+      readonly projectionMatrixContext: ProjectionMatrixContextV2;
     })
-  | (CommonReleaseArtifactV1 & {
-      readonly role: Exclude<ArtifactRole, "projection-analysis-cog" | "projection-visual-pmtiles" | "projection-geoparquet">;
+  | (CommonReleaseArtifactV2 & {
+      readonly role: Exclude<ArtifactRole, "projection-analysis-cog" | "source-grid-identity" | "range-integrity-index" | "projection-visual-pmtiles" | "projection-geoparquet">;
       readonly scientificUse: "not-applicable";
       readonly projectionContext?: never;
       readonly projectionMatrixContext?: never;
     });
 
-export interface ProjectionMatrixContextV1 {
+export interface ProjectionMatrixContextV2 {
   readonly scenarios: readonly ["ssp1-26", "ssp2-45", "ssp5-85"];
   readonly horizons: readonly [2030, 2050, 2100];
   readonly source: {
@@ -167,11 +185,11 @@ export interface ProjectionMatrixContextV1 {
     ];
     readonly methodologyVersion: "ar6-regional-projection-v1";
   };
-  readonly grid: ProjectionContextV1["grid"];
-  readonly values: ProjectionContextV1["values"];
+  readonly grid: ProjectionContextV2["grid"];
+  readonly values: ProjectionContextV2["values"];
 }
 
-export interface ReleaseDatasetV1 {
+export interface ReleaseDatasetV2 {
   readonly scenario: ScenarioId;
   readonly horizon: HorizonYear;
   readonly analysisArtifactId: string;
@@ -180,12 +198,12 @@ export interface ReleaseDatasetV1 {
   readonly stacItemArtifactId: string;
 }
 
-export interface ReleaseManifestV1 {
+export interface ReleaseManifestV2 {
   readonly $schema: ${literal(manifest.properties.$schema.const)};
   readonly schemaVersion: SchemaVersion;
   readonly dataReleaseId: DataReleaseId;
   readonly dataProvenanceClass: DataProvenanceClass;
-  readonly releaseAuthority: ReleaseAuthorityV1;
+  readonly releaseAuthority: ReleaseAuthorityV2;
   readonly createdAt: string;
   readonly codeRevision: string;
   readonly previousReleaseId: DataReleaseId | null;
@@ -209,6 +227,9 @@ export interface ReleaseManifestV1 {
     attribution: string;
     sourceReceipts: readonly string[];
     buildReceipt: string;
+    sourceGridIdentity: string;
+    rangeIntegrityIndex: string;
+    sbom: string;
     searchRecords: string;
     qualitySummary: string;
     architectureEvidence: string;
@@ -219,8 +240,8 @@ export interface ReleaseManifestV1 {
     provenance: string;
     signature: string;
   }>;
-  readonly artifacts: readonly ReleaseArtifactV1[];
-  readonly datasets: ${tuple(manifest.$defs.contractArtifacts.properties.stacItems.prefixItems.map((item) => item.const)).replace(/"stac-[^"]+"/g, "ReleaseDatasetV1")};
+  readonly artifacts: readonly ReleaseArtifactV2[];
+  readonly datasets: ${tuple(manifest.$defs.contractArtifacts.properties.stacItems.prefixItems.map((item) => item.const)).replace(/"stac-[^"]+"/g, "ReleaseDatasetV2")};
 }
 `;
 

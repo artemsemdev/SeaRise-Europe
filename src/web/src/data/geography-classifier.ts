@@ -1,6 +1,6 @@
 import { compressors } from "hyparquet-compressors";
 import { parquetReadObjects, type AsyncBuffer } from "hyparquet";
-import type { ReleaseArtifactV1 } from "../contracts/generated/release-contract";
+import type { ReleaseArtifactV2 } from "../contracts/generated/release-contract";
 import {
   ReleaseContext,
   TechnicalFailure,
@@ -9,6 +9,13 @@ import {
   type ResolvedArtifact,
 } from "../domain/release";
 import type { GeographyClassifier } from "../domain/scientific-lookup";
+import {
+  artifactCacheIdentity,
+  defaultArtifactTransport,
+  verifiedArtifactBytes,
+  waitForCaller,
+  type ArtifactTransport,
+} from "./artifact-integrity";
 
 type Position = readonly [number, number];
 type Ring = readonly Position[];
@@ -24,10 +31,7 @@ interface BoundaryPair {
   readonly coastal: MultiPolygonGeometry;
 }
 
-export type GeographyTransport = (
-  input: URL,
-  init: Readonly<{ signal: AbortSignal; headers: Readonly<Record<string, string>> }>,
-) => Promise<Response>;
+export type GeographyTransport = ArtifactTransport;
 
 const BOUNDARY_MEDIA_TYPES = [
   "application/vnd.apache.parquet",
@@ -46,55 +50,6 @@ function technical(
   recoverable = false,
 ): TechnicalFailure {
   return new TechnicalFailure({ kind: "technical-error", code, message, recoverable });
-}
-
-function defaultTransport(
-  input: URL,
-  init: Parameters<GeographyTransport>[1],
-): Promise<Response> {
-  return fetch(input, { signal: init.signal, headers: init.headers, credentials: "omit" });
-}
-
-function hexadecimal(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
-}
-
-async function verifiedBytes(
-  artifact: ResolvedArtifact,
-  signal: AbortSignal,
-  transport: GeographyTransport,
-): Promise<ArrayBuffer> {
-  let response: Response;
-  try {
-    response = await transport(new URL(artifact.url), {
-      signal,
-      headers: Object.freeze({ Accept: artifact.mediaType }),
-    });
-  } catch (error) {
-    if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
-      throw technical("Aborted", `Boundary read for ${artifact.artifactId} was cancelled.`, true);
-    }
-    throw technical("FetchFailed", `Boundary artifact ${artifact.artifactId} is unavailable.`, true);
-  }
-  if (!response.ok) {
-    throw technical(
-      "FetchFailed",
-      `Boundary artifact ${artifact.artifactId} returned HTTP ${response.status}.`,
-      true,
-    );
-  }
-  const bytes = await response.arrayBuffer();
-  if (bytes.byteLength !== artifact.byteSize) {
-    throw technical("IntegrityFailed", `Boundary artifact ${artifact.artifactId} has the wrong byte size.`);
-  }
-  if (!globalThis.crypto?.subtle) {
-    throw technical("UnsupportedBrowser", "SHA-256 verification is unavailable in this browser.");
-  }
-  const digest = hexadecimal(await globalThis.crypto.subtle.digest("SHA-256", bytes));
-  if (digest !== artifact.sha256) {
-    throw technical("IntegrityFailed", `Boundary artifact ${artifact.artifactId} failed SHA-256 verification.`);
-  }
-  return bytes;
 }
 
 function finitePosition(value: unknown): value is Position {
@@ -221,7 +176,7 @@ async function decodeBoundary(
   signal: AbortSignal,
   transport: GeographyTransport,
 ): Promise<MultiPolygonGeometry> {
-  const bytes = await verifiedBytes(artifact, signal, transport);
+  const bytes = await verifiedArtifactBytes(artifact, signal, transport);
   if (artifact.mediaType === "application/vnd.apache.parquet") {
     return decodeGeoParquet(artifact, bytes);
   }
@@ -307,18 +262,19 @@ export class StaticGeographyClassifier implements GeographyClassifier {
   readonly #cache = new Map<string, Promise<BoundaryPair>>();
 
   constructor(options: { readonly transport?: GeographyTransport } = {}) {
-    this.#transport = options.transport ?? defaultTransport;
+    this.#transport = options.transport ?? defaultArtifactTransport;
   }
 
   async #boundaries(context: ReleaseContext, signal: AbortSignal): Promise<BoundaryPair> {
-    const cacheKey = context.dataReleaseId;
+    const support = resolveBoundaryArtifact(context, "support-boundary");
+    const coastal = resolveBoundaryArtifact(context, "coastal-boundary");
+    const cacheKey = artifactCacheIdentity(context, [support, coastal]);
     let pending = this.#cache.get(cacheKey);
     if (!pending) {
-      const support = resolveBoundaryArtifact(context, "support-boundary");
-      const coastal = resolveBoundaryArtifact(context, "coastal-boundary");
+      const resourceSignal = new AbortController().signal;
       pending = Promise.all([
-        decodeBoundary(support, signal, this.#transport),
-        decodeBoundary(coastal, signal, this.#transport),
+        decodeBoundary(support, resourceSignal, this.#transport),
+        decodeBoundary(coastal, resourceSignal, this.#transport),
       ]).then(([supportGeometry, coastalGeometry]) =>
         Object.freeze({ support: supportGeometry, coastal: coastalGeometry }),
       );
@@ -326,7 +282,7 @@ export class StaticGeographyClassifier implements GeographyClassifier {
       while (this.#cache.size > 2) this.#cache.delete(this.#cache.keys().next().value as string);
       pending.catch(() => this.#cache.delete(cacheKey));
     }
-    return pending;
+    return waitForCaller(pending, signal, "Geography classification was cancelled.");
   }
 
   async classify(
@@ -343,6 +299,6 @@ export class StaticGeographyClassifier implements GeographyClassifier {
   }
 }
 
-export function isBoundaryArtifact(artifact: ReleaseArtifactV1): boolean {
+export function isBoundaryArtifact(artifact: ReleaseArtifactV2): boolean {
   return artifact.role === "support-boundary" || artifact.role === "coastal-boundary";
 }

@@ -1,9 +1,9 @@
 import type {
   DataReleaseId,
   HorizonYear,
-  ReleaseArtifactV1,
-  ReleaseDatasetV1,
-  ReleaseManifestV1,
+  ReleaseArtifactV2,
+  ReleaseDatasetV2,
+  ReleaseManifestV2,
   ResultState,
   ScenarioId,
 } from "../contracts/generated/release-contract";
@@ -104,7 +104,7 @@ const outcomeExhaustiveness: Readonly<Record<ResultState, true>> = Object.freeze
 });
 void outcomeExhaustiveness;
 
-export type ResolvedArtifact = ReleaseArtifactV1 & { readonly url: string };
+export type ResolvedArtifact = ReleaseArtifactV2 & { readonly url: string };
 
 function datasetKey(scenario: ScenarioId, horizon: HorizonYear): string {
   return `${scenario}:${horizon}`;
@@ -115,17 +115,17 @@ export class ReleaseContext {
   readonly disposition: ReleaseDisposition;
   readonly methodologyVersion: "ar6-regional-projection-v1";
   readonly defaults: Readonly<{ scenario: "ssp2-45"; horizon: 2050 }>;
-  readonly manifest: ReleaseManifestV1;
+  readonly manifest: ReleaseManifestV2;
   readonly manifestUrl: string;
   readonly artifacts: Readonly<Record<string, ResolvedArtifact>>;
-  readonly datasets: Readonly<Record<string, ReleaseDatasetV1>>;
+  readonly datasets: Readonly<Record<string, ReleaseDatasetV2>>;
 
   constructor(input: {
-    manifest: ReleaseManifestV1;
+    manifest: ReleaseManifestV2;
     manifestUrl: string;
     disposition: ReleaseDisposition;
     artifacts: Record<string, ResolvedArtifact>;
-    datasets: Record<string, ReleaseDatasetV1>;
+    datasets: Record<string, ReleaseDatasetV2>;
   }) {
     this.manifest = input.manifest;
     this.manifestUrl = input.manifestUrl;
@@ -151,7 +151,7 @@ export class ReleaseContext {
     return artifact;
   }
 
-  dataset(scenario: ScenarioId, horizon: HorizonYear): ReleaseDatasetV1 {
+  dataset(scenario: ScenarioId, horizon: HorizonYear): ReleaseDatasetV2 {
     const dataset = this.datasets[datasetKey(scenario, horizon)];
     if (!dataset) {
       throw new TechnicalFailure({

@@ -9,10 +9,12 @@
   },
   "scripts": {
     "generate:contracts": "node scripts/generate-release-contracts.mjs",
+    "generate:scientific-fixture": "PYTHONPATH=../pipeline python3 ../../scripts/release/build-browser-integrity-fixture.py && node scripts/generate-scientific-fixture-contracts.mjs",
+    "check:scientific-fixture": "node scripts/generate-scientific-fixture-contracts.mjs --check",
     "check:contracts": "node scripts/generate-release-contracts.mjs --check",
     "dev": "vite",
     "serve:local-release": "node scripts/serve-local-release.mjs",
-    "lint": "eslint . && node scripts/check-boundaries.mjs && npm run check:contracts",
+    "lint": "eslint . && node scripts/check-boundaries.mjs && npm run check:contracts && npm run check:scientific-fixture",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "build": "vite build && node scripts/inspect-build.mjs",

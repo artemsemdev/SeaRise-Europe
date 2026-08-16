@@ -1,4 +1,5 @@
-import fixture from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
+import fixture from "../../../../contracts/release/v2/fixtures/browser-release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
+import legacyV1Fixture from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
 import { describe, expect, it } from "vitest";
 import { TechnicalFailure, validateCoordinates } from "../domain/release";
 import { ManifestRepository, type ManifestTransport } from "./manifest-repository";
@@ -50,9 +51,29 @@ describe("ManifestRepository", () => {
     expect(context.artifact("projection-ssp2-45-2050-cog").url).toBe(
       `https://fixture.example/releases/${releaseId}/analysis/ssp2-45/2050.tif`,
     );
+    expect(context.artifact("source-grid-identity")).toMatchObject({
+      artifactId: "source-grid-identity",
+      role: "source-grid-identity",
+      mediaType: "application/gzip",
+    });
+    expect(context.artifact("cog-range-integrity")).toMatchObject({
+      artifactId: "cog-range-integrity",
+      role: "range-integrity-index",
+      mediaType: "application/json",
+    });
     expect(Object.isFrozen(context)).toBe(true);
     expect(Object.isFrozen(context.manifest.artifacts[0])).toBe(true);
     expect(Reflect.set(context.manifest.defaults, "horizon", 2100)).toBe(false);
+    expect(new Set(fixture.artifacts.map((artifact) => artifact.$schema))).toEqual(
+      new Set([
+        "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/artifact.schema.json",
+      ]),
+    );
+    expect(JSON.stringify(fixture.artifacts)).not.toContain("/contracts/release/v1/");
+  });
+
+  it("rejects the byte-sealed v1 manifest because it has no v2 scientific integrity metadata", async () => {
+    expect(await errorCode(structuredClone(legacyV1Fixture))).toBe("SchemaInvalid");
   });
 
   it("requests only the pinned manifest with omitted credentials and an abort signal", async () => {

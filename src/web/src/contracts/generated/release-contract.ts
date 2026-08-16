@@ -1,10 +1,10 @@
 /**
- * Generated from contracts/release/v1/{defs,manifest,artifact}.schema.json.
+ * Generated from contracts/release/v2/{defs,manifest,artifact}.schema.json.
  * Run `npm run generate:contracts --workspace @searise/web`; do not edit.
  */
 
-export const RELEASE_CONTRACT_SOURCE_SHA256 = "93a7d5e4b398958622e3b1bc4ef6ff7e9881f52d9d5fb08bdc84dffe7b86deff";
-export type SchemaVersion = "1.0.0";
+export const RELEASE_CONTRACT_SOURCE_SHA256 = "7a32f764bfec5dd9603fe58d6811469ffb4acc15f4dd31d10c9397de72c83204";
+export type SchemaVersion = "2.0.0";
 export const SCENARIO_IDS = ["ssp1-26", "ssp2-45", "ssp5-85"] as const;
 export type ScenarioId = "ssp1-26" | "ssp2-45" | "ssp5-85";
 export const HORIZON_YEARS = [2030, 2050, 2100] as const;
@@ -12,25 +12,25 @@ export type HorizonYear = 2030 | 2050 | 2100;
 export const RESULT_STATES = ["ProjectionAvailable", "DataUnavailable", "OutOfScope", "UnsupportedGeography"] as const;
 export type ResultState = "ProjectionAvailable" | "DataUnavailable" | "OutOfScope" | "UnsupportedGeography";
 export type DataProvenanceClass = "real-source" | "synthetic-fixture";
-export type ArtifactRole = "release-manifest" | "contract-schema" | "scenario-config" | "methodology" | "source-attribution" | "source-receipt" | "build-receipt" | "support-boundary" | "coastal-boundary" | "settlement-search-index" | "settlement-geoparquet" | "projection-analysis-cog" | "projection-visual-pmtiles" | "projection-geoparquet" | "quality-summary" | "release-gate-report" | "architecture-evidence" | "stac-catalog" | "stac-collection" | "stac-item" | "checksums" | "provenance" | "signature";
-export type MediaType = "application/json" | "application/geo+json" | "application/vnd.apache.parquet" | "application/vnd.in-toto+json" | "application/vnd.pmtiles" | "application/vnd.searise.search-index+json" | "application/vnd.dev.sigstore.bundle+json;version=0.3" | "application/x-ndjson" | "image/tiff; application=geotiff; profile=cloud-optimized" | "text/markdown" | "text/plain";
+export type ArtifactRole = "release-manifest" | "contract-schema" | "scenario-config" | "methodology" | "source-attribution" | "source-receipt" | "build-receipt" | "support-boundary" | "coastal-boundary" | "settlement-search-index" | "settlement-search-receipt" | "settlement-geoparquet" | "projection-analysis-cog" | "source-grid-identity" | "range-integrity-index" | "sbom" | "projection-visual-pmtiles" | "projection-geoparquet" | "quality-summary" | "release-gate-report" | "architecture-evidence" | "stac-catalog" | "stac-collection" | "stac-item" | "checksums" | "provenance" | "signature";
+export type MediaType = "application/json" | "application/gzip" | "application/geo+json" | "application/vnd.apache.parquet" | "application/vnd.in-toto+json" | "application/vnd.pmtiles" | "application/vnd.searise.search-index+json" | "application/vnd.dev.sigstore.bundle+json;version=0.3" | "application/x-ndjson" | "image/tiff; application=geotiff; profile=cloud-optimized" | "text/markdown" | "text/plain";
 export type DataReleaseId = string;
 export type Sha256 = string;
 export type BoundingBox = readonly [number, number, number, number];
 
-export interface ReleaseAuthorityV1 {
+export interface ReleaseAuthorityV2 {
   readonly automatedValidation: "pending" | "passed" | "failed";
   readonly releaseDisposition: "pending-owner" | "approved" | "rejected" | "blocked";
   readonly dataProvenanceClass: DataProvenanceClass;
   readonly statusDisclosureRequired: boolean;
 }
 
-export interface FileIdentityV1 {
+export interface FileIdentityV2 {
   readonly path: string;
   readonly sha256: Sha256;
 }
 
-export interface ProjectionContextV1 {
+export interface ProjectionContextV2 {
   readonly scenario: ScenarioId;
   readonly horizon: HorizonYear;
   readonly source: {
@@ -56,8 +56,8 @@ export interface ProjectionContextV1 {
   };
 }
 
-interface CommonReleaseArtifactV1 {
-  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/artifact.schema.json";
+interface CommonReleaseArtifactV2 {
+  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/artifact.schema.json";
   readonly schemaVersion: SchemaVersion;
   readonly dataReleaseId: DataReleaseId;
   readonly dataProvenanceClass: DataProvenanceClass;
@@ -68,8 +68,8 @@ interface CommonReleaseArtifactV1 {
   readonly byteSize: number;
   readonly sha256: Sha256;
   readonly immutable: true;
-  readonly scientificUse: "exact-lookup" | "exact-analytics" | "visual-only" | "not-applicable";
-  readonly lineage: readonly FileIdentityV1[];
+  readonly scientificUse: "exact-lookup" | "exact-lookup-support" | "exact-analytics" | "visual-only" | "not-applicable";
+  readonly lineage: readonly FileIdentityV2[];
   readonly rights: {
     readonly attributionIds: readonly string[];
     readonly redistribution: "allowed" | "conditional";
@@ -77,39 +77,53 @@ interface CommonReleaseArtifactV1 {
   readonly spatialBounds?: BoundingBox | null;
 }
 
-export type ReleaseArtifactV1 =
-  | (CommonReleaseArtifactV1 & {
+export type ReleaseArtifactV2 =
+  | (CommonReleaseArtifactV2 & {
+      readonly role: "source-grid-identity";
+      readonly mediaType: "application/gzip";
+      readonly scientificUse: "exact-lookup-support";
+      readonly projectionContext?: never;
+      readonly projectionMatrixContext?: never;
+    })
+  | (CommonReleaseArtifactV2 & {
+      readonly role: "range-integrity-index";
+      readonly mediaType: "application/json";
+      readonly scientificUse: "exact-lookup-support";
+      readonly projectionContext?: never;
+      readonly projectionMatrixContext?: never;
+    })
+  | (CommonReleaseArtifactV2 & {
       readonly role: "projection-analysis-cog";
       readonly mediaType: "image/tiff; application=geotiff; profile=cloud-optimized";
       readonly scientificUse: "exact-lookup";
       readonly spatialBounds: BoundingBox;
-      readonly projectionContext: ProjectionContextV1;
+      readonly projectionContext: ProjectionContextV2;
       readonly projectionMatrixContext?: never;
     })
-  | (CommonReleaseArtifactV1 & {
+  | (CommonReleaseArtifactV2 & {
       readonly role: "projection-visual-pmtiles";
       readonly mediaType: "application/vnd.pmtiles";
       readonly scientificUse: "visual-only";
       readonly spatialBounds: BoundingBox;
-      readonly projectionContext: ProjectionContextV1;
+      readonly projectionContext: ProjectionContextV2;
       readonly projectionMatrixContext?: never;
     })
-  | (CommonReleaseArtifactV1 & {
+  | (CommonReleaseArtifactV2 & {
       readonly role: "projection-geoparquet";
       readonly mediaType: "application/vnd.apache.parquet";
       readonly scientificUse: "exact-analytics";
       readonly spatialBounds: BoundingBox;
       readonly projectionContext?: never;
-      readonly projectionMatrixContext: ProjectionMatrixContextV1;
+      readonly projectionMatrixContext: ProjectionMatrixContextV2;
     })
-  | (CommonReleaseArtifactV1 & {
-      readonly role: Exclude<ArtifactRole, "projection-analysis-cog" | "projection-visual-pmtiles" | "projection-geoparquet">;
+  | (CommonReleaseArtifactV2 & {
+      readonly role: Exclude<ArtifactRole, "projection-analysis-cog" | "source-grid-identity" | "range-integrity-index" | "projection-visual-pmtiles" | "projection-geoparquet">;
       readonly scientificUse: "not-applicable";
       readonly projectionContext?: never;
       readonly projectionMatrixContext?: never;
     });
 
-export interface ProjectionMatrixContextV1 {
+export interface ProjectionMatrixContextV2 {
   readonly scenarios: readonly ["ssp1-26", "ssp2-45", "ssp5-85"];
   readonly horizons: readonly [2030, 2050, 2100];
   readonly source: {
@@ -122,11 +136,11 @@ export interface ProjectionMatrixContextV1 {
     ];
     readonly methodologyVersion: "ar6-regional-projection-v1";
   };
-  readonly grid: ProjectionContextV1["grid"];
-  readonly values: ProjectionContextV1["values"];
+  readonly grid: ProjectionContextV2["grid"];
+  readonly values: ProjectionContextV2["values"];
 }
 
-export interface ReleaseDatasetV1 {
+export interface ReleaseDatasetV2 {
   readonly scenario: ScenarioId;
   readonly horizon: HorizonYear;
   readonly analysisArtifactId: string;
@@ -135,12 +149,12 @@ export interface ReleaseDatasetV1 {
   readonly stacItemArtifactId: string;
 }
 
-export interface ReleaseManifestV1 {
-  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v1/manifest.schema.json";
+export interface ReleaseManifestV2 {
+  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/manifest.schema.json";
   readonly schemaVersion: SchemaVersion;
   readonly dataReleaseId: DataReleaseId;
   readonly dataProvenanceClass: DataProvenanceClass;
-  readonly releaseAuthority: ReleaseAuthorityV1;
+  readonly releaseAuthority: ReleaseAuthorityV2;
   readonly createdAt: string;
   readonly codeRevision: string;
   readonly previousReleaseId: DataReleaseId | null;
@@ -164,6 +178,9 @@ export interface ReleaseManifestV1 {
     attribution: string;
     sourceReceipts: readonly string[];
     buildReceipt: string;
+    sourceGridIdentity: string;
+    rangeIntegrityIndex: string;
+    sbom: string;
     searchRecords: string;
     qualitySummary: string;
     architectureEvidence: string;
@@ -174,6 +191,6 @@ export interface ReleaseManifestV1 {
     provenance: string;
     signature: string;
   }>;
-  readonly artifacts: readonly ReleaseArtifactV1[];
-  readonly datasets: readonly [ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1, ReleaseDatasetV1];
+  readonly artifacts: readonly ReleaseArtifactV2[];
+  readonly datasets: readonly [ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2];
 }

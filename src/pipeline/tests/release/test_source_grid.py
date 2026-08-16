@@ -14,6 +14,14 @@ from searise_pipeline.science import ScienceContractError
 
 from .test_source_fixture import contract, fixture_source
 
+REPO_ROOT = Path(__file__).parents[4]
+COMMITTED_BROWSER_GRID = (
+    REPO_ROOT
+    / "contracts/release/v2/fixtures/browser-release"
+    / "searise-europe-v1.0.0-20260810-c096aeab4e09"
+    / "analysis/source-grid.json.gz"
+)
+
 
 def _read_document(path: Path) -> dict[str, object]:
     with gzip.open(path, "rt", encoding="utf-8") as stream:
@@ -40,6 +48,18 @@ def test_source_grid_maps_every_cog_cell_to_its_source_id(tmp_path: Path) -> Non
             source_row = 46 - 1 - cog_row
             assert ids[source_row, cog_column] == source.location_ids[source_row, cog_column]
     assert evidence.cell_count == 3496
+
+
+def test_committed_browser_grid_is_the_exact_authoritative_writer_output(
+    tmp_path: Path,
+) -> None:
+    source = fixture_source()
+    generated = tmp_path / "source-grid.json.gz"
+    write_source_grid(source, generated, contract=contract())
+
+    assert COMMITTED_BROWSER_GRID.read_bytes() == generated.read_bytes()
+    emitted = _read_document(COMMITTED_BROWSER_GRID)["locationIds"]
+    assert emitted == source.location_ids.ravel().tolist()
 
 
 @pytest.mark.parametrize("tamper", ["string", "float", "boolean", "swapped"])

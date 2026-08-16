@@ -1,18 +1,24 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ManifestRepository } from "../data/manifest-repository";
 import type { ReleaseContext } from "../domain/release";
 
 export const FIXTURE_RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 export const FIXTURE_ORIGIN = "https://fixture.searise.invalid";
-export const FIXTURE_ROOT = resolve(
+export const FIXTURE_PAYLOAD_ROOT = resolve(
   process.cwd(),
   "../../contracts/release/v1/fixtures/release",
   FIXTURE_RELEASE_ID,
 );
+export const FIXTURE_OVERLAY_ROOT = resolve(
+  process.cwd(),
+  "../../contracts/release/v2/fixtures/browser-release",
+  FIXTURE_RELEASE_ID,
+);
 
 export function fixtureBytes(path: string): Uint8Array {
-  return readFileSync(resolve(FIXTURE_ROOT, path));
+  const overlay = resolve(FIXTURE_OVERLAY_ROOT, path);
+  return readFileSync(existsSync(overlay) ? overlay : resolve(FIXTURE_PAYLOAD_ROOT, path));
 }
 
 export function responseBody(bytes: Uint8Array): ArrayBuffer {

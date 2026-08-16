@@ -41,7 +41,13 @@ from .public_contracts import (
     validate_release_rights,
     validate_release_stac,
 )
+from .range_integrity import (
+    RangeIntegrityEvidence,
+    RangeObject,
+    write_range_integrity_index,
+)
 from .reproducibility import compare_release_candidates
+from .source_grid import SourceGridEvidence, write_source_grid
 
 __all__ = [
     "BoundaryGeoParquetEvidence",
@@ -55,6 +61,9 @@ __all__ = [
     "PmtilesEvidence",
     "PublicManifestSummary",
     "PublicReleaseContractError",
+    "RangeIntegrityEvidence",
+    "RangeObject",
+    "SourceGridEvidence",
     "VectorToolchainEvidence",
     "build_source_from_verified_archive",
     "compare_release_candidates",
@@ -82,4 +91,6 @@ __all__ = [
     "write_geoparquet",
     "write_visual_pmtiles",
     "write_source_fixture",
+    "write_range_integrity_index",
+    "write_source_grid",
 ]
