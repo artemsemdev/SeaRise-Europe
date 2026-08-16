@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "semantics": "qualified-context-unicode-tokenization-v1",
+  "optionsSha256": "6f9b9906c0b43b52872eb9730644b6fdcb018052b897d10e7dccee73d65709f9",
+  "query": "Bad Säckingen Baden Württemberg District DE",
+  "expectedPlaceIds": ["geonames:900000007"],
+  "record": {
+    "placeId": "geonames:900000007",
+    "displayName": "Bad Säckingen",
+    "searchNames": [],
+    "countryCode": "DE",
+    "admin1Name": "Baden-Württemberg (District)",
+    "population": 17000,
+    "featureCode": "PPL",
+    "distanceToCoastMeters": 500000,
+    "isCoastal": false,
+    "latitude": 47.5537,
+    "longitude": 7.9461
+  }
+}

@@ -6,6 +6,7 @@ import { brotliDecompressSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import manifest from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
 import queryFixture from "../../../../contracts/search-evaluation/v1/fixtures/queries.synthetic.json";
+import qualifiedContextGolden from "../../../../contracts/search-evaluation/v1/fixtures/qualified-context-unicode.synthetic.json";
 import { mergeRankedResults, normalizeSearchText } from "./ranking";
 import { canonicalJson } from "./contract";
 import {
@@ -95,6 +96,32 @@ describe("release-bound settlement search runtime", () => {
       longitude: -4.4214,
     });
     expect(searchShard(core, "Athens")[0].record.displayName).toBe("Αθήνα");
+  });
+
+  it("matches authoritative Unicode tokenization for punctuated qualified context", () => {
+    const record: SettlementSearchRecord = qualifiedContextGolden.record;
+    const normalizedName = normalizeSearchText(record.displayName);
+    const runtime = {
+      authority: fixture("europe-core").authority,
+      commonIdentity: "qualified-context-parity",
+      records: [undefined, record],
+      index: {
+        entries: [[normalizedName, [1]]],
+        lengths: Uint16Array.of(Array.from(normalizedName).length),
+        signatureHigh: Uint32Array.of(0),
+        signatureLow: Uint32Array.of(0),
+        signatureCounts: new Uint32Array(4),
+        byLength: new Map(),
+      },
+    } as unknown as SearchShardRuntime;
+    const coreFixture = fixture("europe-core");
+    const shardDocument = JSON.parse(new TextDecoder().decode(coreFixture.decoded));
+    const envelope = JSON.parse(Buffer.from(shardDocument.indexBase64, "base64").toString("utf8"));
+    const actual = searchShard(runtime, qualifiedContextGolden.query)
+      .map(({ record: result }) => result.placeId);
+
+    expect(envelope.binding.optionsSha256).toBe(qualifiedContextGolden.optionsSha256);
+    expect(actual).toEqual(qualifiedContextGolden.expectedPlaceIds);
   });
 
   it("deduplicates overlap and appends unseen coastal results after core results", async () => {

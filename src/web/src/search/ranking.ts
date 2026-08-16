@@ -9,6 +9,7 @@ const ADMIN_PRIORITY: Readonly<Record<string, number>> = Object.freeze({
   PPLA5: 1,
 });
 const MARKS = new RegExp("\\p{M}+", "gu");
+const TOKENS = new RegExp("[\\p{L}\\p{N}]+", "gu");
 
 export function normalizeSearchText(value: string): string {
   for (let index = 0; index < value.length; index += 1) {
@@ -35,16 +36,18 @@ export function searchFuzzyAllowance(normalizedQuery: string): 0 | 1 | 2 {
   return length < 4 ? 0 : length < 8 ? 1 : 2;
 }
 
+export function tokenizeSearchText(value: string): readonly string[] {
+  return normalizeSearchText(value).match(TOKENS) ?? [];
+}
+
 export function hasQualifiedContext(
   query: string,
   normalizedName: string,
   record: SettlementSearchRecord,
 ): boolean {
   if (!query.startsWith(`${normalizedName} `)) return false;
-  const context = new Set(
-    normalizeSearchText(`${record.countryCode} ${record.admin1Name ?? ""}`).split(" "),
-  );
-  return query.slice(normalizedName.length + 1).split(" ").every((term) => context.has(term));
+  const context = new Set(tokenizeSearchText(`${record.countryCode} ${record.admin1Name ?? ""}`));
+  return tokenizeSearchText(query.slice(normalizedName.length)).every((term) => context.has(term));
 }
 
 function numericId(value: string): bigint {

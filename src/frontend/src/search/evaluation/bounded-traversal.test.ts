@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
+import qualifiedContextGolden from "../../../../../contracts/search-evaluation/v1/fixtures/qualified-context-unicode.synthetic.json";
 import { boundedTrieAdapter } from "./adapters";
 import { prepareCandidateDocuments, rankDocuments, searchFuzzyAllowance } from "./search";
 import type { SearchDocument } from "./types";
@@ -62,6 +63,26 @@ function recordsFrom(names: readonly string[]): SearchDocument[] {
 function ownerPlaceId(nameIndex: number): string {
   return `synthetic:${Math.floor(nameIndex / NAMES_PER_RECORD) + 1}`;
 }
+
+describe("qualified-context Unicode golden", () => {
+  it("preserves the receipt-bound punctuation tokenization", () => {
+    const documents = prepareCandidateDocuments([{
+      ...qualifiedContextGolden.record,
+      searchNames: [...qualifiedContextGolden.record.searchNames],
+    }]);
+    const index = boundedTrieAdapter.build(documents, {
+      evaluationId: "qualified-context-golden",
+      shardId: "europe-core",
+    });
+    const envelope = JSON.parse(new TextDecoder().decode(boundedTrieAdapter.serialize(index)));
+    const candidates = boundedTrieAdapter.search(index, qualifiedContextGolden.query, 100)
+      .map((ordinal) => documents.find((document) => document.ordinal === ordinal)!);
+
+    expect(envelope.binding.optionsSha256).toBe(qualifiedContextGolden.optionsSha256);
+    expect(rankDocuments(qualifiedContextGolden.query, candidates).map(({ record }) => record.placeId))
+      .toEqual(qualifiedContextGolden.expectedPlaceIds);
+  });
+});
 
 describe("bounded trie traversal at settlement-shard scale", () => {
   const names = multiScriptNames(NAMES_PER_SCRIPT);
