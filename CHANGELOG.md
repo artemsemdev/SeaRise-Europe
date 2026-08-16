@@ -52,7 +52,9 @@ All notable changes to this project will be documented in this file.
   per-resource byte authority. Service-worker installation now verifies the
   exact path, media type, byte size, and SHA-256 of both network responses and
   existing candidate-cache entries before installation can complete, and
-  removes only that incomplete candidate cache on failure.
+  removes only that incomplete candidate cache on failure. Controlled shell
+  reads repeat the same verification, including any missing-entry network
+  recovery, so post-install cache mutation cannot be served.
 
 - Sealed Vite, the browser runtime, the service worker, build inspection, and
   explicit local Candidate mode to one immutable build-identity object. Static

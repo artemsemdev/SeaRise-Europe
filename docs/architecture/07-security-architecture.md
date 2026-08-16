@@ -173,8 +173,12 @@ Service-worker caches are versioned. The built worker contains exactly one
 immutable bootstrap authority with the canonical path, media type, byte size,
 and SHA-256 for every shell resource. Installation verifies both fetched bytes
 and an existing exact-name candidate cache before it can complete. A mismatch
-removes only the incomplete candidate cache; it cannot delete an active or
-unrelated cache. Activation must either expose a complete new shell/manifest
+removes only that exact failed cache; caches for unrelated or differently
+versioned application/release pairs remain untouched. Controlled reads verify
+cached bytes again, and a missing entry is restored only after its network
+response passes the same authority;
+any mismatch quarantines the exact shell cache without touching unrelated
+caches. Activation must either expose a complete new shell/manifest
 pair or retain the previous pair. Data ranges from two releases must never
 share a cache namespace. On a mismatch, malformed response, or missing uncached
 range, the UI returns an honest availability state and does not infer a

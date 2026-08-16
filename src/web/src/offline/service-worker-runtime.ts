@@ -221,6 +221,12 @@ export function createServiceWorkerRuntime(
   );
   const cacheName = `${cacheNamespaces(precache.pair).shell}:${precache.precacheSetSha256}`;
 
+  const exactNetworkRequest = (url: string): Request => new Request(url, {
+    cache: "reload",
+    credentials: "omit",
+    redirect: "error",
+  });
+
   const verifyAuthorityDigest = async (): Promise<void> => {
     const digest = await cryptography.subtle.digest(
       "SHA-256",
@@ -256,14 +262,9 @@ export function createServiceWorkerRuntime(
       try {
         const cache = await dependencies.caches.open(cacheName);
         for (const { entry, url } of absoluteEntries.values()) {
-          const request = new Request(url, {
-            cache: "reload",
-            credentials: "omit",
-            redirect: "error",
-          });
           const response = await requireVerifiedResponse(
             url,
-            await dependencies.fetch(request),
+            await dependencies.fetch(exactNetworkRequest(url)),
             entry,
             cryptography,
           );
@@ -289,8 +290,36 @@ export function createServiceWorkerRuntime(
           : parsed.pathname;
       const candidate = path ? absoluteEntries.get(path) : undefined;
       if (!candidate) return undefined;
-      return dependencies.caches.open(cacheName).then(async (cache) =>
-        (await cache.match(candidate.url)) ?? dependencies.fetch(request as Request));
+      return dependencies.caches.open(cacheName).then(async (cache) => {
+        const cached = await cache.match(candidate.url);
+        if (cached) {
+          try {
+            return await requireVerifiedResponse(
+              candidate.url,
+              cached,
+              candidate.entry,
+              cryptography,
+            );
+          } catch (error) {
+            await dependencies.caches.delete(cacheName);
+            throw error;
+          }
+        }
+
+        try {
+          const response = await requireVerifiedResponse(
+            candidate.url,
+            await dependencies.fetch(exactNetworkRequest(candidate.url)),
+            candidate.entry,
+            cryptography,
+          );
+          await cache.put(candidate.url, response.clone());
+          return response;
+        } catch (error) {
+          await dependencies.caches.delete(cacheName);
+          throw error;
+        }
+      });
     },
     message(value: unknown): OfflineWorkerToClientV1 | undefined {
       let request;

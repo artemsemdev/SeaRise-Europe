@@ -204,6 +204,63 @@ describe("service worker shell runtime", () => {
     expect(test.candidateStore()!.has(`${origin}/?scenario=ssp2-45`)).toBe(false);
   });
 
+  it.each(["mime", "hash"] as const)(
+    "rejects and quarantines a post-install cached %s mutation",
+    async (failure) => {
+      const test = harness();
+      test.stores.set("unrelated-active-cache", new Map([["safe", new Response("safe")]]));
+      await test.runtime.install();
+      const appUrl = `${origin}/assets/app.js`;
+      test.candidateStore()!.set(appUrl, failure === "mime"
+        ? new Response(resourceBodies["/assets/app.js"], { headers: { "Content-Type": "text/css" } })
+        : responseFor("/assets/app.js", "x".repeat(resourceBodies["/assets/app.js"].length)));
+
+      await expect(test.runtime.fetch(request("/assets/app.js"))!).rejects.toThrow(
+        /invalid|sealed authority/,
+      );
+
+      expect(test.deleted).toEqual([test.runtime.cacheName]);
+      expect(test.candidateStore()).toBeUndefined();
+      expect(test.stores.get("unrelated-active-cache")?.has("safe")).toBe(true);
+      expect(test.fetcher).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it("verifies and restores an exact missing entry before serving it", async () => {
+    const test = harness();
+    await test.runtime.install();
+    const appUrl = `${origin}/assets/app.js`;
+    test.candidateStore()!.delete(appUrl);
+
+    const response = await test.runtime.fetch(request("/assets/app.js"))!;
+
+    expect(await response.text()).toBe(resourceBodies["/assets/app.js"]);
+    expect(test.fetcher).toHaveBeenCalledTimes(4);
+    expect(await test.candidateStore()!.get(appUrl)!.text()).toBe(resourceBodies["/assets/app.js"]);
+    expect(test.deleted).toEqual([]);
+  });
+
+  it("rejects a corrupt missing-entry fallback without serving or storing its bytes", async () => {
+    let corruptFallback = false;
+    const test = harness(async (value) => {
+      const path = new URL(value.url).pathname;
+      if (corruptFallback && path === "/assets/app.js") {
+        return responseFor(path, "x".repeat(resourceBodies[path].length));
+      }
+      return responseFor(path);
+    });
+    test.stores.set("unrelated-active-cache", new Map([["safe", new Response("safe")]]));
+    await test.runtime.install();
+    test.candidateStore()!.delete(`${origin}/assets/app.js`);
+    corruptFallback = true;
+
+    await expect(test.runtime.fetch(request("/assets/app.js"))!).rejects.toThrow(/sealed authority/);
+
+    expect(test.deleted).toEqual([test.runtime.cacheName]);
+    expect(test.candidateStore()).toBeUndefined();
+    expect(test.stores.get("unrelated-active-cache")?.has("safe")).toBe(true);
+  });
+
   it("bypasses ranges, non-GET, cross-origin, architecture, and release artifacts", () => {
     const test = harness();
     expect(test.runtime.fetch(request("/assets/app.js", { headers: new Headers({ Range: "bytes=0-1" }) }))).toBeUndefined();
