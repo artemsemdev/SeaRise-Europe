@@ -171,8 +171,10 @@ describe("offline storage and lifecycle policy v1", () => {
 
   it("enforces receipt-last pair lifecycle", () => {
     expect(validatePairLifecycle({ contractVersion: 1, pair: pair(), state: "staging", completenessReceiptSha256: null }).state).toBe("staging");
+    expect(validatePairLifecycle({ contractVersion: 1, pair: pair(), state: "removed", completenessReceiptSha256: null }).state).toBe("removed");
     expect(() => validatePairLifecycle({ contractVersion: 1, pair: pair(), state: "active", completenessReceiptSha256: null })).toThrow(/require/);
     expect(() => validatePairLifecycle({ contractVersion: 1, pair: pair(), state: "staging", completenessReceiptSha256: A })).toThrow(/cannot/);
+    expect(() => validatePairLifecycle({ contractVersion: 1, pair: pair(), state: "removed", completenessReceiptSha256: A })).toThrow(/cannot/);
   });
 
   it("requires rollback to target a different pair", () => {
