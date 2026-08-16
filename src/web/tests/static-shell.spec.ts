@@ -245,6 +245,14 @@ test("API inspection exposes the production-like HEAD, CORS-header, and byte-ran
     "Accept-Ranges, Content-Length, Content-Range, ETag",
   );
   expect(head.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+
+  const malformedUrl = await page.request.get(
+    `http://127.0.0.1:8091/releases/${releaseId}/layers/%ZZ.pmtiles`,
+  );
+  expect(malformedUrl.status()).toBe(400);
+  const subsequentValid = await page.request.get(artifactUrl, { headers: { Range: "bytes=0-0" } });
+  expect(subsequentValid.status()).toBe(206);
+  expect(await subsequentValid.body()).toHaveLength(1);
 });
 
 test("Vite preview makes PMTiles network-only while other release artifacts stay immutable", async ({ page }) => {
@@ -252,6 +260,7 @@ test("Vite preview makes PMTiles network-only while other release artifacts stay
   const pmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
     headers: { Range: "bytes=0-127" },
   });
+  const pmtilesHead = await page.request.head(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`);
   const refusedPmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
     headers: { Range: "bytes=9999999-10000000" },
   });
@@ -261,9 +270,15 @@ test("Vite preview makes PMTiles network-only while other release artifacts stay
   expect(pmtiles.headers()["cache-control"]).toBe("no-store");
   expect(pmtiles.headers()["content-range"]).toBe("bytes 0-127/624674");
   expect(pmtiles.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(pmtiles.headers().etag).toMatch(/^"sha256-[0-9a-f]{64}"$/);
+  expect(pmtilesHead.status()).toBe(200);
+  expect(pmtilesHead.headers()["cache-control"]).toBe("no-store");
+  expect(pmtilesHead.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(pmtilesHead.headers().etag).toBe(pmtiles.headers().etag);
   expect(refusedPmtiles.status()).toBe(416);
   expect(refusedPmtiles.headers()["cache-control"]).toBe("no-store");
   expect(refusedPmtiles.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(refusedPmtiles.headers().etag).toBe(pmtiles.headers().etag);
   expect(analysis.status()).toBe(200);
   expect(analysis.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
 });

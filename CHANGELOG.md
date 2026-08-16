@@ -37,11 +37,13 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 - Routed every visual PMTiles byte request through a supported custom PMTiles
-  `Source` that enforces the exact release URL, bounded Range and ETag
+  `Source` that enforces the exact release URL, manifest byte size and SHA-bound
+  strong ETag, bounded Range and short-archive retry
   semantics, `Request.cache = no-store`, and a `no-store` response. PMTiles
   remains visual-only and is excluded from Cache Storage, IndexedDB, session
   storage, and the service-worker precache; Vite preview now serves PMTiles as
-  `no-store` while retaining immutable caching for other release artifacts.
+  `no-store` through one portable delivery policy while retaining immutable
+  caching for analysis COGs and other release artifacts.
 
 - Accepted ADR-026 after real Chromium, Firefox, and WebKit measurements showed
   that Cache Storage rejects `206` responses and range requests can match a

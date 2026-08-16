@@ -275,7 +275,7 @@ export interface RangeArtifactAuthorityV1 {
   readonly contractVersion: 1;
   readonly pair: AppReleasePairV1;
   readonly artifactId: string;
-  readonly role: "projection-analysis-cog" | "projection-visual-pmtiles";
+  readonly role: "projection-analysis-cog";
   readonly canonicalUrl: CanonicalResourceUrl;
   readonly path: string;
   readonly mediaType: string;
@@ -298,7 +298,9 @@ export function validateRangeArtifactAuthority(value: unknown): RangeArtifactAut
     "totalByteSize", "artifactSha256", "etag", "integrityChunkSize",
   ], "range artifact authority");
   if (record.contractVersion !== OFFLINE_CONTRACT_VERSION) fail("Unsupported offline contract version.");
-  if (record.role !== "projection-analysis-cog" && record.role !== "projection-visual-pmtiles") fail("Range persistence is limited to analysis COGs and visual-only PMTiles.");
+  if (record.role !== "projection-analysis-cog") {
+    fail("Range persistence is limited to integrity-authorized analysis COGs.");
+  }
   const artifactSha256 = sha256Hex(record.artifactSha256, "artifactSha256");
   const etag = validateRequiredEtag(record.etag, "etag");
   if (etag !== `"sha256-${artifactSha256}"`) fail("Range ETag must bind the complete artifact SHA-256.");

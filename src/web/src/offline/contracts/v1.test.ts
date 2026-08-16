@@ -27,15 +27,15 @@ const whole = (release = "release-a") => ({
   role: "methodology", canonicalUrl: `https://static.example/releases/${release}/docs/methodology.json`,
   path: "docs/methodology.json", mediaType: "application/json", byteSize: 256, sha256: B, etag: `"sha256-${B}"`,
 } as const);
-const rangeAuthority = (role: "projection-analysis-cog" | "projection-visual-pmtiles" = "projection-analysis-cog") => ({
-  contractVersion: 1, pair: pair(), artifactId: `${role}-ssp2-45-2050`, role,
-  canonicalUrl: `https://static.example/releases/release-a/layers/ssp2-45/2050.${role === "projection-analysis-cog" ? "tif" : "pmtiles"}`,
-  path: `layers/ssp2-45/2050.${role === "projection-analysis-cog" ? "tif" : "pmtiles"}`,
-  mediaType: role === "projection-analysis-cog" ? "image/tiff; application=geotiff; profile=cloud-optimized" : "application/vnd.pmtiles",
+const rangeAuthority = () => ({
+  contractVersion: 1, pair: pair(), artifactId: "projection-analysis-cog-ssp2-45-2050", role: "projection-analysis-cog",
+  canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.tif",
+  path: "layers/ssp2-45/2050.tif",
+  mediaType: "image/tiff; application=geotiff; profile=cloud-optimized",
   totalByteSize: 131100, artifactSha256: C, etag: `"sha256-${C}"`, integrityChunkSize: 65536,
 } as const);
-const range = (role: "projection-analysis-cog" | "projection-visual-pmtiles" = "projection-analysis-cog") => ({
-  contractVersion: 1, authority: rangeAuthority(role), interval: { start: 65536, endExclusive: 131072 }, authorizedIntervalSha256: B,
+const range = () => ({
+  contractVersion: 1, authority: rangeAuthority(), interval: { start: 65536, endExclusive: 131072 }, authorizedIntervalSha256: B,
 } as const);
 
 describe("offline authority foundation v1", () => {
@@ -101,12 +101,19 @@ describe("offline authority foundation v1", () => {
   it("binds range authority to complete artifact digest and ETag", () => {
     expect(validateRangeArtifactAuthority(rangeAuthority()).artifactSha256).toBe(C);
     expect(() => validateRangeArtifactAuthority({ ...rangeAuthority(), etag: `"sha256-${A}"` })).toThrow(/bind/);
+    expect(() => validateRangeArtifactAuthority({
+      ...rangeAuthority(),
+      role: "projection-visual-pmtiles",
+      canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.pmtiles",
+      path: "layers/ssp2-45/2050.pmtiles",
+      mediaType: "application/vnd.pmtiles",
+    })).toThrow(/integrity-authorized analysis COGs/);
   });
 
-  it.each(["projection-analysis-cog", "projection-visual-pmtiles"] as const)("requires an authorized complete chunk for %s", (role) => {
-    expect(validateRangeIdentity(range(role)).authorizedIntervalSha256).toBe(B);
-    expect(() => validateRangeIdentity({ ...range(role), authorizedIntervalSha256: undefined })).toThrow();
-    expect(() => validateRangeIdentity({ ...range(role), interval: { start: 65536, endExclusive: 65552 } })).toThrow(/complete authorized/);
+  it("requires an authorized complete chunk for an analysis COG", () => {
+    expect(validateRangeIdentity(range()).authorizedIntervalSha256).toBe(B);
+    expect(() => validateRangeIdentity({ ...range(), authorizedIntervalSha256: undefined })).toThrow();
+    expect(() => validateRangeIdentity({ ...range(), interval: { start: 65536, endExclusive: 65552 } })).toThrow(/complete authorized/);
   });
 
   it("accepts the shorter final authorized chunk", () => {

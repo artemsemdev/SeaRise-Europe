@@ -1,8 +1,9 @@
 import { cpSync, createReadStream, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { extname, resolve, sep } from "node:path";
+import { resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
+import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
 
 const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
@@ -41,16 +42,6 @@ function forbiddenViteFilesystemRequest(requestUrl: string | undefined): boolean
     (root) => target === root || target.startsWith(`${root}${sep}`),
   );
 }
-const releaseMediaTypes: Readonly<Record<string, string>> = Object.freeze({
-  ".json": "application/json",
-  ".jsonl": "application/x-ndjson",
-  ".gz": "application/gzip",
-  ".parquet": "application/vnd.apache.parquet",
-  ".pmtiles": "application/vnd.pmtiles",
-  ".tif": "image/tiff; application=geotiff; profile=cloud-optimized",
-  ".txt": "text/plain",
-});
-
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repositoryRoot, "SEARISE_");
   const releaseId =
@@ -104,7 +95,10 @@ export default defineConfig(({ mode }) => {
         configurePreviewServer(server) {
           const releaseRoot = resolve(import.meta.dirname, "dist/releases", releaseId);
           const manifest = JSON.parse(readFileSync(resolve(releaseRoot, "manifest.json"), "utf8")) as {
-            artifacts: Array<{ path: string; sha256: string }>;
+            artifacts: Array<{
+              artifactId: string; role: string; path: string; mediaType: string;
+              byteSize: number; sha256: string;
+            }>;
           };
           const artifactByPath = new Map(
             manifest.artifacts.map((artifact) => [artifact.path, artifact]),
@@ -139,17 +133,22 @@ export default defineConfig(({ mode }) => {
               response.writeHead(404).end();
               return;
             }
-            const responseCacheControl = extname(path) === ".pmtiles"
-              ? "no-store"
-              : "public, max-age=31536000, immutable";
-            const responseContentType = releaseMediaTypes[extname(path)] ?? "application/octet-stream";
+            const artifact = artifactByPath.get(relativePath);
+            let delivery: ReturnType<typeof releaseDeliveryPolicy>;
+            try {
+              delivery = releaseDeliveryPolicy(relativePath, artifact, size);
+            } catch {
+              response.writeHead(500, { "Cache-Control": "no-store" }).end();
+              return;
+            }
             const rangeHeader = request.headers.range;
             const range = rangeHeader ? /^bytes=(\d+)-(\d*)$/.exec(rangeHeader) : null;
             if (rangeHeader && !range) {
               response.writeHead(416, {
-                "Cache-Control": responseCacheControl,
+                "Cache-Control": delivery.cacheControl,
                 "Content-Range": `bytes */${size}`,
-                "Content-Type": responseContentType,
+                "Content-Type": delivery.contentType,
+                ...(delivery.etag ? { ETag: delivery.etag } : {}),
               }).end();
               return;
             }
@@ -163,22 +162,22 @@ export default defineConfig(({ mode }) => {
               start >= size
             ) {
               response.writeHead(416, {
-                "Cache-Control": responseCacheControl,
+                "Cache-Control": delivery.cacheControl,
                 "Content-Range": `bytes */${size}`,
-                "Content-Type": responseContentType,
+                "Content-Type": delivery.contentType,
+                ...(delivery.etag ? { ETag: delivery.etag } : {}),
               }).end();
               return;
             }
-            const artifact = artifactByPath.get(relativePath);
             const headers = {
               "Accept-Ranges": "bytes",
               "Access-Control-Allow-Origin": "http://127.0.0.1:4173",
               "Access-Control-Allow-Methods": "GET, HEAD",
               "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, ETag",
-              "Cache-Control": responseCacheControl,
+              "Cache-Control": delivery.cacheControl,
               "Content-Length": String(end - start + 1),
-              "Content-Type": responseContentType,
-              ...(artifact ? { ETag: `"sha256-${artifact.sha256}"` } : {}),
+              "Content-Type": delivery.contentType,
+              ...(delivery.etag ? { ETag: delivery.etag } : {}),
               ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}),
               Vary: "Origin",
             };
