@@ -44,16 +44,24 @@ import { releaseScopeStatus } from "./release-copy";
 import { isForbiddenApplicationApiPath } from "./test/application-api-boundary";
 
 vi.mock("./components/map/MapExplorer", () => ({
-  default: ({ selection, onSelection, context }: {
+  default: ({ selection, journeyActive, journeyTarget, journeyMotionSkipToken, onSelection, context }: {
     selection?: Selection;
+    journeyActive?: boolean;
+    journeyTarget?: { latitude: number; longitude: number };
+    journeyMotionSkipToken?: number;
     onSelection: (selection: Selection) => void;
     context: ReleaseContext;
   }) => (
     <section aria-label="Test map composition">
       <h2>Explore the source grid</h2>
-      <output data-testid="map-accepted-selection">
+      <div data-testid="map-accepted-selection">
         {selection ? `${selection.scenario}/${selection.horizon}/${selection.location.coordinates.latitude}` : "preview-only"}
-      </output>
+      </div>
+      <div data-testid="map-journey-active">{journeyActive ? "true" : "false"}</div>
+      <div data-testid="map-journey-target">
+        {journeyTarget ? `${journeyTarget.latitude}/${journeyTarget.longitude}` : "none"}
+      </div>
+      <div data-testid="map-motion-skip-token">{journeyMotionSkipToken ?? 0}</div>
       <button type="button" onClick={() => onSelection(Object.freeze({
         dataReleaseId: context.dataReleaseId,
         scenario: selection?.scenario ?? context.defaults.scenario,
@@ -263,6 +271,24 @@ class TestController implements AssessmentControllerPort {
     deferred.resolve();
   }
 
+  failDeferredAssessment(
+    error: TechnicalFailure["detail"],
+    availability?: "offline" | "connection-required",
+  ): void {
+    const deferred = this.#deferred;
+    if (!deferred) throw new Error("No deferred selection.");
+    this.#deferred = null;
+    const guard = {
+      operationToken: deferred.operationToken,
+      selectionKey: selectionKey(deferred.selection),
+      dataReleaseId: deferred.selection.dataReleaseId,
+    };
+    this.#publish(projectionReducer(this.#state, availability
+      ? { type: "operation-unavailable", availability, error, ...guard }
+      : { type: "operation-failed", error, ...guard }));
+    deferred.resolve();
+  }
+
   rejectNextSelection(error: unknown): void {
     this.select.mockImplementationOnce(async () => Promise.reject(error));
   }
@@ -418,7 +444,7 @@ function urlFor(
 
 async function waitForRuntime(records: RuntimeRecord[]): Promise<TestController> {
   await waitFor(() => expect(records.length).toBeGreaterThan(0));
-  await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: /select test map point/i })).toBeEnabled());
   return records.at(-1)!.controller;
 }
 
@@ -452,12 +478,17 @@ describe("production static application composition", () => {
     const runtime = runtimeFactory();
     render(<App runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
 
-    expect(screen.getByRole("heading", { level: 1, name: /explore regional sea-level projections across Europe/i })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: /take me there/i })).toBeVisible();
     expect(screen.getByText(/synthetic fixture · illustrative only/i)).toBeVisible();
-    expect(screen.getByRole("navigation", { name: /primary/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /methodology and sources/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /skip to content/i })).toHaveAttribute("href", "#main");
-    expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
+    expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
+    expect(document.querySelector(".flight-scene")).toBeInTheDocument();
+    expect(document.querySelector("[data-flight-phase='idle']")).toBeInTheDocument();
+    expect(screen.getAllByRole("status")).toHaveLength(2);
+    expect(document.querySelector(".selection-status")).toHaveAttribute("aria-live", "polite");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("aria-live", "polite");
   });
 
   it("binds landing release disclosure to verified bootstrap disposition", () => {
@@ -516,6 +547,78 @@ describe("production static application composition", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("moves from idle through a truthful Flight transition before revealing the first result", async () => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    expect(document.querySelector("[data-flight-phase='idle'] .flight-search")).toBeInTheDocument();
+
+    controller.deferNextSelection = true;
+    await user.click(await screen.findByRole("button", { name: /select test map point/i }));
+    expect(document.querySelector("[data-flight-phase='transition'] .flight-scene")).toBeInTheDocument();
+    expect(screen.getByText(/flying to the selected point/i)).toBeVisible();
+    expect(document.querySelector("[data-outcome]")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /skip motion/i }));
+    expect(document.querySelector("[data-flight-phase='transition']")).toBeInTheDocument();
+    expect(screen.getByTestId("map-motion-skip-token")).toHaveTextContent("1");
+    expect(screen.getByText(/camera motion skipped/i)).toBeVisible();
+    expect(document.querySelector("[data-outcome]")).toBeNull();
+
+    act(() => controller.resolveDeferred());
+    await waitFor(() => expect(document.querySelector("[data-flight-phase='result'] .flight-result")).toBeInTheDocument());
+    expect(document.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", "OutOfScope");
+    expect(screen.queryByText(/flying to the selected point/i)).not.toBeInTheDocument();
+  });
+
+  it("moves focus from a selected search result to progress, result, and reset search", async () => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+
+    controller.deferNextSelection = true;
+    await user.type(input, "Fixture");
+    await user.click(await screen.findByRole("option", { name: /Fixturehafen/i }));
+    await waitFor(() => expect(screen.getByText(/selected place accepted/i)).toHaveFocus());
+
+    act(() => controller.resolveDeferred());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /outside the coastal analysis area/i })).toHaveFocus());
+
+    await user.click(screen.getByRole("button", { name: /reset selection/i }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toHaveFocus());
+  });
+
+  it.each([
+    ["technical-error", { kind: "technical-error", code: "FetchFailed", message: "Temporary fetch failure.", recoverable: true }, undefined],
+    ["integrity-error", { kind: "technical-error", code: "IntegrityFailed", message: "Selected bytes failed integrity verification.", recoverable: false }, undefined],
+    ["offline", { kind: "technical-error", code: "FetchFailed", message: "Selected bytes are not cached.", recoverable: true }, "offline"],
+    ["connection-required", { kind: "technical-error", code: "FetchFailed", message: "A connection is required.", recoverable: true }, "connection-required"],
+  ] as const)("moves focus from the selected-place transition to a visible %s alert", async (
+    phase,
+    error,
+    availability,
+  ) => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+
+    controller.deferNextSelection = true;
+    await user.type(input, "Fixture");
+    await user.click(await screen.findByRole("option", { name: /Fixturehafen/i }));
+    await waitFor(() => expect(screen.getByText(/selected place accepted/i)).toHaveFocus());
+
+    act(() => controller.failDeferredAssessment(error, availability));
+    const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(alert).toHaveFocus());
+    expect(document.querySelector(".projection-panel")).toHaveAttribute("data-phase", phase);
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   it("keeps the accepted result on the map while one new command is pending, then swaps atomically", async () => {
     const runtime = runtimeFactory();
     const user = userEvent.setup();
@@ -523,17 +626,23 @@ describe("production static application composition", () => {
     render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
     const controller = await waitForRuntime(runtime.records);
     await screen.findByText(/outside the coastal analysis area/i);
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     expect(await screen.findByTestId("map-accepted-selection")).toHaveTextContent("ssp2-45/2050/51.9");
 
     controller.deferNextSelection = true;
     await user.click(screen.getByLabelText(/Higher-emissions scenario/i));
+    expect(document.querySelector("[data-flight-phase='result']")).toBeInTheDocument();
+    expect(document.querySelector(".projection-panel[data-phase='updating']")).toBeInTheDocument();
+    expect(screen.queryByText(/flying to the selected point/i)).not.toBeInTheDocument();
+    expect(document.querySelector(".flight-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("map-journey-active")).toHaveTextContent("false");
+    expect(screen.getByTestId("map-journey-target")).toHaveTextContent("none");
     expect(screen.getByText(/previous accepted result.*new selection is being checked/i)).toBeVisible();
     expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp2-45/2050/51.9");
     expect(controller.select).toHaveBeenCalledTimes(2);
 
     act(() => controller.resolveDeferred());
     await waitFor(() => expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp5-85/2050/51.9"));
+    expect(document.querySelector("[data-flight-phase='result']")).toBeInTheDocument();
   });
 
   it("announces a terminal assessment failure without implying that evaluation is still running", async () => {
@@ -548,7 +657,6 @@ describe("production static application composition", () => {
       recoverable: true,
     });
 
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
 
     const status = document.querySelector(".selection-status");
@@ -569,7 +677,7 @@ describe("production static application composition", () => {
     const controller = await waitForRuntime(runtime.records);
     expect(await screen.findByText(/outside the coastal analysis area/i)).toBeVisible();
     expect(document.querySelector(".selection-status")).toHaveTextContent(
-      "The accepted projection is shown below.",
+      "The accepted projection is shown in the result panel.",
     );
     controller.failNextAssessment({
       kind: "technical-error",
@@ -584,7 +692,7 @@ describe("production static application composition", () => {
       /technical failure.*not a DataUnavailable scientific outcome/i,
     );
     expect(document.querySelector(".selection-status")).toHaveTextContent(
-      "The previous accepted projection remains shown below; the latest operation ended in a technical failure.",
+      "The previous accepted projection remains in the result panel; the latest operation ended in a technical failure.",
     );
     expect(document.querySelector(".selection-status")).not.toHaveTextContent(/being checked/i);
     expect(document.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", "OutOfScope");
@@ -610,12 +718,7 @@ describe("production static application composition", () => {
     expect(screen.getByText(/share link is ready in the browser address bar/i)).toBeVisible();
     expect(environment.url.searchParams.get("release")).toBe(releaseContext.dataReleaseId);
 
-    const search = screen.getByRole("combobox", { name: /find a city/i });
-    await user.type(search, "Fixture");
-    expect(await screen.findByRole("option", { name: /Fixturehafen/i })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
-    expect(search).toHaveValue("");
     expect(screen.queryByRole("listbox", { name: /settlement results/i })).not.toBeInTheDocument();
     expect(controller.select).toHaveBeenLastCalledWith(expect.objectContaining({
       location: { kind: "coordinate", coordinates: { latitude: 42, longitude: 7 } },
@@ -640,7 +743,7 @@ describe("production static application composition", () => {
     expect(controller.cancelSearch).toHaveBeenCalled();
     expect(controller.reset).toHaveBeenCalledOnce();
     expect(environment.url.searchParams.has("release")).toBe(false);
-    expect(screen.getByText(/choose a settlement or point/i)).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: /take me there/i })).toBeVisible();
   });
 
   it("deduplicates only duplicate StrictMode initial delivery and accepts the same later popstate", async () => {
@@ -726,7 +829,6 @@ describe("production static application composition", () => {
       message: "Stale release selection.",
       recoverable: false,
     }));
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/selection command failed.*not a scientific outcome/i);
   });

@@ -169,7 +169,7 @@ export function MethodologyDialog({
         </button>
       </div>
 
-      <p className="methodology-dialog__disposition" role="status">
+      <p className="methodology-dialog__disposition">
         {DISPOSITION_COPY[trustedMethodology.disposition]}
       </p>
 

@@ -21,9 +21,15 @@ and VoiceOver. This record therefore does not claim that the screen-reader
 narration Definition of Done item is complete.
 
 Automated Playwright keyboard, focus, reduced-motion, and axe evidence remains
-in `src/web/tests/projection-ux.spec.ts`. That automation passed 45/45 tests
-across desktop, Pixel 7 mobile, and reduced-motion Chromium, but it is not used
-as a substitute for the unavailable human VoiceOver check.
+in `src/web/tests/projection-ux.spec.ts` and `src/web/tests/static-shell.spec.ts`.
+The current suite runs those checks across desktop, Pixel 7 mobile, and
+reduced-motion Chromium, but it is not used as a substitute for the unavailable
+human VoiceOver check. The exact pass count belongs in the validation log for
+the commit under test rather than in this manual-review record.
+
+The observations below are historical evidence for the reviewed commit named
+above. They must not be read as a manual review of later focus or live-region
+changes.
 
 ## Browser-assisted keyboard review
 
@@ -42,6 +48,43 @@ as a substitute for the unavailable human VoiceOver check.
 
 No Candidate-v7, TAR, ignored local-data path, external service, application
 API, or public storage was used.
+
+## Follow-up automated accessibility coverage
+
+The focused follow-up commit that contains this section adds production-build
+browser assertions for behaviors that could not be rechecked manually in the
+blocked macOS session:
+
+- the complete initial tab sequence is skip link, home link, methodology
+  button, then settlement search;
+- idle map legend, attribution, visual-band controls, and MapLibre controls are
+  absent from the tab order and accessibility tree;
+- selecting a search result moves focus to the lookup transition, then to the
+  accepted outcome heading; reset returns focus to settlement search;
+- one authoritative polite assessment live region reports evaluation, accepted
+  outcome, share, and technical-operation state, while a distinct search live
+  region announces only the current local result status without duplicating the
+  assessment announcement;
+- after the first selected-place transition, technical, integrity, offline, and
+  connection-required failures move focus to the visible failure alert instead
+  of dropping focus to the document body;
+- scenario or horizon changes at the same location retain the accepted result
+  atomically without camera flight or "Flying" copy;
+- delayed superseded Worker search responses cannot replace the newest query;
+- every completed outcome visibly includes the full product-boundary caveat.
+- desktop and 390 px mobile controls retain a single segmented row, while the
+  mobile hero/header geometry and idle map chrome remain aligned with Flight;
+  the 320 px layout has no horizontal overflow.
+
+These are automated assertions, not a human VoiceOver pass. The pending
+human-only gate below remains open and unchanged.
+
+On 2026-08-16, the production static build passed the complete Playwright
+suite with the permanent single-worker timing isolation: `57 passed` across
+desktop Chromium, Pixel 7 mobile Chromium, and reduced-motion Chromium. The
+same follow-up also passed lint, type-check, 303 unit/integration tests, the
+production build, target-content checks, and fixture/contract checks through
+`npm run web:check`.
 
 ## Pending human-only gate
 

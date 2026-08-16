@@ -17,6 +17,7 @@ import {
 import type { AssessmentResult } from "../domain/scientific-lookup";
 import type { ReleaseMethodology } from "../data/methodology-repository";
 import type { RefObject } from "react";
+import { ArrowCounterClockwise, BookOpenText, ShareNetwork } from "@phosphor-icons/react";
 import "./ProjectionPanel.css";
 
 const SCENARIO_LABELS: Readonly<Record<ScenarioId, string>> = Object.freeze({
@@ -25,12 +26,20 @@ const SCENARIO_LABELS: Readonly<Record<ScenarioId, string>> = Object.freeze({
   "ssp5-85": "Higher-emissions scenario (SSP5-8.5)",
 });
 
+const SCENARIO_SHORT_LABELS: Readonly<Record<ScenarioId, string>> = Object.freeze({
+  "ssp1-26": "SSP1-2.6",
+  "ssp2-45": "SSP2-4.5",
+  "ssp5-85": "SSP5-8.5",
+});
+
 const REQUIRED_DISCLAIMER =
   "This regional sea-level projection is for informational and educational use. " +
   "It does not determine flooding, inundation, terrain exposure, or property risk. " +
   "It is not an engineering assessment, structural survey, legal determination, " +
   "insurance evaluation, mortgage guidance, or financial advice. Do not use it as " +
   "a substitute for appropriate professional or local evidence.";
+const RESULT_CAVEAT =
+  "This result does not determine flooding, inundation, terrain exposure, flood probability, or property risk.";
 
 export interface ProjectionPanelProps {
   readonly state: ProjectionState;
@@ -41,6 +50,9 @@ export interface ProjectionPanelProps {
   readonly onShare: () => void;
   readonly onOpenMethodology: () => void;
   readonly methodologyTriggerRef?: RefObject<HTMLButtonElement | null>;
+  readonly showMethodologyAction?: boolean;
+  readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
+  readonly failureAlertRef?: RefObject<HTMLDivElement | null>;
 }
 
 function assertNever(value: never): never {
@@ -101,19 +113,25 @@ function methodologyMatches(
       "ProjectionAvailable\0DataUnavailable\0OutOfScope\0UnsupportedGeography";
 }
 
-function PhaseMessage({ state }: { readonly state: ProjectionState }): React.ReactNode {
+function PhaseMessage({
+  state,
+  failureAlertRef,
+}: {
+  readonly state: ProjectionState;
+  readonly failureAlertRef?: RefObject<HTMLDivElement | null>;
+}): React.ReactNode {
   switch (state.phase) {
     case "booting":
-      return <p role="status">Loading and verifying the pinned data release…</p>;
+      return <p>Loading and verifying the pinned data release…</p>;
     case "ready":
-      return <p role="status">Choose a settlement or point to check the selected data.</p>;
+      return <p>Choose a settlement or point to check the selected data.</p>;
     case "searching":
-      return <p role="status">Searching places locally…</p>;
+      return <p>Searching places locally…</p>;
     case "evaluating":
-      return <p role="status">Checking the selected point against the selected data…</p>;
+      return <p>Checking the selected point against the selected data…</p>;
     case "updating":
       return (
-        <div className="projection-panel__update" role="status">
+        <div className="projection-panel__update">
           <strong>Checking a new selection</strong>
           {selectedLocation(state.operation.selection)}
           <span>{SCENARIO_LABELS[state.operation.selection.scenario]} · exact ID {state.operation.selection.scenario} · {state.operation.selection.horizon}</span>
@@ -123,13 +141,13 @@ function PhaseMessage({ state }: { readonly state: ProjectionState }): React.Rea
     case "result":
       return null;
     case "offline":
-      return <FailureMessage error={state.error} title="Selected data not available offline" body="Reconnect to load the uncached artifacts for this exact selection. No scientific outcome was produced for the failed operation." />;
+      return <FailureMessage focusRef={failureAlertRef} error={state.error} title="Selected data not available offline" body="Reconnect to load the uncached artifacts for this exact selection. No scientific outcome was produced for the failed operation." />;
     case "connection-required":
-      return <FailureMessage error={state.error} title="Connection required for selected data" body="The required immutable data is not cached. Reconnect and retry this exact selection; no substitute was used." />;
+      return <FailureMessage focusRef={failureAlertRef} error={state.error} title="Connection required for selected data" body="The required immutable data is not cached. Reconnect and retry this exact selection; no substitute was used." />;
     case "unsupported-browser":
     case "integrity-error":
     case "technical-error":
-      return <FailureMessage error={state.error} />;
+      return <FailureMessage focusRef={failureAlertRef} error={state.error} />;
     default:
       return assertNever(state);
   }
@@ -139,14 +157,22 @@ function FailureMessage({
   error,
   title,
   body,
+  focusRef,
 }: {
   readonly error: TechnicalError;
   readonly title?: string;
   readonly body?: string;
+  readonly focusRef?: RefObject<HTMLDivElement | null>;
 }): React.ReactNode {
   const presentation = technicalErrorPresentation(error);
   return (
-    <div className="projection-panel__failure" role="alert" data-technical-error={error.code}>
+    <div
+      ref={focusRef}
+      className="projection-panel__failure"
+      role="alert"
+      tabIndex={focusRef ? -1 : undefined}
+      data-technical-error={error.code}
+    >
       <strong>{title ?? presentation.title}</strong>
       <span>{body ?? `${error.message} ${presentation.guidance}`}</span>
       <span>Technical failure — not a DataUnavailable scientific outcome.</span>
@@ -175,10 +201,11 @@ function SelectionControls({
               type="radio"
               name="projection-scenario"
               value={scenario}
+              aria-label={`${SCENARIO_LABELS[scenario]}, exact ID ${scenario}`}
               checked={selection.scenario === scenario}
               onChange={() => changeScenario(scenario)}
             />
-            <span>{SCENARIO_LABELS[scenario]} <code>{scenario}</code></span>
+            <span>{SCENARIO_SHORT_LABELS[scenario]}</span>
           </label>
         ))}
       </fieldset>
@@ -233,10 +260,12 @@ function OutcomeContent({
   accepted,
   methodology,
   contextLabel,
+  resultHeadingRef,
 }: {
   readonly accepted: AcceptedProjection;
   readonly methodology: ReleaseMethodology;
   readonly contextLabel: string | null;
+  readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }): React.ReactNode {
   const { result, selection } = accepted;
   const scenarioLabel = SCENARIO_LABELS[result.scenario];
@@ -245,7 +274,7 @@ function OutcomeContent({
     case "ProjectionAvailable":
       content = (
         <>
-          <h3>Projected regional sea-level change available</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Projected regional sea-level change available</h3>
           <p>
             Near this point, IPCC AR6 projects a median regional relative sea-level change of
             {` ${result.medianMetres.toFixed(3)} m`} by <strong>{result.horizon}</strong> under
@@ -253,36 +282,17 @@ function OutcomeContent({
             likely range (q0.167–q0.833) is <strong>{result.lowerMetres.toFixed(3)}–{result.upperMetres.toFixed(3)} m</strong>,
             relative to the <strong>{result.baseline}</strong>.
           </p>
-          <dl className="projection-panel__metadata">
-            <div><dt>Source-grid location</dt><dd>{result.source.latitude.toFixed(4)}°, {result.source.longitude.toFixed(4)}°</dd></div>
+          <dl className="projection-panel__primary-facts">
             <div><dt>Source-grid distance</dt><dd>{result.source.distanceKilometres.toFixed(3)} km</dd></div>
             <div><dt>Native resolution</dt><dd>{result.nativeResolutionDegrees}°</dd></div>
-            <div><dt>Methodology version</dt><dd><code>{result.methodologyVersion}</code></dd></div>
-            <div><dt>Data release</dt><dd><code>{result.dataReleaseId}</code></dd></div>
-            <div><dt>AR6 source release</dt><dd><code>{result.sourceRelease}</code></dd></div>
           </dl>
-          <section aria-labelledby="projection-source-title">
-            <h4 id="projection-source-title">Source and licence</h4>
-            <p>{methodology.source.attributionText}</p>
-            <p>
-              <a href={methodology.source.sourceUrl} rel="noreferrer">{methodology.source.title}</a>
-              {" · "}
-              <a href={methodology.source.licence.url} rel="noreferrer">
-                {methodology.source.licence.name} ({methodology.source.licence.spdxId})
-              </a>
-            </p>
-          </section>
-          <section aria-labelledby="projection-limitations-title">
-            <h4 id="projection-limitations-title">Limitations</h4>
-            <ul>{methodology.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
-          </section>
         </>
       );
       break;
     case "DataUnavailable":
       content = (
         <>
-          <h3>Model data unavailable for this point</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Model data unavailable for this point</h3>
           <p>
             The active dataset has no usable value for this point under {scenarioLabel} (exact ID <code>{result.scenario}</code>) in {result.horizon}.
             No other scenario, year, dataset, source-grid location, or value was substituted. This is not a zero-change or no-risk result.
@@ -298,7 +308,7 @@ function OutcomeContent({
     case "OutOfScope":
       content = (
         <>
-          <h3>Outside the coastal analysis area</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Outside the coastal analysis area</h3>
           <p>
             This point is inside the supported Europe geometry but outside the versioned coastal analysis area.
             SeaRise Europe does not assess inland hazards. Search another settlement or choose a point closer to the coast.
@@ -310,7 +320,7 @@ function OutcomeContent({
     case "UnsupportedGeography":
       content = (
         <>
-          <h3>Outside the supported Europe area</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Outside the supported Europe area</h3>
           <p>
             This point is outside the geography supported by the current SeaRise Europe release.
             Search a supported European settlement or choose another point. This is a normal domain outcome, not an application error.
@@ -323,16 +333,45 @@ function OutcomeContent({
   }
 
   return (
-    <article className="projection-panel__outcome" data-outcome={result.resultState} aria-labelledby="projection-outcome-title">
-      {contextLabel === null ? (
-        <p className="projection-panel__sr-only" role="status">Scientific outcome updated: {result.resultState}.</p>
-      ) : null}
+    <article className="projection-panel__outcome" data-outcome={result.resultState} aria-labelledby="projection-outcome-heading">
       {contextLabel ? <p className="projection-panel__context-label">{contextLabel}</p> : null}
-      <div id="projection-outcome-title">{content}</div>
+      <p className="projection-panel__outcome-badge">{result.resultState}</p>
+      <div className="projection-panel__outcome-content">{content}</div>
       {selectedLocation(selection)}
-      <p><strong>Release status:</strong> {dispositionCopy(methodology)}</p>
-      <p><strong>Map meaning:</strong> {mapMeaning(result)}</p>
-      <p className="projection-panel__disclaimer">{REQUIRED_DISCLAIMER}</p>
+      <p className="projection-panel__result-caveat">{RESULT_CAVEAT}</p>
+      <details className="projection-panel__disclosure">
+        <summary>Limitations, method and release identity</summary>
+        <div className="projection-panel__disclosure-content">
+          {result.resultState === "ProjectionAvailable" ? (
+            <dl className="projection-panel__metadata">
+              <div><dt>Source-grid location</dt><dd>{result.source.latitude.toFixed(4)}°, {result.source.longitude.toFixed(4)}°</dd></div>
+              <div><dt>Source-grid distance</dt><dd>{result.source.distanceKilometres.toFixed(3)} km</dd></div>
+              <div><dt>Native resolution</dt><dd>{result.nativeResolutionDegrees}°</dd></div>
+              <div><dt>Methodology version</dt><dd><code>{result.methodologyVersion}</code></dd></div>
+              <div><dt>Data release</dt><dd><code>{result.dataReleaseId}</code></dd></div>
+              <div><dt>AR6 source release</dt><dd><code>{result.sourceRelease}</code></dd></div>
+            </dl>
+          ) : null}
+          <section aria-labelledby="projection-source-title">
+            <h4 id="projection-source-title">Source and licence</h4>
+            <p>{methodology.source.attributionText}</p>
+            <p>
+              <a href={methodology.source.sourceUrl} rel="noreferrer">{methodology.source.title}</a>
+              {" · "}
+              <a href={methodology.source.licence.url} rel="noreferrer">
+                {methodology.source.licence.name} ({methodology.source.licence.spdxId})
+              </a>
+            </p>
+          </section>
+          <section aria-labelledby="projection-limitations-title">
+            <h4 id="projection-limitations-title">Limitations</h4>
+            <ul>{methodology.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
+          </section>
+          <p><strong>Release status:</strong> {dispositionCopy(methodology)}</p>
+          <p><strong>Map meaning:</strong> {mapMeaning(result)}</p>
+          <p className="projection-panel__disclaimer">{REQUIRED_DISCLAIMER}</p>
+        </div>
+      </details>
     </article>
   );
 }
@@ -341,14 +380,16 @@ function AcceptedResult({
   accepted,
   methodology,
   contextLabel,
+  resultHeadingRef,
 }: {
   readonly accepted: AcceptedProjection;
   readonly methodology: ReleaseMethodology | null;
   readonly contextLabel: string | null;
+  readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }): React.ReactNode {
   if (methodology === null) {
     return (
-      <div className="projection-panel__verification" role="status">
+      <div className="projection-panel__verification">
         Loading and verifying methodology before showing the accepted scientific outcome…
       </div>
     );
@@ -361,7 +402,7 @@ function AcceptedResult({
       </div>
     );
   }
-  return <OutcomeContent accepted={accepted} methodology={methodology} contextLabel={contextLabel} />;
+  return <OutcomeContent accepted={accepted} methodology={methodology} contextLabel={contextLabel} resultHeadingRef={resultHeadingRef} />;
 }
 
 function acceptedContext(state: ProjectionState): string | null {
@@ -395,6 +436,9 @@ export function ProjectionPanel({
   onShare,
   onOpenMethodology,
   methodologyTriggerRef,
+  showMethodologyAction = true,
+  resultHeadingRef,
+  failureAlertRef,
 }: ProjectionPanelProps): React.ReactNode {
   const accepted = visibleAcceptedProjection(state);
   const selection = currentSelection(state);
@@ -408,12 +452,15 @@ export function ProjectionPanel({
   const canReset = state.phase !== "booting" && state.phase !== "ready" && selection !== null;
 
   return (
-    <section className="projection-panel" aria-labelledby="projection-panel-title" data-phase={state.phase}>
+    <section className="projection-panel flight-result" aria-labelledby="projection-panel-title" data-phase={state.phase}>
       <header>
         <p className="projection-panel__eyebrow">Static browser projection</p>
         <h2 id="projection-panel-title">Regional relative sea-level projection</h2>
       </header>
-      <PhaseMessage state={state} />
+      <PhaseMessage state={state} failureAlertRef={failureAlertRef} />
+      {accepted ? (
+        <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} resultHeadingRef={resultHeadingRef} />
+      ) : null}
       {selection ? (
         <SelectionControls
           selection={selection}
@@ -421,14 +468,26 @@ export function ProjectionPanel({
           onChange={onSelectionChange}
         />
       ) : null}
-      {accepted ? (
-        <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} />
-      ) : null}
       <div className="projection-panel__actions" aria-label="Projection actions">
-        <button type="button" onClick={onRetry} disabled={!canRetry}>Retry exact selection</button>
-        <button type="button" onClick={onReset} disabled={!canReset}>Reset selection</button>
-        <button type="button" onClick={onShare} disabled={!stableShare}>Share accepted result</button>
-        <button ref={methodologyTriggerRef} type="button" onClick={onOpenMethodology} disabled={!methodologyUsable}>Methodology and sources</button>
+        <button type="button" onClick={onRetry} disabled={!canRetry}>
+          <ArrowCounterClockwise size={16} aria-hidden="true" /> Retry exact selection
+        </button>
+        <button
+          type="button"
+          aria-label="Reset selection and choose another place"
+          onClick={onReset}
+          disabled={!canReset}
+        >
+          <ArrowCounterClockwise size={16} aria-hidden="true" /> Another place
+        </button>
+        <button type="button" onClick={onShare} disabled={!stableShare}>
+          <ShareNetwork size={16} aria-hidden="true" /> Share accepted result
+        </button>
+        {showMethodologyAction ? (
+          <button ref={methodologyTriggerRef} type="button" onClick={onOpenMethodology} disabled={!methodologyUsable}>
+            <BookOpenText size={16} aria-hidden="true" /> Methodology and sources
+          </button>
+        ) : null}
       </div>
     </section>
   );

@@ -6,7 +6,9 @@ import {
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
+  type RefObject,
 } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { ReleaseContext } from "../domain/release";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import { SettlementSearchClient, type SearchWorkerFactory } from "../search/client";
@@ -19,6 +21,7 @@ interface SettlementSearchProps {
   /** Increment to clear the local query from an application-level reset. */
   readonly clearToken?: number;
   readonly workerFactory?: SearchWorkerFactory;
+  readonly inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 const unavailable: SettlementSearchState = Object.freeze({
@@ -93,6 +96,7 @@ interface SettlementSearchSessionProps {
   readonly state: SettlementSearchState;
   readonly onSelect: (record: SettlementSearchRecord) => void;
   readonly clearToken: number;
+  readonly inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 function SettlementSearchSession({
@@ -101,6 +105,7 @@ function SettlementSearchSession({
   state,
   onSelect,
   clearToken,
+  inputRef,
 }: SettlementSearchSessionProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -188,9 +193,10 @@ function SettlementSearchSession({
     >
       <label htmlFor={`${listId}-input`}>Find a city, town, or village</label>
       <div className="search-control">
-        <span className="search-icon" aria-hidden="true" />
+        <MagnifyingGlass className="search-icon" size={19} weight="regular" aria-hidden="true" />
         <input
           id={`${listId}-input`}
+          ref={inputRef}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={optionsVisible}
@@ -214,7 +220,7 @@ function SettlementSearchSession({
           }}
           onKeyDown={onKeyDown}
         />
-        <button type="submit" disabled={!activeResult}>Explore</button>
+        <button type="submit" disabled={!activeResult}>Fly there</button>
       </div>
       <p id={hintId} className="search-hint">
         Settlements only—not addresses or landmarks. Your text stays in this browser.
@@ -224,6 +230,7 @@ function SettlementSearchSession({
         className={`status${state.error ? " error" : ""}`}
         role="status"
         aria-live="polite"
+        aria-atomic="true"
         data-search-readiness={state.readiness}
         data-init-duration-ms={state.initializationMilliseconds ?? undefined}
         data-query-duration-ms={state.durationMilliseconds ?? undefined}
@@ -273,6 +280,7 @@ export function SettlementSearch({
   onSearchLifecycle,
   clearToken = 0,
   workerFactory,
+  inputRef,
 }: SettlementSearchProps) {
   const [client, state] = useClient(release, workerFactory, onSearchLifecycle);
   return (
@@ -283,6 +291,7 @@ export function SettlementSearch({
       state={state}
       onSelect={onSelect}
       clearToken={clearToken}
+      inputRef={inputRef}
     />
   );
 }

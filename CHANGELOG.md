@@ -46,6 +46,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Corrected Flight search-result announcements, first-selection failure focus,
+  segmented control rows, mobile landing composition, and idle map chrome while
+  keeping assessment and search live regions distinct.
+
 - Aligned the static landing copy with the approved product language and bound
   its release disclosure to the verified synthetic, private-engineering, or
   public-promoted disposition instead of hard-coding fixture status.
