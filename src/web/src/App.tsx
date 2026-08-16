@@ -1,8 +1,37 @@
-import { lazy, Suspense, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useAssessmentRuntime } from "./application/use-assessment-runtime";
+import { useProjectionUrl } from "./application/use-projection-url";
+import type { BrowserRuntimeFactory } from "./application/browser-runtime";
+import type {
+  ProjectionUrlEnvironment,
+  ProjectionUrlEvent,
+} from "./application/projection-url-controller";
+import { MethodologyDialog } from "./components/MethodologyDialog";
+import { ProjectionPanel } from "./components/ProjectionPanel";
 import { SettlementSearch } from "./components/SettlementSearch";
 import { releaseLabel, runtimeConfig } from "./config";
-import { technicalErrorPresentation } from "./domain/release";
-import type { Selection } from "./domain/release";
+import { technicalErrorFrom } from "./data/manifest-repository";
+import {
+  selectionKey,
+  visibleAcceptedProjection,
+  type ProjectionState,
+} from "./domain/projection-state";
+import {
+  technicalErrorPresentation,
+  validateCoordinates,
+  type ReleaseContext,
+  type Selection,
+  type TechnicalError,
+} from "./domain/release";
+import type { SearchWorkerFactory } from "./search/client";
+import type { SettlementSearchRecord } from "./search/types";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
@@ -51,10 +80,173 @@ function ReleaseStartup({ state, retry }: { state: ReleaseBootstrapState; retry:
   );
 }
 
-function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry: () => void }) {
+function projectionScopeReady(state: ProjectionState | null, context: ReleaseContext): boolean {
+  if (!state || state.phase === "booting") return false;
+  return state.release?.dataReleaseId === context.dataReleaseId &&
+    state.release.methodologyVersion === context.methodologyVersion;
+}
+
+function settlementSelection(
+  context: ReleaseContext,
+  projection: ProjectionState | null,
+  record: SettlementSearchRecord,
+): Selection {
+  const accepted = projection ? visibleAcceptedProjection(projection) : null;
+  return Object.freeze({
+    dataReleaseId: context.dataReleaseId,
+    scenario: accepted?.selection.scenario ?? context.defaults.scenario,
+    horizon: accepted?.selection.horizon ?? context.defaults.horizon,
+    location: Object.freeze({
+      kind: "settlement" as const,
+      placeId: record.placeId,
+      coordinates: validateCoordinates({
+        latitude: record.latitude,
+        longitude: record.longitude,
+      }),
+    }),
+  });
+}
+
+function TechnicalAlert({ error, prefix }: { error: TechnicalError; prefix: string }) {
+  const presentation = technicalErrorPresentation(error);
+  return (
+    <div className="application-technical-alert" role="alert" data-technical-error={error.code}>
+      <strong>{prefix}: {presentation.title}.</strong>{" "}
+      {error.message} {presentation.guidance} This is a technical failure, not a scientific outcome.
+    </div>
+  );
+}
+
+interface NavigationIntent {
+  readonly serial: number;
+  readonly selection: Selection;
+}
+
+export interface LandingPageProps {
+  readonly release: ReleaseBootstrapState;
+  readonly retry: () => void;
+  readonly runtimeFactory?: BrowserRuntimeFactory;
+  readonly urlEnvironment?: ProjectionUrlEnvironment;
+  readonly searchWorkerFactory?: SearchWorkerFactory;
+}
+
+function LandingPageSession({
+  release,
+  retry,
+  runtimeFactory,
+  urlEnvironment,
+  searchWorkerFactory,
+}: LandingPageProps) {
+  const context = release.phase === "ready" ? release.context : null;
+  const runtime = useAssessmentRuntime(context, runtimeFactory);
   const [mapOpen, setMapOpen] = useState(false);
-  const [selection, applySelection] = useState<Selection>();
-  const [selectionStatus, setSelectionStatus] = useState("Choose a settlement to continue.");
+  const [methodologyOpen, setMethodologyOpen] = useState(false);
+  const [clearSearchToken, setClearSearchToken] = useState(0);
+  const [commandError, setCommandError] = useState<TechnicalError | null>(null);
+  const [urlError, setUrlError] = useState<TechnicalError | null>(null);
+  const [shareStatus, setShareStatus] = useState("");
+  const [navigationIntent, setNavigationIntent] = useState<NavigationIntent | null>(null);
+  const navigationSerial = useRef(0);
+  const handledNavigationSerial = useRef(0);
+  const pendingInitialSelection = useRef<string | null>(null);
+  const methodologyTriggerRef = useRef<HTMLButtonElement>(null);
+  const sessionActive = useRef(false);
+
+  useEffect(() => {
+    sessionActive.current = true;
+    return () => {
+      sessionActive.current = false;
+    };
+  }, []);
+
+  const submitSelection = useCallback((selection: Selection): void => {
+    if (!sessionActive.current || context?.dataReleaseId !== selection.dataReleaseId) return;
+    setCommandError(null);
+    setShareStatus("");
+    void runtime.select(selection).catch((error: unknown) => {
+      if (!sessionActive.current || context.dataReleaseId !== selection.dataReleaseId) return;
+      setCommandError(technicalErrorFrom(error));
+    });
+  }, [context, runtime]);
+
+  const clearApplicationSelection = useCallback((): void => {
+    if (!context || !sessionActive.current) return;
+    setCommandError(null);
+    if (projectionScopeReady(runtime.projection, context)) {
+      runtime.cancelSearch();
+      try {
+        runtime.reset();
+      } catch (error: unknown) {
+        setCommandError(technicalErrorFrom(error));
+      }
+    }
+    setClearSearchToken((token) => token + 1);
+    setMethodologyOpen(false);
+    setUrlError(null);
+    setShareStatus("");
+  }, [context, runtime]);
+
+  const observeUrl = useCallback((event: ProjectionUrlEvent): void => {
+    if (!context || !sessionActive.current) return;
+    if (event.type === "selection") {
+      if (event.selection.dataReleaseId !== context.dataReleaseId) return;
+      const key = `${context.dataReleaseId}:${selectionKey(event.selection)}`;
+      if (event.source === "initial") {
+        if (pendingInitialSelection.current === key) return;
+        pendingInitialSelection.current = key;
+      }
+      setUrlError(null);
+      const serial = ++navigationSerial.current;
+      setNavigationIntent(Object.freeze({ serial, selection: event.selection }));
+      return;
+    }
+    if (event.type === "technical-error") {
+      navigationSerial.current += 1;
+      pendingInitialSelection.current = null;
+      setNavigationIntent(null);
+      setUrlError(event.error);
+      setShareStatus("");
+      return;
+    }
+    navigationSerial.current += 1;
+    pendingInitialSelection.current = null;
+    setNavigationIntent(null);
+    if (event.source === "popstate") clearApplicationSelection();
+  }, [clearApplicationSelection, context]);
+
+  const projectionUrl = useProjectionUrl(context, observeUrl, urlEnvironment);
+  const scopeReady = context !== null && projectionScopeReady(runtime.projection, context);
+
+  useEffect(() => {
+    if (!scopeReady || !navigationIntent ||
+        navigationIntent.serial <= handledNavigationSerial.current) return;
+    handledNavigationSerial.current = navigationIntent.serial;
+    pendingInitialSelection.current = null;
+    submitSelection(navigationIntent.selection);
+  }, [navigationIntent, scopeReady, submitSelection]);
+
+  const accepted = runtime.projection ? visibleAcceptedProjection(runtime.projection) : null;
+  const verifiedMethodology = runtime.methodology.phase === "ready" && context &&
+      runtime.methodology.dataReleaseId === context.dataReleaseId
+    ? runtime.methodology.methodology
+    : null;
+
+  const reset = (): void => {
+    if (!context) return;
+    pendingInitialSelection.current = null;
+    setNavigationIntent(null);
+    clearApplicationSelection();
+    projectionUrl.reset();
+  };
+
+  const share = (): void => {
+    if (!accepted) return;
+    setUrlError(null);
+    const published = projectionUrl.share(accepted);
+    setShareStatus(published
+      ? "Share link is ready in the browser address bar."
+      : "The accepted result could not be added to the browser address bar.");
+  };
 
   return (
     <main id="main" className="landing">
@@ -73,12 +265,24 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
           </p>
           <ReleaseStartup state={release} retry={retry} />
           <SettlementSearch
-            release={release.phase === "ready" ? release.context : null}
-            onSelect={(record) => setSelectionStatus(
-              `${record.displayName}, ${record.admin1Name ?? record.countryCode} selected at ${record.latitude}, ${record.longitude}.`,
-            )}
+            release={scopeReady ? context : null}
+            clearToken={clearSearchToken}
+            workerFactory={searchWorkerFactory}
+            onSearchLifecycle={runtime.handleSearchLifecycle}
+            onSelect={(record) => {
+              if (!context || !scopeReady) return;
+              submitSelection(settlementSelection(context, runtime.projection, record));
+            }}
           />
-          <p className="selection-status" aria-live="polite">{selectionStatus}</p>
+          <p className="selection-status" aria-live="polite">
+            {!scopeReady
+              ? "Waiting for the exact release runtime."
+              : runtime.projection?.phase === "ready"
+                ? "Choose a settlement to continue."
+                : accepted
+                  ? "The accepted projection is shown below."
+                  : "The selected point is being checked below."}
+          </p>
         </div>
         <aside className="scope-card" aria-label="Current data status">
           <span className="scope-number">3 × 3</span>
@@ -88,7 +292,46 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
           <span>No public scientific release is claimed.</span>
         </aside>
       </section>
-      {release.phase === "ready" ? (
+
+      {commandError ? <TechnicalAlert error={commandError} prefix="Selection command failed" /> : null}
+      {urlError ? <TechnicalAlert error={urlError} prefix="Share or navigation failed" /> : null}
+      {runtime.methodology.phase === "technical-error" ? (
+        <TechnicalAlert error={runtime.methodology.error} prefix="Methodology verification failed" />
+      ) : null}
+      <p className="share-status" role="status" aria-live="polite">{shareStatus}</p>
+
+      {runtime.projection ? (
+        <ProjectionPanel
+          state={runtime.projection}
+          methodology={verifiedMethodology}
+          onSelectionChange={submitSelection}
+          onRetry={() => {
+            setCommandError(null);
+            const releaseId = context?.dataReleaseId;
+            void runtime.retry().catch((error: unknown) => {
+              if (sessionActive.current && context?.dataReleaseId === releaseId) {
+                setCommandError(technicalErrorFrom(error));
+              }
+            });
+          }}
+          onReset={reset}
+          onShare={share}
+          onOpenMethodology={() => setMethodologyOpen(true)}
+          methodologyTriggerRef={methodologyTriggerRef}
+        />
+      ) : null}
+
+      {context ? (
+        <MethodologyDialog
+          methodology={verifiedMethodology}
+          release={context}
+          open={methodologyOpen}
+          onClose={() => setMethodologyOpen(false)}
+          triggerRef={methodologyTriggerRef}
+        />
+      ) : null}
+
+      {context && scopeReady ? (
         <section className="map-launcher" aria-label="Release visualization">
           {!mapOpen ? (
             <>
@@ -100,9 +343,9 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
           ) : (
             <Suspense fallback={<p className="map-module-loading" role="status">Loading map module…</p>}>
               <MapExplorer
-                context={release.context}
-                selection={selection}
-                onSelection={applySelection}
+                context={context}
+                selection={accepted?.selection}
+                onSelection={submitSelection}
               />
             </Suspense>
           )}
@@ -133,7 +376,21 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
   );
 }
 
-export default function App() {
+/** Remounts every local command/URL/search guard when the immutable release changes. */
+export function LandingPage(props: LandingPageProps) {
+  const sessionKey = props.release.phase === "ready"
+    ? props.release.context.dataReleaseId
+    : props.release.phase;
+  return <LandingPageSession key={sessionKey} {...props} />;
+}
+
+export interface AppProps {
+  readonly runtimeFactory?: BrowserRuntimeFactory;
+  readonly urlEnvironment?: ProjectionUrlEnvironment;
+  readonly searchWorkerFactory?: SearchWorkerFactory;
+}
+
+export default function App({ runtimeFactory, urlEnvironment, searchWorkerFactory }: AppProps = {}) {
   const architecture = window.location.pathname.replace(/\/+$/, "") === "/about/architecture";
   const [release, retryRelease] = useReleaseContext();
 
@@ -146,7 +403,13 @@ export default function App() {
           <ArchitecturePage />
         </Suspense>
       ) : (
-        <LandingPage release={release} retry={retryRelease} />
+        <LandingPage
+          release={release}
+          retry={retryRelease}
+          runtimeFactory={runtimeFactory}
+          urlEnvironment={urlEnvironment}
+          searchWorkerFactory={searchWorkerFactory}
+        />
       )}
       <footer>
         <span>SeaRise Europe</span>
