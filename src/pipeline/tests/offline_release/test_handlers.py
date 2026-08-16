@@ -71,8 +71,8 @@ def test_fixture_handlers_build_a_complete_new_public_release(tmp_path: Path) ->
     assert receipt["sourceReceipts"] == [
         {"path": source_artifact["path"], "sha256": source_artifact["sha256"]}
     ]
-    assert len(list(root.rglob("*"))) == 57
-    assert len([path for path in root.rglob("*") if path.is_file()]) == 42
+    assert len(list(root.rglob("*"))) == 59
+    assert len([path for path in root.rglob("*") if path.is_file()]) == 44
     assert not any(path.name.endswith("-verification.json") for path in root.rglob("*"))
     assert all(stage.quality_results for stage in result.stages)
     assert validate_complete_release(root, schema_directory=SCHEMAS)["complete"] is True

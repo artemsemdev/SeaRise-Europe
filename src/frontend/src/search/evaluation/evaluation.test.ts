@@ -14,12 +14,12 @@ import { validateEvaluationReportSemantics, validateQueryFixtureSemantics } from
 import type { SearchDocument } from "./types";
 
 const records: SearchDocument[] = [
-  { placeId: "synthetic:1", displayName: "Málaga", searchNames: ["Malaga City"], countryCode: "ES", admin1Name: "Andalucía", population: 578460, featureCode: "PPLA", distanceToCoastMeters: 50, isCoastal: true },
-  { placeId: "synthetic:2", displayName: "Αθήνα", searchNames: ["Athens", "Athina"], countryCode: "GR", admin1Name: "Attica", population: 637798, featureCode: "PPLC", distanceToCoastMeters: 7000, isCoastal: true },
-  { placeId: "synthetic:3", displayName: "Springfield", searchNames: [], countryCode: "AA", admin1Name: "North", population: 1000, featureCode: "PPL", distanceToCoastMeters: 50000, isCoastal: false },
-  { placeId: "synthetic:4", displayName: "Springfield", searchNames: [], countryCode: "BB", admin1Name: "South", population: 500, featureCode: "PPL", distanceToCoastMeters: 100, isCoastal: true },
-  { placeId: "synthetic:5", displayName: "Islet Village", searchNames: [], countryCode: "CC", admin1Name: "Island", population: 0, featureCode: "PPL", distanceToCoastMeters: 0, isCoastal: true },
-  { placeId: "synthetic:6", displayName: "Border City", searchNames: [], countryCode: "TR", admin1Name: "Boundary", population: 2000, featureCode: "PPL", distanceToCoastMeters: 10000, isCoastal: false },
+  { placeId: "geonames:900000001", displayName: "Málaga", searchNames: ["Malaga City"], countryCode: "ES", admin1Name: "Andalucía", population: 578460, featureCode: "PPLA", distanceToCoastMeters: 50, isCoastal: true },
+  { placeId: "geonames:900000002", displayName: "Αθήνα", searchNames: ["Athens", "Athina"], countryCode: "GR", admin1Name: "Attica", population: 637798, featureCode: "PPLC", distanceToCoastMeters: 7000, isCoastal: true },
+  { placeId: "geonames:900000003", displayName: "Springfield", searchNames: [], countryCode: "AA", admin1Name: "North", population: 1000, featureCode: "PPL", distanceToCoastMeters: 50000, isCoastal: false },
+  { placeId: "geonames:900000004", displayName: "Springfield", searchNames: [], countryCode: "BB", admin1Name: "South", population: 500, featureCode: "PPL", distanceToCoastMeters: 100, isCoastal: true },
+  { placeId: "geonames:900000005", displayName: "Islet Village", searchNames: [], countryCode: "CC", admin1Name: "Island", population: 0, featureCode: "PPL", distanceToCoastMeters: 0, isCoastal: true },
+  { placeId: "geonames:900000006", displayName: "Border City", searchNames: [], countryCode: "TR", admin1Name: "Boundary", population: 2000, featureCode: "PPL", distanceToCoastMeters: 10000, isCoastal: false },
 ];
 const documents = prepareCandidateDocuments(records);
 const byOrdinal = new Map(documents.map((document) => [document.ordinal, document]));
@@ -69,12 +69,12 @@ describe("search evaluation v1 contracts", () => {
 describe("shared search semantics", () => {
   it("normalizes accents and ranks canonical, alternate, prefix, fuzzy, and stable ties", () => {
     expect(normalizeSearchText("  MÁLAGA  ")).toBe("malaga");
-    expect(rankDocuments("malaga", documents)[0].record.placeId).toBe("synthetic:1");
-    expect(rankDocuments("malaga city", documents)[0].record.placeId).toBe("synthetic:1");
-    expect(rankDocuments("mal", documents)[0].record.placeId).toBe("synthetic:1");
-    expect(rankDocuments("malagx", documents)[0].record.placeId).toBe("synthetic:1");
+    expect(rankDocuments("malaga", documents)[0].record.placeId).toBe("geonames:900000001");
+    expect(rankDocuments("malaga city", documents)[0].record.placeId).toBe("geonames:900000001");
+    expect(rankDocuments("mal", documents)[0].record.placeId).toBe("geonames:900000001");
+    expect(rankDocuments("malagx", documents)[0].record.placeId).toBe("geonames:900000001");
     expect(rankDocuments("springfield", documents).slice(0, 2).map(({ record }) => record.placeId))
-      .toEqual(["synthetic:3", "synthetic:4"]);
+      .toEqual(["geonames:900000003", "geonames:900000004"]);
     expect(rankDocuments("", documents)).toEqual([]);
     expect(rankDocuments("not present", documents)).toEqual([]);
   });
@@ -87,11 +87,11 @@ describe("shared search semantics", () => {
     expect(() => normalizeSearchText("bad\u0000name")).toThrow(/control/);
     expect(() => normalizeSearchText("bad\ud800name")).toThrow(/unpaired UTF-16/);
     const ordered = prepareCandidateDocuments([
-      { ...records[0], placeId: "synthetic:10" },
-      { ...records[1], placeId: "synthetic:2" },
+      { ...records[0], placeId: "geonames:900000010" },
+      { ...records[1], placeId: "geonames:900000002" },
     ]);
-    expect(ordered.map(({ record }) => record.placeId)).toEqual(["synthetic:2", "synthetic:10"]);
-    expect(() => prepareCandidateDocuments([{ ...records[0], placeId: "geonames:1" }, records[1]]))
+    expect(ordered.map(({ record }) => record.placeId)).toEqual(["geonames:900000002", "geonames:900000010"]);
+    expect(() => prepareCandidateDocuments([{ ...records[0], placeId: "synthetic:1" }, records[1]]))
       .toThrow(/mixes placeId namespaces/);
   });
 
