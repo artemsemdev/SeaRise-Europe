@@ -21,6 +21,10 @@ import {
   assertAcceptedRangeResource,
   type AcceptedAdmissionGateV1,
 } from "./admission-receipt";
+import {
+  OFFLINE_RANGE_STORES,
+  openOfflineRangeDatabase,
+} from "./pair-cleanup-fence";
 
 export type RangeWriteResult = "stored" | "already-present";
 export interface VerifiedRangeWrite {
@@ -408,8 +412,7 @@ export function createRangeStore(authorityInput: AppAuthorityV1, budget: Storage
 
 interface MetaRecord { key: "state"; rangeBytes: number; rangeEntries: number; nextSequence: number; activePair: AppReleasePairV1 | null; previousPair: AppReleasePairV1 | null }
 interface LeaseRecord { key: string; leaseId: string; pairKey: string; pair: AppReleasePairV1; expiresAtEpochMs: number }
-const STORES = { meta: "range-meta", ranges: "ranges", leases: "leases" } as const;
-const RANGE_DATABASE_VERSION = 2;
+const STORES = OFFLINE_RANGE_STORES;
 const initialMeta = (): MetaRecord => ({ key: "state", rangeBytes: 0, rangeEntries: 0, nextSequence: 0, activePair: null, previousPair: null });
 function request<T>(value: IDBRequest<T>): Promise<T> { return new Promise((resolve, reject) => { value.onsuccess = () => resolve(value.result); value.onerror = () => reject(value.error); }); }
 function completed(transaction: IDBTransaction): Promise<void> { return new Promise((resolve, reject) => { transaction.oncomplete = () => resolve(); transaction.onabort = transaction.onerror = () => reject(transaction.error ?? new DOMException("IndexedDB transaction aborted.", "AbortError")); }); }
@@ -427,28 +430,7 @@ class IndexedDbRangeStore implements RangeStore {
     this.#idb = apis.indexedDB; this.#subtle = apis.subtle; this.#approved = approved; this.#now = apis.now ?? Date.now;
   }
   #open(): Promise<IDBDatabase> {
-    if (!this.#database) this.#database = new Promise((resolve, reject) => {
-      const open = this.#idb.open(cacheNamespaces(this.#pair).rangeDatabase, RANGE_DATABASE_VERSION);
-      open.onupgradeneeded = (event) => {
-        const database = open.result;
-        if (!database.objectStoreNames.contains(STORES.meta)) database.createObjectStore(STORES.meta, { keyPath: "key" });
-        if (!database.objectStoreNames.contains(STORES.ranges)) {
-          const ranges = database.createObjectStore(STORES.ranges, { keyPath: "key" });
-          ranges.createIndex("by-pair", "pairKey"); ranges.createIndex("by-lru", ["lastAccessSequence", "key"], { unique: true });
-        }
-        if (event.oldVersion < RANGE_DATABASE_VERSION && database.objectStoreNames.contains(STORES.leases)) {
-          database.deleteObjectStore(STORES.leases);
-        }
-        if (!database.objectStoreNames.contains(STORES.leases)) {
-          const leases = database.createObjectStore(STORES.leases, { keyPath: "key" });
-          leases.createIndex("by-pair", "pairKey");
-          leases.createIndex("by-expiry", ["expiresAtEpochMs", "pairKey", "leaseId"], { unique: true });
-        }
-      };
-      open.onsuccess = () => { open.result.onversionchange = () => open.result.close(); resolve(open.result); };
-      open.onerror = () => reject(open.error ?? new RangeStoreUnsupportedError("IndexedDB open failed."));
-      open.onblocked = () => reject(new RangeStoreUnsupportedError("IndexedDB open was blocked."));
-    });
+    if (!this.#database) this.#database = openOfflineRangeDatabase(this.#idb);
     return this.#database;
   }
   async #meta(store: IDBObjectStore): Promise<MetaRecord> { return (await request(store.get("state")) as MetaRecord | undefined) ?? initialMeta(); }
@@ -505,11 +487,16 @@ class IndexedDbRangeStore implements RangeStore {
   }>> {
     const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle, signal);
     if (admissions.length === 0) return Object.freeze({ results: Object.freeze([]), admissions, ownership: new Map() });
-    const database = await this.#open(); const tx = database.transaction([STORES.meta, STORES.ranges, STORES.leases], "readwrite"); const done = completed(tx); let quota = false;
+    const database = await this.#open(); const tx = database.transaction([
+      STORES.meta, STORES.ranges, STORES.leases, STORES.cleanupFences,
+    ], "readwrite"); const done = completed(tx); let quota = false;
     const abort = () => { try { tx.abort(); } catch { /* Transaction already committed. */ } };
     signal?.addEventListener("abort", abort, { once: true });
     try {
       const metaStore = tx.objectStore(STORES.meta); const rangeStore = tx.objectStore(STORES.ranges); const leaseStore = tx.objectStore(STORES.leases);
+      if (await request(tx.objectStore(STORES.cleanupFences).get(pairKey(this.#pair))) !== undefined) {
+        throw new RangeStoreIntegrityError("Exact-pair cleanup is pending; new range admission is refused.");
+      }
       const meta = await this.#meta(metaStore);
       const unique = new Map<string, VerifiedAdmission>();
       const existingKeys = new Set<string>();
@@ -597,14 +584,29 @@ class IndexedDbRangeStore implements RangeStore {
     return this.readExactOrContaining(identity, requested);
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> {
-    const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx);
+    const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction([
+      STORES.leases, STORES.cleanupFences,
+    ], "readwrite"); const done = completed(tx);
+    if (await request(tx.objectStore(STORES.cleanupFences).get(pairKey(lease.pair))) !== undefined) {
+      tx.abort(); await done.catch(() => undefined);
+      throw new RangeStoreIntegrityError("Exact-pair cleanup is pending; lease acquisition or renewal is refused.");
+    }
     tx.objectStore(STORES.leases).put({ key, leaseId: lease.leaseId, pairKey: pairKey(lease.pair), pair: lease.pair, expiresAtEpochMs: lease.expiresAtEpochMs } satisfies LeaseRecord); await done;
   }
   async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx); tx.objectStore(STORES.leases).delete(key); await done; }
   async setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void> {
     const nextActive = active ? validateAppReleasePair(active) : null; const nextPrevious = previous ? validateAppReleasePair(previous) : null;
     if (nextActive && nextPrevious && samePair(nextActive, nextPrevious)) throw new RangeStoreIntegrityError("Active and previous pairs must differ.");
-    const database = await this.#open(); const tx = database.transaction(STORES.meta, "readwrite"); const done = completed(tx); const store = tx.objectStore(STORES.meta); const meta = await this.#meta(store); meta.activePair = nextActive; meta.previousPair = nextPrevious; store.put(meta); await done;
+    const database = await this.#open(); const tx = database.transaction([
+      STORES.meta, STORES.cleanupFences,
+    ], "readwrite"); const done = completed(tx); const store = tx.objectStore(STORES.meta);
+    for (const retained of [nextActive, nextPrevious]) {
+      if (retained && await request(tx.objectStore(STORES.cleanupFences).get(pairKey(retained))) !== undefined) {
+        tx.abort(); await done.catch(() => undefined);
+        throw new RangeStoreIntegrityError("A cleanup-pending pair cannot become protected range authority.");
+      }
+    }
+    const meta = await this.#meta(store); meta.activePair = nextActive; meta.previousPair = nextPrevious; store.put(meta); await done;
   }
   async inventory(): Promise<RangeInventoryV1> {
     const database = await this.#open(); const tx = database.transaction([STORES.meta, STORES.ranges], "readonly"); const done = completed(tx); const meta = await this.#meta(tx.objectStore(STORES.meta)); const records = await request(tx.objectStore(STORES.ranges).index("by-lru").getAll()) as StoredRange[]; await done;

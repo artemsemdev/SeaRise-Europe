@@ -314,10 +314,10 @@ export function validateStorageBudget(value: unknown): StorageBudgetV1 {
   return Object.freeze(result);
 }
 
-export type PairLifecycleStateV1 = "staging" | "bootstrap-complete" | "core-complete" | "active" | "previous" | "cleanup-pending" | "corrupt";
+export type PairLifecycleStateV1 = "staging" | "bootstrap-complete" | "core-complete" | "active" | "previous" | "cleanup-pending" | "removed" | "corrupt";
 export interface PairLifecycleV1 { readonly contractVersion: 1; readonly pair: AppReleasePairV1; readonly state: PairLifecycleStateV1; readonly completenessReceiptSha256: Sha256Hex | null }
 export interface RollbackRequestV1 { readonly contractVersion: 1; readonly currentPair: AppReleasePairV1; readonly targetPair: AppReleasePairV1; readonly confirmationToken: string }
-const LIFECYCLE = new Set<PairLifecycleStateV1>(["staging", "bootstrap-complete", "core-complete", "active", "previous", "cleanup-pending", "corrupt"]);
+const LIFECYCLE = new Set<PairLifecycleStateV1>(["staging", "bootstrap-complete", "core-complete", "active", "previous", "cleanup-pending", "removed", "corrupt"]);
 const RECEIPT_REQUIRED = new Set<PairLifecycleStateV1>(["bootstrap-complete", "core-complete", "active", "previous"]);
 
 export function validatePairLifecycle(value: unknown): PairLifecycleV1 {
@@ -325,7 +325,7 @@ export function validatePairLifecycle(value: unknown): PairLifecycleV1 {
   if (record.contractVersion !== OFFLINE_CONTRACT_VERSION || !LIFECYCLE.has(record.state as PairLifecycleStateV1)) fail("Pair lifecycle version or state is unsupported.");
   const state = record.state as PairLifecycleStateV1;
   const receipt = record.completenessReceiptSha256 === null ? null : sha256Hex(record.completenessReceiptSha256, "completenessReceiptSha256");
-  if (state === "staging" && receipt !== null) fail("A staging pair cannot have a completeness receipt.");
+  if ((state === "staging" || state === "removed") && receipt !== null) fail("A staging or removed pair cannot have a completeness receipt.");
   if (RECEIPT_REQUIRED.has(state) && receipt === null) fail("Complete, active, and previous states require a completeness receipt.");
   return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, pair: validateAppReleasePair(record.pair), state, completenessReceiptSha256: receipt });
 }

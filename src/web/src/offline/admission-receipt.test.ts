@@ -24,6 +24,7 @@ import {
 import { createVerifiedReleaseResourcePlan, type VerifiedReleaseResourcePlanV1 } from "./release-resource-plan";
 import type { WholeResourceStore } from "./whole-resource-cache";
 import type { RangeStore } from "./range-store";
+import { beginPairCleanupFence } from "./pair-cleanup-fence";
 
 const subtle = webcrypto.subtle as SubtleCrypto;
 const A = "a".repeat(64);
@@ -222,6 +223,22 @@ describe("verified coordinated-admission receipt v1", () => {
     expect(first.rangeResources.length).toBeGreaterThan(0);
     expect(first.storageProfile).toMatchObject({ mode: "memory-only", memoryReason: "local-candidate" });
     expect(first.resourcePlanSha256).toMatch(/^[0-9a-f]{64}$/u);
+  });
+
+  it("refuses receipt publication for a cleanup-fenced persistent pair and preserves the accepted gate", async () => {
+    const factory = new IDBFactory();
+    const locks = new TestAdmissionLocks();
+    const identity = await plan(false);
+    const receipts = createAdmissionReceiptStore(app(), subtle, {
+      indexedDB: factory,
+      locks,
+      nextOperationId: () => "cleanup-race",
+    });
+    const accepted = await admit(identity, receipts);
+    await beginPairCleanupFence(factory, identity.pair, () => 1_000);
+
+    await expect(admit(identity, receipts)).rejects.toMatchObject({ code: "Conflict" });
+    await expect(receipts.accepted(identity)).resolves.toEqual(accepted.gate);
   });
 
   it("rejects copied release plans and partial routed admission sets", async () => {
@@ -548,7 +565,7 @@ describe("verified coordinated-admission receipt v1", () => {
     const locks = new TestAdmissionLocks();
     const owners = new Map<string, string>();
     const operations: string[] = [];
-    const wholeStore = (): WholeResourceStore => ({
+    const wholeStore = (pauseAfterAdmission?: () => Promise<void>): WholeResourceStore => ({
       mode: "persistent",
       storageProfile: identity.storageProfile,
       fetchAndAdmit: async () => new Response("unused"),
@@ -559,6 +576,7 @@ describe("verified coordinated-admission receipt v1", () => {
           if (disposition === "stored") owners.set(authority.canonicalUrl, options.operationId);
           return Object.freeze({ authority, disposition });
         });
+        await pauseAfterAdmission?.();
         return Object.freeze({ contractVersion: 1 as const, operationId: options.operationId, entries: Object.freeze(entries) });
       },
       rollbackAdmission: async (admission) => {
@@ -607,10 +625,18 @@ describe("verified coordinated-admission receipt v1", () => {
         signal: new AbortController().signal,
       });
 
-    const [winner, loser] = await Promise.allSettled([
-      admission(firstReceipt, wholeStore()),
-      admission(secondReceipt, wholeStore()),
-    ]);
+    let firstEntered!: () => void;
+    let releaseFirst!: () => void;
+    const firstEnteredGate = new Promise<void>((resolve) => { firstEntered = resolve; });
+    const releaseFirstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const winnerAdmission = admission(firstReceipt, wholeStore(async () => {
+      firstEntered();
+      await releaseFirstGate;
+    }));
+    await firstEnteredGate;
+    const loserAdmission = admission(secondReceipt, wholeStore());
+    releaseFirst();
+    const [winner, loser] = await Promise.allSettled([winnerAdmission, loserAdmission]);
 
     expect(winner.status).toBe("fulfilled");
     expect(loser.status).toBe("fulfilled");

@@ -14,6 +14,13 @@ All notable changes to this project will be documented in this file.
   app, repeats search and the cached result, and proves an uncached COG remains
   `connection-required`; PMTiles and the nine COG payloads are not precached.
 
+- Added a versioned exact-pair lifecycle repository for verified browser
+  storage. It binds shell bootstrap, core resource-plan, and admission-receipt
+  SHA-256 identities; retains the active and immediately previous complete
+  pair; inventories pair-scoped Cache Storage, ranges, receipts, and leases;
+  and performs lease-gated cleanup in receipt/authority, cache/range, then
+  lifecycle-record order without persisting interaction data.
+
 - Added the final verified browser resource router: exact public whole
   resources are admitted only when requested through receipt-gated Cache
   Storage, and only COG chunks needed by the selected read use no-store
