@@ -304,6 +304,17 @@ clients of the prior worker close. Cancellation or an ambiguous first write can
 leave only harmless `PENDING` evidence. Conditional cleanup may remove that
 exact pending record, but cleanup failure can never make it consumable.
 
+All durable intent mutations share a separate FIFO mutex. The `PENDING` to
+`ARMED` transaction is the publication linearization point: rollback cannot
+publish cancellation or `deployment-required` while that transaction is
+unresolved. After the arm settles, rollback atomically tombstones the exact
+intent whether it is `PENDING` or `ARMED`; tombstoned transition IDs can never
+arm or consume. Only after that tombstone commits may rollback publish
+`deployment-required`. If tombstoning fails, the coordinator instead reports
+`rollback-failed` with the preserved durable intent and its `pending` or
+`armed` state. It never claims completed rollback while durable update
+authority remains.
+
 On the subsequent fresh boot, activation is recognized only when the page
 proves a different boot identity controlled by the exact confirmed
 app/release/precache/core identity and atomically consumes the matching

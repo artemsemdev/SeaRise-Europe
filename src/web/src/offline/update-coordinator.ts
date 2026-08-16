@@ -38,6 +38,7 @@ export interface CloseAndReopenIntentV1 {
 
 export type IntentConsumptionResultV1 = "consumed" | "missing" | "already-consumed" | "not-armed";
 export type IntentArmResultV1 = "armed" | "missing" | "mismatch";
+export type IntentTombstoneResultV1 = "tombstoned" | "missing" | "mismatch";
 
 export interface TransitionArmPermitV1 {
   readonly coordinatorGeneration: number;
@@ -63,6 +64,8 @@ export interface StaticUpdateCoordinatorPorts {
   armTransitionIntent(intent: CloseAndReopenIntentV1, permit: TransitionArmPermitV1): Promise<IntentArmResultV1>;
   /** Conditionally remove only this exact PENDING intent; never remove a newer or ARMED intent. */
   discardPendingTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  /** Atomically tombstone this exact PENDING or ARMED intent. Tombstoned IDs can never arm or consume. */
+  tombstoneTransitionIntent(intent: CloseAndReopenIntentV1): Promise<IntentTombstoneResultV1>;
   /** Atomically consume only the exact ARMED intent once. */
   consumeTransitionIntent(
     intent: CloseAndReopenIntentV1,
@@ -116,6 +119,16 @@ export type StaticUpdateCoordinatorStateV1 =
     boot: ControllerBootProofV1;
     code: "rollback-unavailable";
     message: typeof ROLLBACK_MESSAGE;
+    currentUsable: true;
+  }>
+  | Readonly<{
+    phase: "rollback-failed";
+    operation: "rollback";
+    boot: ControllerBootProofV1;
+    code: "intent-tombstone-failed";
+    intent: CloseAndReopenIntentV1;
+    durableIntentState: "pending" | "armed";
+    message: string;
     currentUsable: true;
   }>
   | Readonly<{
@@ -277,6 +290,8 @@ export class StaticHostUpdateCoordinator {
   #sequence = 0;
   #pendingGeneration: number | null = null;
   #operationAbortController: AbortController | null = null;
+  #durableIntent: Readonly<{ intent: CloseAndReopenIntentV1; state: "pending" | "armed" }> | null = null;
+  #durableMutationTail: Promise<void> = Promise.resolve();
 
   constructor(ports: StaticUpdateCoordinatorPorts, options: StaticUpdateCoordinatorOptions = {}) {
     this.#ports = ports;
@@ -286,6 +301,9 @@ export class StaticHostUpdateCoordinator {
   state(): StaticUpdateCoordinatorStateV1 | null { return this.#state; }
 
   async initialize(): Promise<StaticUpdateCoordinatorStateV1> {
+    if (this.#state?.phase === "recording-close-and-reopen-intent" || this.#durableIntent) {
+      return this.#currentOr(null);
+    }
     const operation = this.#beginOperation();
     let boot: ControllerBootProofV1;
     try { boot = await this.#readBootFor(operation); }
@@ -299,7 +317,9 @@ export class StaticHostUpdateCoordinator {
   }
 
   async prepareUpdate(pairInput: AppReleasePairV1): Promise<StaticUpdateCoordinatorStateV1> {
-    if (this.#state?.phase === "recording-close-and-reopen-intent") return this.#state;
+    if (this.#state?.phase === "recording-close-and-reopen-intent" || this.#durableIntent) {
+      return this.#currentOr(null);
+    }
     const fallback = this.#bootFromState();
     const operation = this.#beginOperation();
     if (fallback) this.#state = Object.freeze({ phase: "preparing", boot: fallback, currentUsable: true });
@@ -398,53 +418,64 @@ export class StaticHostUpdateCoordinator {
       candidate: pending.candidate,
       message: UPDATE_READY_MESSAGE,
     });
-    try {
-      await this.#ports.recordPendingTransitionIntent(intent);
-      if (!this.#isCurrentOperation(operation)) {
-        try { await this.#ports.discardPendingTransitionIntent(intent); }
-        catch (error) {
+    return await this.#withDurableMutation(async () => {
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
+      this.#durableIntent = Object.freeze({ intent, state: "pending" });
+      try {
+        await this.#ports.recordPendingTransitionIntent(intent);
+        if (!this.#isCurrentOperation(operation)) {
+          try {
+            await this.#ports.discardPendingTransitionIntent(intent);
+            if (this.#durableIntent?.intent.transitionId === intent.transitionId && this.#durableIntent.state === "pending") {
+              this.#durableIntent = null;
+            }
+          } catch {
+            // PENDING evidence is non-consumable; the superseding mutation decides its disposition.
+          }
+          return this.#currentOr(pending.boot);
+        }
+        const armed = await this.#ports.armTransitionIntent(intent, {
+          coordinatorGeneration: operation,
+          signal: armSignal,
+        });
+        if (armed === "armed") this.#durableIntent = Object.freeze({ intent, state: "armed" });
+        if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
+        if (armed !== "armed") {
+          return this.#commit(operation, failed(
+            "confirm-update", "intent-record-failed", pending.boot,
+            "Pending transition intent could not be armed exactly once.",
+          ), pending.boot);
+        }
+        return this.#commit(operation, Object.freeze({
+          phase: "close-and-reopen-required", boot: pending.boot, intent,
+          message: UPDATE_READY_MESSAGE, currentUsable: true,
+        }), pending.boot);
+      } catch (error) {
+        try {
+          await this.#ports.discardPendingTransitionIntent(intent);
+          if (this.#durableIntent?.intent.transitionId === intent.transitionId && this.#durableIntent.state === "pending") {
+            this.#durableIntent = null;
+          }
+        } catch (discardError) {
           if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
           return this.#commit(operation, failed(
             "confirm-update", "intent-record-failed", pending.boot,
-            boundedMessage(error, "Cancelled pending transition intent could not be discarded."),
+            boundedMessage(discardError, "Failed pending transition intent could not be discarded."),
           ), pending.boot);
         }
         if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
-        return this.#currentOr(pending.boot);
-      }
-      const armed = await this.#ports.armTransitionIntent(intent, {
-        coordinatorGeneration: operation,
-        signal: armSignal,
-      });
-      if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
-      if (armed !== "armed") {
         return this.#commit(operation, failed(
           "confirm-update", "intent-record-failed", pending.boot,
-          "Pending transition intent could not be armed exactly once.",
+          boundedMessage(error, "Close-and-reopen intent could not be recorded."),
         ), pending.boot);
       }
-      return this.#commit(operation, Object.freeze({
-        phase: "close-and-reopen-required", boot: pending.boot, intent,
-        message: UPDATE_READY_MESSAGE, currentUsable: true,
-      }), pending.boot);
-    } catch (error) {
-      try { await this.#ports.discardPendingTransitionIntent(intent); }
-      catch (discardError) {
-        if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
-        return this.#commit(operation, failed(
-          "confirm-update", "intent-record-failed", pending.boot,
-          boundedMessage(discardError, "Failed pending transition intent could not be discarded."),
-        ), pending.boot);
-      }
-      if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
-      return this.#commit(operation, failed(
-        "confirm-update", "intent-record-failed", pending.boot,
-        boundedMessage(error, "Close-and-reopen intent could not be recorded."),
-      ), pending.boot);
-    }
+    });
   }
 
   async verifyNextBoot(intentInput: CloseAndReopenIntentV1): Promise<StaticUpdateCoordinatorStateV1> {
+    if (this.#state?.phase === "recording-close-and-reopen-intent") {
+      return this.#currentOr(null);
+    }
     const operation = this.#beginOperation();
     const fallback = this.#bootFromState();
     let boot: ControllerBootProofV1;
@@ -513,10 +544,39 @@ export class StaticHostUpdateCoordinator {
       }
       if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
     }
-    return this.#commit(operation, Object.freeze({
-      phase: "deployment-required", operation: "rollback", boot,
-      code: "rollback-unavailable", message: ROLLBACK_MESSAGE, currentUsable: true,
-    }), boot);
+    return await this.#withDurableMutation(async () => {
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
+      const durable = this.#durableIntent;
+      if (durable) {
+        let tombstoned: IntentTombstoneResultV1;
+        try { tombstoned = await this.#ports.tombstoneTransitionIntent(durable.intent); }
+        catch (error) {
+          if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
+          return this.#set(Object.freeze({
+            phase: "rollback-failed", operation: "rollback", boot,
+            code: "intent-tombstone-failed", intent: durable.intent,
+            durableIntentState: durable.state,
+            message: boundedMessage(error, "Durable update intent could not be tombstoned."),
+            currentUsable: true,
+          }));
+        }
+        if (tombstoned !== "mismatch") this.#durableIntent = null;
+        if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
+        if (tombstoned === "mismatch") {
+          return this.#set(Object.freeze({
+            phase: "rollback-failed", operation: "rollback", boot,
+            code: "intent-tombstone-failed", intent: durable.intent,
+            durableIntentState: durable.state,
+            message: "Durable update intent did not match the rollback target.",
+            currentUsable: true,
+          }));
+        }
+      }
+      return this.#commit(operation, Object.freeze({
+        phase: "deployment-required", operation: "rollback", boot,
+        code: "rollback-unavailable", message: ROLLBACK_MESSAGE, currentUsable: true,
+      }), boot);
+    });
   }
 
   async #preparationFailure(
@@ -560,6 +620,15 @@ export class StaticHostUpdateCoordinator {
       throw new Error("Coordinator operation is no longer current.");
     }
     return this.#operationAbortController.signal;
+  }
+
+  async #withDurableMutation<T>(mutation: () => Promise<T>): Promise<T> {
+    const previous = this.#durableMutationTail;
+    let release: (() => void) | undefined;
+    this.#durableMutationTail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try { return await mutation(); }
+    finally { release?.(); }
   }
 
   #isCurrentOperation(operation: number): boolean {

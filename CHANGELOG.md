@@ -16,8 +16,10 @@ All notable changes to this project will be documented in this file.
   replay. Durable intent publication is two-phase: ambiguous or cancelled writes
   remain non-consumable `PENDING` evidence, and only a same-generation,
   abort-bound transaction can arm an intent for one-shot consumption. Browser
-  rollback is reported as deployment-required because Git/deployment history,
-  not browser storage, is the application rollback authority.
+  rollback serializes behind publication and must durably tombstone the exact
+  pending or armed intent before reporting `deployment-required`; tombstone
+  failure preserves and reports the actual durable authority. Git/deployment
+  history, not browser storage, remains the application rollback authority.
 
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,

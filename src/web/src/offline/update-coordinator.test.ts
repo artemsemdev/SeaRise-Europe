@@ -53,7 +53,7 @@ function deferred<T>() {
 }
 
 function durableIntentStore() {
-  let record: Readonly<{ intent: CloseAndReopenIntentV1; state: "pending" | "armed" | "consumed" }> | null = null;
+  let record: Readonly<{ intent: CloseAndReopenIntentV1; state: "pending" | "armed" | "consumed" | "tombstoned" }> | null = null;
   return {
     pendingIntent: () => record?.intent ?? null,
     state: () => record?.state ?? null,
@@ -63,6 +63,7 @@ function durableIntentStore() {
     arm: async (intent: CloseAndReopenIntentV1, permit: TransitionArmPermitV1) => {
       if (permit.signal.aborted) throw new Error("arm cancelled");
       if (!record) return "missing" as const;
+      if (record.state === "tombstoned") return "mismatch" as const;
       if (record.intent.transitionId !== intent.transitionId || record.state !== "pending") return "mismatch" as const;
       record = Object.freeze({ intent: record.intent, state: "armed" as const });
       return "armed" as const;
@@ -70,9 +71,15 @@ function durableIntentStore() {
     discardPending: async (intent: CloseAndReopenIntentV1) => {
       if (record?.state === "pending" && record.intent.transitionId === intent.transitionId) record = null;
     },
+    tombstone: async (intent: CloseAndReopenIntentV1) => {
+      if (!record) return "missing" as const;
+      if (record.intent.transitionId !== intent.transitionId || record.state === "tombstoned") return "mismatch" as const;
+      record = Object.freeze({ intent: record.intent, state: "tombstoned" as const });
+      return "tombstoned" as const;
+    },
     consume: async (intent: CloseAndReopenIntentV1) => {
       if (!record || record.intent.transitionId !== intent.transitionId) return "missing" as const;
-      if (record.state === "pending") return "not-armed" as const;
+      if (record.state === "pending" || record.state === "tombstoned") return "not-armed" as const;
       if (record.state === "consumed") return "already-consumed" as const;
       record = Object.freeze({ intent: record.intent, state: "consumed" as const });
       return "consumed" as const;
@@ -90,6 +97,7 @@ function harness(options: Readonly<{
   record?: StaticUpdateCoordinatorPorts["recordPendingTransitionIntent"];
   arm?: StaticUpdateCoordinatorPorts["armTransitionIntent"];
   discard?: StaticUpdateCoordinatorPorts["discardPendingTransitionIntent"];
+  tombstone?: StaticUpdateCoordinatorPorts["tombstoneTransitionIntent"];
   consume?: StaticUpdateCoordinatorPorts["consumeTransitionIntent"];
 }> = {}) {
   let currentBoot = options.boot ?? boot();
@@ -106,6 +114,10 @@ function harness(options: Readonly<{
     }),
     discardPendingTransitionIntent: options.discard ?? vi.fn(async (intent) => {
       if (recorded[0]?.transitionId === intent.transitionId) recorded.splice(0, 1);
+    }),
+    tombstoneTransitionIntent: options.tombstone ?? vi.fn(async (intent) => {
+      if (recorded[0]?.transitionId === intent.transitionId) recorded.splice(0, 1);
+      return "tombstoned" as const;
     }),
     consumeTransitionIntent: options.consume ?? vi.fn(async () => "consumed" as const),
   };
@@ -350,12 +362,13 @@ describe("conservative static-host update coordinator", () => {
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
     await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
-    const rollback = await test.coordinator.requestRollback();
+    const rollingBack = test.coordinator.requestRollback();
     releaseRecord?.();
     const cancelled = await confirming;
+    const rollback = await rollingBack;
 
     expect(rollback).toMatchObject({ phase: "deployment-required", currentUsable: true });
-    expect(cancelled).toEqual(rollback);
+    expect(cancelled).toMatchObject({ phase: "recording-close-and-reopen-intent", currentUsable: true });
     expect(test.ports.discardPendingTransitionIntent).toHaveBeenCalledOnce();
     expect(persisted).toEqual([]);
   });
@@ -368,10 +381,11 @@ describe("conservative static-host update coordinator", () => {
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
     await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
-    const rollback = await test.coordinator.requestRollback();
+    const rollingBack = test.coordinator.requestRollback();
     record.reject(new Error("record rejected"));
 
-    await expect(confirming).resolves.toEqual(rollback);
+    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
+    const rollback = await rollingBack;
     expect(test.coordinator.state()).toEqual(rollback);
   });
 
@@ -387,12 +401,13 @@ describe("conservative static-host update coordinator", () => {
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
     await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
-    const rollback = await test.coordinator.requestRollback();
+    const rollingBack = test.coordinator.requestRollback();
     record.resolve();
     await vi.waitFor(() => expect(test.ports.discardPendingTransitionIntent).toHaveBeenCalledOnce());
     discard.reject(new Error("discard rejected"));
 
-    await expect(confirming).resolves.toEqual(rollback);
+    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
+    const rollback = await rollingBack;
     expect(test.coordinator.state()).toEqual(rollback);
   });
 
@@ -407,6 +422,7 @@ describe("conservative static-host update coordinator", () => {
       }),
       arm,
       discard: vi.fn(async () => { throw new Error("cleanup rejected"); }),
+      tombstone: vi.fn(store.tombstone),
     });
     const prepared = await test.coordinator.prepareUpdate(candidate.pair);
     if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
@@ -415,18 +431,92 @@ describe("conservative static-host update coordinator", () => {
     await vi.waitFor(() => expect(store.state()).toBe("pending"));
     const poisonedIntent = store.pendingIntent();
     if (!poisonedIntent) throw new Error("expected pending intent");
-    const rollback = await test.coordinator.requestRollback();
+    const rollingBack = test.coordinator.requestRollback();
     recordGate.resolve();
 
-    await expect(confirming).resolves.toEqual(rollback);
+    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
+    const rollback = await rollingBack;
+    expect(rollback).toMatchObject({ phase: "deployment-required" });
     expect(arm).not.toHaveBeenCalled();
-    expect(store.state()).toBe("pending");
+    expect(store.state()).toBe("tombstoned");
 
     const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
     await expect(reopened.coordinator.verifyNextBoot(poisonedIntent)).resolves.toMatchObject({
       phase: "failed", code: "intent-stale", currentUsable: true,
     });
-    expect(store.state()).toBe("pending");
+    expect(store.state()).toBe("tombstoned");
+  });
+
+  it("serializes rollback after an unresolved committed arm and tombstones it", async () => {
+    const store = durableIntentStore();
+    const armGate = deferred<void>();
+    const test = harness({
+      record: vi.fn(store.recordPending),
+      arm: vi.fn(async (intent, permit) => {
+        const result = await store.arm(intent, permit);
+        await armGate.promise;
+        return result;
+      }),
+      discard: vi.fn(store.discardPending),
+      tombstone: vi.fn(store.tombstone),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(store.state()).toBe("armed"));
+    const armedIntent = store.pendingIntent();
+    if (!armedIntent) throw new Error("expected armed intent");
+    const rollingBack = test.coordinator.requestRollback();
+    expect(test.coordinator.state()).toMatchObject({ phase: "recording-close-and-reopen-intent" });
+    armGate.resolve();
+
+    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
+    await expect(rollingBack).resolves.toMatchObject({ phase: "deployment-required" });
+    expect(store.state()).toBe("tombstoned");
+
+    const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
+    await expect(reopened.coordinator.verifyNextBoot(armedIntent)).resolves.toMatchObject({
+      phase: "failed", code: "intent-stale", currentUsable: true,
+    });
+  });
+
+  it("surfaces tombstone failure without claiming rollback over armed authority", async () => {
+    const store = durableIntentStore();
+    const armGate = deferred<void>();
+    const test = harness({
+      record: vi.fn(store.recordPending),
+      arm: vi.fn(async (intent, permit) => {
+        const result = await store.arm(intent, permit);
+        await armGate.promise;
+        return result;
+      }),
+      discard: vi.fn(store.discardPending),
+      tombstone: vi.fn(async () => { throw new Error("tombstone unavailable"); }),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(store.state()).toBe("armed"));
+    const armedIntent = store.pendingIntent();
+    if (!armedIntent) throw new Error("expected armed intent");
+    const rollingBack = test.coordinator.requestRollback();
+    armGate.resolve();
+
+    await confirming;
+    const rollback = await rollingBack;
+    expect(rollback).toMatchObject({
+      phase: "rollback-failed", operation: "rollback", code: "intent-tombstone-failed",
+      durableIntentState: "armed", intent: armedIntent, message: "tombstone unavailable",
+      currentUsable: true,
+    });
+    expect(store.state()).toBe("armed");
+
+    const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
+    await expect(reopened.coordinator.verifyNextBoot(armedIntent)).resolves.toMatchObject({
+      phase: "controller-verified-activation", currentUsable: true,
+    });
   });
 
   it("reports a current record and cleanup failure without arming durable poison", async () => {
