@@ -5,7 +5,7 @@ import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OfflineContractError, validateAppAuthority, validateRangeIdentity, type RangeIdentityV1 } from "./contracts/v1";
 import { validateStorageBudget } from "./contracts/policy";
-import { validateAppReleasePair } from "./contracts/keys";
+import { cacheNamespaces, validateAppReleasePair } from "./contracts/keys";
 import {
   RangeStoreIntegrityError,
   RangeStoreQuotaError,
@@ -107,21 +107,66 @@ async function rawRecords(factory: IDBFactory): Promise<Record<string, unknown>[
   });
   database.close(); return records;
 }
-async function rawLeases(factory: IDBFactory): Promise<Record<string, unknown>[]> {
+async function rawLeaseState(factory: IDBFactory): Promise<{
+  keyPath: IDBObjectStore["keyPath"];
+  records: Record<string, unknown>[];
+}> {
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
     const request = factory.open("searise-offline:v1");
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
+  const objectStore = database.transaction("leases").objectStore("leases");
+  const keyPath = objectStore.keyPath;
   const records = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
-    const request = database.transaction("leases").objectStore("leases").getAll();
+    const request = objectStore.getAll();
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
-  database.close(); return records;
+  database.close(); return { keyPath, records };
 }
-async function seedLegacyLeaseStore(factory: IDBFactory): Promise<void> {
+async function seedLegacyRangeStore(
+  factory: IDBFactory,
+  range: RangeIdentityV1,
+  payload: ArrayBuffer,
+): Promise<void> {
+  const pairKey = cacheNamespaces(range.authority.pair).pairKey;
+  const artifactKey = JSON.stringify([
+    pairKey,
+    range.authority.artifactId,
+    range.authority.path,
+    range.authority.role,
+    range.authority.mediaType,
+    range.authority.totalByteSize,
+    range.authority.artifactSha256,
+    range.authority.integrityChunkSize,
+  ]);
+  const key = JSON.stringify([
+    artifactKey,
+    range.interval.start,
+    range.interval.endExclusive,
+    range.authorizedIntervalSha256,
+  ]);
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
     const request = factory.open("searise-offline:v1", 1);
     request.onupgradeneeded = () => {
+      request.result.createObjectStore("range-meta", { keyPath: "key" }).put({
+        key: "state", rangeBytes: payload.byteLength, rangeEntries: 1, nextSequence: 8,
+        activePair: range.authority.pair, previousPair: null,
+      });
+      const ranges = request.result.createObjectStore("ranges", { keyPath: "key" });
+      ranges.createIndex("by-pair", "pairKey");
+      ranges.createIndex("by-lru", ["lastAccessSequence", "key"], { unique: true });
+      ranges.put({
+        key, pairKey, artifactKey, pair: range.authority.pair,
+        artifactId: range.authority.artifactId, path: range.authority.path,
+        role: range.authority.role, mediaType: range.authority.mediaType,
+        totalByteSize: range.authority.totalByteSize,
+        artifactSha256: range.authority.artifactSha256,
+        integrityChunkSize: range.authority.integrityChunkSize,
+        start: range.interval.start, endExclusive: range.interval.endExclusive,
+        authorizedIntervalSha256: range.authorizedIntervalSha256,
+        bytes: payload.slice(0), byteLength: payload.byteLength,
+        contentSequence: 7, lastAccessSequence: 7,
+      });
       request.result.createObjectStore("leases", { keyPath: "leaseId" }).put({
         leaseId: "shared-lease", pairKey: "legacy", pair: pair(), expiresAtEpochMs: 2_000,
       });
@@ -354,13 +399,20 @@ describe("authoritative IndexedDB range store", () => {
   });
 
   it("upgrades the v1 lease store and isolates the same active lease ID across two release pairs", async () => {
-    await seedLegacyLeaseStore(factory);
     const firstBytes = bytes(1, 1, 1, 1); const secondBytes = bytes(2, 2, 2, 2);
     const first = await identity({ payload: firstBytes });
     const second = await identity({ build: "build-b", release: "release-b", payload: secondBytes });
+    await seedLegacyRangeStore(factory, first, firstBytes);
     const firstStore = persistent(factory, [first]);
+    await expect(firstStore.inventory()).resolves.toMatchObject({
+      payloadBytes: 4, entryCount: 1, activePair: pair(), previousPair: null,
+    });
+    expect([...new Uint8Array((await firstStore.readExactOrContaining(first))!)]).toEqual([1, 1, 1, 1]);
+    await expect(firstStore.putVerified(first, firstBytes)).resolves.toBe("already-present");
+    await expect(rawLeaseState(factory)).resolves.toEqual({ keyPath: "key", records: [] });
+
     const secondStore = persistent(factory, [second], app("build-b", "release-b"));
-    await firstStore.putVerified(first, firstBytes); await secondStore.putVerified(second, secondBytes);
+    await secondStore.putVerified(second, secondBytes);
     const expiresAtEpochMs = 2_000;
     await firstStore.acquireLease({ contractVersion: 1, leaseId: "shared-lease", pair: pair(), expiresAtEpochMs, state: "active" });
     await secondStore.acquireLease({ contractVersion: 1, leaseId: "shared-lease", pair: pair("build-b", "release-b"), expiresAtEpochMs, state: "active" });
@@ -369,7 +421,8 @@ describe("authoritative IndexedDB range store", () => {
     const third = await identity({ build: "build-c", release: "release-c", payload: thirdBytes });
     const thirdStore = persistent(factory, [third], app("build-c", "release-c"), 4, 1, () => 1_500);
     await expect(thirdStore.putVerified(third, thirdBytes)).rejects.toBeInstanceOf(RangeStoreQuotaError);
-    const leases = await rawLeases(factory);
+    const { keyPath, records: leases } = await rawLeaseState(factory);
+    expect(keyPath).toBe("key");
     expect(leases).toHaveLength(2);
     expect(new Set(leases.map((lease) => lease.key)).size).toBe(2);
   });
