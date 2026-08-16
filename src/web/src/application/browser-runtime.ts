@@ -12,6 +12,15 @@ import type { ReleaseContext, Selection } from "../domain/release";
 import { AssessmentController } from "./assessment-controller";
 import { createProductionResourceRouter } from "../offline/create-production-resource-router";
 import type { CogRangeTransport } from "../data/cog-analysis-reader";
+import type {
+  InteractionSubjectV1,
+  RuntimeCapabilityV2,
+} from "../offline/contracts/policy";
+import type { RuntimeCapabilityInspectionV1 } from "../offline/verified-resource-router";
+import {
+  RuntimeCapabilityController,
+  type RuntimeCapabilityPort,
+} from "./runtime-capability";
 
 export interface AssessmentControllerPort {
   readonly getSnapshot: () => ProjectionState;
@@ -33,6 +42,7 @@ export interface BrowserRuntimeScope {
   readonly controller: AssessmentControllerPort;
   readonly methodology: MethodologyLoader;
   readonly searchArtifactTransport?: ArtifactTransport;
+  readonly capability?: RuntimeCapabilityPort;
   readonly dispose?: () => void;
 }
 
@@ -50,6 +60,10 @@ export interface ProductionBrowserRuntime extends BrowserRuntimeScope {
 export interface BrowserResourceRouter {
   readonly artifactTransport: ArtifactTransport;
   readonly cogRangeTransport: CogRangeTransport;
+  readonly inspectCapability?: (
+    subject: InteractionSubjectV1,
+    options?: RuntimeCapabilityInspectionV1,
+  ) => Promise<RuntimeCapabilityV2>;
   close(): void;
 }
 
@@ -102,6 +116,11 @@ export async function createBrowserRuntime(
   const methodology = new MethodologyRepository({
     transport: resources.artifactTransport,
   });
+  const capability = resources.inspectCapability
+    ? new RuntimeCapabilityController({
+        inspect: (subject, inspection) => resources.inspectCapability!(subject, inspection),
+      })
+    : undefined;
 
   return Object.freeze({
     context,
@@ -110,10 +129,12 @@ export async function createBrowserRuntime(
     assessment,
     controller,
     methodology,
+    ...(capability ? { capability } : {}),
     resources,
     searchArtifactTransport: resources.artifactTransport,
     dispose: () => {
       controller.dispose();
+      capability?.dispose();
       resources.close();
     },
   });

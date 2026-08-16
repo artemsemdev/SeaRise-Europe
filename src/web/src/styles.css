@@ -479,6 +479,15 @@ a { color: inherit; }
   outline: 3px solid #f5c66b;
   outline-offset: 3px;
 }
+.application-technical-alert button {
+  margin-left: 0.6rem;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
 .map-module-loading {
   position: absolute;
   inset: 0;

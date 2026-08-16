@@ -11,6 +11,7 @@ import type { ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import type { ProjectionState } from "../domain/projection-state";
 import type { ReleaseContext, Selection, TechnicalError } from "../domain/release";
+import type { RuntimeCapabilityV2 } from "../offline/contracts/policy";
 import {
   createBrowserRuntime,
   type BrowserRuntimeFactory,
@@ -40,6 +41,9 @@ export interface AssessmentRuntimeView {
   readonly handleSearchLifecycle: (event: SearchLifecycleEvent) => void;
   readonly cancelSearch: () => void;
   readonly searchArtifactTransport?: ArtifactTransport;
+  readonly capability: RuntimeCapabilityV2 | null;
+  readonly retryCapability: () => Promise<void>;
+  readonly requestUpdateAction: () => Promise<void>;
 }
 
 interface MethodologyRecord {
@@ -126,6 +130,7 @@ export function useAssessmentRuntime(
                 methodology,
               },
         });
+        void next?.capability?.confirmCurrentInteractionAvailable().catch(() => undefined);
       },
       (error: unknown) => {
         if (!current || controller.signal.aborted) return;
@@ -153,6 +158,11 @@ export function useAssessmentRuntime(
     active?.controller.getSnapshot ?? NULL_SNAPSHOT,
     active?.controller.getSnapshot ?? NULL_SNAPSHOT,
   );
+  const capability = useSyncExternalStore(
+    active?.capability?.subscribe ?? EMPTY_SUBSCRIBE,
+    active?.capability?.getSnapshot ?? NULL_SNAPSHOT,
+    active?.capability?.getSnapshot ?? NULL_SNAPSHOT,
+  );
 
   const methodology = context === null
     ? ({ phase: "idle" } as const)
@@ -162,7 +172,16 @@ export function useAssessmentRuntime(
 
   const select = useCallback((selection: Selection): Promise<void> => {
     if (!active) return Promise.reject(unavailable());
-    return active.controller.select(selection);
+    active.capability?.selectSubject(Object.freeze({
+      kind: "assessment",
+      scenario: selection.scenario,
+      horizon: selection.horizon,
+    }));
+    return active.controller.select(selection).then(async () => {
+      if (active.controller.getSnapshot().phase === "result") {
+        await active.capability?.confirmCurrentInteractionAvailable();
+      }
+    });
   }, [active]);
   const retry = useCallback((): Promise<boolean> => {
     if (!active) return Promise.reject(unavailable());
@@ -170,15 +189,32 @@ export function useAssessmentRuntime(
   }, [active]);
   const reset = useCallback((): void => {
     if (!active) throw unavailable();
+    active.capability?.selectSubject(Object.freeze({ kind: "core" }));
     active.controller.reset();
   }, [active]);
   const handleSearchLifecycle = useCallback((event: SearchLifecycleEvent): void => {
     if (!active) return;
+    if (event.type === "search-started") {
+      active.capability?.selectSubject(Object.freeze({
+        kind: "search",
+        shards: Object.freeze(["core", "coastal"] as const),
+      }));
+    } else if (event.type === "search-completed") {
+      void active.capability?.confirmCurrentInteractionAvailable().catch(() => undefined);
+    }
     active.controller.handleSearchLifecycle(event);
   }, [active]);
   const cancelSearch = useCallback((): void => {
     if (!active) return;
     active.controller.cancelSearch();
+  }, [active]);
+  const retryCapability = useCallback((): Promise<void> => {
+    if (!active?.capability) return Promise.reject(unavailable());
+    return active.capability.retry();
+  }, [active]);
+  const requestUpdateAction = useCallback((): Promise<void> => {
+    if (!active?.capability) return Promise.reject(unavailable());
+    return active.capability.requestUpdateAction();
   }, [active]);
 
   return {
@@ -190,5 +226,8 @@ export function useAssessmentRuntime(
     handleSearchLifecycle,
     cancelSearch,
     searchArtifactTransport: active?.searchArtifactTransport,
+    capability,
+    retryCapability,
+    requestUpdateAction,
   };
 }
