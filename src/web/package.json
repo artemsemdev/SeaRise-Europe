@@ -19,10 +19,10 @@
     "serve:local-release": "node scripts/serve-local-release.mjs",
     "serve:committed-release": "node scripts/serve-committed-release.mjs",
     "e2e:local-candidate": "node scripts/run-local-candidate-e2e.mjs",
-    "lint": "eslint . && node scripts/check-boundaries.mjs && npm run check:contracts && npm run check:search-fixture && npm run check:scientific-fixture",
+    "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-target-content.mjs && npm run check:contracts && npm run check:search-fixture && npm run check:scientific-fixture",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "build": "vite build && node scripts/inspect-build.mjs",
+    "build": "vite build && node scripts/check-target-content.mjs --built dist && node scripts/inspect-build.mjs",
     "serve": "vite preview --host 127.0.0.1 --port 4173",
     "e2e": "playwright test"
   },

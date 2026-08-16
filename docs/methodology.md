@@ -1,13 +1,13 @@
 # AR6 Regional Projection Methodology
 
 > **Status:** Projection lookup, source parity, and Phase 0R release gate approved
-> **Last reviewed:** 2026-08-10
+> **Last reviewed:** 2026-08-16
 > **Decision source:** [ADR-024](architecture/adr/ADR-024-ar6-regional-projection-contract.md), within [ADR-021](architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Machine contract:** [`ar6-projection-contract.json`](../src/pipeline/science/ar6-projection-contract.json)
 > **Release gate:** [`final-gate.json`](../src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json) records automated validation passed, zero blockers, and owner `releaseDisposition=approved`
-> **Phase 1:** `OPEN`; public artifact-contract work is in progress
-> **Reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — implementation `complete`, publication `blocked`
-> **Input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — inputs `locked`, publication `blocked`
+> **Phase 1:** `CLOSED`; the private final Candidate remains local-only
+> **Historical reconciliation evidence:** [Phase 0.7 vertical reconciliation evidence](science/phase-0-7-vertical-reconciliation-evidence.md) — superseded binary-method investigation
+> **Historical input evidence:** [Phase 0.6 vertical source evidence](science/phase-0-6-vertical-source-evidence.md) — retained audit evidence, not the active method
 > **Canonical document:** `docs/methodology.md`
 
 ## Purpose
@@ -62,7 +62,12 @@ The remainder of this document preserves the v1 binary investigation and why
 it was not publishable. It is historical evidence, not an alternative active
 method.
 
-## Historical candidate classification
+## Historical binary-method evidence (superseded)
+
+Everything below this heading records the rejected v1 terrain-comparison
+investigation. It is retained for audit only. It is not product guidance, an
+implementation alternative, a rollback baseline, or an allowed target-domain
+contract. ADR-024 and the active method above are authoritative.
 
 The investigated method is `absolute-mean-water-surface-egm2008-interval-v1`.
 It constructs
@@ -88,7 +93,7 @@ Provisional output semantics after the approved connectivity filter:
 The lookup uses nearest-neighbour class semantics. Rendered map colours are not
 scientific values; the browser reads the exact classification artifact.
 
-## Fixed product dimensions
+### Historical fixed dimensions
 
 | Dimension | Values |
 |---|---|
@@ -102,7 +107,7 @@ Phase 0.2 fixed the median source variable mapping. ADR-023 adds the exact
 confirmed them in each SHA-256-locked regional member; scientific/data review
 of their implemented use remains required.
 
-## Source candidates
+### Historical source candidates
 
 | Role | Candidate source | Required release evidence |
 |---|---|---|
@@ -118,7 +123,7 @@ Raw inputs are acquired once per release into a local or CI cache. They are not
 served to normal site visitors. The release manifest records all inputs and
 published derivatives.
 
-## Phase 0.2 gate result
+### Historical Phase 0.2 gate result
 
 [Phase 0.2 evidence](science/phase-0-2-source-and-geography-evidence.md)
 established these binding implementation facts:
@@ -141,7 +146,7 @@ transformation. The pipeline therefore fails before producing a binary exposure
 raster. The legacy direct comparison is disabled, including for synthetic or
 migration callers.
 
-## Phase 0.5 strategy result
+### Historical Phase 0.5 strategy result
 
 [Phase 0.5 evidence](science/phase-0-5-vertical-methodology-evidence.md)
 selected a reproducible route through the mismatch:
@@ -162,7 +167,7 @@ assumed equivalence. It remains blocked until exact inputs and independent
 controls validate the numerical chain. No independent project reviewer has
 yet approved or rejected it.
 
-## Phase 0.6 input result
+### Historical Phase 0.6 input result
 
 [Phase 0.6 evidence](science/phase-0-6-vertical-source-evidence.md) locks the
 full AR6 archive and exact scenario members, all 240 monthly SLA objects, the
@@ -175,7 +180,7 @@ This closes source identity, licensing, and coverage evidence. It does not
 close numerical transformation, uncertainty-bound, DEM selection, or
 independent-review gates.
 
-## Phase 0.7 implementation result
+### Historical Phase 0.7 implementation result
 
 [Phase 0.7 evidence](science/phase-0-7-vertical-reconciliation-evidence.md)
 implements and tests the deterministic parts of the selected method:
@@ -202,7 +207,7 @@ terrain, and connectivity controls were still pending; and Baltic/Black Sea,
 cross-environment, and independent-review evidence was absent. Those conditions
 produced `DataUnavailable` or stopped the build rather than guessed values.
 
-## Phase 0.8 terrain and scope result
+### Historical Phase 0.8 terrain and scope result
 
 [Phase 0.8 evidence](science/phase-0-8-terrain-geography-controls.md) selects
 GLO-30 after comparing five GLO-30/GLO-90 coastal windows with their EDM, FLM,
@@ -229,7 +234,7 @@ geography controls and nine symbolic connectivity controls pass. External
 product/scientific review remains mandatory, and the connectivity screen is
 not a hydraulic model.
 
-## Phase 0.9 final gate result
+### Historical Phase 0.9 final gate result
 
 [Phase 0.9 evidence](evidence/phase-0-9-regional-gate.md) records the Phase 0.9
 disposition as `BLOCKED`; the Phase 0 scientific gate remains blocked. The
@@ -251,7 +256,7 @@ recorded their evidence without manufacturing approval. Issue
 [#98](https://github.com/artemsemdev/SeaRise-Europe/issues/98) then performed
 the terminal v1 re-evaluation recorded in Phase 0.14.
 
-## Phase 0.11 uncertainty-budget result
+### Historical Phase 0.11 uncertainty-budget result
 
 The [machine-readable Phase 0.11 budget](../src/pipeline/science/coastal-uncertainty-budget.json)
 calibrates every selected non-projection term at a common 90% interpretation
@@ -276,7 +281,7 @@ publication gate remains `blocked` until an independent scientific/data
 reviewer records it. The v1 method is superseded for publication; its evidence
 remains historical input to the recovery decision.
 
-## Phase 0.14 terminal no-go
+### Historical Phase 0.14 terminal no-go
 
 [Phase 0.14 evidence](evidence/phase-0-14-final-no-go.md) records three distinct
 states that must not be collapsed:
@@ -296,7 +301,7 @@ removed the absolute-water and terrain comparison. Recovery through #135 and
 set the release decision that unlocked
 [#48](https://github.com/artemsemdev/SeaRise-Europe/issues/48).
 
-## Historical v1 required preprocessing record
+### Historical v1 required preprocessing record
 
 Before approval, the pipeline must record and test:
 
@@ -321,7 +326,7 @@ the same flattened location dimension as tide gauges. The exact transformation
 is enforced in code and tests. Direct archive/member inspection is complete;
 review of the implemented interval transform remains a publication gate.
 
-## Coastal analysis scope
+### Historical coastal-analysis scope
 
 The checked-in v2 geometry is a deterministic 25 km inland band derived from
 pinned Natural Earth 5.1.1 inputs. It includes a fixed EPSG:3035 recipe,
@@ -339,7 +344,7 @@ external product-owner review, not promoted as a canonical hazard boundary.
 this versioned product boundary. `UnsupportedGeography` means it is outside the
 versioned Europe support geometry.
 
-## Known limitations
+### Historical limitations
 
 The [Phase 0.3 regional evidence](evidence/phase-0-regional-fixture.md)
 records why the legacy comparison, connectivity, scientific goldens, nine
@@ -363,27 +368,27 @@ must disclose at least:
 7. A `0` is not a safety determination.
 8. A `1` is not a prediction that flooding will occur.
 
-## User-facing interpretation contract
+### Historical v1 interpretation record
 
-### Modeled exposure detected
+#### Historical `ModeledExposureDetected`
 
 The selected point meets the candidate model condition for the chosen scenario
 and horizon. It is a screening result, not a flood forecast, probability, or
 property assessment.
 
-### No modeled exposure detected
+#### Historical `NoModeledExposureDetected`
 
 The selected point does not meet the candidate model condition for the chosen
 scenario and horizon. This is not a safety determination and does not evaluate
 all flood mechanisms.
 
-### Data unavailable
+#### Historical v1 `DataUnavailable`
 
 A required source value, uncertainty bound, transformation, connectivity
 decision, or validated artifact is unavailable, or the complete interval
 crosses the threshold. The application does not substitute or infer a class.
 
-## Scientific test set
+### Historical v1 scientific test set
 
 The approval suite contains:
 
@@ -402,7 +407,7 @@ The approval suite contains:
 Every release records the test-set version and result summary in
 `manifest.json`. A failed golden point blocks publication.
 
-## Historical v1 approval conditions
+### Historical v1 approval conditions
 
 These conditions explain why v1 did not pass. They are retained for audit, not
 as a route to revive ADR-023. The recovery issues must define and approve a new
@@ -426,7 +431,7 @@ versioned contract. Methodology `v1.0` would have required all of the following:
 Any future classification rule belongs to methodology v2 and a superseding
 ADR. Do not edit the v1 evidence or interpretation in place.
 
-## Version history
+### Methodology version history
 
 | Candidate version | Date | State | Change |
 |---|---|---|---|
