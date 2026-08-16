@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { dirname, extname, posix, resolve } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { basename, extname, join, relative, resolve } from "node:path";
 import { applicationBuildIdentityFile } from "./application-build-identity.mjs";
 
 export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V3__";
@@ -36,6 +36,45 @@ function collectEntry(viteManifest, key, files) {
   for (const css of entry.css ?? []) files.add(css);
   for (const asset of entry.assets ?? []) files.add(asset);
   for (const imported of entry.imports ?? []) collectEntry(viteManifest, imported, files);
+  for (const imported of entry.dynamicImports ?? []) collectEntry(viteManifest, imported, files);
+}
+
+function emittedAssetFiles(dist) {
+  const root = resolve(dist, "assets");
+  const visit = (directory) => readdirSync(directory).flatMap((name) => {
+    const path = join(directory, name);
+    return statSync(path).isDirectory() ? visit(path) : [relative(dist, path).replaceAll("\\", "/")];
+  });
+  const assets = visit(root).filter((path) => MEDIA_TYPES[extname(path)]);
+  const names = assets.map((path) => basename(path));
+  if (new Set(names).size !== names.length) {
+    throw new Error("The emitted shell asset basenames are not unique");
+  }
+  return assets;
+}
+
+function collectEmittedReferences(dist, files) {
+  const candidates = emittedAssetFiles(dist);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const sourcePath of [...files]) {
+      if (![".css", ".js"].includes(extname(sourcePath))) continue;
+      const source = readFileSync(resolve(dist, sourcePath), "utf8");
+      for (const candidate of candidates) {
+        if (files.has(candidate)) continue;
+        const name = basename(candidate);
+        if (
+          source.includes(candidate) ||
+          source.includes(`./${name}`) ||
+          source.includes(`/${name}`)
+        ) {
+          files.add(candidate);
+          changed = true;
+        }
+      }
+    }
+  }
 }
 
 export function shellPrecachePaths({ dist, viteManifest, dataReleaseId }) {
@@ -45,15 +84,7 @@ export function shellPrecachePaths({ dist, viteManifest, dataReleaseId }) {
   )?.[0];
   if (!mainKey) throw new Error("Vite manifest has no static application entry");
   collectEntry(viteManifest, mainKey, files);
-  for (const file of [...files].filter((path) => path.endsWith(".css"))) {
-    const css = readFileSync(`${dist}/${file}`, "utf8");
-    for (const match of css.matchAll(/url\((?:["']?)([^"')]+)(?:["']?)\)/gu)) {
-      if (/^(?:data:|https?:)/u.test(match[1])) continue;
-      files.add(match[1].startsWith("/")
-        ? match[1].slice(1)
-        : posix.normalize(posix.join(dirname(file), match[1])));
-    }
-  }
+  collectEmittedReferences(dist, files);
   return [
     "/",
     `/${applicationBuildIdentityFile}`,

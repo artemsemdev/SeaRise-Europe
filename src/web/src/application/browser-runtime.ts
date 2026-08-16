@@ -66,6 +66,10 @@ export interface BrowserRuntimeOptions {
   ) => Promise<BrowserResourceRouter>;
 }
 
+function requiresConnection(error: Readonly<{ message: string }>): boolean {
+  return /^COG (?:delivery metadata|range|range body) for .+ is unavailable\.$/u.test(error.message);
+}
+
 /**
  * Creates one immutable-release browser runtime from the real static adapters.
  * Delivery failures remain technical here; service-worker/cache availability
@@ -90,6 +94,10 @@ export async function createBrowserRuntime(
   const controller = new AssessmentController({
     context,
     assessment,
+    // The controller asks only for recoverable FetchFailed operations. A
+    // failed request for absent COG bytes needs a connection; an HTTP failure
+    // remains a distinct technical delivery error.
+    classifyAvailability: (error) => requiresConnection(error) ? "connection-required" : null,
   });
   const methodology = new MethodologyRepository({
     transport: resources.artifactTransport,

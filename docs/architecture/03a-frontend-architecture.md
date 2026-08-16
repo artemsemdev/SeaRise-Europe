@@ -324,6 +324,16 @@ Cache Storage, IndexedDB, or the session-memory range store without the
 separate promotion contract required by ADR-026. Cache cleanup may delete old
 releases only when no active client uses them.
 
+The production shell inventory is generated from the recursive Vite main
+graph and exact references in emitted JavaScript and CSS. It includes lazy
+`MapExplorer` and `map-runtime` modules, their styles, the settlement-search
+Worker, its Brotli WASM decoder, fonts, and scientific decoder chunks. Build
+inspection independently reconstructs the inventory and rejects drift.
+Release manifests and the exact COG range-integrity bootstrap remain sealed
+members. Visual PMTiles and analysis COG payloads are excluded: search shards
+and only the COG ranges used by an accepted assessment enter their dedicated
+verified stores when requested.
+
 The UI distinguishes:
 
 - online and complete for the current selection;

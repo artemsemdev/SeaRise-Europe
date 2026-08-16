@@ -1,7 +1,7 @@
 import { brotliCompressSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, extname, join, relative, resolve } from "node:path";
+import { basename, extname, join, relative, resolve } from "node:path";
 import {
   applicationBuildIdentityFile,
   validateApplicationBuildIdentity,
@@ -121,19 +121,37 @@ function collectPrecache(key) {
   for (const css of entry.css ?? []) expectedPrecacheFiles.add(css);
   for (const asset of entry.assets ?? []) expectedPrecacheFiles.add(asset);
   for (const imported of entry.imports ?? []) collectPrecache(imported);
+  for (const imported of entry.dynamicImports ?? []) collectPrecache(imported);
 }
 const precacheMainKey = Object.entries(viteManifest).find(([, entry]) =>
   entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
 )?.[0];
 if (!precacheMainKey) throw new Error("Vite manifest has no precache application entry");
 collectPrecache(precacheMainKey);
-for (const file of [...expectedPrecacheFiles].filter((path) => path.endsWith(".css"))) {
-  const css = readFileSync(resolve(dist, file), "utf8");
-  for (const match of css.matchAll(/url\((?:["']?)([^"')]+)(?:["']?)\)/gu)) {
-    if (/^(?:data:|https?:)/u.test(match[1])) continue;
-    expectedPrecacheFiles.add(match[1].startsWith("/")
-      ? match[1].slice(1)
-      : join(dirname(file), match[1]).replaceAll("\\", "/"));
+const shellAssetExtensions = new Set([
+  ".css", ".html", ".js", ".json", ".png", ".svg", ".wasm", ".woff", ".woff2",
+]);
+const emittedShellAssets = paths
+  .filter((path) => path.startsWith(resolve(dist, "assets")) && shellAssetExtensions.has(extname(path)))
+  .map((path) => relative(dist, path).replaceAll("\\", "/"));
+const emittedBasenames = emittedShellAssets.map((path) => basename(path));
+if (new Set(emittedBasenames).size !== emittedBasenames.length) {
+  throw new Error("Independent shell inventory found duplicate emitted asset basenames");
+}
+let foundReference = true;
+while (foundReference) {
+  foundReference = false;
+  for (const sourcePath of [...expectedPrecacheFiles]) {
+    if (![".css", ".js"].includes(extname(sourcePath))) continue;
+    const source = readFileSync(resolve(dist, sourcePath), "utf8");
+    for (const candidate of emittedShellAssets) {
+      if (expectedPrecacheFiles.has(candidate)) continue;
+      const name = basename(candidate);
+      if (source.includes(candidate) || source.includes(`./${name}`) || source.includes(`/${name}`)) {
+        expectedPrecacheFiles.add(candidate);
+        foundReference = true;
+      }
+    }
   }
 }
 const expectedPrecachePaths = [
@@ -180,6 +198,15 @@ if (
     (path.startsWith("/releases/") && path !== buildIdentity.manifestPath &&
       path !== rangeIntegrityBootstrapPath(releaseId)))
 ) throw new Error("Service worker embedded precache differs from the independent shell inventory");
+const requiredRecursiveShell = [
+  viteManifest["src/components/map/MapExplorer.tsx"]?.file,
+  viteManifest["src/components/map/map-runtime.ts"]?.file,
+  ...workerPaths.map((path) => relative(dist, path).replaceAll("\\", "/")),
+  ...brotliWasmPaths.map((path) => relative(dist, path).replaceAll("\\", "/")),
+];
+if (requiredRecursiveShell.some((path) => !path || !embedded.entries.some((entry) => entry.path === `/${path}`))) {
+  throw new Error("Service worker precache omits a required recursive Flight shell resource");
+}
 assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
 validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
 const mainEntry = Object.values(viteManifest).find((entry) =>
