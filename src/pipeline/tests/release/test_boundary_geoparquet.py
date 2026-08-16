@@ -65,6 +65,7 @@ def test_browser_classifier_golden_matches_shapely_covers_on_exact_geoparquet() 
         "coastal",
     }
     assert {case["relation"] for case in fixture["cases"]} == {
+        "browser-fixture-control",
         "exterior-boundary",
         "hole-boundary",
         "epsilon-inside",
@@ -91,6 +92,15 @@ def test_browser_classifier_golden_matches_shapely_covers_on_exact_geoparquet() 
         if case["relation"].endswith("boundary"):
             boundary = support.boundary if case["boundaryRole"] == "support" else coastal.boundary
             assert boundary.covers(point), case["id"]
+
+    control = fixture["release"]["browserFixtureControl"]
+    assert control == {
+        "controlId": "browser-only-source-nodata-62n-44e",
+        "path": "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json",
+        "sha256": "55a3811d7c56879b5ac5cff6e0a868cd22a8a545305ddb718a9697244c431d2e",
+        "fixtureOnly": True,
+    }
+    assert _sha256(REPO_ROOT / control["path"]) == control["sha256"]
 
 
 @pytest.mark.parametrize("role", sorted(SOURCES))

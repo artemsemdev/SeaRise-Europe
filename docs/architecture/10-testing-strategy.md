@@ -200,7 +200,12 @@ COG embedded scenario/horizon/source/band identity, canonical chunk hashes,
 exact `HEAD`/CORS/`206` delivery, corrupt and missing ranges, cancellation that
 does not poison shared resources, exact-artifact cache isolation, boundary
 classification, nodata, the inclusive distance limit, lowest-ID ties, and
-generated coordinate and grid candidates. The operational commands and measured local gate are in
+generated coordinate and grid candidates. A pinned browser-only polygon at
+62°N, 44°E makes the real geography-to-COG `DataUnavailable/source-value-nodata`
+path reproducible; it is explicitly excluded from audited geometry and
+real-source releases. Disjointness, pinned cross-platform Arrow schemas, and
+all 27 nodata samples are checked. The operational
+commands and measured local gate are in
 the [static scientific lookup runbook](../operations/static-scientific-lookup.md).
 
 ### 3.8 Offline, accessibility, and visual tests

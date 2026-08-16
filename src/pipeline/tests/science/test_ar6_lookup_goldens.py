@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 import rasterio
 from jsonschema import Draft202012Validator, FormatChecker
-from shapely.geometry import box
+from shapely.geometry import Point
 
 from searise_pipeline.science import (
     Ar6GridSlice,
@@ -215,18 +215,35 @@ def test_committed_browser_fixture_matches_all_four_adr024_outcomes() -> None:
     }
 
     interval, raw_cog, cog_path = _fixture_cog_interval(fixture)
+    manifest = _load(REPO_ROOT / fixture["release"]["manifestPath"])
+    overlay_root = (
+        REPO_ROOT
+        / "contracts/release/v2/fixtures/browser-release"
+        / fixture["release"]["dataReleaseId"]
+    )
+    support = gpd.read_parquet(
+        overlay_root
+        / next(item["path"] for item in manifest["artifacts"] if item["role"] == "support-boundary")
+    ).geometry.iloc[0]
+    coastal = gpd.read_parquet(
+        overlay_root
+        / next(item["path"] for item in manifest["artifacts"] if item["role"] == "coastal-boundary")
+    ).geometry.iloc[0]
     lookup_contract = _load(SCIENCE_DIR / "ar6-lookup-validation.json")
     actual_states: set[str] = set()
     for case in fixture["cases"]:
-        classification = case["geographyClassification"]
-        if classification == "InEuropeAndCoastalZone":
-            support = coastal = box(-180, -90, 180, 90)
-        elif classification == "InEuropeOutsideCoastalZone":
-            support = box(-180, -90, 180, 90)
-            coastal = box(-1, -1, 1, 1)
-        else:
-            support = coastal = box(-30, 25, 45, 75)
         coordinates = case["coordinates"]
+        point = Point(coordinates["longitude"], coordinates["latitude"])
+        classification = (
+            "OutsideEurope"
+            if not support.covers(point)
+            else (
+                "InEuropeAndCoastalZone"
+                if coastal.covers(point)
+                else "InEuropeOutsideCoastalZone"
+            )
+        )
+        assert classification == case["geographyClassification"]
         actual = lookup_ar6_projection(
             interval,
             latitude=coordinates["latitude"],
@@ -266,8 +283,12 @@ def test_committed_browser_fixture_matches_all_four_adr024_outcomes() -> None:
                 projection["upper"],
             ]
         if nodata := case.get("nodataEvidence"):
-            assert REPO_ROOT / nodata["artifactPath"] == cog_path
-            assert raw_cog[:, nodata["row"], nodata["column"]].tolist() == nodata["bandValues"]
+            assert nodata["kind"] == "committed-nine-cog-cell-and-browser-boundary-control"
+            selected_path = nodata["artifactPathPattern"].format(**fixture["selection"])
+            assert REPO_ROOT / selected_path == cog_path
+            assert raw_cog[:, nodata["row"], nodata["column"]].tolist() == nodata[
+                "bandValuesForEveryCombination"
+            ]
             assert nodata["storedNodata"] == -32768
             assert actual.central_m is None
 

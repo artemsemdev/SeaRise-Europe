@@ -97,6 +97,65 @@ describe("honest browser-overlay evidence", () => {
     expect(validateManifest(manifest), JSON.stringify(validateManifest.errors)).toBe(true);
   });
 
+  it("identifies the browser-only nodata control in every affected overlay contract", () => {
+    const controlPath = "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json";
+    const controlBytes = read(controlPath);
+    const controlSha256 = sha256(controlBytes);
+    const arrowSchemasPath =
+      "src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json";
+    const arrowSchemasBytes = read(arrowSchemasPath);
+    const arrowSchemasSha256 = sha256(arrowSchemasBytes);
+    const manifest = JSON.parse(readFileSync(resolve(overlayRoot, "manifest.json"), "utf8"));
+    const receipt = JSON.parse(
+      readFileSync(resolve(overlayRoot, "receipts/browser-derivation.json"), "utf8"),
+    );
+    const attribution = JSON.parse(
+      readFileSync(resolve(overlayRoot, "config/source-attribution.json"), "utf8"),
+    );
+    const sbom = JSON.parse(
+      readFileSync(resolve(overlayRoot, "sbom/browser-integrity.cdx.json"), "utf8"),
+    );
+
+    expect(JSON.parse(controlBytes.toString("utf8"))).toMatchObject({
+      controlId: "browser-only-source-nodata-62n-44e",
+      fixtureRole: "browser-only-adr-024-data-unavailable-control",
+      dataProvenanceClass: "synthetic-fixture",
+    });
+    expect(receipt.materials).toContainEqual({ path: controlPath, sha256: controlSha256 });
+    expect(receipt.materials).toContainEqual({
+      path: arrowSchemasPath,
+      sha256: arrowSchemasSha256,
+    });
+    expect(sbom.components).toContainEqual(expect.objectContaining({
+      name: controlPath,
+      hashes: [{ alg: "SHA-256", content: controlSha256 }],
+    }));
+    expect(sbom.components).toContainEqual(expect.objectContaining({
+      name: arrowSchemasPath,
+      hashes: [{ alg: "SHA-256", content: arrowSchemasSha256 }],
+    }));
+    expect(attribution.records).toContainEqual(expect.objectContaining({
+      attributionId: "browser-nodata-control-fixture",
+      sourceSha256: controlSha256,
+      appliesToRoles: ["support-boundary", "coastal-boundary"],
+    }));
+    for (const artifact of manifest.artifacts.filter(
+      (candidate: { role: string }) =>
+        candidate.role === "support-boundary" || candidate.role === "coastal-boundary",
+    )) {
+      expect(artifact.spatialBounds[2]).toBe(44.001);
+      expect(artifact.rights.attributionIds).toEqual([
+        "browser-nodata-control-fixture",
+        "natural-earth-boundaries",
+      ]);
+      expect(artifact.lineage).toContainEqual({ path: controlPath, sha256: controlSha256 });
+      expect(artifact.lineage).toContainEqual({
+        path: arrowSchemasPath,
+        sha256: arrowSchemasSha256,
+      });
+    }
+  });
+
   it("keeps authoritative v1 evidence byte-identical and scopes inherited identity", () => {
     expect(readFileSync(resolve(overlayRoot, "receipts/build.json"))).toEqual(
       readFileSync(resolve(baseRoot, "receipts/build.json")),

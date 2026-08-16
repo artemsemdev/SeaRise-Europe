@@ -7,11 +7,18 @@
   "purpose": "Prove that independent Python and browser evaluators produce all and only the four ADR-024 outcomes from one neutral serialized control set.",
   "limitations": [
     "This synthetic release fixture is authoritative for behavior parity, not for public scientific release values.",
-    "The nodata control reads an actual three-band nodata cell from the committed COG while declaring the coastal classification to isolate exact source-grid lookup behavior."
+    "The nodata control reads an actual three-band nodata cell from every committed COG through an isolated browser-only polygon appended to both synthetic v2 boundary artifacts.",
+    "The control polygon is not part of the audited support/coastal geometry and is not production or public scientific evidence."
   ],
   "release": {
     "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
     "manifestPath": "contracts/release/v2/fixtures/browser-release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json"
+  },
+  "browserFixtureControl": {
+    "controlId": "browser-only-source-nodata-62n-44e",
+    "path": "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json",
+    "sha256": "55a3811d7c56879b5ac5cff6e0a868cd22a8a545305ddb718a9697244c431d2e",
+    "fixtureOnly": true
   },
   "selection": {
     "scenario": "ssp2-45",
@@ -81,12 +88,12 @@
         }
       },
       "nodataEvidence": {
-        "kind": "committed-cog-cell",
-        "artifactPath": "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/analysis/ssp2-45/2050.tif",
+        "kind": "committed-nine-cog-cell-and-browser-boundary-control",
+        "artifactPathPattern": "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/analysis/{scenario}/{horizon}.tif",
         "row": 13,
         "column": 74,
         "storedNodata": -32768,
-        "bandValues": [
+        "bandValuesForEveryCombination": [
           -32768,
           -32768,
           -32768

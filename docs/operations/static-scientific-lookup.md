@@ -60,6 +60,29 @@ graph. Inherited sealed v1 evidence is retained unchanged, including its
 historical lineage structure; v2 does not rewrite that evidence to manufacture
 a whole-release acyclicity claim.
 
+### Browser-only DataUnavailable control
+
+The committed synthetic browser overlay appends one isolated square around
+`62°N, 44°E` to both v2 fixture boundaries. Its exact contract is
+`src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json`. The
+point resolves to native COG row 13, column 74 and location ID `1002800440`.
+All three required bands in all nine scenario/horizon COGs contain the stored
+nodata value `-32768`, so the complete production browser chain returns
+`DataUnavailable/source-value-nodata` without mocking geography or a
+scientific outcome.
+
+This control is browser-fixture evidence only. It is not added to either
+audited `data/geometry` input, the byte-sealed v1 fixture, or any private
+candidate. GeoParquet metadata, release attribution, derivation materials,
+SBOM, manifest, and checksums identify the synthetic addition explicitly. The
+fixture writer proves its polygon bounding box is disjoint from each audited
+source geometry before append, and canonicalizes each output with the pinned
+payload and decoded SHA-256 in
+`src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json`. It
+must never be copied into a real-source candidate or interpreted as support,
+coastal, hazard, flooding, inundation, terrain exposure, flood probability, or
+property-risk evidence.
+
 ## Clean-clone verification
 
 From the repository root with the pinned Node and npm versions:
@@ -75,6 +98,7 @@ PYTHONPATH=src/pipeline .venv/bin/python -m pytest \
   src/pipeline/tests/science/test_projection_contract.py \
   src/pipeline/tests/offline_release/test_cog_range.py \
   src/pipeline/tests/release/test_range_integrity.py \
+  src/pipeline/tests/release/test_browser_integrity_fixture.py \
   src/pipeline/tests/release/test_boundary_geoparquet.py -q
 ```
 
@@ -86,8 +110,8 @@ are:
   mapping, cancellation, exact scaling, distance limits, tie breaks, and 500
   generated candidate sets;
 - `src/web/src/data/geography-classifier.test.ts` for real GeoParquet decoding,
-  support/coastal precedence, caching, corruption, and twelve shared Shapely
-  parity cases at exterior boundaries, hole boundaries, and epsilon seams;
+  support/coastal precedence, caching, corruption, twelve audited-boundary
+  seam cases, and the isolated browser-only nodata control shared with Shapely;
 - `src/web/src/data/cog-analysis-reader.golden.test.ts` for all nine
   scenario/horizon combinations, 63 Python/TypeScript golden comparisons,
   native-grid edges, the inclusive 100 km reader policy, nodata, strict ranges,

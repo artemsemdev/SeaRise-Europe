@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added an explicitly browser-only synthetic `DataUnavailable` control at
+  62°N, 44°E. The isolated v2 fixture polygon drives the real static geography
+  and exact COG lookup chain, while deterministic gates prove all 27 source
+  bands are nodata, prove the control is disjoint from audited geometry, pin
+  cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
+
 ### Changed
 
 - Reclassified the superseded Flight mock and binary terrain-comparison methodology as explicit historical evidence, and added a fail-closed target-content scan so those legacy claims cannot re-enter the static application or built assets.
