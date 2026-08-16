@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a deterministic verified-release resource plan that promotes only
+  exact COG integrity chunks to range authority, routes approved complete
+  resources to pair-scoped storage, keeps private and local candidates in
+  memory, and leaves visual PMTiles network-only with `no-store`.
+
 - Added a release-pinned root service worker shell with a generated minimal
   app/manifest precache, delayed public-static registration, private Candidate
   refusal, conservative lifecycle behavior, and exact worker identity checks.
