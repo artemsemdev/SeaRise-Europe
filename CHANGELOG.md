@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added versioned release-scoped offline authority contracts for whole and
+  authorized range resources, with fail-closed private-candidate persistence
+  and an exact privacy allowlist for durable records.
+
 - Added production-static browser journey evidence for all four ADR-024
   outcomes and all nine scenario/horizon projections, including exact COG
   values, release-scoped PMTiles identity, keyboard and reduced-motion flows,
