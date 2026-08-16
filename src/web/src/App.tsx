@@ -35,6 +35,7 @@ import {
 import type { SearchWorkerFactory } from "./search/client";
 import type { SettlementSearchRecord } from "./search/types";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
+import flightOverviewUrl from "./assets/flight-overview.svg?url";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
 const MapExplorer = lazy(() => import("./components/map/MapExplorer"));
@@ -465,6 +466,10 @@ function LandingPageSession({
         )}
       </div>
 
+      <div className="flight-overview" aria-hidden="true">
+        <img src={flightOverviewUrl} alt="" />
+      </div>
+
       <section
         className="flight-command flight-search"
         aria-labelledby="hero-title"
@@ -473,8 +478,8 @@ function LandingPageSession({
           <div className="flight-command__content">
             <h1 id="hero-title">Take me <em>there</em>.</h1>
             <p className="hero-copy">
-              Name a European settlement to check its nearest native IPCC AR6 source-grid
-              projection—privately, in this browser.
+              Name a European coastal settlement. You will fly to it and watch the modelled
+              scenario play out — computed in your browser, in about fifteen seconds.
             </p>
             <ReleaseStartup state={release} retry={retry} />
             <SettlementSearch

@@ -127,7 +127,7 @@ describe("settlement search combobox", () => {
   it("uses the approved European-settlement prompt without synthetic control names", () => {
     render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => new FakeWorker()} />);
     const input = screen.getByRole("combobox", { name: /find a city/i });
-    expect(input).toHaveAttribute("placeholder", "Try Rotterdam, Porto, or Galway");
+    expect(input).toHaveAttribute("placeholder", "Wilhelmshaven, Ravenna, Bergen…");
     expect(input).not.toHaveAttribute("placeholder", expect.stringMatching(/Border City/i));
   });
 

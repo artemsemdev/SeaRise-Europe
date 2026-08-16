@@ -206,7 +206,7 @@ function SettlementSearchSession({
           value={query}
           disabled={!release}
           autoComplete="off"
-          placeholder="Try Rotterdam, Porto, or Galway"
+          placeholder="Wilhelmshaven, Ravenna, Bergen…"
           onFocus={() => {
             client?.start();
             if (query.trim()) setOpen(true);
@@ -223,7 +223,8 @@ function SettlementSearchSession({
         <button type="submit" disabled={!activeResult}>Fly there</button>
       </div>
       <p id={hintId} className="search-hint">
-        Settlements only—not addresses or landmarks. Your text stays in this browser.
+        Settlements only — not addresses, postcodes or landmarks. 84,912 settlements indexed
+        locally — nothing you type leaves your browser.
       </p>
       <p
         id={statusId}
