@@ -11,7 +11,13 @@ const contractRoot = resolve(root, "contracts/release/v2");
 const output = resolve(import.meta.dirname, "../src/contracts/generated/release-contract.ts");
 const validatorOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.mjs");
 const validatorTypesOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.d.mts");
-const schemaFiles = ["artifact.schema.json", "defs.schema.json", "manifest.schema.json"];
+const schemaFiles = [
+  "artifact.schema.json",
+  "browser-derivation-provenance.schema.json",
+  "browser-derivation-receipt.schema.json",
+  "defs.schema.json",
+  "manifest.schema.json",
+];
 const schemaSources = Object.fromEntries(
   schemaFiles.map((name) => [name, readFileSync(resolve(contractRoot, name), "utf8")]),
 );
@@ -32,7 +38,7 @@ const assertRequired = (schema, expected, name) => {
 };
 assertRequired(manifest, [
   "$schema", "schemaVersion", "dataReleaseId", "dataProvenanceClass", "releaseAuthority",
-  "createdAt", "codeRevision", "previousReleaseId", "methodologyVersion", "defaults",
+  "baseReleaseIdentity", "browserDerivationIdentity", "previousReleaseId", "methodologyVersion", "defaults",
   "publication", "sources", "contractArtifacts", "artifacts", "datasets",
 ], "manifest.schema.json");
 assertRequired(artifact.$defs.common, [
@@ -48,7 +54,7 @@ const contractDigest = createHash("sha256")
   .digest("hex");
 
 const generated = `/**
- * Generated from contracts/release/v2/{defs,manifest,artifact}.schema.json.
+ * Generated from the versioned contracts in contracts/release/v2.
  * Run \`npm run generate:contracts --workspace @searise/web\`; do not edit.
  */
 
@@ -204,8 +210,19 @@ export interface ReleaseManifestV2 {
   readonly dataReleaseId: DataReleaseId;
   readonly dataProvenanceClass: DataProvenanceClass;
   readonly releaseAuthority: ReleaseAuthorityV2;
-  readonly createdAt: string;
-  readonly codeRevision: string;
+  readonly baseReleaseIdentity: Readonly<{
+    identityScope: "sealed-release-v1";
+    schemaVersion: "1.0.0";
+    manifestSha256: Sha256;
+    createdAt: string;
+    codeRevision: string;
+  }>;
+  readonly browserDerivationIdentity: Readonly<{
+    identityScope: "browser-overlay-derivation";
+    executionIdentity: "not-recorded";
+    receiptArtifactId: string;
+    provenanceArtifactId: string;
+  }>;
   readonly previousReleaseId: DataReleaseId | null;
   readonly methodologyVersion: "ar6-regional-projection-v1";
   readonly defaults: { readonly scenario: "ssp2-45"; readonly horizon: 2050 };
@@ -226,7 +243,8 @@ export interface ReleaseManifestV2 {
     methodology: string;
     attribution: string;
     sourceReceipts: readonly string[];
-    buildReceipt: string;
+    baseReleaseBuildReceipt: string;
+    browserDerivationReceipt: string;
     sourceGridIdentity: string;
     rangeIntegrityIndex: string;
     sbom: string;
@@ -237,8 +255,9 @@ export interface ReleaseManifestV2 {
     stacCollection: string;
     stacItems: readonly string[];
     checksums: string;
-    provenance: string;
-    signature: string;
+    baseReleaseProvenance: string;
+    browserDerivationProvenance: string;
+    baseReleaseSignature: string;
   }>;
   readonly artifacts: readonly ReleaseArtifactV2[];
   readonly datasets: ${tuple(manifest.$defs.contractArtifacts.properties.stacItems.prefixItems.map((item) => item.const)).replace(/"stac-[^"]+"/g, "ReleaseDatasetV2")};

@@ -10,8 +10,8 @@
     "dataReleaseId",
     "dataProvenanceClass",
     "releaseAuthority",
-    "createdAt",
-    "codeRevision",
+    "baseReleaseIdentity",
+    "browserDerivationIdentity",
     "previousReleaseId",
     "methodologyVersion",
     "defaults",
@@ -29,8 +29,29 @@
     "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
     "dataProvenanceClass": { "$ref": "defs.schema.json#/$defs/dataProvenanceClass" },
     "releaseAuthority": { "$ref": "defs.schema.json#/$defs/releaseAuthority" },
-    "createdAt": { "type": "string", "format": "date-time" },
-    "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "baseReleaseIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityScope", "schemaVersion", "manifestSha256", "createdAt", "codeRevision"],
+      "properties": {
+        "identityScope": { "const": "sealed-release-v1" },
+        "schemaVersion": { "const": "1.0.0" },
+        "manifestSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "browserDerivationIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityScope", "executionIdentity", "receiptArtifactId", "provenanceArtifactId"],
+      "properties": {
+        "identityScope": { "const": "browser-overlay-derivation" },
+        "executionIdentity": { "const": "not-recorded" },
+        "receiptArtifactId": { "$ref": "#/$defs/artifactId" },
+        "provenanceArtifactId": { "$ref": "#/$defs/artifactId" }
+      }
+    },
     "previousReleaseId": {
       "oneOf": [
         { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
@@ -126,7 +147,8 @@
         "methodology",
         "attribution",
         "sourceReceipts",
-        "buildReceipt",
+        "baseReleaseBuildReceipt",
+        "browserDerivationReceipt",
         "sourceGridIdentity",
         "rangeIntegrityIndex",
         "sbom",
@@ -137,8 +159,9 @@
         "stacCollection",
         "stacItems",
         "checksums",
-        "provenance",
-        "signature"
+        "baseReleaseProvenance",
+        "browserDerivationProvenance",
+        "baseReleaseSignature"
       ],
       "properties": {
         "scenarioConfig": { "$ref": "#/$defs/artifactId" },
@@ -150,7 +173,8 @@
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/artifactId" }
         },
-        "buildReceipt": { "$ref": "#/$defs/artifactId" },
+        "baseReleaseBuildReceipt": { "$ref": "#/$defs/artifactId" },
+        "browserDerivationReceipt": { "$ref": "#/$defs/artifactId" },
         "sourceGridIdentity": { "$ref": "#/$defs/artifactId" },
         "rangeIntegrityIndex": { "$ref": "#/$defs/artifactId" },
         "sbom": { "$ref": "#/$defs/artifactId" },
@@ -178,8 +202,9 @@
           "uniqueItems": true
         },
         "checksums": { "$ref": "#/$defs/artifactId" },
-        "provenance": { "$ref": "#/$defs/artifactId" },
-        "signature": { "$ref": "#/$defs/artifactId" }
+        "baseReleaseProvenance": { "$ref": "#/$defs/artifactId" },
+        "browserDerivationProvenance": { "$ref": "#/$defs/artifactId" },
+        "baseReleaseSignature": { "$ref": "#/$defs/artifactId" }
       }
     },
     "dataset": {

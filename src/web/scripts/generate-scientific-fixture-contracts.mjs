@@ -164,65 +164,113 @@ attribution.records.push({
 const attributionBytes = compactJson(attribution);
 writeOverlay("config/source-attribution.json", attributionBytes);
 
-const buildReceipt = JSON.parse(readFileSync(resolve(payloadRoot, "receipts/build.json"), "utf8"));
-buildReceipt.$schema =
-  "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/build-receipt.schema.json";
-buildReceipt.schemaVersion = "2.0.0";
-for (const output of buildReceipt.outputs) {
-  const replacement = cogArtifacts.find((artifact) => artifact.path === output.path);
-  if (replacement) {
-    output.byteSize = replacement.byteSize;
-    output.sha256 = replacement.sha256;
-  }
-}
-buildReceipt.outputs.push(
-  { path: "analysis/source-grid.json.gz", role: "source-grid-identity", mediaType: "application/gzip", byteSize: sourceGridBytes.length, sha256: sha256(sourceGridBytes) },
-  { path: "analysis/cog-range-integrity.json", role: "range-integrity-index", mediaType: "application/json", byteSize: rangeIntegrityBytes.length, sha256: sha256(rangeIntegrityBytes) },
-  { path: "sbom/browser-integrity.cdx.json", role: "sbom", mediaType: "application/json", byteSize: sbomBytes.length, sha256: sha256(sbomBytes) },
-  { path: "config/source-attribution.json", role: "source-attribution", mediaType: "application/json", byteSize: attributionBytes.length, sha256: sha256(attributionBytes) },
-  ...boundaries.map((boundary) => ({
-    path: boundary.path,
-    role: boundary.role,
-    mediaType: "application/vnd.apache.parquet",
-    byteSize: boundary.bytes.length,
-    sha256: sha256(boundary.bytes),
-  })),
-);
-buildReceipt.outputs.sort((left, right) =>
-  left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
-);
-const buildReceiptBytes = compactJson(buildReceipt);
-writeOverlay("receipts/build.json", buildReceiptBytes);
-
-const provenance = JSON.parse(
-  readFileSync(resolve(payloadRoot, "provenance.intoto.jsonl"), "utf8"),
-);
-provenance.predicate.buildDefinition.buildType =
-  "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/manifest.schema.json";
-const subjects = new Map(provenance.subject.map((subject) => [subject.name, subject]));
-for (const [name, bytes] of [
-  ["analysis/source-grid.json.gz", sourceGridBytes],
-  ["analysis/cog-range-integrity.json", rangeIntegrityBytes],
-  ["sbom/browser-integrity.cdx.json", sbomBytes],
-  ["config/source-attribution.json", attributionBytes],
-  ["receipts/build.json", buildReceiptBytes],
+const identity = (path, bytes) => ({ path, sha256: sha256(bytes) });
+const repositoryBytes = (path) => readFileSync(resolve(repositoryRoot, path));
+const v1ManifestBytes = readFileSync(resolve(payloadRoot, "manifest.json"));
+const v1BuildReceiptBytes = readFileSync(resolve(payloadRoot, "receipts/build.json"));
+const v1ProvenanceBytes = readFileSync(resolve(payloadRoot, "provenance.intoto.jsonl"));
+// The overlay keeps byte-identical copies only so the assembled fixture cannot
+// shadow the sealed base evidence with modified claims.
+writeOverlay("receipts/build.json", v1BuildReceiptBytes);
+writeOverlay("provenance.intoto.jsonl", v1ProvenanceBytes);
+const nonClaims = [
+  "No build run, workflow, platform, timestamp, or code revision is asserted for this deterministic browser derivation.",
+  "This receipt is not the authoritative build receipt for the sealed v1 release.",
+  "This synthetic fixture is not approved real-source public-release evidence.",
+];
+const overlayInputs = [
+  identity("analysis/source-grid.json.gz", sourceGridBytes),
+  identity("analysis/cog-range-integrity.json", rangeIntegrityBytes),
   ...cogArtifacts
     .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
-    .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
-  ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
-]) {
-  subjects.set(name, { name, digest: { sha256: sha256(bytes) } });
-}
-provenance.subject = [...subjects.values()].sort((left, right) =>
-  left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
-);
-const provenanceBytes = compactJson(provenance);
-writeOverlay("provenance.intoto.jsonl", provenanceBytes);
+    .map((artifact) => identity(artifact.path, cogBodies.get(artifact.path))),
+  ...boundaries.map((boundary) => identity(boundary.path, boundary.bytes)),
+].sort((left, right) => left.path.localeCompare(right.path));
+const derivationMaterials = [
+  identity(
+    `contracts/release/v1/fixtures/release/${RELEASE_ID}/manifest.json`,
+    v1ManifestBytes,
+  ),
+  identity(
+    `contracts/release/v1/fixtures/release/${RELEASE_ID}/receipts/build.json`,
+    v1BuildReceiptBytes,
+  ),
+  identity(
+    `contracts/release/v1/fixtures/release/${RELEASE_ID}/provenance.intoto.jsonl`,
+    v1ProvenanceBytes,
+  ),
+  identity(
+    "src/web/scripts/generate-scientific-fixture-contracts.mjs",
+    repositoryBytes("src/web/scripts/generate-scientific-fixture-contracts.mjs"),
+  ),
+  ...overlayInputs,
+].sort((left, right) => left.path.localeCompare(right.path));
+const derivedOutputs = [
+  identity("sbom/browser-integrity.cdx.json", sbomBytes),
+  identity("config/source-attribution.json", attributionBytes),
+].sort((left, right) => left.path.localeCompare(right.path));
+const derivationReceipt = {
+  $schema:
+    "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/browser-derivation-receipt.schema.json",
+  schemaVersion: "2.0.0",
+  receiptType: "browser-overlay-derivation",
+  dataReleaseId: RELEASE_ID,
+  dataProvenanceClass: "synthetic-fixture",
+  executionIdentity: "not-recorded",
+  materials: derivationMaterials,
+  outputs: derivedOutputs,
+  nonClaims,
+};
+const derivationReceiptBytes = compactJson(derivationReceipt);
+writeOverlay("receipts/browser-derivation.json", derivationReceiptBytes);
+
+const derivationProvenance = {
+  $schema:
+    "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/browser-derivation-provenance.schema.json",
+  schemaVersion: "2.0.0",
+  _type: "https://in-toto.io/Statement/v1",
+  subject: [
+    ...derivedOutputs.map(({ path: name, sha256: digest }) => ({
+      name,
+      digest: { sha256: digest },
+    })),
+    {
+      name: "receipts/browser-derivation.json",
+      digest: { sha256: sha256(derivationReceiptBytes) },
+    },
+  ].sort((left, right) => left.name.localeCompare(right.name)),
+  predicateType:
+    "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/browser-derivation-predicate/v1",
+  predicate: {
+    derivationType: "deterministic-browser-overlay",
+    executionIdentity: "not-recorded",
+    materials: derivationMaterials,
+    receipt: identity("receipts/browser-derivation.json", derivationReceiptBytes),
+    nonClaims,
+  },
+};
+const derivationProvenanceBytes = compactJson(derivationProvenance);
+writeOverlay("browser-derivation.intoto.json", derivationProvenanceBytes);
 
 const manifest = clone(v1Manifest);
 manifest.$schema =
   "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/manifest.schema.json";
 manifest.schemaVersion = "2.0.0";
+manifest.baseReleaseIdentity = {
+  identityScope: "sealed-release-v1",
+  schemaVersion: "1.0.0",
+  manifestSha256: sha256(v1ManifestBytes),
+  createdAt: v1Manifest.createdAt,
+  codeRevision: v1Manifest.codeRevision,
+};
+manifest.browserDerivationIdentity = {
+  identityScope: "browser-overlay-derivation",
+  executionIdentity: "not-recorded",
+  receiptArtifactId: "browser-derivation-receipt",
+  provenanceArtifactId: "browser-derivation-provenance",
+};
+delete manifest.createdAt;
+delete manifest.codeRevision;
 for (const artifact of manifest.artifacts) {
   artifact.$schema =
     "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/artifact.schema.json";
@@ -233,26 +281,77 @@ for (const artifact of manifest.artifacts) {
     artifact.sha256 = replacement.sha256;
   }
 }
-const buildSha256 = sha256(buildReceiptBytes);
+const baseBuildArtifact = manifest.artifacts.find(
+  (artifact) => artifact.artifactId === manifest.contractArtifacts.buildReceipt,
+);
+const baseProvenanceArtifact = manifest.artifacts.find(
+  (artifact) => artifact.artifactId === manifest.contractArtifacts.provenance,
+);
+const baseSignatureArtifact = manifest.artifacts.find(
+  (artifact) => artifact.artifactId === manifest.contractArtifacts.signature,
+);
+baseBuildArtifact.role = "base-release-build-receipt";
+baseProvenanceArtifact.role = "base-release-provenance";
+baseSignatureArtifact.role = "base-release-signature";
+const derivationLineage = [
+  identity("receipts/browser-derivation.json", derivationReceiptBytes),
+];
+const scriptIdentity = (path) => identity(path, repositoryBytes(path));
+const sourceGridLineage = [
+  scriptIdentity("scripts/release/build-browser-integrity-fixture.py"),
+  scriptIdentity("src/pipeline/searise_pipeline/release/model.py"),
+  scriptIdentity("src/pipeline/searise_pipeline/release/source_grid.py"),
+  scriptIdentity("src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json"),
+  scriptIdentity("src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz"),
+  scriptIdentity("src/pipeline/science/ar6-regional-release.json"),
+].sort((left, right) => left.path.localeCompare(right.path));
+const rangeIntegrityLineage = [
+  scriptIdentity("scripts/release/build-browser-integrity-fixture.py"),
+  scriptIdentity("src/pipeline/searise_pipeline/release/range_integrity.py"),
+  identity(
+    `contracts/release/v1/fixtures/release/${RELEASE_ID}/manifest.json`,
+    v1ManifestBytes,
+  ),
+].sort((left, right) => left.path.localeCompare(right.path));
+const projectionLineageByArtifactId = new Map(
+  cogArtifacts
+    .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
+    .map((artifact) => {
+      const baseArtifact = v1Manifest.artifacts.find(
+        (candidate) => candidate.artifactId === artifact.artifactId,
+      );
+      return [
+        artifact.artifactId,
+        [
+          scriptIdentity("scripts/release/build-browser-integrity-fixture.py"),
+          identity(
+            `contracts/release/v1/fixtures/release/${RELEASE_ID}/${baseArtifact.path}`,
+            readFileSync(resolve(payloadRoot, baseArtifact.path)),
+          ),
+        ].sort((left, right) => left.path.localeCompare(right.path)),
+      ];
+    }),
+);
 for (const artifact of manifest.artifacts) {
-  artifact.lineage = artifact.lineage.map((identity) =>
-    identity.path === "receipts/build.json"
-      ? { ...identity, sha256: buildSha256 }
-      : identity,
-  );
+  const projectionLineage = projectionLineageByArtifactId.get(artifact.artifactId);
+  if (projectionLineage) artifact.lineage = projectionLineage;
 }
+const boundaryLineage = [
+  scriptIdentity("src/pipeline/searise_pipeline/release/boundary_geoparquet.py"),
+  scriptIdentity("src/pipeline/sources/source-lock.phase-1-settlement-coastline.json"),
+].sort((left, right) => left.path.localeCompare(right.path));
 const common = {
   $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/artifact.schema.json",
   schemaVersion: "2.0.0",
   dataReleaseId: RELEASE_ID,
   dataProvenanceClass: "synthetic-fixture",
   immutable: true,
-  lineage: [{ path: "receipts/build.json", sha256: buildSha256 }],
+  lineage: derivationLineage,
   spatialBounds: null,
 };
 const additions = [
-  { ...common, artifactId: "source-grid-identity", path: "analysis/source-grid.json.gz", role: "source-grid-identity", mediaType: "application/gzip", scientificUse: "exact-lookup-support", byteSize: sourceGridBytes.length, sha256: sha256(sourceGridBytes), rights: { attributionIds: ["ipcc-ar6-sl-projections-20210809"], redistribution: "allowed" } },
-  { ...common, artifactId: "cog-range-integrity", path: "analysis/cog-range-integrity.json", role: "range-integrity-index", mediaType: "application/json", scientificUse: "exact-lookup-support", byteSize: rangeIntegrityBytes.length, sha256: sha256(rangeIntegrityBytes), rights: { attributionIds: ["ipcc-ar6-sl-projections-20210809"], redistribution: "allowed" } },
+  { ...common, artifactId: "source-grid-identity", path: "analysis/source-grid.json.gz", role: "source-grid-identity", mediaType: "application/gzip", scientificUse: "exact-lookup-support", byteSize: sourceGridBytes.length, sha256: sha256(sourceGridBytes), lineage: sourceGridLineage, rights: { attributionIds: ["ipcc-ar6-sl-projections-20210809"], redistribution: "allowed" } },
+  { ...common, artifactId: "cog-range-integrity", path: "analysis/cog-range-integrity.json", role: "range-integrity-index", mediaType: "application/json", scientificUse: "exact-lookup-support", byteSize: rangeIntegrityBytes.length, sha256: sha256(rangeIntegrityBytes), lineage: rangeIntegrityLineage, rights: { attributionIds: ["ipcc-ar6-sl-projections-20210809"], redistribution: "allowed" } },
   { ...common, artifactId: "browser-integrity-sbom", path: "sbom/browser-integrity.cdx.json", role: "sbom", mediaType: "application/json", scientificUse: "not-applicable", byteSize: sbomBytes.length, sha256: sha256(sbomBytes), rights: { attributionIds: ["geonames-fixture"], redistribution: "allowed" } },
   ...boundaries.map((boundary) => ({
     ...common,
@@ -264,8 +363,32 @@ const additions = [
     byteSize: boundary.bytes.length,
     sha256: sha256(boundary.bytes),
     spatialBounds: boundary.spatialBounds,
+    lineage: boundaryLineage,
     rights: { attributionIds: ["natural-earth-boundaries"], redistribution: "allowed" },
   })),
+  {
+    ...common,
+    artifactId: "browser-derivation-receipt",
+    path: "receipts/browser-derivation.json",
+    role: "browser-derivation-receipt",
+    mediaType: "application/json",
+    scientificUse: "not-applicable",
+    byteSize: derivationReceiptBytes.length,
+    sha256: sha256(derivationReceiptBytes),
+    lineage: derivationMaterials,
+    rights: { attributionIds: ["geonames-fixture"], redistribution: "allowed" },
+  },
+  {
+    ...common,
+    artifactId: "browser-derivation-provenance",
+    path: "browser-derivation.intoto.json",
+    role: "browser-derivation-provenance",
+    mediaType: "application/vnd.in-toto+json",
+    scientificUse: "not-applicable",
+    byteSize: derivationProvenanceBytes.length,
+    sha256: sha256(derivationProvenanceBytes),
+    rights: { attributionIds: ["geonames-fixture"], redistribution: "allowed" },
+  },
 ];
 const firstProjection = manifest.artifacts.findIndex(
   (artifact) => artifact.role === "projection-analysis-cog",
@@ -274,6 +397,14 @@ manifest.artifacts.splice(firstProjection, 0, ...additions);
 manifest.contractArtifacts.sourceGridIdentity = "source-grid-identity";
 manifest.contractArtifacts.rangeIntegrityIndex = "cog-range-integrity";
 manifest.contractArtifacts.sbom = "browser-integrity-sbom";
+manifest.contractArtifacts.baseReleaseBuildReceipt = manifest.contractArtifacts.buildReceipt;
+manifest.contractArtifacts.browserDerivationReceipt = "browser-derivation-receipt";
+manifest.contractArtifacts.baseReleaseProvenance = manifest.contractArtifacts.provenance;
+manifest.contractArtifacts.browserDerivationProvenance = "browser-derivation-provenance";
+manifest.contractArtifacts.baseReleaseSignature = manifest.contractArtifacts.signature;
+delete manifest.contractArtifacts.buildReceipt;
+delete manifest.contractArtifacts.provenance;
+delete manifest.contractArtifacts.signature;
 
 const replaceArtifact = (artifactId, bytes) => {
   const artifact = manifest.artifacts.find((candidate) => candidate.artifactId === artifactId);
@@ -281,34 +412,37 @@ const replaceArtifact = (artifactId, bytes) => {
   artifact.sha256 = sha256(bytes);
 };
 replaceArtifact("attribution", attributionBytes);
-replaceArtifact("build-receipt", buildReceiptBytes);
-replaceArtifact("provenance", provenanceBytes);
+manifest.artifacts.find((artifact) => artifact.artifactId === "attribution").lineage =
+  derivationLineage;
 
 const replacements = new Map([
   ["config/source-attribution.json", attributionBytes],
-  ["receipts/build.json", buildReceiptBytes],
-  ["provenance.intoto.jsonl", provenanceBytes],
   ...cogArtifacts
     .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
     .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
 ]);
-const checksums = readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8")
+const checksumIdentities = new Map(readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8")
   .trimEnd()
   .split("\n")
   .map((line) => {
     const path = line.slice(line.indexOf("  ") + 2);
     const bytes = replacements.get(path);
-    return bytes ? `${sha256(bytes)}  ${path}` : line;
-  });
-checksums.splice(1, 0,
-  `${sha256(rangeIntegrityBytes)}  analysis/cog-range-integrity.json`,
-  `${sha256(sourceGridBytes)}  analysis/source-grid.json.gz`,
-  ...boundaries.map((boundary) => `${sha256(boundary.bytes)}  ${boundary.path}`),
-  `${sha256(sbomBytes)}  sbom/browser-integrity.cdx.json`,
+    return [path, bytes ? sha256(bytes) : line.slice(0, 64)];
+  }));
+for (const output of derivedOutputs) checksumIdentities.set(output.path, output.sha256);
+checksumIdentities.set("receipts/browser-derivation.json", sha256(derivationReceiptBytes));
+checksumIdentities.set("browser-derivation.intoto.json", sha256(derivationProvenanceBytes));
+const checksumsBytes = Buffer.from(
+  `${[...checksumIdentities.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([path, digest]) => `${digest}  ${path}`)
+    .join("\n")}\n`,
+  "utf8",
 );
-const checksumsBytes = Buffer.from(`${checksums.join("\n")}\n`, "utf8");
 writeOverlay("checksums.txt", checksumsBytes);
 replaceArtifact("checksums", checksumsBytes);
+manifest.artifacts.find((artifact) => artifact.artifactId === "checksums").lineage =
+  derivationLineage;
 
 writeOverlay("manifest.json", compactJson(manifest));
 

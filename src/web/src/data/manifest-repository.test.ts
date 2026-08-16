@@ -114,7 +114,7 @@ describe("ManifestRepository", () => {
     ["bad hash", (value: typeof fixture) => { value.artifacts[0].sha256 = "bad"; }],
     ["bad size", (value: typeof fixture) => { value.artifacts[0].byteSize = 0; }],
     ["bad bounds", (value: typeof fixture) => { value.artifacts[0].spatialBounds = [-181, 0, 1, 1]; }],
-    ["impossible calendar date", (value: typeof fixture) => { value.createdAt = "2026-02-31T12:05:00Z"; }],
+    ["impossible sealed-release date", (value: typeof fixture) => { value.baseReleaseIdentity.createdAt = "2026-02-31T12:05:00Z"; }],
     ["bad defaults", (value: typeof fixture) => { value.defaults.horizon = 2100; }],
     ["unsafe path", (value: typeof fixture) => { value.artifacts[0].path = "../escape.json"; }],
   ])("fails closed for %s", async (_label, mutate) => {

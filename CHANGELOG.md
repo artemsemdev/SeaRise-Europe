@@ -19,6 +19,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Separated the sealed v1 release identity from the deterministic browser
+  overlay identity. The v1 build receipt and provenance remain byte-identical;
+  the overlay now has dedicated versioned derivation evidence with no
+  fabricated run, workflow, platform, timestamp, revision, or SLSA claim, and
+  its acyclicity gate is scoped to the overlay-derived digest graph.
+
 - Restored complete npm registry URL and SHA-512 integrity metadata for the
   static browser dependency graph, pinned its scientific readers, and made the
   dependency inventory fail closed if future registry identities are missing.

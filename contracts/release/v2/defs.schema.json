@@ -37,6 +37,15 @@
       "maxLength": 512,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*[?#\\\\])(?:[A-Za-z0-9][A-Za-z0-9._-]*)(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*$"
     },
+    "fileIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/releaseRelativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
     "artifactRole": {
       "enum": [
         "release-manifest",
@@ -46,6 +55,8 @@
         "source-attribution",
         "source-receipt",
         "build-receipt",
+        "base-release-build-receipt",
+        "browser-derivation-receipt",
         "support-boundary",
         "coastal-boundary",
         "settlement-search-index",
@@ -65,6 +76,9 @@
         "stac-item",
         "checksums",
         "provenance",
+        "base-release-provenance",
+        "browser-derivation-provenance",
+        "base-release-signature",
         "signature"
       ]
     },

@@ -83,7 +83,8 @@ function referencedArtifactIds(manifest: ReleaseManifestV2): readonly string[] {
     contracts.methodology,
     contracts.attribution,
     ...contracts.sourceReceipts,
-    contracts.buildReceipt,
+    contracts.baseReleaseBuildReceipt,
+    contracts.browserDerivationReceipt,
     contracts.sourceGridIdentity,
     contracts.rangeIntegrityIndex,
     contracts.sbom,
@@ -94,8 +95,9 @@ function referencedArtifactIds(manifest: ReleaseManifestV2): readonly string[] {
     contracts.stacCollection,
     ...contracts.stacItems,
     contracts.checksums,
-    contracts.provenance,
-    contracts.signature,
+    contracts.baseReleaseProvenance,
+    contracts.browserDerivationProvenance,
+    contracts.baseReleaseSignature,
     ...manifest.sources.map((source) => source.receiptArtifactId),
   ];
 }
@@ -170,7 +172,8 @@ function validateSemantics(
   requireRole(artifacts, contracts.methodology, ["methodology"]);
   requireRole(artifacts, contracts.attribution, ["source-attribution"]);
   for (const artifactId of contracts.sourceReceipts) requireRole(artifacts, artifactId, ["source-receipt"]);
-  requireRole(artifacts, contracts.buildReceipt, ["build-receipt"]);
+  requireRole(artifacts, contracts.baseReleaseBuildReceipt, ["base-release-build-receipt"]);
+  requireRole(artifacts, contracts.browserDerivationReceipt, ["browser-derivation-receipt"]);
   requireRole(artifacts, contracts.sourceGridIdentity, ["source-grid-identity"]);
   requireRole(artifacts, contracts.rangeIntegrityIndex, ["range-integrity-index"]);
   requireRole(artifacts, contracts.sbom, ["sbom"]);
@@ -181,8 +184,9 @@ function validateSemantics(
   requireRole(artifacts, contracts.stacCollection, ["stac-collection"]);
   for (const artifactId of contracts.stacItems) requireRole(artifacts, artifactId, ["stac-item"]);
   requireRole(artifacts, contracts.checksums, ["checksums"]);
-  requireRole(artifacts, contracts.provenance, ["provenance"]);
-  requireRole(artifacts, contracts.signature, ["signature"]);
+  requireRole(artifacts, contracts.baseReleaseProvenance, ["base-release-provenance"]);
+  requireRole(artifacts, contracts.browserDerivationProvenance, ["browser-derivation-provenance"]);
+  requireRole(artifacts, contracts.baseReleaseSignature, ["base-release-signature"]);
   for (const source of manifest.sources) requireRole(artifacts, source.receiptArtifactId, ["source-receipt"]);
 
   for (const role of ["support-boundary", "coastal-boundary"] as const) {
