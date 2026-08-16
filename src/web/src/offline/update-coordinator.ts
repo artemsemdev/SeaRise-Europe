@@ -283,18 +283,28 @@ export class ExplicitUpdateCoordinator {
   async prepareRollback(): Promise<UpdateCoordinatorStateV1> {
     if (this.#state?.phase === "transitioning") return this.#state;
     const operation = ++this.#sequence;
-    const expected = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
-    if (operation !== this.#sequence) return this.#currentOr(expected);
-    if (!expected.previous) {
-      return this.#set(failure("prepare-rollback", "rollback-unavailable", expected, "No exact previous pair is retained for rollback."));
+    const fallback = this.#state && "snapshot" in this.#state ? this.#state.snapshot : null;
+    try {
+      const expected = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
+      if (operation !== this.#sequence) return this.#currentOr(expected);
+      if (!expected.previous) {
+        return this.#set(failure("prepare-rollback", "rollback-unavailable", expected, "No exact previous pair is retained for rollback."));
+      }
+      const confirmationToken = opaque(this.#ports.issueConfirmationToken({
+        action: "rollback", expected, target: expected.previous,
+      }), "confirmation token", TOKEN);
+      return this.#set(Object.freeze({
+        phase: "awaiting-confirmation", action: "rollback", snapshot: expected,
+        target: expected.previous, confirmationToken,
+      }));
+    } catch (error) {
+      const current = await this.#safeSnapshot(fallback);
+      if (operation !== this.#sequence) return this.#currentOr(current);
+      return this.#set(failure(
+        "prepare-rollback", "transition-failed", current,
+        boundedMessage(error, "Rollback authority could not be prepared."),
+      ));
     }
-    const confirmationToken = opaque(this.#ports.issueConfirmationToken({
-      action: "rollback", expected, target: expected.previous,
-    }), "confirmation token", TOKEN);
-    return this.#set(Object.freeze({
-      phase: "awaiting-confirmation", action: "rollback", snapshot: expected,
-      target: expected.previous, confirmationToken,
-    }));
   }
 
   async confirm(tokenInput: string): Promise<UpdateCoordinatorStateV1> {

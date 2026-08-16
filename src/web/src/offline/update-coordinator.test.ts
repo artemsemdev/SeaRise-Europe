@@ -229,6 +229,24 @@ describe("explicit update coordinator", () => {
     });
   });
 
+  it("withholds reload but preserves the new authority when post-activation cleanup fails", async () => {
+    const test = harness();
+    test.cleanupRetiredPair.mockRejectedValueOnce(new Error("synthetic cleanup fence failure"));
+    const prepared = await test.coordinator.prepareUpdate(third.pair);
+    if (prepared.phase !== "awaiting-confirmation") throw new Error("expected confirmation");
+
+    const state = await test.coordinator.confirm(prepared.confirmationToken);
+
+    expect(state).toMatchObject({
+      phase: "failed",
+      operation: "cleanup",
+      code: "cleanup-failed",
+      currentUsable: true,
+      snapshot: { active: third, previous: second },
+    });
+    expect("reloadAllowed" in state).toBe(false);
+  });
+
   it("reports activation failure as technical state and refreshes the usable current pair", async () => {
     const test = harness();
     test.activate.mockRejectedValueOnce(new Error("synthetic atomic failure"));
@@ -273,6 +291,41 @@ describe("explicit update coordinator", () => {
     const state = await test.coordinator.prepareRollback();
 
     expect(state).toMatchObject({ phase: "failed", operation: "prepare-rollback", code: "rollback-unavailable" });
+    expect(test.rollback).not.toHaveBeenCalled();
+  });
+
+  it("contains snapshot failure while preparing rollback and keeps the known current usable", async () => {
+    const test = harness();
+    await test.coordinator.initialize();
+    vi.mocked(test.ports.readSnapshot).mockRejectedValueOnce(new Error("synthetic snapshot failure"));
+
+    const state = await test.coordinator.prepareRollback();
+
+    expect(state).toMatchObject({
+      phase: "failed",
+      operation: "prepare-rollback",
+      code: "transition-failed",
+      currentUsable: true,
+      snapshot: snapshot("revision-1"),
+    });
+    expect(test.rollback).not.toHaveBeenCalled();
+  });
+
+  it("contains confirmation-token issuance failure while preparing rollback", async () => {
+    const test = harness();
+    vi.mocked(test.ports.issueConfirmationToken).mockImplementationOnce(() => {
+      throw new Error("synthetic token failure");
+    });
+
+    const state = await test.coordinator.prepareRollback();
+
+    expect(state).toMatchObject({
+      phase: "failed",
+      operation: "prepare-rollback",
+      code: "transition-failed",
+      currentUsable: true,
+      snapshot: snapshot("revision-1"),
+    });
     expect(test.rollback).not.toHaveBeenCalled();
   });
 });
