@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
@@ -10,11 +10,29 @@ const payloadRoot = resolve(
   repositoryRoot,
   `contracts/release/v1/fixtures/release/${RELEASE_ID}`,
 );
+const sealedFixtureRoot = resolve(repositoryRoot, "contracts/release/v1/fixtures");
 const overlayRoot = resolve(
   repositoryRoot,
   `contracts/release/v2/fixtures/browser-release/${RELEASE_ID}`,
 );
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const treeDigest = (root) => {
+  const digest = createHash("sha256");
+  const visit = (directory, prefix = "") => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name))) {
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const path = resolve(directory, entry.name);
+      digest.update(`${entry.isDirectory() ? "d" : "f"}\0${relative}\0`);
+      if (entry.isDirectory()) visit(path, relative);
+      else if (entry.isFile()) digest.update(readFileSync(path));
+      else throw new Error(`The byte-sealed v1 payload contains a non-file entry: ${relative}`);
+    }
+  };
+  visit(root);
+  return digest.digest("hex");
+};
+const sealedFixtureDigest = treeDigest(sealedFixtureRoot);
 const compactJson = (value) => Buffer.from(`${JSON.stringify(value)}\n`, "utf8");
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const writeOverlay = (relative, bytes) => {
@@ -38,6 +56,23 @@ const sourceGridBytes = readFileSync(resolve(overlayRoot, "analysis/source-grid.
 const rangeIntegrityBytes = readFileSync(
   resolve(overlayRoot, "analysis/cog-range-integrity.json"),
 );
+const boundaries = [
+  {
+    artifactId: "europe-support-geoparquet",
+    path: "boundaries/europe.parquet",
+    role: "support-boundary",
+    spatialBounds: [-28.851018, 30.021175999999997, 40.173396, 74.53634699999999],
+  },
+  {
+    artifactId: "coastal-analysis-zone-geoparquet",
+    path: "boundaries/coastal-analysis-zone.parquet",
+    role: "coastal-boundary",
+    spatialBounds: [-28.850986, 30.021210999999997, 38.314159, 74.536318],
+  },
+].map((boundary) => ({
+  ...boundary,
+  bytes: readFileSync(resolve(overlayRoot, boundary.path)),
+}));
 
 const cogArtifacts = v1Manifest.artifacts.filter(
   (artifact) => artifact.role === "projection-analysis-cog",
@@ -78,6 +113,7 @@ const sbom = {
   components: [
     ["analysis/source-grid.json.gz", sourceGridBytes],
     ["analysis/cog-range-integrity.json", rangeIntegrityBytes],
+    ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
   ].map(([path, bytes]) => ({
     type: "data",
     name: path,
@@ -101,6 +137,21 @@ const fixture = attribution.records.find(
   (record) => record.attributionId === "geonames-fixture",
 );
 fixture.appliesToRoles = [...new Set([...fixture.appliesToRoles, "sbom"])].sort();
+attribution.records.push({
+  attributionId: "natural-earth-boundaries",
+  sourceId: "natural-earth-10m/5.1.1",
+  title: "Natural Earth 1:10m physical and cultural vectors",
+  sourceUrl: "https://www.naturalearthdata.com/",
+  sourceSha256: "2623fc05db56e8f67de95b555b7a5e43f54012f824fbf3154d04283313b7a6e8",
+  attributionText: "Made with Natural Earth.",
+  licence: {
+    spdxId: "LicenseRef-Natural-Earth-Public-Domain",
+    name: "Natural Earth public domain dedication",
+    url: "https://www.naturalearthdata.com/about/terms-of-use/",
+  },
+  redistribution: "allowed",
+  appliesToRoles: ["support-boundary", "coastal-boundary"],
+});
 const attributionBytes = compactJson(attribution);
 writeOverlay("config/source-attribution.json", attributionBytes);
 
@@ -113,6 +164,13 @@ buildReceipt.outputs.push(
   { path: "analysis/cog-range-integrity.json", role: "range-integrity-index", mediaType: "application/json", byteSize: rangeIntegrityBytes.length, sha256: sha256(rangeIntegrityBytes) },
   { path: "sbom/browser-integrity.cdx.json", role: "sbom", mediaType: "application/json", byteSize: sbomBytes.length, sha256: sha256(sbomBytes) },
   { path: "config/source-attribution.json", role: "source-attribution", mediaType: "application/json", byteSize: attributionBytes.length, sha256: sha256(attributionBytes) },
+  ...boundaries.map((boundary) => ({
+    path: boundary.path,
+    role: boundary.role,
+    mediaType: "application/vnd.apache.parquet",
+    byteSize: boundary.bytes.length,
+    sha256: sha256(boundary.bytes),
+  })),
 );
 buildReceipt.outputs.sort((left, right) =>
   left.path < right.path ? -1 : left.path > right.path ? 1 : 0,
@@ -132,6 +190,7 @@ for (const [name, bytes] of [
   ["sbom/browser-integrity.cdx.json", sbomBytes],
   ["config/source-attribution.json", attributionBytes],
   ["receipts/build.json", buildReceiptBytes],
+  ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
 ]) {
   subjects.set(name, { name, digest: { sha256: sha256(bytes) } });
 }
@@ -171,6 +230,18 @@ const additions = [
   { ...common, artifactId: "source-grid-identity", path: "analysis/source-grid.json.gz", role: "source-grid-identity", mediaType: "application/gzip", scientificUse: "exact-lookup-support", byteSize: sourceGridBytes.length, sha256: sha256(sourceGridBytes), rights: { attributionIds: ["ipcc-ar6-sl-projections-20210809"], redistribution: "allowed" } },
   { ...common, artifactId: "cog-range-integrity", path: "analysis/cog-range-integrity.json", role: "range-integrity-index", mediaType: "application/json", scientificUse: "exact-lookup-support", byteSize: rangeIntegrityBytes.length, sha256: sha256(rangeIntegrityBytes), rights: { attributionIds: ["ipcc-ar6-sl-projections-20210809"], redistribution: "allowed" } },
   { ...common, artifactId: "browser-integrity-sbom", path: "sbom/browser-integrity.cdx.json", role: "sbom", mediaType: "application/json", scientificUse: "not-applicable", byteSize: sbomBytes.length, sha256: sha256(sbomBytes), rights: { attributionIds: ["geonames-fixture"], redistribution: "allowed" } },
+  ...boundaries.map((boundary) => ({
+    ...common,
+    artifactId: boundary.artifactId,
+    path: boundary.path,
+    role: boundary.role,
+    mediaType: "application/vnd.apache.parquet",
+    scientificUse: "not-applicable",
+    byteSize: boundary.bytes.length,
+    sha256: sha256(boundary.bytes),
+    spatialBounds: boundary.spatialBounds,
+    rights: { attributionIds: ["natural-earth-boundaries"], redistribution: "allowed" },
+  })),
 ];
 const firstProjection = manifest.artifacts.findIndex(
   (artifact) => artifact.role === "projection-analysis-cog",
@@ -205,6 +276,7 @@ const checksums = readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8")
 checksums.splice(1, 0,
   `${sha256(rangeIntegrityBytes)}  analysis/cog-range-integrity.json`,
   `${sha256(sourceGridBytes)}  analysis/source-grid.json.gz`,
+  ...boundaries.map((boundary) => `${sha256(boundary.bytes)}  ${boundary.path}`),
   `${sha256(sbomBytes)}  sbom/browser-integrity.cdx.json`,
 );
 const checksumsBytes = Buffer.from(`${checksums.join("\n")}\n`, "utf8");
@@ -212,3 +284,14 @@ writeOverlay("checksums.txt", checksumsBytes);
 replaceArtifact("checksums", checksumsBytes);
 
 writeOverlay("manifest.json", compactJson(manifest));
+
+for (const artifact of manifest.artifacts) {
+  const overlayPath = resolve(overlayRoot, artifact.path);
+  const body = readFileSync(existsSync(overlayPath) ? overlayPath : resolve(payloadRoot, artifact.path));
+  if (body.length !== artifact.byteSize || sha256(body) !== artifact.sha256) {
+    throw new Error(`The assembled v2 body differs from manifest identity: ${artifact.path}`);
+  }
+}
+if (treeDigest(sealedFixtureRoot) !== sealedFixtureDigest) {
+  throw new Error("The v2 overlay generator modified the byte-sealed v1 fixture subtree");
+}

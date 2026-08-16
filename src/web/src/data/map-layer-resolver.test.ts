@@ -1,6 +1,6 @@
-import fixture from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
+import fixture from "../../../../contracts/release/v2/fixtures/browser-release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
 import { describe, expect, it } from "vitest";
-import { HORIZON_YEARS, SCENARIO_IDS, type ReleaseArtifactV1 } from "../contracts/generated/release-contract";
+import { HORIZON_YEARS, SCENARIO_IDS, type ReleaseArtifactV2 } from "../contracts/generated/release-contract";
 import { ReleaseContext, TechnicalFailure, type ResolvedArtifact } from "../domain/release";
 import { ManifestRepository } from "./manifest-repository";
 import { resolveMapLayers } from "./map-layer-resolver";
@@ -85,7 +85,7 @@ describe("visual map layer resolution", () => {
       role: "projection-analysis-cog",
       mediaType: "image/tiff; application=geotiff; profile=cloud-optimized",
       scientificUse: "exact-lookup",
-    } as unknown as ReleaseArtifactV1 & { readonly url: string };
+    } as unknown as ReleaseArtifactV2 & { readonly url: string };
     const invalid = new ReleaseContext({
       manifest: context.manifest,
       manifestUrl: context.manifestUrl,

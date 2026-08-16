@@ -65,7 +65,8 @@ are:
   native-grid edges, nodata, strict ranges, aborts, and malformed responses.
 
 The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 29 focused
-lookup tests and 56 static-target unit/integration tests. Its warm in-memory
+lookup tests, 65 static-target unit/integration tests, and 16 desktop/mobile
+Playwright tests. Its warm in-memory
 100-lookup sample had p95 below the required
 100 ms gate. This is a synthetic-fixture engineering measurement, not a claim
 about public hosting latency or private production-sized bytes.

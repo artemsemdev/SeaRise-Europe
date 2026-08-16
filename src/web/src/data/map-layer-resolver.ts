@@ -57,11 +57,8 @@ function optionalBoundaries(context: ReleaseContext): readonly BoundaryVisualLay
   const boundaries: BoundaryVisualLayer[] = [];
   for (const artifact of Object.values(context.artifacts)) {
     if (artifact.role !== "support-boundary" && artifact.role !== "coastal-boundary") continue;
-    if (
-      artifact.scientificUse !== "not-applicable" ||
-      (artifact.mediaType !== "application/vnd.pmtiles" && artifact.mediaType !== "application/geo+json")
-    ) {
-      fail(`Boundary artifact ${artifact.artifactId} is not an approved visual map source.`);
+    if (artifact.mediaType !== "application/vnd.pmtiles" && artifact.mediaType !== "application/geo+json") {
+      continue;
     }
     boundaries.push(Object.freeze({
       kind: artifact.role,
