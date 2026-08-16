@@ -376,7 +376,7 @@ export class MemoryRangeStore implements RangeStore {
   }
   async readAccepted(input: RangeIdentityV1, gate: AcceptedAdmissionGateV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
     const identity = checkedCatalogIdentity(input, this.#pair, this.#approved);
-    await assertAcceptedRangeResource(gate, identity, this.#subtle);
+    await assertAcceptedRangeResource(gate, identity, this.#subtle, this);
     return this.readExactOrContaining(identity, requested);
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.set(leaseKey(lease), lease); }
@@ -580,7 +580,7 @@ class IndexedDbRangeStore implements RangeStore {
   }
   async readAccepted(input: RangeIdentityV1, gate: AcceptedAdmissionGateV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
     const identity = checkedCatalogIdentity(input, this.#pair, this.#approved);
-    await assertAcceptedRangeResource(gate, identity, this.#subtle);
+    await assertAcceptedRangeResource(gate, identity, this.#subtle, this);
     return this.readExactOrContaining(identity, requested);
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> {

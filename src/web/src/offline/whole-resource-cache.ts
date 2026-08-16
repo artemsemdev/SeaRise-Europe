@@ -327,7 +327,7 @@ export class WholeResourceCache implements WholeResourceStore {
     await assertAcceptedWholeResource(gate, resource, {
       digest: (_algorithm: AlgorithmIdentifier, bytes: BufferSource) =>
         this.#dependencies.digest("SHA-256", arrayBuffer(bytes)),
-    } as SubtleCrypto);
+    } as SubtleCrypto, this);
     return this.read(resource);
   }
 
@@ -650,7 +650,7 @@ export class MemoryWholeResourceCache implements WholeResourceStore {
     await assertAcceptedWholeResource(gate, resource, {
       digest: (_algorithm: AlgorithmIdentifier, bytes: BufferSource) =>
         this.#dependencies.digest("SHA-256", arrayBuffer(bytes)),
-    } as SubtleCrypto);
+    } as SubtleCrypto, this);
     return this.read(resource);
   }
 

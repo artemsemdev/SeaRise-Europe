@@ -3,9 +3,9 @@
 import { webcrypto } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { IDBFactory } from "fake-indexeddb";
+import { IDBDatabase, IDBFactory, IDBObjectStore } from "fake-indexeddb";
 import fixture from "../../../../contracts/release/v2/fixtures/browser-release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ManifestRepository } from "../data/manifest-repository";
 import {
   validateAppAuthority,
@@ -13,6 +13,7 @@ import {
   type StorageProfileV1,
   type WholeResourceAuthorityV1,
 } from "./contracts/v1";
+import { validateStorageBudget } from "./contracts/policy";
 import {
   assertAcceptedRangeResource,
   assertAcceptedWholeResource,
@@ -22,8 +23,17 @@ import {
   type AdmissionLockPort,
 } from "./admission-receipt";
 import { createVerifiedReleaseResourcePlan, type VerifiedReleaseResourcePlanV1 } from "./release-resource-plan";
-import type { WholeResourceStore } from "./whole-resource-cache";
-import type { RangeStore } from "./range-store";
+import {
+  MemoryWholeResourceCache,
+  WholeResourceCache,
+  type CacheStoragePort,
+  type WholeResourceStore,
+} from "./whole-resource-cache";
+import {
+  createRangeAuthorityCatalog,
+  createRangeStore,
+  type RangeStore,
+} from "./range-store";
 import { beginPairCleanupFence } from "./pair-cleanup-fence";
 
 const subtle = webcrypto.subtle as SubtleCrypto;
@@ -31,6 +41,23 @@ const A = "a".repeat(64);
 const RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const MANIFEST_URL = `https://fixture.example/releases/${RELEASE_ID}/manifest.json`;
 const INDEX_PATH = resolve(process.cwd(), "../../contracts/release/v2/fixtures/browser-release", RELEASE_ID, "analysis/cog-range-integrity.json");
+const STORAGE_BUDGET = validateStorageBudget({
+  contractVersion: 1,
+  policyId: "receipt-profile-test",
+  maxTotalBytes: 1_024,
+  maxWholeResourceBytes: 512,
+  maxRangeBytes: 512,
+  maxWholeEntries: 8,
+  maxRangeEntries: 8,
+  highWatermarkBytes: 1_024,
+  lowWatermarkBytes: 768,
+  minQuotaReserveBytes: 0,
+  maxQuotaFraction: 0.25,
+  leaseTtlMs: 120_000,
+  heartbeatMs: 30_000,
+  retainedCompletePairs: 2,
+  eviction: "unleased-lru",
+});
 
 class TestAdmissionLocks implements AdmissionLockPort {
   readonly #tails = new Map<string, Promise<void>>();
@@ -215,6 +242,21 @@ async function admit(
 }
 
 describe("verified coordinated-admission receipt v1", () => {
+  async function capturedProof(
+    identity: Awaited<ReturnType<typeof plan>>,
+    store: ReturnType<typeof createAdmissionReceiptStore>,
+  ): Promise<Parameters<typeof store.publishLast>[0]> {
+    let captured: Parameters<typeof store.publishLast>[0] | undefined;
+    const publish = vi.spyOn(store, "publishLast").mockImplementationOnce(async (proof) => {
+      captured = proof;
+      throw new Error("capture verified proof before publication");
+    });
+    await expect(admit(identity, store)).rejects.toThrow(/capture verified proof/);
+    publish.mockRestore();
+    expect(captured).toBeDefined();
+    return captured!;
+  }
+
   it("derives one deterministic, order-independent exact resource-plan identity", async () => {
     const first = await plan();
     const second = await plan();
@@ -315,9 +357,9 @@ describe("verified coordinated-admission receipt v1", () => {
     await expect(store.accepted(secondPlan)).resolves.toMatchObject({
       receiptSha256: second.gate.receiptSha256,
     });
-    await expect(assertAcceptedWholeResource(first.gate, secondResource, subtle))
+    await expect(assertAcceptedWholeResource(first.gate, secondResource, subtle, store))
       .rejects.toMatchObject({ code: "AuthorityRejected" });
-    await expect(assertAcceptedWholeResource(second.gate, firstResource, subtle))
+    await expect(assertAcceptedWholeResource(second.gate, firstResource, subtle, store))
       .rejects.toMatchObject({ code: "AuthorityRejected" });
   });
 
@@ -329,9 +371,9 @@ describe("verified coordinated-admission receipt v1", () => {
     const firstWhole = exactResources.wholeResources[0]!;
     const firstRange = exactResources.rangeWrites[0]!.identity;
     expect(store.mode).toBe("memory-only");
-    await expect(assertAcceptedWholeResource(gate, firstWhole, subtle)).resolves.toBeUndefined();
-    await expect(assertAcceptedRangeResource(gate, firstRange, subtle)).resolves.toBeUndefined();
-    await expect(assertAcceptedWholeResource({ ...gate }, firstWhole, subtle)).rejects.toMatchObject({
+    await expect(assertAcceptedWholeResource(gate, firstWhole, subtle, store)).resolves.toBeUndefined();
+    await expect(assertAcceptedRangeResource(gate, firstRange, subtle, store)).resolves.toBeUndefined();
+    await expect(assertAcceptedWholeResource({ ...gate }, firstWhole, subtle, store)).rejects.toMatchObject({
       code: "AuthorityRejected",
     });
     await expect(store.publishLast({
@@ -340,6 +382,232 @@ describe("verified coordinated-admission receipt v1", () => {
       operationId: "forged",
       expectedPreviousReceiptSha256: null,
     }, new AbortController().signal)).rejects.toMatchObject({ code: "AuthorityRejected" });
+  });
+
+  it("binds verified proofs and accepted gates to the exact issuing store", async () => {
+    const identity = await plan();
+    const source = createAdmissionReceiptStore(app(), subtle, {
+      localCandidate: true,
+      nextOperationId: (() => { let value = 0; return () => `source-${++value}`; })(),
+    });
+    const target = createAdmissionReceiptStore(app(), subtle, {
+      localCandidate: true,
+      nextOperationId: () => "target",
+    });
+    const { gate } = await admit(identity, source);
+    const proof = await capturedProof(identity, source);
+
+    await expect(target.publishLast(proof, new AbortController().signal))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(target.deleteIfCurrent(gate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(source.deleteIfCurrent(gate)).resolves.toBe(true);
+  });
+
+  it("rejects Candidate proof, read, and delete misuse in a persistent store before persistence", async () => {
+    const candidatePlan = await plan();
+    const candidate = createAdmissionReceiptStore(app(), subtle, {
+      localCandidate: true,
+      nextOperationId: (() => { let value = 0; return () => `candidate-${++value}`; })(),
+    });
+    const { gate } = await admit(candidatePlan, candidate);
+    const proof = await capturedProof(candidatePlan, candidate);
+    let persistenceCalls = 0;
+    const neverIndexedDb = {
+      open: () => { persistenceCalls += 1; throw new Error("cross-profile misuse opened IndexedDB"); },
+    } as unknown as IDBFactory;
+    const neverLocks: AdmissionLockPort = {
+      request: async () => { persistenceCalls += 1; throw new Error("cross-profile misuse requested a lock"); },
+    };
+    const persistent = createAdmissionReceiptStore(app(), subtle, {
+      indexedDB: neverIndexedDb,
+      locks: neverLocks,
+      nextOperationId: () => "persistent-target",
+    });
+
+    await expect(persistent.publishLast(proof, new AbortController().signal))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(persistent.accepted(candidatePlan))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(persistent.deleteIfCurrent(gate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    expect(persistenceCalls).toBe(0);
+  });
+
+  it("rejects persistent proof, read, and delete misuse in Candidate memory without persistence", async () => {
+    const persistentPlan = await plan(false);
+    const source = createAdmissionReceiptStore(app(), subtle, {
+      indexedDB: new IDBFactory(),
+      locks: new TestAdmissionLocks(),
+      nextOperationId: (() => { let value = 0; return () => `persistent-${++value}`; })(),
+    });
+    const { gate } = await admit(persistentPlan, source);
+    const proof = await capturedProof(persistentPlan, source);
+    let persistenceCalls = 0;
+    const neverIndexedDb = {
+      open: () => { persistenceCalls += 1; throw new Error("Candidate opened IndexedDB"); },
+    } as unknown as IDBFactory;
+    const neverLocks: AdmissionLockPort = {
+      request: async () => { persistenceCalls += 1; throw new Error("Candidate requested a persistent lock"); },
+    };
+    const candidate = createAdmissionReceiptStore(app(), subtle, {
+      localCandidate: true,
+      indexedDB: neverIndexedDb,
+      locks: neverLocks,
+      nextOperationId: () => "candidate-target",
+    });
+
+    await expect(candidate.publishLast(proof, new AbortController().signal))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(candidate.accepted(persistentPlan))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(candidate.deleteIfCurrent(gate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    expect(persistenceCalls).toBe(0);
+  });
+
+  it("consumes a proof before failed persistent publication and rejects replay without persistence", async () => {
+    const identity = await plan(false);
+    const exactResources = await resources(false);
+    const log: string[] = [];
+    const stores = admissionStores(identity.storageProfile, { log });
+    const receipts = createAdmissionReceiptStore(app(), subtle, {
+      indexedDB: new IDBFactory(),
+      locks: new TestAdmissionLocks(),
+      nextOperationId: () => "one-shot-proof",
+    });
+    let proof: Parameters<typeof receipts.publishLast>[0] | undefined;
+    const originalPublish = receipts.publishLast.bind(receipts);
+    const publish = vi.spyOn(receipts, "publishLast").mockImplementationOnce(async (candidate, signal) => {
+      proof = candidate;
+      return await originalPublish(candidate, signal);
+    });
+    const originalPut = IDBObjectStore.prototype.put;
+    const failedPut = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (
+      this: IDBObjectStore,
+      value: unknown,
+      key?: IDBValidKey,
+    ) {
+      if (this.name === "accepted-receipts") throw new Error("intercepted receipt publication");
+      return key === undefined ? originalPut.call(this, value) : originalPut.call(this, value, key);
+    });
+
+    await expect(coordinateVerifiedAdmission({
+      plan: identity,
+      ...exactResources,
+      ...stores,
+      receiptStore: receipts,
+      subtle,
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: "StorageFailed" });
+    failedPut.mockRestore();
+    publish.mockRestore();
+    expect(proof).toBeDefined();
+    expect(log).toContain("whole-rollback");
+    expect(log).toContain("range-rollback");
+
+    const transaction = vi.spyOn(IDBDatabase.prototype, "transaction");
+    await expect(receipts.publishLast(proof!, new AbortController().signal))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    expect(transaction).not.toHaveBeenCalled();
+    transaction.mockRestore();
+  });
+
+  it("revokes a captured proof when public receipt publication is intercepted before store validation", async () => {
+    const identity = await plan(false);
+    const exactResources = await resources(false);
+    const log: string[] = [];
+    const stores = admissionStores(identity.storageProfile, { log });
+    const receipts = createAdmissionReceiptStore(app(), subtle, {
+      indexedDB: new IDBFactory(),
+      locks: new TestAdmissionLocks(),
+      nextOperationId: () => "intercepted-publication",
+    });
+    let proof: Parameters<typeof receipts.publishLast>[0] | undefined;
+    const publish = vi.spyOn(receipts, "publishLast").mockImplementationOnce(async (candidate) => {
+      proof = candidate;
+      throw new Error("intercepted public publication");
+    });
+
+    await expect(coordinateVerifiedAdmission({
+      plan: identity,
+      ...exactResources,
+      ...stores,
+      receiptStore: receipts,
+      subtle,
+      signal: new AbortController().signal,
+    })).rejects.toThrow("intercepted public publication");
+    publish.mockRestore();
+    expect(proof).toBeDefined();
+    expect(log).toContain("whole-rollback");
+    expect(log).toContain("range-rollback");
+
+    const transaction = vi.spyOn(IDBDatabase.prototype, "transaction");
+    await expect(receipts.publishLast(proof!, new AbortController().signal))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    expect(transaction).not.toHaveBeenCalled();
+    transaction.mockRestore();
+  });
+
+  it("rejects cross-profile gates in actual whole and range stores before persistent access", async () => {
+    const candidatePlan = await plan();
+    const persistentPlan = await plan(false);
+    const candidateReceipts = createAdmissionReceiptStore(app(), subtle, {
+      localCandidate: true,
+      nextOperationId: () => "candidate-gate",
+    });
+    const persistentReceipts = createAdmissionReceiptStore(app(), subtle, {
+      indexedDB: new IDBFactory(),
+      locks: new TestAdmissionLocks(),
+      nextOperationId: () => "persistent-gate",
+    });
+    const candidateGate = (await admit(candidatePlan, candidateReceipts)).gate;
+    const persistentGate = (await admit(persistentPlan, persistentReceipts)).gate;
+    const exactResources = await resources(false);
+    const whole = exactResources.wholeResources[0]!;
+    const range = exactResources.rangeWrites[0]!.identity;
+    let cacheCalls = 0;
+    const neverCaches: CacheStoragePort = {
+      open: async () => { cacheCalls += 1; throw new Error("cross-profile gate opened Cache Storage"); },
+      delete: async () => { cacheCalls += 1; throw new Error("cross-profile gate deleted Cache Storage"); },
+    };
+    const persistentWhole = new WholeResourceCache(app(), {
+      cacheStorage: neverCaches,
+      fetchResource: async () => { throw new Error("unexpected whole-resource fetch"); },
+      digest: async (algorithm, bytes) => await subtle.digest(algorithm, bytes),
+      applicationOrigin: "https://fixture.example",
+      nextOperationId: () => "persistent-whole",
+    });
+    const memoryWhole = new MemoryWholeResourceCache(app(), {
+      fetchResource: async () => { throw new Error("unexpected Candidate whole-resource fetch"); },
+      digest: async (algorithm, bytes) => await subtle.digest(algorithm, bytes),
+      applicationOrigin: "https://fixture.example",
+      nextOperationId: () => "candidate-whole",
+    }, { localCandidate: true, maxBytes: 1_024, maxEntries: 8 });
+    let indexedDbCalls = 0;
+    const neverIndexedDb = {
+      open: () => { indexedDbCalls += 1; throw new Error("cross-profile gate opened IndexedDB"); },
+    } as unknown as IDBFactory;
+    const catalog = createRangeAuthorityCatalog([range]);
+    const persistentRange = createRangeStore(app(), STORAGE_BUDGET, {
+      indexedDB: neverIndexedDb,
+      subtle,
+    }, { catalog });
+    const memoryRange = createRangeStore(app(), STORAGE_BUDGET, {
+      indexedDB: neverIndexedDb,
+      subtle,
+    }, { catalog, localCandidate: true });
+
+    await expect(persistentWhole.readAccepted(whole, candidateGate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(memoryWhole.readAccepted(whole, persistentGate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(persistentRange.readAccepted(range, candidateGate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(memoryRange.readAccepted(range, persistentGate))
+      .rejects.toMatchObject({ code: "AuthorityRejected" });
+    expect(cacheCalls).toBe(0);
+    expect(indexedDbCalls).toBe(0);
   });
 
   it("preserves the prior accepted receipt across cancellation and repeated admission", async () => {
