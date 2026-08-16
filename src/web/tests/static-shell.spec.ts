@@ -3,6 +3,8 @@ import { expect, test } from "@playwright/test";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { flightUpdateAlertPresentation } from "../src/components/flight-capability-presentation";
+import type { RuntimeCapabilityV2 } from "../src/offline/contracts/policy";
 import { isForbiddenApplicationApiPath } from "../src/test/application-api-boundary";
 
 const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
@@ -195,9 +197,10 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   expect(forbiddenRequests).toEqual([]);
 });
 
-test("375px Flight keeps the offline pill and actionable update notice reachable", async ({ page }, testInfo) => {
+test("375px Flight keeps the offline pill and safe update notice reachable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chromium");
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
   await search.fill("Málaga");
@@ -208,39 +211,56 @@ test("375px Flight keeps the offline pill and actionable update notice reachable
   );
   await expect(offlinePill).toHaveText("Available offline for this assessment");
 
-  // Update coordination has its own contract tests. This controlled browser
-  // fixture exercises the canonical Flight alert slot with the exact rendered
-  // notice/action geometry while the real offline assessment pill is present.
-  await page.evaluate(() => {
-    const host = document.querySelector(".flight-alerts");
-    if (!host) throw new Error("Flight alert host was unavailable.");
+  // Update coordination has its own contract tests. Use the production
+  // presentation contract for the exact ready state in Flight's canonical
+  // alert slot so this browser fixture cannot drift in copy or semantics.
+  const capability = Object.freeze({
+    contractVersion: 2,
+    subject: Object.freeze({ kind: "assessment", scenario: "ssp2-45", horizon: 2050 }),
+    data: Object.freeze({
+      state: "available-offline",
+      pair: Object.freeze({
+        contractVersion: 1,
+        appBuildId: buildReport.appBuildId,
+        dataReleaseId: buildReport.dataReleaseId,
+      }),
+      resourceCount: 5,
+      byteCount: 1024,
+    }),
+    update: Object.freeze({
+      state: "ready-to-activate",
+      candidate: Object.freeze({
+        contractVersion: 1,
+        appBuildId: "next-build",
+        dataReleaseId: "next-release",
+      }),
+    }),
+  }) satisfies RuntimeCapabilityV2;
+  const updateAlert = flightUpdateAlertPresentation(capability.update);
+  if (!updateAlert) throw new Error("The production update presentation was unavailable.");
+  await page.locator(".flight-alerts").evaluate((host, presentation) => {
     const alert = document.createElement("div");
-    alert.className = "application-technical-alert";
-    alert.dataset.updateState = "ready-to-activate";
-    alert.setAttribute("role", "status");
-    alert.setAttribute("aria-live", "polite");
-    alert.append("Update ready. Reload to use the accepted candidate release. ");
-    const action = document.createElement("button");
-    action.type = "button";
-    action.textContent = "Reload to update";
-    action.addEventListener("click", () => {
-      action.dataset.clicked = "true";
-    });
-    alert.append(action);
-    host.append(alert);
-  });
+    alert.className = presentation.className;
+    alert.dataset.updateState = presentation.state;
+    alert.setAttribute("role", presentation.role);
+    alert.setAttribute("aria-live", presentation.ariaLive);
+    alert.textContent = presentation.message;
+    if (presentation.action) {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.textContent = presentation.action;
+      alert.append(action);
+    }
+    host.prepend(alert);
+  }, updateAlert);
 
   const header = page.locator(".flight-header");
   const alert = page.locator(
     ".flight-alerts .application-technical-alert[data-update-state='ready-to-activate']",
   );
   await expect(alert).toBeVisible();
-  await expect(alert).toContainText("Update ready.");
-  const action = alert.getByRole("button", { name: "Reload to update" });
-  await action.focus();
-  await expect(action).toBeFocused();
-  await action.click();
-  await expect(action).toHaveAttribute("data-clicked", "true");
+  await expect(alert).toHaveText("Update ready. Close all SeaRise tabs and reopen to use it.");
+  await expect(alert.getByRole("button")).toHaveCount(0);
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const headerBox = await header.boundingBox();

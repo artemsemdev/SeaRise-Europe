@@ -2,8 +2,8 @@ import { useState } from "react";
 import type {
   MissingRequirementV2,
   RuntimeCapabilityV2,
-  UpdateCapabilityV1,
 } from "../offline/contracts/policy";
+import { flightUpdateAlertPresentation } from "./flight-capability-presentation";
 
 interface CapabilityActions {
   readonly capability: RuntimeCapabilityV2 | null;
@@ -39,33 +39,6 @@ export function FlightCapabilityPill({ capability }: Pick<CapabilityActions, "ca
   return label ? <span className="release-pill" data-capability-state="available-offline">{label}</span> : null;
 }
 
-function updateMessage(update: UpdateCapabilityV1): string | null {
-  switch (update.state) {
-    case "current": return null;
-    case "update-available":
-      return `Update available for ${update.candidate.dataReleaseId}. The current version remains active.`;
-    case "installing":
-      return `Preparing update ${update.candidate.dataReleaseId}. The current version remains active.`;
-    case "ready-to-activate":
-      return `Update ready. Reload to use ${update.candidate.dataReleaseId}.`;
-    case "activation-blocked":
-      return `Update blocked. ${update.reason} The current version remains active.`;
-    case "failed":
-      return `Update failed. The current version remains active. ${update.reason}`;
-  }
-}
-
-function updateAction(update: UpdateCapabilityV1): string | null {
-  switch (update.state) {
-    case "update-available": return "Prepare update";
-    case "ready-to-activate": return "Reload to update";
-    case "activation-blocked":
-    case "failed": return "Retry update";
-    case "current":
-    case "installing": return null;
-  }
-}
-
 /** Technical, connection, storage, and update state stays in Flight's alert slot. */
 export function FlightCapabilityAlerts({
   capability,
@@ -88,8 +61,7 @@ export function FlightCapabilityAlerts({
     }
   };
 
-  const updateCopy = updateMessage(capability.update);
-  const updateButton = updateAction(capability.update);
+  const updateAlert = flightUpdateAlertPresentation(capability.update);
   return (
     <>
       {capability.subject.kind !== "core" && capability.data.state === "connection-required" ? (
@@ -112,16 +84,21 @@ export function FlightCapabilityAlerts({
           The current accepted result remains visible. New data may require a connection.
         </div>
       ) : null}
-      {updateCopy ? (
-        <div className="application-technical-alert" role="status" aria-live="polite" data-update-state={capability.update.state}>
-          {updateCopy}
-          {updateButton ? (
+      {updateAlert ? (
+        <div
+          className={updateAlert.className}
+          role={updateAlert.role}
+          aria-live={updateAlert.ariaLive}
+          data-update-state={updateAlert.state}
+        >
+          {updateAlert.message}
+          {updateAlert.action ? (
             <button
               type="button"
               disabled={pending !== null}
               onClick={() => void run("update", onUpdateAction)}
             >
-              {pending === "update" ? "Working…" : updateButton}
+              {pending === "update" ? "Working…" : updateAlert.action}
             </button>
           ) : null}
         </div>

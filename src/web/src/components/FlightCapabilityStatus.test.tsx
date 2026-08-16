@@ -134,12 +134,11 @@ describe("Flight capability presentation", () => {
 
   it.each([
     ["update-available", "Update available for next-release. The current version remains active.", "Prepare update"],
-    ["ready-to-activate", "Update ready. Reload to use next-release.", "Reload to update"],
     ["activation-blocked", "Update blocked. another tab is active The current version remains active.", "Retry update"],
     ["failed", "Update failed. The current version remains active. integrity check failed", "Retry update"],
   ] as const)("places %s in the visible alert slot with an explicit action", async (state, copy, action) => {
     const request = vi.fn(noAction);
-    const update = state === "update-available" || state === "ready-to-activate"
+    const update = state === "update-available"
       ? Object.freeze({
           state,
           candidate: validateAppReleasePair({ ...pair, appBuildId: "next-build", dataReleaseId: "next-release" }),
@@ -156,6 +155,24 @@ describe("Flight capability presentation", () => {
     expect(screen.getByRole("status")).toHaveTextContent(copy);
     await userEvent.click(screen.getByRole("button", { name: action }));
     await waitFor(() => expect(request).toHaveBeenCalledOnce());
+  });
+
+  it("gives safe cross-tab instructions when an update is ready without claiming in-page activation", () => {
+    const request = vi.fn(noAction);
+    render(<FlightCapabilityAlerts
+      capability={runtimeCapability(online, Object.freeze({
+        state: "ready-to-activate",
+        candidate: validateAppReleasePair({ ...pair, appBuildId: "next-build", dataReleaseId: "next-release" }),
+      }))}
+      onRetry={noAction}
+      onUpdateAction={request}
+    />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Update ready. Close all SeaRise tabs and reopen to use it.",
+    );
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("keeps action errors visible and technical", async () => {
