@@ -138,6 +138,53 @@ memory and latency require a separate, explicit, read-only local run against
 the ignored Candidate-v7 path. Candidate-v7 and its TAR must not be copied into
 the static build, committed, sent to CI, or uploaded anywhere.
 
+### Read-only Candidate-v7 measurement
+
+The static target includes a local-only measurement command. It reads an
+explicit candidate root in place, verifies each compressed shard against the
+candidate manifest, serves the production Worker bundle and those source files
+from a cross-origin-isolated loopback origin, and writes its raw report with
+exclusive creation. Keep that report under `/tmp` or another ignored private
+directory:
+
+```bash
+cd src/web
+npm run build
+npm run measure:local-candidate-search -- \
+  --candidate-root /absolute/ignored/candidate-v7 \
+  --query-set /absolute/ignored/performance-queries.json \
+  --output /tmp/static-search-candidate-v7-measurement.json \
+  --samples 5
+```
+
+The command uses Pixel 7 emulation and a 512 MiB Worker V8 old-space limit. It
+records Chromium version, initialization and query distributions,
+`performance.measureUserAgentSpecificMemory()` when available, and dedicated
+Worker `Runtime.getHeapUsage` telemetry. The conservative numeric observation
+adds V8 used heap, embedder heap, and backing storage, then takes the maximum
+with the user-agent-specific observations. This is not device RSS and Pixel
+emulation is not physical mobile hardware.
+
+The 2026-08-16 read-only run observed 38,512,542-byte and 46,221,779-byte
+decoded shards. The 64 MiB decoded ceiling therefore leaves 20,887,085 bytes
+(45.2%) above the larger representative shard, while the 16 MiB compressed
+ceiling leaves more than 2.8 times the larger compressed shard. Streaming
+checks cumulative output before requesting another decoder allocation.
+
+Chromium 151 produced initialization p50 439.76 ms and p95 459.89 ms across
+five cold core loads, query p50 3.61 ms and p95 9.09 ms across 100
+measurements, and a conservative Worker observation of 251,963,600 bytes.
+The tested runtime keeps the canonical sorted entries compact, performs direct
+ordinal-array lookup, and applies admissible length and signature-count lower
+bounds before banded fuzzy distance. The Worker omits duplicate publisher-side
+equivalence reconstruction only after the compressed artifact passes its exact
+manifest size and SHA-256 authority; standalone contract tests retain the full
+reconstruction path. `measureUserAgentSpecificMemory()` was unavailable, so
+the numeric bound is the CDP heap/embedder/backing-storage sum, not process RSS.
+Initialization passes its 1,000 ms target and query performance passes its
+50 ms target. These observations are local browser acceptance evidence, not a
+physical-mobile, production, publication, or scientific approval.
+
 ## Failure interpretation
 
 Search failures use the closed technical-error vocabulary from the release

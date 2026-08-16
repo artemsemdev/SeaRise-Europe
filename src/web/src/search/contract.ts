@@ -52,12 +52,16 @@ export interface ValidatedSearchShard {
 function fail(message: string): never { throw new Error(message); }
 
 export function compareCodePoints(left: string, right: string): number {
-  const leftPoints = Array.from(left, (point) => point.codePointAt(0)!);
-  const rightPoints = Array.from(right, (point) => point.codePointAt(0)!);
-  for (let index = 0; index < Math.min(leftPoints.length, rightPoints.length); index += 1) {
-    if (leftPoints[index] !== rightPoints[index]) return leftPoints[index] - rightPoints[index];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftPoint = left.codePointAt(leftIndex)!;
+    const rightPoint = right.codePointAt(rightIndex)!;
+    if (leftPoint !== rightPoint) return leftPoint - rightPoint;
+    leftIndex += leftPoint > 0xffff ? 2 : 1;
+    rightIndex += rightPoint > 0xffff ? 2 : 1;
   }
-  return leftPoints.length - rightPoints.length;
+  return (left.length - leftIndex) - (right.length - rightIndex);
 }
 
 export function canonicalJson(value: unknown): string {
@@ -72,8 +76,11 @@ export function canonicalJson(value: unknown): string {
 }
 
 function exactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    && canonicalJson(Object.keys(value).sort(compareCodePoints)) === canonicalJson([...keys].sort(compareCodePoints));
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const actual = Object.keys(value);
+  if (actual.length !== keys.length) return false;
+  const expected = new Set(keys);
+  return actual.every((key) => expected.has(key));
 }
 
 function hex(bytes: ArrayBuffer): string {
@@ -137,8 +144,30 @@ function terms(record: IndexedRecord): string {
     .flatMap(tokenize))].join(" ");
 }
 
-function validateRecords(value: unknown, shardId: SearchShardId): readonly IndexedRecord[] {
+function validateRecords(value: unknown, shardId: SearchShardId, artifactVerified: boolean): readonly IndexedRecord[] {
   if (!Array.isArray(value)) fail("search shard records differ from the v4 contract");
+  if (artifactVerified) {
+    value.forEach((record, index) => {
+      if (typeof record !== "object" || record === null || Array.isArray(record)
+          || record.ordinal !== index + 1
+          || typeof record.placeId !== "string" || !/^geonames:[1-9][0-9]*$/.test(record.placeId)
+          || typeof record.displayName !== "string" || !record.displayName
+          || !Array.isArray(record.searchNames) || record.searchNames.length > 1026
+          || record.searchNames.some((name: unknown) => typeof name !== "string" || !name)
+          || typeof record.countryCode !== "string" || !/^[A-Z]{2}$/.test(record.countryCode)
+          || !(record.admin1Name === null || (typeof record.admin1Name === "string" && record.admin1Name.length > 0))
+          || !(record.population === null || (Number.isSafeInteger(record.population) && record.population >= 0))
+          || typeof record.featureCode !== "string" || !FEATURE_CODES.has(record.featureCode)
+          || !Number.isSafeInteger(record.distanceToCoastMeters) || record.distanceToCoastMeters < 0
+          || typeof record.isCoastal !== "boolean"
+          || typeof record.latitude !== "number" || !Number.isFinite(record.latitude) || record.latitude < -90 || record.latitude > 90
+          || typeof record.longitude !== "number" || !Number.isFinite(record.longitude) || record.longitude < -180 || record.longitude > 180
+          || (shardId === "europe-coastal" && record.isCoastal !== true)) {
+        fail("verified search shard record has an unsafe runtime shape");
+      }
+    });
+    return value as IndexedRecord[];
+  }
   let previous = 0n;
   let totalNamePoints = 0;
   value.forEach((record, index) => {
@@ -174,10 +203,17 @@ function decodeBase64(value: unknown): Uint8Array {
     return fail("search index is not canonical base64");
   }
   const binary = atob(value);
-  return Uint8Array.from(binary, (point) => point.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }
 
-async function validateEnvelope(value: unknown, records: readonly IndexedRecord[], shardId: SearchShardId): Promise<IndexEnvelope> {
+async function validateEnvelope(
+  value: unknown,
+  records: readonly IndexedRecord[],
+  shardId: SearchShardId,
+  artifactVerified: boolean,
+): Promise<IndexEnvelope> {
   let envelope: unknown;
   try { envelope = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(decodeBase64(value))); }
   catch { return fail("search index is not strict UTF-8 JSON"); }
@@ -188,24 +224,53 @@ async function validateEnvelope(value: unknown, records: readonly IndexedRecord[
       || envelope.binding.evaluationId !== "browser-search-shard-v2"
       || envelope.binding.shardId !== shardId || envelope.binding.documentCount !== records.length
       || envelope.binding.optionsSha256 !== await digest(OPTIONS_IDENTITY)
-      || envelope.binding.documentsSha256 !== await digest(JSON.stringify(records.map((record) => [
+      || typeof envelope.binding.documentsSha256 !== "string" || !SHA256.test(envelope.binding.documentsSha256)
+      || (!artifactVerified && envelope.binding.documentsSha256 !== await digest(JSON.stringify(records.map((record) => [
         record.ordinal, terms(record), record.placeId, record.displayName, record.searchNames,
         record.countryCode, record.admin1Name, record.population, record.featureCode,
         record.distanceToCoastMeters, record.isCoastal,
-      ])))
+      ]))))
       || !exactKeys(envelope.payload, ["serializationVersion", "entries"])
       || envelope.payload.serializationVersion !== 1 || !Array.isArray(envelope.payload.entries)) {
     fail("search index identity or document binding differs from the v4 contract");
   }
-  const postings = new Map<string, number[]>();
-  for (const record of records) {
-    for (const name of new Set([record.displayName, ...record.searchNames].map(normalizeSearchText))) {
-      postings.set(name, [...(postings.get(name) ?? []), record.ordinal]);
+  let previousName = "";
+  for (const entry of envelope.payload.entries) {
+    if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || !entry[0]
+        || (!artifactVerified && normalizeSearchText(entry[0]) !== entry[0])
+        || (previousName && compareCodePoints(entry[0], previousName) <= 0)
+        || !Array.isArray(entry[1]) || entry[1].length === 0) {
+      fail("search index entries are not normalized, unique, and sorted");
     }
+    let previousOrdinal = 0;
+    for (const ordinal of entry[1]) {
+      if (!Number.isSafeInteger(ordinal) || ordinal <= previousOrdinal || ordinal > records.length) {
+        fail("search index posting differs from the record inventory");
+      }
+      previousOrdinal = ordinal;
+    }
+    previousName = entry[0];
   }
-  const expectedEntries = [...postings].sort(([left], [right]) => compareCodePoints(left, right));
-  if (canonicalJson(envelope.payload.entries) !== canonicalJson(expectedEntries)) {
-    fail("search index differs from its exact v4 records");
+  if (!artifactVerified) {
+    const postings = new Map<string, number[]>();
+    for (const record of records) {
+      for (const name of new Set([record.displayName, ...record.searchNames].map(normalizeSearchText))) {
+        postings.set(name, [...(postings.get(name) ?? []), record.ordinal]);
+      }
+    }
+    const expectedEntries = [...postings].sort(([left], [right]) => compareCodePoints(left, right));
+    if (envelope.payload.entries.length !== expectedEntries.length) {
+      fail("search index differs from its exact v4 records");
+    }
+    for (let index = 0; index < expectedEntries.length; index += 1) {
+      const actual = envelope.payload.entries[index];
+      const expected = expectedEntries[index];
+      const actualOrdinals = actual[1] as readonly number[];
+      if (actual[0] !== expected[0] || actualOrdinals.length !== expected[1].length
+          || actualOrdinals.some((ordinal: number, ordinalIndex: number) => ordinal !== expected[1][ordinalIndex])) {
+        fail("search index differs from its exact v4 records");
+      }
+    }
   }
   return envelope as unknown as IndexEnvelope;
 }
@@ -213,6 +278,7 @@ async function validateEnvelope(value: unknown, records: readonly IndexedRecord[
 export async function validateSearchShardDocument(
   raw: Uint8Array,
   authority: SearchShardAuthority,
+  artifactVerified = false,
 ): Promise<ValidatedSearchShard> {
   let text: string;
   let value: unknown;
@@ -220,7 +286,7 @@ export async function validateSearchShardDocument(
     text = new TextDecoder("utf-8", { fatal: true }).decode(raw);
     value = JSON.parse(text);
   } catch { return fail("search shard is not strict UTF-8 JSON"); }
-  if (canonicalJson(value) !== text) fail("search shard JSON is not canonical");
+  if (!artifactVerified && canonicalJson(value) !== text) fail("search shard JSON is not canonical");
   if (!exactKeys(value, SCHEMA.$defs.shard.required)
       || value.$schema !== SCHEMA.$id || value.schemaVersion !== "4.0.0"
       || typeof value.dataReleaseId !== "string" || !RELEASE_ID.test(value.dataReleaseId)
@@ -243,14 +309,14 @@ export async function validateSearchShardDocument(
   }
   validateSpatial(value.spatialIdentity);
   validateSource(value.source);
-  const records = validateRecords(value.records, authority.shardId);
+  const records = validateRecords(value.records, authority.shardId, artifactVerified);
   if (!Number.isSafeInteger(value.recordCount) || Number(value.recordCount) < 0
       || Number(value.recordCount) > 5_000_000 || value.recordCount !== records.length
       || typeof value.recordsSha256 !== "string" || !SHA256.test(value.recordsSha256)
-      || value.recordsSha256 !== await digest(canonicalJson(records))) {
+      || (!artifactVerified && value.recordsSha256 !== await digest(JSON.stringify(records)))) {
     fail("search shard record count or recordsSha256 differs from the v4 contract");
   }
-  const envelope = await validateEnvelope(value.indexBase64, records, authority.shardId);
+  const envelope = await validateEnvelope(value.indexBase64, records, authority.shardId, artifactVerified);
   return Object.freeze({
     records,
     envelope,

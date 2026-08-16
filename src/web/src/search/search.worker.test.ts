@@ -1,11 +1,12 @@
 // @vitest-environment node
 
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
-import { brotliDecompressSync } from "node:zlib";
+import { brotliCompressSync, brotliDecompressSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 import manifest from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
-import { installSearchWorker } from "./search.worker";
+import { decodeBrotliStream, installSearchWorker } from "./search.worker";
 import type { SearchWorkerRequest, SearchWorkerResponse } from "./worker-protocol";
 import type { SearchShardAuthority, SearchShardId } from "./types";
 
@@ -128,6 +129,32 @@ describe("settlement search worker protocol", () => {
     });
   });
 
+  it.each([
+    ["non-string search name", (document: { records: Array<{ searchNames: unknown[] }> }) => {
+      document.records[0].searchNames = [42];
+    }],
+    ["out-of-range latitude", (document: { records: Array<{ latitude: number }> }) => {
+      document.records[0].latitude = 900;
+    }],
+  ])("rejects an unsafe verified-artifact runtime shape: %s", async (_name, mutate) => {
+    const fixture = compressedFixture();
+    const document = JSON.parse(fixture.decoded.toString()) as {
+      records: Array<{ searchNames: unknown[]; latitude: number }>;
+    };
+    mutate(document);
+    const worker = scope();
+    installSearchWorker(
+      worker.target,
+      async () => new Response(Uint8Array.from(fixture.compressed)),
+      async () => new TextEncoder().encode(JSON.stringify(document)),
+    );
+    await send(worker, { kind: "initialize", token: 1, authority: fixture.authority });
+    expect(worker.messages.at(-1)).toMatchObject({
+      kind: "error",
+      error: { kind: "technical-error", code: "IntegrityFailed" },
+    });
+  });
+
   it("maps unsupported and malformed Brotli decoding to bounded technical errors", async () => {
     const fixture = compressedFixture();
     const unsupported = scope();
@@ -151,6 +178,20 @@ describe("settlement search worker protocol", () => {
     );
     await send(malformed, { kind: "initialize", token: 1, authority: fixture.authority });
     expect(malformed.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "DecodeFailed" } });
+  });
+
+  it("streams Brotli output and rejects expansion at the cumulative limit", async () => {
+    const brotli = createRequire(import.meta.url)("brotli-wasm");
+    const fixture = compressedFixture();
+    expect(decodeBrotliStream(
+      new Uint8Array(fixture.compressed),
+      brotli,
+      fixture.decoded.byteLength,
+    )).toEqual(new Uint8Array(fixture.decoded));
+
+    const compressedBomb = new Uint8Array(brotliCompressSync(Buffer.alloc(4096, 0x61)));
+    expect(() => decodeBrotliStream(compressedBomb, brotli, 128))
+      .toThrow(/exceeds its browser limit/);
   });
 
   it("rejects a coastal shard with a different source identity without losing core search", async () => {

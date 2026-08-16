@@ -12,6 +12,7 @@
     "check:contracts": "node scripts/generate-release-contracts.mjs --check",
     "generate:search-fixture": "node scripts/generate-search-fixture.mjs",
     "check:search-fixture": "node scripts/generate-search-fixture.mjs --check",
+    "measure:local-candidate-search": "node scripts/measure-local-candidate-search.mjs",
     "dev": "vite",
     "serve:local-release": "node scripts/serve-local-release.mjs",
     "lint": "eslint . && node scripts/check-boundaries.mjs && npm run check:contracts && npm run check:search-fixture",

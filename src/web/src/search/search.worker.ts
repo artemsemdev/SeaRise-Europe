@@ -20,6 +20,28 @@ interface WorkerScope {
 type WorkerTransport = (input: URL, init: RequestInit) => Promise<Response>;
 export type BrotliDecoder = (bytes: Uint8Array) => Promise<Uint8Array>;
 
+interface BrotliStreamResult {
+  readonly buf: Uint8Array;
+  readonly code: number;
+  readonly input_offset: number;
+  free?(): void;
+}
+
+interface BrotliRuntime {
+  readonly BrotliStreamResultCode: {
+    readonly ResultSuccess: number;
+    readonly NeedsMoreInput: number;
+    readonly NeedsMoreOutput: number;
+  };
+  readonly DecompressStream: new () => {
+    decompress(input: Uint8Array, outputSize: number): BrotliStreamResult;
+    free(): void;
+  };
+}
+
+const MAX_DECODED_BYTES = 64 * 1024 * 1024;
+const DECODE_CHUNK_BYTES = 1024 * 1024;
+
 class SearchWorkerFailure extends Error {
   readonly code: TechnicalErrorCode;
   readonly recoverable: boolean;
@@ -95,9 +117,9 @@ async function fetchShard(
     throw new SearchWorkerFailure("DecodeFailed", "Settlement shard bytes could not be read.", true);
   }
   try {
-    await verifySearchArtifactBytes(raw, authority);
+    const verifiedArtifact = await verifySearchArtifactBytes(raw, authority);
     const decoded = url.pathname.endsWith(".br") ? await decodeBrotli(raw) : raw;
-    return await decodeSearchShard(decoded, authority);
+    return await decodeSearchShard(decoded, authority, verifiedArtifact);
   } catch (error) {
     if (error instanceof SearchWorkerFailure) throw error;
     const code = /authority|release|identity|SHA|bytes differ/i.test(bounded(error))
@@ -115,7 +137,7 @@ async function pinnedBrotli(bytes: Uint8Array): Promise<Uint8Array> {
       false,
     );
   }
-  let brotli: { decompress(input: Uint8Array): Uint8Array };
+  let brotli: BrotliRuntime;
   try {
     brotli = await importBrotli();
   } catch {
@@ -126,15 +148,75 @@ async function pinnedBrotli(bytes: Uint8Array): Promise<Uint8Array> {
     );
   }
   try {
-    return Uint8Array.from(brotli.decompress(bytes));
+    return decodeBrotliStream(bytes, brotli);
   } catch {
     throw new SearchWorkerFailure("DecodeFailed", "The Brotli settlement shard is malformed.", false);
   }
 }
 
-async function importBrotli() {
+export function decodeBrotliStream(
+  bytes: Uint8Array,
+  brotli: BrotliRuntime,
+  maximumBytes = MAX_DECODED_BYTES,
+): Uint8Array {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > MAX_DECODED_BYTES) {
+    throw new Error("decoded search shard limit is invalid");
+  }
+  const stream = new brotli.DecompressStream();
+  const chunks: Uint8Array[] = [];
+  let inputOffset = 0;
+  let outputBytes = 0;
+  let complete = false;
+  try {
+    while (!complete) {
+      const remainingBytes = maximumBytes - outputBytes;
+      if (remainingBytes === 0) throw new Error("decoded search shard exceeds its browser limit");
+      const outputSize = Math.min(DECODE_CHUNK_BYTES, remainingBytes);
+      const result = stream.decompress(bytes.subarray(inputOffset), outputSize);
+      const chunk = Uint8Array.from(result.buf);
+      const resultCode = result.code;
+      const consumedInputBytes = result.input_offset;
+      const previousInputOffset = inputOffset;
+      inputOffset += consumedInputBytes;
+      result.free?.();
+      if (inputOffset > bytes.length || outputBytes + chunk.length > maximumBytes) {
+        throw new Error("decoded search shard exceeds its browser limit");
+      }
+      if (chunk.length) {
+        chunks.push(chunk);
+        outputBytes += chunk.length;
+      }
+      if (resultCode === brotli.BrotliStreamResultCode.ResultSuccess) {
+        if (inputOffset !== bytes.length) throw new Error("Brotli settlement shard has trailing bytes");
+        complete = true;
+      } else if (resultCode === brotli.BrotliStreamResultCode.NeedsMoreOutput) {
+        if (outputBytes === maximumBytes) {
+          throw new Error("decoded search shard exceeds its browser limit");
+        }
+        if (inputOffset === previousInputOffset && chunk.length === 0) {
+          throw new Error("Brotli settlement shard decoder made no progress");
+        }
+      } else if (resultCode === brotli.BrotliStreamResultCode.NeedsMoreInput) {
+        if (inputOffset >= bytes.length) throw new Error("Brotli settlement shard is truncated");
+      } else {
+        throw new Error(`Brotli settlement shard decoder returned code ${resultCode}`);
+      }
+    }
+    const decoded = new Uint8Array(outputBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      decoded.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return decoded;
+  } finally {
+    stream.free();
+  }
+}
+
+async function importBrotli(): Promise<BrotliRuntime> {
   const module = await import("brotli-wasm");
-  return await module.default;
+  return await module.default as BrotliRuntime;
 }
 
 function mergeRanked(

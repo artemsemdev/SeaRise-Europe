@@ -8,8 +8,14 @@ import manifest from "../../../../contracts/release/v1/fixtures/release/searise-
 import queryFixture from "../../../../contracts/search-evaluation/v1/fixtures/queries.synthetic.json";
 import { mergeRankedResults, normalizeSearchText } from "./ranking";
 import { canonicalJson } from "./contract";
-import { assertCompatibleShardSet, decodeSearchShard, searchShard, verifySearchArtifactBytes } from "./runtime";
-import type { SearchShardAuthority, SearchShardId } from "./types";
+import {
+  assertCompatibleShardSet,
+  decodeSearchShard,
+  searchShard,
+  verifySearchArtifactBytes,
+  type SearchShardRuntime,
+} from "./runtime";
+import type { SearchShardAuthority, SearchShardId, SettlementSearchRecord } from "./types";
 
 const releaseRoot = resolve(
   process.cwd(),
@@ -138,5 +144,51 @@ describe("release-bound settlement search runtime", () => {
       document.source.projectionSha256 = "0".repeat(64);
     }), coastalValue.authority);
     expect(() => assertCompatibleShardSet(core, coastal)).toThrow(/one v4 release\/source\/spatial identity/);
+  });
+
+  it("evicts a broad candidate set without scanning or materializing the record catalogue", () => {
+    const recordCount = 20_000;
+    const recordValues: (SettlementSearchRecord | undefined)[] = [undefined];
+    const ordinals = Array.from({ length: recordCount }, (_, index) => index + 1);
+    for (const ordinal of ordinals) {
+      recordValues[ordinal] = {
+        placeId: `geonames:${900100000 + ordinal}`,
+        displayName: "A",
+        searchNames: [],
+        countryCode: "AA",
+        admin1Name: null,
+        population: recordCount - ordinal,
+        featureCode: "PPL",
+        distanceToCoastMeters: 0,
+        isCoastal: false,
+        latitude: 50,
+        longitude: 10,
+      };
+    }
+    const records = new Proxy(recordValues, {
+      get(target, property, receiver) {
+        if (property === Symbol.iterator || property === "entries" || property === "values") {
+          throw new Error("record catalogue scan is forbidden");
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const runtime = {
+      authority: fixture("europe-core").authority,
+      commonIdentity: "bounded-candidate-test",
+      records,
+      index: {
+        entries: [["a", ordinals]],
+        lengths: Uint16Array.of(1),
+        signatureHigh: Uint32Array.of(0),
+        signatureLow: Uint32Array.of(0),
+        signatureCounts: new Uint32Array(4),
+        byLength: new Map([[1, Uint32Array.of(0)]]),
+      },
+    } as unknown as SearchShardRuntime;
+
+    const results = searchShard(runtime, "a");
+    expect(results).toHaveLength(10);
+    expect(results[0].record.placeId).toBe("geonames:900100001");
   });
 });
