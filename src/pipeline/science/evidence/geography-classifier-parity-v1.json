@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureRole": "cross-runtime-geography-classifier-golden",
+  "dataProvenanceClass": "synthetic-fixture",
+  "release": {
+    "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+    "supportArtifact": {
+      "artifactId": "europe-support-geoparquet",
+      "path": "boundaries/europe.parquet",
+      "sha256": "531c6042a33cf3be9bc3ea340b0e557cb66bafb34de7954db0d7e47be90d35a9"
+    },
+    "coastalArtifact": {
+      "artifactId": "coastal-analysis-zone-geoparquet",
+      "path": "boundaries/coastal-analysis-zone.parquet",
+      "sha256": "3ba4d5eaba24d1202482bc33fd64fde8ce54b7ff1dd1456990d3c8cfece43366"
+    }
+  },
+  "semantics": {
+    "operation": "OGC-covers",
+    "boundaryInclusive": true,
+    "epsilonDegrees": 0.00001,
+    "classificationOrder": [
+      "support",
+      "coastal"
+    ]
+  },
+  "cases": [
+    {
+      "id": "support-exterior-boundary",
+      "boundaryRole": "support",
+      "relation": "exterior-boundary",
+      "coordinates": { "latitude": 38.585979, "longitude": -28.851018 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "InEuropeOutsideCoastalZone"
+    },
+    {
+      "id": "support-exterior-epsilon-inside",
+      "boundaryRole": "support",
+      "relation": "epsilon-inside",
+      "coordinates": { "latitude": 38.57414197350934, "longitude": -28.826926586823117 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "InEuropeOutsideCoastalZone"
+    },
+    {
+      "id": "support-exterior-epsilon-outside",
+      "boundaryRole": "support",
+      "relation": "epsilon-outside",
+      "coordinates": { "latitude": 38.574124026490665, "longitude": -28.82693541317688 },
+      "expectedSupportCovers": false,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "OutsideEurope"
+    },
+    {
+      "id": "support-hole-boundary",
+      "boundaryRole": "support",
+      "relation": "hole-boundary",
+      "coordinates": { "latitude": 65.644498, "longitude": -23.919115 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "InEuropeOutsideCoastalZone"
+    },
+    {
+      "id": "support-hole-epsilon-inside",
+      "boundaryRole": "support",
+      "relation": "epsilon-inside",
+      "coordinates": { "latitude": 65.64242638555716, "longitude": -23.905473491437885 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "InEuropeOutsideCoastalZone"
+    },
+    {
+      "id": "support-hole-epsilon-outside",
+      "boundaryRole": "support",
+      "relation": "epsilon-outside",
+      "coordinates": { "latitude": 65.64240661444283, "longitude": -23.905476508562113 },
+      "expectedSupportCovers": false,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "OutsideEurope"
+    },
+    {
+      "id": "coastal-exterior-boundary",
+      "boundaryRole": "coastal",
+      "relation": "exterior-boundary",
+      "coordinates": { "latitude": 38.585994, "longitude": -28.850986 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": true,
+      "expectedClassification": "InEuropeAndCoastalZone"
+    },
+    {
+      "id": "coastal-exterior-epsilon-inside",
+      "boundaryRole": "coastal",
+      "relation": "epsilon-inside",
+      "coordinates": { "latitude": 38.57416247388551, "longitude": -28.826900587588085 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": true,
+      "expectedClassification": "InEuropeAndCoastalZone"
+    },
+    {
+      "id": "coastal-exterior-epsilon-outside",
+      "boundaryRole": "coastal",
+      "relation": "epsilon-outside",
+      "coordinates": { "latitude": 38.574144526114495, "longitude": -28.826909412411915 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "InEuropeOutsideCoastalZone"
+    },
+    {
+      "id": "coastal-hole-boundary",
+      "boundaryRole": "coastal",
+      "relation": "hole-boundary",
+      "coordinates": { "latitude": 65.64449, "longitude": -23.91917 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": true,
+      "expectedClassification": "InEuropeAndCoastalZone"
+    },
+    {
+      "id": "coastal-hole-epsilon-inside",
+      "boundaryRole": "coastal",
+      "relation": "epsilon-inside",
+      "coordinates": { "latitude": 65.64245288550312, "longitude": -23.905444491083763 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": true,
+      "expectedClassification": "InEuropeAndCoastalZone"
+    },
+    {
+      "id": "coastal-hole-epsilon-outside",
+      "boundaryRole": "coastal",
+      "relation": "epsilon-outside",
+      "coordinates": { "latitude": 65.64243311449688, "longitude": -23.90544750891624 },
+      "expectedSupportCovers": true,
+      "expectedCoastalCovers": false,
+      "expectedClassification": "InEuropeOutsideCoastalZone"
+    }
+  ]
+}
