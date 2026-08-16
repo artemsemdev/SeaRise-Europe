@@ -3,7 +3,7 @@
  * Run `npm run generate:contracts --workspace @searise/web`; do not edit.
  */
 
-export const RELEASE_CONTRACT_SOURCE_SHA256 = "b9d97a892d942555c6ecc3910bda423c8b097ac905308ff099d7be8f4c5d85f6";
+export const RELEASE_CONTRACT_SOURCE_SHA256 = "fe82074cb7b123a85ad7c1375803dbea83b3b297cd7d01c7df5c8dfd022a6cfe";
 export type SchemaVersion = "2.0.0";
 export const SCENARIO_IDS = ["ssp1-26", "ssp2-45", "ssp5-85"] as const;
 export type ScenarioId = "ssp1-26" | "ssp2-45" | "ssp5-85";
@@ -207,3 +207,50 @@ export interface ReleaseManifestV2 {
   readonly artifacts: readonly ReleaseArtifactV2[];
   readonly datasets: readonly [ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2];
 }
+
+export interface PrivateBindingManifestV1 {
+  readonly $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-binding-manifest.schema.json";
+  readonly schemaVersion: "1.0.0";
+  readonly dataReleaseId: DataReleaseId;
+  readonly privateEngineeringOnly: true;
+  readonly verified: false;
+  readonly publicPromotionAuthorized: false;
+  readonly binding: Readonly<{
+    adapter: Readonly<{ createdAt: string; codeRevision: string }>;
+    baseCandidate: Readonly<{
+      candidateId: string;
+      dataReleaseId: DataReleaseId;
+      manifestSha256: Sha256;
+      snapshotSha256: Sha256;
+      createdAt: string;
+      codeRevision: string;
+    }>;
+    sourceGrid: Readonly<{ byteSize: number; sha256: Sha256 }>;
+  }>;
+  readonly releaseManifest: PrivateReleaseManifestV1;
+}
+
+export type PrivateReleaseManifestV1 = Omit<
+  ReleaseManifestV2,
+  "$schema" | "baseReleaseIdentity" | "publication" | "contractArtifacts"
+> & Readonly<{
+  $schema: "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-release-manifest.schema.json";
+  baseReleaseIdentity: Readonly<{
+    identityScope: "private-phase-1-candidate";
+    schemaVersion: "2.0.0";
+    manifestSha256: Sha256;
+    createdAt: string;
+    codeRevision: string;
+  }>;
+  publication: Readonly<{
+    releasePath: string;
+    cacheControl: "private, no-store";
+    appendOnly: true;
+  }>;
+  contractArtifacts: Omit<
+    ReleaseManifestV2["contractArtifacts"],
+    "baseReleaseProvenance" | "baseReleaseSignature"
+  > & Readonly<{ baseReleaseProvenance: null; baseReleaseSignature: null }>;
+}>;
+
+export type BrowserReleaseManifestV2 = ReleaseManifestV2 | PrivateReleaseManifestV1;

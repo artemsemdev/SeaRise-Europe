@@ -24,8 +24,18 @@
       "type": "array",
       "prefixItems": [
         { "const": "No build run, workflow, platform, timestamp, or code revision is asserted for this deterministic browser derivation." },
-        { "const": "This receipt is not the authoritative build receipt for the sealed v1 release." },
-        { "const": "This synthetic fixture is not approved real-source public-release evidence." }
+        {
+          "enum": [
+            "This receipt is not the authoritative build receipt for the sealed v1 release.",
+            "This receipt is not the authoritative build receipt for the private Phase 1 candidate."
+          ]
+        },
+        {
+          "enum": [
+            "This synthetic fixture is not approved real-source public-release evidence.",
+            "This private real-source binding is not approved public-release evidence."
+          ]
+        }
       ],
       "items": false, "minItems": 3, "maxItems": 3
     }

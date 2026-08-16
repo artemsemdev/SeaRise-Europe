@@ -6,7 +6,7 @@ import argparse
 import glob
 import json
 from collections.abc import Iterable
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +77,10 @@ def _discover_test_files() -> set[str]:
     )
     files.update(
         str(path.relative_to(ROOT))
+        for path in (ROOT / "src/web/scripts").rglob("*.test.mjs")
+    )
+    files.update(
+        str(path.relative_to(ROOT))
         for path in (ROOT / "src/web/tests").rglob("*.spec.ts")
     )
     files.update(
@@ -102,12 +106,28 @@ def _duplicates(values: Iterable[str]) -> list[str]:
 
 
 def validate_inventory(
-    inventory: dict[str, Any], schema_path: Path = DEFAULT_SCHEMA
+    inventory: dict[str, Any],
+    schema_path: Path = DEFAULT_SCHEMA,
+    *,
+    now: datetime | None = None,
 ) -> list[str]:
     _schema_validate(inventory, schema_path)
     errors: list[str] = []
     suites = inventory["suites"]
     evidence = inventory["evidence"]
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        raise InventoryError("inventory validation time must include a timezone")
+    for evidence_id, record in evidence.items():
+        try:
+            observed_at = datetime.fromisoformat(record["observedAt"].replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            errors.append(f"{evidence_id}: observedAt is not a valid timezone-aware timestamp")
+            continue
+        if observed_at.tzinfo is None:
+            errors.append(f"{evidence_id}: observedAt must include a timezone")
+        elif observed_at > current_time + timedelta(minutes=5):
+            errors.append(f"{evidence_id}: observedAt is in the future")
 
     duplicate_ids = _duplicates(suite["id"] for suite in suites)
     if duplicate_ids:

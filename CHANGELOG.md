@@ -43,6 +43,11 @@ All notable changes to this project will be documented in this file.
   CORS headers are inspected separately without claiming public cross-origin
   browser enforcement or Candidate performance.
 
+- Replaced the cross-port private-candidate harness with one read-only,
+  same-origin loopback binding that derives only `verified: false` local
+  metadata, strictly allowlists immutable files and ranges, and proves the
+  complete ignored Candidate-v7 tree is unchanged after browser testing.
+
 - Bound private real-source candidates to reviewed STAC archive/member lineage,
   an existing Git code revision, the exact local dependency lock, build
   parameters, and pipeline identity. The superseded candidate with fixture

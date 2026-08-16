@@ -11,12 +11,16 @@ const contractRoot = resolve(root, "contracts/release/v2");
 const output = resolve(import.meta.dirname, "../src/contracts/generated/release-contract.ts");
 const validatorOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.mjs");
 const validatorTypesOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.d.mts");
+const privateValidatorOutput = resolve(import.meta.dirname, "../src/contracts/generated/private-binding-validator.mjs");
+const privateValidatorTypesOutput = resolve(import.meta.dirname, "../src/contracts/generated/private-binding-validator.d.mts");
 const schemaFiles = [
   "artifact.schema.json",
   "browser-derivation-provenance.schema.json",
   "browser-derivation-receipt.schema.json",
   "defs.schema.json",
   "manifest.schema.json",
+  "private-release-manifest.schema.json",
+  "private-binding-manifest.schema.json",
 ];
 const schemaSources = Object.fromEntries(
   schemaFiles.map((name) => [name, readFileSync(resolve(contractRoot, name), "utf8")]),
@@ -24,6 +28,8 @@ const schemaSources = Object.fromEntries(
 const artifact = JSON.parse(schemaSources["artifact.schema.json"]);
 const defs = JSON.parse(schemaSources["defs.schema.json"]);
 const manifest = JSON.parse(schemaSources["manifest.schema.json"]);
+const privateManifest = JSON.parse(schemaSources["private-binding-manifest.schema.json"]);
+const privateReleaseManifest = JSON.parse(schemaSources["private-release-manifest.schema.json"]);
 
 const literal = (value) => (typeof value === "string" ? JSON.stringify(value) : String(value));
 const union = (values) => values.map(literal).join(" | ");
@@ -49,6 +55,7 @@ const artifactSchemaId = artifact.$defs.common.properties.$schema.const;
 if (artifactSchemaId !== artifact.$id) {
   throw new Error("artifact.schema.json must require its own canonical $id");
 }
+const publicCacheControl = manifest.properties.publication.properties.cacheControl.const;
 const contractDigest = createHash("sha256")
   .update(schemaFiles.map((name) => schemaSources[name]).join("\n"))
   .digest("hex");
@@ -228,7 +235,7 @@ export interface ReleaseManifestV2 {
   readonly defaults: { readonly scenario: "ssp2-45"; readonly horizon: 2050 };
   readonly publication: {
     readonly releasePath: string;
-    readonly cacheControl: "public, max-age=31536000, immutable";
+    readonly cacheControl: ${literal(publicCacheControl)};
     readonly appendOnly: true;
   };
   readonly sources: readonly Readonly<{
@@ -262,6 +269,53 @@ export interface ReleaseManifestV2 {
   readonly artifacts: readonly ReleaseArtifactV2[];
   readonly datasets: ${tuple(manifest.$defs.contractArtifacts.properties.stacItems.prefixItems.map((item) => item.const)).replace(/"stac-[^"]+"/g, "ReleaseDatasetV2")};
 }
+
+export interface PrivateBindingManifestV1 {
+  readonly $schema: ${literal(privateManifest.properties.$schema.const)};
+  readonly schemaVersion: "1.0.0";
+  readonly dataReleaseId: DataReleaseId;
+  readonly privateEngineeringOnly: true;
+  readonly verified: false;
+  readonly publicPromotionAuthorized: false;
+  readonly binding: Readonly<{
+    adapter: Readonly<{ createdAt: string; codeRevision: string }>;
+    baseCandidate: Readonly<{
+      candidateId: string;
+      dataReleaseId: DataReleaseId;
+      manifestSha256: Sha256;
+      snapshotSha256: Sha256;
+      createdAt: string;
+      codeRevision: string;
+    }>;
+    sourceGrid: Readonly<{ byteSize: number; sha256: Sha256 }>;
+  }>;
+  readonly releaseManifest: PrivateReleaseManifestV1;
+}
+
+export type PrivateReleaseManifestV1 = Omit<
+  ReleaseManifestV2,
+  "$schema" | "baseReleaseIdentity" | "publication" | "contractArtifacts"
+> & Readonly<{
+  $schema: ${literal(privateReleaseManifest.properties.$schema.const)};
+  baseReleaseIdentity: Readonly<{
+    identityScope: "private-phase-1-candidate";
+    schemaVersion: "2.0.0";
+    manifestSha256: Sha256;
+    createdAt: string;
+    codeRevision: string;
+  }>;
+  publication: Readonly<{
+    releasePath: string;
+    cacheControl: "private, no-store";
+    appendOnly: true;
+  }>;
+  contractArtifacts: Omit<
+    ReleaseManifestV2["contractArtifacts"],
+    "baseReleaseProvenance" | "baseReleaseSignature"
+  > & Readonly<{ baseReleaseProvenance: null; baseReleaseSignature: null }>;
+}>;
+
+export type BrowserReleaseManifestV2 = ReleaseManifestV2 | PrivateReleaseManifestV1;
 `;
 
 const ajv = new Ajv2020({
@@ -278,9 +332,12 @@ const ajv = new Ajv2020({
 addFormats(ajv);
 ajv.addSchema(defs);
 ajv.addSchema(artifact);
-const validateManifest = ajv.compile(manifest);
-const generatedValidator = `/* eslint-disable */
-${standaloneCode(ajv, validateManifest)
+ajv.addSchema(manifest);
+ajv.addSchema(privateReleaseManifest);
+const validateManifest = ajv.getSchema(manifest.$id);
+const validatePrivateManifest = ajv.compile(privateManifest);
+const browserStandalone = (validator) => `/* eslint-disable */
+${standaloneCode(ajv, validator)
   .replace(
     /const (func\d+) = require\("ajv\/dist\/runtime\/equal"\)\.default;/,
     'import equalRuntime from "ajv/dist/runtime/equal.js";const $1 = typeof equalRuntime === "function" ? equalRuntime : equalRuntime.default;',
@@ -293,8 +350,13 @@ ${standaloneCode(ajv, validateManifest)
     /const (formats\d+) = require\("ajv-formats\/dist\/formats"\)\.fullFormats\["date-time"\];/,
     'import formatsRuntime from "ajv-formats/dist/formats.js";const fullFormatsRuntime = formatsRuntime.fullFormats ?? formatsRuntime.default?.fullFormats;const $1 = fullFormatsRuntime["date-time"];',
   )}\n`;
+const generatedValidator = browserStandalone(validateManifest);
+const generatedPrivateValidator = browserStandalone(validatePrivateManifest);
 if (/\brequire\s*\(|\b(?:new\s+)?Function\s*\(/.test(generatedValidator)) {
   throw new Error("Standalone manifest validator is not browser CSP-safe");
+}
+if (/\brequire\s*\(|\b(?:new\s+)?Function\s*\(/.test(generatedPrivateValidator)) {
+  throw new Error("Standalone private-binding validator is not browser CSP-safe");
 }
 const generatedValidatorTypes = `/** Generated with the release contract; do not edit. */
 import type { ErrorObject } from "ajv";
@@ -307,6 +369,17 @@ declare const validateManifest: {
 
 export default validateManifest;
 `;
+const generatedPrivateValidatorTypes = `/** Generated with the release contract; do not edit. */
+import type { ErrorObject } from "ajv";
+import type { PrivateBindingManifestV1 } from "./release-contract";
+
+declare const validatePrivateManifest: {
+  (value: unknown): value is PrivateBindingManifestV1;
+  errors?: ErrorObject[] | null;
+};
+
+export default validatePrivateManifest;
+`;
 
 if (process.argv.includes("--check")) {
   const current = readFileSync(output, "utf8");
@@ -317,8 +390,16 @@ if (process.argv.includes("--check")) {
   if (readFileSync(validatorTypesOutput, "utf8") !== generatedValidatorTypes) {
     throw new Error("Generated standalone manifest validator types are stale");
   }
+  if (readFileSync(privateValidatorOutput, "utf8") !== generatedPrivateValidator) {
+    throw new Error("Generated standalone private-binding validator is stale");
+  }
+  if (readFileSync(privateValidatorTypesOutput, "utf8") !== generatedPrivateValidatorTypes) {
+    throw new Error("Generated standalone private-binding validator types are stale");
+  }
 } else {
   writeFileSync(output, generated);
   writeFileSync(validatorOutput, generatedValidator);
   writeFileSync(validatorTypesOutput, generatedValidatorTypes);
+  writeFileSync(privateValidatorOutput, generatedPrivateValidator);
+  writeFileSync(privateValidatorTypesOutput, generatedPrivateValidatorTypes);
 }
