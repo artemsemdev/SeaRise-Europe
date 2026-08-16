@@ -1128,7 +1128,7 @@ def test_committed_public_release_tree_is_complete_and_fail_closed() -> None:
         if path.is_file()
     }
     assert committed == inventoried | {"manifest.json"}
-    assert (summary.artifact_count, summary.dataset_count) == (41, 9)
+    assert (summary.artifact_count, summary.dataset_count) == (43, 9)
     assert manifest["releaseAuthority"] == {
         "automatedValidation": "passed",
         "releaseDisposition": "pending-owner",
@@ -1143,7 +1143,12 @@ def test_committed_public_release_tree_is_complete_and_fail_closed() -> None:
             assert payload[:4] in {b"II*\x00", b"MM\x00*"}
         elif artifact["role"] == "projection-visual-pmtiles":
             assert payload.startswith(b"PMTiles")
-        elif artifact["role"] in {"projection-geoparquet", "settlement-geoparquet"}:
+        elif artifact["role"] in {
+            "projection-geoparquet",
+            "settlement-geoparquet",
+            "support-boundary",
+            "coastal-boundary",
+        }:
             assert payload.startswith(b"PAR1") and payload.endswith(b"PAR1")
 
     text = "\n".join(
