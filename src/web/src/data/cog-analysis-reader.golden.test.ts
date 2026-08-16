@@ -3,6 +3,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReleaseManifestV1 } from "../contracts/generated/release-contract";
+import { ReleaseContext, type ResolvedArtifact } from "../domain/release";
 import { CogAnalysisArtifactReader } from "./cog-analysis-reader";
 import {
   fixtureArtifactPath,
@@ -47,6 +49,47 @@ interface RangeCall {
   readonly start: number;
   readonly end: number;
   readonly size: number;
+}
+
+function cloneReleaseContext(
+  source: ReleaseContext,
+  dataReleaseId: string,
+  replacement: ResolvedArtifact,
+): ReleaseContext {
+  const targetId = "projection-ssp2-45-2050-cog";
+  const releasePath = `releases/${dataReleaseId}`;
+  const manifest = {
+    ...source.manifest,
+    dataReleaseId,
+    publication: { ...source.manifest.publication, releasePath },
+    artifacts: source.manifest.artifacts.map((artifact) => ({
+      ...artifact,
+      dataReleaseId,
+      ...(artifact.artifactId === targetId
+        ? { byteSize: replacement.byteSize, sha256: replacement.sha256 }
+        : {}),
+    })),
+  } as ReleaseManifestV1;
+  const artifacts = Object.fromEntries(
+    Object.values(source.artifacts).map((artifact) => {
+      const next = {
+        ...artifact,
+        dataReleaseId,
+        url: artifact.url.replace(source.dataReleaseId, dataReleaseId),
+        ...(artifact.artifactId === targetId
+          ? { byteSize: replacement.byteSize, sha256: replacement.sha256 }
+          : {}),
+      } as ResolvedArtifact;
+      return [next.artifactId, Object.freeze(next)];
+    }),
+  );
+  return new ReleaseContext({
+    manifest,
+    manifestUrl: source.manifestUrl.replace(source.dataReleaseId, dataReleaseId),
+    disposition: source.disposition,
+    artifacts,
+    datasets: { ...source.datasets },
+  });
 }
 
 function rangeFetch(calls: RangeCall[]): typeof fetch {
@@ -131,6 +174,78 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
       ),
     );
     expect(rangeCalls.every((call) => call.size < 65_536)).toBe(true);
+  });
+
+  it("does not reuse a decoded COG across immutable releases sharing one artifact ID", async () => {
+    const firstContext = await fixtureReleaseContext();
+    const replacement = firstContext.artifact("projection-ssp5-85-2100-cog");
+    const secondReleaseId = "searise-europe-v1.0.1-20260816-release-isolation";
+    const secondContext = cloneReleaseContext(firstContext, secondReleaseId, replacement);
+    const originalBytes = fixtureBytes("analysis/ssp2-45/2050.tif");
+    const replacementBytes = fixtureBytes("analysis/ssp5-85/2100.tif");
+    const requestedReleases: string[] = [];
+    vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : input.toString());
+      const bytes = url.pathname.includes(`/${secondReleaseId}/`)
+        ? replacementBytes
+        : originalBytes;
+      requestedReleases.push(url.pathname);
+      const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
+      if (!match) throw new Error("range required");
+      const start = Number(match[1]);
+      const end = Math.min(Number(match[2]), bytes.length - 1);
+      const body = bytes.slice(start, end + 1);
+      return new Response(responseBody(body), {
+        status: 206,
+        headers: { "content-range": `bytes ${start}-${end}/${bytes.length}` },
+      });
+    });
+    const reader = new CogAnalysisArtifactReader();
+    const coordinates = available[0].coordinates;
+
+    const first = await reader.lookup(
+      firstContext,
+      "ssp2-45",
+      2050,
+      coordinates,
+      new AbortController().signal,
+    );
+    const second = await reader.lookup(
+      secondContext,
+      "ssp2-45",
+      2050,
+      coordinates,
+      new AbortController().signal,
+    );
+    const firstGolden = available[0].projections.find(
+      (projection) => projection.scenario === "ssp2-45" && projection.horizon === 2050,
+    );
+    const secondGolden = available[0].projections.find(
+      (projection) => projection.scenario === "ssp5-85" && projection.horizon === 2100,
+    );
+    if (!firstGolden || !secondGolden) throw new Error("release-isolation goldens are incomplete");
+
+    expect(secondContext.dataset("ssp2-45", 2050).analysisArtifactId).toBe(
+      firstContext.dataset("ssp2-45", 2050).analysisArtifactId,
+    );
+    expect(secondContext.artifact("projection-ssp2-45-2050-cog").sha256).not.toBe(
+      firstContext.artifact("projection-ssp2-45-2050-cog").sha256,
+    );
+
+    expect(first).toMatchObject({
+      kind: "projection",
+      lowerMillimetres: firstGolden.lowerMillimetres,
+      medianMillimetres: firstGolden.centralMillimetres,
+      upperMillimetres: firstGolden.upperMillimetres,
+    });
+    expect(second).toMatchObject({
+      kind: "projection",
+      lowerMillimetres: secondGolden.lowerMillimetres,
+      medianMillimetres: secondGolden.centralMillimetres,
+      upperMillimetres: secondGolden.upperMillimetres,
+    });
+    expect(second).not.toEqual(first);
+    expect(requestedReleases.some((path) => path.includes(`/${secondReleaseId}/`))).toBe(true);
   });
 
   it("returns source nodata without looking for a farther valid cell", async () => {

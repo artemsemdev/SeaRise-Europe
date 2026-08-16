@@ -13,7 +13,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-16T02:12:32+02:00",
       "reference": "src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 24 focused cases, 500 generated candidate sets, 63 Python/TypeScript projection comparisons, warm cached p95 below 100 ms"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 25 focused cases, 500 generated candidate sets, 63 Python/TypeScript projection comparisons, cross-release cache-isolation regression, warm cached p95 below 100 ms"
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
@@ -221,7 +221,7 @@
       "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 15, "class": "fast", "evidenceRef": "local-2026-08-16-static-scientific-lookup", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, strict range and failure cases, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, strict range and failure cases, cross-release cache isolation, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
     },
     {
       "id": "static-web-shell",

@@ -165,10 +165,26 @@ function classifyReadError(error: unknown, artifactId: string, signal: AbortSign
   return technical("DecodeFailed", `A required byte range for ${artifactId} could not be decoded.`, true);
 }
 
+function cogCacheIdentity(
+  context: ReleaseContext,
+  artifact: ResolvedArtifact,
+  projection: ProjectionContextV1,
+): string {
+  return JSON.stringify([
+    context.dataReleaseId,
+    artifact.artifactId,
+    artifact.sha256,
+    artifact.url,
+    projection.scenario,
+    projection.horizon,
+  ]);
+}
+
 export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
   readonly #cache = new Map<string, Promise<CachedCog>>();
 
   async #open(
+    context: ReleaseContext,
     artifact: ResolvedArtifact,
     projection: ProjectionContextV1,
     signal: AbortSignal,
@@ -176,7 +192,8 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
     if (artifact.role !== "projection-analysis-cog") {
       throw technical("SchemaInvalid", `${artifact.artifactId} is not a scientific analysis COG.`);
     }
-    let pending = this.#cache.get(artifact.artifactId);
+    const cacheIdentity = cogCacheIdentity(context, artifact, projection);
+    let pending = this.#cache.get(cacheIdentity);
     if (!pending) {
       pending = (async () => {
         const client = new StrictRangeClient(artifact.url);
@@ -217,9 +234,11 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
           throw classifyReadError(error, artifact.artifactId, signal);
         }
       })();
-      this.#cache.set(artifact.artifactId, pending);
+      this.#cache.set(cacheIdentity, pending);
       while (this.#cache.size > 4) this.#cache.delete(this.#cache.keys().next().value as string);
-      pending.catch(() => this.#cache.delete(artifact.artifactId));
+      pending.catch(() => {
+        if (this.#cache.get(cacheIdentity) === pending) this.#cache.delete(cacheIdentity);
+      });
     }
     return pending;
   }
@@ -247,7 +266,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
     ) {
       throw technical("SchemaInvalid", "The selected analysis artifact violates the exact AR6 release contract.");
     }
-    const cached = await this.#open(artifact, artifact.projectionContext, signal);
+    const cached = await this.#open(context, artifact, artifact.projectionContext, signal);
     const selected = selectNearestSourceGridLocation(cached.locations, coordinates);
     if (selected.unroundedDistanceKilometres > MAXIMUM_SOURCE_DISTANCE_KILOMETRES) {
       return Object.freeze({

@@ -56,7 +56,7 @@ are:
   scenario/horizon combinations, 63 Python/TypeScript golden comparisons,
   native-grid edges, nodata, strict ranges, aborts, and malformed responses.
 
-The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 24 focused
+The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 25 focused
 lookup tests. Its warm in-memory 100-lookup sample had p95 below the required
 100 ms gate. This is a synthetic-fixture engineering measurement, not a claim
 about public hosting latency or private production-sized bytes.
