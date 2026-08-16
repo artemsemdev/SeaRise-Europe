@@ -1,10 +1,16 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import Ajv2020 from "ajv/dist/2020.js";
+import { _ } from "ajv/dist/compile/codegen/index.js";
+import standaloneCode from "ajv/dist/standalone/index.js";
+import addFormats from "ajv-formats";
 
 const root = resolve(import.meta.dirname, "../../..");
 const contractRoot = resolve(root, "contracts/release/v1");
 const output = resolve(import.meta.dirname, "../src/contracts/generated/release-contract.ts");
+const validatorOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.mjs");
+const validatorTypesOutput = resolve(import.meta.dirname, "../src/contracts/generated/manifest-validator.d.mts");
 const schemaFiles = ["artifact.schema.json", "defs.schema.json", "manifest.schema.json"];
 const schemaSources = Object.fromEntries(
   schemaFiles.map((name) => [name, readFileSync(resolve(contractRoot, name), "utf8")]),
@@ -218,9 +224,61 @@ export interface ReleaseManifestV1 {
 }
 `;
 
+const ajv = new Ajv2020({
+  allErrors: true,
+  strict: true,
+  strictRequired: false,
+  strictTypes: false,
+  code: {
+    source: true,
+    esm: true,
+    formats: _`require("ajv-formats/dist/formats").fullFormats`,
+  },
+});
+addFormats(ajv);
+ajv.addSchema(defs);
+ajv.addSchema(artifact);
+const validateManifest = ajv.compile(manifest);
+const generatedValidator = `/* eslint-disable */
+${standaloneCode(ajv, validateManifest)
+  .replace(
+    /const (func\d+) = require\("ajv\/dist\/runtime\/equal"\)\.default;/,
+    'import equalRuntime from "ajv/dist/runtime/equal.js";const $1 = typeof equalRuntime === "function" ? equalRuntime : equalRuntime.default;',
+  )
+  .replace(
+    /const (func\d+) = require\("ajv\/dist\/runtime\/ucs2length"\)\.default;/,
+    'import ucs2LengthRuntime from "ajv/dist/runtime/ucs2length.js";const $1 = typeof ucs2LengthRuntime === "function" ? ucs2LengthRuntime : ucs2LengthRuntime.default;',
+  )
+  .replace(
+    /const (formats\d+) = require\("ajv-formats\/dist\/formats"\)\.fullFormats\["date-time"\];/,
+    'import formatsRuntime from "ajv-formats/dist/formats.js";const fullFormatsRuntime = formatsRuntime.fullFormats ?? formatsRuntime.default?.fullFormats;const $1 = fullFormatsRuntime["date-time"];',
+  )}\n`;
+if (/\brequire\s*\(|\b(?:new\s+)?Function\s*\(/.test(generatedValidator)) {
+  throw new Error("Standalone manifest validator is not browser CSP-safe");
+}
+const generatedValidatorTypes = `/** Generated with the release contract; do not edit. */
+import type { ErrorObject } from "ajv";
+import type { ReleaseManifestV1 } from "./release-contract";
+
+declare const validateManifest: {
+  (value: unknown): value is ReleaseManifestV1;
+  errors?: ErrorObject[] | null;
+};
+
+export default validateManifest;
+`;
+
 if (process.argv.includes("--check")) {
   const current = readFileSync(output, "utf8");
   if (current !== generated) throw new Error("Generated release contracts are stale");
+  if (readFileSync(validatorOutput, "utf8") !== generatedValidator) {
+    throw new Error("Generated standalone manifest validator is stale");
+  }
+  if (readFileSync(validatorTypesOutput, "utf8") !== generatedValidatorTypes) {
+    throw new Error("Generated standalone manifest validator types are stale");
+  }
 } else {
   writeFileSync(output, generated);
+  writeFileSync(validatorOutput, generatedValidator);
+  writeFileSync(validatorTypesOutput, generatedValidatorTypes);
 }

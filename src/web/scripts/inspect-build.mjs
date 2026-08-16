@@ -5,6 +5,7 @@ import { extname, join, relative, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+const expectedCsp = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
 function files(directory) {
   return readdirSync(directory).flatMap((name) => {
@@ -24,12 +25,29 @@ for (const path of required) {
   if (!paths.includes(path)) throw new Error(`Static build is missing ${relative(dist, path)}`);
 }
 
+for (const entry of ["index.html", "about/architecture/index.html"]) {
+  const html = readFileSync(resolve(dist, entry), "utf8");
+  const csp = html.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"\s*\/?\s*>/i)?.[1];
+  if (csp !== expectedCsp) {
+    throw new Error(`${entry} does not contain the exact static-document CSP`);
+  }
+  if (csp.includes("frame-ancestors")) {
+    throw new Error(`${entry} must leave frame-ancestors to the deployment response header`);
+  }
+  if (!/<meta\s+name="referrer"\s+content="no-referrer"\s*\/?\s*>/i.test(html)) {
+    throw new Error(`${entry} does not enforce the no-referrer document policy`);
+  }
+}
+
 const scanned = paths.filter((path) => [".html", ".js", ".css", ".map"].includes(extname(path)));
 const forbidden = [/candidate-v7/i, /local-data\/phase-1/i, /["'`]\/[^"'`]*assess(?:[/?"'`]|$)/, /["'`]\/[^"'`]*geocode(?:[/?"'`]|$)/, /["'`]\/[^"'`]*config(?:[/?"'`]|$)/];
 for (const path of scanned) {
   const text = readFileSync(path, "utf8");
   if (forbidden.some((pattern) => pattern.test(text))) {
     throw new Error(`Forbidden runtime reference in ${relative(dist, path)}`);
+  }
+  if (extname(path) === ".js" && /\b(?:new\s+)?Function\s*\(|Error compiling schema, function code/.test(text)) {
+    throw new Error(`CSP-incompatible runtime code generation in ${relative(dist, path)}`);
   }
 }
 

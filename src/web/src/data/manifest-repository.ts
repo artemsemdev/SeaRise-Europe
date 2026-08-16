@@ -1,8 +1,4 @@
-import Ajv2020, { type ErrorObject } from "ajv/dist/2020";
-import addFormats from "ajv-formats";
-import artifactSchema from "../../../../contracts/release/v1/artifact.schema.json";
-import defsSchema from "../../../../contracts/release/v1/defs.schema.json";
-import manifestSchema from "../../../../contracts/release/v1/manifest.schema.json";
+import type { ErrorObject } from "ajv";
 import {
   HORIZON_YEARS,
   SCENARIO_IDS,
@@ -12,6 +8,7 @@ import {
   type ReleaseManifestV1,
   type ScenarioId,
 } from "../contracts/generated/release-contract";
+import validateManifest from "../contracts/generated/manifest-validator.mjs";
 import {
   ReleaseContext,
   TechnicalFailure,
@@ -32,17 +29,6 @@ interface ManifestRepositoryOptions {
   readonly expectedDisposition: ReleaseDisposition;
   readonly transport?: ManifestTransport;
 }
-
-const ajv = new Ajv2020({
-  allErrors: true,
-  strict: true,
-  strictRequired: false,
-  strictTypes: false,
-});
-addFormats(ajv);
-ajv.addSchema(defsSchema);
-ajv.addSchema(artifactSchema);
-const validateManifest = ajv.compile<ReleaseManifestV1>(manifestSchema);
 
 function technical(
   code: TechnicalError["code"],

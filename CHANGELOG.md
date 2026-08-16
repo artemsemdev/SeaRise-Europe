@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Enforced an exact static-document Content Security Policy and `no-referrer`
+  policy on both browser entry routes, with browser/build gates for blocked
+  unlisted origins and the one optional OpenFreeMap origin. Manifest schemas
+  are now compiled ahead of time so runtime validation needs no `unsafe-eval`;
+  deployment retains responsibility for the response-only `frame-ancestors`
+  protection.
+
 - Pinned the legacy API test container dependency graph to SSH.NET 2026.0.0,
   removing the high-severity recursive SCP path-traversal advisory from the
   locked restore while that test runtime awaits Phase 2 removal.

@@ -69,8 +69,10 @@ test("all nine release selections resolve without mixing visual artifact identit
 
 test("basemap failure preserves release overlay, attribution, text, and coordinate selection", async ({ page }) => {
   const pageErrors: string[] = [];
+  let openFreeMapRequestObserved = false;
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.route("https://tiles.openfreemap.org/**", async (route) => {
+    openFreeMapRequestObserved = true;
     await route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
   });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -81,6 +83,7 @@ test("basemap failure preserves release overlay, attribution, text, and coordina
 
   await page.getByRole("button", { name: /load optional basemap/i }).click();
   await expect(page.locator(".map-status")).toContainText(/optional basemap unavailable/i);
+  expect(openFreeMapRequestObserved).toBe(true);
   await expect(map).toHaveAttribute("data-artifact-id", "projection-ssp2-45-2050-pmtiles");
   await expect(page.getByRole("link", { name: "OpenFreeMap" })).toBeVisible();
   await expect(page.getByRole("link", { name: /OpenStreetMap contributors/i })).toBeVisible();
