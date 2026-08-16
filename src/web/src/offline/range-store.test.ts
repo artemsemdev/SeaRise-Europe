@@ -8,6 +8,7 @@ import { validateStorageBudget } from "./contracts/policy";
 import { cacheNamespaces, validateAppReleasePair } from "./contracts/keys";
 import {
   RangeStoreIntegrityError,
+  RangeStoreAbortedError,
   RangeStoreQuotaError,
   RangeStoreUnsupportedError,
   createRangeAuthorityCatalog,
@@ -483,6 +484,50 @@ describe("authoritative IndexedDB range store", () => {
     await expect(localStore.readExactOrContaining(visual as RangeIdentityV1)).rejects.toBeInstanceOf(RangeStoreUnsupportedError);
     await expect(privateStore.putVerified(privateVisual as RangeIdentityV1, value)).rejects.toBeInstanceOf(RangeStoreUnsupportedError);
     await expect(localStore.inventory()).resolves.toMatchObject({ payloadBytes: 4, entryCount: 1 });
+  });
+
+  it.each(["persistent", "memory-only"] as const)("conditionally rolls back only operation-owned %s range writes", async (mode) => {
+    const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
+    const first = await identity({ payload: firstBytes });
+    const second = await identity({ start: 4, payload: secondBytes });
+    const store = storeFor(mode, factory, [first, second], 8, 2);
+    await store.putVerified(first, firstBytes);
+    const admission = await store.admitVerifiedBatch([
+      { identity: first, bytes: firstBytes },
+      { identity: second, bytes: secondBytes },
+    ], { operationId: "range-operation", signal: new AbortController().signal });
+    expect(admission.entries.map((entry) => entry.disposition)).toEqual(["already-present", "stored"]);
+    await expect(store.rollbackAdmission({ ...admission })).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.rollbackAdmission(admission)).resolves.toEqual({
+      deleted: 1, retainedAlreadyPresent: 1, ownershipLost: 0,
+    });
+    await expect(store.readExactOrContaining(first)).resolves.toBeInstanceOf(ArrayBuffer);
+    await expect(store.readExactOrContaining(second)).resolves.toBeNull();
+  });
+
+  it.each(["persistent", "memory-only"] as const)("does not evict prior %s state for an unreceipted coordinated batch", async (mode) => {
+    const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
+    const first = await identity({ payload: firstBytes });
+    const second = await identity({ projection: ["ssp1-26", "2030"], payload: secondBytes });
+    const store = storeFor(mode, factory, [first, second], 4, 1);
+    await store.putVerified(first, firstBytes);
+    await expect(store.admitVerifiedBatch([{ identity: second, bytes: secondBytes }], {
+      operationId: "range-overflow",
+      signal: new AbortController().signal,
+    })).rejects.toBeInstanceOf(RangeStoreQuotaError);
+    await expect(store.readExactOrContaining(first)).resolves.toBeInstanceOf(ArrayBuffer);
+    await expect(store.readExactOrContaining(second)).resolves.toBeNull();
+  });
+
+  it.each(["persistent", "memory-only"] as const)("cancels a %s coordinated batch before mutation", async (mode) => {
+    const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const store = storeFor(mode, factory, [range]);
+    const controller = new AbortController(); controller.abort();
+    await expect(store.admitVerifiedBatch([{ identity: range, bytes: value }], {
+      operationId: "range-cancel",
+      signal: controller.signal,
+    })).rejects.toBeInstanceOf(RangeStoreAbortedError);
+    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 0, entryCount: 0 });
   });
 
   it("persists only the privacy allowlist and never a full URL", async () => {
