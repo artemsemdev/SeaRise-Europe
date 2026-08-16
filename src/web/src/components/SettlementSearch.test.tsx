@@ -310,7 +310,7 @@ describe("settlement search combobox", () => {
     );
   });
 
-  it("clears old results immediately so Enter and Explore cannot select a stale query", async () => {
+  it("clears old results immediately so Enter and Fly there cannot select a stale query", async () => {
     const worker = new FakeWorker();
     const selected = vi.fn();
     const user = userEvent.setup();
@@ -322,9 +322,9 @@ describe("settlement search combobox", () => {
     worker.holdQueries = true;
     await user.type(input, "x");
     expect(screen.queryAllByRole("option")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: /explore/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /fly there/i })).toBeDisabled();
     await user.keyboard("{Enter}");
-    await user.click(screen.getByRole("button", { name: /explore/i }));
+    await user.click(screen.getByRole("button", { name: /fly there/i }));
     expect(selected).not.toHaveBeenCalled();
   });
 
@@ -340,7 +340,7 @@ describe("settlement search combobox", () => {
     await user.type(input, "technical");
     expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
-    expect(screen.getByRole("button", { name: /explore/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /fly there/i })).toBeDisabled();
     await user.keyboard("{Enter}");
     expect(selected).not.toHaveBeenCalled();
   });
@@ -355,7 +355,7 @@ describe("settlement search combobox", () => {
     expect(await screen.findAllByRole("option")).toHaveLength(2);
     expect(await screen.findByText(/coastal index has a technical failure/i)).toBeVisible();
     expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "core-ready");
-    expect(screen.getByRole("button", { name: /explore/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /fly there/i })).toBeEnabled();
   });
 
   it("fails closed when the pinned release omits the core search shard", async () => {

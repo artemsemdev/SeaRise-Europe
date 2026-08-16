@@ -7,6 +7,7 @@ import {
   useSyncExternalStore,
   type KeyboardEvent,
 } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { ReleaseContext } from "../domain/release";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import { SettlementSearchClient, type SearchWorkerFactory } from "../search/client";
@@ -188,7 +189,7 @@ function SettlementSearchSession({
     >
       <label htmlFor={`${listId}-input`}>Find a city, town, or village</label>
       <div className="search-control">
-        <span className="search-icon" aria-hidden="true" />
+        <MagnifyingGlass className="search-icon" size={19} weight="regular" aria-hidden="true" />
         <input
           id={`${listId}-input`}
           role="combobox"
@@ -214,7 +215,7 @@ function SettlementSearchSession({
           }}
           onKeyDown={onKeyDown}
         />
-        <button type="submit" disabled={!activeResult}>Explore</button>
+        <button type="submit" disabled={!activeResult}>Fly there</button>
       </div>
       <p id={hintId} className="search-hint">
         Settlements only—not addresses or landmarks. Your text stays in this browser.
