@@ -44,6 +44,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a lazy MapLibre/PMTiles visualization path that resolves all nine
+  visual-only overlays from the pinned release context, keeps map clicks on the
+  shared selection command, degrades safely without the optional basemap, and
+  preserves keyboard, text-alternative, attribution, range-request, and initial
+  bundle gates.
+
 - Added the browser's pinned-manifest anti-corruption layer: generated
   schema-derived TypeScript contracts, an immutable release context, exact
   nine-combination and artifact-reference validation, origin-safe URLs,
