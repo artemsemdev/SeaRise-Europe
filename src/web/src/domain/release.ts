@@ -1,9 +1,9 @@
 import type {
   DataReleaseId,
+  BrowserReleaseManifestV2,
   HorizonYear,
   ReleaseArtifactV2,
   ReleaseDatasetV2,
-  ReleaseManifestV2,
   ResultState,
   ScenarioId,
 } from "../contracts/generated/release-contract";
@@ -115,13 +115,13 @@ export class ReleaseContext {
   readonly disposition: ReleaseDisposition;
   readonly methodologyVersion: "ar6-regional-projection-v1";
   readonly defaults: Readonly<{ scenario: "ssp2-45"; horizon: 2050 }>;
-  readonly manifest: ReleaseManifestV2;
+  readonly manifest: BrowserReleaseManifestV2;
   readonly manifestUrl: string;
   readonly artifacts: Readonly<Record<string, ResolvedArtifact>>;
   readonly datasets: Readonly<Record<string, ReleaseDatasetV2>>;
 
   constructor(input: {
-    manifest: ReleaseManifestV2;
+    manifest: BrowserReleaseManifestV2;
     manifestUrl: string;
     disposition: ReleaseDisposition;
     artifacts: Record<string, ResolvedArtifact>;

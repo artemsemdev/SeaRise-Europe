@@ -146,6 +146,27 @@ git check-ignore -v local-data/phase-1/local-production-run/candidate-v7/manifes
 The static production build must continue to contain only the committed
 synthetic fixture until a separately authorized public release is promoted.
 
+### Recorded private binding check
+
+The 2026-08-16 local-only Chromium run used Node 20.20.1 and the explicit
+ignored Candidate-v7 and source-grid paths documented above. It passed its
+page-context Playwright gate with all nine combinations. The adapter observed
+55 candidate files and produced the same complete snapshot SHA-256 before and
+after:
+
+```text
+73625efa3908d81301a01b17dc2e97ce26dc5a387c7fe759533735d19b1af605
+```
+
+The ephemeral manifest contained 59 artifacts and exposed 61 exact allowlisted
+paths, including its private metadata. The process removed its temporary
+overlay on exit. The same private run executed all nine Candidate-backed
+lookups through the production assessment engine and COG reader, all four
+scientific outcomes, and a separate technical-failure control. The ordinary
+synthetic-fixture suite also remained green. These results are local
+engineering evidence only; they are not publication,
+signature, verification, approval, or public-host performance claims.
+
 ## Fail-closed triage
 
 - `RangeUnsupported`: `HEAD` or a range response omitted or contradicted the

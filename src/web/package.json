@@ -17,6 +17,8 @@
     "measure:local-candidate-search": "node scripts/measure-local-candidate-search.mjs",
     "dev": "vite",
     "serve:local-release": "node scripts/serve-local-release.mjs",
+    "serve:committed-release": "node scripts/serve-committed-release.mjs",
+    "e2e:local-candidate": "node scripts/run-local-candidate-e2e.mjs",
     "lint": "eslint . && node scripts/check-boundaries.mjs && npm run check:contracts && npm run check:search-fixture && npm run check:scientific-fixture",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

@@ -16,6 +16,31 @@ const fixtureOverlayRoot = resolve(
   "contracts/release/v2/fixtures/browser-release",
   fixtureReleaseId,
 );
+const viteFilesystemRoots = Object.freeze([
+  import.meta.dirname,
+  resolve(repositoryRoot, "node_modules"),
+  fixturePayloadRoot,
+  fixtureOverlayRoot,
+]);
+
+function forbiddenViteFilesystemRequest(requestUrl: string | undefined): boolean {
+  let pathname: string;
+  try {
+    pathname = (requestUrl ?? "/").split(/[?#]/, 1)[0].replaceAll("\\", "/");
+    for (let depth = 0; depth < 4; depth += 1) {
+      const decoded = decodeURIComponent(pathname).replaceAll("\\", "/");
+      if (decoded === pathname) break;
+      pathname = decoded;
+    }
+  } catch {
+    return true;
+  }
+  if (!pathname.startsWith("/@fs/")) return false;
+  const target = resolve("/", pathname.slice("/@fs".length));
+  return !viteFilesystemRoots.some(
+    (root) => target === root || target.startsWith(`${root}${sep}`),
+  );
+}
 const releaseMediaTypes: Readonly<Record<string, string>> = Object.freeze({
   ".json": "application/json",
   ".jsonl": "application/x-ndjson",
@@ -26,7 +51,7 @@ const releaseMediaTypes: Readonly<Record<string, string>> = Object.freeze({
   ".txt": "text/plain",
 });
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repositoryRoot, "SEARISE_");
   const releaseId =
     process.env.SEARISE_DATA_RELEASE_ID ?? env.SEARISE_DATA_RELEASE_ID ?? fixtureReleaseId;
@@ -34,30 +59,34 @@ export default defineConfig(({ command, mode }) => {
     process.env.SEARISE_RELEASE_DISPOSITION ??
     env.SEARISE_RELEASE_DISPOSITION ??
     "synthetic-fixture";
-  const localManifestUrl =
-    process.env.SEARISE_LOCAL_MANIFEST_URL ?? env.SEARISE_LOCAL_MANIFEST_URL;
   if (!["synthetic-fixture", "private-engineering", "public-promoted"].includes(releaseDisposition)) {
     throw new Error("Unsupported release disposition.");
   }
-  if (localManifestUrl && (command !== "serve" || releaseDisposition !== "private-engineering")) {
-    throw new Error("A local manifest URL is allowed only for explicit private-engineering development.");
+  if (releaseDisposition === "private-engineering") {
+    throw new Error(
+      "Private engineering mode is owned by scripts/run-local-candidate-e2e.mjs, not Vite serve/build.",
+    );
   }
-  if (localManifestUrl) {
-    const localUrl = new URL(localManifestUrl);
-    if (localUrl.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(localUrl.hostname)) {
-      throw new Error("A private engineering manifest must be served from loopback over HTTP.");
-    }
-  }
-  if (releaseDisposition === "private-engineering" && !localManifestUrl) {
-    throw new Error("Private engineering mode requires an explicit local manifest URL.");
-  }
-  if (command === "build" && releaseDisposition === "private-engineering") {
-    throw new Error("Private engineering releases cannot be copied into a production build.");
-  }
-  const manifestUrl = localManifestUrl ?? `/releases/${releaseId}/manifest.json`;
+  const manifestUrl = `/releases/${releaseId}/manifest.json`;
 
   return {
     plugins: [
+      {
+        name: "strict-vite-filesystem-boundary",
+        configureServer(server) {
+          server.middlewares.use((request, response, next) => {
+            if (!forbiddenViteFilesystemRequest(request.url)) {
+              next();
+              return;
+            }
+            response.writeHead(403, {
+              "Cache-Control": "no-store",
+              "Content-Type": "text/plain; charset=utf-8",
+              "X-Content-Type-Options": "nosniff",
+            }).end("Forbidden filesystem route");
+          });
+        },
+      },
       react(),
       {
         name: "committed-release-fixture",
@@ -153,6 +182,13 @@ export default defineConfig(({ command, mode }) => {
       __DATA_RELEASE_ID__: JSON.stringify(releaseId),
       __RELEASE_DISPOSITION__: JSON.stringify(releaseDisposition),
       __MANIFEST_URL__: JSON.stringify(manifestUrl),
+    },
+    server: {
+      fs: {
+        strict: true,
+        allow: [...viteFilesystemRoots],
+        deny: ["**/local-data/**"],
+      },
     },
     build: {
       target: "es2022",

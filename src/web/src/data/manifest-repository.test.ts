@@ -4,6 +4,7 @@ import type { ErrorObject } from "ajv";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { ReleaseManifestV2 } from "../contracts/generated/release-contract";
 import validateManifest from "../contracts/generated/manifest-validator.mjs";
+import validatePrivateManifest from "../contracts/generated/private-binding-validator.mjs";
 import { TechnicalFailure, validateCoordinates } from "../domain/release";
 import { ManifestRepository, type ManifestTransport } from "./manifest-repository";
 
@@ -26,6 +27,94 @@ function repository(value: unknown): ManifestRepository {
     expectedDisposition: "synthetic-fixture",
     transport,
   });
+}
+
+interface MutablePrivateEnvelope {
+  $schema: string;
+  schemaVersion: string;
+  dataReleaseId: string;
+  privateEngineeringOnly: boolean;
+  verified: boolean;
+  publicPromotionAuthorized: boolean;
+  binding: {
+    adapter: { createdAt: string; codeRevision: string };
+    baseCandidate: {
+      candidateId: string;
+      dataReleaseId: string;
+      manifestSha256: string;
+      snapshotSha256: string;
+      createdAt: string;
+      codeRevision: string;
+    };
+    sourceGrid: { byteSize: number; sha256: string };
+  };
+  releaseManifest: {
+    dataReleaseId: string;
+    dataProvenanceClass: string;
+    baseReleaseIdentity: {
+      identityScope: string;
+      schemaVersion: string;
+      manifestSha256: string;
+      createdAt: string;
+      codeRevision: string;
+    };
+    releaseAuthority: {
+      automatedValidation: string;
+      releaseDisposition: string;
+      dataProvenanceClass: string;
+      statusDisclosureRequired: boolean;
+    };
+    publication: { cacheControl: string };
+    contractArtifacts: {
+      baseReleaseProvenance: string | null;
+      browserDerivationProvenance: string;
+      baseReleaseSignature: string | null;
+    };
+    artifacts: Array<{ dataProvenanceClass: string }>;
+    [key: string]: unknown;
+  };
+}
+
+function privateEnvelope(): MutablePrivateEnvelope {
+  const releaseManifest = structuredClone(fixture) as unknown as MutablePrivateEnvelope["releaseManifest"];
+  releaseManifest.dataProvenanceClass = "real-source";
+  releaseManifest.$schema =
+    "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-release-manifest.schema.json";
+  releaseManifest.releaseAuthority = {
+    automatedValidation: "pending",
+    releaseDisposition: "pending-owner",
+    dataProvenanceClass: "real-source",
+    statusDisclosureRequired: true,
+  };
+  releaseManifest.publication.cacheControl = "private, no-store";
+  releaseManifest.baseReleaseIdentity.identityScope = "private-phase-1-candidate";
+  releaseManifest.baseReleaseIdentity.schemaVersion = "2.0.0";
+  releaseManifest.baseReleaseIdentity.manifestSha256 = "b".repeat(64);
+  releaseManifest.contractArtifacts.baseReleaseSignature = null;
+  releaseManifest.contractArtifacts.baseReleaseProvenance = null;
+  for (const artifact of releaseManifest.artifacts) artifact.dataProvenanceClass = "real-source";
+  return {
+    $schema:
+      "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-binding-manifest.schema.json",
+    schemaVersion: "1.0.0",
+    dataReleaseId: releaseId,
+    privateEngineeringOnly: true,
+    verified: false,
+    publicPromotionAuthorized: false,
+    binding: {
+      adapter: { createdAt: "2026-08-16T05:00:00Z", codeRevision: "a".repeat(40) },
+      baseCandidate: {
+        candidateId: "private-candidate-test",
+        dataReleaseId: releaseId,
+        manifestSha256: "b".repeat(64),
+        snapshotSha256: "c".repeat(64),
+        createdAt: releaseManifest.baseReleaseIdentity.createdAt,
+        codeRevision: releaseManifest.baseReleaseIdentity.codeRevision,
+      },
+      sourceGrid: { byteSize: 7848, sha256: "d".repeat(64) },
+    },
+    releaseManifest,
+  };
 }
 
 async function errorCode(value: unknown): Promise<string> {
@@ -85,6 +174,59 @@ describe("ManifestRepository", () => {
 
   it("rejects the byte-sealed v1 manifest because it has no v2 scientific integrity metadata", async () => {
     expect(await errorCode(structuredClone(legacyV1Fixture))).toBe("SchemaInvalid");
+  });
+
+  it("rejects private no-store semantics in the public manifest contract", () => {
+    const pending = structuredClone(fixture);
+    pending.publication.cacheControl = "private, no-store";
+    expect(validateManifest(pending)).toBe(false);
+    expect(validateManifest.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          instancePath: "/publication/cacheControl",
+          keyword: "const",
+        }),
+      ]),
+    );
+  });
+
+  it("requires the versioned fail-closed envelope for private engineering", async () => {
+    const envelope = privateEnvelope();
+    expect(validatePrivateManifest(envelope)).toBe(true);
+    const target = (value: unknown) =>
+      new ManifestRepository({
+        manifestUrl,
+        allowedOrigins: ["https://fixture.example"],
+        expectedDisposition: "private-engineering",
+        transport: async () => response(value),
+      });
+    await expect(
+      target(envelope).load(releaseId, new AbortController().signal),
+    ).resolves.toMatchObject({ disposition: "private-engineering", dataReleaseId: releaseId });
+    await expect(
+      target(envelope.releaseManifest).load(releaseId, new AbortController().signal),
+    ).rejects.toMatchObject({ detail: { code: "SchemaInvalid" } });
+  });
+
+  it.each([
+    ["verified", (value: MutablePrivateEnvelope) => { value.verified = true; }],
+    ["promotion", (value: MutablePrivateEnvelope) => { value.publicPromotionAuthorized = true; }],
+    ["approved", (value: MutablePrivateEnvelope) => { value.releaseManifest.releaseAuthority.releaseDisposition = "approved"; }],
+    ["passed", (value: MutablePrivateEnvelope) => { value.releaseManifest.releaseAuthority.automatedValidation = "passed"; }],
+    ["cacheable", (value: MutablePrivateEnvelope) => { value.releaseManifest.publication.cacheControl = "public, max-age=31536000, immutable"; }],
+    ["signed", (value: MutablePrivateEnvelope) => { value.releaseManifest.contractArtifacts.baseReleaseSignature = "base-release-signature"; }],
+  ])("rejects a private envelope mutated to %s semantics", async (_label, mutate) => {
+    const envelope = privateEnvelope();
+    mutate(envelope);
+    const target = new ManifestRepository({
+      manifestUrl,
+      allowedOrigins: ["https://fixture.example"],
+      expectedDisposition: "private-engineering",
+      transport: async () => response(envelope),
+    });
+    await expect(target.load(releaseId, new AbortController().signal)).rejects.toMatchObject({
+      detail: { code: "SchemaInvalid" },
+    });
   });
 
   it("requests only the pinned manifest with omitted credentials and an abort signal", async () => {
