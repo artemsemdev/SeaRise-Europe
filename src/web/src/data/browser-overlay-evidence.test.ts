@@ -21,20 +21,22 @@ const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest(
 describe("honest browser-overlay evidence", () => {
   it("validates the manifest and first-class derivation evidence contracts", () => {
     const defs = json("contracts/release/v2/defs.schema.json") as AnySchema;
-    const ajv = new Ajv2020({ allErrors: true, strict: true });
+    const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
     addFormats(ajv);
     ajv.addSchema(defs);
 
     for (const name of [
+      "attribution.schema.json",
       "browser-derivation-receipt.schema.json",
       "browser-derivation-provenance.schema.json",
     ]) {
       const schema = json(`contracts/release/v2/${name}`) as AnySchema;
-      const document = json(
-        name.includes("receipt")
+      const documentPath = name === "attribution.schema.json"
+        ? `contracts/release/v2/fixtures/browser-release/${releaseId}/config/source-attribution.json`
+        : name.includes("receipt")
           ? `contracts/release/v2/fixtures/browser-release/${releaseId}/receipts/browser-derivation.json`
-          : `contracts/release/v2/fixtures/browser-release/${releaseId}/browser-derivation.intoto.json`,
-      );
+          : `contracts/release/v2/fixtures/browser-release/${releaseId}/browser-derivation.intoto.json`;
+      const document = json(documentPath);
       const validate = ajv.compile(schema);
       expect(validate(document), JSON.stringify(validate.errors)).toBe(true);
     }
