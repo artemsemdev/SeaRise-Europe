@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 - Added independently validated offline capability, storage-budget, lease,
   update, cleanup, rollback, worker-protocol, and technical-failure contracts.
 
+- Added a release-scoped complete-resource cache adapter with byte verification
+  before admission and after readback, staged promotion, corruption quarantine,
+  private-data exclusion, and aggregate-only availability evidence.
+
 - Added production-static browser journey evidence for all four ADR-024
   outcomes and all nine scenario/horizon projections, including exact COG
   values, release-scoped PMTiles identity, keyboard and reduced-motion flows,
