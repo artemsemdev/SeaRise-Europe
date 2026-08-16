@@ -1,5 +1,8 @@
 import { runtimeConfig } from "./config";
-import { CogAnalysisArtifactReader } from "./data/cog-analysis-reader";
+import {
+  CogAnalysisArtifactReader,
+  type CogRangeTransport,
+} from "./data/cog-analysis-reader";
 import { StaticGeographyClassifier } from "./data/geography-classifier";
 import { ManifestRepository } from "./data/manifest-repository";
 import {
@@ -13,6 +16,7 @@ import {
   type AssessmentResult,
   type GeographyClassifier,
 } from "./domain/scientific-lookup";
+import { createProductionResourceRouter } from "./offline/create-production-resource-router";
 
 const coordinates = Object.freeze({ latitude: 51.9244, longitude: 4.4777 });
 const scenarios = ["ssp1-26", "ssp2-45", "ssp5-85"] as const;
@@ -35,6 +39,23 @@ function unavailableAnalysis(): AnalysisArtifactReader {
       },
     }),
   };
+}
+
+function failingCandidateRoute(transport: CogRangeTransport): CogRangeTransport {
+  const route: CogRangeTransport = {
+    validateDelivery: async (artifact, identity, signal) => {
+      await transport.validateDelivery(artifact, identity, signal);
+      throw new TechnicalFailure({
+        kind: "technical-error",
+        code: "FetchFailed",
+        message: "Candidate delivery failure probe.",
+        recoverable: true,
+      });
+    },
+    readExpandedRange: (artifact, identity, start, endExclusive, signal) =>
+      transport.readExpandedRange(artifact, identity, start, endExclusive, signal),
+  };
+  return Object.freeze(route);
 }
 
 function selection(dataReleaseId: string, scenario: (typeof scenarios)[number], horizon: (typeof horizons)[number]): Selection {
@@ -62,83 +83,92 @@ export async function runPrivateCandidateScientificValidation(): Promise<Readonl
     expectedDisposition: "private-engineering",
   }).load(runtimeConfig.dataReleaseId, new AbortController().signal);
 
-  const engine = new AssessmentEngine({
-    geography: new StaticGeographyClassifier(),
-    analysis: new CogAnalysisArtifactReader(),
-  });
-  const lookups: AssessmentResult[] = [];
-  for (const scenario of scenarios) {
-    for (const horizon of horizons) {
-      lookups.push(
-        (
-          await engine.evaluate(
-            context,
-            selection(context.dataReleaseId, scenario, horizon),
-            new AbortController().signal,
-          )
-        ).result,
-      );
-    }
-  }
-
-  const outcomeResults = await Promise.all([
-    new AssessmentEngine({
-      geography: fixedGeography("InEuropeAndCoastalZone"),
-      analysis: unavailableAnalysis(),
-    }).evaluate(
-      context,
-      selection(context.dataReleaseId, "ssp2-45", 2050),
-      new AbortController().signal,
-    ),
-    new AssessmentEngine({
-      geography: fixedGeography("InEuropeOutsideCoastalZone"),
-      analysis: unavailableAnalysis(),
-    }).evaluate(
-      context,
-      selection(context.dataReleaseId, "ssp2-45", 2050),
-      new AbortController().signal,
-    ),
-    new AssessmentEngine({
-      geography: fixedGeography("OutsideEurope"),
-      analysis: unavailableAnalysis(),
-    }).evaluate(
-      context,
-      selection(context.dataReleaseId, "ssp2-45", 2050),
-      new AbortController().signal,
-    ),
-  ]);
-
-  const failingFetch: typeof fetch = async (input, init) => {
-    const url = new URL(input instanceof Request ? input.url : input.toString());
-    if (init?.method === "HEAD" && url.pathname.endsWith("/analysis/ssp2-45/2050.tif")) {
-      return new Response(null, { status: 503 });
-    }
-    return fetch(input, init);
-  };
-  let technicalFailure: Readonly<{ kind: "technical-error"; code: string }> | undefined;
+  const resources = await createProductionResourceRouter(
+    context,
+    new AbortController().signal,
+  );
   try {
-    await new AssessmentEngine({
-      geography: fixedGeography("InEuropeAndCoastalZone"),
-      analysis: new CogAnalysisArtifactReader({ fetch: failingFetch }),
-    }).evaluate(
-      context,
-      selection(context.dataReleaseId, "ssp2-45", 2050),
-      new AbortController().signal,
-    );
-  } catch (error) {
-    if (!(error instanceof TechnicalFailure)) throw error;
-    technicalFailure = Object.freeze({ kind: error.detail.kind, code: error.detail.code });
-  }
-  if (!technicalFailure) throw new Error("Technical delivery failure produced a scientific outcome");
+    const engine = new AssessmentEngine({
+      geography: new StaticGeographyClassifier({
+        transport: resources.artifactTransport,
+      }),
+      analysis: new CogAnalysisArtifactReader({
+        artifactTransport: resources.artifactTransport,
+        cogRangeTransport: resources.cogRangeTransport,
+      }),
+    });
+    const lookups: AssessmentResult[] = [];
+    for (const scenario of scenarios) {
+      for (const horizon of horizons) {
+        lookups.push(
+          (
+            await engine.evaluate(
+              context,
+              selection(context.dataReleaseId, scenario, horizon),
+              new AbortController().signal,
+            )
+          ).result,
+        );
+      }
+    }
 
-  return Object.freeze({
-    lookups: Object.freeze(lookups),
-    outcomes: Object.freeze([
-      lookups[4].resultState,
-      ...outcomeResults.map((evaluation) => evaluation.result.resultState),
-    ]),
-    technicalFailure,
-  });
+    const outcomeResults = await Promise.all([
+      new AssessmentEngine({
+        geography: fixedGeography("InEuropeAndCoastalZone"),
+        analysis: unavailableAnalysis(),
+      }).evaluate(
+        context,
+        selection(context.dataReleaseId, "ssp2-45", 2050),
+        new AbortController().signal,
+      ),
+      new AssessmentEngine({
+        geography: fixedGeography("InEuropeOutsideCoastalZone"),
+        analysis: unavailableAnalysis(),
+      }).evaluate(
+        context,
+        selection(context.dataReleaseId, "ssp2-45", 2050),
+        new AbortController().signal,
+      ),
+      new AssessmentEngine({
+        geography: fixedGeography("OutsideEurope"),
+        analysis: unavailableAnalysis(),
+      }).evaluate(
+        context,
+        selection(context.dataReleaseId, "ssp2-45", 2050),
+        new AbortController().signal,
+      ),
+    ]);
+
+    let technicalFailure: Readonly<{ kind: "technical-error"; code: string }> | undefined;
+    try {
+      await new AssessmentEngine({
+        geography: fixedGeography("InEuropeAndCoastalZone"),
+        analysis: new CogAnalysisArtifactReader({
+          artifactTransport: resources.artifactTransport,
+          cogRangeTransport: failingCandidateRoute(resources.cogRangeTransport),
+        }),
+      }).evaluate(
+        context,
+        selection(context.dataReleaseId, "ssp2-45", 2050),
+        new AbortController().signal,
+      );
+    } catch (error) {
+      if (!(error instanceof TechnicalFailure)) throw error;
+      technicalFailure = Object.freeze({ kind: error.detail.kind, code: error.detail.code });
+    }
+    if (!technicalFailure) throw new Error("Technical delivery failure produced a scientific outcome");
+
+    return Object.freeze({
+      lookups: Object.freeze(lookups),
+      outcomes: Object.freeze([
+        lookups[4].resultState,
+        ...outcomeResults.map((evaluation) => evaluation.result.resultState),
+      ]),
+      technicalFailure,
+    });
+  } finally {
+    resources.close();
+  }
 }
 
 export function installPrivateCandidateValidation(): void {
