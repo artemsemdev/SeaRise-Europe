@@ -304,16 +304,26 @@ clients of the prior worker close. Cancellation or an ambiguous first write can
 leave only harmless `PENDING` evidence. Conditional cleanup may remove that
 exact pending record, but cleanup failure can never make it consumable.
 
-All durable intent mutations share a separate FIFO mutex. The `PENDING` to
-`ARMED` transaction is the publication linearization point: rollback cannot
-publish cancellation or `deployment-required` while that transaction is
-unresolved. After the arm settles, rollback atomically tombstones the exact
+All durable intent mutations share a non-reentrant exclusive guard. The
+`PENDING` to `ARMED` transaction is the publication linearization point. A
+concurrent or adapter-reentrant mutation returns immediate, recoverable
+`mutation-busy` instead of queueing behind the port callback; the caller may
+retry after publication settles. After a compliant delayed arm settles, a
+retried rollback atomically tombstones the exact
 intent whether it is `PENDING` or `ARMED`; tombstoned transition IDs can never
 arm or consume. Only after that tombstone commits may rollback publish
 `deployment-required`. If tombstoning fails, the coordinator instead reports
 `rollback-failed` with the preserved durable intent and its `pending` or
 `armed` state. It never claims completed rollback while durable update
 authority remains.
+
+Durable adapter methods are non-reentrant and receive a bounded deadline plus
+an `AbortSignal`. They must keep their transaction bound to the signal and
+settle promptly after abort. The coordinator does not release its exclusive
+guard until the adapter acknowledges settlement. If the deadline expires and
+the adapter never settles, state becomes fail-closed `adapter-stalled`; later
+mutations return immediately with that technical state instead of waiting or
+claiming a durable outcome.
 
 On the subsequent fresh boot, activation is recognized only when the page
 proves a different boot identity controlled by the exact confirmed
@@ -322,8 +332,8 @@ one-shot intent. Same-page, mismatched-controller, stale-intent, missing-intent,
 pending-intent, and replay attempts fail closed while the actually controlling
 pair remains usable. A changed controller proof reported to the original
 coordinator is still the same page, not a fresh boot, and cannot finalize
-activation. Async
-completion from a cancelled generation cannot overwrite a newer operation.
+activation. Async completion from a cancelled generation cannot overwrite a
+newer operation.
 Candidate evidence failures remain distinct from technical controller,
 inspection-port, token-provider, and intent-store failures. All are technical
 update states, never scientific outcomes.

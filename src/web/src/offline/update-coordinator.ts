@@ -40,12 +40,14 @@ export type IntentConsumptionResultV1 = "consumed" | "missing" | "already-consum
 export type IntentArmResultV1 = "armed" | "missing" | "mismatch";
 export type IntentTombstoneResultV1 = "tombstoned" | "missing" | "mismatch";
 
-export interface TransitionArmPermitV1 {
+export interface DurablePortPermitV1 {
   readonly coordinatorGeneration: number;
-  /** A durable adapter must abort its arm transaction while this signal is aborted. */
+  readonly deadlineMs: number;
+  /** A durable adapter must abort its transaction and settle when this signal is aborted. */
   readonly signal: AbortSignal;
 }
 
+/** Durable methods are non-reentrant and must settle promptly after permit abort. */
 export interface StaticUpdateCoordinatorPorts {
   readControllerBoot(): Promise<ControllerBootProofV1>;
   inspectWaitingCandidate(pair: AppReleasePairV1): Promise<WaitingCandidateInspectionV1>;
@@ -55,21 +57,22 @@ export interface StaticUpdateCoordinatorPorts {
     candidate: AcceptedPairIdentityV1;
   }>): string;
   /** Persist a non-consumable PENDING intent for this exact source boot. */
-  recordPendingTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  recordPendingTransitionIntent(intent: CloseAndReopenIntentV1, permit: DurablePortPermitV1): Promise<void>;
   /**
    * Atomically change this exact PENDING intent to ARMED. The durable transaction
    * must observe and remain bound to the permit signal until commit. Rejection,
    * abort, `missing`, or `mismatch` must guarantee that no ARMED write committed.
    */
-  armTransitionIntent(intent: CloseAndReopenIntentV1, permit: TransitionArmPermitV1): Promise<IntentArmResultV1>;
+  armTransitionIntent(intent: CloseAndReopenIntentV1, permit: DurablePortPermitV1): Promise<IntentArmResultV1>;
   /** Conditionally remove only this exact PENDING intent; never remove a newer or ARMED intent. */
-  discardPendingTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  discardPendingTransitionIntent(intent: CloseAndReopenIntentV1, permit: DurablePortPermitV1): Promise<void>;
   /** Atomically tombstone this exact PENDING or ARMED intent. Tombstoned IDs can never arm or consume. */
-  tombstoneTransitionIntent(intent: CloseAndReopenIntentV1): Promise<IntentTombstoneResultV1>;
+  tombstoneTransitionIntent(intent: CloseAndReopenIntentV1, permit: DurablePortPermitV1): Promise<IntentTombstoneResultV1>;
   /** Atomically consume only the exact ARMED intent once. */
   consumeTransitionIntent(
     intent: CloseAndReopenIntentV1,
     boot: ControllerBootProofV1,
+    permit: DurablePortPermitV1,
   ): Promise<IntentConsumptionResultV1>;
 }
 
@@ -92,6 +95,24 @@ export type StaticUpdateCoordinatorStateV1 =
     boot: ControllerBootProofV1;
     candidate: AcceptedPairIdentityV1;
     confirmationToken: string;
+    currentUsable: true;
+  }>
+  | Readonly<{
+    phase: "mutation-busy";
+    operation: "initialize" | "prepare-update" | "confirm-update" | "verify-next-boot" | "rollback";
+    boot: ControllerBootProofV1;
+    code: "durable-mutation-busy";
+    message: string;
+    retryable: true;
+    currentUsable: true;
+  }>
+  | Readonly<{
+    phase: "adapter-stalled";
+    operation: "confirm-update" | "verify-next-boot" | "rollback";
+    boot: ControllerBootProofV1;
+    code: "durable-adapter-stalled";
+    message: string;
+    retryable: false;
     currentUsable: true;
   }>
   | Readonly<{
@@ -143,6 +164,8 @@ export type StaticUpdateCoordinatorStateV1 =
 export interface StaticUpdateCoordinatorOptions {
   /** Deterministic test seam. Production callers must use the secure default. */
   readonly instanceId?: string;
+  /** Bounded durable adapter deadline. Production default is 5 seconds. */
+  readonly durablePortTimeoutMs?: number;
 }
 
 const claimedCoordinatorInstanceIds = new Set<string>();
@@ -291,16 +314,25 @@ export class StaticHostUpdateCoordinator {
   #pendingGeneration: number | null = null;
   #operationAbortController: AbortController | null = null;
   #durableIntent: Readonly<{ intent: CloseAndReopenIntentV1; state: "pending" | "armed" }> | null = null;
-  #durableMutationTail: Promise<void> = Promise.resolve();
+  #durableMutationActive = false;
+  #adapterStalled = false;
+  readonly #durablePortTimeoutMs: number;
 
   constructor(ports: StaticUpdateCoordinatorPorts, options: StaticUpdateCoordinatorOptions = {}) {
     this.#ports = ports;
     this.#instanceId = claimCoordinatorInstanceId(options.instanceId ?? secureCoordinatorInstanceId());
+    const timeout = options.durablePortTimeoutMs ?? 5_000;
+    if (!Number.isSafeInteger(timeout) || timeout < 10 || timeout > 60_000) {
+      throw new TypeError("Durable port timeout is invalid.");
+    }
+    this.#durablePortTimeoutMs = timeout;
   }
 
   state(): StaticUpdateCoordinatorStateV1 | null { return this.#state; }
 
   async initialize(): Promise<StaticUpdateCoordinatorStateV1> {
+    const blocked = this.#busyOrStalled("initialize");
+    if (blocked) return blocked;
     if (this.#state?.phase === "recording-close-and-reopen-intent" || this.#durableIntent) {
       return this.#currentOr(null);
     }
@@ -317,6 +349,8 @@ export class StaticHostUpdateCoordinator {
   }
 
   async prepareUpdate(pairInput: AppReleasePairV1): Promise<StaticUpdateCoordinatorStateV1> {
+    const blocked = this.#busyOrStalled("prepare-update");
+    if (blocked) return blocked;
     if (this.#state?.phase === "recording-close-and-reopen-intent" || this.#durableIntent) {
       return this.#currentOr(null);
     }
@@ -381,6 +415,8 @@ export class StaticHostUpdateCoordinator {
   }
 
   async confirmUpdate(tokenInput: string): Promise<StaticUpdateCoordinatorStateV1> {
+    const blocked = this.#busyOrStalled("confirm-update");
+    if (blocked) return blocked;
     const pending = this.#state;
     if (!pending || pending.phase !== "waiting-candidate-verified") return this.#currentOr(null);
     const pendingGeneration = this.#pendingGeneration;
@@ -404,7 +440,6 @@ export class StaticHostUpdateCoordinator {
     }
 
     const operation = this.#beginOperation();
-    const armSignal = this.#operationSignal(operation);
     this.#commit(operation, Object.freeze({
       phase: "recording-close-and-reopen-intent", boot: pending.boot,
       candidate: pending.candidate, currentUsable: true,
@@ -422,10 +457,12 @@ export class StaticHostUpdateCoordinator {
       if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
       this.#durableIntent = Object.freeze({ intent, state: "pending" });
       try {
-        await this.#ports.recordPendingTransitionIntent(intent);
+        await this.#callDurable(operation, "confirm-update", pending.boot, async (permit) =>
+          await this.#ports.recordPendingTransitionIntent(intent, permit));
         if (!this.#isCurrentOperation(operation)) {
           try {
-            await this.#ports.discardPendingTransitionIntent(intent);
+            await this.#callDurable(operation, "confirm-update", pending.boot, async (permit) =>
+              await this.#ports.discardPendingTransitionIntent(intent, permit));
             if (this.#durableIntent?.intent.transitionId === intent.transitionId && this.#durableIntent.state === "pending") {
               this.#durableIntent = null;
             }
@@ -434,10 +471,8 @@ export class StaticHostUpdateCoordinator {
           }
           return this.#currentOr(pending.boot);
         }
-        const armed = await this.#ports.armTransitionIntent(intent, {
-          coordinatorGeneration: operation,
-          signal: armSignal,
-        });
+        const armed = await this.#callDurable(operation, "confirm-update", pending.boot, async (permit) =>
+          await this.#ports.armTransitionIntent(intent, permit));
         if (armed === "armed") this.#durableIntent = Object.freeze({ intent, state: "armed" });
         if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
         if (armed !== "armed") {
@@ -452,7 +487,8 @@ export class StaticHostUpdateCoordinator {
         }), pending.boot);
       } catch (error) {
         try {
-          await this.#ports.discardPendingTransitionIntent(intent);
+          await this.#callDurable(operation, "confirm-update", pending.boot, async (permit) =>
+            await this.#ports.discardPendingTransitionIntent(intent, permit));
           if (this.#durableIntent?.intent.transitionId === intent.transitionId && this.#durableIntent.state === "pending") {
             this.#durableIntent = null;
           }
@@ -473,6 +509,8 @@ export class StaticHostUpdateCoordinator {
   }
 
   async verifyNextBoot(intentInput: CloseAndReopenIntentV1): Promise<StaticUpdateCoordinatorStateV1> {
+    const blocked = this.#busyOrStalled("verify-next-boot");
+    if (blocked) return blocked;
     if (this.#state?.phase === "recording-close-and-reopen-intent") {
       return this.#currentOr(null);
     }
@@ -511,7 +549,9 @@ export class StaticHostUpdateCoordinator {
       ), boot);
     }
     try {
-      const consumed = await this.#ports.consumeTransitionIntent(intent, boot);
+      const consumed = await this.#withDurableMutation(async () =>
+        await this.#callDurable(operation, "verify-next-boot", boot, async (permit) =>
+          await this.#ports.consumeTransitionIntent(intent, boot, permit)));
       if (operation !== this.#sequence) return this.#currentOr(boot);
       if (consumed !== "consumed") {
         return this.#commit(
@@ -533,6 +573,8 @@ export class StaticHostUpdateCoordinator {
   }
 
   async requestRollback(): Promise<StaticUpdateCoordinatorStateV1> {
+    const blocked = this.#busyOrStalled("rollback");
+    if (blocked) return blocked;
     const operation = this.#beginOperation();
     const fallback = this.#bootFromState();
     let boot = fallback;
@@ -549,7 +591,10 @@ export class StaticHostUpdateCoordinator {
       const durable = this.#durableIntent;
       if (durable) {
         let tombstoned: IntentTombstoneResultV1;
-        try { tombstoned = await this.#ports.tombstoneTransitionIntent(durable.intent); }
+        try {
+          tombstoned = await this.#callDurable(operation, "rollback", boot, async (permit) =>
+            await this.#ports.tombstoneTransitionIntent(durable.intent, permit));
+        }
         catch (error) {
           if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
           return this.#set(Object.freeze({
@@ -623,12 +668,68 @@ export class StaticHostUpdateCoordinator {
   }
 
   async #withDurableMutation<T>(mutation: () => Promise<T>): Promise<T> {
-    const previous = this.#durableMutationTail;
-    let release: (() => void) | undefined;
-    this.#durableMutationTail = new Promise<void>((resolve) => { release = resolve; });
-    await previous;
+    if (this.#durableMutationActive) throw new Error("Durable mutation is already active.");
+    this.#durableMutationActive = true;
     try { return await mutation(); }
-    finally { release?.(); }
+    finally { this.#durableMutationActive = false; }
+  }
+
+  async #callDurable<T>(
+    operation: number,
+    operationName: "confirm-update" | "verify-next-boot" | "rollback",
+    boot: ControllerBootProofV1,
+    call: (permit: DurablePortPermitV1) => Promise<T>,
+  ): Promise<T> {
+    const operationSignal = this.#operationSignal(operation);
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (operationSignal.aborted) controller.abort();
+    else operationSignal.addEventListener("abort", abort, { once: true });
+    let deadlineExceeded = false;
+    const timer = setTimeout(() => {
+      deadlineExceeded = true;
+      controller.abort();
+      this.#adapterStalled = true;
+      if (this.#isCurrentOperation(operation)) {
+        this.#set(Object.freeze({
+          phase: "adapter-stalled", operation: operationName, boot,
+          code: "durable-adapter-stalled",
+          message: "Durable adapter exceeded its deadline and has not acknowledged abort.",
+          retryable: false, currentUsable: true,
+        }));
+      }
+    }, this.#durablePortTimeoutMs);
+    try {
+      const result = await call({
+        coordinatorGeneration: operation,
+        deadlineMs: this.#durablePortTimeoutMs,
+        signal: controller.signal,
+      });
+      if (deadlineExceeded) throw new Error("Durable adapter settled only after its deadline.");
+      return result;
+    } catch (error) {
+      if (deadlineExceeded) throw new Error("Durable adapter acknowledged abort after its deadline.");
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      operationSignal.removeEventListener("abort", abort);
+      if (deadlineExceeded) this.#adapterStalled = false;
+    }
+  }
+
+  #busyOrStalled(
+    operation: "initialize" | "prepare-update" | "confirm-update" | "verify-next-boot" | "rollback",
+  ): StaticUpdateCoordinatorStateV1 | null {
+    if (!this.#durableMutationActive) return null;
+    if (this.#adapterStalled && this.#state?.phase === "adapter-stalled") return this.#state;
+    const boot = this.#bootFromState() ?? this.#launchBoot;
+    if (!boot) throw new Error("Durable mutation is active without controller authority.");
+    return Object.freeze({
+      phase: "mutation-busy", operation, boot,
+      code: "durable-mutation-busy",
+      message: "A durable update operation is in progress. Retry after it settles.",
+      retryable: true, currentUsable: true,
+    });
   }
 
   #isCurrentOperation(operation: number): boolean {

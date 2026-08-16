@@ -10,8 +10,9 @@ import {
   type CloseAndReopenIntentV1,
   type ControllerBootProofV1,
   type IntentConsumptionResultV1,
+  type StaticUpdateCoordinatorStateV1,
   type StaticUpdateCoordinatorPorts,
-  type TransitionArmPermitV1,
+  type DurablePortPermitV1,
 } from "./update-coordinator";
 
 function pair(build: string, release: string): AppReleasePairV1 {
@@ -60,7 +61,7 @@ function durableIntentStore() {
     recordPending: async (intent: CloseAndReopenIntentV1) => {
       record = Object.freeze({ intent, state: "pending" as const });
     },
-    arm: async (intent: CloseAndReopenIntentV1, permit: TransitionArmPermitV1) => {
+    arm: async (intent: CloseAndReopenIntentV1, permit: DurablePortPermitV1) => {
       if (permit.signal.aborted) throw new Error("arm cancelled");
       if (!record) return "missing" as const;
       if (record.state === "tombstoned") return "mismatch" as const;
@@ -91,6 +92,7 @@ function harness(options: Readonly<{
   boot?: ControllerBootProofV1;
   instanceId?: string;
   useDefaultEntropy?: boolean;
+  durablePortTimeoutMs?: number;
   read?: StaticUpdateCoordinatorPorts["readControllerBoot"];
   inspect?: StaticUpdateCoordinatorPorts["inspectWaitingCandidate"];
   token?: StaticUpdateCoordinatorPorts["issueConfirmationToken"];
@@ -123,7 +125,10 @@ function harness(options: Readonly<{
   };
   const coordinatorOptions = options.useDefaultEntropy
     ? undefined
-    : { instanceId: options.instanceId ?? `test-instance-${String(++instanceSequence).padStart(8, "0")}` };
+    : {
+        instanceId: options.instanceId ?? `test-instance-${String(++instanceSequence).padStart(8, "0")}`,
+        durablePortTimeoutMs: options.durablePortTimeoutMs,
+      };
   return {
     coordinator: new StaticHostUpdateCoordinator(ports, coordinatorOptions),
     ports,
@@ -209,7 +214,11 @@ describe("conservative static-host update coordinator", () => {
       intent,
       currentUsable: true,
     });
-    expect(reopened.ports.consumeTransitionIntent).toHaveBeenCalledWith(intent, boot("boot-2", candidate));
+    expect(reopened.ports.consumeTransitionIntent).toHaveBeenCalledWith(
+      intent,
+      boot("boot-2", candidate),
+      expect.objectContaining({ coordinatorGeneration: 1, deadlineMs: 5_000 }),
+    );
     expect("reloadAllowed" in state).toBe(false);
   });
 
@@ -344,7 +353,7 @@ describe("conservative static-host update coordinator", () => {
     expect(() => harness({ instanceId })).toThrow("already active");
   });
 
-  it("discards a persisted pending intent when a newer operation cancels confirmation", async () => {
+  it("fails rollback fast while pending publication is active and succeeds on retry", async () => {
     let releaseRecord: (() => void) | undefined;
     const recordGate = new Promise<void>((resolve) => { releaseRecord = resolve; });
     const persisted: CloseAndReopenIntentV1[] = [];
@@ -356,20 +365,24 @@ describe("conservative static-host update coordinator", () => {
       discard: vi.fn(async (intent) => {
         if (persisted[0]?.transitionId === intent.transitionId) persisted.splice(0, 1);
       }),
+      tombstone: vi.fn(async (intent) => {
+        if (persisted[0]?.transitionId === intent.transitionId) persisted.splice(0, 1);
+        return "tombstoned" as const;
+      }),
     });
     const prepared = await test.coordinator.prepareUpdate(candidate.pair);
     if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
     await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
-    const rollingBack = test.coordinator.requestRollback();
+    const busy = await test.coordinator.requestRollback();
     releaseRecord?.();
-    const cancelled = await confirming;
-    const rollback = await rollingBack;
+    const confirmed = await confirming;
+    const rollback = await test.coordinator.requestRollback();
 
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
     expect(rollback).toMatchObject({ phase: "deployment-required", currentUsable: true });
-    expect(cancelled).toMatchObject({ phase: "recording-close-and-reopen-intent", currentUsable: true });
-    expect(test.ports.discardPendingTransitionIntent).toHaveBeenCalledOnce();
+    expect(confirmed).toMatchObject({ phase: "close-and-reopen-required", currentUsable: true });
     expect(persisted).toEqual([]);
   });
 
@@ -381,11 +394,12 @@ describe("conservative static-host update coordinator", () => {
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
     await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
-    const rollingBack = test.coordinator.requestRollback();
+    const busy = await test.coordinator.requestRollback();
     record.reject(new Error("record rejected"));
 
-    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
-    const rollback = await rollingBack;
+    await expect(confirming).resolves.toMatchObject({ phase: "failed", code: "intent-record-failed" });
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    const rollback = await test.coordinator.requestRollback();
     expect(test.coordinator.state()).toEqual(rollback);
   });
 
@@ -401,17 +415,18 @@ describe("conservative static-host update coordinator", () => {
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
     await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
-    const rollingBack = test.coordinator.requestRollback();
-    record.resolve();
+    const busy = await test.coordinator.requestRollback();
+    record.reject(new Error("record rejected"));
     await vi.waitFor(() => expect(test.ports.discardPendingTransitionIntent).toHaveBeenCalledOnce());
     discard.reject(new Error("discard rejected"));
 
-    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
-    const rollback = await rollingBack;
+    await expect(confirming).resolves.toMatchObject({ phase: "failed", code: "intent-record-failed" });
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    const rollback = await test.coordinator.requestRollback();
     expect(test.coordinator.state()).toEqual(rollback);
   });
 
-  it("never arms a pending intent when cancellation races a failed cleanup", async () => {
+  it("keeps delayed publication authoritative until a busy rollback is retried", async () => {
     const store = durableIntentStore();
     const recordGate = deferred<void>();
     const arm = vi.fn(store.arm);
@@ -431,13 +446,14 @@ describe("conservative static-host update coordinator", () => {
     await vi.waitFor(() => expect(store.state()).toBe("pending"));
     const poisonedIntent = store.pendingIntent();
     if (!poisonedIntent) throw new Error("expected pending intent");
-    const rollingBack = test.coordinator.requestRollback();
+    const busy = await test.coordinator.requestRollback();
     recordGate.resolve();
 
-    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
-    const rollback = await rollingBack;
+    await expect(confirming).resolves.toMatchObject({ phase: "close-and-reopen-required" });
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    const rollback = await test.coordinator.requestRollback();
     expect(rollback).toMatchObject({ phase: "deployment-required" });
-    expect(arm).not.toHaveBeenCalled();
+    expect(arm).toHaveBeenCalledOnce();
     expect(store.state()).toBe("tombstoned");
 
     const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
@@ -467,12 +483,13 @@ describe("conservative static-host update coordinator", () => {
     await vi.waitFor(() => expect(store.state()).toBe("armed"));
     const armedIntent = store.pendingIntent();
     if (!armedIntent) throw new Error("expected armed intent");
-    const rollingBack = test.coordinator.requestRollback();
+    const busy = await test.coordinator.requestRollback();
     expect(test.coordinator.state()).toMatchObject({ phase: "recording-close-and-reopen-intent" });
     armGate.resolve();
 
-    await expect(confirming).resolves.toMatchObject({ phase: "recording-close-and-reopen-intent" });
-    await expect(rollingBack).resolves.toMatchObject({ phase: "deployment-required" });
+    await expect(confirming).resolves.toMatchObject({ phase: "close-and-reopen-required" });
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    await expect(test.coordinator.requestRollback()).resolves.toMatchObject({ phase: "deployment-required" });
     expect(store.state()).toBe("tombstoned");
 
     const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
@@ -501,11 +518,12 @@ describe("conservative static-host update coordinator", () => {
     await vi.waitFor(() => expect(store.state()).toBe("armed"));
     const armedIntent = store.pendingIntent();
     if (!armedIntent) throw new Error("expected armed intent");
-    const rollingBack = test.coordinator.requestRollback();
+    const busy = await test.coordinator.requestRollback();
     armGate.resolve();
 
     await confirming;
-    const rollback = await rollingBack;
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    const rollback = await test.coordinator.requestRollback();
     expect(rollback).toMatchObject({
       phase: "rollback-failed", operation: "rollback", code: "intent-tombstone-failed",
       durableIntentState: "armed", intent: armedIntent, message: "tombstone unavailable",
@@ -516,6 +534,83 @@ describe("conservative static-host update coordinator", () => {
     const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
     await expect(reopened.coordinator.verifyNextBoot(armedIntent)).resolves.toMatchObject({
       phase: "controller-verified-activation", currentUsable: true,
+    });
+  });
+
+  it.each(["record", "arm"] as const)(
+    "returns mutation-busy when the %s adapter re-enters and awaits rollback",
+    async (stage) => {
+      const store = durableIntentStore();
+      let requestRollback = async (): Promise<StaticUpdateCoordinatorStateV1> => {
+        throw new Error("rollback callback is not initialized");
+      };
+      let reentrant: StaticUpdateCoordinatorStateV1 | null = null;
+      const test = harness({
+        record: vi.fn(async (intent) => {
+          if (stage === "record") reentrant = await requestRollback();
+          await store.recordPending(intent);
+        }),
+        arm: vi.fn(async (intent, permit) => {
+          if (stage === "arm") reentrant = await requestRollback();
+          return await store.arm(intent, permit);
+        }),
+        discard: vi.fn(store.discardPending),
+        tombstone: vi.fn(store.tombstone),
+      });
+      requestRollback = async () => await test.coordinator.requestRollback();
+      const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+      if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+      const confirmed = await test.coordinator.confirmUpdate(prepared.confirmationToken);
+
+      expect(reentrant).toMatchObject({
+        phase: "mutation-busy", operation: "rollback", code: "durable-mutation-busy", retryable: true,
+      });
+      expect(confirmed).toMatchObject({ phase: "close-and-reopen-required" });
+    },
+  );
+
+  it("marks a non-settling durable adapter stalled and makes later mutations fail fast", async () => {
+    const observed: { signal: AbortSignal | null } = { signal: null };
+    const test = harness({
+      durablePortTimeoutMs: 20,
+      record: vi.fn(async (_intent, permit) => {
+        observed.signal = permit.signal;
+        await new Promise<void>(() => undefined);
+      }),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    void test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(test.coordinator.state()).toMatchObject({
+      phase: "adapter-stalled", code: "durable-adapter-stalled", retryable: false,
+    }));
+
+    expect(observed.signal?.aborted).toBe(true);
+    await expect(test.coordinator.requestRollback()).resolves.toMatchObject({
+      phase: "adapter-stalled", code: "durable-adapter-stalled", retryable: false,
+    });
+  });
+
+  it("releases the mutation guard only after a timed-out adapter acknowledges abort", async () => {
+    const test = harness({
+      durablePortTimeoutMs: 20,
+      record: vi.fn(async (_intent, permit) => {
+        if (permit.signal.aborted) return;
+        await new Promise<void>((resolve) => permit.signal.addEventListener("abort", () => resolve(), { once: true }));
+      }),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirmation = await test.coordinator.confirmUpdate(prepared.confirmationToken);
+
+    expect(confirmation).toMatchObject({
+      phase: "failed", operation: "confirm-update", code: "intent-record-failed", currentUsable: true,
+    });
+    await expect(test.coordinator.requestRollback()).resolves.toMatchObject({
+      phase: "deployment-required", currentUsable: true,
     });
   });
 
@@ -563,11 +658,12 @@ describe("conservative static-host update coordinator", () => {
 
     const verifying = reopened.coordinator.verifyNextBoot(intent);
     await vi.waitFor(() => expect(reopened.ports.consumeTransitionIntent).toHaveBeenCalledOnce());
-    const rollback = await reopened.coordinator.requestRollback();
+    const busy = await reopened.coordinator.requestRollback();
     releaseConsume?.();
 
-    await expect(verifying).resolves.toEqual(rollback);
-    expect(reopened.coordinator.state()).toEqual(rollback);
+    await expect(verifying).resolves.toMatchObject({ phase: "controller-verified-activation" });
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    await expect(reopened.coordinator.requestRollback()).resolves.toMatchObject({ phase: "deployment-required" });
   });
 
   it("does not let a rejected intent consumption overwrite a newer operation", async () => {
@@ -580,11 +676,12 @@ describe("conservative static-host update coordinator", () => {
 
     const verifying = reopened.coordinator.verifyNextBoot(intent);
     await vi.waitFor(() => expect(reopened.ports.consumeTransitionIntent).toHaveBeenCalledOnce());
-    const rollback = await reopened.coordinator.requestRollback();
+    const busy = await reopened.coordinator.requestRollback();
     consume.reject(new Error("consume rejected"));
 
-    await expect(verifying).resolves.toEqual(rollback);
-    expect(reopened.coordinator.state()).toEqual(rollback);
+    await expect(verifying).resolves.toMatchObject({ phase: "failed", code: "intent-stale" });
+    expect(busy).toMatchObject({ phase: "mutation-busy", retryable: true });
+    await expect(reopened.coordinator.requestRollback()).resolves.toMatchObject({ phase: "deployment-required" });
   });
 
   it.each(["resolve", "reject"] as const)(
