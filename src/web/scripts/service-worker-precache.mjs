@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, posix } from "node:path";
+import { applicationBuildIdentityFile } from "./application-build-identity.mjs";
 
 export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V2__";
 
@@ -31,9 +32,26 @@ export function shellPrecacheUrls({ dist, viteManifest, dataReleaseId }) {
   }
   return [
     "/",
+    `/${applicationBuildIdentityFile}`,
     ...[...files].map((path) => `/${path}`),
     `/releases/${dataReleaseId}/manifest.json`,
   ].sort();
+}
+
+export function extractEmbeddedPrecachePayload(source) {
+  const candidates = [...source.matchAll(/JSON\.parse\((?:`((?:\\.|[^`\\])*)`|("(?:\\.|[^"\\])*"))\)/gu)]
+    .map((match) => {
+      try {
+        if (match[2]) return JSON.parse(JSON.parse(match[2]));
+        try { return JSON.parse(match[1]); }
+        catch { return JSON.parse(JSON.parse(`"${match[1]}"`)); }
+      } catch { return null; }
+    })
+    .filter((value) => value?.contractVersion === 2 && value?.buildIdentity && Array.isArray(value.urls));
+  if (candidates.length !== 1) {
+    throw new Error(`Service worker must contain exactly one readable precache authority; found ${candidates.length}`);
+  }
+  return candidates[0];
 }
 
 export function createEmbeddedPrecache({ buildIdentity, urls }) {

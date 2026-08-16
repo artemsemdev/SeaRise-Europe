@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 
-declare const __SEARISE_BUILD_IDENTITY_JSON__: string;
 declare const __SEARISE_PRECACHE_JSON__: string;
 
 interface Window {

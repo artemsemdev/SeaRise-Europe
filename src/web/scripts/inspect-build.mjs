@@ -3,10 +3,15 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
 import {
+  applicationBuildIdentityFile,
+  validateApplicationBuildIdentity,
+} from "./application-build-identity.mjs";
+import {
   assertSameBuildIdentity,
   buildIdentityFile,
   validateBuildIdentity,
 } from "./build-identity.mjs";
+import { extractEmbeddedPrecachePayload } from "./service-worker-precache.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
@@ -31,6 +36,7 @@ const required = [
   resolve(dist, "vite-manifest.json"),
   resolve(dist, "service-worker.js"),
   resolve(dist, buildIdentityFile),
+  resolve(dist, applicationBuildIdentityFile),
 ];
 for (const path of required) {
   if (!paths.includes(path)) throw new Error(`Static build is missing ${relative(dist, path)}`);
@@ -102,19 +108,7 @@ const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
 if (/skipWaiting\s*\(|clients\s*\.\s*claim\s*\(/u.test(serviceWorker)) {
   throw new Error("Worker shell cannot force activation or claim existing clients");
 }
-function parsedEmbeddedJson(source) {
-  return [...source.matchAll(/JSON\.parse\((?:`((?:\\.|[^`\\])*)`|("(?:\\.|[^"\\])*"))\)/gu)]
-    .map((match) => {
-      try {
-        if (match[2]) return JSON.parse(JSON.parse(match[2]));
-        try { return JSON.parse(match[1]); }
-        catch { return JSON.parse(JSON.parse(`"${match[1]}"`)); }
-      } catch { return null; }
-    });
-}
-const embedded = parsedEmbeddedJson(serviceWorker)
-  .find((value) => value?.contractVersion === 2 && value?.buildIdentity && Array.isArray(value.urls));
-if (!embedded) throw new Error("Service worker has no readable embedded precache authority");
+const embedded = extractEmbeddedPrecachePayload(serviceWorker);
 
 const expectedPrecacheFiles = new Set();
 function collectPrecache(key) {
@@ -141,6 +135,7 @@ for (const file of [...expectedPrecacheFiles].filter((path) => path.endsWith(".c
 }
 const expectedPrecacheUrls = [
   "/",
+  `/${applicationBuildIdentityFile}`,
   ...[...expectedPrecacheFiles].map((path) => `/${path}`),
   `/releases/${releaseId}/manifest.json`,
 ].sort();
@@ -156,15 +151,11 @@ if (
     (url.startsWith("/releases/") && url !== buildIdentity.manifestPath))
 ) throw new Error("Service worker embedded precache differs from the independent shell inventory");
 assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
+validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
 const mainEntry = Object.values(viteManifest).find((entry) =>
   entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
 );
 if (!mainEntry) throw new Error("Vite manifest has no static application entry");
-const application = readFileSync(resolve(dist, mainEntry.file), "utf8");
-const applicationIdentity = parsedEmbeddedJson(application)
-  .find((value) => value?.schemaVersion === "1.0.0" && value?.manifestPath);
-if (!applicationIdentity) throw new Error("Application bundle has no readable canonical build identity");
-assertSameBuildIdentity(buildIdentity, applicationIdentity, "application bundle");
 const initialFiles = new Set();
 function collectInitial(entry) {
   if (!entry || initialFiles.has(entry.file)) return;

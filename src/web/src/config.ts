@@ -29,7 +29,9 @@ function runtimeBuildIdentity(value: unknown): BuildIdentityV1 {
 }
 
 export const runtimeConfig = runtimeBuildIdentity(
-  JSON.parse(__SEARISE_BUILD_IDENTITY_JSON__) as unknown,
+  (globalThis as typeof globalThis & {
+    readonly __SEARISE_RUNTIME_BUILD_IDENTITY__: unknown;
+  }).__SEARISE_RUNTIME_BUILD_IDENTITY__,
 );
 
 export function releaseLabel(): string {

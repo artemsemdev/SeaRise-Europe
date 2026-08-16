@@ -2,6 +2,7 @@ import { cpSync, createReadStream, mkdirSync, readFileSync, rmSync, statSync } f
 import { resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { applicationBuildIdentityPlugin } from "./scripts/application-build-identity.mjs";
 import { buildIdentityFile, resolveBuildIdentity } from "./scripts/build-identity.mjs";
 import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
 
@@ -49,6 +50,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      applicationBuildIdentityPlugin(buildIdentity),
       {
         name: "canonical-build-identity",
         generateBundle() {
@@ -186,7 +188,6 @@ export default defineConfig(({ mode }) => {
       },
     ],
     define: {
-      __SEARISE_BUILD_IDENTITY_JSON__: JSON.stringify(JSON.stringify(buildIdentity)),
       __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V2__"),
     },
     server: {

@@ -1,5 +1,6 @@
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { validateApplicationBuildIdentity } from "./application-build-identity.mjs";
 import { buildIdentityFile, validateBuildIdentity } from "./build-identity.mjs";
 import {
   createEmbeddedPrecache,
@@ -24,6 +25,7 @@ if (
 const buildIdentity = validateBuildIdentity(
   JSON.parse(readFileSync(resolve(dist, buildIdentityFile), "utf8")),
 );
+validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
 const urls = shellPrecacheUrls({
   dist,
   viteManifest,
@@ -33,7 +35,10 @@ const payload = createEmbeddedPrecache({ buildIdentity, urls });
 let worker = readFileSync(workerPath, "utf8");
 const occurrences = worker.split(precachePlaceholder).length - 1;
 if (occurrences !== 1) throw new Error("Service worker precache placeholder is missing or duplicated");
-worker = worker.replace(precachePlaceholder, JSON.stringify(payload).replaceAll("\\", "\\\\").replaceAll('"', '\\"'));
+worker = worker.replace(
+  precachePlaceholder,
+  JSON.stringify(payload).replaceAll("\\", "\\\\").replaceAll('"', '\\"'),
+);
 worker = worker.replace(/\n?\/\/# sourceMappingURL=service-worker\.js\.map\s*$/u, "");
 writeFileSync(workerPath, worker);
 rmSync(`${workerPath}.map`, { force: true });

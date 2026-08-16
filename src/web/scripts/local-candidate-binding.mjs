@@ -21,6 +21,7 @@ import {
 import { createServer as createHttpServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { applicationBuildIdentityPlugin } from "./application-build-identity.mjs";
 import { privateCandidateBuildIdentity } from "./build-identity.mjs";
 
 const ARTIFACT_SCHEMA =
@@ -1144,10 +1145,7 @@ export async function servePrivateCandidate(options) {
     await build({
       configFile: false,
       root: webRoot,
-      plugins: [react()],
-      define: {
-        __SEARISE_BUILD_IDENTITY_JSON__: JSON.stringify(JSON.stringify(buildIdentity)),
-      },
+      plugins: [applicationBuildIdentityPlugin(buildIdentity), react()],
       build: {
         emptyOutDir: true,
         outDir: appRoot,
