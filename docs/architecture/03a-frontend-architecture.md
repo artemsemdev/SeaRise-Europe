@@ -277,6 +277,16 @@ Map clicks may refine a selected location. They use the same assessment engine
 as settlement selections and must not create a second implementation of the
 domain flow.
 
+The Phase 2 implementation keeps `MapExplorer` and the MapLibre/PMTiles adapter
+as separate dynamic entries. `MapExplorer` receives a controlled `Selection`
+and `SelectionCommand`; only the visual quantile band is local presentation
+state. `MapLayerResolver` can return only the active dataset's `visual-only`
+PMTiles URL from `ReleaseContext`. Optional support/coastal boundary roles are
+discovered from that same context when present. The committed synthetic fixture
+currently contains the nine projection archives but no separate boundary
+artifacts, so its grid-cell outlines and manifest extent are the only boundary
+context shown in clean-clone tests.
+
 ## Offline and cache behaviour
 
 The service worker uses release-scoped cache names. It precaches the app shell

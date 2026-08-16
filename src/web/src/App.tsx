@@ -1,9 +1,11 @@
 import { lazy, Suspense, useId, useState } from "react";
 import { releaseLabel, runtimeConfig } from "./config";
 import { technicalErrorPresentation } from "./domain/release";
+import type { Selection } from "./domain/release";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
+const MapExplorer = lazy(() => import("./components/map/MapExplorer"));
 
 function Brand() {
   return (
@@ -52,6 +54,8 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
   const hintId = useId();
   const [place, setPlace] = useState("");
   const [status, setStatus] = useState("Place search loads locally in the next Phase 2 slice.");
+  const [mapOpen, setMapOpen] = useState(false);
+  const [selection, applySelection] = useState<Selection>();
 
   return (
     <main id="main" className="landing">
@@ -110,6 +114,26 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
           <span>No public scientific release is claimed.</span>
         </aside>
       </section>
+      {release.phase === "ready" ? (
+        <section className="map-launcher" aria-label="Release visualization">
+          {!mapOpen ? (
+            <>
+              <p className="eyebrow dark">Optional visualization</p>
+              <h2>The map stays out of the initial application bundle.</h2>
+              <p>Open it when useful. Search, release validation, and textual information do not depend on it.</p>
+              <button type="button" onClick={() => setMapOpen(true)}>Open static visualization</button>
+            </>
+          ) : (
+            <Suspense fallback={<p className="map-module-loading" role="status">Loading map module…</p>}>
+              <MapExplorer
+                context={release.context}
+                selection={selection}
+                onSelection={applySelection}
+              />
+            </Suspense>
+          )}
+        </section>
+      ) : null}
       <section className="principles" aria-labelledby="principles-title">
         <p className="eyebrow dark">What this explorer reports</p>
         <h2 id="principles-title">A source-bound regional projection, with its limits beside it.</h2>

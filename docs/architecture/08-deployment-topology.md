@@ -84,6 +84,13 @@ State changes and plans are reviewed before apply. Tool and provider versions
 are pinned. The infrastructure must not introduce Cloudflare D1, KV, Durable
 Objects, Queues, or Worker-only business logic into the baseline.
 
+The checked-in HTML applies the restrictive static-document CSP and
+`no-referrer` policy on every host. Infrastructure must repeat that CSP as a
+response header and append `frame-ancestors 'none'`, which browsers ignore in
+a meta CSP, together with the remaining response-only security headers. A
+separate release-data origin cannot be activated until its exact origin is
+reviewed into CSP and CORS; wildcards are not part of the baseline.
+
 ## Build and release flow
 
 Data release and application deployment are separate, ordered jobs:

@@ -69,4 +69,17 @@ describe("static application shell", () => {
     expect(await screen.findByText(/retry limit reached/i)).toBeVisible();
     expect(screen.queryByRole("button", { name: /retry pinned release/i })).not.toBeInTheDocument();
   });
+
+  it("loads the visual map surface only after explicit user intent", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /open static visualization/i })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /explore the source grid/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
+    expect(await screen.findByRole("heading", { name: /explore the source grid/i })).toBeVisible();
+    expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(
+      "projection-ssp2-45-2050-pmtiles",
+    );
+  });
 });

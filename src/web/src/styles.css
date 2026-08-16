@@ -10,7 +10,7 @@
   --teal-500: #1ca2a4;
   --paper: #f7f7f1;
   --ink: #10272d;
-  --muted: #5d6f72;
+  --muted: #526568;
 }
 
 * { box-sizing: border-box; }
@@ -158,6 +158,108 @@ a { color: inherit; }
 .scope-rule { height: 1px; margin: 0.75rem 0; background: rgb(255 255 255 / 18%); }
 .scope-card strong { color: #a9e6df; }
 
+.map-launcher {
+  min-height: 18rem;
+  padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 7vw, 8rem);
+  background: #e5ece7;
+}
+.map-launcher > h2, .map-copy h2 {
+  max-width: 20ch;
+  margin: 0;
+  font-family: "Instrument Serif", serif;
+  font-size: clamp(2.2rem, 4.5vw, 4.4rem);
+  font-weight: 400;
+  line-height: 1;
+}
+.map-launcher > p:not(.eyebrow) { max-width: 58ch; color: var(--muted); line-height: 1.6; }
+.map-launcher > button, .basemap-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.9rem 1.25rem;
+  background: var(--ink);
+  color: white;
+  cursor: pointer;
+}
+.map-launcher button:focus-visible, select:focus-visible, .band-controls input:focus-visible {
+  outline: 3px solid #d59d2a;
+  outline-offset: 3px;
+}
+.map-module-loading { min-height: 18rem; }
+.map-explorer {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.82fr) minmax(24rem, 1.18fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  margin: calc(clamp(4rem, 8vw, 7rem) * -1) calc(clamp(1.25rem, 7vw, 8rem) * -1);
+  padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 7vw, 8rem);
+}
+.map-copy > p:not(.eyebrow, .map-attribution) { color: var(--muted); line-height: 1.65; }
+.map-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-top: 1.8rem; }
+.map-controls label { display: grid; gap: 0.45rem; color: var(--muted); font-size: 0.78rem; }
+.map-controls select {
+  min-height: 2.8rem;
+  border: 1px solid #9aaba7;
+  border-radius: 0.55rem;
+  padding: 0 0.7rem;
+  background: var(--paper);
+  color: var(--ink);
+}
+.band-controls { display: grid; gap: 0.6rem; margin: 1rem 0 0; border: 1px solid #b5c3bf; }
+.band-controls legend { padding: 0 0.4rem; color: var(--muted); font-size: 0.78rem; }
+.band-controls label { display: flex; gap: 0.5rem; align-items: center; }
+.map-text-alternative {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-left: 4px solid var(--teal-500);
+  background: var(--paper);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.map-attribution { margin-top: 1rem; color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
+.map-attribution a { text-underline-offset: 0.18rem; }
+.map-surface-shell { position: relative; align-self: stretch; min-height: 34rem; }
+.map-surface { width: 100%; min-height: 34rem; border: 1px solid #adbbb7; border-radius: 1rem; overflow: hidden; background: #dbe9e7; }
+.map-status {
+  position: absolute;
+  z-index: 2;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  width: fit-content;
+  max-width: calc(100% - 1.4rem);
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.45rem;
+  background: rgb(4 22 27 / 88%);
+  color: white;
+  font-size: 0.72rem;
+}
+.map-status.degraded, .map-status.unavailable { background: rgb(91 46 15 / 94%); }
+.basemap-button { position: absolute; z-index: 3; top: 0.7rem; left: 0.7rem; padding: 0.55rem 0.8rem; font-size: 0.72rem; }
+.map-selection-pin {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 90%);
+  box-shadow: 0 0.35rem 1rem rgb(5 27 33 / 30%);
+  transform: translate(-50%, -50%);
+  cursor: crosshair;
+}
+.map-selection-pin span { display: block; width: 0.8rem; height: 0.8rem; margin: auto; border: 3px solid #b23b2e; border-radius: 50%; }
+.map-selection-pin:focus-visible { outline: 4px solid #d59d2a; outline-offset: 3px; }
+.maplibregl-canvas:focus-visible { outline: 4px solid #d59d2a; outline-offset: -4px; }
+.maplibregl-ctrl-attrib { max-width: min(28rem, 70vw); }
+.maplibregl-ctrl-attrib a {
+  color: #075d68 !important;
+  text-decoration: underline !important;
+  text-underline-offset: 0.12rem;
+}
+
 .principles { padding: clamp(4rem, 8vw, 8rem) clamp(1.25rem, 7vw, 8rem); background: var(--paper); }
 .principles > h2 { max-width: 18ch; margin: 0; font-family: "Instrument Serif", serif; font-size: clamp(2.4rem, 5vw, 4.8rem); font-weight: 400; line-height: 1; }
 .principle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 4rem; background: #cbd4cf; }
@@ -199,6 +301,9 @@ footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-
   .search-control button { grid-column: 1 / -1; width: 100%; }
   .scope-card { left: 1rem; right: 1rem; bottom: 1rem; width: auto; }
   .principle-grid, .architecture-flow, .evidence-grid, .boundary-panel { grid-template-columns: 1fr; }
+  .map-explorer { grid-template-columns: 1fr; }
+  .map-controls { grid-template-columns: 1fr; }
+  .map-surface-shell, .map-surface { min-height: 26rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

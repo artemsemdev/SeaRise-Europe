@@ -65,6 +65,7 @@ export default defineConfig(({ command, mode }) => {
     build: {
       target: "es2022",
       sourcemap: true,
+      manifest: "vite-manifest.json",
       rollupOptions: {
         input: {
           index: resolve(import.meta.dirname, "index.html"),
