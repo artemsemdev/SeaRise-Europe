@@ -31,6 +31,7 @@ const PROJECTION_MATRIX: readonly ProjectionExpectation[] = Object.freeze([
 
 const outcome = (page: Page) => page.locator(".projection-panel__outcome");
 const panel = (page: Page) => page.locator(".projection-panel");
+const RESULT_CAVEAT = "This result does not determine flooding, inundation, terrain exposure, flood probability, or property risk.";
 
 async function ready(page: Page): Promise<void> {
   await expect(page.getByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
@@ -55,6 +56,7 @@ async function expectAvailable(
 ): Promise<void> {
   await expect(panel(page)).toHaveAttribute("data-phase", "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "ProjectionAvailable");
+  await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
   await expect(outcome(page).getByRole("heading", {
     name: "Projected regional sea-level change available",
   })).toBeVisible();
@@ -109,6 +111,7 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
 
   await selectSettlement(page, "Springfield", /Springfield North.*AA/i);
   await expect(outcome(page)).toHaveAttribute("data-outcome", "OutOfScope");
+  await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
   await expect(outcome(page).getByRole("heading", { name: "Outside the coastal analysis area" })).toBeVisible();
   await expect(outcome(page)).toContainText("50.00000°, 10.00000°");
   await expectNoSeriousAxeFindings(page);
@@ -116,6 +119,7 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
 
   await selectSettlement(page, "Border City", /Border City.*Boundary, TR/i);
   await expect(outcome(page)).toHaveAttribute("data-outcome", "UnsupportedGeography");
+  await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
   await expect(outcome(page).getByRole("heading", { name: "Outside the supported Europe area" })).toBeVisible();
   await expect(outcome(page)).toContainText("41.00000°, 29.00000°");
   await expectNoSeriousAxeFindings(page);
@@ -124,6 +128,7 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
   await page.goto(`/?release=${RELEASE_ID}&scenario=ssp2-45&horizon=2050&lat=62&lon=44`);
   await expect(panel(page)).toHaveAttribute("data-phase", "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "DataUnavailable");
+  await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
   await expect(outcome(page).getByRole("heading", { name: "Model data unavailable for this point" })).toBeVisible();
   await expect(outcome(page)).toContainText("q0.167, q0.5, or q0.833");
   await expectNoSeriousAxeFindings(page);
@@ -273,6 +278,13 @@ test("rapid control and map commands cannot publish stale mixed state", async ({
   });
   await page.getByRole("radio", { name: "2100", exact: true }).check();
   await expect(panel(page)).toHaveAttribute("data-phase", "updating");
+  await expect(page.locator("[data-flight-phase='result']")).toBeVisible();
+  await expect(page.locator(".flight-progress")).toHaveCount(0);
+  await expect(page.getByText(/flying to the selected point/i)).toHaveCount(0);
+  await expect(page.getByRole("region", { name: /release-scoped source-grid visualization/i })).toHaveAttribute(
+    "data-journey-active",
+    "false",
+  );
 
   await page.getByRole("button", { name: /select coordinate at source extent centre/i }).click();
   releaseRange?.();
@@ -364,6 +376,7 @@ test("camera motion can be skipped without cancelling or fabricating the assessm
   await search.fill("Málaga");
   await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
   await expect(page.locator("[data-flight-phase='transition']")).toBeVisible();
+  await expect(page.getByText(/selected place accepted.*lookup is in progress/i)).toBeFocused();
   await expect(outcome(page)).toHaveCount(0);
 
   const skipMotion = page.getByRole("button", { name: "Skip motion" });
@@ -380,6 +393,50 @@ test("camera motion can be skipped without cancelling or fabricating the assessm
 
   releaseLookup?.();
   await expectAvailable(page, PROJECTION_MATRIX[4]);
+  await expect(outcome(page).getByRole("heading", {
+    name: "Projected regional sea-level change available",
+  })).toBeFocused();
+  await page.getByRole("button", { name: /reset selection and choose another place/i }).click();
+  await expect(page.getByRole("combobox", { name: /find a city, town, or village/i })).toBeFocused();
+});
+
+test("a superseded search response cannot replace the newest Worker query", async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    class DelayedQueryWorker extends NativeWorker {
+      postMessage(message: unknown, transfer?: Transferable[]): void {
+        const send = (): void => {
+          if (transfer) super.postMessage(message, transfer);
+          else super.postMessage(message);
+        };
+        const request = message as { readonly kind?: string; readonly query?: string };
+        if (request.kind === "query" && request.query === "Málaga") {
+          (window as unknown as { __delayedSearchQuerySeen: boolean }).__delayedSearchQuerySeen = true;
+          window.setTimeout(send, 180);
+          return;
+        }
+        send();
+      }
+    }
+    Object.defineProperty(window, "Worker", { configurable: true, value: DelayedQueryWorker });
+  });
+
+  await page.goto("/");
+  await ready(page);
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.waitForFunction(() =>
+    Boolean((window as unknown as { __delayedSearchQuerySeen?: boolean }).__delayedSearchQuerySeen));
+  await search.fill("Springfield");
+  await expect(page.getByRole("option", { name: /Springfield North.*AA/i })).toBeVisible();
+  await page.waitForTimeout(250);
+  await expect(search).toHaveValue("Springfield");
+  await expect(page.getByRole("option", { name: /Málaga.*Andalucía, ES/i })).toHaveCount(0);
+
+  await page.getByRole("option", { name: /Springfield North.*AA/i }).click();
+  await expect(panel(page)).toHaveAttribute("data-phase", "result");
+  await expect(outcome(page)).toHaveAttribute("data-outcome", "OutOfScope");
+  await expect(outcome(page)).toContainText("Selected settlement: geonames:900000003");
 });
 
 test("keyboard-only search, radios, dialog focus, and reduced motion remain operable", async ({ page }) => {

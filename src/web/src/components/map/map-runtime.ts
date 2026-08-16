@@ -288,6 +288,12 @@ export class MapController {
       else handler.disable();
     }
     this.#map.getCanvas().tabIndex = enabled ? 0 : -1;
+    const controls = this.#map.getContainer().querySelector<HTMLElement>(".maplibregl-control-container");
+    if (controls) {
+      controls.inert = !enabled;
+      if (enabled) controls.removeAttribute("aria-hidden");
+      else controls.setAttribute("aria-hidden", "true");
+    }
     for (const control of this.#map.getContainer().querySelectorAll<HTMLButtonElement>(".maplibregl-ctrl button")) {
       control.disabled = !enabled;
       control.tabIndex = enabled ? 0 : -1;

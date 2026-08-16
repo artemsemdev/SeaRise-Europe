@@ -124,6 +124,14 @@ function projectionSelectionStatus(
   if (!scopeReady) return "Waiting for the exact release runtime.";
   if (!state || state.phase === "ready") return "Choose a settlement to continue.";
   switch (state.phase) {
+    case "searching":
+      return "Searching settlements locally in this browser.";
+    case "evaluating":
+      return "Checking the selected place against the exact nearest native source-grid location.";
+    case "updating":
+      return "Checking a scenario or horizon update. The previous accepted projection remains visible until the update completes.";
+    case "result":
+      return `Scientific outcome updated: ${state.accepted.result.resultState}. The accepted projection is shown in the result panel.`;
     case "offline":
     case "connection-required":
     case "unsupported-browser":
@@ -132,10 +140,8 @@ function projectionSelectionStatus(
       return hasAcceptedProjection
         ? "The previous accepted projection remains in the result panel; the latest operation ended in a technical failure."
         : "The selected operation ended in a technical failure. No scientific outcome was produced.";
-    default:
-      return hasAcceptedProjection
-        ? "The accepted projection is shown in the result panel."
-        : "The selected point is being checked.";
+    case "booting":
+      return "Loading and verifying the pinned data release.";
   }
 }
 
@@ -147,11 +153,21 @@ function projectionPanelVisible(state: ProjectionState | null, hasAcceptedProjec
     state.phase === "technical-error";
 }
 
+function sameLocation(left: Selection["location"], right: Selection["location"]): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === "settlement" && right.kind === "settlement" && left.placeId !== right.placeId) return false;
+  return left.coordinates.latitude === right.coordinates.latitude &&
+    left.coordinates.longitude === right.coordinates.longitude;
+}
+
 function projectionJourneySelection(state: ProjectionState | null): Selection | null {
   if (!state) return null;
-  return state.phase === "evaluating" || state.phase === "updating"
-    ? state.operation.selection
-    : null;
+  if (state.phase === "evaluating") return state.operation.selection;
+  if (state.phase === "updating" && !sameLocation(
+    state.previous.selection.location,
+    state.operation.selection.location,
+  )) return state.operation.selection;
+  return null;
 }
 
 function flightPhase(
@@ -252,6 +268,11 @@ function LandingPageSession({
   const handledNavigationSerial = useRef(0);
   const pendingInitialSelection = useRef<string | null>(null);
   const methodologyTriggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const transitionStatusRef = useRef<HTMLParagraphElement>(null);
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const pendingSelectionFocus = useRef(false);
+  const pendingSearchFocus = useRef(false);
   const sessionActive = useRef(false);
 
   useEffect(() => {
@@ -344,9 +365,29 @@ function LandingPageSession({
     ? runtime.methodology.methodology
     : null;
 
+  useEffect(() => {
+    if (!pendingSelectionFocus.current || !runtime.projection) return;
+    if ((runtime.projection.phase === "evaluating" || runtime.projection.phase === "updating") && journeyActive) {
+      transitionStatusRef.current?.focus();
+      return;
+    }
+    if (runtime.projection.phase === "result" && verifiedMethodology && resultHeadingRef.current) {
+      resultHeadingRef.current.focus();
+      pendingSelectionFocus.current = false;
+    }
+  }, [journeyActive, runtime.projection, verifiedMethodology]);
+
+  useEffect(() => {
+    if (!pendingSearchFocus.current || !scopeReady || panelVisible || journeyActive) return;
+    searchInputRef.current?.focus();
+    pendingSearchFocus.current = false;
+  }, [journeyActive, panelVisible, scopeReady]);
+
   const reset = (): void => {
     if (!context) return;
     pendingInitialSelection.current = null;
+    pendingSelectionFocus.current = false;
+    pendingSearchFocus.current = true;
     setNavigationIntent(null);
     clearApplicationSelection();
     projectionUrl.reset();
@@ -375,7 +416,7 @@ function LandingPageSession({
 
       <div className="flight-map-layer flight-scene" aria-hidden={!context || !scopeReady}>
         {context && scopeReady ? (
-          <Suspense fallback={<p className="map-module-loading" role="status">Loading map module…</p>}>
+          <Suspense fallback={<p className="map-module-loading">Loading map module…</p>}>
             <MapExplorer
               context={context}
               selection={accepted?.selection}
@@ -408,25 +449,27 @@ function LandingPageSession({
             <ReleaseStartup state={release} retry={retry} />
             <SettlementSearch
               release={scopeReady ? context : null}
+              inputRef={searchInputRef}
               clearToken={clearSearchToken}
               workerFactory={searchWorkerFactory}
               onSearchLifecycle={runtime.handleSearchLifecycle}
               onSelect={(record) => {
                 if (!context || !scopeReady) return;
+                pendingSelectionFocus.current = true;
                 submitSelection(settlementSelection(context, runtime.projection, record));
               }}
             />
           </div>
       </section>
 
-      <p className="selection-status" aria-live="polite">
-        {projectionSelectionStatus(scopeReady, runtime.projection, accepted !== null)}
+      <p className="selection-status" role="status" aria-live="polite" aria-atomic="true">
+        {shareStatus || projectionSelectionStatus(scopeReady, runtime.projection, accepted !== null)}
       </p>
 
       {journeyActive ? (
-        <div className="flight-progress" aria-live="polite">
+        <div className="flight-progress">
           <AirplaneTilt size={19} weight="fill" aria-hidden="true" />
-          <span role="status">
+          <span>
             <strong>{journeyMotionComplete ? "Checking the selected point" : "Flying to the selected point"}</strong>
             {reducedMotion
               ? "Camera motion reduced. Checking its exact nearest native source-grid location in this browser…"
@@ -446,6 +489,9 @@ function LandingPageSession({
               Skip motion
             </button>
           ) : null}
+          <p ref={transitionStatusRef} className="flight-progress__focus-target" tabIndex={-1}>
+            Selected place accepted. Exact browser lookup is in progress.
+          </p>
         </div>
       ) : null}
 
@@ -455,13 +501,13 @@ function LandingPageSession({
         {runtime.methodology.phase === "technical-error" ? (
           <TechnicalAlert error={runtime.methodology.error} prefix="Methodology verification failed" />
         ) : null}
-        <p className="share-status" role="status" aria-live="polite">{shareStatus}</p>
       </div>
 
       {runtime.projection ? (
         <ProjectionPanel
           state={runtime.projection}
           methodology={verifiedMethodology}
+          resultHeadingRef={resultHeadingRef}
           onSelectionChange={submitSelection}
           onRetry={() => {
             setCommandError(null);

@@ -33,8 +33,22 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
     "Take me there.",
   );
+  await expect(page.getByRole("button", { name: "Methodology and sources" })).toBeEnabled();
+  await expect(page.getByRole("combobox", { name: /find a city, town, or village/i })).toBeEnabled();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "SeaRise Europe home" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Methodology and sources" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("combobox", { name: /find a city, town, or village/i })).toBeFocused();
+  await expect(page.locator(".flight-legend")).toHaveCount(0);
+  const mapControls = page.locator(".maplibregl-control-container");
+  await expect(mapControls).toHaveCount(1);
+  await expect(mapControls).toHaveAttribute("aria-hidden", "true");
+  await expect(mapControls).toHaveAttribute("inert", "");
+  await expect(page.locator('[aria-live]:not([aria-live="off"]), [role="status"]')).toHaveCount(1);
   await expect(page.getByText(/Synthetic fixture · illustrative only/i)).toBeVisible();
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeAttached();
 

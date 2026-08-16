@@ -305,7 +305,7 @@ describe("settlement search combobox", () => {
     expect(await screen.findByText(
       "No matching places found. Check the spelling or try a nearby city, town, or village.",
     )).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(document.querySelector(".search-shell .status")).toHaveTextContent(
       /No matching places found in the loaded index.*try a nearby city, town, or village/i,
     );
   });
@@ -354,7 +354,7 @@ describe("settlement search combobox", () => {
     await user.type(input, "Spring");
     expect(await screen.findAllByRole("option")).toHaveLength(2);
     expect(await screen.findByText(/coastal index has a technical failure/i)).toBeVisible();
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "core-ready");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "core-ready");
     expect(screen.getByRole("button", { name: /fly there/i })).toBeEnabled();
   });
 
@@ -397,11 +397,11 @@ describe("settlement search combobox", () => {
 
     await user.type(input, "Spring");
     expect(await screen.findAllByRole("option")).toHaveLength(2);
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "all-ready");
 
     act(() => first.onerror?.({} as ErrorEvent));
     expect(first.terminated).toBe(true);
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "idle");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "idle");
     expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
 
@@ -409,7 +409,7 @@ describe("settlement search combobox", () => {
     await user.type(input, "Spring");
     expect(await screen.findAllByRole("option")).toHaveLength(2);
     expect(factory).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "all-ready");
     expect(screen.queryByText(/technical failure, not a no-match result/i)).not.toBeInTheDocument();
   });
 });

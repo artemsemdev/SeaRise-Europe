@@ -38,6 +38,8 @@ const REQUIRED_DISCLAIMER =
   "It is not an engineering assessment, structural survey, legal determination, " +
   "insurance evaluation, mortgage guidance, or financial advice. Do not use it as " +
   "a substitute for appropriate professional or local evidence.";
+const RESULT_CAVEAT =
+  "This result does not determine flooding, inundation, terrain exposure, flood probability, or property risk.";
 
 export interface ProjectionPanelProps {
   readonly state: ProjectionState;
@@ -49,6 +51,7 @@ export interface ProjectionPanelProps {
   readonly onOpenMethodology: () => void;
   readonly methodologyTriggerRef?: RefObject<HTMLButtonElement | null>;
   readonly showMethodologyAction?: boolean;
+  readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }
 
 function assertNever(value: never): never {
@@ -112,16 +115,16 @@ function methodologyMatches(
 function PhaseMessage({ state }: { readonly state: ProjectionState }): React.ReactNode {
   switch (state.phase) {
     case "booting":
-      return <p role="status">Loading and verifying the pinned data release…</p>;
+      return <p>Loading and verifying the pinned data release…</p>;
     case "ready":
-      return <p role="status">Choose a settlement or point to check the selected data.</p>;
+      return <p>Choose a settlement or point to check the selected data.</p>;
     case "searching":
-      return <p role="status">Searching places locally…</p>;
+      return <p>Searching places locally…</p>;
     case "evaluating":
-      return <p role="status">Checking the selected point against the selected data…</p>;
+      return <p>Checking the selected point against the selected data…</p>;
     case "updating":
       return (
-        <div className="projection-panel__update" role="status">
+        <div className="projection-panel__update">
           <strong>Checking a new selection</strong>
           {selectedLocation(state.operation.selection)}
           <span>{SCENARIO_LABELS[state.operation.selection.scenario]} · exact ID {state.operation.selection.scenario} · {state.operation.selection.horizon}</span>
@@ -242,10 +245,12 @@ function OutcomeContent({
   accepted,
   methodology,
   contextLabel,
+  resultHeadingRef,
 }: {
   readonly accepted: AcceptedProjection;
   readonly methodology: ReleaseMethodology;
   readonly contextLabel: string | null;
+  readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }): React.ReactNode {
   const { result, selection } = accepted;
   const scenarioLabel = SCENARIO_LABELS[result.scenario];
@@ -254,7 +259,7 @@ function OutcomeContent({
     case "ProjectionAvailable":
       content = (
         <>
-          <h3>Projected regional sea-level change available</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Projected regional sea-level change available</h3>
           <p>
             Near this point, IPCC AR6 projects a median regional relative sea-level change of
             {` ${result.medianMetres.toFixed(3)} m`} by <strong>{result.horizon}</strong> under
@@ -272,7 +277,7 @@ function OutcomeContent({
     case "DataUnavailable":
       content = (
         <>
-          <h3>Model data unavailable for this point</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Model data unavailable for this point</h3>
           <p>
             The active dataset has no usable value for this point under {scenarioLabel} (exact ID <code>{result.scenario}</code>) in {result.horizon}.
             No other scenario, year, dataset, source-grid location, or value was substituted. This is not a zero-change or no-risk result.
@@ -288,7 +293,7 @@ function OutcomeContent({
     case "OutOfScope":
       content = (
         <>
-          <h3>Outside the coastal analysis area</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Outside the coastal analysis area</h3>
           <p>
             This point is inside the supported Europe geometry but outside the versioned coastal analysis area.
             SeaRise Europe does not assess inland hazards. Search another settlement or choose a point closer to the coast.
@@ -300,7 +305,7 @@ function OutcomeContent({
     case "UnsupportedGeography":
       content = (
         <>
-          <h3>Outside the supported Europe area</h3>
+          <h3 id="projection-outcome-heading" ref={resultHeadingRef} tabIndex={-1}>Outside the supported Europe area</h3>
           <p>
             This point is outside the geography supported by the current SeaRise Europe release.
             Search a supported European settlement or choose another point. This is a normal domain outcome, not an application error.
@@ -313,14 +318,12 @@ function OutcomeContent({
   }
 
   return (
-    <article className="projection-panel__outcome" data-outcome={result.resultState} aria-labelledby="projection-outcome-title">
-      {contextLabel === null ? (
-        <p className="projection-panel__sr-only" role="status">Scientific outcome updated: {result.resultState}.</p>
-      ) : null}
+    <article className="projection-panel__outcome" data-outcome={result.resultState} aria-labelledby="projection-outcome-heading">
       {contextLabel ? <p className="projection-panel__context-label">{contextLabel}</p> : null}
       <p className="projection-panel__outcome-badge">{result.resultState}</p>
-      <div id="projection-outcome-title">{content}</div>
+      <div className="projection-panel__outcome-content">{content}</div>
       {selectedLocation(selection)}
+      <p className="projection-panel__result-caveat">{RESULT_CAVEAT}</p>
       <details className="projection-panel__disclosure">
         <summary>Limitations, method and release identity</summary>
         <div className="projection-panel__disclosure-content">
@@ -362,14 +365,16 @@ function AcceptedResult({
   accepted,
   methodology,
   contextLabel,
+  resultHeadingRef,
 }: {
   readonly accepted: AcceptedProjection;
   readonly methodology: ReleaseMethodology | null;
   readonly contextLabel: string | null;
+  readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
 }): React.ReactNode {
   if (methodology === null) {
     return (
-      <div className="projection-panel__verification" role="status">
+      <div className="projection-panel__verification">
         Loading and verifying methodology before showing the accepted scientific outcome…
       </div>
     );
@@ -382,7 +387,7 @@ function AcceptedResult({
       </div>
     );
   }
-  return <OutcomeContent accepted={accepted} methodology={methodology} contextLabel={contextLabel} />;
+  return <OutcomeContent accepted={accepted} methodology={methodology} contextLabel={contextLabel} resultHeadingRef={resultHeadingRef} />;
 }
 
 function acceptedContext(state: ProjectionState): string | null {
@@ -417,6 +422,7 @@ export function ProjectionPanel({
   onOpenMethodology,
   methodologyTriggerRef,
   showMethodologyAction = true,
+  resultHeadingRef,
 }: ProjectionPanelProps): React.ReactNode {
   const accepted = visibleAcceptedProjection(state);
   const selection = currentSelection(state);
@@ -437,7 +443,7 @@ export function ProjectionPanel({
       </header>
       <PhaseMessage state={state} />
       {accepted ? (
-        <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} />
+        <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} resultHeadingRef={resultHeadingRef} />
       ) : null}
       {selection ? (
         <SelectionControls

@@ -202,7 +202,7 @@ describe("projection panel phases", () => {
     [{ phase: "searching", release, operationToken: 0, searchToken: 1, operation: search, previous: null }, /searching places locally/i],
     [{ phase: "evaluating", release, operationToken: 2, searchToken: 0, operation: operation("evaluation") }, /checking the selected point/i],
     [{ phase: "updating", release, operationToken: 2, searchToken: 0, operation: operation("update"), previous: accepted() }, /checking a new selection/i],
-    [{ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() }, /scientific outcome updated: ProjectionAvailable/i],
+    [{ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() }, /projected regional sea-level change available/i],
     [failureState("offline"), /not available offline/i],
     [failureState("connection-required"), /connection required/i],
     [failureState("unsupported-browser"), /browser capability unavailable/i],
@@ -221,7 +221,8 @@ describe("projection panel phases", () => {
     const next = selection("ssp5-85", 2100, 52.1);
     renderPanel({ phase: "updating", release, operationToken: 2, searchToken: 0, operation: operation("update", next), previous });
 
-    const update = screen.getByRole("status", { name: "" });
+    const update = document.querySelector(".projection-panel__update");
+    expect(update).not.toBeNull();
     expect(update).toHaveTextContent("Checking a new selection");
     expect(update).toHaveTextContent("Higher-emissions scenario (SSP5-8.5)");
     expect(update).toHaveTextContent("2100");
@@ -243,6 +244,9 @@ describe("projection panel scientific outcomes", () => {
     expect(screen.getByRole("heading", { name: headline })).toBeVisible();
     expect(container.querySelectorAll("[data-outcome]")).toHaveLength(1);
     expect(container.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", outcome);
+    expect(screen.getByText(
+      "This result does not determine flooding, inundation, terrain exposure, flood probability, or property risk.",
+    )).toBeVisible();
     await user.click(screen.getByText(/limitations, method and release identity/i));
     expect(screen.getByText(/map meaning:/i)).toBeVisible();
     expect(screen.getByText(/informational and educational use/i)).toHaveTextContent(
@@ -377,7 +381,7 @@ describe("projection panel controls and fail-closed presentation", () => {
   it("hides scientific values until verified matching methodology is available", () => {
     const state: ProjectionState = { phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() };
     const { rerender } = renderPanel(state, null);
-    expect(screen.getByText(/verifying methodology before showing/i)).toHaveAttribute("role", "status");
+    expect(screen.getByText(/verifying methodology before showing/i)).toBeVisible();
     expect(screen.queryByText(/0\.247 m/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /share/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /methodology/i })).toBeDisabled();

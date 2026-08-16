@@ -59,51 +59,46 @@ export default function MapExplorer({
           onSelection(createCoordinateSelection(context, scenario, horizon, coordinates));
         }}
       />
-      <aside className="map-copy flight-legend" aria-label="Visual layer legend and map text alternative">
-        <p className="map-copy__label">Visual source grid</p>
-        <strong>{scenario} · {horizon}</strong>
-        {!selection ? (
-          <p className="map-preview-status" role="status">
-            Default release preview—not an accepted scientific result.
+      {selection ? (
+        <aside className="map-copy flight-legend" aria-label="Visual layer legend and map text alternative">
+          <p className="map-copy__label">Visual source grid</p>
+          <strong>{scenario} · {horizon}</strong>
+          <fieldset className="band-controls">
+            <legend>Visual quantile band</legend>
+            {VISUAL_BANDS.map((value) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="visual-band"
+                  value={value}
+                  checked={band === value}
+                  onChange={() => setBand(value)}
+                />
+                {BAND_LABELS[value]}
+              </label>
+            ))}
+          </fieldset>
+          <div className="map-text-alternative" aria-label="Map text alternative">
+            <span>Accepted result visualization · {scenario} · {horizon} · {BAND_LABELS[band]}</span>
+            <span>Outlined 1° native cells; exact values never come from colour.</span>
+            {selection.location.kind === "coordinate" ? (
+              <span>
+                Selected coordinate: {selection.location.coordinates.latitude.toFixed(4)}, {selection.location.coordinates.longitude.toFixed(4)}.
+              </span>
+            ) : (
+              <span>
+                Selected settlement {selection.location.placeId}: {selection.location.coordinates.latitude.toFixed(4)}, {selection.location.coordinates.longitude.toFixed(4)}.
+              </span>
+            )}
+          </div>
+          <p className="map-attribution flight-attribution">
+            <a href="https://doi.org/10.5281/zenodo.6382554">IPCC AR6 Sea Level Projections</a>
+            {" · "}<a href={layers.attributionArtifactUrl}>release attribution record</a>
+            {" · optional basemap: "}<a href="https://openfreemap.org/">OpenFreeMap</a>
+            {" / "}<a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>
           </p>
-        ) : null}
-        <fieldset className="band-controls">
-          <legend>Visual quantile band</legend>
-          {VISUAL_BANDS.map((value) => (
-            <label key={value}>
-              <input
-                type="radio"
-                name="visual-band"
-                value={value}
-                checked={band === value}
-                onChange={() => setBand(value)}
-              />
-              {BAND_LABELS[value]}
-            </label>
-          ))}
-        </fieldset>
-        <div className="map-text-alternative" aria-label="Map text alternative">
-          <span>{selection ? "Accepted result visualization" : "Default non-result preview"} · {scenario} · {horizon} · {BAND_LABELS[band]}</span>
-          <span>Outlined 1° native cells; exact values never come from colour.</span>
-          {selection?.location.kind === "coordinate" ? (
-            <span>
-              Selected coordinate: {selection.location.coordinates.latitude.toFixed(4)}, {selection.location.coordinates.longitude.toFixed(4)}.
-            </span>
-          ) : selection?.location.kind === "settlement" ? (
-            <span>
-              Selected settlement {selection.location.placeId}: {selection.location.coordinates.latitude.toFixed(4)}, {selection.location.coordinates.longitude.toFixed(4)}.
-            </span>
-          ) : (
-            <span>Select a coordinate on the map or search for a settlement.</span>
-          )}
-        </div>
-        <p className="map-attribution flight-attribution">
-          <a href="https://doi.org/10.5281/zenodo.6382554">IPCC AR6 Sea Level Projections</a>
-          {" · "}<a href={layers.attributionArtifactUrl}>release attribution record</a>
-          {" · optional basemap: "}<a href="https://openfreemap.org/">OpenFreeMap</a>
-          {" / "}<a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>
-        </p>
-      </aside>
+        </aside>
+      ) : null}
     </section>
   );
 }

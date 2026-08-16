@@ -417,6 +417,16 @@ a { color: inherit; }
 }
 .flight-progress button:hover { background: rgb(255 255 255 / 18%); }
 .flight-progress button:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
+.flight-progress__focus-target {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 .flight-app.is-journey .map-surface { transform: scale(1.012); transition: transform 900ms cubic-bezier(.62, .01, .24, 1); }
 @keyframes flight-progress-drift {
   from { transform: translateX(-0.18rem); }
@@ -441,8 +451,6 @@ a { color: inherit; }
   line-height: 1.45;
   box-shadow: 0 0.75rem 2rem rgb(4 20 25 / 24%);
 }
-.share-status { margin: 0; color: white; font-size: 0.75rem; }
-.share-status:empty { display: none; }
 .map-module-loading {
   position: absolute;
   inset: 0;

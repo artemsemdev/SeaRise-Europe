@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
+  type RefObject,
 } from "react";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { ReleaseContext } from "../domain/release";
@@ -20,6 +21,7 @@ interface SettlementSearchProps {
   /** Increment to clear the local query from an application-level reset. */
   readonly clearToken?: number;
   readonly workerFactory?: SearchWorkerFactory;
+  readonly inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 const unavailable: SettlementSearchState = Object.freeze({
@@ -94,6 +96,7 @@ interface SettlementSearchSessionProps {
   readonly state: SettlementSearchState;
   readonly onSelect: (record: SettlementSearchRecord) => void;
   readonly clearToken: number;
+  readonly inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 function SettlementSearchSession({
@@ -102,6 +105,7 @@ function SettlementSearchSession({
   state,
   onSelect,
   clearToken,
+  inputRef,
 }: SettlementSearchSessionProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -192,6 +196,7 @@ function SettlementSearchSession({
         <MagnifyingGlass className="search-icon" size={19} weight="regular" aria-hidden="true" />
         <input
           id={`${listId}-input`}
+          ref={inputRef}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={optionsVisible}
@@ -223,8 +228,6 @@ function SettlementSearchSession({
       <p
         id={statusId}
         className={`status${state.error ? " error" : ""}`}
-        role="status"
-        aria-live="polite"
         data-search-readiness={state.readiness}
         data-init-duration-ms={state.initializationMilliseconds ?? undefined}
         data-query-duration-ms={state.durationMilliseconds ?? undefined}
@@ -274,6 +277,7 @@ export function SettlementSearch({
   onSearchLifecycle,
   clearToken = 0,
   workerFactory,
+  inputRef,
 }: SettlementSearchProps) {
   const [client, state] = useClient(release, workerFactory, onSearchLifecycle);
   return (
@@ -284,6 +288,7 @@ export function SettlementSearch({
       state={state}
       onSelect={onSelect}
       clearToken={clearToken}
+      inputRef={inputRef}
     />
   );
 }

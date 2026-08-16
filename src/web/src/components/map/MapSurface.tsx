@@ -132,7 +132,7 @@ export function MapSurface({
           <Crosshair size={19} weight="bold" aria-hidden="true" />
         </button>
       ) : null}
-      <div className={`map-status ${status.kind}`} role="status" aria-live="polite">
+      <div className={`map-status ${status.kind}`}>
         {status.message}
       </div>
       {interactionEnabled ? (

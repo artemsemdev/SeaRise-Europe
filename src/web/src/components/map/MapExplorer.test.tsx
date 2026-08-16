@@ -43,7 +43,7 @@ async function context() {
 }
 
 describe("MapExplorer", () => {
-  it("keeps preview non-result while the result panel owns scenario and horizon selection", async () => {
+  it("keeps idle legend and attribution controls out of the accessibility tree", async () => {
     const release = await context();
     const command = vi.fn();
     const initial = Object.freeze({
@@ -57,10 +57,11 @@ describe("MapExplorer", () => {
     }) satisfies Selection;
     const { rerender } = render(<MapExplorer context={release} onSelection={command} />);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/default release preview.*not an accepted scientific result/i);
     expect(screen.queryByLabelText("Scenario")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Horizon")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(/default non-result preview/i);
+    expect(screen.queryByLabelText("Map text alternative")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(document.querySelector(".flight-legend")).not.toBeInTheDocument();
     expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-interaction-enabled", "false");
 
     rerender(<MapExplorer context={release} selection={initial} onSelection={command} />);
@@ -101,7 +102,8 @@ describe("MapExplorer", () => {
     );
     expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-journey", "59.9139/10.7522");
     expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-motion-skip-token", "3");
-    expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(/default non-result preview/i);
+    expect(screen.queryByLabelText("Map text alternative")).not.toBeInTheDocument();
+    expect(document.querySelector(".flight-legend")).not.toBeInTheDocument();
   });
 
   it("routes a map click through the immutable common coordinate selection", async () => {

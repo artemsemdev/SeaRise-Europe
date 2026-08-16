@@ -44,18 +44,24 @@ import { releaseScopeStatus } from "./release-copy";
 import { isForbiddenApplicationApiPath } from "./test/application-api-boundary";
 
 vi.mock("./components/map/MapExplorer", () => ({
-  default: ({ selection, journeyMotionSkipToken, onSelection, context }: {
+  default: ({ selection, journeyActive, journeyTarget, journeyMotionSkipToken, onSelection, context }: {
     selection?: Selection;
+    journeyActive?: boolean;
+    journeyTarget?: { latitude: number; longitude: number };
     journeyMotionSkipToken?: number;
     onSelection: (selection: Selection) => void;
     context: ReleaseContext;
   }) => (
     <section aria-label="Test map composition">
       <h2>Explore the source grid</h2>
-      <output data-testid="map-accepted-selection">
+      <div data-testid="map-accepted-selection">
         {selection ? `${selection.scenario}/${selection.horizon}/${selection.location.coordinates.latitude}` : "preview-only"}
-      </output>
-      <output data-testid="map-motion-skip-token">{journeyMotionSkipToken ?? 0}</output>
+      </div>
+      <div data-testid="map-journey-active">{journeyActive ? "true" : "false"}</div>
+      <div data-testid="map-journey-target">
+        {journeyTarget ? `${journeyTarget.latitude}/${journeyTarget.longitude}` : "none"}
+      </div>
+      <div data-testid="map-motion-skip-token">{journeyMotionSkipToken ?? 0}</div>
       <button type="button" onClick={() => onSelection(Object.freeze({
         dataReleaseId: context.dataReleaseId,
         scenario: selection?.scenario ?? context.defaults.scenario,
@@ -462,6 +468,8 @@ describe("production static application composition", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
     expect(document.querySelector(".flight-scene")).toBeInTheDocument();
     expect(document.querySelector("[data-flight-phase='idle']")).toBeInTheDocument();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toHaveClass("selection-status");
   });
 
   it("binds landing release disclosure to verified bootstrap disposition", () => {
@@ -545,6 +553,25 @@ describe("production static application composition", () => {
     expect(screen.queryByText(/flying to the selected point/i)).not.toBeInTheDocument();
   });
 
+  it("moves focus from a selected search result to progress, result, and reset search", async () => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+
+    controller.deferNextSelection = true;
+    await user.type(input, "Fixture");
+    await user.click(await screen.findByRole("option", { name: /Fixturehafen/i }));
+    await waitFor(() => expect(screen.getByText(/selected place accepted/i)).toHaveFocus());
+
+    act(() => controller.resolveDeferred());
+    await waitFor(() => expect(screen.getByRole("heading", { name: /outside the coastal analysis area/i })).toHaveFocus());
+
+    await user.click(screen.getByRole("button", { name: /reset selection/i }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toHaveFocus());
+  });
+
   it("keeps the accepted result on the map while one new command is pending, then swaps atomically", async () => {
     const runtime = runtimeFactory();
     const user = userEvent.setup();
@@ -556,8 +583,12 @@ describe("production static application composition", () => {
 
     controller.deferNextSelection = true;
     await user.click(screen.getByLabelText(/Higher-emissions scenario/i));
-    expect(document.querySelector("[data-flight-phase='transition']")).toBeInTheDocument();
-    expect(screen.getByText(/flying to the selected point/i)).toBeVisible();
+    expect(document.querySelector("[data-flight-phase='result']")).toBeInTheDocument();
+    expect(document.querySelector(".projection-panel[data-phase='updating']")).toBeInTheDocument();
+    expect(screen.queryByText(/flying to the selected point/i)).not.toBeInTheDocument();
+    expect(document.querySelector(".flight-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("map-journey-active")).toHaveTextContent("false");
+    expect(screen.getByTestId("map-journey-target")).toHaveTextContent("none");
     expect(screen.getByText(/previous accepted result.*new selection is being checked/i)).toBeVisible();
     expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp2-45/2050/51.9");
     expect(controller.select).toHaveBeenCalledTimes(2);
