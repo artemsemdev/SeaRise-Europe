@@ -12,6 +12,11 @@ import {
   type LifecycleCacheStorage,
   type PairAcceptedIdentityV1,
 } from "./pair-lifecycle-store";
+import {
+  assertPairAdmissionOpen,
+  pairAdmissionLockName,
+  type PairCleanupLockPort,
+} from "./pair-cleanup-fence";
 
 const A = "a".repeat(64);
 const B = "b".repeat(64);
@@ -34,7 +39,7 @@ class MemoryCaches implements LifecycleCacheStorage {
   readonly stores = new Map<string, MemoryCache>();
   readonly events: string[] = [];
   failDelete = false;
-  onDelete: ((name: string) => void) | null = null;
+  onDelete: ((name: string) => void | Promise<void>) | null = null;
 
   seed(name: string, ...urls: string[]): void {
     const cache = new MemoryCache();
@@ -50,9 +55,33 @@ class MemoryCaches implements LifecycleCacheStorage {
   }
   async delete(name: string): Promise<boolean> {
     this.events.push(`cache:${name}`);
-    this.onDelete?.(name);
+    await this.onDelete?.(name);
     if (this.failDelete) throw new Error("synthetic cache deletion failure");
     return this.stores.delete(name);
+  }
+}
+
+class TestPairLocks implements PairCleanupLockPort {
+  readonly #tails = new Map<string, Promise<void>>();
+  beforeOperation: (() => Promise<void>) | null = null;
+
+  async request<T>(
+    name: string,
+    options: Readonly<{ mode: "exclusive"; signal: AbortSignal }>,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = this.#tails.get(name) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    this.#tails.set(name, previous.then(() => current));
+    await previous;
+    if (options.signal.aborted) throw new DOMException("Aborted", "AbortError");
+    try {
+      await this.beforeOperation?.();
+      return await operation();
+    } finally {
+      release();
+    }
   }
 }
 
@@ -137,6 +166,49 @@ async function seedReceiptDatabase(factory: IDBFactory, target: AppReleasePairV1
   database.close();
 }
 
+async function putLease(
+  factory: IDBFactory,
+  target: AppReleasePairV1,
+  leaseId: string,
+  expiresAtEpochMs: number,
+): Promise<void> {
+  const database = await openDatabase(factory, "searise-offline:v1");
+  const transaction = database.transaction("leases", "readwrite");
+  transaction.objectStore("leases").put({
+    key: JSON.stringify([cacheNamespaces(target).pairKey, leaseId]),
+    leaseId,
+    pairKey: cacheNamespaces(target).pairKey,
+    pair: target,
+    expiresAtEpochMs,
+  });
+  await transactionDone(transaction);
+  database.close();
+}
+
+async function publishSyntheticAdmission(factory: IDBFactory, target: AppReleasePairV1): Promise<void> {
+  await assertPairAdmissionOpen(factory, target);
+  const rangeDatabase = await openDatabase(factory, "searise-offline:v1");
+  const rangeTransaction = rangeDatabase.transaction("ranges", "readwrite");
+  rangeTransaction.objectStore("ranges").put({
+    key: "racing-range",
+    pairKey: cacheNamespaces(target).pairKey,
+    byteLength: 4,
+    lastAccessSequence: 100,
+  });
+  await transactionDone(rangeTransaction);
+  rangeDatabase.close();
+
+  const receiptDatabase = await openDatabase(factory, "searise-offline:admission-receipts:v1");
+  const receiptTransaction = receiptDatabase.transaction("accepted-receipts", "readwrite");
+  receiptTransaction.objectStore("accepted-receipts").put({
+    key: JSON.stringify([cacheNamespaces(target).pairKey, "racing-plan"]),
+    receipt: { pair: target },
+    receiptSha256: C,
+  });
+  await transactionDone(receiptTransaction);
+  receiptDatabase.close();
+}
+
 async function makeComplete(store: PairLifecycleStore, value: AppReleasePairV1): Promise<void> {
   await store.stage(value);
   await store.completeBootstrap(value, A);
@@ -146,12 +218,14 @@ async function makeComplete(store: PairLifecycleStore, value: AppReleasePairV1):
 describe("versioned exact-pair lifecycle store", () => {
   let factory: IDBFactory;
   let caches: MemoryCaches;
+  let locks: TestPairLocks;
   let store: PairLifecycleStore;
 
   beforeEach(() => {
     factory = new IDBFactory();
     caches = new MemoryCaches();
-    store = new PairLifecycleStore({ indexedDB: factory, cacheStorage: caches, now: () => 1_000 });
+    locks = new TestPairLocks();
+    store = new PairLifecycleStore({ indexedDB: factory, cacheStorage: caches, locks, now: () => 1_000 });
   });
 
   it("binds bootstrap and core completion to the exact composite SHA-256 identity", async () => {
@@ -268,7 +342,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(store.removeExactPair(target)).rejects.toMatchObject({ code: "CleanupBlocked" });
 
     const protectedFactory = new IDBFactory();
-    const protectedStore = new PairLifecycleStore({ indexedDB: protectedFactory, cacheStorage: caches, now: () => 3_000 });
+    const protectedStore = new PairLifecycleStore({ indexedDB: protectedFactory, cacheStorage: caches, locks, now: () => 3_000 });
     await protectedStore.stage(target);
     await protectedStore.markCleanupPending(target);
     await seedRangeDatabase(protectedFactory, target, { leaseExpiresAt: 900, protectedAs: "previous" });
@@ -289,6 +363,73 @@ describe("versioned exact-pair lifecycle store", () => {
     expect(other.leaseRecordCount).toBe(1);
   });
 
+  it("preserves existing data when a lease is acquired after the caller's initial observation", async () => {
+    const target = pair();
+    await makeComplete(store, target);
+    await store.markCleanupPending(target);
+    const namespaces = cacheNamespaces(target);
+    caches.seed(namespaces.shell, "https://static.example/index.html");
+    await seedRangeDatabase(factory, target, { leaseExpiresAt: 900 });
+    await seedReceiptDatabase(factory, target);
+
+    let cleanupReachedLock!: () => void;
+    let continueCleanup!: () => void;
+    const reachedLock = new Promise<void>((resolve) => { cleanupReachedLock = resolve; });
+    const continueGate = new Promise<void>((resolve) => { continueCleanup = resolve; });
+    locks.beforeOperation = async () => {
+      locks.beforeOperation = null;
+      cleanupReachedLock();
+      await continueGate;
+    };
+
+    const cleanup = store.removeExactPair(target, [{ clientId: "initially-inactive", state: "inactive" }]);
+    await reachedLock;
+    await putLease(factory, target, "late-live-client", 2_000);
+    continueCleanup();
+
+    await expect(cleanup).rejects.toMatchObject({ code: "CleanupBlocked" });
+    await expect(store.read(target)).resolves.toMatchObject({ status: "found", record: { state: "cleanup-pending" } });
+    await expect(store.storageInventory(target)).resolves.toMatchObject({
+      cacheNames: [namespaces.shell], rangeRecordCount: 1, receiptRecordCount: 1, leaseRecordCount: 2,
+    });
+  });
+
+  it("serializes racing admission behind cleanup and leaves no orphaned receipt or range bytes", async () => {
+    const target = pair();
+    await makeComplete(store, target);
+    await store.markCleanupPending(target);
+    const namespaces = cacheNamespaces(target);
+    caches.seed(namespaces.shell, "https://static.example/index.html");
+    await seedRangeDatabase(factory, target, { leaseExpiresAt: 900 });
+    await seedReceiptDatabase(factory, target);
+
+    let cleanupReachedDeletion!: () => void;
+    let continueCleanup!: () => void;
+    const reachedDeletion = new Promise<void>((resolve) => { cleanupReachedDeletion = resolve; });
+    const continueGate = new Promise<void>((resolve) => { continueCleanup = resolve; });
+    caches.onDelete = async () => {
+      caches.onDelete = null;
+      cleanupReachedDeletion();
+      await continueGate;
+    };
+
+    const cleanup = store.removeExactPair(target, [{ clientId: "closed-client", state: "inactive" }]);
+    await reachedDeletion;
+    const signal = new AbortController().signal;
+    const racingAdmission = locks.request(
+      pairAdmissionLockName(target),
+      { mode: "exclusive", signal },
+      async () => publishSyntheticAdmission(factory, target),
+    );
+    continueCleanup();
+
+    await expect(cleanup).resolves.toMatchObject({ state: "removed" });
+    await expect(racingAdmission).rejects.toMatchObject({ code: "CleanupPending" });
+    await expect(store.storageInventory(target)).resolves.toMatchObject({
+      cacheNames: [], rangeRecordCount: 0, receiptRecordCount: 0, leaseRecordCount: 0,
+    });
+  });
+
   it("deletes exact receipt authority before caches and ranges, then removes lifecycle last", async () => {
     const target = pair();
     await makeComplete(store, target);
@@ -300,7 +441,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await seedReceiptDatabase(factory, target);
 
     const events: string[] = [];
-    caches.onDelete = (name) => events.push(`cache:${name}`);
+    caches.onDelete = (name) => { events.push(`cache:${name}`); };
     const originalDelete = IDBObjectStore.prototype.delete;
     vi.spyOn(IDBObjectStore.prototype, "delete").mockImplementation(function (this: IDBObjectStore, key) {
       events.push(`idb:${this.name}`);

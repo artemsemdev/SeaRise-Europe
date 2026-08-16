@@ -23,6 +23,11 @@ import {
   assertVerifiedReleaseResourcePlan,
   type VerifiedReleaseResourcePlanV1,
 } from "./release-resource-plan";
+import {
+  assertPairAdmissionOpen,
+  pairAdmissionLockName,
+  type PairCleanupLockPort,
+} from "./pair-cleanup-fence";
 
 const RECEIPT_DATABASE = "searise-offline:admission-receipts:v1";
 const RECEIPT_STORE = "accepted-receipts";
@@ -86,13 +91,7 @@ export interface AdmissionReceiptStore {
   close(): void;
 }
 
-export interface AdmissionLockPort {
-  request<T>(
-    name: string,
-    options: Readonly<{ mode: "exclusive"; signal: AbortSignal }>,
-    operation: () => Promise<T>,
-  ): Promise<T>;
-}
+export type AdmissionLockPort = PairCleanupLockPort;
 
 export function browserAdmissionLockPort(locks: LockManager): AdmissionLockPort {
   return Object.freeze({
@@ -548,6 +547,7 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
   readonly subtle: SubtleCrypto;
   readonly #locks: AdmissionLockPort | undefined;
   readonly #nextOperationId: () => string;
+  readonly #assertAdmissionOpen: (() => Promise<void>) | undefined;
   #memoryTail: Promise<void> = Promise.resolve();
 
   constructor(
@@ -555,12 +555,14 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
     subtle: SubtleCrypto,
     locks: AdmissionLockPort | undefined,
     nextOperationId: () => string,
+    assertAdmissionOpen?: () => Promise<void>,
   ) {
     this.storageProfile = profile;
     this.pair = validateAppReleasePair(profile.pair);
     this.subtle = subtle;
     this.#locks = locks;
     this.#nextOperationId = nextOperationId;
+    this.#assertAdmissionOpen = assertAdmissionOpen;
   }
 
   abstract readStored(key: string): Promise<StoredReceipt | undefined>;
@@ -602,10 +604,12 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
     let operationFailure = false;
     try {
       return await this.#locks.request(
-        `searise-offline:admission:${cacheNamespaces(this.pair).pairKey}`,
+        pairAdmissionLockName(this.pair),
         { mode: "exclusive", signal },
         async () => {
           try {
+            await this.#assertAdmissionOpen?.();
+            requireSignal(signal);
             return await execute();
           } catch (error) {
             operationFailure = true;
@@ -707,7 +711,21 @@ class IndexedDbAdmissionReceiptStore extends BaseReceiptStore {
     locks: AdmissionLockPort,
     nextOperationId: () => string,
   ) {
-    super(profile, subtle, locks, nextOperationId);
+    super(
+      profile,
+      subtle,
+      locks,
+      nextOperationId,
+      async () => {
+        try {
+          await assertPairAdmissionOpen(indexedDB, profile.pair);
+        } catch (error) {
+          throw new AdmissionReceiptError(
+            "Conflict", "Exact-pair cleanup is pending; coordinated admission is refused.", error,
+          );
+        }
+      },
+    );
     this.#idb = indexedDB;
   }
 

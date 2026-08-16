@@ -1,6 +1,12 @@
 import { cacheNamespaces, exactRecord, validateAppReleasePair, type AppReleasePairV1 } from "./contracts/keys";
 import { sha256Hex } from "./contracts/v1";
 import type { PairLifecycleStateV1 } from "./contracts/policy";
+import {
+  beginPairCleanupFence,
+  pairAdmissionLockName,
+  PairCleanupFenceError,
+  type PairCleanupLockPort,
+} from "./pair-cleanup-fence";
 
 export const OFFLINE_LIFECYCLE_DATABASE = "searise-offline:lifecycle:v1" as const;
 export const OFFLINE_LIFECYCLE_STORE = "pair-lifecycle" as const;
@@ -81,6 +87,7 @@ export interface LifecycleCacheStorage {
 export interface PairLifecycleStoreDependencies {
   readonly indexedDB: IDBFactory;
   readonly cacheStorage: LifecycleCacheStorage;
+  readonly locks?: PairCleanupLockPort;
   readonly now?: () => number;
 }
 
@@ -241,12 +248,14 @@ function receiptPairKey(record: StoredReceiptSummary): string | null {
 export class PairLifecycleStore {
   readonly #idb: IDBFactory;
   readonly #cacheStorage: LifecycleCacheStorage;
+  readonly #locks: PairCleanupLockPort | undefined;
   readonly #now: () => number;
   #database: Promise<IDBDatabase> | null = null;
 
   constructor(dependencies: PairLifecycleStoreDependencies) {
     this.#idb = dependencies.indexedDB;
     this.#cacheStorage = dependencies.cacheStorage;
+    this.#locks = dependencies.locks;
     this.#now = dependencies.now ?? Date.now;
   }
 
@@ -534,20 +543,6 @@ export class PairLifecycleStore {
     });
   }
 
-  async #allLeases(): Promise<readonly StoredLeaseSummary[]> {
-    const names = await this.#databaseNames();
-    const database = await this.#openExisting(RANGE_DATABASE, names);
-    if (!database) return [];
-    try {
-      if (!database.objectStoreNames.contains(RANGE_STORES.leases)) return [];
-      const transaction = database.transaction(RANGE_STORES.leases, "readonly");
-      const done = completed(transaction);
-      const leases = await request(transaction.objectStore(RANGE_STORES.leases).getAll()) as StoredLeaseSummary[];
-      await done;
-      return leases;
-    } finally { database.close(); }
-  }
-
   async #deleteReceiptAuthority(pair: AppReleasePairV1): Promise<Readonly<{ receipts: number; authority: number }>> {
     const names = await this.#databaseNames();
     let receipts = 0;
@@ -639,6 +634,28 @@ export class PairLifecycleStore {
   ): Promise<RemovedPairV1> {
     const pair = validateAppReleasePair(pairInput);
     const observations = observationsInput.map(validateObservation);
+    if (!this.#locks) {
+      throw new PairLifecycleStoreError(
+        "StorageFailed", "A cross-context exact-pair admission lock is required for cleanup.",
+      );
+    }
+    const signal = new AbortController().signal;
+    let operationStarted = false;
+    try {
+      return await this.#locks.request(pairAdmissionLockName(pair), { mode: "exclusive", signal }, async () => {
+        operationStarted = true;
+        return this.#removeExactPairLocked(pair, observations);
+      });
+    } catch (error) {
+      if (operationStarted || error instanceof PairLifecycleStoreError) throw error;
+      throw new PairLifecycleStoreError("StorageFailed", "Cross-context exact-pair cleanup lock failed.", error);
+    }
+  }
+
+  async #removeExactPairLocked(
+    pair: AppReleasePairV1,
+    observations: readonly ClientLeaseObservationV1[],
+  ): Promise<RemovedPairV1> {
     const lifecycle = await this.read(pair);
     if (lifecycle.status !== "found" || lifecycle.record.state !== "cleanup-pending") {
       throw new PairLifecycleStoreError("Conflict", "Only a cleanup-pending exact pair may be removed.");
@@ -655,21 +672,21 @@ export class PairLifecycleStore {
         retained.some((record) => samePair(record.pair, pair))) {
       throw new PairLifecycleStoreError("CleanupBlocked", "Active and immediately previous complete pairs must be retained.");
     }
-    const storage = await this.storageInventory(pair);
-    if (storage.protectedByRangeAuthority) {
-      throw new PairLifecycleStoreError("CleanupBlocked", "Range authority still protects this pair as active or previous.");
-    }
-    const targetPairKey = lifecycleKey(pair);
-    const unsafeStoredLease = (await this.#allLeases()).some((lease) => {
-      if (typeof lease.pairKey !== "string") return true;
-      if (lease.pairKey !== targetPairKey) return false;
-      return !Number.isSafeInteger(lease.expiresAtEpochMs) || Number(lease.expiresAtEpochMs) > this.#now();
-    });
     const unsafeObservedLease = observations.some(({ state }) =>
       state === "active" || state === "unknown" || state === "unresponsive");
-    if (unsafeStoredLease || unsafeObservedLease) {
+    if (unsafeObservedLease) {
       throw new PairLifecycleStoreError("CleanupBlocked", "An active, unknown, or unresponsive client lease blocks cleanup.");
     }
+
+    try {
+      await beginPairCleanupFence(this.#idb, pair, this.#now);
+    } catch (error) {
+      if (error instanceof PairCleanupFenceError && error.code === "CleanupBlocked") {
+        throw new PairLifecycleStoreError("CleanupBlocked", error.message, error);
+      }
+      throw new PairLifecycleStoreError("StorageFailed", "Exact-pair cleanup fence could not be established.", error);
+    }
+    const storage = await this.storageInventory(pair);
 
     let deletedAuthority: Readonly<{ receipts: number; authority: number }> = { receipts: 0, authority: 0 };
     let cacheNamespacesDeleted = 0;

@@ -14,6 +14,7 @@ import {
   createRangeAuthorityCatalog,
   createRangeStore,
 } from "./range-store";
+import { beginPairCleanupFence } from "./pair-cleanup-fence";
 
 const A = "a".repeat(64);
 const C = "c".repeat(64);
@@ -190,6 +191,39 @@ describe("authoritative IndexedDB range store", () => {
     expect([...new Uint8Array((await store.readExactOrContaining(range))!)]).toEqual([10, 20, 30, 40]);
     expect([...new Uint8Array((await store.readExactOrContaining(range, { start: 1, endExclusive: 3 }))!)]).toEqual([20, 30]);
     await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 4, entryCount: 1 });
+  });
+
+  it("refuses range admission and lease acquisition or renewal after an exact-pair cleanup fence", async () => {
+    const firstBytes = bytes(10, 20, 30, 40);
+    const secondBytes = bytes(50, 60, 70, 80);
+    const first = await identity({ payload: firstBytes });
+    const second = await identity({ start: 4, payload: secondBytes });
+    const store = persistent(factory, [first, second]);
+    await store.putVerified(first, firstBytes);
+    await store.acquireLease({
+      contractVersion: 1,
+      leaseId: "expired-before-cleanup",
+      pair: pair(),
+      expiresAtEpochMs: 900,
+      state: "active",
+    });
+
+    await beginPairCleanupFence(factory, pair(), () => 1_000);
+
+    await expect(store.acquireLease({
+      contractVersion: 1,
+      leaseId: "expired-before-cleanup",
+      pair: pair(),
+      expiresAtEpochMs: 2_000,
+      state: "active",
+    })).rejects.toThrow(/cleanup is pending/);
+    await expect(store.putVerified(second, secondBytes)).rejects.toThrow(/cleanup is pending/);
+    await expect(store.admitVerifiedBatch([{ identity: second, bytes: secondBytes }], {
+      operationId: "late-admission",
+      signal: new AbortController().signal,
+    })).rejects.toThrow(/cleanup is pending/);
+    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 4, entryCount: 1 });
+    await expect(store.readExactOrContaining(first)).resolves.not.toBeNull();
   });
 
   it("admits one release-authorized interval for every scenario and horizon combination", async () => {
