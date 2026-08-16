@@ -263,9 +263,85 @@ display a new domain result for the uncached selection.
 
 An active session remains pinned to one release. A newer deployment may notify
 the visitor that an update is available, but it does not mix manifests,
-indexes, geometries, or byte ranges. On reload, the new app/release pairing
-initializes in a new cache namespace. Rollback deploys the previous complete
-pair; immutable artifacts are never overwritten.
+indexes, geometries, or byte ranges. An ordinary reload does not activate the
+new app/release pairing while any tab remains controlled by the prior worker.
+Every SeaRise tab must close first, allowing natural service-worker activation; only
+the subsequent reopen initializes the new pairing in a new cache namespace.
+Rollback deploys the previous complete pair; immutable artifacts are never
+overwritten.
+
+The static-host update coordinator is a pure user-intent state machine over
+injected ports. Its waiting-candidate identity binds the exact app/release pair
+to the accepted shell precache hash, resource-plan hash, and core
+admission-receipt hash. Inspection can report only `sealed`, `incomplete`,
+`corrupt`, `mixed`, or `stale`; only a sealed waiting candidate can produce a
+confirmation token.
+
+Starting newer preparation synchronously enters `preparing` and revokes the
+prior pending confirmation before the first asynchronous port call. The
+coordinator wraps the provider token in its own monotonic, one-time generation,
+so provider reuse or collision cannot authorize a later intent and a consumed
+confirmation cannot be replayed. Each production coordinator mints its own
+instance identifier from browser cryptographic entropy; deterministic injection
+exists only as a test seam, and duplicate identifiers are rejected within one
+JavaScript realm. Two coordinators created during the same page boot therefore
+cannot mint the same transition identity. The first validated controller proof
+is pinned as that coordinator's immutable launch boot.
+
+Explicit confirmation first records a non-consumable `PENDING` transition
+intent. Only after that write resolves unambiguously and the same coordinator
+generation remains current may a second durable transaction change the exact
+intent to `ARMED`. That arm transaction remains bound to an abort signal until
+commit. Only an exact `ARMED` intent can be consumed once; `PENDING`, consumed,
+missing, mismatched, tombstoned, and unknown records fail closed. The
+coordinator then presents the exact instruction: `Update ready. Close all
+SeaRise tabs and reopen to use it.` It does not swap browser-storage authority,
+activate a worker, call
+`skipWaiting`, call `clients.claim`, navigate, reload, or claim that the new
+pair is current. Existing tabs remain pinned to their controlling worker. A
+verified waiting worker becomes eligible to activate naturally only after all
+clients of the prior worker close. Cancellation or an ambiguous first write can
+leave only harmless `PENDING` evidence. Conditional cleanup may remove that
+exact pending record, but cleanup failure can never make it consumable.
+
+All durable intent mutations share a non-reentrant exclusive guard. The
+`PENDING` to `ARMED` transaction is the publication linearization point. A
+concurrent or adapter-reentrant mutation returns immediate, recoverable
+`mutation-busy` instead of queueing behind the port callback; the caller may
+retry after publication settles. After a compliant delayed arm settles, a
+retried rollback atomically tombstones the exact
+intent whether it is `PENDING` or `ARMED`; tombstoned transition IDs can never
+arm or consume. Only after that tombstone commits may rollback publish
+`deployment-required`. If tombstoning fails, the coordinator instead reports
+`rollback-failed` with the preserved durable intent and its `pending` or
+`armed` state. It never claims completed rollback while durable update
+authority remains.
+
+Durable adapter methods are non-reentrant and receive a bounded deadline plus
+an `AbortSignal`. They must keep their transaction bound to the signal and
+settle promptly after abort. The coordinator does not release its exclusive
+guard until the adapter acknowledges settlement. If the deadline expires and
+the adapter never settles, state becomes fail-closed `adapter-stalled`; later
+mutations return immediately with that technical state instead of waiting or
+claiming a durable outcome.
+
+On the subsequent fresh boot, activation is recognized only when the page
+proves a different boot identity controlled by the exact confirmed
+app/release/precache/core identity and atomically consumes the matching
+one-shot intent. Same-page, mismatched-controller, stale-intent, missing-intent,
+pending-intent, and replay attempts fail closed while the actually controlling
+pair remains usable. A changed controller proof reported to the original
+coordinator is still the same page, not a fresh boot, and cannot finalize
+activation. Async completion from a cancelled generation cannot overwrite a
+newer operation.
+Candidate evidence failures remain distinct from technical controller,
+inspection-port, token-provider, and intent-store failures. All are technical
+update states, never scientific outcomes.
+
+Browser storage is not application rollback authority. Rollback requires a
+verified static deployment, using repository Git history when source recovery
+is needed. The browser coordinator reports `deployment-required` and keeps the
+current controller usable; it never claims a local application rollback.
 
 ## 12. Architecture and methodology access
 

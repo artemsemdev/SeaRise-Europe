@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a conservative static-host update coordinator that verifies a sealed
+  waiting candidate and records an explicit one-shot close-and-reopen intent
+  without activating a worker, reloading, or changing current authority. A
+  subsequent fresh boot must prove the exact confirmed controller identity;
+  immutable launch-boot pinning prevents same-page finalization, while
+  internally minted cryptographic per-instance entropy and generation binding
+  prevent transition collisions, stale-token reuse, async state overwrite, and
+  replay. Durable intent publication is two-phase: ambiguous or cancelled writes
+  remain non-consumable `PENDING` evidence, and only a same-generation,
+  abort-bound transaction can arm an intent for one-shot consumption. Browser
+  rollback receives recoverable `mutation-busy` while publication is active,
+  then on retry must durably tombstone the exact pending or armed intent before
+  reporting `deployment-required`; tombstone failure preserves and reports the
+  actual durable authority. Bounded abort-aware adapter deadlines fail closed
+  as `adapter-stalled` if a port never acknowledges settlement. Git/deployment
+  history, not browser storage, remains the application rollback authority.
+
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,
   settlement-search Worker, Brotli WASM decoder, fonts, and dynamic scientific
