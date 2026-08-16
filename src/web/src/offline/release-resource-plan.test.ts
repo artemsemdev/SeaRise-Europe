@@ -247,10 +247,30 @@ describe("deterministic release resource plan", () => {
     const cogs = plan.routes.filter((route) => route.kind === "analysis-cog-ranges");
     const pmtiles = plan.routes.filter((route) =>
       route.kind === "network-only" && route.reason === "visual-pmtiles");
+    const completeIdentity = (route: (typeof complete)[number]) => {
+      if (route.authority.authorityKind !== "release-artifact") {
+        throw new Error("Release plans may contain only release-artifact complete authorities.");
+      }
+      return {
+        artifactId: route.authority.artifactId,
+        role: route.authority.role,
+      };
+    };
 
     expect(plan.persistence.mode).toBe("persistent");
-    expect(complete).toHaveLength(8);
+    expect(complete.map(completeIdentity)).toEqual([
+      { artifactId: "attribution", role: "source-attribution" },
+      { artifactId: "coastal-analysis-zone-geoparquet", role: "coastal-boundary" },
+      { artifactId: "cog-range-integrity", role: "range-integrity-index" },
+      { artifactId: "europe-support-geoparquet", role: "support-boundary" },
+      { artifactId: "methodology", role: "methodology" },
+      { artifactId: "scenario-config", role: "scenario-config" },
+      { artifactId: "settlements-europe-coastal", role: "settlement-search-index" },
+      { artifactId: "settlements-europe-core", role: "settlement-search-index" },
+      { artifactId: "source-grid-identity", role: "source-grid-identity" },
+    ]);
     expect(complete.every((route) => route.storage === "cache-storage")).toBe(true);
+    expect(complete.every((route) => !route.authority.path.endsWith(".pmtiles"))).toBe(true);
     expect(cogs).toHaveLength(9);
     expect(cogs.every((route) => route.storage === "indexeddb")).toBe(true);
     expect(plan.rangeCatalog.identities).toHaveLength(12);
