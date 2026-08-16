@@ -3,9 +3,8 @@
 import type { TechnicalError, TechnicalErrorCode } from "../domain/release";
 import {
   assertCompatibleShardSet,
-  decodeSearchShard,
+  decodeVerifiedCompressedSearchShard,
   searchShard,
-  verifySearchArtifactBytes,
   type SearchShardRuntime,
 } from "./runtime";
 import { SEARCH_WORKER_VERSION, type SearchWorkerRequest, type SearchWorkerResponse } from "./worker-protocol";
@@ -202,9 +201,7 @@ async function fetchShard(
     throw new SearchWorkerFailure("DecodeFailed", "Settlement shard bytes could not be read.", true);
   }
   try {
-    const verifiedArtifact = await verifySearchArtifactBytes(raw, authority);
-    const decoded = url.pathname.endsWith(".br") ? await decodeBrotli(raw) : raw;
-    return await decodeSearchShard(decoded, authority, verifiedArtifact);
+    return await decodeVerifiedCompressedSearchShard(raw, authority, decodeBrotli);
   } catch (error) {
     if (error instanceof SearchWorkerFailure) throw error;
     const code = /authority|release|identity|SHA|bytes differ/i.test(bounded(error))

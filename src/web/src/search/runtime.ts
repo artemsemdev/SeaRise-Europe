@@ -4,26 +4,25 @@ import {
   normalizeSearchText,
   searchFuzzyAllowance,
 } from "./ranking";
-import { compareCodePoints, validateSearchShardDocument, type IndexEnvelope } from "./contract";
+import {
+  compareCodePoints,
+  validateSearchShardDocument,
+  validateVerifiedCompressedSearchShardDocument,
+  type IndexEnvelope,
+  type SearchShardDecoder,
+  type ValidatedSearchShard,
+} from "./contract";
 import type {
   RankedSearchResult,
   SearchShardAuthority,
   SettlementSearchRecord,
 } from "./types";
 
-const MAX_COMPRESSED_BYTES = 16 * 1024 * 1024;
 const MAX_RAW_BYTES = 64 * 1024 * 1024;
 const MAX_QUERY_POINTS = 128;
 const MAX_QUERY_WORK = 250_000;
 const CANDIDATE_LIMIT = 128;
 const RESULT_LIMIT = 10;
-const VERIFIED_ARTIFACT = Symbol("verified-search-artifact");
-
-export interface VerifiedSearchArtifact {
-  readonly authority: SearchShardAuthority;
-  readonly [VERIFIED_ARTIFACT]: true;
-}
-
 interface CompactIndex {
   readonly entries: IndexEnvelope["payload"]["entries"];
   readonly lengths: Uint16Array;
@@ -42,14 +41,6 @@ export interface SearchShardRuntime {
 
 function fail(message: string): never {
   throw new Error(message);
-}
-
-function hex(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256(bytes: Uint8Array): Promise<string> {
-  return hex(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer));
 }
 
 function signatureBucket(point: string): number {
@@ -94,30 +85,10 @@ function compactIndex(envelope: IndexEnvelope): CompactIndex {
   };
 }
 
-export async function verifySearchArtifactBytes(
-  raw: Uint8Array,
+function searchRuntime(
+  value: ValidatedSearchShard,
   authority: SearchShardAuthority,
-): Promise<VerifiedSearchArtifact> {
-  if (
-    raw.length !== authority.artifact.byteSize
-    || raw.length > MAX_COMPRESSED_BYTES
-    || !/^[a-f0-9]{64}$/.test(authority.artifact.sha256)
-    || await sha256(raw) !== authority.artifact.sha256
-  ) {
-    return fail("search shard bytes differ from the pinned release authority");
-  }
-  return Object.freeze({ authority, [VERIFIED_ARTIFACT]: true as const });
-}
-
-export async function decodeSearchShard(
-  raw: Uint8Array,
-  authority: SearchShardAuthority,
-  verifiedArtifact?: VerifiedSearchArtifact,
-): Promise<SearchShardRuntime> {
-  if (raw.length > MAX_RAW_BYTES) return fail("decoded search shard exceeds its browser limit");
-  const artifactVerified = verifiedArtifact?.authority === authority
-    && verifiedArtifact[VERIFIED_ARTIFACT] === true;
-  const value = await validateSearchShardDocument(raw, authority, artifactVerified);
+): SearchShardRuntime {
   const records: (SettlementSearchRecord | undefined)[] = [undefined];
   for (const record of value.records) records.push(record);
   return Object.freeze({
@@ -126,6 +97,27 @@ export async function decodeSearchShard(
     records: Object.freeze(records),
     index: compactIndex(value.envelope),
   });
+}
+
+/** Decode arbitrary raw bytes only through the complete public contract validator. */
+export async function decodeSearchShard(
+  raw: Uint8Array,
+  authority: SearchShardAuthority,
+): Promise<SearchShardRuntime> {
+  if (raw.length > MAX_RAW_BYTES) return fail("decoded search shard exceeds its browser limit");
+  return searchRuntime(await validateSearchShardDocument(raw, authority), authority);
+}
+
+/** Keep exact compressed verification and the one-shot private fast parse in one operation. */
+export async function decodeVerifiedCompressedSearchShard(
+  compressed: Uint8Array,
+  authority: SearchShardAuthority,
+  decoder: SearchShardDecoder,
+): Promise<SearchShardRuntime> {
+  return searchRuntime(
+    await validateVerifiedCompressedSearchShardDocument(compressed, authority, decoder),
+    authority,
+  );
 }
 
 export function assertCompatibleShardSet(

@@ -12,8 +12,8 @@ import { canonicalJson } from "./contract";
 import {
   assertCompatibleShardSet,
   decodeSearchShard,
+  decodeVerifiedCompressedSearchShard,
   searchShard,
-  verifySearchArtifactBytes,
   type SearchShardRuntime,
 } from "./runtime";
 import type { SearchShardAuthority, SearchShardId, SettlementSearchRecord } from "./types";
@@ -64,8 +64,6 @@ describe("release-bound settlement search runtime", () => {
   it("preserves the canonical synthetic ranking controls across core and coastal shards", async () => {
     const coreFixture = fixture("europe-core");
     const coastalFixture = fixture("europe-coastal");
-    await verifySearchArtifactBytes(coreFixture.raw, coreFixture.authority);
-    await verifySearchArtifactBytes(coastalFixture.raw, coastalFixture.authority);
     const core = await decodeSearchShard(coreFixture.decoded, coreFixture.authority);
     const coastal = await decodeSearchShard(coastalFixture.decoded, coastalFixture.authority);
     expect(() => assertCompatibleShardSet(core, coastal)).not.toThrow();
@@ -139,11 +137,33 @@ describe("release-bound settlement search runtime", () => {
     const value = fixture("europe-core");
     const changed = Uint8Array.from(value.raw);
     changed[0] ^= 1;
-    await expect(verifySearchArtifactBytes(changed, value.authority)).rejects.toThrow(/pinned release authority/);
+    await expect(decodeVerifiedCompressedSearchShard(
+      changed,
+      value.authority,
+      async (bytes) => new Uint8Array(brotliDecompressSync(bytes)),
+    )).rejects.toThrow(/pinned release authority/);
     await expect(decodeSearchShard(value.decoded, { ...value.authority, dataReleaseId: "searise-europe-v1.0.0-20260810-aaaaaaaaaaaa" }))
       .rejects.toThrow(/authoritative v4 schema/);
     const runtime = await decodeSearchShard(value.decoded, value.authority);
     expect(() => searchShard(runtime, "bad\u0000query")).toThrow(/control characters/);
+  });
+
+  it("cannot replay a successful compressed verification to bypass full decoded validation", async () => {
+    const value = fixture("europe-core");
+    const runtime = await decodeVerifiedCompressedSearchShard(
+      value.raw,
+      value.authority,
+      async (bytes) => new Uint8Array(brotliDecompressSync(bytes)),
+    );
+    const changed = mutate(value, (document) => { document.recordsSha256 = "0".repeat(64); });
+    const attemptedReplay = decodeSearchShard as unknown as (
+      raw: Uint8Array,
+      authority: SearchShardAuthority,
+      capability: SearchShardRuntime,
+    ) => Promise<SearchShardRuntime>;
+
+    await expect(attemptedReplay(changed, value.authority, runtime))
+      .rejects.toThrow(/recordsSha256/);
   });
 
   it.each([
