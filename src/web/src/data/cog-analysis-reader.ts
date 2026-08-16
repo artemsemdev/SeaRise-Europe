@@ -39,8 +39,14 @@ interface NativeLocation {
 
 interface CachedCog {
   readonly artifact: ResolvedArtifact & { readonly role: "projection-analysis-cog" };
+  readonly client: StrictRangeClient;
   readonly image: GeoTIFFImage;
   readonly locations: readonly NativeLocation[];
+}
+
+interface ReadWave {
+  readonly controller: AbortController;
+  consumers: number;
 }
 
 interface SourceGridDocument {
@@ -121,7 +127,8 @@ class StrictRangeClient extends BaseClient {
   readonly #artifact: ResolvedArtifact;
   readonly #identity: RangeArtifactIdentity;
   readonly #fetch: typeof fetch;
-  readonly #signal: AbortSignal;
+  readonly #openSignal: AbortSignal;
+  #readWave: ReadWave | undefined;
   #etag: string | undefined;
   failure: TechnicalFailure | undefined;
 
@@ -141,7 +148,36 @@ class StrictRangeClient extends BaseClient {
     this.#artifact = artifact;
     this.#identity = identity;
     this.#fetch = fetcher;
-    this.#signal = signal;
+    this.#openSignal = signal;
+  }
+
+  async read<T>(
+    signal: AbortSignal,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    if (signal.aborted) {
+      throw technical("Aborted", `Analysis read for ${this.#artifact.artifactId} was cancelled.`, true);
+    }
+    let wave = this.#readWave;
+    if (!wave || wave.controller.signal.aborted) {
+      wave = { controller: new AbortController(), consumers: 0 };
+      this.#readWave = wave;
+    }
+    wave.consumers += 1;
+    const pending = Promise.resolve().then(operation);
+    try {
+      return await waitForCaller(
+        pending,
+        signal,
+        `Analysis read for ${this.#artifact.artifactId} was cancelled.`,
+      );
+    } finally {
+      wave.consumers -= 1;
+      if (wave.consumers === 0) {
+        wave.controller.abort("all pixel readers completed or cancelled");
+        if (this.#readWave === wave) this.#readWave = undefined;
+      }
+    }
   }
 
   async validateDelivery(): Promise<void> {
@@ -149,12 +185,12 @@ class StrictRangeClient extends BaseClient {
     try {
       response = await this.#fetch(this.url, {
         method: "HEAD",
-        signal: this.#signal,
+        signal: this.#openSignal,
         credentials: "omit",
         referrerPolicy: "no-referrer",
       });
     } catch (error) {
-      if (this.#signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+      if (this.#openSignal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         throw technical("Aborted", `Delivery metadata for ${this.#artifact.artifactId} was cancelled.`, true);
       }
       throw technical("FetchFailed", `Delivery metadata for ${this.#artifact.artifactId} is unavailable.`, true);
@@ -206,16 +242,17 @@ class StrictRangeClient extends BaseClient {
     }
     headers.set("If-Match", this.#etag);
     let response: Response;
+    const requestSignal = this.#readWave?.controller.signal ?? this.#openSignal;
     try {
       response = await this.#fetch(this.url, {
         ...options,
-        signal: this.#signal,
+        signal: requestSignal,
         headers,
         credentials: "omit",
         referrerPolicy: "no-referrer",
       });
     } catch (error) {
-      if (this.#signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+      if (requestSignal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         throw this.#record(technical("Aborted", `A byte range for ${this.#artifact.artifactId} was cancelled.`, true));
       }
       throw this.#record(technical("FetchFailed", `A required byte range for ${this.#artifact.artifactId} is unavailable.`, true));
@@ -240,7 +277,7 @@ class StrictRangeClient extends BaseClient {
     try {
       expanded = await response.arrayBuffer();
     } catch (error) {
-      if (this.#signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+      if (requestSignal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         throw this.#record(technical("Aborted", `A byte range for ${this.#artifact.artifactId} was cancelled.`, true));
       }
       throw this.#record(technical("FetchFailed", `A byte-range body for ${this.#artifact.artifactId} is unavailable.`, true));
@@ -654,6 +691,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
           await validateImage(image, projection, artifact);
           return Object.freeze({
             artifact,
+            client,
             image,
             locations: nativeLocations(projection, metadata.sourceGrid),
           }) as CachedCog;
@@ -714,7 +752,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
     }
     let rasters: Awaited<ReturnType<GeoTIFFImage["readRasters"]>>;
     try {
-      rasters = await waitForCaller(cached.image.readRasters({
+      rasters = await cached.client.read(signal, () => cached.image.readRasters({
         window: [
           selected.candidate.column,
           selected.candidate.row,
@@ -723,7 +761,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
         ],
         samples: [0, 1, 2],
         interleave: false,
-      }), signal, `Analysis read for ${artifact.artifactId} was cancelled.`);
+      }));
     } catch (error) {
       if (error instanceof TechnicalFailure) throw error;
       throw classifyReadError(error, artifact.artifactId, signal);

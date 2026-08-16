@@ -125,6 +125,43 @@ function etag(bytes: Uint8Array): string {
   return `"sha256-${sha256(bytes)}"`;
 }
 
+function canonicalRangeChunks(bytes: Uint8Array) {
+  const chunks = [];
+  for (let start = 0; start < bytes.byteLength; start += 65_536) {
+    const endExclusive = Math.min(start + 65_536, bytes.byteLength);
+    chunks.push({ start, endExclusive, sha256: sha256(bytes.slice(start, endExclusive)) });
+  }
+  return chunks;
+}
+
+function relocateMainTiffTile(bytes: Uint8Array): Uint8Array {
+  const source = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (source.getUint16(0, true) !== 0x4949 || source.getUint16(2, true) !== 42) {
+    throw new Error("expected a little-endian classic TIFF fixture");
+  }
+  const directoryOffset = source.getUint32(4, true);
+  const entryCount = source.getUint16(directoryOffset, true);
+  let tileOffsetEntry: number | undefined;
+  let tileByteCount: number | undefined;
+  for (let index = 0; index < entryCount; index += 1) {
+    const entry = directoryOffset + 2 + index * 12;
+    const tag = source.getUint16(entry, true);
+    if (source.getUint16(entry + 2, true) !== 4 || source.getUint32(entry + 4, true) !== 1) continue;
+    if (tag === 324) tileOffsetEntry = entry;
+    if (tag === 325) tileByteCount = source.getUint32(entry + 8, true);
+  }
+  if (tileOffsetEntry === undefined || tileByteCount === undefined) {
+    throw new Error("expected one LONG TileOffsets and TileByteCounts value");
+  }
+  const originalOffset = source.getUint32(tileOffsetEntry + 8, true);
+  const relocatedOffset = 2 * 65_536;
+  const relocated = new Uint8Array(relocatedOffset + tileByteCount);
+  relocated.set(bytes);
+  relocated.set(bytes.slice(originalOffset, originalOffset + tileByteCount), relocatedOffset);
+  new DataView(relocated.buffer).setUint32(tileOffsetEntry + 8, relocatedOffset, true);
+  return relocated;
+}
+
 function cloneReleaseContext(
   source: ReleaseContext,
   dataReleaseId: string,
@@ -149,11 +186,7 @@ function cloneReleaseContext(
   if (!rangeRecord) throw new Error("missing fixture range identity");
   rangeRecord.byteSize = replacementBytes.byteLength;
   rangeRecord.sha256 = replacementSha256;
-  rangeRecord.chunks = [{
-    start: 0,
-    endExclusive: replacementBytes.byteLength,
-    sha256: replacementSha256,
-  }];
+  rangeRecord.chunks = canonicalRangeChunks(replacementBytes);
   const rangeIntegrityBytes = new TextEncoder().encode(`${JSON.stringify(rangeIntegrity)}\n`);
   const rangeIntegritySha256 = sha256(rangeIntegrityBytes);
   const releasePath = `releases/${dataReleaseId}`;
@@ -193,6 +226,46 @@ function cloneReleaseContext(
     artifacts,
     datasets: { ...source.datasets },
   }), rangeIntegrityBytes };
+}
+
+function clonedRangeFetch(
+  releaseId: string,
+  replacementBytes: Uint8Array,
+  rangeIntegrityBytes: Uint8Array,
+  waitForRelocatedRange: (signal: AbortSignal) => Promise<void>,
+): typeof fetch {
+  return async (input, init) => {
+    const signal = init?.signal;
+    if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+    const url = new URL(input instanceof Request ? input.url : input.toString());
+    const path = url.pathname.split(`/${releaseId}/`)[1];
+    if (!path) throw new Error(`unexpected cloned release URL ${url.href}`);
+    const bytes = path === "analysis/source-grid.json.gz"
+      ? fixtureBytes(path)
+      : path === "analysis/cog-range-integrity.json"
+        ? rangeIntegrityBytes
+        : replacementBytes;
+    if (path === "analysis/source-grid.json.gz" || path === "analysis/cog-range-integrity.json") {
+      return new Response(responseBody(bytes), { status: 200 });
+    }
+    if (init?.method === "HEAD") {
+      return new Response(null, { status: 200, headers: {
+        "accept-ranges": "bytes", "content-length": String(bytes.byteLength), etag: etag(bytes),
+      } });
+    }
+    const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
+    if (!match) throw new Error("range required");
+    const start = Number(match[1]);
+    const end = Math.min(Number(match[2]), bytes.byteLength - 1);
+    if (start >= 2 * 65_536) await waitForRelocatedRange(signal ?? new AbortController().signal);
+    const body = bytes.slice(start, end + 1);
+    return new Response(responseBody(body), { status: 206, headers: {
+      "accept-ranges": "bytes",
+      "content-length": String(body.byteLength),
+      "content-range": `bytes ${start}-${end}/${bytes.byteLength}`,
+      etag: etag(bytes),
+    } });
+  };
 }
 
 function rangeFetch(calls: RangeCall[]): typeof fetch {
@@ -469,6 +542,35 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
     });
   });
 
+  it("applies the unrounded inclusive 100 km limit in the actual COG reader", async () => {
+    const context = await fixtureReleaseContext();
+    const reader = new CogAnalysisArtifactReader();
+    const exactLatitude = 75 + (100 / 6_371.0088) * (180 / Math.PI);
+    const beyondLatitude = 75 + (100.001 / 6_371.0088) * (180 / Math.PI);
+
+    await expect(
+      reader.lookup(
+        context,
+        "ssp1-26",
+        2030,
+        { latitude: exactLatitude, longitude: -30 },
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({ kind: "projection", source: { distanceKilometres: 100 } });
+    await expect(
+      reader.lookup(
+        context,
+        "ssp1-26",
+        2030,
+        { latitude: beyondLatitude, longitude: -30 },
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: "source-location-too-distant",
+    });
+  });
+
   it("keeps cached local lookup p95 below the documented 100 ms gate", async () => {
     const context = await fixtureReleaseContext();
     const reader = new CogAnalysisArtifactReader();
@@ -587,6 +689,110 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
     firstController.abort("superseded");
 
     await expect(first).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    await expect(second).resolves.toMatchObject({ kind: "projection" });
+  });
+
+  it("aborts an uncached post-open range transport when its last caller cancels", async () => {
+    const source = await fixtureReleaseContext();
+    const releaseId = "searise-europe-v1.0.1-20260816-post-open-abort";
+    const relocated = relocateMainTiffTile(fixtureBytes("analysis/ssp2-45/2050.tif"));
+    const cloned = cloneReleaseContext(source, releaseId, relocated);
+    let resolveStarted!: () => void;
+    const started = new Promise<void>((resolve) => { resolveStarted = resolve; });
+    let transportSignal: AbortSignal | undefined;
+    const fetcher = clonedRangeFetch(
+      releaseId,
+      relocated,
+      cloned.rangeIntegrityBytes,
+      (signal) => {
+        transportSignal = signal;
+        resolveStarted();
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    );
+    const reader = new CogAnalysisArtifactReader({ fetch: fetcher });
+    await expect(
+      reader.lookup(
+        cloned.context,
+        "ssp2-45",
+        2050,
+        { latitude: 90, longitude: -30 },
+        new AbortController().signal,
+      ),
+    ).resolves.toMatchObject({ kind: "unavailable", reason: "source-location-too-distant" });
+
+    const controller = new AbortController();
+    const lookup = reader.lookup(
+      cloned.context,
+      "ssp2-45",
+      2050,
+      available[0].coordinates,
+      controller.signal,
+    );
+    await started;
+    expect(transportSignal?.aborted).toBe(false);
+    controller.abort("superseded");
+
+    await expect(lookup).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    expect(transportSignal?.aborted).toBe(true);
+  });
+
+  it("keeps an uncached post-open range alive for a remaining shared caller", async () => {
+    const source = await fixtureReleaseContext();
+    const releaseId = "searise-europe-v1.0.1-20260816-post-open-shared";
+    const relocated = relocateMainTiffTile(fixtureBytes("analysis/ssp2-45/2050.tif"));
+    const cloned = cloneReleaseContext(source, releaseId, relocated);
+    let resolveStarted!: () => void;
+    const started = new Promise<void>((resolve) => { resolveStarted = resolve; });
+    let releaseRange!: () => void;
+    const rangeGate = new Promise<void>((resolve) => { releaseRange = resolve; });
+    let transportSignal: AbortSignal | undefined;
+    const reader = new CogAnalysisArtifactReader({
+      fetch: clonedRangeFetch(
+        releaseId,
+        relocated,
+        cloned.rangeIntegrityBytes,
+        (signal) => {
+          transportSignal = signal;
+          resolveStarted();
+          return rangeGate;
+        },
+      ),
+    });
+    await reader.lookup(
+      cloned.context,
+      "ssp2-45",
+      2050,
+      { latitude: 90, longitude: -30 },
+      new AbortController().signal,
+    );
+    const firstController = new AbortController();
+    const first = reader.lookup(
+      cloned.context,
+      "ssp2-45",
+      2050,
+      available[0].coordinates,
+      firstController.signal,
+    );
+    const second = reader.lookup(
+      cloned.context,
+      "ssp2-45",
+      2050,
+      available[0].coordinates,
+      new AbortController().signal,
+    );
+    await started;
+    firstController.abort("superseded");
+    await expect(first).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    expect(transportSignal?.aborted).toBe(false);
+    releaseRange();
+
     await expect(second).resolves.toMatchObject({ kind: "projection" });
   });
 
