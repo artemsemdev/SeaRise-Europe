@@ -11,10 +11,12 @@ import {
 import type { GeographyClassifier } from "../domain/scientific-lookup";
 import {
   artifactCacheIdentity,
+  createSharedArtifactResource,
   defaultArtifactTransport,
   verifiedArtifactBytes,
-  waitForCaller,
+  waitForSharedArtifact,
   type ArtifactTransport,
+  type SharedArtifactResource,
 } from "./artifact-integrity";
 
 type Position = readonly [number, number];
@@ -259,7 +261,7 @@ export function geometryCovers(
 
 export class StaticGeographyClassifier implements GeographyClassifier {
   readonly #transport: GeographyTransport;
-  readonly #cache = new Map<string, Promise<BoundaryPair>>();
+  readonly #cache = new Map<string, SharedArtifactResource<BoundaryPair>>();
 
   constructor(options: { readonly transport?: GeographyTransport } = {}) {
     this.#transport = options.transport ?? defaultArtifactTransport;
@@ -269,20 +271,30 @@ export class StaticGeographyClassifier implements GeographyClassifier {
     const support = resolveBoundaryArtifact(context, "support-boundary");
     const coastal = resolveBoundaryArtifact(context, "coastal-boundary");
     const cacheKey = artifactCacheIdentity(context, [support, coastal]);
-    let pending = this.#cache.get(cacheKey);
-    if (!pending) {
-      const resourceSignal = new AbortController().signal;
-      pending = Promise.all([
-        decodeBoundary(support, resourceSignal, this.#transport),
-        decodeBoundary(coastal, resourceSignal, this.#transport),
-      ]).then(([supportGeometry, coastalGeometry]) =>
-        Object.freeze({ support: supportGeometry, coastal: coastalGeometry }),
+    let resource = this.#cache.get(cacheKey);
+    if (!resource) {
+      resource = createSharedArtifactResource((resourceSignal) =>
+        Promise.all([
+          decodeBoundary(support, resourceSignal, this.#transport),
+          decodeBoundary(coastal, resourceSignal, this.#transport),
+        ]).then(([supportGeometry, coastalGeometry]) =>
+          Object.freeze({ support: supportGeometry, coastal: coastalGeometry }),
+        ),
       );
-      this.#cache.set(cacheKey, pending);
+      this.#cache.set(cacheKey, resource);
       while (this.#cache.size > 2) this.#cache.delete(this.#cache.keys().next().value as string);
-      pending.catch(() => this.#cache.delete(cacheKey));
+      resource.pending.catch(() => {
+        if (this.#cache.get(cacheKey) === resource) this.#cache.delete(cacheKey);
+      });
     }
-    return waitForCaller(pending, signal, "Geography classification was cancelled.");
+    return waitForSharedArtifact(
+      resource,
+      signal,
+      "Geography classification was cancelled.",
+      () => {
+        if (this.#cache.get(cacheKey) === resource) this.#cache.delete(cacheKey);
+      },
+    );
   }
 
   async classify(

@@ -121,6 +121,10 @@ function sha256(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
+function etag(bytes: Uint8Array): string {
+  return `"sha256-${sha256(bytes)}"`;
+}
+
 function cloneReleaseContext(
   source: ReleaseContext,
   dataReleaseId: string,
@@ -209,9 +213,12 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
         headers: {
           "accept-ranges": "bytes",
           "content-length": String(bytes.byteLength),
-          etag: `"fixture-${bytes.byteLength}"`,
+          etag: etag(bytes),
         },
       });
+    }
+    if (new Headers(init?.headers).get("if-match") !== etag(bytes)) {
+      throw new Error(`missing exact If-Match identity for ${path}`);
     }
     const range = new Headers(init?.headers).get("range");
     const match = /^bytes=(\d+)-(\d+)$/.exec(range ?? "");
@@ -228,7 +235,7 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
         "content-length": String(body.byteLength),
         "content-range": `bytes ${start}-${end}/${bytes.byteLength}`,
         "content-type": "image/tiff",
-        etag: `"fixture-${bytes.byteLength}"`,
+        etag: etag(bytes),
       },
     });
   };
@@ -387,7 +394,7 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
       }
       if (init?.method === "HEAD") {
         return new Response(null, { status: 200, headers: {
-          "accept-ranges": "bytes", "content-length": String(bytes.length), etag: '"replacement"',
+          "accept-ranges": "bytes", "content-length": String(bytes.length), etag: etag(bytes),
         } });
       }
       const match = /^bytes=(\d+)-(\d+)$/.exec(new Headers(init?.headers).get("range") ?? "");
@@ -401,6 +408,7 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
           "accept-ranges": "bytes",
           "content-length": String(body.length),
           "content-range": `bytes ${start}-${end}/${bytes.length}`,
+          etag: etag(bytes),
         },
       });
     });
@@ -491,6 +499,40 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
     ).rejects.toMatchObject({ detail: { code: "RangeUnsupported" } });
   });
 
+  it.each([
+    ["missing HEAD ETag", "head", null, "RangeUnsupported"],
+    ["mismatched HEAD ETag", "head", '"sha256-wrong"', "IntegrityFailed"],
+    ["missing range ETag", "range", null, "RangeUnsupported"],
+    ["changed range ETag", "range", '"sha256-changed"', "IntegrityFailed"],
+  ] as const)("fails closed for %s", async (_label, stage, replacement, expectedCode) => {
+    const base = rangeFetch([]);
+    vi.stubGlobal("fetch", async (input: URL | RequestInfo, init?: RequestInit) => {
+      const response = await base(input, init);
+      const isTarget = stage === "head"
+        ? init?.method === "HEAD"
+        : new Headers(init?.headers).has("range");
+      if (!isTarget) return response;
+      const headers = new Headers(response.headers);
+      if (replacement === null) headers.delete("etag");
+      else headers.set("etag", replacement);
+      return new Response(init?.method === "HEAD" ? null : await response.arrayBuffer(), {
+        status: response.status,
+        headers,
+      });
+    });
+    const context = await fixtureReleaseContext();
+
+    await expect(
+      new CogAnalysisArtifactReader().lookup(
+        context,
+        "ssp2-45",
+        2050,
+        available[0].coordinates,
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ detail: { code: expectedCode } });
+  });
+
   it("turns an aborted range request into a technical cancellation", async () => {
     const controller = new AbortController();
     const base = rangeFetch([]);
@@ -571,6 +613,7 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
           "accept-ranges": "bytes",
           "content-length": String(body.length),
           "content-range": `bytes ${start}-${end}/${bytes.length}`,
+          etag: etag(fixtureBytes(fixtureArtifactPath(url))),
         },
       });
     });

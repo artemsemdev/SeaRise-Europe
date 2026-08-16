@@ -20,10 +20,13 @@ import {
 } from "../domain/scientific-lookup";
 import {
   artifactCacheIdentity,
+  createSharedArtifactResource,
   sha256Hex,
   verifiedArtifactBytes,
   waitForCaller,
+  waitForSharedArtifact,
   type ArtifactTransport,
+  type SharedArtifactResource,
 } from "./artifact-integrity";
 
 interface NativeLocation {
@@ -118,6 +121,8 @@ class StrictRangeClient extends BaseClient {
   readonly #artifact: ResolvedArtifact;
   readonly #identity: RangeArtifactIdentity;
   readonly #fetch: typeof fetch;
+  readonly #signal: AbortSignal;
+  #etag: string | undefined;
   failure: TechnicalFailure | undefined;
 
   #record(error: TechnicalFailure): TechnicalFailure {
@@ -130,11 +135,13 @@ class StrictRangeClient extends BaseClient {
     artifact: ResolvedArtifact,
     identity: RangeArtifactIdentity,
     fetcher: typeof fetch,
+    signal: AbortSignal,
   ) {
     super(url);
     this.#artifact = artifact;
     this.#identity = identity;
     this.#fetch = fetcher;
+    this.#signal = signal;
   }
 
   async validateDelivery(): Promise<void> {
@@ -142,22 +149,32 @@ class StrictRangeClient extends BaseClient {
     try {
       response = await this.#fetch(this.url, {
         method: "HEAD",
+        signal: this.#signal,
         credentials: "omit",
         referrerPolicy: "no-referrer",
       });
-    } catch {
+    } catch (error) {
+      if (this.#signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        throw technical("Aborted", `Delivery metadata for ${this.#artifact.artifactId} was cancelled.`, true);
+      }
       throw technical("FetchFailed", `Delivery metadata for ${this.#artifact.artifactId} is unavailable.`, true);
     }
     if (!response.ok) {
       throw technical("FetchFailed", `Delivery metadata for ${this.#artifact.artifactId} returned HTTP ${response.status}.`, true);
     }
+    const etag = response.headers.get("etag");
     if (
       response.headers.get("accept-ranges") !== "bytes" ||
       response.headers.get("content-length") !== String(this.#artifact.byteSize) ||
-      !response.headers.get("etag")
+      !etag
     ) {
       throw technical("RangeUnsupported", `Host delivery for ${this.#artifact.artifactId} lacks exact HEAD range identity.`, true);
     }
+    const expectedEtag = `"sha256-${this.#artifact.sha256}"`;
+    if (etag !== expectedEtag) {
+      throw technical("IntegrityFailed", `Host delivery for ${this.#artifact.artifactId} does not match its manifest ETag.`);
+    }
+    this.#etag = etag;
   }
 
   override async request(options: RequestInit = {}): Promise<BaseResponse> {
@@ -184,16 +201,23 @@ class StrictRangeClient extends BaseClient {
     const expandedEnd = chunks.at(-1)!.endExclusive - 1;
     const headers = new Headers(options.headers);
     headers.set("Range", `bytes=${expandedStart}-${expandedEnd}`);
+    if (!this.#etag) {
+      throw this.#record(technical("RangeUnsupported", `HEAD identity is required before reading ${this.#artifact.artifactId}.`, true));
+    }
+    headers.set("If-Match", this.#etag);
     let response: Response;
     try {
       response = await this.#fetch(this.url, {
         ...options,
-        signal: undefined,
+        signal: this.#signal,
         headers,
         credentials: "omit",
         referrerPolicy: "no-referrer",
       });
-    } catch {
+    } catch (error) {
+      if (this.#signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        throw this.#record(technical("Aborted", `A byte range for ${this.#artifact.artifactId} was cancelled.`, true));
+      }
       throw this.#record(technical("FetchFailed", `A required byte range for ${this.#artifact.artifactId} is unavailable.`, true));
     }
     const expectedLength = expandedEnd - expandedStart + 1;
@@ -204,12 +228,23 @@ class StrictRangeClient extends BaseClient {
       response.status !== 206 ||
       response.headers.get("accept-ranges") !== "bytes" ||
       response.headers.get("content-length") !== String(expectedLength) ||
-      response.headers.get("content-range") !==
-        `bytes ${expandedStart}-${expandedEnd}/${this.#artifact.byteSize}`
+      response.headers.get("content-range") !== `bytes ${expandedStart}-${expandedEnd}/${this.#artifact.byteSize}` ||
+      !response.headers.get("etag")
     ) {
       throw this.#record(technical("RangeUnsupported", `Host delivery for ${this.#artifact.artifactId} returned an inexact byte range.`, true));
     }
-    const expanded = await response.arrayBuffer();
+    if (response.headers.get("etag") !== this.#etag) {
+      throw this.#record(technical("IntegrityFailed", `Host delivery for ${this.#artifact.artifactId} changed ETag during a range read.`));
+    }
+    let expanded: ArrayBuffer;
+    try {
+      expanded = await response.arrayBuffer();
+    } catch (error) {
+      if (this.#signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        throw this.#record(technical("Aborted", `A byte range for ${this.#artifact.artifactId} was cancelled.`, true));
+      }
+      throw this.#record(technical("FetchFailed", `A byte-range body for ${this.#artifact.artifactId} is unavailable.`, true));
+    }
     if (expanded.byteLength !== expectedLength) {
       throw this.#record(technical("IntegrityFailed", `A byte range for ${this.#artifact.artifactId} has the wrong size.`));
     }
@@ -501,8 +536,8 @@ function cogCacheIdentity(
 }
 
 export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
-  readonly #cache = new Map<string, Promise<CachedCog>>();
-  readonly #metadataCache = new Map<string, Promise<ScientificMetadata>>();
+  readonly #cache = new Map<string, SharedArtifactResource<CachedCog>>();
+  readonly #metadataCache = new Map<string, SharedArtifactResource<ScientificMetadata>>();
   readonly #fetch: typeof fetch;
   readonly #artifactTransport: ArtifactTransport;
 
@@ -532,36 +567,44 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
       throw technical("SchemaInvalid", "Scientific browser metadata artifacts have invalid release roles.");
     }
     const cacheKey = artifactCacheIdentity(context, [sourceGridArtifact, rangeIntegrityArtifact]);
-    let pending = this.#metadataCache.get(cacheKey);
-    if (!pending) {
-      const resourceSignal = new AbortController().signal;
-      pending = Promise.all([
-        verifiedArtifactBytes(sourceGridArtifact, resourceSignal, this.#artifactTransport),
-        verifiedArtifactBytes(rangeIntegrityArtifact, resourceSignal, this.#artifactTransport),
-      ]).then(async ([sourceGridBytes, rangeIntegrityBytes]) => {
-        let rangeValue: unknown;
-        try {
-          rangeValue = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rangeIntegrityBytes));
-        } catch {
-          throw technical("DecodeFailed", "The COG range-integrity artifact is invalid JSON.");
-        }
-        return Object.freeze({
-          sourceGrid: parseSourceGrid(
-            await decodeGzipJson(sourceGridBytes, sourceGridArtifact.artifactId),
-            context,
-          ),
-          rangeIntegrity: parseRangeIntegrity(rangeValue, context),
-        });
-      });
-      this.#metadataCache.set(cacheKey, pending);
+    let resource = this.#metadataCache.get(cacheKey);
+    if (!resource) {
+      resource = createSharedArtifactResource((resourceSignal) =>
+        Promise.all([
+          verifiedArtifactBytes(sourceGridArtifact, resourceSignal, this.#artifactTransport),
+          verifiedArtifactBytes(rangeIntegrityArtifact, resourceSignal, this.#artifactTransport),
+        ]).then(async ([sourceGridBytes, rangeIntegrityBytes]) => {
+          let rangeValue: unknown;
+          try {
+            rangeValue = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rangeIntegrityBytes));
+          } catch {
+            throw technical("DecodeFailed", "The COG range-integrity artifact is invalid JSON.");
+          }
+          return Object.freeze({
+            sourceGrid: parseSourceGrid(
+              await decodeGzipJson(sourceGridBytes, sourceGridArtifact.artifactId),
+              context,
+            ),
+            rangeIntegrity: parseRangeIntegrity(rangeValue, context),
+          });
+        }),
+      );
+      this.#metadataCache.set(cacheKey, resource);
       while (this.#metadataCache.size > 2) {
         this.#metadataCache.delete(this.#metadataCache.keys().next().value as string);
       }
-      pending.catch(() => {
-        if (this.#metadataCache.get(cacheKey) === pending) this.#metadataCache.delete(cacheKey);
+      resource.pending.catch(() => {
+        if (this.#metadataCache.get(cacheKey) === resource) this.#metadataCache.delete(cacheKey);
       });
     }
-    return waitForCaller(pending, signal, "Scientific metadata loading was cancelled.");
+    return waitForSharedArtifact(
+      resource,
+      signal,
+      "Scientific metadata loading was cancelled.",
+      () => {
+        if (this.#metadataCache.get(cacheKey) === resource) this.#metadataCache.delete(cacheKey);
+      },
+    );
   }
 
   async #open(
@@ -569,6 +612,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
     artifact: ResolvedArtifact,
     projection: ProjectionContextV2,
     metadata: ScientificMetadata,
+    signal: AbortSignal,
   ): Promise<CachedCog> {
     if (artifact.role !== "projection-analysis-cog") {
       throw technical("SchemaInvalid", `${artifact.artifactId} is not a scientific analysis COG.`);
@@ -578,16 +622,22 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
       context.artifact(context.manifest.contractArtifacts.rangeIntegrityIndex),
     ];
     const cacheIdentity = cogCacheIdentity(context, artifact, projection, metadataArtifacts);
-    let pending = this.#cache.get(cacheIdentity);
-    if (!pending) {
-      pending = (async () => {
+    let resource = this.#cache.get(cacheIdentity);
+    if (!resource) {
+      resource = createSharedArtifactResource(async (resourceSignal) => {
         const rangeIdentity = metadata.rangeIntegrity.artifacts.find(
           (candidate) => candidate.artifactId === artifact.artifactId,
         );
         if (!rangeIdentity) {
           throw technical("IntegrityFailed", `No range-integrity identity exists for ${artifact.artifactId}.`);
         }
-        const client = new StrictRangeClient(artifact.url, artifact, rangeIdentity, this.#fetch);
+        const client = new StrictRangeClient(
+          artifact.url,
+          artifact,
+          rangeIdentity,
+          this.#fetch,
+          resourceSignal,
+        );
         try {
           await client.validateDelivery();
           const sourceOptions = {
@@ -610,16 +660,23 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
         } catch (error) {
           if (error instanceof TechnicalFailure) throw error;
           if (client.failure) throw client.failure;
-          throw classifyReadError(error, artifact.artifactId, new AbortController().signal);
+          throw classifyReadError(error, artifact.artifactId, resourceSignal);
         }
-      })();
-      this.#cache.set(cacheIdentity, pending);
+      });
+      this.#cache.set(cacheIdentity, resource);
       while (this.#cache.size > 4) this.#cache.delete(this.#cache.keys().next().value as string);
-      pending.catch(() => {
-        if (this.#cache.get(cacheIdentity) === pending) this.#cache.delete(cacheIdentity);
+      resource.pending.catch(() => {
+        if (this.#cache.get(cacheIdentity) === resource) this.#cache.delete(cacheIdentity);
       });
     }
-    return pending;
+    return waitForSharedArtifact(
+      resource,
+      signal,
+      `Analysis read for ${artifact.artifactId} was cancelled.`,
+      () => {
+        if (this.#cache.get(cacheIdentity) === resource) this.#cache.delete(cacheIdentity);
+      },
+    );
   }
 
   async lookup(
@@ -646,11 +703,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
       throw technical("SchemaInvalid", "The selected analysis artifact violates the exact AR6 release contract.");
     }
     const metadata = await this.#metadata(context, signal);
-    const cached = await waitForCaller(
-      this.#open(context, artifact, artifact.projectionContext, metadata),
-      signal,
-      `Analysis read for ${artifact.artifactId} was cancelled.`,
-    );
+    const cached = await this.#open(context, artifact, artifact.projectionContext, metadata, signal);
     const selected = selectNearestSourceGridLocation(cached.locations, coordinates);
     if (selected.unroundedDistanceKilometres > MAXIMUM_SOURCE_DISTANCE_KILOMETRES) {
       return Object.freeze({
