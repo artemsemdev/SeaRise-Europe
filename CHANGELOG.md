@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
   app/manifest precache, delayed public-static registration, private Candidate
   refusal, conservative lifecycle behavior, and exact worker identity checks.
 
+- Added a bounded authoritative IndexedDB range store for release-authorized
+  COG chunks, with exact app/release/artifact isolation, verified containing
+  slices, atomic accounting and eviction, active/previous and lease protection,
+  corruption quarantine, and memory-only private-candidate handling. Visual
+  PMTiles remain deliberately network-only and cannot enter range persistence.
+
 - Added versioned release-scoped offline authority contracts for whole and
   authorized range resources, with fail-closed private-candidate persistence
   and an exact privacy allowlist for durable records.

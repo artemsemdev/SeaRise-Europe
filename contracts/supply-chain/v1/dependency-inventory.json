@@ -49,11 +49,11 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "package-lock.json", "role": "lock", "sha256": "666b9384976469b1bab5a7b7cfbd5b298cbc742d21f3c458f7fdc3335afbe007" },
+        { "path": "package-lock.json", "role": "lock", "sha256": "5cf2dabe9ba24e2e0f9593b966fb6bab16cd16b15b59e859e5a04da17854626e" },
         { "path": "package.json", "role": "manifest", "sha256": "340a13f00e5be4cd6d1a5397f380ba75388611ed9d191f220fdaf43185da3d4d" },
         { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "c5d8af53b1029f9bfb75424ccad83b3da4ad096d175f4ba05789e847d5548cdd" },
         { "path": "src/frontend/package.json", "role": "manifest", "sha256": "e08c0876aefb117577488d2fb0bdcb4aea3a636156336643a6debf84e91485af" },
-        { "path": "src/web/package.json", "role": "manifest", "sha256": "4ccbb09974e997bd6eb59bd5024e89ff94fcdc16921046e7fb3f4856242e4da1" }
+        { "path": "src/web/package.json", "role": "manifest", "sha256": "37d1ba5fb98de53c2053e4c366febe94b0ce44c5a6ad5275ea01bcc304674e3b" }
       ],
       "note": "The static web workspace uses the root npm lockfileVersion 3 with exact registry URLs and SHA-512 integrity; the legacy frontend remains separately locked during the migration."
     },
