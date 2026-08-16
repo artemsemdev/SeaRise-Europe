@@ -33,6 +33,7 @@ export interface VerifiedResourceRouterOptionsV1 {
   readonly receiptStore: AdmissionReceiptStore;
   readonly subtle: SubtleCrypto;
   readonly fetchRange: typeof fetch;
+  readonly clientLease?: Readonly<{ close(): Promise<void> }>;
 }
 
 function technical(
@@ -80,6 +81,7 @@ export class VerifiedResourceRouter {
   readonly #receiptStore: AdmissionReceiptStore;
   readonly #subtle: SubtleCrypto;
   readonly #fetchRange: typeof fetch;
+  readonly #clientLease: Readonly<{ close(): Promise<void> }> | undefined;
   readonly #cogResponseCacheControl: string;
   readonly #whole: readonly WholeResourceAuthorityV1[];
   readonly #assessmentSupport: readonly WholeResourceAuthorityV1[];
@@ -88,6 +90,7 @@ export class VerifiedResourceRouter {
   readonly #rangesByArtifact: ReadonlyMap<string, readonly RangeIdentityV1[]>;
   #active: AcceptedResourceSnapshotV1 | undefined;
   #admissionTail: Promise<void> = Promise.resolve();
+  #closed = false;
 
   readonly artifactTransport: ArtifactTransport;
   readonly cogRangeTransport: CogRangeTransport;
@@ -99,6 +102,7 @@ export class VerifiedResourceRouter {
     this.#receiptStore = options.receiptStore;
     this.#subtle = options.subtle;
     this.#fetchRange = options.fetchRange;
+    this.#clientLease = options.clientLease;
     this.#cogResponseCacheControl = this.#releasePlan.persistence.mode === "memory-only"
       ? "private, no-store"
       : "public, max-age=31536000, immutable";
@@ -467,9 +471,18 @@ export class VerifiedResourceRouter {
   }
 
   close(): void {
-    this.#receiptStore.close();
-    this.#rangeStore.close();
-    this.#wholeStore.close();
+    if (this.#closed) return;
+    this.#closed = true;
+    const closeStores = (): void => {
+      this.#receiptStore.close();
+      this.#rangeStore.close();
+      this.#wholeStore.close();
+    };
+    if (!this.#clientLease) {
+      closeStores();
+      return;
+    }
+    void this.#clientLease.close().catch(() => undefined).finally(closeStores);
   }
 
 }

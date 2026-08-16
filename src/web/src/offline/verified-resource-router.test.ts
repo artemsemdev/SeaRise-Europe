@@ -127,6 +127,7 @@ async function harness(options: Readonly<{
   maxRangeBytes?: number;
   rangeFetch?: typeof fetch;
   localCandidate?: boolean;
+  clientLease?: Readonly<{ close(): Promise<void> }>;
   mutateWholeResponse?: (response: Response) => Response | Promise<Response>;
   mutateRangeResponse?: (response: Response, init: RequestInit) => Response | Promise<Response>;
 }> = {}): Promise<Harness> {
@@ -248,6 +249,7 @@ async function harness(options: Readonly<{
     receiptStore: receipts,
     subtle,
     fetchRange: strictRangeFetch,
+    clientLease: options.clientLease,
   });
   const createPeerRouter = (): VerifiedResourceRouter => new VerifiedResourceRouter({
     releasePlan: plan,
@@ -304,6 +306,15 @@ async function readFirstCog(
 }
 
 describe("verified resource router", () => {
+  it("requests orderly client-lease release once when the runtime closes", async () => {
+    const close = vi.fn(async () => undefined);
+    const test = await harness({ clientLease: { close } });
+
+    test.router.close();
+    test.router.close();
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
+  });
+
   it("admits only assessment support without preloading nine COGs, then admits the requested range and serves its offline hit with zero network", async () => {
     const test = await harness();
     const snapshot = await test.router.prepareAssessmentSupport(new AbortController().signal);
