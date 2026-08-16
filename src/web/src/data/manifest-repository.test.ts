@@ -1,6 +1,9 @@
 import fixture from "../../../../contracts/release/v2/fixtures/browser-release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
 import legacyV1Fixture from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
-import { describe, expect, it } from "vitest";
+import type { ErrorObject } from "ajv";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import type { ReleaseManifestV2 } from "../contracts/generated/release-contract";
+import validateManifest from "../contracts/generated/manifest-validator.mjs";
 import { TechnicalFailure, validateCoordinates } from "../domain/release";
 import { ManifestRepository, type ManifestTransport } from "./manifest-repository";
 
@@ -36,6 +39,14 @@ async function errorCode(value: unknown): Promise<string> {
 }
 
 describe("ManifestRepository", () => {
+  it("types the generated standalone validator against the release v2 manifest", () => {
+    expectTypeOf(validateManifest).toEqualTypeOf<{
+      (value: unknown): value is ReleaseManifestV2;
+      errors?: ErrorObject[] | null;
+    }>();
+    expect(validateManifest(structuredClone(fixture))).toBe(true);
+  });
+
   it("loads the complete fixture into an immutable, release-scoped context", async () => {
     const context = await repository(structuredClone(fixture)).load(
       releaseId,
