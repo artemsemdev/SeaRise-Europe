@@ -90,6 +90,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Bound every persisted COG range to an immutable trusted identity catalog,
+  isolated lease IDs by app/release pair across the IndexedDB v1-to-v2
+  migration, and made rejected memory protection updates non-mutating.
+  COG-shaped relabeling cannot authorize bytes that are absent from the
+  verified range-index authority.
+
 - Restored the canonical SeaRise Flight landing and result composition across
   desktop and mobile, with durable same-viewport visual QA evidence, while
   retaining the corrected ADR-024 scientific outcomes and accessibility flow.

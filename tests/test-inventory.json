@@ -409,15 +409,15 @@
       "id": "static-authoritative-range-store",
       "layer": "integration",
       "owner": "platform",
-      "purpose": "Keep release-authorized COG range persistence exact, bounded, private-safe, corruption-detecting, and transactionally consistent while PMTiles remains network-only and outside every range store.",
+      "purpose": "Keep release-authorized COG range persistence bound to an immutable trusted identity catalog, exact, bounded, private-safe, corruption-detecting, pair-isolated, and transactionally consistent while PMTiles remains network-only and outside every range store.",
       "sourcePaths": ["src/web/src/offline/range-store.ts", "src/web/src/offline/range-store.test.ts"],
       "changedPaths": ["src/web/src/offline/range-store.ts", "src/web/src/offline/range-store.test.ts", "src/web/src/offline/contracts/**"],
       "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent IndexedDB and memory authority, atomic batch quota/rollback, deterministic eviction, lease protection, corruption, and PMTiles-refusal gate." },
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent trusted range-index authority, IndexedDB and memory isolation, atomic batch quota/rollback, deterministic eviction, pair-bound lease protection, corruption, and PMTiles-refusal gate." },
       "commands": { "focused": "npm exec --workspace @searise/web vitest run src/offline/range-store.test.ts", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-16-authoritative-range-store", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A fresh fake IndexedDB factory and injected clock isolate every deterministic transaction; native browser quota and storage pressure remain later browser gates." }
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A fresh fake IndexedDB factory, immutable trusted catalogs, deterministic v1-to-v2 lease migration, and injected clock isolate every transaction; native browser quota and storage pressure remain later browser gates." }
     },
     {
       "id": "static-range-cache-compatibility",
