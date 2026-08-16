@@ -91,4 +91,13 @@ describe("offline persistence privacy contract v1", () => {
       lastAccessSequence: 7,
     })).toThrow(/query/);
   });
+
+  it("persists lease authority without browser client identifiers", () => {
+    const record = validatePersistedOfflineRecord({
+      recordType: "lease",
+      lease: { contractVersion: 1, leaseId: "lease-1", pair, expiresAtEpochMs: 1_800_000_000_000, state: "active" },
+    });
+    expect(record).not.toHaveProperty("clientId");
+    expect(() => validatePersistedOfflineRecord({ ...record, clientId: "browser-client" })).toThrow(/additional/);
+  });
 });

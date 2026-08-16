@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   authorized range resources, with fail-closed private-candidate persistence
   and an exact privacy allowlist for durable records.
 
+- Added independently validated offline capability, storage-budget, lease,
+  update, cleanup, rollback, worker-protocol, and technical-failure contracts.
+
 - Added production-static browser journey evidence for all four ADR-024
   outcomes and all nine scenario/horizon projections, including exact COG
   values, release-scoped PMTiles identity, keyboard and reduced-motion flows,

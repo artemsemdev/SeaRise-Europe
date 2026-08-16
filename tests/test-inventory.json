@@ -264,8 +264,8 @@
     "local-2026-08-16-offline-authority-contracts": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T14:29:00+02:00",
-      "reference": "src/web/src/offline/contracts/keys.test.ts, src/web/src/offline/contracts/v1.test.ts, and src/web/src/offline/contracts/privacy.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 36 deterministic authority, namespace, integrity, persistence-eligibility, and privacy contract cases; committed synthetic identities and in-memory sentinel values only; no browser, network, private candidate bytes, TAR, clock, or external storage"
+      "reference": "src/web/src/offline/contracts/keys.test.ts, src/web/src/offline/contracts/v1.test.ts, src/web/src/offline/contracts/privacy.test.ts, and src/web/src/offline/contracts/policy.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 56 deterministic authority, namespace, integrity, persistence-eligibility, privacy, capability, budget, lifecycle, lease, update, rollback, worker-message, and technical-failure contract cases; committed synthetic identities and in-memory sentinel values only; no browser, network, private candidate bytes, TAR, clock, or external storage"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -363,7 +363,7 @@
       "id": "static-offline-contracts",
       "layer": "contract",
       "owner": "platform",
-      "purpose": "Keep app/release cache authority, canonical namespaces, whole-resource and authorized half-open range identities, private-candidate persistence exclusion, and durable-record privacy schemas fail closed before offline storage is implemented.",
+      "purpose": "Keep app/release cache authority, canonical namespaces, whole-resource and authorized half-open range identities, private-candidate persistence exclusion, durable-record privacy, capability, budget, lifecycle, lease, update, rollback, worker-message, and technical-failure schemas fail closed before offline storage is implemented.",
       "sourcePaths": ["src/web/src/offline/contracts/**"],
       "changedPaths": ["src/web/src/offline/contracts/**"],
       "disposition": "keep-permanently",
@@ -1331,6 +1331,7 @@
     { "path": "src/web/src/domain/projection-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/release.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/keys.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/contracts/policy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/privacy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
