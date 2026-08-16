@@ -55,6 +55,18 @@ describe("offline authority foundation v1", () => {
     expect(() => validateAppAuthority({ ...authority(), query: "Berlin" })).toThrow(/additional/);
   });
 
+  it.each([
+    "https://static.example/releases/release-a-prefix/manifest.json",
+    "https://static.example/releases/prefix-release-a/manifest.json",
+    "https://static.example/releases/%72elease-a/manifest.json",
+    "https://static.example/releases/release-a%2Fshadow/manifest.json",
+    "https://static.example/releases/release-a%252Fshadow/manifest.json",
+  ])("rejects ambiguous release scope %s", (manifestUrl) => {
+    expect(() => validateAppAuthority({ ...authority(), manifestUrl })).toThrow(
+      /exact dataReleaseId path segment/,
+    );
+  });
+
   it.each(["https://user:secret@static.example/a", "https://static.example/a?latitude=1", "https://static.example/a#selection", "file:///tmp/private-overlay"])("rejects non-canonical URL %s", (url) => {
     expect(() => canonicalResourceUrl(url)).toThrow();
   });

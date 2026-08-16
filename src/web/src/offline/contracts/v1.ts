@@ -65,7 +65,19 @@ function pairFromRecord(record: Record<string, unknown>): AppReleasePairV1 {
 }
 
 function assertReleaseScopedUrl(url: CanonicalResourceUrl, pair: AppReleasePairV1, name: string): void {
-  if (!new URL(url).pathname.includes(`/${pair.dataReleaseId}/`)) {
+  const rawSegments = new URL(url).pathname.split("/");
+  let segments: readonly string[];
+  try {
+    segments = rawSegments.map((segment) => decodeURIComponent(segment));
+  } catch {
+    fail(`${name} pathname contains invalid percent encoding.`);
+  }
+  if (
+    !segments.some((segment) => segment === pair.dataReleaseId)
+    || rawSegments.some(
+      (segment, index) => segments[index] === pair.dataReleaseId && segment !== pair.dataReleaseId,
+    )
+  ) {
     fail(`${name} must contain the exact dataReleaseId path segment.`);
   }
 }

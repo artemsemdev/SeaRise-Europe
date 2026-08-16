@@ -267,6 +267,12 @@
       "reference": "src/web/src/offline/contracts, src/web/src/offline/register-service-worker.test.ts, and src/web/src/offline/service-worker-runtime.test.ts",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 70 deterministic authority, namespace, privacy, policy, registration, crash-recovery, routing, and worker-message cases; committed synthetic identities and in-memory storage/network doubles only; no private candidate bytes, TAR, clock, or external storage"
     },
+    "local-2026-08-16-whole-resource-cache": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T16:07:36+02:00",
+      "reference": "src/web/src/offline/whole-resource-cache.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 33 deterministic complete-resource cache cases with injected in-memory Cache Storage, fetch, and SHA-256 ports; synthetic bytes and authorities only; no browser storage, network, private candidate bytes, TAR, clock, or external service"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -372,6 +378,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-offline-authority-contracts", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "All cases use exact immutable objects and deterministic validators with no browser, storage API, network, candidate artifact, or clock dependency." }
+    },
+    {
+      "id": "static-whole-resource-cache",
+      "layer": "unit",
+      "owner": "platform",
+      "purpose": "Keep complete shell and small immutable release-resource persistence release-scoped, same-origin, integrity-verified, private-data-free, staged, rollback-safe where Cache Storage permits, and aggregate-only before service-worker integration.",
+      "sourcePaths": ["src/web/src/offline/whole-resource-cache.ts", "src/web/src/offline/whole-resource-cache.test.ts"],
+      "changedPaths": ["src/web/src/offline/whole-resource-cache.ts", "src/web/src/offline/whole-resource-cache.test.ts", "src/web/src/offline/contracts/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent complete-resource persistence, integrity, isolation, and privacy gate." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline/whole-resource-cache.test.ts", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-whole-resource-cache", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Injected deterministic browser ports cover fetch, Cache Storage, digest, staging, concurrent admission, partial failures, corruption, rollback, and exact-key quarantine without network, browser, storage quota, candidate artifact, or clock dependencies." }
     },
     {
       "id": "static-range-cache-compatibility",
@@ -1336,6 +1356,7 @@
     { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/register-service-worker.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/service-worker-runtime.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/whole-resource-cache.test.ts", "suite": "static-whole-resource-cache", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
