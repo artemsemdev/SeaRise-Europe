@@ -31,12 +31,12 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   await page.goto("/");
   await expectStaticDocumentSecurity(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "Explore regional sea-level projections across Europe",
+    "Take me there.",
   );
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await expect(page.getByText(/Synthetic fixture · illustrative only/i)).toBeVisible();
-  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeAttached();
 
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations.filter((item) => ["critical", "serious"].includes(item.impact ?? ""))).toEqual([]);
@@ -408,9 +408,13 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
   await expect(page.getByRole("option", { name: /Springfield.*South, BB/i })).toBeVisible();
   await input.press("ArrowDown");
   await input.press("Enter");
-  await expect(page.locator(".selection-status")).toContainText(/accepted projection is shown below/i);
+  await expect(page.locator(".selection-status")).toContainText(/accepted projection is shown in the result panel/i);
   await expect(page.locator(".projection-panel__location")).toContainText(/50\.10000°, 10\.10000°/i);
-  await expect(input).toBeFocused();
+  await expect(input).toHaveCount(0);
+
+  await page.getByRole("button", { name: /reset selection and choose another place/i }).click();
+  await expect(input).toBeVisible();
+  await input.focus();
 
   await input.fill("PrivateSearchTokenXYZ");
   await expect(searchStatus).toContainText(/No matching places found in the loaded index/i);
@@ -430,14 +434,14 @@ test("settlement shard delivery failure remains a technical state", async ({ pag
   });
   await page.goto("/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
-  const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.focus();
   await input.fill("Athens");
-  await expect(searchStatus).toContainText(/technical failure, not a no-match result/i, { timeout: 10_000 });
-  await expect(page.locator(".search-shell .search-empty.error")).toContainText(
-    /No scientific outcome was produced/i,
+  await expect(page.locator(".projection-panel")).toHaveAttribute("data-phase", "integrity-error", { timeout: 10_000 });
+  await expect(page.locator('.projection-panel [role="alert"]')).toContainText(
+    /technical failure.*not a DataUnavailable scientific outcome/i,
   );
+  await expect(page.locator("[data-outcome]")).toHaveCount(0);
   await expect(page.getByText(/Try another spelling/i)).toHaveCount(0);
 });
 
