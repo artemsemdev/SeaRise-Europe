@@ -4,7 +4,7 @@ import maplibregl, {
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { Protocol } from "pmtiles";
+import { Protocol, ResolvedValueCache, type Cache } from "pmtiles";
 import type { Coordinates } from "../../domain/release";
 import type {
   BoundaryVisualLayer,
@@ -12,6 +12,7 @@ import type {
   VisualBand,
 } from "../../data/map-layer-resolver";
 import { RenderToken } from "./render-token";
+import { registerNetworkOnlyPmtiles } from "./pmtiles-network-source";
 
 const SOURCE_ID = "searise-projection";
 const FILL_LAYER_ID = "searise-projection-fill";
@@ -28,24 +29,44 @@ const EMPTY_STYLE: StyleSpecification = {
 };
 
 let sharedProtocol: Protocol | undefined;
+let sharedMetadataCache: Cache | undefined;
 let protocolUsers = 0;
 
-function acquireProtocol(): () => void {
+interface ProtocolLease {
+  readonly register: (layers: ResolvedMapLayers) => void;
+  readonly release: () => void;
+}
+
+function acquireProtocol(initialLayers: ResolvedMapLayers): ProtocolLease {
   if (!sharedProtocol) {
     sharedProtocol = new Protocol({ metadata: true, errorOnMissingTile: false });
+    // Bounded, ephemeral decoded headers/directories only; never tile ranges.
+    sharedMetadataCache = new ResolvedValueCache(64);
     maplibregl.addProtocol("pmtiles", sharedProtocol.tile);
   }
+  const protocol = sharedProtocol;
+  const cache = sharedMetadataCache!;
+  const register = (layers: ResolvedMapLayers) => {
+    registerNetworkOnlyPmtiles(protocol, cache, layers.projection);
+    for (const boundary of layers.boundaries) {
+      if (boundary.mediaType === "application/vnd.pmtiles") {
+        registerNetworkOnlyPmtiles(protocol, cache, boundary);
+      }
+    }
+  };
+  register(initialLayers);
   protocolUsers += 1;
   let released = false;
-  return () => {
+  return Object.freeze({ register, release: () => {
     if (released) return;
     released = true;
     protocolUsers -= 1;
     if (protocolUsers === 0) {
       maplibregl.removeProtocol("pmtiles");
       sharedProtocol = undefined;
+      sharedMetadataCache = undefined;
     }
-  };
+  } });
 }
 
 export type MapRuntimeStatus =
@@ -124,7 +145,7 @@ function valueColour(property: string): maplibregl.ExpressionSpecification {
 
 export class MapController {
   readonly #map: MapLibreMap;
-  readonly #releaseProtocol: () => void;
+  readonly #protocol: ProtocolLease;
   readonly #renderToken = new RenderToken();
   readonly #onCoordinate: (coordinates: Coordinates) => void;
   readonly #onStatus: (status: MapRuntimeStatus) => void;
@@ -134,6 +155,7 @@ export class MapController {
   #basemapAbort: AbortController | undefined;
   #basemapActive = false;
   #basemapUnavailable = false;
+  #styleReady = false;
   #destroyed = false;
 
   constructor(options: MapControllerOptions) {
@@ -141,7 +163,7 @@ export class MapController {
     this.#band = options.initialBand;
     this.#onCoordinate = options.onCoordinate;
     this.#onStatus = options.onStatus;
-    this.#releaseProtocol = acquireProtocol();
+    this.#protocol = acquireProtocol(this.#layers);
     this.#map = new maplibregl.Map({
       container: options.container,
       style: EMPTY_STYLE,
@@ -200,6 +222,7 @@ export class MapController {
       if (this.#destroyed || !this.#renderToken.isCurrent(token)) return;
       this.#removeReleaseLayers();
       const projection = this.#layers.projection;
+      this.#protocol.register(this.#layers);
       this.#map.addSource(SOURCE_ID, {
         type: "vector",
         url: pmtilesUrl(projection.url),
@@ -236,8 +259,15 @@ export class MapController {
             message: `${projection.scenario} · ${projection.horizon} · ${this.#band} visual band ready.`,
           });
     };
-    if (this.#map.isStyleLoaded()) apply();
-    else this.#map.once("style.load", apply);
+    if (this.#styleReady || this.#map.isStyleLoaded()) {
+      this.#styleReady = true;
+      apply();
+    } else {
+      this.#map.once("style.load", () => {
+        this.#styleReady = true;
+        apply();
+      });
+    }
   }
 
   update(layers: ResolvedMapLayers, band: VisualBand): void {
@@ -328,6 +358,7 @@ export class MapController {
       this.#basemapActive = true;
       this.#basemapUnavailable = false;
       const token = this.#renderToken.next();
+      this.#styleReady = false;
       this.#map.setStyle(style);
       this.#applyWhenReady(token, false);
     } catch (error) {
@@ -348,7 +379,7 @@ export class MapController {
     this.#basemapAbort?.abort();
     this.#marker?.remove();
     this.#map.remove();
-    this.#releaseProtocol();
+    this.#protocol.release();
   }
 }
 

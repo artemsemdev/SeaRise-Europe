@@ -167,6 +167,33 @@ if (mapFiles.length !== 2 || mapFiles.some((file) => initialFiles.has(file))) {
 if (mapFiles.some((file) => !dynamicFiles.includes(file))) {
   throw new Error("Map visualization modules must remain dynamic Vite entries");
 }
+const mapRuntimeEntry = viteManifest["src/components/map/map-runtime.ts"];
+const mapRuntimeSourceMap = JSON.parse(readFileSync(
+  resolve(dist, `${mapRuntimeEntry.file}.map`),
+  "utf8",
+));
+const networkSourceIndex = mapRuntimeSourceMap.sources.findIndex((source) =>
+  source.endsWith("/components/map/pmtiles-network-source.ts"),
+);
+const networkSource = mapRuntimeSourceMap.sourcesContent?.[networkSourceIndex];
+if (
+  networkSourceIndex < 0 ||
+  typeof networkSource !== "string" ||
+  !networkSource.includes('cache: "no-store"') ||
+  !networkSource.includes("new PMTiles(source, cache)") ||
+  !networkSource.includes("new NetworkOnlyPmtilesSource(authority)") ||
+  /\b(?:indexedDB|sessionStorage|localStorage|CacheStorage)\b|\bcaches\s*\./u.test(networkSource) ||
+  /\b(?:ProjectionAvailable|DataUnavailable|OutOfScope|UnsupportedGeography)\b/u.test(networkSource)
+) {
+  throw new Error("Built PMTiles source is not a network-only, no-store, visual-only adapter");
+}
+const mapRuntimeJavascript = readFileSync(resolve(dist, mapRuntimeEntry.file), "utf8");
+if (!/cache:[`'"]no-store[`'"]/u.test(mapRuntimeJavascript)) {
+  throw new Error("Emitted PMTiles adapter does not preserve Request.cache=no-store");
+}
+if (embedded.urls.some((url) => url.endsWith(".pmtiles"))) {
+  throw new Error("Visual PMTiles cannot enter the service-worker precache");
+}
 const initialJavascript = assets
   .filter((asset) => asset.path.endsWith(".js") && initialFiles.has(asset.path))
   .reduce((total, asset) => total + asset.brotliBytes, 0);

@@ -26,8 +26,8 @@ const whole = (release = "release-a") => ({
 const range = {
   contractVersion: 1,
   authority: {
-    contractVersion: 1, pair: pair(), artifactId: "projection-ssp2-45-2050", role: "projection-analysis-cog",
-    canonicalUrl: "https://static.example/releases/release-a/layers/ssp2-45/2050.tif", path: "layers/ssp2-45/2050.tif",
+    contractVersion: 1, pair: pair(), artifactId: "projection-ssp2-45-2050-cog", role: "projection-analysis-cog",
+    canonicalUrl: "https://static.example/releases/release-a/analysis/ssp2-45/2050.tif", path: "analysis/ssp2-45/2050.tif",
     mediaType: "image/tiff; application=geotiff; profile=cloud-optimized", totalByteSize: 65536,
     artifactSha256: A, etag: `"sha256-${A}"`, integrityChunkSize: 65536,
   },

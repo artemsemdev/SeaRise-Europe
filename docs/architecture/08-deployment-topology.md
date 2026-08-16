@@ -40,7 +40,8 @@ is used as a static host.
 | HTML entry points and service worker | Static site domain | Short TTL or revalidation; must activate atomically |
 | Hashed JavaScript, CSS, fonts, icons | Static site domain | `public, max-age=31536000, immutable` |
 | Small pinned config/search files within platform limits | Static site or canonical data domain | Immutable release path |
-| PMTiles, COG, GeoParquet, large indexes, STAC and provenance | R2 custom data domain | `public, max-age=31536000, immutable` |
+| Visual PMTiles | R2 custom data domain | Network-only `no-store` request and response policy from ADR-026 |
+| Analysis COG, GeoParquet, large indexes, STAC and provenance | R2 custom data domain | `public, max-age=31536000, immutable` |
 | `/release.json`, if used | Static site domain | Short TTL plus revalidation; discovery only |
 
 An application build contains or resolves one explicit `dataReleaseId`. It
@@ -50,6 +51,14 @@ must not consume “latest” during a session. Each release is stored under
 R2 must support `GET`, `HEAD`, and byte-range requests with the CORS and exposed
 headers in ADR-021. Large artifacts use one public canonical URL so browser,
 STAC, manifest, and smoke tests all address the same object.
+
+The manifest's generic `publication.cacheControl` remains the immutable default
+for release objects. ADR-026 is the role-specific delivery override for visual
+PMTiles: host/R2 metadata must return `Cache-Control: no-store` for PMTiles
+`200`, `206`, and `416` responses. The object path is still append-only and
+hash-bound, but neither the browser nor an intermediary may persist its bytes.
+Analysis COGs and other release objects retain immutable delivery; only
+integrity-authorized COG chunks may enter bounded IndexedDB persistence.
 
 ## Environments
 
@@ -148,9 +157,9 @@ runtime.
 
 ## Availability and failure isolation
 
-- The application shell and cached data continue to work according to the
+- The application shell and eligible cached scientific/text data continue to work according to the
   explicit offline policy when origins are unavailable.
-- R2 outage or missing uncached ranges produces an availability message, never
+- R2 outage, unavailable network-only PMTiles, or missing uncached COG ranges produces an availability message, never
   a guessed assessment.
 - OpenFreeMap outage removes visual context only; local search and assessment
   remain authoritative and functional when their data is cached.
@@ -182,8 +191,9 @@ Cloudflare is the reference host, not an application dependency. A replacement
 platform must provide:
 
 - HTTPS static hosting;
-- object storage or CDN with `GET`, `HEAD`, byte ranges, CORS, and immutable
-  cache headers;
+- object storage or CDN with `GET`, `HEAD`, byte ranges, CORS, role-specific
+  `no-store` delivery for visual PMTiles, and immutable cache headers for other
+  release objects;
 - atomic deployment or a recoverable application pointer;
 - the ability to serve PMTiles, COG, GeoParquet, JSON, STAC, and Sigstore
   bundles without format conversion.
@@ -201,7 +211,8 @@ A production deployment is complete only when automation proves:
 - HTML is revalidated and content-hashed assets are immutable;
 - R2 `HEAD` and partial `GET` return correct range and CORS headers;
 - no runtime request targets an application API, database, or tile server;
-- a representative cached flow works after network removal;
+- a representative eligible scientific/text cached flow works after network
+  removal, while visual PMTiles remains honestly network-only;
 - `/about/architecture` exposes the release, commit, provenance, sizes, and
   current fitness-function evidence;
 - rollback metadata identifies a verified previous pair.

@@ -77,9 +77,14 @@ releases/{dataReleaseId}/
 ```
 
 Paths are release-versioned or content-addressed and are never overwritten.
-Versioned objects use `Cache-Control: public, max-age=31536000, immutable`.
-A mutable `/release.json`, if used, has a short TTL and only points to a
-release; an application build pins one release for the duration of a session.
+Versioned objects use `Cache-Control: public, max-age=31536000, immutable` as
+the generic publication default. ADR-026 and the checked-in
+[`HTTP delivery policy`](../../contracts/http-delivery/v1/policy.json) override
+that transport policy for visual PMTiles: `200`, `206`, and `416` responses are
+`no-store`, even though their release paths remain append-only. Analysis COGs
+and other release objects retain immutable delivery. A mutable `/release.json`,
+if used, has a short TTL and only points to a release; an application build
+pins one release for the duration of a session.
 
 ## 4. Public contracts
 

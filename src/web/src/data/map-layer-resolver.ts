@@ -10,6 +10,8 @@ export interface ProjectionVisualLayer {
   readonly scenario: ScenarioId;
   readonly horizon: HorizonYear;
   readonly artifactId: string;
+  readonly byteSize: number;
+  readonly sha256: string;
   readonly url: string;
   readonly sourceLayer: "projection";
   readonly bounds: readonly [number, number, number, number];
@@ -19,7 +21,10 @@ export interface ProjectionVisualLayer {
 
 export interface BoundaryVisualLayer {
   readonly kind: "support-boundary" | "coastal-boundary";
+  readonly dataReleaseId: string;
   readonly artifactId: string;
+  readonly byteSize: number;
+  readonly sha256: string;
   readonly url: string;
   readonly mediaType: "application/vnd.pmtiles" | "application/geo+json";
   readonly sourceLayer: "support_boundary" | "coastal_boundary";
@@ -60,9 +65,20 @@ function optionalBoundaries(context: ReleaseContext): readonly BoundaryVisualLay
     if (artifact.mediaType !== "application/vnd.pmtiles" && artifact.mediaType !== "application/geo+json") {
       continue;
     }
+    if (artifact.mediaType === "application/vnd.pmtiles") {
+      const required = artifact.role === "support-boundary"
+        ? { artifactId: "support-boundary-pmtiles", path: "boundaries/europe.pmtiles" }
+        : { artifactId: "coastal-boundary-pmtiles", path: "boundaries/coastal-analysis-zone.pmtiles" };
+      if (artifact.artifactId !== required.artifactId || artifact.path !== required.path) {
+        fail(`${artifact.role} PMTiles does not match the candidate artifact contract.`);
+      }
+    }
     boundaries.push(Object.freeze({
       kind: artifact.role,
+      dataReleaseId: context.dataReleaseId,
       artifactId: artifact.artifactId,
+      byteSize: artifact.byteSize,
+      sha256: artifact.sha256,
       url: artifact.url,
       mediaType: artifact.mediaType,
       sourceLayer: artifact.role === "support-boundary" ? "support_boundary" : "coastal_boundary",
@@ -95,6 +111,8 @@ export function resolveMapLayers(
     scenario,
     horizon,
     artifactId: artifact.artifactId,
+    byteSize: artifact.byteSize,
+    sha256: artifact.sha256,
     url: artifact.url,
     sourceLayer: "projection" as const,
     bounds: exactBounds(artifact),

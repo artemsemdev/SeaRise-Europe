@@ -69,6 +69,12 @@
       "reference": "src/web/src/data/map-layer-resolver.test.ts and src/web/tests/map-visualization.spec.ts",
       "environment": "macOS arm64; Node 20.20.1; MapLibre GL JS 5.19.0; PMTiles 4.4.0; Chromium desktop/mobile; committed synthetic fixture only"
     },
+    "local-2026-08-16-pmtiles-network-only": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T16:30:00+02:00",
+      "reference": "src/web/src/components/map/pmtiles-network-source.test.ts, src/web/tests/map-visualization.spec.ts, src/web/tests/static-shell.spec.ts, and src/web/scripts/inspect-build.mjs",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; Playwright 1.62.1 Chromium; Vite 8.2.1 production preview; 39 deterministic custom-Source cases, 7 portable delivery-policy cases, 462 full static-target tests, and 14 focused browser cases passed; nine exact visual identities, manifest-bound size/strong ETag, strict 200/206/416 handling, injected request inspection, real bounded PMTiles ranges, browser inspection with zero Blob/ArrayBuffer/view values, and emitted-source inspection; committed synthetic fixture only; no Candidate-v7, TAR, scientific lookup, or external storage"
+    },
     "local-2026-08-16-static-settlement-search": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T06:34:30+02:00",
@@ -434,6 +440,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-16-static-map", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Thirty-five Vitest cases and fourteen desktop/mobile Playwright cases passed; map E2E covers all nine visual identities, restrictive-CSP compatibility, and deterministic basemap failure." }
+    },
+    {
+      "id": "static-pmtiles-network-only",
+      "layer": "integration",
+      "owner": "platform",
+      "purpose": "Keep all nine visual-only PMTiles identities on the PMTiles-supported custom Source boundary with exact release URLs, manifest-bound byte size and strong ETag, bounded Range behavior, role-specific no-store requests and responses, bounded ephemeral decoded metadata only, no PMTiles persistence authority or structural browser-persistence trace, and no scientific interpretation.",
+      "sourcePaths": ["contracts/http-delivery/v1/policy.json", "src/web/scripts/release-delivery-policy.mjs", "src/web/scripts/release-delivery-policy.test.mjs", "src/web/src/components/map/pmtiles-network-source.ts", "src/web/src/components/map/pmtiles-network-source.test.ts", "src/web/src/components/map/map-runtime.ts", "src/web/src/offline/contracts/v1.ts", "src/web/vite.config.ts", "src/web/scripts/serve-committed-release.mjs", "src/web/scripts/inspect-build.mjs", "src/web/tests/map-visualization.spec.ts", "src/web/tests/static-shell.spec.ts"],
+      "changedPaths": ["contracts/http-delivery/**", "src/web/src/components/map/**", "src/web/src/data/map-layer-resolver*.ts", "src/web/src/offline/contracts/**", "src/web/vite.config.ts", "src/web/scripts/release-delivery-policy*", "src/web/scripts/serve-committed-release.mjs", "src/web/scripts/inspect-build.mjs", "src/web/tests/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent visual PMTiles network-only, role-specific no-store, non-scientific, and no-persistence-authority gate." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/components/map/pmtiles-network-source.test.ts src/data/map-layer-resolver.test.ts && npx playwright test tests/map-visualization.spec.ts tests/static-shell.spec.ts --project chromium", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-pmtiles-network-only", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Injected fetch and real preview tests use exact committed bytes and local loopback origins; structural browser inspection asserts no PMTiles authority tokens and zero binary values in this map-only journey, while emitted-source inspection prohibits persistence APIs in the adapter. No clock, random input, Candidate-v7, remote network, or visual-byte persistence authority is involved." }
     },
     {
       "id": "static-settlement-search",
@@ -1363,6 +1383,8 @@
     { "path": "src/web/src/local-measurement-paths.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/search/runtime.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/search/search.worker.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/map/pmtiles-network-source.test.ts", "suite": "static-pmtiles-network-only", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/release-delivery-policy.test.mjs", "suite": "static-pmtiles-network-only", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/projection-ux.spec.ts", "suite": "static-projection-browser-ux", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/range-cache-compatibility.spec.ts", "suite": "static-range-cache-compatibility", "status": "active", "removalGate": null, "replacementEvidence": null },
