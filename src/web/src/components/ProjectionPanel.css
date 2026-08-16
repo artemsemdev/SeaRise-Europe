@@ -93,6 +93,10 @@
   border-left-color: #98472f;
   background: #fff1eb;
 }
+.projection-panel__failure:focus-visible {
+  outline: 3px solid #f5c66b;
+  outline-offset: 3px;
+}
 
 .projection-panel__controls { display: grid; gap: 0.7rem; }
 
@@ -110,6 +114,7 @@
 
 .projection-panel fieldset legend {
   float: left;
+  grid-column: 1 / -1;
   width: 100%;
   padding: 0.1rem 0.25rem 0.4rem;
   color: #314b50;

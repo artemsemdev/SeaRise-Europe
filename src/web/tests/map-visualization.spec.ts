@@ -29,7 +29,8 @@ test("map is the static-first scene, loads bounded PMTiles ranges, and keeps one
 
   await page.goto("/");
   await expect(page.getByRole("region", { name: /visual release map preview/i })).toBeVisible();
-  await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
+  await expect(page.locator(".map-status")).toBeHidden();
+  await expect(page.locator(".maplibregl-control-container")).toBeHidden();
   await expect.poll(() => pmtilesRequests.length).toBeGreaterThan(0);
 
   for (const request of pmtilesRequests) {
@@ -40,6 +41,12 @@ test("map is the static-first scene, loads bounded PMTiles ranges, and keeps one
   }
 
   await acceptMapPoint(page);
+  await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
+  await expect(page.locator(".map-status")).toBeVisible();
+  const mapControls = page.locator(".maplibregl-control-container");
+  await expect(mapControls).not.toHaveAttribute("aria-hidden", "true");
+  expect(await mapControls.evaluate((element) => getComputedStyle(element).display)).not.toBe("none");
+  await expect(page.locator(".maplibregl-ctrl-attrib")).toBeVisible();
   await expect(page.getByRole("region", { name: /visual release map preview/i })).toHaveCount(0);
   await page.getByRole("radio", { name: /higher-emissions scenario.*ssp5-85/i }).check();
   await page.getByRole("radio", { name: "2100" }).check();

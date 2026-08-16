@@ -310,6 +310,25 @@ describe("settlement search combobox", () => {
     );
   });
 
+  it("announces only the current completed result count in its dedicated live region", async () => {
+    const worker = new FakeWorker();
+    const user = userEvent.setup();
+    render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => worker} />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+    const searchStatus = screen.getByRole("status");
+
+    expect(searchStatus).toHaveClass("status");
+    expect(searchStatus).toHaveAttribute("aria-live", "polite");
+    expect(searchStatus).toHaveAttribute("aria-atomic", "true");
+    await user.type(input, "Spring");
+    await waitFor(() => expect(searchStatus).toHaveTextContent(/^2 settlements found\./));
+
+    worker.holdQueries = true;
+    await user.type(input, "x");
+    expect(searchStatus).toHaveTextContent("Searching settlements in this browser.");
+    expect(searchStatus).not.toHaveTextContent(/2 settlements found/i);
+  });
+
   it("clears old results immediately so Enter and Fly there cannot select a stale query", async () => {
     const worker = new FakeWorker();
     const selected = vi.fn();

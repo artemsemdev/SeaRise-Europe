@@ -228,6 +228,9 @@ function SettlementSearchSession({
       <p
         id={statusId}
         className={`status${state.error ? " error" : ""}`}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
         data-search-readiness={state.readiness}
         data-init-duration-ms={state.initializationMilliseconds ?? undefined}
         data-query-duration-ms={state.durationMilliseconds ?? undefined}

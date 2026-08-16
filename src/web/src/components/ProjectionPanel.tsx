@@ -52,6 +52,7 @@ export interface ProjectionPanelProps {
   readonly methodologyTriggerRef?: RefObject<HTMLButtonElement | null>;
   readonly showMethodologyAction?: boolean;
   readonly resultHeadingRef?: RefObject<HTMLHeadingElement | null>;
+  readonly failureAlertRef?: RefObject<HTMLDivElement | null>;
 }
 
 function assertNever(value: never): never {
@@ -112,7 +113,13 @@ function methodologyMatches(
       "ProjectionAvailable\0DataUnavailable\0OutOfScope\0UnsupportedGeography";
 }
 
-function PhaseMessage({ state }: { readonly state: ProjectionState }): React.ReactNode {
+function PhaseMessage({
+  state,
+  failureAlertRef,
+}: {
+  readonly state: ProjectionState;
+  readonly failureAlertRef?: RefObject<HTMLDivElement | null>;
+}): React.ReactNode {
   switch (state.phase) {
     case "booting":
       return <p>Loading and verifying the pinned data release…</p>;
@@ -134,13 +141,13 @@ function PhaseMessage({ state }: { readonly state: ProjectionState }): React.Rea
     case "result":
       return null;
     case "offline":
-      return <FailureMessage error={state.error} title="Selected data not available offline" body="Reconnect to load the uncached artifacts for this exact selection. No scientific outcome was produced for the failed operation." />;
+      return <FailureMessage focusRef={failureAlertRef} error={state.error} title="Selected data not available offline" body="Reconnect to load the uncached artifacts for this exact selection. No scientific outcome was produced for the failed operation." />;
     case "connection-required":
-      return <FailureMessage error={state.error} title="Connection required for selected data" body="The required immutable data is not cached. Reconnect and retry this exact selection; no substitute was used." />;
+      return <FailureMessage focusRef={failureAlertRef} error={state.error} title="Connection required for selected data" body="The required immutable data is not cached. Reconnect and retry this exact selection; no substitute was used." />;
     case "unsupported-browser":
     case "integrity-error":
     case "technical-error":
-      return <FailureMessage error={state.error} />;
+      return <FailureMessage focusRef={failureAlertRef} error={state.error} />;
     default:
       return assertNever(state);
   }
@@ -150,14 +157,22 @@ function FailureMessage({
   error,
   title,
   body,
+  focusRef,
 }: {
   readonly error: TechnicalError;
   readonly title?: string;
   readonly body?: string;
+  readonly focusRef?: RefObject<HTMLDivElement | null>;
 }): React.ReactNode {
   const presentation = technicalErrorPresentation(error);
   return (
-    <div className="projection-panel__failure" role="alert" data-technical-error={error.code}>
+    <div
+      ref={focusRef}
+      className="projection-panel__failure"
+      role="alert"
+      tabIndex={focusRef ? -1 : undefined}
+      data-technical-error={error.code}
+    >
       <strong>{title ?? presentation.title}</strong>
       <span>{body ?? `${error.message} ${presentation.guidance}`}</span>
       <span>Technical failure — not a DataUnavailable scientific outcome.</span>
@@ -423,6 +438,7 @@ export function ProjectionPanel({
   methodologyTriggerRef,
   showMethodologyAction = true,
   resultHeadingRef,
+  failureAlertRef,
 }: ProjectionPanelProps): React.ReactNode {
   const accepted = visibleAcceptedProjection(state);
   const selection = currentSelection(state);
@@ -441,7 +457,7 @@ export function ProjectionPanel({
         <p className="projection-panel__eyebrow">Static browser projection</p>
         <h2 id="projection-panel-title">Regional relative sea-level projection</h2>
       </header>
-      <PhaseMessage state={state} />
+      <PhaseMessage state={state} failureAlertRef={failureAlertRef} />
       {accepted ? (
         <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} resultHeadingRef={resultHeadingRef} />
       ) : null}

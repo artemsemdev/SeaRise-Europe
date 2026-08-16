@@ -271,6 +271,24 @@ class TestController implements AssessmentControllerPort {
     deferred.resolve();
   }
 
+  failDeferredAssessment(
+    error: TechnicalFailure["detail"],
+    availability?: "offline" | "connection-required",
+  ): void {
+    const deferred = this.#deferred;
+    if (!deferred) throw new Error("No deferred selection.");
+    this.#deferred = null;
+    const guard = {
+      operationToken: deferred.operationToken,
+      selectionKey: selectionKey(deferred.selection),
+      dataReleaseId: deferred.selection.dataReleaseId,
+    };
+    this.#publish(projectionReducer(this.#state, availability
+      ? { type: "operation-unavailable", availability, error, ...guard }
+      : { type: "operation-failed", error, ...guard }));
+    deferred.resolve();
+  }
+
   rejectNextSelection(error: unknown): void {
     this.select.mockImplementationOnce(async () => Promise.reject(error));
   }
@@ -468,8 +486,9 @@ describe("production static application composition", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
     expect(document.querySelector(".flight-scene")).toBeInTheDocument();
     expect(document.querySelector("[data-flight-phase='idle']")).toBeInTheDocument();
-    expect(screen.getAllByRole("status")).toHaveLength(1);
-    expect(screen.getByRole("status")).toHaveClass("selection-status");
+    expect(screen.getAllByRole("status")).toHaveLength(2);
+    expect(document.querySelector(".selection-status")).toHaveAttribute("aria-live", "polite");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("aria-live", "polite");
   });
 
   it("binds landing release disclosure to verified bootstrap disposition", () => {
@@ -570,6 +589,34 @@ describe("production static application composition", () => {
 
     await user.click(screen.getByRole("button", { name: /reset selection/i }));
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toHaveFocus());
+  });
+
+  it.each([
+    ["technical-error", { kind: "technical-error", code: "FetchFailed", message: "Temporary fetch failure.", recoverable: true }, undefined],
+    ["integrity-error", { kind: "technical-error", code: "IntegrityFailed", message: "Selected bytes failed integrity verification.", recoverable: false }, undefined],
+    ["offline", { kind: "technical-error", code: "FetchFailed", message: "Selected bytes are not cached.", recoverable: true }, "offline"],
+    ["connection-required", { kind: "technical-error", code: "FetchFailed", message: "A connection is required.", recoverable: true }, "connection-required"],
+  ] as const)("moves focus from the selected-place transition to a visible %s alert", async (
+    phase,
+    error,
+    availability,
+  ) => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+
+    controller.deferNextSelection = true;
+    await user.type(input, "Fixture");
+    await user.click(await screen.findByRole("option", { name: /Fixturehafen/i }));
+    await waitFor(() => expect(screen.getByText(/selected place accepted/i)).toHaveFocus());
+
+    act(() => controller.failDeferredAssessment(error, availability));
+    const alert = await screen.findByRole("alert");
+    await waitFor(() => expect(alert).toHaveFocus());
+    expect(document.querySelector(".projection-panel")).toHaveAttribute("data-phase", phase);
+    expect(document.activeElement).not.toBe(document.body);
   });
 
   it("keeps the accepted result on the map while one new command is pending, then swaps atomically", async () => {

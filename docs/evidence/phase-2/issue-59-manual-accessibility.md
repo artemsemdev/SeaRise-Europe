@@ -61,20 +61,28 @@ blocked macOS session:
   absent from the tab order and accessibility tree;
 - selecting a search result moves focus to the lookup transition, then to the
   accepted outcome heading; reset returns focus to settlement search;
-- one authoritative polite live region reports search, evaluation, accepted
-  outcome, share, and technical-operation state;
+- one authoritative polite assessment live region reports evaluation, accepted
+  outcome, share, and technical-operation state, while a distinct search live
+  region announces only the current local result status without duplicating the
+  assessment announcement;
+- after the first selected-place transition, technical, integrity, offline, and
+  connection-required failures move focus to the visible failure alert instead
+  of dropping focus to the document body;
 - scenario or horizon changes at the same location retain the accepted result
   atomically without camera flight or "Flying" copy;
 - delayed superseded Worker search responses cannot replace the newest query;
 - every completed outcome visibly includes the full product-boundary caveat.
+- desktop and 390 px mobile controls retain a single segmented row, while the
+  mobile hero/header geometry and idle map chrome remain aligned with Flight;
+  the 320 px layout has no horizontal overflow.
 
 These are automated assertions, not a human VoiceOver pass. The pending
 human-only gate below remains open and unchanged.
 
 On 2026-08-16, the production static build passed the complete Playwright
-suite with the permanent single-worker timing isolation: `51 passed` across
+suite with the permanent single-worker timing isolation: `57 passed` across
 desktop Chromium, Pixel 7 mobile Chromium, and reduced-motion Chromium. The
-same follow-up also passed lint, type-check, 298 unit/integration tests, the
+same follow-up also passed lint, type-check, 303 unit/integration tests, the
 production build, target-content checks, and fixture/contract checks through
 `npm run web:check`.
 

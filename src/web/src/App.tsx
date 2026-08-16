@@ -125,7 +125,9 @@ function projectionSelectionStatus(
   if (!state || state.phase === "ready") return "Choose a settlement to continue.";
   switch (state.phase) {
     case "searching":
-      return "Searching settlements locally in this browser.";
+      // Search owns its result-count announcement. Keep the assessment region
+      // stable until a settlement becomes an assessment command.
+      return "Choose a settlement to continue.";
     case "evaluating":
       return "Checking the selected place against the exact nearest native source-grid location.";
     case "updating":
@@ -205,10 +207,24 @@ function settlementSelection(
   });
 }
 
-function TechnicalAlert({ error, prefix }: { error: TechnicalError; prefix: string }) {
+function TechnicalAlert({
+  error,
+  prefix,
+  focusRef,
+}: {
+  error: TechnicalError;
+  prefix: string;
+  focusRef?: RefObject<HTMLDivElement | null>;
+}) {
   const presentation = technicalErrorPresentation(error);
   return (
-    <div className="application-technical-alert" role="alert" data-technical-error={error.code}>
+    <div
+      ref={focusRef}
+      className="application-technical-alert"
+      role="alert"
+      tabIndex={focusRef ? -1 : undefined}
+      data-technical-error={error.code}
+    >
       <strong>{prefix}: {presentation.title}.</strong>{" "}
       {error.message} {presentation.guidance} This is a technical failure, not a scientific outcome.
     </div>
@@ -271,6 +287,8 @@ function LandingPageSession({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const transitionStatusRef = useRef<HTMLParagraphElement>(null);
   const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const projectionFailureRef = useRef<HTMLDivElement>(null);
+  const commandFailureRef = useRef<HTMLDivElement>(null);
   const pendingSelectionFocus = useRef(false);
   const pendingSearchFocus = useRef(false);
   const sessionActive = useRef(false);
@@ -374,8 +392,20 @@ function LandingPageSession({
     if (runtime.projection.phase === "result" && verifiedMethodology && resultHeadingRef.current) {
       resultHeadingRef.current.focus();
       pendingSelectionFocus.current = false;
+      return;
+    }
+    if (["offline", "connection-required", "unsupported-browser", "integrity-error", "technical-error"]
+      .includes(runtime.projection.phase) && projectionFailureRef.current) {
+      projectionFailureRef.current.focus();
+      pendingSelectionFocus.current = false;
     }
   }, [journeyActive, runtime.projection, verifiedMethodology]);
+
+  useEffect(() => {
+    if (!pendingSelectionFocus.current || !commandError || !commandFailureRef.current) return;
+    commandFailureRef.current.focus();
+    pendingSelectionFocus.current = false;
+  }, [commandError]);
 
   useEffect(() => {
     if (!pendingSearchFocus.current || !scopeReady || panelVisible || journeyActive) return;
@@ -496,7 +526,9 @@ function LandingPageSession({
       ) : null}
 
       <div className="flight-alerts">
-        {commandError ? <TechnicalAlert error={commandError} prefix="Selection command failed" /> : null}
+        {commandError ? (
+          <TechnicalAlert error={commandError} prefix="Selection command failed" focusRef={commandFailureRef} />
+        ) : null}
         {urlError ? <TechnicalAlert error={urlError} prefix="Share or navigation failed" /> : null}
         {runtime.methodology.phase === "technical-error" ? (
           <TechnicalAlert error={runtime.methodology.error} prefix="Methodology verification failed" />
@@ -508,6 +540,7 @@ function LandingPageSession({
           state={runtime.projection}
           methodology={verifiedMethodology}
           resultHeadingRef={resultHeadingRef}
+          failureAlertRef={projectionFailureRef}
           onSelectionChange={submitSelection}
           onRetry={() => {
             setCommandError(null);

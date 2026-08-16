@@ -75,6 +75,20 @@ async function expectNoSeriousAxeFindings(page: Page): Promise<void> {
   ).toEqual([]);
 }
 
+async function expectThreeOptionSegmentedRow(page: Page, name: RegExp): Promise<void> {
+  const positions = await page.getByRole("group", { name }).locator("label").evaluateAll((labels) =>
+    labels.map((label) => {
+      const bounds = label.getBoundingClientRect();
+      return { left: bounds.left, top: bounds.top, width: bounds.width };
+    }));
+  expect(positions).toHaveLength(3);
+  expect(Math.max(...positions.map(({ top }) => top)) - Math.min(...positions.map(({ top }) => top)))
+    .toBeLessThan(2);
+  expect(positions[0].left).toBeLessThan(positions[1].left);
+  expect(positions[1].left).toBeLessThan(positions[2].left);
+  expect(positions.every(({ width }) => width > 0)).toBe(true);
+}
+
 async function attachStableState(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   const path = testInfo.outputPath(`${name}-${testInfo.project.name}.png`);
   await page.screenshot({ path, fullPage: true, animations: "disabled" });
@@ -136,6 +150,67 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
 
   expect(boundary.forbidden).toEqual([]);
   expect(boundary.releaseConfig).toContain(`${RELEASE_ROOT}/manifest.json`);
+});
+
+test("first selected-place technical failure receives focus after the transition", async ({ page }) => {
+  let releaseFailure!: () => void;
+  const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
+  let held = false;
+  await page.route(`**${RELEASE_ROOT}/analysis/ssp2-45/2050.tif`, async (route) => {
+    if (!held && route.request().method() === "HEAD") {
+      held = true;
+      await failureGate;
+      await route.fulfill({ status: 503, contentType: "text/plain", body: "temporary" });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/");
+  await ready(page);
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(page.getByText(/selected place accepted.*lookup is in progress/i)).toBeFocused();
+
+  releaseFailure();
+  await expect(panel(page)).toHaveAttribute("data-phase", "technical-error");
+  const alert = panel(page).getByRole("alert");
+  await expect(alert).toContainText("Technical failure — not a DataUnavailable scientific outcome");
+  await expect(alert).toBeFocused();
+  expect(held).toBe(true);
+});
+
+test("first selected-place integrity failure receives focus after the transition", async ({ page }) => {
+  let releaseCorruption!: () => void;
+  const corruptionGate = new Promise<void>((resolve) => { releaseCorruption = resolve; });
+  let mutated = false;
+  await page.route(`**${RELEASE_ROOT}/analysis/ssp2-45/2050.tif`, async (route) => {
+    if (route.request().method() !== "GET" || !route.request().headers().range || mutated) {
+      await route.continue();
+      return;
+    }
+    await corruptionGate;
+    const response = await route.fetch();
+    const bytes = await response.body();
+    bytes[Math.min(32, bytes.length - 1)] ^= 0x01;
+    mutated = true;
+    await route.fulfill({ response, body: bytes });
+  });
+
+  await page.goto("/");
+  await ready(page);
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(page.getByText(/selected place accepted.*lookup is in progress/i)).toBeFocused();
+
+  releaseCorruption();
+  await expect(panel(page)).toHaveAttribute("data-phase", "integrity-error");
+  const alert = panel(page).getByRole("alert");
+  await expect(alert).toContainText("Technical failure — not a DataUnavailable scientific outcome");
+  await expect(alert).toBeFocused();
+  expect(mutated).toBe(true);
 });
 
 test("all nine accepted projections keep exact COG values and PMTiles identity", async ({ page }, testInfo) => {
@@ -448,6 +523,8 @@ test("keyboard-only search, radios, dialog focus, and reduced motion remain oper
   await expect(search).toHaveAttribute("aria-expanded", "true");
   await page.keyboard.press("Enter");
   await expectAvailable(page, PROJECTION_MATRIX[4]);
+  await expectThreeOptionSegmentedRow(page, /emissions scenario/i);
+  await expectThreeOptionSegmentedRow(page, /absolute horizon/i);
 
   const currentScenario = page.getByRole("radio", { name: /ssp2-45/ });
   await currentScenario.focus();
