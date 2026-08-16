@@ -21,6 +21,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Selected IndexedDB, rather than Cache Storage, for bounded COG and PMTiles
+  range persistence after real Chromium, Firefox, and WebKit measurements
+  showed that `206` responses are rejected and range requests can match a
+  cached whole `200`. Cache Storage remains suitable only for explicitly
+  routed complete resources; public-origin behavior is not yet claimed.
+
 - Bound the canonical frontend npm SBOM to the static `src/web` workspace in
   the root lockfile, including the Flight icon dependency and its exact
   registry integrity, instead of retaining the superseded Next.js lock as the

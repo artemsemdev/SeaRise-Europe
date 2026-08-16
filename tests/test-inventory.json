@@ -258,7 +258,7 @@
     "local-2026-08-16-range-cache-compatibility": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T13:40:00+02:00",
-      "reference": "src/web/tests/range-cache-compatibility.spec.ts",
+      "reference": "docs/evidence/phase-2/issue-60-range-cache-compatibility.md and docs/evidence/phase-2/issue-60-range-cache-compatibility.json",
       "environment": "macOS 26.5.2 (25F84) arm64; Node 20.20.1; npm 11.12.1; Playwright 1.62.1; Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5; six COG/PMTiles cases over committed synthetic fixture bytes and a production-like same-origin loopback range server; no Candidate-v7, TAR, public origin, or external storage"
     },
     "repository-2026-08-05": {
