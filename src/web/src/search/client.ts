@@ -82,24 +82,42 @@ export class SettlementSearchClient {
     for (const listener of this.#listeners) listener(this.#state);
   }
 
+  #workerCrashed(worker: SearchWorkerPort): void {
+    if (this.#disposed || this.#worker !== worker) return;
+    worker.onmessage = null;
+    worker.onerror = null;
+    worker.terminate();
+    this.#worker = null;
+    this.#latestQueryToken = -1;
+    this.#publish({
+      readiness: "idle",
+      pending: false,
+      results: [],
+      coastalError: null,
+      durationMilliseconds: null,
+      error: Object.freeze({
+        kind: "technical-error",
+        code: "DecodeFailed",
+        message: "The settlement search worker stopped unexpectedly.",
+        recoverable: true,
+      }),
+    });
+  }
+
   start(): void {
     if (this.#disposed || this.#worker) return;
     try {
-      this.#worker = this.#factory();
-      this.#worker.onmessage = ({ data }) => this.#receive(data);
-      this.#worker.onerror = () => this.#publish({
-        pending: false,
-        results: [],
-        error: Object.freeze({
-          kind: "technical-error",
-          code: "DecodeFailed",
-          message: "The settlement search worker stopped unexpectedly.",
-          recoverable: true,
-        }),
-      });
+      const worker = this.#factory();
+      this.#worker = worker;
+      worker.onmessage = ({ data }) => {
+        if (this.#worker === worker) this.#receive(data);
+      };
+      worker.onerror = () => this.#workerCrashed(worker);
       this.#publish({ readiness: "loading-core", pending: true, results: [], error: null, coastalError: null });
-      this.#worker.postMessage({ kind: "initialize", token: ++this.#token, authority: authority(this.#context, "europe-core") });
+      worker.postMessage({ kind: "initialize", token: ++this.#token, authority: authority(this.#context, "europe-core") });
     } catch (error) {
+      this.#worker?.terminate();
+      this.#worker = null;
       this.#publish({
         readiness: "idle",
         pending: false,
@@ -112,7 +130,8 @@ export class SettlementSearchClient {
   query(value: string): void {
     if (this.#disposed) return;
     this.#pendingQuery = value;
-    if (this.#state.error && !["core-ready", "all-ready"].includes(this.#state.readiness)) {
+    if (this.#state.error && !this.#state.error.recoverable
+        && !["core-ready", "all-ready"].includes(this.#state.readiness)) {
       this.#publish({ query: value, results: [], pending: false, durationMilliseconds: null });
       return;
     }
