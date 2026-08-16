@@ -2,6 +2,11 @@ import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import {
+  assertChecksumInventory,
+  canonicalChecksumText,
+  parseChecksumText,
+} from "./checksum-inventory.mjs";
 
 const RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const checking = process.argv.includes("--check");
@@ -50,6 +55,12 @@ const writeOverlay = (relative, bytes) => {
 // v1 is a byte-sealed payload source. This generator only writes the separate
 // committed v2 overlay assembled by the static build.
 const v1Manifest = JSON.parse(readFileSync(resolve(payloadRoot, "manifest.json"), "utf8"));
+const v1ChecksumsText = readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8");
+// The sealed v1 file contains an explanatory comment and may contain blank
+// lines. Parse those as metadata/spacing, never as artifact identities, and
+// retain an exact semantic check before using the v1 manifest as input.
+parseChecksumText(v1ChecksumsText);
+assertChecksumInventory(v1Manifest, v1ChecksumsText);
 // These two scientific inputs are produced only by the reusable Python release
 // writers. Node deliberately cannot synthesize source IDs or range hashes.
 const sourceGridBytes = readFileSync(resolve(overlayRoot, "analysis/source-grid.json.gz"));
@@ -211,6 +222,10 @@ const derivationMaterials = [
   identity(
     "src/web/scripts/generate-scientific-fixture-contracts.mjs",
     repositoryBytes("src/web/scripts/generate-scientific-fixture-contracts.mjs"),
+  ),
+  identity(
+    "src/web/scripts/checksum-inventory.mjs",
+    repositoryBytes("src/web/scripts/checksum-inventory.mjs"),
   ),
   ...overlayInputs,
 ].sort((left, right) => left.path.localeCompare(right.path));
@@ -428,31 +443,11 @@ replaceArtifact("methodology", methodologyBytes);
 manifest.artifacts.find((artifact) => artifact.artifactId === "methodology").lineage =
   derivationLineage;
 
-const replacements = new Map([
-  ["config/methodology.json", methodologyBytes],
-  ["config/source-attribution.json", attributionBytes],
-  ...cogArtifacts
-    .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
-    .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
-]);
-const checksumIdentities = new Map(readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8")
-  .trimEnd()
-  .split("\n")
-  .map((line) => {
-    const path = line.slice(line.indexOf("  ") + 2);
-    const bytes = replacements.get(path);
-    return [path, bytes ? sha256(bytes) : line.slice(0, 64)];
-  }));
-for (const output of derivedOutputs) checksumIdentities.set(output.path, output.sha256);
-checksumIdentities.set("receipts/browser-derivation.json", sha256(derivationReceiptBytes));
-checksumIdentities.set("browser-derivation.intoto.json", sha256(derivationProvenanceBytes));
-const checksumsBytes = Buffer.from(
-  `${[...checksumIdentities.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([path, digest]) => `${digest}  ${path}`)
-    .join("\n")}\n`,
-  "utf8",
-);
+// Render from the complete final manifest inventory, not a partial inherited
+// list. manifest.json and checksums.txt are the only exclusions because their
+// inclusion would create a mutual/direct self-reference cycle.
+const checksumsBytes = Buffer.from(canonicalChecksumText(manifest), "utf8");
+assertChecksumInventory(manifest, checksumsBytes.toString("utf8"));
 writeOverlay("checksums.txt", checksumsBytes);
 replaceArtifact("checksums", checksumsBytes);
 manifest.artifacts.find((artifact) => artifact.artifactId === "checksums").lineage =

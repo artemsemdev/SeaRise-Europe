@@ -6,6 +6,11 @@ import type { AnySchema } from "ajv";
 import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 import validateManifest from "../contracts/generated/manifest-validator.mjs";
+import {
+  CHECKSUM_SELF_REFERENCE_EXCLUSIONS,
+  assertChecksumInventory,
+  parseChecksumText,
+} from "../../scripts/checksum-inventory.mjs";
 
 const root = resolve(import.meta.dirname, "../../../..");
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
@@ -19,6 +24,51 @@ const json = (path: string): unknown => JSON.parse(read(path).toString("utf8"));
 const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
 describe("honest browser-overlay evidence", () => {
+  it("binds canonical checksums to the exact manifest artifact inventory", () => {
+    const manifest = JSON.parse(readFileSync(resolve(overlayRoot, "manifest.json"), "utf8"));
+    const checksums = readFileSync(resolve(overlayRoot, "checksums.txt"), "utf8");
+    const parsed = assertChecksumInventory(manifest, checksums);
+
+    expect(parsed.size).toBe(manifest.artifacts.length - 1);
+    expect(CHECKSUM_SELF_REFERENCE_EXCLUSIONS).toEqual(["manifest.json", "checksums.txt"]);
+    expect(Object.isFrozen(CHECKSUM_SELF_REFERENCE_EXCLUSIONS)).toBe(true);
+    expect(parsed.has("manifest.json")).toBe(false);
+    expect(parsed.has("checksums.txt")).toBe(false);
+    expect([...parsed.keys()]).toEqual([...parsed.keys()].sort());
+    for (const path of [
+      "analysis/source-grid.json.gz",
+      "analysis/cog-range-integrity.json",
+      "boundaries/europe.parquet",
+      "boundaries/coastal-analysis-zone.parquet",
+    ]) {
+      const artifact = manifest.artifacts.find(
+        (candidate: { path: string }) => candidate.path === path,
+      );
+      expect(parsed.get(path), path).toBe(artifact.sha256);
+    }
+  });
+
+  it("ignores v1 comments and blank lines instead of inventing artifacts", () => {
+    const v1Checksums = readFileSync(resolve(baseRoot, "checksums.txt"), "utf8");
+    const parsed = parseChecksumText(`${v1Checksums}\n# another comment\n\n`);
+    expect(parsed.size).toBe(42);
+    expect([...parsed.keys()].some((path) => path.startsWith("#"))).toBe(false);
+  });
+
+  it.each([
+    ["duplicate", (lines: string[]) => [...lines, lines[0]]],
+    ["comment as artifact", (lines: string[]) => [...lines, `${"a".repeat(64)}  # forged-comment`]],
+    ["stale", (lines: string[]) => [`${"a".repeat(64)}${lines[0].slice(64)}`, ...lines.slice(1)]],
+    ["missing", (lines: string[]) => lines.slice(1)],
+    ["extra", (lines: string[]) => [...lines, `${"a".repeat(64)}  stale/extra.bin`]],
+  ])("rejects a %s checksum inventory mutation", (_name, mutate) => {
+    const manifest = JSON.parse(readFileSync(resolve(overlayRoot, "manifest.json"), "utf8"));
+    const lines = readFileSync(resolve(overlayRoot, "checksums.txt"), "utf8")
+      .split("\n")
+      .filter((line) => line !== "" && !line.startsWith("#"));
+    expect(() => assertChecksumInventory(manifest, `${mutate(lines).join("\n")}\n`)).toThrow();
+  });
+
   it("validates the manifest and first-class derivation evidence contracts", () => {
     const defs = json("contracts/release/v2/defs.schema.json") as AnySchema;
     const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
@@ -145,10 +195,7 @@ describe("honest browser-overlay evidence", () => {
     );
     dependencies.set(
       "checksums.txt",
-      readFileSync(resolve(overlayRoot, "checksums.txt"), "utf8")
-        .trimEnd()
-        .split("\n")
-        .map((line) => line.slice(line.indexOf("  ") + 2))
+      [...parseChecksumText(readFileSync(resolve(overlayRoot, "checksums.txt"), "utf8")).keys()]
         .filter((path) => overlayPaths.has(path)),
     );
     const visiting = new Set<string>();
