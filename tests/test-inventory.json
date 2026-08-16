@@ -15,6 +15,12 @@
       "reference": "src/web/src/App.test.tsx and src/web/tests/static-shell.spec.ts",
       "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vite 8.2.1; Vitest 4.1.10; Chromium desktop/mobile; committed synthetic fixture"
     },
+    "local-2026-08-16-static-map": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T02:12:00+02:00",
+      "reference": "src/web/src/data/map-layer-resolver.test.ts and src/web/tests/map-visualization.spec.ts",
+      "environment": "macOS arm64; Node 20.20.1; MapLibre GL JS 5.19.0; PMTiles 4.4.0; Chromium desktop/mobile; committed synthetic fixture only"
+    },
     "ci-30949490661": {
       "kind": "github-actions",
       "observedAt": "2026-08-04T20:51:42Z",
@@ -224,6 +230,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Three Vitest cases and four Playwright cases passed locally; CI reruns the same immutable fixture scope." }
+    },
+    {
+      "id": "static-map-visualization",
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Verify lazy release-scoped MapLibre/PMTiles visualization, the exact nine visual identities, bounded ranges, controlled map selection, stale-render rejection, attribution, accessibility, and graceful no-basemap operation without creating scientific results.",
+      "sourcePaths": ["src/web/src/components/map/**", "src/web/src/data/map-layer-resolver*.ts", "src/web/tests/map-visualization.spec.ts"],
+      "changedPaths": ["package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent visual-only map/release isolation and degradation contract." },
+      "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-16-static-map", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Thirty-four Vitest cases and twelve desktop/mobile Playwright cases passed; map E2E covers all nine visual identities and deterministic basemap failure." }
     },
     {
       "id": "quality-inventory-harness",
