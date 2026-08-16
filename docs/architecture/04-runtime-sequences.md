@@ -278,7 +278,11 @@ Starting newer preparation synchronously enters `preparing` and revokes the
 prior pending confirmation before the first asynchronous port call. The
 coordinator wraps the provider token in its own monotonic, one-time generation,
 so provider reuse or collision cannot authorize a later intent and a consumed
-confirmation cannot be replayed.
+confirmation cannot be replayed. Each coordinator also receives a
+collision-resistant instance identifier from an injected entropy port, so two
+coordinators created during the same page boot cannot mint the same transition
+identity. The first validated controller proof is pinned as that coordinator's
+immutable launch boot.
 
 Explicit confirmation records only a one-shot transition intent and presents
 the exact instruction: `Update ready. Close all SeaRise tabs and reopen to use
@@ -286,14 +290,19 @@ it.` It does not swap browser-storage authority, activate a worker, call
 `skipWaiting`, call `clients.claim`, navigate, reload, or claim that the new
 pair is current. Existing tabs remain pinned to their controlling worker. A
 verified waiting worker becomes eligible to activate naturally only after all
-clients of the prior worker close.
+clients of the prior worker close. If a newer operation cancels confirmation
+while its intent write is in flight, the coordinator conditionally revokes only
+that exact stale intent before returning; it cannot remove a newer intent.
 
 On the subsequent fresh boot, activation is recognized only when the page
 proves a different boot identity controlled by the exact confirmed
 app/release/precache/core identity and atomically consumes the matching
 one-shot intent. Same-page, mismatched-controller, stale-intent, missing-intent,
 and replay attempts fail closed while the actually controlling pair remains
-usable. Candidate evidence failures remain distinct from technical controller,
+usable. A changed controller proof reported to the original coordinator is
+still the same page, not a fresh boot, and cannot finalize activation. Async
+completion from a cancelled generation cannot overwrite a newer operation.
+Candidate evidence failures remain distinct from technical controller,
 inspection-port, token-provider, and intent-store failures. All are technical
 update states, never scientific outcomes.
 

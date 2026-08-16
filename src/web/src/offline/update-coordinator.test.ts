@@ -37,8 +37,11 @@ function boot(bootId = "boot-1", controller = active): ControllerBootProofV1 {
 
 function harness(options: Readonly<{
   boot?: ControllerBootProofV1;
+  instanceId?: string;
   inspect?: StaticUpdateCoordinatorPorts["inspectWaitingCandidate"];
   token?: StaticUpdateCoordinatorPorts["issueConfirmationToken"];
+  record?: StaticUpdateCoordinatorPorts["recordTransitionIntent"];
+  revoke?: StaticUpdateCoordinatorPorts["revokeTransitionIntent"];
   consume?: StaticUpdateCoordinatorPorts["consumeTransitionIntent"];
 }> = {}) {
   let currentBoot = options.boot ?? boot();
@@ -48,7 +51,11 @@ function harness(options: Readonly<{
     readControllerBoot: vi.fn(async () => currentBoot),
     inspectWaitingCandidate: options.inspect ?? vi.fn(async () => ({ status: "sealed" as const, candidate })),
     issueConfirmationToken: options.token ?? vi.fn(() => `provider-${++tokenSequence}`),
-    recordTransitionIntent: vi.fn(async (intent) => { recorded.splice(0, recorded.length, intent); }),
+    issueCoordinatorInstanceId: vi.fn(() => options.instanceId ?? "instance-00000001"),
+    recordTransitionIntent: options.record ?? vi.fn(async (intent) => { recorded.splice(0, recorded.length, intent); }),
+    revokeTransitionIntent: options.revoke ?? vi.fn(async (intent) => {
+      if (recorded[0]?.transitionId === intent.transitionId) recorded.splice(0, 1);
+    }),
     consumeTransitionIntent: options.consume ?? vi.fn(async () => "consumed" as const),
   };
   return {
@@ -107,6 +114,19 @@ describe("conservative static-host update coordinator", () => {
     expect(state).toMatchObject({
       phase: "failed", operation: "verify-next-boot", code: "controller-mismatch",
       boot: boot(), currentUsable: true,
+    });
+    expect(test.ports.consumeTransitionIntent).not.toHaveBeenCalled();
+  });
+
+  it("rejects same-page finalization when the controller port changes its boot proof", async () => {
+    const { test, intent } = await confirmedIntent();
+    test.setBoot(boot("boot-2", candidate));
+
+    const state = await test.coordinator.verifyNextBoot(intent);
+
+    expect(state).toMatchObject({
+      phase: "failed", operation: "verify-next-boot", code: "controller-mismatch",
+      boot: boot("boot-2", candidate), currentUsable: true,
     });
     expect(test.ports.consumeTransitionIntent).not.toHaveBeenCalled();
   });
@@ -233,6 +253,64 @@ describe("conservative static-host update coordinator", () => {
     await test.coordinator.confirmUpdate(prepared.confirmationToken);
 
     expect(test.ports.recordTransitionIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses collision-resistant instance identity when coordinators share one boot", async () => {
+    const first = await confirmedIntent(harness({ instanceId: "instance-00000001" }));
+    const second = await confirmedIntent(harness({ instanceId: "instance-00000002" }));
+
+    expect(first.intent.transitionId).toBe("boot-1.instance-00000001.g1");
+    expect(second.intent.transitionId).toBe("boot-1.instance-00000002.g1");
+    expect(first.intent.transitionId).not.toBe(second.intent.transitionId);
+  });
+
+  it("revokes a persisted intent when a newer operation cancels confirmation", async () => {
+    let releaseRecord: (() => void) | undefined;
+    const recordGate = new Promise<void>((resolve) => { releaseRecord = resolve; });
+    const persisted: CloseAndReopenIntentV1[] = [];
+    const test = harness({
+      record: vi.fn(async (intent) => {
+        persisted.splice(0, persisted.length, intent);
+        await recordGate;
+      }),
+      revoke: vi.fn(async (intent) => {
+        if (persisted[0]?.transitionId === intent.transitionId) persisted.splice(0, 1);
+      }),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(test.ports.recordTransitionIntent).toHaveBeenCalledOnce());
+    const rollback = await test.coordinator.requestRollback();
+    releaseRecord?.();
+    const cancelled = await confirming;
+
+    expect(rollback).toMatchObject({ phase: "deployment-required", currentUsable: true });
+    expect(cancelled).toEqual(rollback);
+    expect(test.ports.revokeTransitionIntent).toHaveBeenCalledOnce();
+    expect(persisted).toEqual([]);
+  });
+
+  it("does not overwrite a newer operation after concurrent intent consumption", async () => {
+    const { intent } = await confirmedIntent();
+    let releaseConsume: (() => void) | undefined;
+    const consumeGate = new Promise<void>((resolve) => { releaseConsume = resolve; });
+    const reopened = harness({
+      boot: boot("boot-2", candidate),
+      consume: vi.fn(async () => {
+        await consumeGate;
+        return "consumed" as const;
+      }),
+    });
+
+    const verifying = reopened.coordinator.verifyNextBoot(intent);
+    await vi.waitFor(() => expect(reopened.ports.consumeTransitionIntent).toHaveBeenCalledOnce());
+    const rollback = await reopened.coordinator.requestRollback();
+    releaseConsume?.();
+
+    await expect(verifying).resolves.toEqual(rollback);
+    expect(reopened.coordinator.state()).toEqual(rollback);
   });
 
   it("reports rollback as deployment-required without changing browser authority", async () => {

@@ -4,6 +4,7 @@ import { sha256Hex } from "./contracts/v1";
 const OPAQUE_ID = /^[A-Za-z0-9._-]{1,128}$/u;
 const PROVIDER_TOKEN = /^[A-Za-z0-9._-]{1,96}$/u;
 const BOOT_ID = /^[A-Za-z0-9._-]{1,64}$/u;
+const INSTANCE_ID = /^[A-Za-z0-9_-]{16,32}$/u;
 const UPDATE_READY_MESSAGE = "Update ready. Close all SeaRise tabs and reopen to use it." as const;
 const ROLLBACK_MESSAGE = "Application rollback requires a verified static deployment or Git-history restoration." as const;
 
@@ -45,8 +46,12 @@ export interface StaticUpdateCoordinatorPorts {
     boot: ControllerBootProofV1;
     candidate: AcceptedPairIdentityV1;
   }>): string;
+  /** Return a collision-resistant identifier minted once for this coordinator instance. */
+  issueCoordinatorInstanceId(): string;
   /** Persist only the latest unconsumed intent for this exact source boot. */
   recordTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  /** Conditionally remove only this exact intent; never remove a newer intent. */
+  revokeTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
   /** Consume the intent once; this record is not controller or rollback authority. */
   consumeTransitionIntent(
     intent: CloseAndReopenIntentV1,
@@ -170,15 +175,23 @@ export function validateCloseAndReopenIntent(value: CloseAndReopenIntentV1): Clo
   }
   const confirmationGeneration = generation(value.confirmationGeneration);
   const sourceBootId = opaque(value.sourceBootId, "sourceBootId", BOOT_ID);
-  if (value.transitionId !== `${sourceBootId}.g${confirmationGeneration}`) {
+  const transitionId = opaque(value.transitionId, "transitionId");
+  const transitionPrefix = `${sourceBootId}.`;
+  const transitionSuffix = `.g${confirmationGeneration}`;
+  if (!transitionId.startsWith(transitionPrefix) || !transitionId.endsWith(transitionSuffix)) {
     throw new TypeError("Transition identity does not match its source boot and generation.");
   }
+  opaque(
+    transitionId.slice(transitionPrefix.length, -transitionSuffix.length),
+    "coordinator instance id",
+    INSTANCE_ID,
+  );
   const sourceController = validateAcceptedPairIdentity(value.sourceController);
   const candidate = validateAcceptedPairIdentity(value.candidate);
   if (sameIdentity(sourceController, candidate)) throw new TypeError("Transition candidate is already active.");
   return Object.freeze({
     contractVersion: 1,
-    transitionId: opaque(value.transitionId, "transitionId"),
+    transitionId,
     confirmationGeneration,
     sourceBootId,
     sourceController,
@@ -223,16 +236,26 @@ function failed(
  */
 export class StaticHostUpdateCoordinator {
   readonly #ports: StaticUpdateCoordinatorPorts;
+  readonly #instanceId: string;
   #state: StaticUpdateCoordinatorStateV1 | null = null;
+  #launchBoot: ControllerBootProofV1 | null = null;
   #sequence = 0;
   #pendingGeneration: number | null = null;
 
-  constructor(ports: StaticUpdateCoordinatorPorts) { this.#ports = ports; }
+  constructor(ports: StaticUpdateCoordinatorPorts) {
+    this.#ports = ports;
+    this.#instanceId = opaque(
+      ports.issueCoordinatorInstanceId(),
+      "coordinator instance id",
+      INSTANCE_ID,
+    );
+  }
 
   state(): StaticUpdateCoordinatorStateV1 | null { return this.#state; }
 
   async initialize(): Promise<StaticUpdateCoordinatorStateV1> {
-    const boot = validateControllerBootProof(await this.#ports.readControllerBoot());
+    const boot = await this.#readAndPinLaunchBoot();
+    if (!this.#isLaunchBoot(boot)) throw new Error("Controller authority changed within one page boot.");
     return this.#set(Object.freeze({ phase: "current", boot, currentUsable: true }));
   }
 
@@ -244,7 +267,7 @@ export class StaticHostUpdateCoordinator {
     if (fallback) this.#state = Object.freeze({ phase: "preparing", boot: fallback, currentUsable: true });
 
     let boot: ControllerBootProofV1;
-    try { boot = validateControllerBootProof(await this.#ports.readControllerBoot()); }
+    try { boot = await this.#readAndPinLaunchBoot(); }
     catch (error) {
       return await this.#preparationFailure(operation, fallback, error, "Controller authority could not be read.");
     }
@@ -276,12 +299,12 @@ export class StaticHostUpdateCoordinator {
     }
 
     let current: ControllerBootProofV1;
-    try { current = validateControllerBootProof(await this.#ports.readControllerBoot()); }
+    try { current = await this.#readAndPinLaunchBoot(); }
     catch (error) {
       return await this.#preparationFailure(operation, boot, error, "Controller authority could not be confirmed.");
     }
     if (operation !== this.#sequence) return this.#currentOr(boot);
-    if (current.bootId !== boot.bootId || !sameIdentity(current.controller, boot.controller)) {
+    if (!this.#isLaunchBoot(current) || current.bootId !== boot.bootId || !sameIdentity(current.controller, boot.controller)) {
       return this.#set(failed("prepare-update", "preparation-failed", current, "Controller authority changed during candidate inspection."));
     }
 
@@ -313,14 +336,14 @@ export class StaticHostUpdateCoordinator {
     }
 
     this.#pendingGeneration = null;
-    ++this.#sequence;
+    const operation = ++this.#sequence;
     this.#state = Object.freeze({
       phase: "recording-close-and-reopen-intent", boot: pending.boot,
       candidate: pending.candidate, currentUsable: true,
     });
     const intent = validateCloseAndReopenIntent({
       contractVersion: 1,
-      transitionId: `${pending.boot.bootId}.g${pendingGeneration}`,
+      transitionId: `${pending.boot.bootId}.${this.#instanceId}.g${pendingGeneration}`,
       confirmationGeneration: pendingGeneration,
       sourceBootId: pending.boot.bootId,
       sourceController: pending.boot.controller,
@@ -329,11 +352,28 @@ export class StaticHostUpdateCoordinator {
     });
     try {
       await this.#ports.recordTransitionIntent(intent);
+      if (operation !== this.#sequence) {
+        try { await this.#ports.revokeTransitionIntent(intent); }
+        catch (error) {
+          return this.#set(failed(
+            "confirm-update", "intent-record-failed", pending.boot,
+            boundedMessage(error, "Cancelled transition intent could not be revoked."),
+          ));
+        }
+        return this.#currentOr(pending.boot);
+      }
       return this.#set(Object.freeze({
         phase: "close-and-reopen-required", boot: pending.boot, intent,
         message: UPDATE_READY_MESSAGE, currentUsable: true,
       }));
     } catch (error) {
+      try { await this.#ports.revokeTransitionIntent(intent); }
+      catch (revokeError) {
+        return this.#set(failed(
+          "confirm-update", "intent-record-failed", pending.boot,
+          boundedMessage(revokeError, "Failed transition intent could not be revoked."),
+        ));
+      }
       return this.#set(failed(
         "confirm-update", "intent-record-failed", pending.boot,
         boundedMessage(error, "Close-and-reopen intent could not be recorded."),
@@ -342,19 +382,27 @@ export class StaticHostUpdateCoordinator {
   }
 
   async verifyNextBoot(intentInput: CloseAndReopenIntentV1): Promise<StaticUpdateCoordinatorStateV1> {
+    const operation = ++this.#sequence;
+    this.#pendingGeneration = null;
     const fallback = this.#bootFromState();
     let boot: ControllerBootProofV1;
-    try { boot = validateControllerBootProof(await this.#ports.readControllerBoot()); }
+    try { boot = await this.#readAndPinLaunchBoot(); }
     catch (error) {
       if (!fallback) throw error;
       return this.#set(failed("verify-next-boot", "preparation-failed", fallback, boundedMessage(error, "Controller proof is unavailable.")));
     }
+    if (operation !== this.#sequence) return this.#currentOr(boot);
     let intent: CloseAndReopenIntentV1;
     try { intent = validateCloseAndReopenIntent(intentInput); }
     catch (error) {
       return this.#set(failed("verify-next-boot", "intent-stale", boot, boundedMessage(error, "Transition intent is invalid.")));
     }
-    if (boot.bootId === intent.sourceBootId || !sameIdentity(boot.controller, intent.candidate)) {
+    if (
+      !this.#isLaunchBoot(boot) ||
+      this.#launchBoot?.bootId === intent.sourceBootId ||
+      boot.bootId === intent.sourceBootId ||
+      !sameIdentity(boot.controller, intent.candidate)
+    ) {
       return this.#set(failed(
         "verify-next-boot", "controller-mismatch", boot,
         "Fresh boot is not controlled by the exact confirmed app/release candidate.",
@@ -362,6 +410,7 @@ export class StaticHostUpdateCoordinator {
     }
     try {
       const consumed = await this.#ports.consumeTransitionIntent(intent, boot);
+      if (operation !== this.#sequence) return this.#currentOr(boot);
       if (consumed !== "consumed") {
         return this.#set(failed("verify-next-boot", "intent-stale", boot, "Transition intent is missing or was already consumed."));
       }
@@ -398,7 +447,7 @@ export class StaticHostUpdateCoordinator {
   }
 
   async #safeBoot(fallback: ControllerBootProofV1 | null): Promise<ControllerBootProofV1> {
-    try { return validateControllerBootProof(await this.#ports.readControllerBoot()); }
+    try { return await this.#readAndPinLaunchBoot(); }
     catch (error) {
       if (fallback) return fallback;
       throw error;
@@ -407,6 +456,18 @@ export class StaticHostUpdateCoordinator {
 
   #bootFromState(): ControllerBootProofV1 | null {
     return this.#state && "boot" in this.#state ? this.#state.boot : null;
+  }
+
+  async #readAndPinLaunchBoot(): Promise<ControllerBootProofV1> {
+    const boot = validateControllerBootProof(await this.#ports.readControllerBoot());
+    this.#launchBoot ??= boot;
+    return boot;
+  }
+
+  #isLaunchBoot(boot: ControllerBootProofV1): boolean {
+    return this.#launchBoot !== null &&
+      boot.bootId === this.#launchBoot.bootId &&
+      sameIdentity(boot.controller, this.#launchBoot.controller);
   }
 
   #currentOr(fallback: ControllerBootProofV1 | null): StaticUpdateCoordinatorStateV1 {
