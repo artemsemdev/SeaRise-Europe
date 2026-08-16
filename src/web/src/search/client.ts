@@ -147,11 +147,20 @@ export class SettlementSearchClient {
           coastalError: null,
           initializationMilliseconds: message.durationMilliseconds,
         });
-        this.#worker!.postMessage({
-          kind: "load-shard",
-          token: ++this.#token,
-          authority: authority(this.#context, "europe-coastal"),
-        });
+        try {
+          this.#worker!.postMessage({
+            kind: "load-shard",
+            token: ++this.#token,
+            authority: authority(this.#context, "europe-coastal"),
+          });
+        } catch (error) {
+          this.#publish({
+            readiness: "core-ready",
+            coastalError: technical(error instanceof Error
+              ? error.message
+              : "Pinned release has no coastal settlement index."),
+          });
+        }
         if (this.#pendingQuery.trim()) this.#sendQuery(this.#pendingQuery);
       } else {
         this.#publish({ readiness: "all-ready", error: null, coastalError: null });

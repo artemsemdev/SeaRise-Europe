@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import manifest from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
 import { ManifestRepository } from "../data/manifest-repository";
-import type { ReleaseContext } from "../domain/release";
+import { ReleaseContext } from "../domain/release";
 import type { SearchWorkerPort, SearchWorkerRequest } from "../search/worker-protocol";
 import type { SettlementSearchRecord } from "../search/types";
 import { SettlementSearch } from "./SettlementSearch";
@@ -72,6 +72,18 @@ class FakeWorker implements SearchWorkerPort {
 }
 
 let context: ReleaseContext;
+
+function withoutArtifact(artifactId: string): ReleaseContext {
+  const artifacts = { ...context.artifacts };
+  delete artifacts[artifactId];
+  return new ReleaseContext({
+    manifest: context.manifest,
+    manifestUrl: context.manifestUrl,
+    disposition: context.disposition,
+    artifacts,
+    datasets: { ...context.datasets },
+  });
+}
 
 beforeEach(async () => {
   const manifestUrl = `https://fixture.invalid/releases/${manifest.dataReleaseId}/manifest.json`;
@@ -169,5 +181,32 @@ describe("settlement search combobox", () => {
     expect(await screen.findByText(/coastal index has a technical failure/i)).toBeVisible();
     expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "core-ready");
     expect(screen.getByRole("button", { name: /explore/i })).toBeEnabled();
+  });
+
+  it("fails closed when the pinned release omits the core search shard", async () => {
+    const user = userEvent.setup();
+    render(<SettlementSearch
+      release={withoutArtifact("settlements-europe-core")}
+      onSelect={vi.fn()}
+      workerFactory={() => new FakeWorker()}
+    />);
+    await user.type(screen.getByRole("combobox", { name: /find a city/i }), "Athens");
+    expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+  });
+
+  it("keeps core search useful when the pinned release omits the coastal shard", async () => {
+    const worker = new FakeWorker();
+    const user = userEvent.setup();
+    render(<SettlementSearch
+      release={withoutArtifact("settlements-europe-coastal")}
+      onSelect={vi.fn()}
+      workerFactory={() => worker}
+    />);
+    await user.type(screen.getByRole("combobox", { name: /find a city/i }), "Spring");
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+    expect(await screen.findByText(/coastal index has a technical failure/i)).toBeVisible();
+    expect(worker.requests.some(({ kind }) => kind === "load-shard")).toBe(false);
+    expect(worker.requests.some(({ kind }) => kind === "query")).toBe(true);
   });
 });
