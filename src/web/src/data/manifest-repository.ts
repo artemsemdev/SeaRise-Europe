@@ -179,6 +179,24 @@ function validateSemantics(
   requireRole(artifacts, contracts.signature, ["signature"]);
   for (const source of manifest.sources) requireRole(artifacts, source.receiptArtifactId, ["source-receipt"]);
 
+  for (const role of ["support-boundary", "coastal-boundary"] as const) {
+    const candidates = Object.values(artifacts).filter(
+      (artifact) =>
+        artifact.role === role &&
+        ["application/vnd.apache.parquet", "application/geo+json"].includes(artifact.mediaType),
+    );
+    if (candidates.length !== 1) {
+      throw technical(
+        "SchemaInvalid",
+        `The release must declare exactly one browser-decodable ${role} artifact.`,
+      );
+    }
+    const boundary = candidates[0];
+    if (boundary.scientificUse !== "not-applicable" || boundary.spatialBounds == null) {
+      throw technical("SchemaInvalid", `${role} must be a scoped non-scientific geometry artifact.`);
+    }
+  }
+
   const datasets: Record<string, ReleaseDatasetV1> = Object.create(null);
   const combinations = canonicalCombinations();
   for (const [index, [scenario, horizon]] of combinations.entries()) {
