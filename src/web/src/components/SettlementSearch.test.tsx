@@ -297,6 +297,19 @@ describe("settlement search combobox", () => {
     expect(screen.queryByText(/try another spelling/i)).not.toBeInTheDocument();
   });
 
+  it("uses the approved settlement-only no-match guidance", async () => {
+    const worker = new FakeWorker();
+    const user = userEvent.setup();
+    render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => worker} />);
+    await user.type(screen.getByRole("combobox", { name: /find a city/i }), "Unknown place");
+    expect(await screen.findByText(
+      "No matching places found. Check the spelling or try a nearby city, town, or village.",
+    )).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /No matching places found in the loaded index.*try a nearby city, town, or village/i,
+    );
+  });
+
   it("clears old results immediately so Enter and Explore cannot select a stale query", async () => {
     const worker = new FakeWorker();
     const selected = vi.fn();

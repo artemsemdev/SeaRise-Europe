@@ -413,7 +413,10 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
   await expect(input).toBeFocused();
 
   await input.fill("PrivateSearchTokenXYZ");
-  await expect(searchStatus).toContainText(/No matching settlement/i);
+  await expect(searchStatus).toContainText(/No matching places found in the loaded index/i);
+  await expect(page.locator(".search-shell .search-empty")).toContainText(
+    /Check the spelling or try a nearby city, town, or village/i,
+  );
   expect(network.join("\n")).not.toContain("PrivateSearchTokenXYZ");
   expect(network.filter((request) => request.includes("/search/")).length).toBe(2);
 

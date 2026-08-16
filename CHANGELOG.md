@@ -38,6 +38,11 @@ All notable changes to this project will be documented in this file.
   its release disclosure to the verified synthetic, private-engineering, or
   public-promoted disposition instead of hard-coding fixture status.
 
+- Aligned settlement no-match guidance with the approved product copy and
+  corrected active product documentation to identify the implemented static
+  target as the sole baseline and the superseded Flight mock as historical
+  evidence only.
+
 - Corrected the application live status after terminal projection failures so
   assistive technology no longer announces that a completed failed operation
   is still being checked, while any previous accepted outcome remains explicit.
