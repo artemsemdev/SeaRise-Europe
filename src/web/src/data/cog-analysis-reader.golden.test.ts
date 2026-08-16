@@ -373,7 +373,15 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
         ),
       ),
     );
-    expect(rangeCalls.every((call) => call.size < 65_536)).toBe(true);
+    expect(rangeCalls.every((call) => call.size <= 65_536)).toBe(true);
+    const multichunkPath = "analysis/ssp2-45/2050.tif";
+    const multichunkCalls = rangeCalls.filter((call) => call.path === multichunkPath);
+    const multichunkSize = fixtureBytes(multichunkPath).byteLength;
+    expect(multichunkSize).toBeGreaterThan(2 * 65_536);
+    expect(multichunkCalls.some((call) => call.size === 65_536)).toBe(true);
+    expect(multichunkCalls.reduce((total, call) => total + call.size, 0)).toBeLessThan(
+      multichunkSize,
+    );
   });
 
   it("rejects scenario/horizon substitution even when release and range hashes bind the wrong COG bytes", async () => {

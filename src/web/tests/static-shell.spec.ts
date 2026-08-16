@@ -1,9 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { Buffer } from "node:buffer";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const forbiddenPaths = ["ass" + "ess", "geo" + "code", "con" + "fig"];
 const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
+const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+const multichunkArtifactPath = "analysis/ssp2-45/2050.tif";
+const viteManifest = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, "../dist/vite-manifest.json"), "utf8"),
+) as Record<string, { readonly file: string }>;
+const scientificRuntimeUrl = `/${viteManifest["src/scientific-runtime.ts"].file}`;
 
 async function expectStaticDocumentSecurity(page: import("@playwright/test").Page) {
   const csp = page.locator('meta[http-equiv="Content-Security-Policy"]');
@@ -83,13 +91,15 @@ test("architecture direct navigation works from static output", async ({ page })
 });
 
 test("production-like release delivery exposes exact HEAD, CORS, and byte-range identity", async ({ page }) => {
-  const artifactUrl =
-    "http://127.0.0.1:8091/releases/searise-europe-v1.0.0-20260810-c096aeab4e09/analysis/ssp2-45/2050.tif";
+  const artifactUrl = `http://127.0.0.1:8091/releases/${releaseId}/${multichunkArtifactPath}`;
   const head = await page.request.head(artifactUrl, {
     headers: { Origin: "http://127.0.0.1:4173" },
   });
   const ranged = await page.request.get(artifactUrl, {
     headers: { Origin: "http://127.0.0.1:4173", Range: "bytes=16-47" },
+  });
+  const malformed = await page.request.get(artifactUrl, {
+    headers: { Origin: "http://127.0.0.1:4173", Range: "bytes=0-1,4-5" },
   });
   const observed = {
     head: {
@@ -111,17 +121,19 @@ test("production-like release delivery exposes exact HEAD, CORS, and byte-range 
   expect(observed.head).toEqual({
     status: 200,
     acceptRanges: "bytes",
-    contentLength: "20320",
-    etag: '"sha256-d7998337ead737320cba98772284c7e7ee9372573f65e72f100071f38b90391f"',
+    contentLength: "139264",
+    etag: '"sha256-9630a20038a11e577a2203db0ba9ec03e79c295d4aaf945886ca4d9fe58411f7"',
   });
   expect(observed.ranged).toMatchObject({
     status: 206,
     acceptRanges: "bytes",
     contentLength: "32",
-    contentRange: "bytes 16-47/20320",
+    contentRange: "bytes 16-47/139264",
     etag: observed.head.etag,
   });
   expect(observed.ranged.bytes).toHaveLength(32);
+  expect(malformed.status()).toBe(416);
+  expect(malformed.headers()["content-range"]).toBe("bytes */139264");
 
   expect(head.headers()["access-control-allow-origin"]).toBe("http://127.0.0.1:4173");
   expect(head.headers()["access-control-allow-methods"]).toBe("GET, HEAD");
@@ -129,6 +141,144 @@ test("production-like release delivery exposes exact HEAD, CORS, and byte-range 
     "Accept-Ranges, Content-Length, Content-Range, ETag",
   );
   expect(head.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+});
+
+test("page context performs an exact multichunk COG lookup under the shipped CSP", async ({ page }) => {
+  await page.goto("/");
+  await expectStaticDocumentSecurity(page);
+
+  const observed = await page.evaluate(async ({ releaseId, runtimeUrl, artifactPath }) => {
+    const artifactSuffix = `/releases/${releaseId}/${artifactPath}`;
+    const calls: Array<{
+      method: string;
+      range: string | null;
+      status: number;
+      contentLength: number;
+      contentRange: string | null;
+      acceptRanges: string | null;
+      allowOrigin: string | null;
+      chunkHashes: string[];
+    }> = [];
+    const originalFetch = window.fetch.bind(window);
+    const hex = (bytes: ArrayBuffer) =>
+      Array.from(new Uint8Array(bytes), (value) => value.toString(16).padStart(2, "0")).join("");
+    window.fetch = async (input, init) => {
+      const response = await originalFetch(input, init);
+      const url = new URL(input instanceof Request ? input.url : input.toString(), location.href);
+      if (url.pathname.endsWith(artifactSuffix)) {
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        const range = new Headers(init?.headers).get("range");
+        const body = method === "HEAD" ? new Uint8Array() : new Uint8Array(await response.clone().arrayBuffer());
+        const chunkHashes: string[] = [];
+        for (let offset = 0; offset < body.byteLength; offset += 65_536) {
+          chunkHashes.push(hex(await crypto.subtle.digest("SHA-256", body.slice(offset, offset + 65_536))));
+        }
+        calls.push({
+          method,
+          range,
+          status: response.status,
+          contentLength: Number(response.headers.get("content-length") ?? "0"),
+          contentRange: response.headers.get("content-range"),
+          acceptRanges: response.headers.get("accept-ranges"),
+          allowOrigin: response.headers.get("access-control-allow-origin"),
+          chunkHashes,
+        });
+      }
+      return response;
+    };
+
+    const runtime = await import(runtimeUrl) as {
+      ManifestRepository: new (options: {
+        manifestUrl: string;
+        allowedOrigins: string[];
+        expectedDisposition: "synthetic-fixture";
+      }) => { load(id: string, signal: AbortSignal): Promise<unknown> };
+      CogAnalysisArtifactReader: new () => {
+        lookup(
+          context: unknown,
+          scenario: "ssp2-45",
+          horizon: 2050,
+          coordinates: { latitude: number; longitude: number },
+          signal: AbortSignal,
+        ): Promise<unknown>;
+      };
+    };
+    const repository = new runtime.ManifestRepository({
+      manifestUrl: `${location.origin}/releases/${releaseId}/manifest.json`,
+      allowedOrigins: [location.origin],
+      expectedDisposition: "synthetic-fixture",
+    });
+    const context = await repository.load(releaseId, new AbortController().signal);
+    const result = await new runtime.CogAnalysisArtifactReader().lookup(
+      context,
+      "ssp2-45",
+      2050,
+      { latitude: 51.9244, longitude: 4.4777 },
+      new AbortController().signal,
+    );
+    const rangeIndex = await originalFetch(
+      `/releases/${releaseId}/analysis/cog-range-integrity.json`,
+    ).then((response) => response.json());
+    const malformedRange = await originalFetch(artifactSuffix, {
+      headers: { Range: "bytes=0-1,4-5" },
+    });
+    return {
+      calls,
+      result,
+      rangeIndex,
+      malformedRange: {
+        status: malformedRange.status,
+        contentRange: malformedRange.headers.get("content-range"),
+      },
+    };
+  }, { releaseId, runtimeUrl: scientificRuntimeUrl, artifactPath: multichunkArtifactPath });
+
+  expect(observed.result).toMatchObject({
+    kind: "projection",
+    source: {
+      locationId: 1003800040,
+      latitude: 52,
+      longitude: 4,
+      distanceKilometres: 33.792469,
+    },
+    lowerMillimetres: 156,
+    medianMillimetres: 247,
+    upperMillimetres: 351,
+  });
+  const identity = observed.rangeIndex.artifacts.find(
+    (artifact: { artifactId: string }) => artifact.artifactId === "projection-ssp2-45-2050-cog",
+  );
+  expect(identity.byteSize).toBe(139264);
+  expect(identity.chunks).toHaveLength(3);
+  expect(observed.malformedRange).toEqual({
+    status: 416,
+    contentRange: "bytes */139264",
+  });
+  const head = observed.calls.find((call) => call.method === "HEAD");
+  expect(head).toMatchObject({
+    status: 200,
+    contentLength: identity.byteSize,
+    acceptRanges: "bytes",
+    allowOrigin: "http://127.0.0.1:4173",
+  });
+  const ranged = observed.calls.filter((call) => call.method !== "HEAD");
+  expect(ranged.length).toBeGreaterThan(0);
+  expect(ranged.every((call) => call.status === 206 && call.acceptRanges === "bytes")).toBe(true);
+  expect(ranged.reduce((total, call) => total + call.contentLength, 0)).toBeLessThan(identity.byteSize);
+  for (const call of ranged) {
+    const match = /^bytes=(\d+)-(\d+)$/.exec(call.range ?? "");
+    expect(match).not.toBeNull();
+    const start = Number(match![1]);
+    const endExclusive = Number(match![2]) + 1;
+    const expectedChunks = identity.chunks.filter(
+      (chunk: { start: number; endExclusive: number }) =>
+        chunk.start >= start && chunk.endExclusive <= endExclusive,
+    );
+    expect(call.contentRange).toBe(`bytes ${start}-${endExclusive - 1}/${identity.byteSize}`);
+    expect(call.chunkHashes).toEqual(
+      expectedChunks.map((chunk: { sha256: string }) => chunk.sha256),
+    );
+  }
 });
 
 test("local settlement worker is private, partial-ready, keyboard accessible, and fast on fixture", async ({ page }, testInfo) => {

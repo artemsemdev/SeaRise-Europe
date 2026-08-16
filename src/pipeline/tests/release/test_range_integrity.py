@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -14,12 +15,8 @@ from searise_pipeline.science import ScienceContractError
 REPO_ROOT = Path(__file__).parents[4]
 RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09"
 PAYLOAD_ROOT = REPO_ROOT / "contracts/release/v1/fixtures/release" / RELEASE_ID
-COMMITTED_INDEX = (
-    REPO_ROOT
-    / "contracts/release/v2/fixtures/browser-release"
-    / RELEASE_ID
-    / "analysis/cog-range-integrity.json"
-)
+OVERLAY_ROOT = REPO_ROOT / "contracts/release/v2/fixtures/browser-release" / RELEASE_ID
+COMMITTED_INDEX = OVERLAY_ROOT / "analysis/cog-range-integrity.json"
 
 
 def _sha256(payload: bytes) -> str:
@@ -95,7 +92,8 @@ def test_range_integrity_rejects_identity_mismatch_and_duplicates(
 def test_committed_range_index_is_the_exact_production_writer_output(
     tmp_path: Path,
 ) -> None:
-    manifest = json.loads((PAYLOAD_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((OVERLAY_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    assembled = tmp_path / "assembled"
     cogs = [
         RangeObject(
             artifact_id=item["artifactId"],
@@ -106,9 +104,15 @@ def test_committed_range_index_is_the_exact_production_writer_output(
         for item in manifest["artifacts"]
         if item["role"] == "projection-analysis-cog"
     ]
+    for cog in cogs:
+        overlay = OVERLAY_ROOT / cog.path
+        source = overlay if overlay.is_file() else PAYLOAD_ROOT / cog.path
+        destination = assembled / cog.path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
     generated = tmp_path / "cog-range-integrity.json"
     write_range_integrity_index(
-        PAYLOAD_ROOT,
+        assembled,
         generated,
         data_release_id=RELEASE_ID,
         artifact_path="analysis/cog-range-integrity.json",
@@ -116,3 +120,21 @@ def test_committed_range_index_is_the_exact_production_writer_output(
     )
 
     assert COMMITTED_INDEX.read_bytes() == generated.read_bytes()
+
+
+def test_committed_browser_fixture_has_exact_multichunk_cog_integrity() -> None:
+    document = json.loads(COMMITTED_INDEX.read_text(encoding="utf-8"))
+    record = next(
+        item
+        for item in document["artifacts"]
+        if item["artifactId"] == "projection-ssp2-45-2050-cog"
+    )
+    payload = (OVERLAY_ROOT / record["path"]).read_bytes()
+
+    assert record["byteSize"] == len(payload) == 139_264
+    assert len(payload) > 2 * 65_536
+    assert len(record["chunks"]) == 3
+    for chunk in record["chunks"]:
+        body = payload[chunk["start"] : chunk["endExclusive"]]
+        assert len(body) <= 65_536
+        assert _sha256(body) == chunk["sha256"]
