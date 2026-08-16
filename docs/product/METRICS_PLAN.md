@@ -212,7 +212,7 @@ production payload in browser tests.
 | Every pull request | Relevant unit, contract, browser, accessibility, and bundle checks |
 | Every data release | Scientific, search, integrity, licence, provenance, cost, and artifact delivery gates |
 | Weekly after launch | Synthetic failures, static host/object errors, cost and storage anomalies |
-| After material copy or flow change | Five-state comprehension and accessibility review |
+| After material copy or flow change | Four-outcome comprehension, canonical Flight fidelity, and accessibility review |
 | Quarterly while actively maintained | Dependency, source licence, cost assumption, browser support, and portfolio evidence review |
 
 Metrics that are not actively collected must be labelled “not measured,” not

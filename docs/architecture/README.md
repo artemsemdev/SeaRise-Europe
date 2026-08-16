@@ -42,11 +42,13 @@ Read in this order:
    browser responsibilities.
 4. [Browser application](03a-frontend-architecture.md) — runtime components,
    search, assessment, map, state, and offline behaviour.
-5. [Data architecture](05-data-architecture.md) — immutable release layout and
+5. [Atomic projection state](17-atomic-projection-state.md) — release-scoped
+   transitions and stale-completion guards.
+6. [Data architecture](05-data-architecture.md) — immutable release layout and
    public data contracts.
-6. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
+7. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
    processing and publication gates.
-7. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
+8. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
    and portable delivery requirements.
 
 ## Current document set
@@ -68,6 +70,7 @@ Read in this order:
 | [14 — Integration Patterns](14-integration-patterns.md) | Build ingestion, publication, HTTPS artifact contracts, basemap boundary |
 | [15 — Performance and Scalability](15-performance-and-scalability.md) | Browser/CDN budgets, caching, range requests, and cost controls |
 | [16 — Geospatial Pipeline](16-geospatial-data-pipeline.md) | Real-data workflow, settlement index, reproducibility, and validation |
+| [17 — Atomic Projection State](17-atomic-projection-state.md) | Immutable result/selection/release tuple and guarded state transitions |
 | [Public release contracts](../../contracts/release/README.md) | Authoritative JSON Schemas, version compatibility, deprecation, and rollback |
 | [ADR directory](adr/README.md) | Standalone architecture decision records and ADR conventions |
 | [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
@@ -78,6 +81,13 @@ Supporting current documents:
 - [Static-first migration plan](../delivery/README.md)
 - [Product requirements](../product/PRD.md)
 - [Content guidelines](../product/CONTENT_GUIDELINES.md)
+- [Canonical Flight visual and interaction contract](../product/Mock/DESIGN.md)
+
+Architecture components implement the canonical Flight experience rather than
+substituting a generic dashboard or map utility. ADR-024 overrides the mock's
+binary exposure, terrain comparison, modeled-water/flood meaning, and related
+scientific copy; it does not override Flight's layout, information hierarchy,
+map-first composition, controls, responsive behavior, or interaction character.
 
 ## Status model
 

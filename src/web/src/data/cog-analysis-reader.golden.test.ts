@@ -14,6 +14,7 @@ import {
 } from "../domain/release";
 import { AssessmentEngine } from "../domain/scientific-lookup";
 import { CogAnalysisArtifactReader } from "./cog-analysis-reader";
+import { StaticGeographyClassifier } from "./geography-classifier";
 import {
   fixtureArtifactPath,
   fixtureBytes,
@@ -78,9 +79,9 @@ interface OutcomeParityCase {
     };
   };
   readonly nodataEvidence?: {
-    readonly kind: "committed-cog-cell";
+    readonly kind: "committed-nine-cog-cell-and-browser-boundary-control";
     readonly storedNodata: -32768;
-    readonly bandValues: readonly [-32768, -32768, -32768];
+    readonly bandValuesForEveryCombination: readonly [-32768, -32768, -32768];
   };
 }
 
@@ -88,6 +89,10 @@ interface OutcomeParityFixture {
   readonly fixtureRole: "authoritative-adr-024-behavior-golden";
   readonly dataProvenanceClass: "synthetic-fixture";
   readonly release: { readonly dataReleaseId: string };
+  readonly browserFixtureControl: {
+    readonly controlId: "browser-only-source-nodata-62n-44e";
+    readonly fixtureOnly: true;
+  };
   readonly selection: {
     readonly scenario: "ssp2-45";
     readonly horizon: 2050;
@@ -274,7 +279,11 @@ function rangeFetch(calls: RangeCall[]): typeof fetch {
     const url = new URL(input instanceof Request ? input.url : input.toString());
     const path = fixtureArtifactPath(url);
     const bytes = fixtureBytes(path);
-    if (path === "analysis/source-grid.json.gz" || path === "analysis/cog-range-integrity.json") {
+    if (
+      path === "analysis/source-grid.json.gz" ||
+      path === "analysis/cog-range-integrity.json" ||
+      path.startsWith("boundaries/")
+    ) {
       return new Response(responseBody(bytes), {
         status: 200,
         headers: { "content-length": String(bytes.byteLength) },
@@ -327,6 +336,10 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
   it("matches Python for all and only the four ADR-024 outcomes using a real COG nodata cell", async () => {
     expect(outcomeParity.fixtureRole).toBe("authoritative-adr-024-behavior-golden");
     expect(outcomeParity.dataProvenanceClass).toBe("synthetic-fixture");
+    expect(outcomeParity.browserFixtureControl).toMatchObject({
+      controlId: "browser-only-source-nodata-62n-44e",
+      fixtureOnly: true,
+    });
     expect(outcomeParity.contract).toEqual({
       resultStates: [
         "ProjectionAvailable",
@@ -349,10 +362,15 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
     const context = await fixtureReleaseContext();
     expect(context.dataReleaseId).toBe(outcomeParity.release.dataReleaseId);
     const reader = new CogAnalysisArtifactReader();
+    const geography = new StaticGeographyClassifier();
     const actualStates = new Set<OutcomeState>();
     for (const golden of outcomeParity.cases) {
+      await expect(
+        geography.classify(context, golden.coordinates, new AbortController().signal),
+        golden.id,
+      ).resolves.toBe(golden.geographyClassification);
       const engine = new AssessmentEngine({
-        geography: { classify: async () => golden.geographyClassification },
+        geography,
         analysis: reader,
       });
       const selection: Selection = {
@@ -381,15 +399,51 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
       }
       if (golden.nodataEvidence) {
         expect(golden.nodataEvidence).toMatchObject({
-          kind: "committed-cog-cell",
+          kind: "committed-nine-cog-cell-and-browser-boundary-control",
           storedNodata: -32768,
-          bandValues: [-32768, -32768, -32768],
+          bandValuesForEveryCombination: [-32768, -32768, -32768],
         });
         expect(evaluation.result.resultState, golden.id).toBe("DataUnavailable");
       }
     }
 
     expect(actualStates).toEqual(new Set(outcomeParity.contract.resultStates));
+  });
+
+  it("returns production-engine DataUnavailable for the control in all nine combinations", async () => {
+    const context = await fixtureReleaseContext();
+    const engine = new AssessmentEngine({
+      geography: new StaticGeographyClassifier(),
+      analysis: new CogAnalysisArtifactReader(),
+    });
+
+    for (const scenario of ["ssp1-26", "ssp2-45", "ssp5-85"] as const) {
+      for (const horizon of [2030, 2050, 2100] as const) {
+        const evaluation = await engine.evaluate(
+          context,
+          {
+            dataReleaseId: context.dataReleaseId,
+            scenario,
+            horizon,
+            location: {
+              kind: "coordinate",
+              coordinates: { latitude: 62, longitude: 44 },
+            },
+          },
+          new AbortController().signal,
+        );
+        expect(evaluation.result, `${scenario}/${horizon}`).toMatchObject({
+          resultState: "DataUnavailable",
+          reason: "source-value-nodata",
+          source: {
+            locationId: 1_002_800_440,
+            latitude: 62,
+            longitude: 44,
+            distanceKilometres: 0,
+          },
+        });
+      }
+    }
   });
 
   const rangeCalls: RangeCall[] = [];

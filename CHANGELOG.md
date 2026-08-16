@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added production-static browser journey evidence for all four ADR-024
+  outcomes and all nine scenario/horizon projections, including exact COG
+  values, release-scoped PMTiles identity, keyboard and reduced-motion flows,
+  URL restoration, stale-operation races, recoverable delivery failure, and
+  fail-closed range-integrity corruption. Screenshots and the exact projection
+  matrix are retained only as short-lived CI artifacts.
+
+- Added an explicitly browser-only synthetic `DataUnavailable` control at
+  62°N, 44°E. The isolated v2 fixture polygon drives the real static geography
+  and exact COG lookup chain, while deterministic gates prove all 27 source
+  bands are nodata, prove the control is disjoint from audited geometry, pin
+  cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
+
+### Changed
+
+- Bound the canonical frontend npm SBOM to the static `src/web` workspace in
+  the root lockfile, including the Flight icon dependency and its exact
+  registry integrity, instead of retaining the superseded Next.js lock as the
+  active frontend authority.
+
+- Confirmed the SeaRise Flight mock as the active canonical visual and
+  interaction reference while adding an explicit ADR-024 correction map and a
+  fail-closed annotation gate. Its layout, hierarchy, map-first composition,
+  controls, responsive behavior, and interaction character remain required;
+  binary exposure, terrain/flood/property meaning, and other prohibited claims
+  remain excluded from the target application and built assets.
+
 ### Security
 
 - Pinned private overlay cleanup to an open directory identity so immediate
@@ -21,6 +50,35 @@ All notable changes to this project will be documented in this file.
   locked restore while that test runtime awaits Phase 2 removal.
 
 ### Fixed
+
+- Restored the canonical SeaRise Flight landing and result composition across
+  desktop and mobile, with durable same-viewport visual QA evidence, while
+  retaining the corrected ADR-024 scientific outcomes and accessibility flow.
+
+- Corrected Flight search-result announcements, first-selection failure focus,
+  segmented control rows, mobile landing composition, and idle map chrome while
+  keeping assessment and search live regions distinct.
+
+- Aligned the static landing copy with the approved product language and bound
+  its release disclosure to the verified synthetic, private-engineering, or
+  public-promoted disposition instead of hard-coding fixture status.
+
+- Aligned settlement no-match guidance with the approved product copy and
+  corrected active product documentation to identify the implemented static
+  runtime as the sole code baseline.
+
+- Corrected the application live status after terminal projection failures so
+  assistive technology no longer announces that a completed failed operation
+  is still being checked, while any previous accepted outcome remains explicit.
+
+- Made the committed browser release checksum list an exact, canonical view of
+  the manifest artifact inventory. Comments and blank lines can no longer be
+  misread as artifacts, and missing, extra, duplicate, or stale entries fail
+  the deterministic fixture gate.
+
+- Corrected the methodology dialog definitions so `OutOfScope` means inside
+  supported Europe but outside the versioned coastal analysis area, while
+  `UnsupportedGeography` means outside the versioned Europe support geometry.
 
 - Separated the sealed v1 release identity from the deterministic browser
   overlay identity. The v1 build receipt and provenance remain byte-identical;
@@ -81,6 +139,11 @@ All notable changes to this project will be documented in this file.
   loader, and worker decoder while retaining byte-exact v3 fixture validation.
 
 ### Added
+
+- Added a framework-neutral atomic projection state contract that binds every
+  accepted outcome to its immutable selection and release, retains prior
+  results explicitly during updates, and rejects stale asynchronous
+  completions by monotonic token, selection identity, and release identity.
 
 - Added a lazy MapLibre/PMTiles visualization path that resolves all nine
   visual-only overlays from the pinned release context, keeps map clicks on the

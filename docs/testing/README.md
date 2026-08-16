@@ -24,6 +24,10 @@ The measured pipeline and browser examples are recorded in
 [`tests/evidence/tdd-slices.json`](../../tests/evidence/tdd-slices.json). They
 also show that target parity alone does not authorize legacy deletion.
 
+The [legacy frontend removal inventory](legacy-frontend-removal-inventory.md)
+maps every API-shaped store, type, component test, and directly related
+frontend suite to static target evidence and explicit issue #70 blocking gates.
+
 ## Locations and naming
 
 | Evidence | Location | Naming rule |

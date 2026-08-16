@@ -2,6 +2,12 @@ import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { inflateSync } from "node:zlib";
+import {
+  assertChecksumInventory,
+  canonicalChecksumText,
+  parseChecksumText,
+} from "./checksum-inventory.mjs";
 
 const RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const checking = process.argv.includes("--check");
@@ -15,6 +21,14 @@ const overlayRoot = resolve(
   repositoryRoot,
   `contracts/release/v2/fixtures/browser-release/${RELEASE_ID}`,
 );
+const nodataControlPath =
+  "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json";
+const nodataControlBytes = readFileSync(resolve(repositoryRoot, nodataControlPath));
+const nodataControl = JSON.parse(nodataControlBytes.toString("utf8"));
+const boundaryArrowSchemasPath =
+  "src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json";
+const boundaryArrowSchemasBytes = readFileSync(resolve(repositoryRoot, boundaryArrowSchemasPath));
+const boundaryArrowSchemas = JSON.parse(boundaryArrowSchemasBytes.toString("utf8"));
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const treeDigest = (root) => {
   const digest = createHash("sha256");
@@ -50,6 +64,12 @@ const writeOverlay = (relative, bytes) => {
 // v1 is a byte-sealed payload source. This generator only writes the separate
 // committed v2 overlay assembled by the static build.
 const v1Manifest = JSON.parse(readFileSync(resolve(payloadRoot, "manifest.json"), "utf8"));
+const v1ChecksumsText = readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8");
+// The sealed v1 file contains an explanatory comment and may contain blank
+// lines. Parse those as metadata/spacing, never as artifact identities, and
+// retain an exact semantic check before using the v1 manifest as input.
+parseChecksumText(v1ChecksumsText);
+assertChecksumInventory(v1Manifest, v1ChecksumsText);
 // These two scientific inputs are produced only by the reusable Python release
 // writers. Node deliberately cannot synthesize source IDs or range hashes.
 const sourceGridBytes = readFileSync(resolve(overlayRoot, "analysis/source-grid.json.gz"));
@@ -61,18 +81,40 @@ const boundaries = [
     artifactId: "europe-support-geoparquet",
     path: "boundaries/europe.parquet",
     role: "support-boundary",
-    spatialBounds: [-28.851018, 30.021175999999997, 40.173396, 74.53634699999999],
+    spatialBounds: [-28.851018, 30.021176, 44.001, 74.536347],
   },
   {
     artifactId: "coastal-analysis-zone-geoparquet",
     path: "boundaries/coastal-analysis-zone.parquet",
     role: "coastal-boundary",
-    spatialBounds: [-28.850986, 30.021210999999997, 38.314159, 74.536318],
+    spatialBounds: [-28.850986, 30.021211, 44.001, 74.536318],
   },
 ].map((boundary) => ({
   ...boundary,
   bytes: readFileSync(resolve(overlayRoot, boundary.path)),
 }));
+if (
+  nodataControl.controlId !== "browser-only-source-nodata-62n-44e" ||
+  nodataControl.fixtureRole !== "browser-only-adr-024-data-unavailable-control" ||
+  nodataControl.dataProvenanceClass !== "synthetic-fixture" ||
+  nodataControl.dataReleaseId !== RELEASE_ID
+) {
+  throw new Error("The browser-only nodata control identity differs from the pin");
+}
+if (
+  boundaryArrowSchemas.fixtureRole !== "browser-only-boundary-canonical-arrow-schemas" ||
+  boundaryArrowSchemas.encoding !== "base64-zlib" ||
+  Object.keys(boundaryArrowSchemas.schemas).sort().join(",") !==
+    "coastal-boundary,support-boundary"
+) {
+  throw new Error("The browser-only canonical Arrow schema identity differs from the pin");
+}
+for (const record of Object.values(boundaryArrowSchemas.schemas)) {
+  const decoded = inflateSync(Buffer.from(record.payload, "base64"));
+  if (decoded.length !== record.decodedLength || sha256(decoded) !== record.decodedSha256) {
+    throw new Error("The browser-only canonical Arrow schema payload differs from the pin");
+  }
+}
 
 const cogBodies = new Map();
 const cogArtifacts = v1Manifest.artifacts
@@ -123,6 +165,8 @@ const sbom = {
       .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
       .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
     ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
+    [nodataControlPath, nodataControlBytes],
+    [boundaryArrowSchemasPath, boundaryArrowSchemasBytes],
   ].map(([path, bytes]) => ({
     type: "data",
     name: path,
@@ -136,6 +180,9 @@ writeOverlay("sbom/browser-integrity.cdx.json", sbomBytes);
 const attribution = JSON.parse(
   readFileSync(resolve(payloadRoot, "config/source-attribution.json"), "utf8"),
 );
+attribution.$schema =
+  "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/attribution.schema.json";
+attribution.schemaVersion = "2.0.0";
 const ipcc = attribution.records.find(
   (record) => record.attributionId === "ipcc-ar6-sl-projections-20210809",
 );
@@ -161,8 +208,26 @@ attribution.records.push({
   redistribution: "allowed",
   appliesToRoles: ["support-boundary", "coastal-boundary"],
 });
+attribution.records.push({
+  attributionId: "browser-nodata-control-fixture",
+  sourceId: "searise-browser-nodata-control/v1",
+  title: "SeaRise Europe browser-only ADR-024 nodata control",
+  sourceUrl: "https://github.com/artemsemdev/SeaRise-Europe",
+  sourceSha256: sha256(nodataControlBytes),
+  attributionText:
+    "Synthetic browser-only DataUnavailable control; not production or public scientific evidence.",
+  licence: {
+    spdxId: "CC-BY-4.0",
+    name: "Creative Commons Attribution 4.0 International",
+    url: "https://creativecommons.org/licenses/by/4.0/",
+  },
+  redistribution: "allowed",
+  appliesToRoles: ["support-boundary", "coastal-boundary"],
+});
 const attributionBytes = compactJson(attribution);
 writeOverlay("config/source-attribution.json", attributionBytes);
+const methodologyBytes = readFileSync(resolve(payloadRoot, "config/methodology.json"));
+writeOverlay("config/methodology.json", methodologyBytes);
 
 const identity = (path, bytes) => ({ path, sha256: sha256(bytes) });
 const repositoryBytes = (path) => readFileSync(resolve(repositoryRoot, path));
@@ -200,13 +265,32 @@ const derivationMaterials = [
     v1ProvenanceBytes,
   ),
   identity(
+    `contracts/release/v1/fixtures/release/${RELEASE_ID}/config/methodology.json`,
+    methodologyBytes,
+  ),
+  identity(
     "src/web/scripts/generate-scientific-fixture-contracts.mjs",
     repositoryBytes("src/web/scripts/generate-scientific-fixture-contracts.mjs"),
+  ),
+  identity(
+    "src/web/scripts/checksum-inventory.mjs",
+    repositoryBytes("src/web/scripts/checksum-inventory.mjs"),
+  ),
+  identity(nodataControlPath, nodataControlBytes),
+  identity(boundaryArrowSchemasPath, boundaryArrowSchemasBytes),
+  identity(
+    "scripts/release/build-browser-integrity-fixture.py",
+    repositoryBytes("scripts/release/build-browser-integrity-fixture.py"),
+  ),
+  identity(
+    "src/pipeline/searise_pipeline/release/boundary_geoparquet.py",
+    repositoryBytes("src/pipeline/searise_pipeline/release/boundary_geoparquet.py"),
   ),
   ...overlayInputs,
 ].sort((left, right) => left.path.localeCompare(right.path));
 const derivedOutputs = [
   identity("sbom/browser-integrity.cdx.json", sbomBytes),
+  identity("config/methodology.json", methodologyBytes),
   identity("config/source-attribution.json", attributionBytes),
 ].sort((left, right) => left.path.localeCompare(right.path));
 const derivationReceipt = {
@@ -337,7 +421,10 @@ for (const artifact of manifest.artifacts) {
   if (projectionLineage) artifact.lineage = projectionLineage;
 }
 const boundaryLineage = [
+  scriptIdentity("scripts/release/build-browser-integrity-fixture.py"),
   scriptIdentity("src/pipeline/searise_pipeline/release/boundary_geoparquet.py"),
+  identity(nodataControlPath, nodataControlBytes),
+  identity(boundaryArrowSchemasPath, boundaryArrowSchemasBytes),
   scriptIdentity("src/pipeline/sources/source-lock.phase-1-settlement-coastline.json"),
 ].sort((left, right) => left.path.localeCompare(right.path));
 const common = {
@@ -364,7 +451,10 @@ const additions = [
     sha256: sha256(boundary.bytes),
     spatialBounds: boundary.spatialBounds,
     lineage: boundaryLineage,
-    rights: { attributionIds: ["natural-earth-boundaries"], redistribution: "allowed" },
+    rights: {
+      attributionIds: ["browser-nodata-control-fixture", "natural-earth-boundaries"],
+      redistribution: "allowed",
+    },
   })),
   {
     ...common,
@@ -414,31 +504,15 @@ const replaceArtifact = (artifactId, bytes) => {
 replaceArtifact("attribution", attributionBytes);
 manifest.artifacts.find((artifact) => artifact.artifactId === "attribution").lineage =
   derivationLineage;
+replaceArtifact("methodology", methodologyBytes);
+manifest.artifacts.find((artifact) => artifact.artifactId === "methodology").lineage =
+  derivationLineage;
 
-const replacements = new Map([
-  ["config/source-attribution.json", attributionBytes],
-  ...cogArtifacts
-    .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
-    .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
-]);
-const checksumIdentities = new Map(readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8")
-  .trimEnd()
-  .split("\n")
-  .map((line) => {
-    const path = line.slice(line.indexOf("  ") + 2);
-    const bytes = replacements.get(path);
-    return [path, bytes ? sha256(bytes) : line.slice(0, 64)];
-  }));
-for (const output of derivedOutputs) checksumIdentities.set(output.path, output.sha256);
-checksumIdentities.set("receipts/browser-derivation.json", sha256(derivationReceiptBytes));
-checksumIdentities.set("browser-derivation.intoto.json", sha256(derivationProvenanceBytes));
-const checksumsBytes = Buffer.from(
-  `${[...checksumIdentities.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([path, digest]) => `${digest}  ${path}`)
-    .join("\n")}\n`,
-  "utf8",
-);
+// Render from the complete final manifest inventory, not a partial inherited
+// list. manifest.json and checksums.txt are the only exclusions because their
+// inclusion would create a mutual/direct self-reference cycle.
+const checksumsBytes = Buffer.from(canonicalChecksumText(manifest), "utf8");
+assertChecksumInventory(manifest, checksumsBytes.toString("utf8"));
 writeOverlay("checksums.txt", checksumsBytes);
 replaceArtifact("checksums", checksumsBytes);
 manifest.artifacts.find((artifact) => artifact.artifactId === "checksums").lineage =

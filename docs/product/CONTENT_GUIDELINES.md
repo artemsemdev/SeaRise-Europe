@@ -219,13 +219,21 @@ near-zero idle cost within current free allowances,” not “free forever.” U
 ## 9. Visual mock status
 
 The self-contained [SeaRise Flight mock](Mock/SeaRise-Flight.html) is the active
-visual and interaction direction. It replaces the legacy multi-page mock set.
-The mock uses synthetic illustrative values and remains subordinate to this
-guide, the PRD, methodology, release contracts, accessibility requirements, and
-ADR-021. Fixture counts, release IDs, artifact paths, timings, coordinates, and
-classifications must not be copied into production as constants. See
-[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for the implementation
-scope, required corrections, missing states, and GitHub issue links.
+canonical visual and interaction reference. Preserve its layout, information
+hierarchy, map-first composition, controls, responsive behavior, and
+interaction character. This guide, the PRD, release contracts, accessibility
+requirements, and ADR-024 override only conflicting scientific meaning,
+product copy, fixture facts, and implementation details; they do not downgrade
+Flight's design authority.
+
+The mock's `exposed` and `notexposed` cards both map to
+`ProjectionAvailable`; `unavailable` maps to `DataUnavailable`;
+`outofscope` maps to `OutOfScope`; and the missing `UnsupportedGeography`
+presentation must be added in the same result-panel system. Binary exposure,
+terrain comparison, modeled-water/flood meaning, and property or hazard claims
+must not enter the target domain or production build. See the active
+[mock requirements map](Mock/MOCK_REQUIREMENTS_MAP.md) for the complete
+preservation and correction contract.
 
 ## 10. Prohibited language
 

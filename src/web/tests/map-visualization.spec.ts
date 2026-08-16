@@ -1,10 +1,22 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { isForbiddenApplicationApiPath } from "../src/test/application-api-boundary";
 
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
-const forbiddenParts = ["ass" + "ess", "geo" + "code", "con" + "fig"];
 
-test("map stays lazy, loads bounded PMTiles ranges, and keeps one atomic active overlay", async ({ page }) => {
+async function acceptMapPoint(page: Page): Promise<void> {
+  await expect(page.locator("[data-flight-phase='idle'] .flight-search")).toBeVisible();
+  await expect(page.getByRole("button", { name: /select coordinate at source extent centre/i })).toHaveCount(0);
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await page.getByRole("button", { name: /select coordinate at source extent centre/i }).click();
+  await expect(page.locator("[data-flight-phase='result'] .flight-result")).toBeVisible();
+  await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(/accepted result visualization/i);
+  await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(/selected coordinate:/i);
+}
+
+test("map is the static-first scene, loads bounded PMTiles ranges, and keeps one atomic active overlay", async ({ page }) => {
   const pmtilesRequests: { url: string; range?: string }[] = [];
   const forbiddenRequests: string[] = [];
   page.on("request", (request) => {
@@ -12,36 +24,36 @@ test("map stays lazy, loads bounded PMTiles ranges, and keeps one atomic active 
     if (url.pathname.endsWith(".pmtiles")) {
       pmtilesRequests.push({ url: url.href, range: request.headers().range });
     }
-    if (forbiddenParts.some((part) => url.pathname.toLowerCase().includes(part))) {
-      forbiddenRequests.push(url.pathname);
-    }
+    if (isForbiddenApplicationApiPath(url.pathname)) forbiddenRequests.push(url.pathname);
   });
 
   await page.goto("/");
-  await expect(page.getByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
-  expect(pmtilesRequests).toEqual([]);
-  expect(await page.locator('script[src*="MapExplorer"], script[src*="map-runtime"]').count()).toBe(0);
-
-  await page.getByRole("button", { name: /open static visualization/i }).click();
-  await expect(page.getByRole("region", { name: /interactive visual map/i })).toBeVisible();
-  await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
+  await expect(page.getByRole("region", { name: /visual release map preview/i })).toBeVisible();
+  await expect(page.locator(".map-status")).toBeHidden();
+  await expect(page.locator(".maplibregl-control-container")).toBeHidden();
   await expect.poll(() => pmtilesRequests.length).toBeGreaterThan(0);
 
   for (const request of pmtilesRequests) {
-    expect(new URL(request.url).pathname).toBe(
-      `/releases/${releaseId}/layers/ssp2-45/2050.pmtiles`,
-    );
+    expect(new URL(request.url).pathname).toBe(`/releases/${releaseId}/layers/ssp2-45/2050.pmtiles`);
     expect(request.range).toMatch(/^bytes=\d+-\d+$/);
     const [start, end] = request.range!.slice(6).split("-").map(Number);
     expect(end - start + 1).toBeLessThanOrEqual(512 * 1024);
   }
 
-  await page.getByLabel("Scenario").selectOption("ssp5-85");
-  await page.getByLabel("Horizon").selectOption("2100");
-  await page.getByLabel(/Upper · q0.833/).check();
+  await acceptMapPoint(page);
+  await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
+  await expect(page.locator(".map-status")).toBeVisible();
+  const mapControls = page.locator(".maplibregl-control-container");
+  await expect(mapControls).not.toHaveAttribute("aria-hidden", "true");
+  expect(await mapControls.evaluate((element) => getComputedStyle(element).display)).not.toBe("none");
+  await expect(page.locator(".maplibregl-ctrl-attrib")).toBeVisible();
+  await expect(page.getByRole("region", { name: /visual release map preview/i })).toHaveCount(0);
+  await page.getByRole("radio", { name: /higher-emissions scenario.*ssp5-85/i }).check();
+  await page.getByRole("radio", { name: "2100" }).check();
+  await page.locator(".flight-legend").getByLabel(/Upper · q0.833/).check();
   const map = page.getByRole("region", { name: /interactive visual map/i });
   await expect(map).toHaveAttribute("data-artifact-id", "projection-ssp5-85-2100-pmtiles");
-  await expect(page.getByLabel("Map text alternative")).toContainText(
+  await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(
     "ssp5-85 · 2100 · Upper · q0.833",
   );
   expect(forbiddenRequests).toEqual([]);
@@ -49,20 +61,20 @@ test("map stays lazy, loads bounded PMTiles ranges, and keeps one atomic active 
 
 test("all nine release selections resolve without mixing visual artifact identity", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /open static visualization/i }).click();
+  await expect(page.getByRole("region", { name: /visual release map preview/i })).toBeVisible();
+  await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
+  await acceptMapPoint(page);
   const map = page.getByRole("region", { name: /interactive visual map/i });
   const scenarios = ["ssp1-26", "ssp2-45", "ssp5-85"];
   const horizons = ["2030", "2050", "2100"];
 
   for (const scenario of scenarios) {
     for (const horizon of horizons) {
-      await page.getByLabel("Scenario").selectOption(scenario);
-      await page.getByLabel("Horizon").selectOption(horizon);
-      await expect(map).toHaveAttribute(
-        "data-artifact-id",
-        `projection-${scenario}-${horizon}-pmtiles`,
-      );
-      await expect(page.getByLabel("Map text alternative")).toContainText(`${scenario} · ${horizon}`);
+      await page.locator(`input[name="projection-scenario"][value="${scenario}"]`).check();
+      await page.locator(`input[name="projection-horizon"][value="${horizon}"]`).check();
+      await expect(map).toHaveAttribute("data-artifact-id", `projection-${scenario}-${horizon}-pmtiles`);
+      await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(`${scenario} · ${horizon}`);
+      await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(/accepted result visualization/i);
     }
   }
 });
@@ -77,7 +89,7 @@ test("basemap failure preserves release overlay, attribution, text, and coordina
   });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await page.getByRole("button", { name: /open static visualization/i }).click();
+  await acceptMapPoint(page);
   const map = page.getByRole("region", { name: /interactive visual map/i });
   await expect(map).toHaveAttribute("data-artifact-id", "projection-ssp2-45-2050-pmtiles");
 
@@ -88,9 +100,7 @@ test("basemap failure preserves release overlay, attribution, text, and coordina
   await expect(page.getByRole("link", { name: "OpenFreeMap" })).toBeVisible();
   await expect(page.getByRole("link", { name: /OpenStreetMap contributors/i })).toBeVisible();
 
-  await page.locator(".maplibregl-canvas").click({ position: { x: 180, y: 160 } });
   expect(pageErrors).toEqual([]);
-  await expect(page.getByLabel("Map text alternative")).toContainText(/selected coordinate:/i);
 
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations.filter((item) => ["critical", "serious"].includes(item.impact ?? ""))).toEqual([]);

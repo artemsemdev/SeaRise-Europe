@@ -20,6 +20,12 @@ interface GeographyParityFixture {
     readonly dataReleaseId: string;
     readonly supportArtifact: { readonly artifactId: string; readonly sha256: string };
     readonly coastalArtifact: { readonly artifactId: string; readonly sha256: string };
+    readonly browserFixtureControl: {
+      readonly controlId: string;
+      readonly path: string;
+      readonly sha256: string;
+      readonly fixtureOnly: true;
+    };
   };
   readonly semantics: {
     readonly operation: "OGC-covers";
@@ -29,7 +35,12 @@ interface GeographyParityFixture {
   readonly cases: readonly {
     readonly id: string;
     readonly boundaryRole: "support" | "coastal";
-    readonly relation: "exterior-boundary" | "hole-boundary" | "epsilon-inside" | "epsilon-outside";
+    readonly relation:
+      | "browser-fixture-control"
+      | "exterior-boundary"
+      | "hole-boundary"
+      | "epsilon-inside"
+      | "epsilon-outside";
     readonly coordinates: { readonly latitude: number; readonly longitude: number };
     readonly expectedClassification: "OutsideEurope" | "InEuropeOutsideCoastalZone" | "InEuropeAndCoastalZone";
   }[];
@@ -73,7 +84,13 @@ describe("release-scoped geography classification", () => {
       parity.release.coastalArtifact.sha256,
     );
     expect(new Set(parity.cases.map(({ relation }) => relation))).toEqual(
-      new Set(["exterior-boundary", "hole-boundary", "epsilon-inside", "epsilon-outside"]),
+      new Set([
+        "browser-fixture-control",
+        "exterior-boundary",
+        "hole-boundary",
+        "epsilon-inside",
+        "epsilon-outside",
+      ]),
     );
     expect(new Set(parity.cases.map(({ boundaryRole }) => boundaryRole))).toEqual(
       new Set(["support", "coastal"]),
@@ -93,6 +110,7 @@ describe("release-scoped geography classification", () => {
     [52.52, 13.405, "InEuropeOutsideCoastalZone"],
     [40.7128, -74.006, "OutsideEurope"],
     [54.93643, 10.684168, "InEuropeOutsideCoastalZone"],
+    [62, 44, "InEuropeAndCoastalZone"],
   ] as const)("classifies %.6f, %.6f with covers semantics", async (latitude, longitude, expected) => {
     const context = await fixtureReleaseContext();
     const calls: string[] = [];

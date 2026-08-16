@@ -2,18 +2,26 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
+  type RefObject,
 } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { ReleaseContext } from "../domain/release";
+import type { SearchLifecycleEvent } from "../domain/projection-search";
 import { SettlementSearchClient, type SearchWorkerFactory } from "../search/client";
 import type { SettlementSearchRecord, SettlementSearchState } from "../search/types";
 
 interface SettlementSearchProps {
   readonly release: ReleaseContext | null;
   readonly onSelect: (record: SettlementSearchRecord) => void;
+  readonly onSearchLifecycle?: (event: SearchLifecycleEvent) => void;
+  /** Increment to clear the local query from an application-level reset. */
+  readonly clearToken?: number;
   readonly workerFactory?: SearchWorkerFactory;
+  readonly inputRef?: RefObject<HTMLInputElement | null>;
 }
 
 const unavailable: SettlementSearchState = Object.freeze({
@@ -25,14 +33,30 @@ const unavailable: SettlementSearchState = Object.freeze({
   coastalError: null,
   durationMilliseconds: null,
   initializationMilliseconds: null,
+  operation: null,
+  completedOperation: null,
 });
 
-function useClient(release: ReleaseContext | null, factory?: SearchWorkerFactory) {
+function useClient(
+  release: ReleaseContext | null,
+  factory: SearchWorkerFactory | undefined,
+  onLifecycle: ((event: SearchLifecycleEvent) => void) | undefined,
+) {
   const client = useMemo(
     () => release ? new SettlementSearchClient(release, factory) : null,
     [factory, release],
   );
-  useEffect(() => () => client?.dispose(), [client]);
+  const lifecycleListener = useRef(onLifecycle);
+  useEffect(() => {
+    lifecycleListener.current = onLifecycle;
+  }, [onLifecycle]);
+  useEffect(() => {
+    const unsubscribe = client?.subscribeLifecycle((event) => lifecycleListener.current?.(event));
+    return () => {
+      client?.dispose();
+      unsubscribe?.();
+    };
+  }, [client]);
   const state = useSyncExternalStore(
     (listener) => client?.subscribe(listener) ?? (() => undefined),
     () => client?.snapshot ?? unavailable,
@@ -63,21 +87,52 @@ function liveMessage(state: SettlementSearchState): string {
   const partial = state.readiness === "core-ready" ? " Coastal settlements are still loading." : "";
   return count
     ? `${count} ${count === 1 ? "settlement" : "settlements"} found.${partial}`
-    : `No matching settlement in the loaded index.${partial}`;
+    : `No matching places found in the loaded index. Check the spelling or try a nearby city, town, or village.${partial}`;
 }
 
-export function SettlementSearch({ release, onSelect, workerFactory }: SettlementSearchProps) {
-  const [client, state] = useClient(release, workerFactory);
+interface SettlementSearchSessionProps {
+  readonly release: ReleaseContext | null;
+  readonly client: SettlementSearchClient | null;
+  readonly state: SettlementSearchState;
+  readonly onSelect: (record: SettlementSearchRecord) => void;
+  readonly clearToken: number;
+  readonly inputRef?: RefObject<HTMLInputElement | null>;
+}
+
+function SettlementSearchSession({
+  release,
+  client,
+  state,
+  onSelect,
+  clearToken,
+  inputRef,
+}: SettlementSearchSessionProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const hintId = useId();
   const listId = useId();
   const statusId = useId();
+  const observedClearToken = useRef(clearToken);
   const safeActive = Math.min(active, Math.max(0, state.results.length - 1));
-  const resultsAreCurrent = state.query === query && !state.pending && !state.error;
+  const resultsAreCurrent = state.query === query && !state.pending && !state.error &&
+    state.operation !== null && state.completedOperation !== null &&
+    state.operation.searchToken === state.completedOperation.searchToken &&
+    state.operation.searchGeneration === state.completedOperation.searchGeneration &&
+    state.operation.queryKey === state.completedOperation.queryKey &&
+    state.operation.dataReleaseId === state.completedOperation.dataReleaseId &&
+    state.operation.dataReleaseId === release?.dataReleaseId;
   const activeResult = resultsAreCurrent ? state.results[safeActive] : undefined;
   const activeId = activeResult ? `${listId}-option-${safeActive}` : undefined;
+
+  useEffect(() => {
+    if (observedClearToken.current === clearToken) return;
+    observedClearToken.current = clearToken;
+    setQuery("");
+    setOpen(false);
+    setActive(0);
+    client?.query("");
+  }, [clearToken, client]);
 
   useEffect(() => {
     if (!client) return;
@@ -97,7 +152,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
     if (!record || !resultsAreCurrent) return;
     setQuery(record.displayName);
     setOpen(false);
-    onSelect(record);
+    onSelect(Object.freeze({ ...record, searchNames: Object.freeze([...record.searchNames]) }));
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -138,9 +193,10 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
     >
       <label htmlFor={`${listId}-input`}>Find a city, town, or village</label>
       <div className="search-control">
-        <span className="search-icon" aria-hidden="true" />
+        <MagnifyingGlass className="search-icon" size={19} weight="regular" aria-hidden="true" />
         <input
           id={`${listId}-input`}
+          ref={inputRef}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={optionsVisible}
@@ -150,7 +206,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
           value={query}
           disabled={!release}
           autoComplete="off"
-          placeholder="Try Málaga, Athens, or Border City"
+          placeholder="Wilhelmshaven, Ravenna, Bergen…"
           onFocus={() => {
             client?.start();
             if (query.trim()) setOpen(true);
@@ -164,16 +220,18 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
           }}
           onKeyDown={onKeyDown}
         />
-        <button type="submit" disabled={!activeResult}>Explore</button>
+        <button type="submit" disabled={!activeResult}>Fly there</button>
       </div>
       <p id={hintId} className="search-hint">
-        Settlements only—not addresses or landmarks. Your text stays in this browser.
+        Settlements only — not addresses, postcodes or landmarks. 84,912 settlements indexed
+        locally — nothing you type leaves your browser.
       </p>
       <p
         id={statusId}
         className={`status${state.error ? " error" : ""}`}
         role="status"
         aria-live="polite"
+        aria-atomic="true"
         data-search-readiness={state.readiness}
         data-init-duration-ms={state.initializationMilliseconds ?? undefined}
         data-query-duration-ms={state.durationMilliseconds ?? undefined}
@@ -206,7 +264,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
             </div>
           ))}
           {!state.pending && !state.error && resultsAreCurrent && state.results.length === 0 ? (
-            <p className="search-empty">No matching settlement. Try another spelling.</p>
+            <p className="search-empty">No matching places found. Check the spelling or try a nearby city, town, or village.</p>
           ) : null}
           {state.error ? (
             <p className="search-empty error">Technical index failure. No scientific outcome was produced.</p>
@@ -214,5 +272,27 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
         </div>
       ) : null}
     </form>
+  );
+}
+
+export function SettlementSearch({
+  release,
+  onSelect,
+  onSearchLifecycle,
+  clearToken = 0,
+  workerFactory,
+  inputRef,
+}: SettlementSearchProps) {
+  const [client, state] = useClient(release, workerFactory, onSearchLifecycle);
+  return (
+    <SettlementSearchSession
+      key={client?.generation ?? "unavailable"}
+      release={release}
+      client={client}
+      state={state}
+      onSelect={onSelect}
+      clearToken={clearToken}
+      inputRef={inputRef}
+    />
   );
 }

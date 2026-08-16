@@ -49,11 +49,11 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "package-lock.json", "role": "lock", "sha256": "b89908effd6589f187b924403f309dfa573918a3978203778b84d384ba804800" },
+        { "path": "package-lock.json", "role": "lock", "sha256": "666b9384976469b1bab5a7b7cfbd5b298cbc742d21f3c458f7fdc3335afbe007" },
         { "path": "package.json", "role": "manifest", "sha256": "340a13f00e5be4cd6d1a5397f380ba75388611ed9d191f220fdaf43185da3d4d" },
         { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "c5d8af53b1029f9bfb75424ccad83b3da4ad096d175f4ba05789e847d5548cdd" },
         { "path": "src/frontend/package.json", "role": "manifest", "sha256": "e08c0876aefb117577488d2fb0bdcb4aea3a636156336643a6debf84e91485af" },
-        { "path": "src/web/package.json", "role": "manifest", "sha256": "987e7aee65f747b33b5918986fb5032388064407dab479a6a25da67f1c485870" }
+        { "path": "src/web/package.json", "role": "manifest", "sha256": "7a029eaec66e73e1d0a90e0c5df14e5d199763b97f71e5998abe0dffe0bb6de3" }
       ],
       "note": "The static web workspace uses the root npm lockfileVersion 3 with exact registry URLs and SHA-512 integrity; the legacy frontend remains separately locked during the migration."
     },
@@ -63,7 +63,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "1ba4a26a12e724313123d0f11c6c945b773225e01a1be8145155586d400300f1" },
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "411c68c6cb20a44076b89dc8743d20f0e0cd4a551e3be637249b1d6d14b0c0f6" },
         { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },

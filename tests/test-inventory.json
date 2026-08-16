@@ -3,17 +3,59 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-16",
   "evidence": {
+    "local-2026-08-16-static-browser-assisted-keyboard": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T11:05:00+02:00",
+      "reference": "docs/evidence/phase-2/issue-59-manual-accessibility.md",
+      "environment": "macOS 26.5.2 (25F84); Google Chrome 151.0.7922.138; exact production static build at 2f835e195e706467991fab50f22c13ca08c050f5; committed synthetic fixture only; browser-assisted keyboard and semantic-tree review passed; human VoiceOver narration blocked by unavailable Computer Use permission and explicitly not claimed"
+    },
+    "local-2026-08-16-static-search-lifecycle": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T09:08:44+02:00",
+      "reference": "src/web/src/domain/projection-state.test.ts, src/web/src/application/assessment-controller.test.ts, src/web/src/application/use-assessment-runtime.test.tsx, and src/web/src/components/SettlementSearch.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; fast-check 4.9.0; 273 deterministic static-target tests including 92 focused reducer/controller/runtime/component cases; committed synthetic fixture only; no network, Candidate-v7, TAR, clock, or local-only input"
+    },
+    "local-2026-08-16-static-assessment-controller": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T08:19:55+02:00",
+      "reference": "src/web/src/application/assessment-controller.test.ts and src/web/src/application/use-assessment-runtime.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; 23 deterministic controller/runtime cases over the committed synthetic release context"
+    },
+    "local-2026-08-16-static-projection-url": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T09:05:11+02:00",
+      "reference": "src/web/src/application/use-projection-url.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; deterministic in-memory URL environment, committed synthetic release context, and synthetic privacy sentinel strings only; no network, Candidate-v7, or local-only input"
+    },
+    "local-2026-08-16-static-projection-panel": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T08:44:07+02:00",
+      "reference": "src/web/src/components/ProjectionPanel.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; 27 deterministic presentational cases over immutable in-memory projection tuples; no network, Candidate-v7, clock, worker, or local-only input"
+    },
     "local-2026-08-16-static-release-domain": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T01:20:00+02:00",
       "reference": "src/web/src/data/browser-overlay-evidence.test.ts, src/web/src/data/manifest-repository.test.ts, and src/web/src/domain/url-state.test.ts",
       "environment": "macOS arm64; Node 20.20.1; AJV 8.20.0; Vitest 4.1.10; fast-check 4.9.0; committed synthetic fixture only"
     },
+    "local-2026-08-16-static-target-content": {
+      "kind": "repository-inspection",
+      "observedAt": "2026-08-16T11:16:35+02:00",
+      "reference": "docs/product/Mock/SeaRise-Flight.html, docs/product/Mock/MOCK_REQUIREMENTS_MAP.md, docs/evidence/phase-2/issue-59-content-review.md, src/web/scripts/check-target-content.mjs, and docs/testing/static-target-content-contract.md",
+      "environment": "macOS arm64; Node 20.20.1; deterministic source and emitted-asset scanner with per-category mutation controls plus exact canonical Flight annotation, requirements-map, and SHA-256 gates; no network, browser, Candidate-v7, TAR, or local-only input"
+    },
     "local-2026-08-16-static-scientific-lookup": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T06:19:05+02:00",
       "reference": "src/pipeline/tests/release/test_boundary_geoparquet.py, src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 121 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, 12 Shapely/browser geography comparisons, exact later-fourth-chunk COG integrity, same-origin page-context lookup under shipped CSP, scoped cold/cached budgets, abort-safe shared open and post-open range transport"
+    },
+    "local-2026-08-16-static-projection-browser-ux": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T10:40:00+02:00",
+      "reference": "src/web/tests/projection-ux.spec.ts",
+      "environment": "macOS arm64; Node 20.20.1; Playwright 1.62.1; Chromium desktop, Pixel 7 mobile, and reduced-motion desktop profiles; committed synthetic fixture only; no Candidate-v7, TAR, external storage, or runtime service"
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
@@ -222,10 +264,52 @@
   },
   "suites": [
     {
+      "id": "static-target-content",
+      "layer": "static-analysis",
+      "owner": "frontend",
+      "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, and product-copy limits fail closed in production source, active documentation, and emitted static assets while requiring an explicit scientific correction map on the active canonical Flight visual reference.",
+      "sourcePaths": ["src/web/scripts/check-target-content.mjs", "docs/testing/static-target-content-contract.md", "docs/evidence/phase-2/issue-59-content-review.md", "docs/product/Mock/SeaRise-Flight.html", "docs/product/Mock/DESIGN.md", "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"],
+      "changedPaths": ["src/web/**", "docs/product/**", "docs/methodology.md", "docs/testing/static-target-content-contract.md"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent mutation-sensitive static target content, canonical Flight annotation, and historical-evidence boundary." },
+      "commands": { "focused": "node src/web/scripts/check-target-content.mjs", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-16-static-target-content", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The scanner reads deterministic repository or build bytes and runs explicit mutation controls for every prohibited-claim category; it has no clock, network, browser, Candidate-v7, or local-only dependency." }
+    },
+    {
+      "id": "static-projection-panel",
+      "layer": "component",
+      "owner": "frontend",
+      "purpose": "Keep all eleven projection phases, exactly four ADR-024 outcomes, verified release metadata and disposition, technical failure taxonomy, semantic three-by-three controls, updating old/new separation, source attribution, map text equivalents, limitations, and required exclusions accessible and fail closed.",
+      "sourcePaths": ["src/web/src/components/ProjectionPanel.tsx", "src/web/src/components/ProjectionPanel.css", "src/web/src/components/ProjectionPanel.test.tsx"],
+      "changedPaths": ["src/web/src/components/ProjectionPanel.tsx", "src/web/src/components/ProjectionPanel.css", "src/web/src/components/ProjectionPanel.test.tsx"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent accessible static projection-state and outcome presentation contract." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/components/ProjectionPanel.test.tsx", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 3, "class": "fast", "evidenceRef": "local-2026-08-16-static-projection-panel", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-seven deterministic Testing Library cases use immutable in-memory selections, results, methodology, and callbacks; no timing, network, browser worker, Candidate-v7, or external service is involved." }
+    },
+    {
+      "id": "static-assessment-controller",
+      "layer": "unit",
+      "owner": "frontend",
+      "purpose": "Keep selection orchestration and its React runtime adapter atomic across rapid updates, cancellation, four scientific outcomes, verified methodology loading, technical delivery failures, exact retry, reset, release replacement, and disposal.",
+      "sourcePaths": ["src/web/src/application/**", "src/web/src/domain/projection-state.ts", "src/web/src/domain/scientific-lookup.ts"],
+      "changedPaths": ["src/web/src/application/**", "src/web/src/domain/projection-state.ts", "src/web/src/domain/scientific-lookup.ts"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent release-scoped atomic assessment orchestration and stale-completion gate." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/application/assessment-controller.test.ts src/application/use-assessment-runtime.test.tsx", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-static-assessment-controller", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-three deterministic cases use injected evaluators/runtime scopes and the committed synthetic release context; no clock, network, worker, Candidate-v7, or local-only input is involved." }
+    },
+    {
       "id": "static-release-domain",
       "layer": "contract",
       "owner": "frontend",
-      "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry, exact range-only native-grid COG lookup including a real later-chunk tile, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
+      "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry including the explicit browser-only nodata control, exact range-only native-grid COG lookup including a real later-chunk tile, an atomic four-outcome projection state contract, separate technical failures, and release-scoped URL reload state.",
       "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
       "changedPaths": ["src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
@@ -233,7 +317,21 @@
       "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 15, "class": "fast", "evidenceRef": "local-2026-08-16-static-scientific-lookup", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, 12 exact-GeoParquet Shapely/browser classifier comparisons, strict range and failure cases, post-open cancellation, cross-release cache isolation, a valid deterministic later-chunk COG, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, 12 audited-boundary Shapely/browser seam comparisons plus one browser-only nodata control, strict range and failure cases, post-open cancellation, cross-release cache isolation, a valid deterministic later-chunk COG, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
+    },
+    {
+      "id": "static-projection-browser-ux",
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Prove the complete production-static projection journey: all four ADR-024 outcomes, exact values for all nine combinations, COG and PMTiles release identity, separate integrity and recoverable delivery failures, stale-completion rejection, atomic map/result/URL state, share/reload/popstate/reset, keyboard and dialog focus, reduced motion, responsive mobile operation, axe gates, and zero legacy application API roots.",
+      "sourcePaths": ["src/web/tests/projection-ux.spec.ts", "src/web/playwright.config.ts"],
+      "changedPaths": ["src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent four-outcome projection UX, atomic-state, accessibility, failure, and no-legacy-API browser contract." },
+      "commands": { "focused": "npm run e2e --workspace @searise/web -- tests/projection-ux.spec.ts", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 40, "class": "fast", "evidenceRef": "local-2026-08-16-static-projection-browser-ux", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-one production-static journeys use only the immutable committed fixture. Success screenshots and JSON matrices are ignored locally and retained by CI for 14 days; failure traces and diagnostics have the same bounded retention." }
     },
     {
       "id": "static-web-shell",
@@ -743,8 +841,8 @@
       "id": "pipeline-ar6-release-cog",
       "layer": "scientific",
       "owner": "science",
-      "purpose": "Verify analysis COGs preserve exact AR6 integer-millimetre bands, deterministic bytes, grid metadata, and nodata semantics.",
-      "sourcePaths": ["scripts/release/build-browser-integrity-fixture.py", "src/pipeline/tests/release/test_browser_integrity_fixture.py", "src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
+      "purpose": "Verify analysis COGs preserve exact AR6 integer-millimetre bands, deterministic bytes, grid metadata, and nodata semantics, including the browser-only 62N,44E control across all 27 bands.",
+      "sourcePaths": ["scripts/release/build-browser-integrity-fixture.py", "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json", "src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json", "src/pipeline/tests/release/test_browser_integrity_fixture.py", "src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
       "changedPaths": ["contracts/release/v2/fixtures/browser-release/**", "scripts/release/build-browser-integrity-fixture.py", "src/pipeline/searise_pipeline/release/cog.py", "src/pipeline/searise_pipeline/release/source_grid.py", "src/pipeline/searise_pipeline/release/range_integrity.py", "src/pipeline/tests/release/test_browser_integrity_fixture.py", "src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-analysis-artifact structure, value, and determinism gate." },
@@ -785,9 +883,9 @@
       "id": "pipeline-boundary-geoparquet",
       "layer": "contract",
       "owner": "data",
-      "purpose": "Verify checked-in engineering support and coastal boundaries retain exact input lineage, safe status, rights, canonical normalization, and deterministic GeoParquet bytes.",
-      "sourcePaths": ["src/pipeline/tests/release/test_boundary_geoparquet.py"],
-      "changedPaths": ["data/geometry/**", "src/pipeline/searise_pipeline/release/boundary_geoparquet.py", "src/pipeline/tests/release/test_boundary_geoparquet.py"],
+      "purpose": "Verify checked-in engineering support and coastal boundaries retain exact input lineage, safe status, rights, canonical normalization, and deterministic GeoParquet bytes, while the separate browser-fixture writer pins and labels its isolated nodata control.",
+      "sourcePaths": ["src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json", "src/pipeline/fixtures/browser-release/boundary-arrow-schemas-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/pipeline/tests/release/test_browser_integrity_fixture.py"],
+      "changedPaths": ["data/geometry/**", "contracts/release/v2/fixtures/browser-release/**", "scripts/release/build-browser-integrity-fixture.py", "src/pipeline/fixtures/browser-release/**", "src/pipeline/searise_pipeline/release/boundary_geoparquet.py", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/pipeline/tests/release/test_browser_integrity_fixture.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent boundary identity, safe-status, rights, geometry, and determinism gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_geoparquet.py -q", "full": "python -m pytest src/pipeline/tests -q" },
@@ -1176,6 +1274,11 @@
     { "path": "src/frontend/src/search/worker/browser-runtime.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts", "suite": "frontend-settlement-worker-performance", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/application/assessment-controller.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/application/use-assessment-runtime.test.tsx", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/application/use-projection-url.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/ProjectionPanel.test.tsx", "suite": "static-projection-panel", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/render-token.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/SettlementSearch.test.tsx", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1184,6 +1287,8 @@
     { "path": "src/web/src/data/map-layer-resolver.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/browser-overlay-evidence.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/manifest-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/data/methodology-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/domain/projection-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/release.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1192,6 +1297,7 @@
     { "path": "src/web/src/search/runtime.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/search/search.worker.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/projection-ux.spec.ts", "suite": "static-projection-browser-ux", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/local-candidate-binding.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/run-local-candidate-e2e.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/private/private-candidate-binding.spec.ts", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },

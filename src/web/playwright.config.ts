@@ -4,7 +4,10 @@ export default defineConfig({
   testDir: "./tests",
   testIgnore: /tests\/private\//,
   fullyParallel: true,
+  // Keep timing-gate samples isolated from high-core host contention.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
+  preserveOutput: "always",
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
@@ -14,6 +17,14 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile-chromium", use: { ...devices["Pixel 7"] } },
+    {
+      name: "reduced-motion-chromium",
+      testMatch: /projection-ux\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        contextOptions: { reducedMotion: "reduce" },
+      },
+    },
   ],
   webServer: [
     {

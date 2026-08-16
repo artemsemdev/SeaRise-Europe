@@ -3,6 +3,8 @@
 > **Status:** Accepted target architecture
 > **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
 > **Role:** Primary runtime component view
+> **Experience authority:** [SeaRise Flight](../product/Mock/SeaRise-Flight.html)
+> and its [design contract](../product/Mock/DESIGN.md)
 
 ## Goals and constraints
 
@@ -36,6 +38,23 @@ Vite emits static HTML, CSS, JavaScript, worker, and service-worker assets.
 There are no server components, server actions, SSR runtime, or API routes.
 Both routes must provide meaningful document titles, landmarks, and fallback
 content before JavaScript initialization.
+
+## UI composition contract
+
+The runtime implements the active canonical Flight visual and interaction
+reference. Component boundaries, lazy loading, and scientific anti-corruption
+layers must preserve its editorial map-first composition, information
+hierarchy, dominant search entry, flight/arrival interaction character,
+layered result panel, visible controls, progressive evidence disclosure, and
+responsive behavior. Technical architecture is not permission to replace the
+experience with a generic dashboard or disconnected map and form.
+
+ADR-024 replaces only invalid scientific semantics. The mock's two binary
+exposure cards become one `ProjectionAvailable` presentation; unavailable and
+out-of-scope states map to `DataUnavailable` and `OutOfScope`; and the missing
+`UnsupportedGeography` state is added. Terrain comparison, modeled-water/flood
+meaning, binary exposure, and property claims are never implemented. The
+surrounding visual structure and interaction character remain authoritative.
 
 ## Logical component structure
 

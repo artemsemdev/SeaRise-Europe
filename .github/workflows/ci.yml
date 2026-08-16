@@ -130,6 +130,26 @@ jobs:
       - name: Browser smoke and accessibility
         run: npm run web:e2e
 
+      - name: Retain successful browser evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phase2-browser-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: src/web/test-results/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Retain browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phase2-browser-failure-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            src/web/test-results/
+            src/web/playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Retain static build inventory
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 import math
@@ -24,6 +25,15 @@ _RIGHTS = {
     "spdx": "LicenseRef-Natural-Earth-Public-Domain",
     "url": "https://www.naturalearthdata.com/about/terms-of-use/",
 }
+_BROWSER_NODATA_CONTROL_PATH = (
+    "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json"
+)
+_BROWSER_NODATA_CONTROL_SHA256 = (
+    "55a3811d7c56879b5ac5cff6e0a868cd22a8a545305ddb718a9697244c431d2e"
+)
+_BROWSER_FIXTURE_ARROW_SCHEMAS_SHA256 = (
+    "b9c1b0dfc8228cafac98653ec8a5baf8199ae911a9d2c41af8d9ceeefff5a094"
+)
 _ARROW_SCHEMA_KEY = b"ARROW:schema"
 _CANONICAL_ARROW_SCHEMAS = {
     "support-boundary": zlib.decompress(
@@ -230,6 +240,91 @@ def _canonical_geometry(source_path: Path, specification: _BoundarySpecification
     return polygons
 
 
+def _browser_nodata_control(control_path: Path) -> tuple[Polygon, dict[str, Any]]:
+    """Load the one pinned browser-only polygon without weakening source pins."""
+    if _sha256(control_path) != _BROWSER_NODATA_CONTROL_SHA256:
+        raise ScienceContractError("Browser nodata control SHA-256 differs from the pin")
+    try:
+        document = json.loads(control_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ScienceContractError("Browser nodata control is not readable JSON") from exc
+    if (
+        document.get("schemaVersion") != "1.0.0"
+        or document.get("controlId") != "browser-only-source-nodata-62n-44e"
+        or document.get("fixtureRole")
+        != "browser-only-adr-024-data-unavailable-control"
+        or document.get("dataProvenanceClass") != "synthetic-fixture"
+        or document.get("dataReleaseId")
+        != "searise-europe-v1.0.0-20260810-c096aeab4e09"
+    ):
+        raise ScienceContractError("Browser nodata control identity differs from the pin")
+    boundary = document.get("boundaryControl")
+    evidence = document.get("sourceGridEvidence")
+    if (
+        not isinstance(boundary, dict)
+        or boundary.get("appliesToRoles")
+        != ["support-boundary", "coastal-boundary"]
+        or boundary.get("operation") != "append-isolated-polygon"
+        or boundary.get("controlPoint") != {"latitude": 62.0, "longitude": 44.0}
+        or boundary.get("expectedClassification") != "InEuropeAndCoastalZone"
+        or not isinstance(evidence, dict)
+        or evidence.get("locationId") != 1_002_800_440
+        or evidence.get("latitude") != 62.0
+        or evidence.get("longitude") != 44.0
+        or evidence.get("row") != 13
+        or evidence.get("column") != 74
+        or evidence.get("storedNodata") != -32_768
+        or evidence.get("requiredQuantiles") != [0.167, 0.5, 0.833]
+        or evidence.get("expectedBandValuesForEveryCombination")
+        != [-32_768, -32_768, -32_768]
+        or evidence.get("expectedOutcome")
+        != {
+            "resultState": "DataUnavailable",
+            "reason": "source-value-nodata",
+            "distanceKilometres": 0.0,
+        }
+    ):
+        raise ScienceContractError("Browser nodata control semantics differ from the pin")
+    polygon = _canonical_polygon([boundary.get("ring")])
+    if _bounds((polygon,)) != [43.999, 61.999, 44.001, 62.001]:
+        raise ScienceContractError("Browser nodata control polygon differs from the pin")
+    return polygon, document
+
+
+def _browser_fixture_arrow_schemas(schema_path: Path) -> dict[str, bytes]:
+    """Load byte-pinned fixture schemas used to canonicalize both platforms."""
+    if _sha256(schema_path) != _BROWSER_FIXTURE_ARROW_SCHEMAS_SHA256:
+        raise ScienceContractError("Browser fixture Arrow schema SHA-256 differs from the pin")
+    try:
+        document = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ScienceContractError("Browser fixture Arrow schemas are not readable JSON") from exc
+    if (
+        document.get("schemaVersion") != "1.0.0"
+        or document.get("fixtureRole")
+        != "browser-only-boundary-canonical-arrow-schemas"
+        or document.get("encoding") != "base64-zlib"
+        or set(document.get("schemas", {})) != set(_SPECIFICATIONS)
+    ):
+        raise ScienceContractError("Browser fixture Arrow schema identity differs from the pin")
+    schemas: dict[str, bytes] = {}
+    for role in sorted(_SPECIFICATIONS):
+        record = document["schemas"][role]
+        if not isinstance(record, dict):
+            raise ScienceContractError("Browser fixture Arrow schema record is invalid")
+        try:
+            decoded = zlib.decompress(base64.b64decode(record.get("payload", ""), validate=True))
+        except (binascii.Error, zlib.error) as exc:
+            raise ScienceContractError("Browser fixture Arrow schema payload is corrupt") from exc
+        if (
+            len(decoded) != record.get("decodedLength")
+            or hashlib.sha256(decoded).hexdigest() != record.get("decodedSha256")
+        ):
+            raise ScienceContractError("Browser fixture Arrow schema payload differs from the pin")
+        schemas[role] = decoded
+    return schemas
+
+
 def _wkb(geometry: MultiPolygon) -> bytes:
     output = bytearray(struct.pack("<BII", 1, 6, len(geometry)))
     for polygon in geometry:
@@ -245,6 +340,24 @@ def _bounds(geometry: MultiPolygon) -> list[float]:
     coordinates = [point for polygon in geometry for ring in polygon for point in ring]
     longitudes, latitudes = zip(*coordinates)
     return [min(longitudes), min(latitudes), max(longitudes), max(latitudes)]
+
+
+def _assert_disjoint_browser_control(
+    source_geometry: MultiPolygon,
+    control_polygon: Polygon,
+) -> None:
+    """Fail closed unless source and control bounding boxes prove disjointness."""
+    source = _bounds(source_geometry)
+    control = _bounds((control_polygon,))
+    if not (
+        source[2] < control[0]
+        or control[2] < source[0]
+        or source[3] < control[1]
+        or control[3] < source[1]
+    ):
+        raise ScienceContractError(
+            "Browser nodata control is not provably disjoint from audited geometry"
+        )
 
 
 def _dependencies() -> tuple[Any, Any, Any]:
@@ -269,8 +382,11 @@ def _json_bytes(value: Mapping[str, Any]) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
 
 
-def _boundary_metadata(specification: _BoundarySpecification) -> dict[str, Any]:
-    return {
+def _boundary_metadata(
+    specification: _BoundarySpecification,
+    browser_control: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    metadata = {
         "canonical": False,
         "engineeringUse": "engineering-only",
         "hazardExtentClaim": False,
@@ -296,9 +412,22 @@ def _boundary_metadata(specification: _BoundarySpecification) -> dict[str, Any]:
         "status": _STATUS,
         "version": specification.version,
     }
+    if browser_control is not None:
+        metadata["browserFixtureControl"] = {
+            "controlId": browser_control["controlId"],
+            "dataProvenanceClass": "synthetic-fixture",
+            "fixtureOnly": True,
+            "path": _BROWSER_NODATA_CONTROL_PATH,
+            "sha256": _BROWSER_NODATA_CONTROL_SHA256,
+        }
+    return metadata
 
 
-def _schema(specification: _BoundarySpecification, geometry: MultiPolygon) -> Any:
+def _schema(
+    specification: _BoundarySpecification,
+    geometry: MultiPolygon,
+    browser_control: Mapping[str, Any] | None = None,
+) -> Any:
     pa, _, pyproj = _dependencies()
     crs = pyproj.CRS.from_user_input("OGC:CRS84").to_json_dict()
     if crs.get("id") != {"authority": "OGC", "code": "CRS84"}:
@@ -332,12 +461,18 @@ def _schema(specification: _BoundarySpecification, geometry: MultiPolygon) -> An
         fields,
         metadata={
             b"geo": _json_bytes(geo),
-            b"searise:boundary": _json_bytes(_boundary_metadata(specification)),
+            b"searise:boundary": _json_bytes(
+                _boundary_metadata(specification, browser_control)
+            ),
         },
     )
 
 
-def _table(specification: _BoundarySpecification, geometry: MultiPolygon) -> Any:
+def _table(
+    specification: _BoundarySpecification,
+    geometry: MultiPolygon,
+    browser_control: Mapping[str, Any] | None = None,
+) -> Any:
     pa, _, _ = _dependencies()
     values = [
         [specification.boundary_id],
@@ -351,12 +486,17 @@ def _table(specification: _BoundarySpecification, geometry: MultiPolygon) -> Any
         [False],
         [_wkb(geometry)],
     ]
-    schema = _schema(specification, geometry)
+    schema = _schema(specification, geometry, browser_control)
     arrays = [pa.array(value, type=field.type) for value, field in zip(values, schema)]
     return pa.Table.from_arrays(arrays, schema=schema)
 
 
-def _serialized_bytes(table: Any, specification: _BoundarySpecification) -> bytes:
+def _serialized_bytes(
+    table: Any,
+    specification: _BoundarySpecification,
+    *,
+    canonical_arrow_schemas: Mapping[str, bytes] = _CANONICAL_ARROW_SCHEMAS,
+) -> bytes:
     pa, pq, _ = _dependencies()
     sink = pa.BufferOutputStream()
     pq.write_table(
@@ -376,7 +516,7 @@ def _serialized_bytes(table: Any, specification: _BoundarySpecification) -> byte
         generated_schema = metadata[_ARROW_SCHEMA_KEY]
     except KeyError as exc:
         raise ScienceContractError("Boundary GeoParquet Arrow schema is missing") from exc
-    canonical_schema = _CANONICAL_ARROW_SCHEMAS[specification.role]
+    canonical_schema = canonical_arrow_schemas[specification.role]
     if len(generated_schema) != len(canonical_schema):
         raise ScienceContractError("Boundary Arrow schema length differs from the pin")
     if payload.count(generated_schema) != 1:
@@ -408,6 +548,59 @@ def write_boundary_geoparquet(
         role=role,
         byte_size=output_path.stat().st_size,
         sha256=_sha256(output_path),
+        source_sha256=specification.input_sha256,
+        row_count=1,
+    )
+
+
+def _write_browser_fixture_boundary_geoparquet(
+    source_path: Path,
+    output_path: Path,
+    *,
+    role: str,
+    control_path: Path,
+    arrow_schema_path: Path,
+) -> BoundaryGeoParquetEvidence:
+    """Append the pinned nodata polygon to one browser-only synthetic boundary."""
+    specification = _specification(role)
+    control_polygon, control = _browser_nodata_control(control_path)
+    source_geometry = _canonical_geometry(source_path, specification)
+    _assert_disjoint_browser_control(source_geometry, control_polygon)
+    geometry = tuple(sorted((*source_geometry, control_polygon)))
+    canonical_schemas = _browser_fixture_arrow_schemas(arrow_schema_path)
+    table = _table(specification, geometry, control)
+    payload = _serialized_bytes(
+        table,
+        specification,
+        canonical_arrow_schemas=canonical_schemas,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(payload)
+
+    pa, pq, _ = _dependencies()
+    try:
+        parquet = pq.ParquetFile(output_path)
+        actual = pq.read_table(output_path)
+    except (OSError, pa.ArrowException) as exc:
+        raise ScienceContractError("Browser fixture boundary GeoParquet is unreadable") from exc
+    if (
+        parquet.metadata.num_rows != 1
+        or parquet.metadata.num_row_groups != 1
+        or actual.schema != table.schema
+        or actual.to_pydict() != table.to_pydict()
+        or output_path.read_bytes()
+        != _serialized_bytes(
+            table,
+            specification,
+            canonical_arrow_schemas=canonical_schemas,
+        )
+    ):
+        raise ScienceContractError("Browser fixture boundary GeoParquet is not deterministic")
+    return BoundaryGeoParquetEvidence(
+        path=specification.output_path,
+        role=role,
+        byte_size=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
         source_sha256=specification.input_sha256,
         row_count=1,
     )

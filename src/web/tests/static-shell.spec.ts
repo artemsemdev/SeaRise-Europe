@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { isForbiddenApplicationApiPath } from "../src/test/application-api-boundary";
 
-const forbiddenPaths = ["ass" + "ess", "geo" + "code", "con" + "fig"];
 const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const multichunkArtifactPath = "analysis/ssp2-45/2050.tif";
@@ -21,20 +21,70 @@ async function expectStaticDocumentSecurity(page: import("@playwright/test").Pag
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
 }
 
-test("landing shell is static, keyboard reachable, and has no serious accessibility findings", async ({ page }) => {
+test("landing shell is static, keyboard reachable, and has no serious accessibility findings", async ({ page }, testInfo) => {
+  if (testInfo.project.name === "mobile-chromium") {
+    await page.setViewportSize({ width: 390, height: 844 });
+  }
   const forbiddenRequests: string[] = [];
   page.on("request", (request) => {
-    const path = new URL(request.url()).pathname.toLowerCase();
-    if (forbiddenPaths.some((part) => path.includes(part))) forbiddenRequests.push(path);
+    const path = new URL(request.url()).pathname;
+    if (isForbiddenApplicationApiPath(path)) forbiddenRequests.push(path);
   });
 
   await page.goto("/");
   await expectStaticDocumentSecurity(page);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Take me there");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Take me there.",
+  );
+  await expect(page.getByRole("button", { name: "Methodology and sources" })).toBeEnabled();
+  await expect(page.getByRole("combobox", { name: /find a city, town, or village/i })).toBeEnabled();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "SeaRise Europe home" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Methodology and sources" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("combobox", { name: /find a city, town, or village/i })).toBeFocused();
+  await expect(page.locator(".flight-legend")).toHaveCount(0);
+  const mapControls = page.locator(".maplibregl-control-container");
+  await expect(mapControls).toHaveCount(1);
+  await expect(mapControls).toBeHidden();
+  await expect(mapControls).toHaveAttribute("aria-hidden", "true");
+  await expect(mapControls).toHaveAttribute("inert", "");
+  await expect(page.locator(".map-status")).toBeHidden();
+  const assessmentStatus = page.locator(".selection-status[role='status']");
+  const searchStatus = page.locator(".search-shell .status[role='status']");
+  await expect(assessmentStatus).toHaveCount(1);
+  await expect(searchStatus).toHaveCount(1);
+  await expect(assessmentStatus).toHaveAttribute("aria-live", "polite");
+  await expect(searchStatus).toHaveAttribute("aria-live", "polite");
   await expect(page.getByText(/Synthetic fixture · illustrative only/i)).toBeVisible();
-  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeAttached();
+
+  if (testInfo.project.name === "mobile-chromium") {
+    const brand = await page.getByRole("link", { name: "SeaRise Europe home" }).boundingBox();
+    const badge = await page.locator(".flight-header .release-pill").boundingBox();
+    const methodology = await page.getByRole("button", { name: "Methodology and sources" }).boundingBox();
+    const heading = await page.getByRole("heading", { level: 1 }).boundingBox();
+    expect(brand && badge && methodology && heading).toBeTruthy();
+    if (!brand || !badge || !methodology || !heading) throw new Error("Mobile Flight geometry was unavailable.");
+    expect(Math.abs(brand.x - badge.x)).toBeLessThan(3);
+    expect(Math.abs(brand.x - methodology.x)).toBeLessThan(3);
+    expect(brand.y).toBeLessThan(badge.y);
+    expect(badge.y).toBeLessThan(methodology.y);
+    expect(heading.y).toBeGreaterThan(190);
+    expect(heading.y).toBeLessThan(360);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCSS("font-size", "38px");
+
+    await page.setViewportSize({ width: 320, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const narrowHeading = await page.getByRole("heading", { level: 1 }).boundingBox();
+    expect(narrowHeading).not.toBeNull();
+    if (!narrowHeading) throw new Error("Narrow mobile heading geometry was unavailable.");
+    expect(narrowHeading.x).toBeGreaterThanOrEqual(0);
+    expect(narrowHeading.x + narrowHeading.width).toBeLessThanOrEqual(320);
+  }
 
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations.filter((item) => ["critical", "serious"].includes(item.impact ?? ""))).toEqual([]);
@@ -364,22 +414,26 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
 
   await page.goto("/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.focus();
   await input.fill("Athens");
   await expect(page.getByRole("option", { name: /Αθήνα.*Attica, GR/i })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText(/coastal settlements are still loading/i);
-  const initialization = Number(await page.getByRole("status").getAttribute("data-init-duration-ms"));
+  await expect(searchStatus).toHaveAttribute("role", "status");
+  await expect(searchStatus).toContainText(/^1 settlement found\./);
+  await expect(page.locator(".selection-status")).toHaveText("Choose a settlement to continue.");
+  await expect(searchStatus).toContainText(/coastal settlements are still loading/i);
+  const initialization = Number(await searchStatus.getAttribute("data-init-duration-ms"));
   expect(initialization).toBeGreaterThanOrEqual(0);
   expect(initialization).toBeLessThan(1_000);
 
   releaseCoastal();
-  await expect(page.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+  await expect(searchStatus).toHaveAttribute("data-search-readiness", "all-ready");
   const observations: number[] = [];
   for (const query of ["Málaga", "Athens", "Spring", "Border City", "Islet Village", "malagx", "Athina", "Springfield AA", "Springfield South", "missing", "Málaga", "Athens", "Spring", "Border City", "Islet Village", "malagx", "Athina", "Springfield AA", "Springfield South", "missing"]) {
     await input.fill(query);
-    await expect(page.getByRole("status")).not.toContainText(/Searching settlements/i);
-    observations.push(Number(await page.getByRole("status").getAttribute("data-query-duration-ms")));
+    await expect(searchStatus).not.toContainText(/Searching settlements/i);
+    observations.push(Number(await searchStatus.getAttribute("data-query-duration-ms")));
   }
   const ordered = [...observations].sort((left, right) => left - right);
   const percentile = (value: number) => ordered[Math.max(0, Math.ceil(ordered.length * value) - 1)];
@@ -405,11 +459,20 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
   await expect(page.getByRole("option", { name: /Springfield.*South, BB/i })).toBeVisible();
   await input.press("ArrowDown");
   await input.press("Enter");
-  await expect(page.getByText(/Springfield, South selected at 50.1, 10.1/i)).toBeVisible();
-  await expect(input).toBeFocused();
+  await expect(page.locator(".selection-status")).toContainText(/accepted projection is shown in the result panel/i);
+  await expect(page.locator(".projection-panel__location")).toContainText(/50\.10000°, 10\.10000°/i);
+  await expect(input).toHaveCount(0);
+
+  await page.getByRole("button", { name: /reset selection and choose another place/i }).click();
+  await expect(input).toBeVisible();
+  await input.focus();
 
   await input.fill("PrivateSearchTokenXYZ");
-  await expect(page.getByRole("status")).toContainText(/No matching settlement/i);
+  await expect(searchStatus).toContainText(/No matching places found in the loaded index/i);
+  await expect(page.locator(".selection-status")).toHaveText("Choose a settlement to continue.");
+  await expect(page.locator(".search-shell .search-empty")).toContainText(
+    /Check the spelling or try a nearby city, town, or village/i,
+  );
   expect(network.join("\n")).not.toContain("PrivateSearchTokenXYZ");
   expect(network.filter((request) => request.includes("/search/")).length).toBe(2);
 
@@ -426,8 +489,11 @@ test("settlement shard delivery failure remains a technical state", async ({ pag
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.focus();
   await input.fill("Athens");
-  await expect(page.getByRole("status")).toContainText(/technical failure, not a no-match result/i, { timeout: 10_000 });
-  await expect(page.getByText(/No scientific outcome was produced/i)).toBeVisible();
+  await expect(page.locator(".projection-panel")).toHaveAttribute("data-phase", "integrity-error", { timeout: 10_000 });
+  await expect(page.locator('.projection-panel [role="alert"]')).toContainText(
+    /technical failure.*not a DataUnavailable scientific outcome/i,
+  );
+  await expect(page.locator("[data-outcome]")).toHaveCount(0);
   await expect(page.getByText(/Try another spelling/i)).toHaveCount(0);
 });
 
@@ -450,8 +516,9 @@ test("exact CSP permits the real Brotli Worker while blocking JavaScript eval", 
   });
   await expect.poll(() => page.evaluate(() => Reflect.get(globalThis, "__cspEvalProbe")))
     .toEqual({ evalBlocked: true, functionBlocked: true });
+  const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.fill("Athens");
   await expect(page.getByRole("option", { name: /Αθήνα.*Attica, GR/i })).toBeVisible();
-  await expect(page.getByRole("status")).not.toContainText(/technical failure/i);
+  await expect(searchStatus).not.toContainText(/technical failure/i);
 });
