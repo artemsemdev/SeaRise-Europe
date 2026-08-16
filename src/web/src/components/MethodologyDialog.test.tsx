@@ -160,6 +160,12 @@ describe("release methodology dialog", () => {
     );
 
     methodology.resultStates.forEach((outcome) => expect(screen.getByText(outcome)).toBeVisible());
+    expect(screen.getByText("OutOfScope").closest("li")).toHaveTextContent(
+      "The selected point is inside the supported Europe geometry but outside the versioned coastal analysis area.",
+    );
+    expect(screen.getByText("UnsupportedGeography").closest("li")).toHaveTextContent(
+      "The selected point is outside the versioned Europe support geometry.",
+    );
     expect(screen.getAllByRole("listitem").filter((item) =>
       methodology.resultStates.some((outcome) => item.textContent?.startsWith(outcome)),
     )).toHaveLength(4);

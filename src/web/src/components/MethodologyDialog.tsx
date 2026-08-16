@@ -26,8 +26,8 @@ interface IntegrityLink {
 const OUTCOME_DESCRIPTIONS: Readonly<Record<ReleaseMethodology["resultStates"][number], string>> = {
   ProjectionAvailable: "The exact release contains a projection for the selected scenario and horizon.",
   DataUnavailable: "The release has no usable projection value at the selected native source-grid location.",
-  OutOfScope: "The selected point is outside the release's supported European geography.",
-  UnsupportedGeography: "The selected point is in Europe but outside the supported coastal geography.",
+  OutOfScope: "The selected point is inside the supported Europe geometry but outside the versioned coastal analysis area.",
+  UnsupportedGeography: "The selected point is outside the versioned Europe support geometry.",
 };
 
 const DISPOSITION_COPY: Readonly<Record<ReleaseMethodology["disposition"], string>> = {

@@ -22,6 +22,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Corrected the methodology dialog definitions so `OutOfScope` means inside
+  supported Europe but outside the versioned coastal analysis area, while
+  `UnsupportedGeography` means outside the versioned Europe support geometry.
+
 - Separated the sealed v1 release identity from the deterministic browser
   overlay identity. The v1 build receipt and provenance remain byte-identical;
   the overlay now has dedicated versioned derivation evidence with no
