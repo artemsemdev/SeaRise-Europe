@@ -17,6 +17,10 @@ import {
 import { cacheNamespaces, validateAppReleasePair, type AppReleasePairV1 } from "./contracts/keys";
 
 export type RangeWriteResult = "stored" | "already-present";
+export interface VerifiedRangeWrite {
+  readonly identity: RangeIdentityV1;
+  readonly bytes: ArrayBuffer;
+}
 export interface RangeInventoryV1 {
   readonly mode: "memory-only" | "persistent";
   readonly payloadBytes: number;
@@ -32,6 +36,7 @@ export interface RangeStore {
   readonly mode: "memory-only" | "persistent";
   readExactOrContaining(identity: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null>;
   putVerified(identity: RangeIdentityV1, bytes: ArrayBuffer): Promise<RangeWriteResult>;
+  putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]>;
   acquireLease(lease: ClientLeaseV1): Promise<void>;
   releaseLease(lease: ClientLeaseV1): Promise<void>;
   setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void>;
@@ -86,6 +91,13 @@ function checkedIdentity(identity: RangeIdentityV1, expectedPair: AppReleasePair
   }
   return validated;
 }
+function checkedCogIdentity(identity: RangeIdentityV1, expectedPair: AppReleasePairV1): RangeIdentityV1 {
+  const validated = checkedIdentity(identity, expectedPair);
+  if (validated.authority.role !== "projection-analysis-cog") {
+    throw new RangeStoreUnsupportedError("PMTiles is visual, network-only context and cannot enter a range store.");
+  }
+  return validated;
+}
 function requestedInterval(identity: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>) {
   const interval = validateByteInterval(requested ?? identity.interval, identity.authority.totalByteSize);
   if (interval.start < identity.interval.start || interval.endExclusive > identity.interval.endExclusive) {
@@ -96,6 +108,25 @@ function requestedInterval(identity: RangeIdentityV1, requested?: Readonly<{ sta
 async function digest(bytes: ArrayBuffer, subtle: SubtleCrypto): Promise<string> {
   return [...new Uint8Array(await subtle.digest("SHA-256", bytes))]
     .map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+interface VerifiedAdmission {
+  readonly identity: RangeIdentityV1;
+  readonly bytes: ArrayBuffer;
+  readonly key: string;
+}
+async function verifyAdmissions(
+  writes: readonly VerifiedRangeWrite[],
+  expectedPair: AppReleasePairV1,
+  subtle: SubtleCrypto,
+): Promise<readonly VerifiedAdmission[]> {
+  return Promise.all(writes.map(async ({ identity: input, bytes }) => {
+    const identity = checkedCogIdentity(input, expectedPair);
+    if (bytes.byteLength !== identity.interval.endExclusive - identity.interval.start
+      || await digest(bytes, subtle) !== identity.authorizedIntervalSha256) {
+      throw new RangeStoreIntegrityError("Only exact release-authorized COG chunk bytes may enter a range store.");
+    }
+    return Object.freeze({ identity, bytes, key: rangeKey(identity) });
+  }));
 }
 function recordFor(identity: RangeIdentityV1, bytes: ArrayBuffer, sequence: number): StoredRange {
   const authority = identity.authority;
@@ -133,7 +164,7 @@ export class MemoryRangeStore implements RangeStore {
     this.#pair = validateAppReleasePair(pair); this.#budget = validateStorageBudget(budget); this.#subtle = subtle; this.#now = now;
   }
   async readExactOrContaining(input: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
-    const identity = checkedIdentity(input, this.#pair); const interval = requestedInterval(identity, requested);
+    const identity = checkedCogIdentity(input, this.#pair); const interval = requestedInterval(identity, requested);
     const record = this.#entries.get(rangeKey(identity)); if (!record) return null;
     if (!matches(record, identity) || await digest(record.bytes, this.#subtle) !== record.authorizedIntervalSha256) {
       this.#entries.delete(record.key); throw new RangeStoreIntegrityError("Stored range bytes failed their authorized SHA-256 identity.");
@@ -142,26 +173,49 @@ export class MemoryRangeStore implements RangeStore {
     return record.bytes.slice(interval.start - record.start, interval.endExclusive - record.start);
   }
   async putVerified(input: RangeIdentityV1, bytes: ArrayBuffer): Promise<RangeWriteResult> {
-    const identity = checkedIdentity(input, this.#pair);
-    if (bytes.byteLength !== identity.interval.endExclusive - identity.interval.start
-      || await digest(bytes, this.#subtle) !== identity.authorizedIntervalSha256) {
-      throw new RangeStoreIntegrityError("Only exact release-authorized range bytes may enter session memory.");
-    }
-    const key = rangeKey(identity); const existing = this.#entries.get(key);
-    if (existing) { existing.lastAccessSequence = ++this.#sequence; return "already-present"; }
+    return (await this.putVerifiedBatch([{ identity: input, bytes }]))[0]!;
+  }
+  async putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]> {
+    const admissions = await verifyAdmissions(writes, this.#pair, this.#subtle);
+    if (admissions.length === 0) return Object.freeze([]);
+
+    const unique = new Map<string, VerifiedAdmission>();
+    const initiallyPresent = new Set(this.#entries.keys());
+    const results = admissions.map((admission) => {
+      const present = initiallyPresent.has(admission.key) || unique.has(admission.key);
+      if (!unique.has(admission.key)) unique.set(admission.key, admission);
+      return present ? "already-present" as const : "stored" as const;
+    });
+    const incomingKeys = new Set(unique.keys());
     const protectedKeys = new Set([this.#active, this.#previous].filter(Boolean).map((pair) => pairKey(pair!)));
+    const expiredLeases: string[] = [];
     for (const lease of this.#leases.values()) {
-      if (lease.expiresAtEpochMs <= this.#now()) this.#leases.delete(lease.leaseId);
+      if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(lease.leaseId);
       else protectedKeys.add(pairKey(lease.pair));
     }
     const ordered = [...this.#entries.values()].sort((a, b) => a.lastAccessSequence - b.lastAccessSequence || a.key.localeCompare(b.key));
     let total = ordered.reduce((sum, record) => sum + record.byteLength, 0);
-    while ((total + bytes.byteLength > this.#budget.maxRangeBytes || this.#entries.size + 1 > this.#budget.maxRangeEntries) && ordered.length) {
-      const candidate = ordered.shift()!; if (protectedKeys.has(candidate.pairKey)) continue;
-      this.#entries.delete(candidate.key); total -= candidate.byteLength;
+    const additions = [...unique.values()].filter((admission) => !initiallyPresent.has(admission.key));
+    const additionBytes = additions.reduce((sum, admission) => sum + admission.bytes.byteLength, 0);
+    let projectedEntries = this.#entries.size + additions.length;
+    const evictions: StoredRange[] = [];
+    while ((total + additionBytes > this.#budget.maxRangeBytes || projectedEntries > this.#budget.maxRangeEntries) && ordered.length) {
+      const candidate = ordered.shift()!;
+      if (protectedKeys.has(candidate.pairKey) || incomingKeys.has(candidate.key)) continue;
+      evictions.push(candidate); total -= candidate.byteLength; projectedEntries -= 1;
     }
-    if (total + bytes.byteLength > this.#budget.maxRangeBytes || this.#entries.size + 1 > this.#budget.maxRangeEntries) throw new RangeStoreQuotaError();
-    this.#entries.set(key, recordFor(identity, bytes, ++this.#sequence)); return "stored";
+    if (total + additionBytes > this.#budget.maxRangeBytes || projectedEntries > this.#budget.maxRangeEntries) {
+      throw new RangeStoreQuotaError();
+    }
+
+    let nextSequence = this.#sequence;
+    const records = [...unique.values()].map((admission) =>
+      recordFor(admission.identity, admission.bytes, ++nextSequence));
+    for (const candidate of evictions) this.#entries.delete(candidate.key);
+    for (const leaseId of expiredLeases) this.#leases.delete(leaseId);
+    for (const record of records) this.#entries.set(record.key, record);
+    this.#sequence = nextSequence;
+    return Object.freeze(results);
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = validateClientLease(input); this.#leases.set(lease.leaseId, lease); }
   async releaseLease(input: ClientLeaseV1): Promise<void> { this.#leases.delete(validateClientLease(input).leaseId); }
@@ -224,7 +278,7 @@ class IndexedDbRangeStore implements RangeStore {
   }
   async #meta(store: IDBObjectStore): Promise<MetaRecord> { return (await request(store.get("state")) as MetaRecord | undefined) ?? initialMeta(); }
   async readExactOrContaining(input: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
-    const identity = checkedIdentity(input, this.#pair); if (identity.authority.role !== "projection-analysis-cog") throw new RangeStoreUnsupportedError("PMTiles ranges lack release-authorized interval digests and cannot be persisted.");
+    const identity = checkedCogIdentity(input, this.#pair);
     const interval = requestedInterval(identity, requested); const database = await this.#open();
     const key = rangeKey(identity); const transaction = database.transaction(STORES.ranges, "readonly"); const done = completed(transaction);
     const record = await request(transaction.objectStore(STORES.ranges).get(key)) as StoredRange | undefined; await done;
@@ -250,26 +304,52 @@ class IndexedDbRangeStore implements RangeStore {
     await done;
   }
   async putVerified(input: RangeIdentityV1, bytes: ArrayBuffer): Promise<RangeWriteResult> {
-    const identity = checkedIdentity(input, this.#pair);
-    if (identity.authority.role !== "projection-analysis-cog") throw new RangeStoreUnsupportedError("PMTiles persistent admission is disabled until its release declares authoritative interval digests.");
-    if (bytes.byteLength !== identity.interval.endExclusive - identity.interval.start || await digest(bytes, this.#subtle) !== identity.authorizedIntervalSha256) throw new RangeStoreIntegrityError("Only exact release-authorized COG chunk bytes may be persisted.");
+    return (await this.putVerifiedBatch([{ identity: input, bytes }]))[0]!;
+  }
+  async putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]> {
+    const admissions = await verifyAdmissions(writes, this.#pair, this.#subtle);
+    if (admissions.length === 0) return Object.freeze([]);
     const database = await this.#open(); const tx = database.transaction([STORES.meta, STORES.ranges, STORES.leases], "readwrite"); const done = completed(tx); let quota = false;
     try {
       const metaStore = tx.objectStore(STORES.meta); const rangeStore = tx.objectStore(STORES.ranges); const leaseStore = tx.objectStore(STORES.leases);
-      const meta = await this.#meta(metaStore); const key = rangeKey(identity); const existing = await request(rangeStore.get(key)) as StoredRange | undefined;
+      const meta = await this.#meta(metaStore);
+      const unique = new Map<string, VerifiedAdmission>();
+      const existingKeys = new Set<string>();
+      const results: RangeWriteResult[] = [];
+      for (const admission of admissions) {
+        if (unique.has(admission.key)) {
+          results.push("already-present");
+          continue;
+        }
+        unique.set(admission.key, admission);
+        const existing = await request(rangeStore.get(admission.key)) as StoredRange | undefined;
+        if (existing) existingKeys.add(admission.key);
+        results.push(existing ? "already-present" : "stored");
+      }
       const leases = await request(leaseStore.getAll()) as LeaseRecord[]; const protectedPairs = new Set([meta.activePair, meta.previousPair].filter(Boolean).map((pair) => pairKey(pair!)));
-      for (const lease of leases) { if (lease.expiresAtEpochMs <= this.#now()) leaseStore.delete(lease.leaseId); else protectedPairs.add(lease.pairKey); }
-      if (existing) { rangeStore.put(recordFor(identity, bytes, ++meta.nextSequence)); metaStore.put(meta); await done; return "already-present"; }
+      const expiredLeases: string[] = [];
+      for (const lease of leases) { if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(lease.leaseId); else protectedPairs.add(lease.pairKey); }
       const candidates = await request(rangeStore.index("by-lru").getAll()) as StoredRange[];
-      let projectedBytes = meta.rangeBytes + bytes.byteLength; let projectedEntries = meta.rangeEntries + 1;
+      const additions = [...unique.values()].filter((admission) => !existingKeys.has(admission.key));
+      let projectedBytes = meta.rangeBytes + additions.reduce((sum, admission) => sum + admission.bytes.byteLength, 0);
+      let projectedEntries = meta.rangeEntries + additions.length;
+      const evictions: StoredRange[] = [];
       for (const candidate of candidates) {
         if (projectedBytes <= this.#budget.maxRangeBytes && projectedEntries <= this.#budget.maxRangeEntries) break;
-        if (protectedPairs.has(candidate.pairKey)) continue;
-        rangeStore.delete(candidate.key); projectedBytes -= candidate.byteLength; projectedEntries -= 1;
+        if (protectedPairs.has(candidate.pairKey) || unique.has(candidate.key)) continue;
+        evictions.push(candidate); projectedBytes -= candidate.byteLength; projectedEntries -= 1;
       }
       if (projectedBytes > this.#budget.maxRangeBytes || projectedEntries > this.#budget.maxRangeEntries) { quota = true; tx.abort(); await done; }
-      const sequence = ++meta.nextSequence; rangeStore.put(recordFor(identity, bytes, sequence)); meta.rangeBytes = projectedBytes; meta.rangeEntries = projectedEntries; metaStore.put(meta); await done; return "stored";
+      for (const leaseId of expiredLeases) leaseStore.delete(leaseId);
+      for (const candidate of evictions) rangeStore.delete(candidate.key);
+      for (const admission of unique.values()) {
+        rangeStore.put(recordFor(admission.identity, admission.bytes, ++meta.nextSequence));
+      }
+      meta.rangeBytes = projectedBytes; meta.rangeEntries = projectedEntries; metaStore.put(meta);
+      await done; return Object.freeze(results);
     } catch (error) {
+      try { tx.abort(); } catch { /* Transaction already completed or aborted. */ }
+      await done.catch(() => undefined);
       if (quota || (typeof error === "object" && error !== null && "name" in error
         && error.name === "QuotaExceededError")) throw new RangeStoreQuotaError();
       throw error;

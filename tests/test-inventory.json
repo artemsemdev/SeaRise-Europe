@@ -283,7 +283,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-16T15:15:00+02:00",
       "reference": "src/web/src/offline/range-store.ts and src/web/src/offline/range-store.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; ten deterministic exact/sliced range, adjacent-fragment exclusion, release isolation, PMTiles fail-closed, corruption quarantine, LRU, pair protection, lease expiry, transaction rollback, concurrent accounting, and private-memory cases; synthetic bytes only; no Candidate-v7, TAR, browser network, or external storage"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; seventeen deterministic exact/sliced range, atomic batch verification, mid-transaction rollback, quota/LRU planning, release isolation, all-store PMTiles refusal, corruption quarantine, pair protection, lease expiry, concurrent accounting, and private-memory cases; synthetic bytes only; no Candidate-v7, TAR, browser network, or external storage"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -409,11 +409,11 @@
       "id": "static-authoritative-range-store",
       "layer": "integration",
       "owner": "platform",
-      "purpose": "Keep release-authorized COG range persistence exact, bounded, private-safe, corruption-detecting, and transactionally consistent while PMTiles persistence remains fail closed.",
+      "purpose": "Keep release-authorized COG range persistence exact, bounded, private-safe, corruption-detecting, and transactionally consistent while PMTiles remains network-only and outside every range store.",
       "sourcePaths": ["src/web/src/offline/range-store.ts", "src/web/src/offline/range-store.test.ts"],
       "changedPaths": ["src/web/src/offline/range-store.ts", "src/web/src/offline/range-store.test.ts", "src/web/src/offline/contracts/**"],
       "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent IndexedDB authority, atomic quota, deterministic eviction, lease protection, corruption, and private-memory gate." },
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent IndexedDB and memory authority, atomic batch quota/rollback, deterministic eviction, lease protection, corruption, and PMTiles-refusal gate." },
       "commands": { "focused": "npm exec --workspace @searise/web vitest run src/offline/range-store.test.ts", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-16-authoritative-range-store", "scope": "focused-suite" },

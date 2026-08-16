@@ -13,8 +13,9 @@ All notable changes to this project will be documented in this file.
 - Added a bounded authoritative IndexedDB range store for release-authorized
   COG chunks, with exact app/release/artifact isolation, verified containing
   slices, atomic accounting and eviction, active/previous and lease protection,
-  corruption quarantine, and memory-only private-candidate handling. Visual
-  PMTiles remain deliberately network-only and cannot enter range persistence.
+  corruption quarantine, atomic multi-chunk admission, and memory-only
+  private-candidate handling. Visual-only PMTiles remain network-only and are
+  rejected by every range-store implementation.
 
 - Added versioned release-scoped offline authority contracts for whole and
   authorized range resources, with fail-closed private-candidate persistence
