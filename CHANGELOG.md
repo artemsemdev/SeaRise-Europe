@@ -6,13 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added a pure explicit update and rollback coordinator that binds confirmation
-  to an unchanged active/previous snapshot and a fully sealed shell/core
-  candidate identity. Atomic transition receipts preserve the exact rollback
-  pair, while lease-fenced cleanup and technical failures keep the current pair
-  usable without silent service-worker activation or reload. New preparation
-  synchronously revokes older confirmation, and a coordinator-owned one-time
-  generation prevents provider-token collision and replay.
+- Added a conservative static-host update coordinator that verifies a sealed
+  waiting candidate and records an explicit one-shot close-and-reopen intent
+  without activating a worker, reloading, or changing current authority. A
+  subsequent fresh boot must prove the exact confirmed controller identity;
+  generation binding prevents stale-token collision and replay. Browser
+  rollback is reported as deployment-required because Git/deployment history,
+  not browser storage, is the application rollback authority.
 
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,

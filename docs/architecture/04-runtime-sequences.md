@@ -267,36 +267,40 @@ indexes, geometries, or byte ranges. On reload, the new app/release pairing
 initializes in a new cache namespace. Rollback deploys the previous complete
 pair; immutable artifacts are never overwritten.
 
-The explicit update coordinator is a pure state machine over injected ports.
-Its candidate identity binds the exact app/release pair to the accepted shell
-precache hash, resource-plan hash, and core admission-receipt hash. Inspection
-can report only `sealed`, `incomplete`, `corrupt`, `mixed`, or `stale`; only a
-sealed candidate can produce a confirmation token.
+The static-host update coordinator is a pure user-intent state machine over
+injected ports. Its waiting-candidate identity binds the exact app/release pair
+to the accepted shell precache hash, resource-plan hash, and core
+admission-receipt hash. Inspection can report only `sealed`, `incomplete`,
+`corrupt`, `mixed`, or `stale`; only a sealed waiting candidate can produce a
+confirmation token.
 
-Starting any newer update or rollback preparation synchronously enters a
-`preparing` state and revokes the prior pending confirmation before the first
-asynchronous port call. The coordinator wraps the provider token in its own
-monotonic, one-time generation, so provider reuse or collision cannot authorize
-a later transition and a consumed confirmation cannot be replayed.
+Starting newer preparation synchronously enters `preparing` and revokes the
+prior pending confirmation before the first asynchronous port call. The
+coordinator wraps the provider token in its own monotonic, one-time generation,
+so provider reuse or collision cannot authorize a later intent and a consumed
+confirmation cannot be replayed.
 
-Activation and rollback require that exact token and the unchanged authority
-snapshot. The persistence adapter must compare the snapshot revision and move
-both slots atomically: update moves current to previous and candidate to
-active, while rollback swaps the exact active and previous identities. The
-coordinator exposes reload permission only after receiving and validating that
-atomic transition receipt. It has no service-worker lifecycle or reload port,
-so inspection alone cannot silently switch the application.
+Explicit confirmation records only a one-shot transition intent and presents
+the exact instruction: `Update ready. Close all SeaRise tabs and reopen to use
+it.` It does not swap browser-storage authority, activate a worker, call
+`skipWaiting`, call `clients.claim`, navigate, reload, or claim that the new
+pair is current. Existing tabs remain pinned to their controlling worker. A
+verified waiting worker becomes eligible to activate naturally only after all
+clients of the prior worker close.
 
-After update activation, only the older former-previous pair is eligible for
-cleanup. The cleanup adapter receives the new active/previous snapshot as a
-fence and must test live client leases under the same exclusion boundary as
-deletion. A blocked or failed cleanup leaves the newly active pair usable and
-the exact previous pair available for rollback. Candidate, authority,
-transition, and cleanup failures are technical update states; they are never
-scientific outcomes.
-Snapshot, inspection-port, and token-provider failures are technical
-preparation failures; `candidate-corrupt` is reserved for candidate evidence
-that is explicitly corrupt or fails candidate validation.
+On the subsequent fresh boot, activation is recognized only when the page
+proves a different boot identity controlled by the exact confirmed
+app/release/precache/core identity and atomically consumes the matching
+one-shot intent. Same-page, mismatched-controller, stale-intent, missing-intent,
+and replay attempts fail closed while the actually controlling pair remains
+usable. Candidate evidence failures remain distinct from technical controller,
+inspection-port, token-provider, and intent-store failures. All are technical
+update states, never scientific outcomes.
+
+Browser storage is not application rollback authority. Rollback requires a
+verified static deployment, using repository Git history when source recovery
+is needed. The browser coordinator reports `deployment-required` and keeps the
+current controller usable; it never claims a local application rollback.
 
 ## 12. Architecture and methodology access
 

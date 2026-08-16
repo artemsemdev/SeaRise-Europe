@@ -1,10 +1,11 @@
 import { validateAppReleasePair, type AppReleasePairV1 } from "./contracts/keys";
-import { validateClientLease, type ClientLeaseV1 } from "./contracts/policy";
 import { sha256Hex } from "./contracts/v1";
 
-const TOKEN = /^[A-Za-z0-9._-]{1,128}$/u;
+const OPAQUE_ID = /^[A-Za-z0-9._-]{1,128}$/u;
 const PROVIDER_TOKEN = /^[A-Za-z0-9._-]{1,96}$/u;
-const REVISION = /^[A-Za-z0-9._-]{1,128}$/u;
+const BOOT_ID = /^[A-Za-z0-9._-]{1,64}$/u;
+const UPDATE_READY_MESSAGE = "Update ready. Close all SeaRise tabs and reopen to use it." as const;
+const ROLLBACK_MESSAGE = "Application rollback requires a verified static deployment or Git-history restoration." as const;
 
 export interface AcceptedPairIdentityV1 {
   readonly contractVersion: 1;
@@ -14,108 +15,100 @@ export interface AcceptedPairIdentityV1 {
   readonly receiptSha256: string;
 }
 
-export interface PairAuthoritySnapshotV1 {
+export interface ControllerBootProofV1 {
   readonly contractVersion: 1;
-  readonly revision: string;
-  readonly active: AcceptedPairIdentityV1;
-  readonly previous: AcceptedPairIdentityV1 | null;
+  readonly bootId: string;
+  readonly controller: AcceptedPairIdentityV1;
 }
 
-export type CandidateInspectionV1 =
+export type WaitingCandidateInspectionV1 =
   | Readonly<{ status: "sealed"; candidate: AcceptedPairIdentityV1 }>
   | Readonly<{ status: "incomplete" | "corrupt" | "mixed" | "stale"; reason: string }>;
 
-export interface AtomicPairTransitionV1 {
+export interface CloseAndReopenIntentV1 {
   readonly contractVersion: 1;
-  readonly before: PairAuthoritySnapshotV1;
-  readonly after: PairAuthoritySnapshotV1;
-}
-
-export interface ConfirmedUpdateRequestV1 {
-  readonly expected: PairAuthoritySnapshotV1;
+  readonly transitionId: string;
+  readonly confirmationGeneration: number;
+  readonly sourceBootId: string;
+  readonly sourceController: AcceptedPairIdentityV1;
   readonly candidate: AcceptedPairIdentityV1;
-  readonly confirmationToken: string;
+  readonly message: typeof UPDATE_READY_MESSAGE;
 }
 
-export interface ConfirmedRollbackRequestV1 {
-  readonly expected: PairAuthoritySnapshotV1;
-  readonly target: AcceptedPairIdentityV1;
-  readonly confirmationToken: string;
-}
+export type IntentConsumptionResultV1 = "consumed" | "missing" | "already-consumed";
 
-export interface CleanupRetiredPairRequestV1 {
-  readonly protectedSnapshot: PairAuthoritySnapshotV1;
-  readonly pair: AppReleasePairV1;
-}
-
-export type CleanupFenceResultV1 =
-  | Readonly<{ status: "removed" }>
-  | Readonly<{ status: "blocked"; leases: readonly ClientLeaseV1[] }>;
-
-export interface UpdateCoordinatorPorts {
-  readSnapshot(): Promise<PairAuthoritySnapshotV1>;
-  inspectCandidate(pair: AppReleasePairV1): Promise<CandidateInspectionV1>;
+export interface StaticUpdateCoordinatorPorts {
+  readControllerBoot(): Promise<ControllerBootProofV1>;
+  inspectWaitingCandidate(pair: AppReleasePairV1): Promise<WaitingCandidateInspectionV1>;
   issueConfirmationToken(request: Readonly<{
-    action: "update" | "rollback";
     coordinatorGeneration: number;
-    expected: PairAuthoritySnapshotV1;
-    target: AcceptedPairIdentityV1;
+    boot: ControllerBootProofV1;
+    candidate: AcceptedPairIdentityV1;
   }>): string;
-  activate(request: ConfirmedUpdateRequestV1): Promise<AtomicPairTransitionV1>;
-  rollback(request: ConfirmedRollbackRequestV1): Promise<AtomicPairTransitionV1>;
-  /** The adapter must test leases and delete under one shared cleanup fence. */
-  cleanupRetiredPair(request: CleanupRetiredPairRequestV1): Promise<CleanupFenceResultV1>;
+  /** Persist only the latest unconsumed intent for this exact source boot. */
+  recordTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  /** Consume the intent once; this record is not controller or rollback authority. */
+  consumeTransitionIntent(
+    intent: CloseAndReopenIntentV1,
+    boot: ControllerBootProofV1,
+  ): Promise<IntentConsumptionResultV1>;
 }
 
-export type CleanupStateV1 =
-  | Readonly<{ status: "removed"; pair: AppReleasePairV1 }>
-  | Readonly<{ status: "blocked"; pair: AppReleasePairV1; leases: readonly ClientLeaseV1[] }>;
-
-export type UpdateCoordinatorFailureCodeV1 =
+export type StaticUpdateFailureCodeV1 =
   | "candidate-incomplete"
   | "candidate-corrupt"
   | "candidate-mixed"
   | "candidate-stale"
-  | "authority-stale"
   | "confirmation-rejected"
-  | "rollback-unavailable"
-  | "transition-failed"
-  | "cleanup-failed";
+  | "controller-mismatch"
+  | "intent-stale"
+  | "preparation-failed"
+  | "intent-record-failed";
 
-export type UpdateCoordinatorStateV1 =
-  | Readonly<{ phase: "current"; snapshot: PairAuthoritySnapshotV1; cleanup: null }>
+export type StaticUpdateCoordinatorStateV1 =
+  | Readonly<{ phase: "current"; boot: ControllerBootProofV1; currentUsable: true }>
+  | Readonly<{ phase: "preparing"; boot: ControllerBootProofV1; currentUsable: true }>
   | Readonly<{
-    phase: "preparing";
-    action: "update" | "rollback";
-    snapshot: PairAuthoritySnapshotV1;
-  }>
-  | Readonly<{
-    phase: "awaiting-confirmation";
-    action: "update" | "rollback";
-    snapshot: PairAuthoritySnapshotV1;
-    target: AcceptedPairIdentityV1;
+    phase: "waiting-candidate-verified";
+    boot: ControllerBootProofV1;
+    candidate: AcceptedPairIdentityV1;
     confirmationToken: string;
+    currentUsable: true;
   }>
   | Readonly<{
-    phase: "transitioning";
-    action: "update" | "rollback";
-    snapshot: PairAuthoritySnapshotV1;
-    target: AcceptedPairIdentityV1;
+    phase: "recording-close-and-reopen-intent";
+    boot: ControllerBootProofV1;
+    candidate: AcceptedPairIdentityV1;
+    currentUsable: true;
   }>
   | Readonly<{
-    phase: "activated" | "rolled-back";
-    snapshot: PairAuthoritySnapshotV1;
-    cleanup: CleanupStateV1 | null;
-    reloadAllowed: true;
+    phase: "close-and-reopen-required";
+    boot: ControllerBootProofV1;
+    intent: CloseAndReopenIntentV1;
+    message: typeof UPDATE_READY_MESSAGE;
+    currentUsable: true;
+  }>
+  | Readonly<{
+    phase: "controller-verified-activation";
+    boot: ControllerBootProofV1;
+    intent: CloseAndReopenIntentV1;
+    currentUsable: true;
+  }>
+  | Readonly<{
+    phase: "deployment-required";
+    operation: "rollback";
+    boot: ControllerBootProofV1;
+    code: "rollback-unavailable";
+    message: typeof ROLLBACK_MESSAGE;
+    currentUsable: true;
   }>
   | Readonly<{
     phase: "failed";
-    operation: "prepare-update" | "prepare-rollback" | "activate-update" | "rollback" | "cleanup";
-    code: UpdateCoordinatorFailureCodeV1;
+    operation: "prepare-update" | "confirm-update" | "verify-next-boot";
+    code: StaticUpdateFailureCodeV1;
     message: string;
-    recoverable: true;
+    boot: ControllerBootProofV1;
     currentUsable: true;
-    snapshot: PairAuthoritySnapshotV1;
   }>;
 
 function samePair(left: AppReleasePairV1, right: AppReleasePairV1): boolean {
@@ -129,23 +122,22 @@ function sameIdentity(left: AcceptedPairIdentityV1, right: AcceptedPairIdentityV
     left.receiptSha256 === right.receiptSha256;
 }
 
+function opaque(value: unknown, name: string, pattern = OPAQUE_ID): string {
+  if (typeof value !== "string" || !pattern.test(value)) throw new TypeError(`${name} is invalid.`);
+  return value;
+}
+
 function boundedMessage(value: unknown, fallback: string): string {
   if (value instanceof Error && value.message) return value.message.slice(0, 512);
   if (typeof value === "string" && value) return value.slice(0, 512);
   return fallback;
 }
 
-function opaque(value: unknown, name: string, pattern: RegExp): string {
-  if (typeof value !== "string" || !pattern.test(value)) throw new TypeError(`${name} is invalid.`);
-  return value;
-}
-
-function boundConfirmationToken(providerToken: unknown, generation: number): string {
-  if (!Number.isSafeInteger(generation) || generation <= 0) {
-    throw new TypeError("Coordinator confirmation generation is invalid.");
+function generation(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) {
+    throw new TypeError("Confirmation generation is invalid.");
   }
-  const provider = opaque(providerToken, "provider confirmation token", PROVIDER_TOKEN);
-  return opaque(`g${generation}.${provider}`, "bound confirmation token", TOKEN);
+  return value as number;
 }
 
 export function validateAcceptedPairIdentity(value: AcceptedPairIdentityV1): AcceptedPairIdentityV1 {
@@ -161,303 +153,273 @@ export function validateAcceptedPairIdentity(value: AcceptedPairIdentityV1): Acc
   });
 }
 
-export function validatePairAuthoritySnapshot(value: PairAuthoritySnapshotV1): PairAuthoritySnapshotV1 {
+export function validateControllerBootProof(value: ControllerBootProofV1): ControllerBootProofV1 {
   if (!value || typeof value !== "object" || value.contractVersion !== 1) {
-    throw new TypeError("Pair authority snapshot is invalid.");
-  }
-  const active = validateAcceptedPairIdentity(value.active);
-  const previous = value.previous === null ? null : validateAcceptedPairIdentity(value.previous);
-  if (previous && samePair(active.pair, previous.pair)) {
-    throw new TypeError("Active and previous authority must be different exact pairs.");
+    throw new TypeError("Controller boot proof is invalid.");
   }
   return Object.freeze({
     contractVersion: 1,
-    revision: opaque(value.revision, "snapshot revision", REVISION),
-    active,
-    previous,
+    bootId: opaque(value.bootId, "bootId", BOOT_ID),
+    controller: validateAcceptedPairIdentity(value.controller),
   });
 }
 
-function sameSnapshot(left: PairAuthoritySnapshotV1, right: PairAuthoritySnapshotV1): boolean {
-  return left.revision === right.revision && sameIdentity(left.active, right.active) &&
-    (left.previous === null ? right.previous === null : right.previous !== null && sameIdentity(left.previous, right.previous));
-}
-
-function failure(
-  operation: Extract<UpdateCoordinatorStateV1, { phase: "failed" }>["operation"],
-  code: UpdateCoordinatorFailureCodeV1,
-  snapshot: PairAuthoritySnapshotV1,
-  message: string,
-): UpdateCoordinatorStateV1 {
+export function validateCloseAndReopenIntent(value: CloseAndReopenIntentV1): CloseAndReopenIntentV1 {
+  if (!value || typeof value !== "object" || value.contractVersion !== 1 || value.message !== UPDATE_READY_MESSAGE) {
+    throw new TypeError("Close-and-reopen transition intent is invalid.");
+  }
+  const confirmationGeneration = generation(value.confirmationGeneration);
+  const sourceBootId = opaque(value.sourceBootId, "sourceBootId", BOOT_ID);
+  if (value.transitionId !== `${sourceBootId}.g${confirmationGeneration}`) {
+    throw new TypeError("Transition identity does not match its source boot and generation.");
+  }
+  const sourceController = validateAcceptedPairIdentity(value.sourceController);
+  const candidate = validateAcceptedPairIdentity(value.candidate);
+  if (sameIdentity(sourceController, candidate)) throw new TypeError("Transition candidate is already active.");
   return Object.freeze({
-    phase: "failed", operation, code, message, recoverable: true, currentUsable: true, snapshot,
+    contractVersion: 1,
+    transitionId: opaque(value.transitionId, "transitionId"),
+    confirmationGeneration,
+    sourceBootId,
+    sourceController,
+    candidate,
+    message: UPDATE_READY_MESSAGE,
   });
 }
 
-function validateInspection(value: CandidateInspectionV1, requested: AppReleasePairV1): CandidateInspectionV1 {
-  if (!value || typeof value !== "object") throw new TypeError("Candidate inspection is invalid.");
+function validateInspection(
+  value: WaitingCandidateInspectionV1,
+  requested: AppReleasePairV1,
+): WaitingCandidateInspectionV1 {
+  if (!value || typeof value !== "object") throw new TypeError("Waiting-candidate inspection is invalid.");
   if (value.status === "sealed") {
     const candidate = validateAcceptedPairIdentity(value.candidate);
-    if (!samePair(candidate.pair, requested)) throw new TypeError("Candidate inspection returned a mixed pair.");
+    if (!samePair(candidate.pair, requested)) throw new TypeError("Waiting candidate contains a mixed pair.");
     return Object.freeze({ status: "sealed", candidate });
   }
   if (!new Set(["incomplete", "corrupt", "mixed", "stale"]).has(value.status)) {
-    throw new TypeError("Candidate inspection status is unsupported.");
+    throw new TypeError("Waiting-candidate status is unsupported.");
   }
   return Object.freeze({ status: value.status, reason: boundedMessage(value.reason, `Candidate is ${value.status}.`) });
 }
 
-function validateTransition(
-  value: AtomicPairTransitionV1,
-  expected: PairAuthoritySnapshotV1,
-  nextActive: AcceptedPairIdentityV1,
-): PairAuthoritySnapshotV1 {
-  if (!value || value.contractVersion !== 1) throw new TypeError("Atomic transition receipt is invalid.");
-  const before = validatePairAuthoritySnapshot(value.before);
-  const after = validatePairAuthoritySnapshot(value.after);
-  if (!sameSnapshot(before, expected) || after.revision === expected.revision ||
-      !sameIdentity(after.active, nextActive) || after.previous === null ||
-      !sameIdentity(after.previous, expected.active)) {
-    throw new TypeError("Atomic transition did not preserve the exact active/previous authority contract.");
-  }
-  return after;
+function boundConfirmationToken(providerToken: unknown, value: number): string {
+  const provider = opaque(providerToken, "provider confirmation token", PROVIDER_TOKEN);
+  return opaque(`g${generation(value)}.${provider}`, "bound confirmation token");
 }
 
-function validateCleanup(
-  value: CleanupFenceResultV1,
-  target: AppReleasePairV1,
-): CleanupStateV1 {
-  if (value.status === "removed") return Object.freeze({ status: "removed", pair: target });
-  if (value.status !== "blocked" || !Array.isArray(value.leases) || value.leases.length === 0) {
-    throw new TypeError("Cleanup fence result is invalid.");
-  }
-  const leases = value.leases.map(validateClientLease);
-  if (leases.some((lease) => !samePair(lease.pair, target))) {
-    throw new TypeError("Cleanup fence reported a lease for another pair.");
-  }
-  return Object.freeze({ status: "blocked", pair: target, leases: Object.freeze(leases) });
+function failed(
+  operation: Extract<StaticUpdateCoordinatorStateV1, { phase: "failed" }>["operation"],
+  code: StaticUpdateFailureCodeV1,
+  boot: ControllerBootProofV1,
+  message: string,
+): StaticUpdateCoordinatorStateV1 {
+  return Object.freeze({ phase: "failed", operation, code, message, boot, currentUsable: true });
 }
 
 /**
- * Pure orchestration around injected persistence and lease-fence ports. This
- * module never calls browser lifecycle APIs; only a confirmed atomic receipt
- * exposes `reloadAllowed: true` to the adapter.
+ * Coordinates user intent only. It cannot activate a worker, swap browser
+ * storage authority, reload the page, or perform application rollback.
  */
-export class ExplicitUpdateCoordinator {
-  readonly #ports: UpdateCoordinatorPorts;
-  #state: UpdateCoordinatorStateV1 | null = null;
+export class StaticHostUpdateCoordinator {
+  readonly #ports: StaticUpdateCoordinatorPorts;
+  #state: StaticUpdateCoordinatorStateV1 | null = null;
   #sequence = 0;
   #pendingGeneration: number | null = null;
 
-  constructor(ports: UpdateCoordinatorPorts) { this.#ports = ports; }
+  constructor(ports: StaticUpdateCoordinatorPorts) { this.#ports = ports; }
 
-  state(): UpdateCoordinatorStateV1 | null { return this.#state; }
+  state(): StaticUpdateCoordinatorStateV1 | null { return this.#state; }
 
-  async initialize(): Promise<UpdateCoordinatorStateV1> {
-    const snapshot = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
-    return this.#set(Object.freeze({ phase: "current", snapshot, cleanup: null }));
+  async initialize(): Promise<StaticUpdateCoordinatorStateV1> {
+    const boot = validateControllerBootProof(await this.#ports.readControllerBoot());
+    return this.#set(Object.freeze({ phase: "current", boot, currentUsable: true }));
   }
 
-  async prepareUpdate(pairInput: AppReleasePairV1): Promise<UpdateCoordinatorStateV1> {
-    if (this.#state?.phase === "transitioning") return this.#state;
-    const fallback = this.#state && "snapshot" in this.#state ? this.#state.snapshot : null;
-    const operation = this.#beginPreparation("update", fallback);
-    let expected: PairAuthoritySnapshotV1;
-    try {
-      expected = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
-    } catch (error) {
-      return await this.#preparationFailure(operation, "prepare-update", fallback, error, "Update authority could not be read.");
+  async prepareUpdate(pairInput: AppReleasePairV1): Promise<StaticUpdateCoordinatorStateV1> {
+    if (this.#state?.phase === "recording-close-and-reopen-intent") return this.#state;
+    const fallback = this.#bootFromState();
+    const operation = ++this.#sequence;
+    this.#pendingGeneration = null;
+    if (fallback) this.#state = Object.freeze({ phase: "preparing", boot: fallback, currentUsable: true });
+
+    let boot: ControllerBootProofV1;
+    try { boot = validateControllerBootProof(await this.#ports.readControllerBoot()); }
+    catch (error) {
+      return await this.#preparationFailure(operation, fallback, error, "Controller authority could not be read.");
     }
-    if (operation !== this.#sequence) return this.#currentOr(expected);
+    if (operation !== this.#sequence) return this.#currentOr(boot);
 
     let requested: AppReleasePairV1;
     try { requested = validateAppReleasePair(pairInput); }
     catch (error) {
-      return this.#set(failure("prepare-update", "candidate-corrupt", expected, boundedMessage(error, "Candidate pair is invalid.")));
+      return this.#set(failed("prepare-update", "candidate-corrupt", boot, boundedMessage(error, "Candidate pair is invalid.")));
     }
-    if (samePair(requested, expected.active.pair) ||
-        (expected.previous && samePair(requested, expected.previous.pair))) {
-      return this.#set(failure("prepare-update", "candidate-stale", expected, "Update candidate is already retained by the current authority."));
+    if (samePair(requested, boot.controller.pair)) {
+      return this.#set(failed("prepare-update", "candidate-stale", boot, "Waiting candidate is already the controlling pair."));
     }
 
-    let rawInspection: CandidateInspectionV1;
-    try { rawInspection = await this.#ports.inspectCandidate(requested); }
+    let rawInspection: WaitingCandidateInspectionV1;
+    try { rawInspection = await this.#ports.inspectWaitingCandidate(requested); }
     catch (error) {
-      return await this.#preparationFailure(operation, "prepare-update", expected, error, "Candidate inspection port failed.");
+      return await this.#preparationFailure(operation, boot, error, "Waiting-candidate inspection failed.");
     }
-    if (operation !== this.#sequence) return this.#currentOr(expected);
+    if (operation !== this.#sequence) return this.#currentOr(boot);
 
-    let inspected: CandidateInspectionV1;
-    try { inspected = validateInspection(rawInspection, requested); }
+    let inspection: WaitingCandidateInspectionV1;
+    try { inspection = validateInspection(rawInspection, requested); }
     catch (error) {
-      return this.#set(failure("prepare-update", "candidate-corrupt", expected, boundedMessage(error, "Candidate evidence is corrupt.")));
+      return this.#set(failed("prepare-update", "candidate-corrupt", boot, boundedMessage(error, "Candidate evidence is corrupt.")));
     }
-    let current: PairAuthoritySnapshotV1;
-    try { current = validatePairAuthoritySnapshot(await this.#ports.readSnapshot()); }
+    if (inspection.status !== "sealed") {
+      return this.#set(failed("prepare-update", `candidate-${inspection.status}`, boot, inspection.reason));
+    }
+
+    let current: ControllerBootProofV1;
+    try { current = validateControllerBootProof(await this.#ports.readControllerBoot()); }
     catch (error) {
-      return await this.#preparationFailure(operation, "prepare-update", expected, error, "Update authority could not be confirmed.");
+      return await this.#preparationFailure(operation, boot, error, "Controller authority could not be confirmed.");
     }
-    if (operation !== this.#sequence) return this.#currentOr(expected);
-    if (!sameSnapshot(current, expected)) {
-      return this.#set(failure("prepare-update", "authority-stale", current, "Pair authority changed while the candidate was inspected."));
+    if (operation !== this.#sequence) return this.#currentOr(boot);
+    if (current.bootId !== boot.bootId || !sameIdentity(current.controller, boot.controller)) {
+      return this.#set(failed("prepare-update", "preparation-failed", current, "Controller authority changed during candidate inspection."));
     }
-    if (inspected.status !== "sealed") {
-      return this.#set(failure("prepare-update", `candidate-${inspected.status}`, expected, inspected.reason));
-    }
+
     try {
       const confirmationToken = boundConfirmationToken(this.#ports.issueConfirmationToken({
-        action: "update", coordinatorGeneration: operation, expected, target: inspected.candidate,
+        coordinatorGeneration: operation, boot, candidate: inspection.candidate,
       }), operation);
       this.#pendingGeneration = operation;
       return this.#set(Object.freeze({
-        phase: "awaiting-confirmation", action: "update", snapshot: expected,
-        target: inspected.candidate, confirmationToken,
+        phase: "waiting-candidate-verified", boot, candidate: inspection.candidate,
+        confirmationToken, currentUsable: true,
       }));
     } catch (error) {
-      return await this.#preparationFailure(operation, "prepare-update", expected, error, "Update confirmation could not be issued.");
+      return await this.#preparationFailure(operation, boot, error, "Update confirmation could not be issued.");
     }
   }
 
-  async prepareRollback(): Promise<UpdateCoordinatorStateV1> {
-    if (this.#state?.phase === "transitioning") return this.#state;
-    const fallback = this.#state && "snapshot" in this.#state ? this.#state.snapshot : null;
-    const operation = this.#beginPreparation("rollback", fallback);
-    try {
-      const expected = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
-      if (operation !== this.#sequence) return this.#currentOr(expected);
-      if (!expected.previous) {
-        return this.#set(failure("prepare-rollback", "rollback-unavailable", expected, "No exact previous pair is retained for rollback."));
-      }
-      const confirmationToken = boundConfirmationToken(this.#ports.issueConfirmationToken({
-        action: "rollback", coordinatorGeneration: operation, expected, target: expected.previous,
-      }), operation);
-      this.#pendingGeneration = operation;
-      return this.#set(Object.freeze({
-        phase: "awaiting-confirmation", action: "rollback", snapshot: expected,
-        target: expected.previous, confirmationToken,
-      }));
-    } catch (error) {
-      return await this.#preparationFailure(
-        operation, "prepare-rollback", fallback, error, "Rollback authority could not be prepared.",
-      );
-    }
-  }
-
-  async confirm(tokenInput: string): Promise<UpdateCoordinatorStateV1> {
+  async confirmUpdate(tokenInput: string): Promise<StaticUpdateCoordinatorStateV1> {
     const pending = this.#state;
-    if (!pending || pending.phase !== "awaiting-confirmation") return this.#currentOr(null);
+    if (!pending || pending.phase !== "waiting-candidate-verified") return this.#currentOr(null);
     const pendingGeneration = this.#pendingGeneration;
     let token: string;
-    try { token = opaque(tokenInput, "confirmation token", TOKEN); } catch {
-      return this.#set(failure(
-        pending.action === "update" ? "activate-update" : "rollback",
-        "confirmation-rejected", pending.snapshot, "Confirmation token is invalid.",
-      ));
+    try { token = opaque(tokenInput, "confirmation token"); }
+    catch {
+      return this.#set(failed("confirm-update", "confirmation-rejected", pending.boot, "Confirmation token is invalid."));
     }
     if (pendingGeneration === null || pendingGeneration !== this.#sequence || token !== pending.confirmationToken) {
-      return this.#set(failure(
-        pending.action === "update" ? "activate-update" : "rollback",
-        "confirmation-rejected", pending.snapshot, "Confirmation token does not authorize this exact transition.",
-      ));
+      return this.#set(failed("confirm-update", "confirmation-rejected", pending.boot, "Confirmation token does not authorize this waiting candidate."));
     }
+
     this.#pendingGeneration = null;
     ++this.#sequence;
     this.#state = Object.freeze({
-      phase: "transitioning", action: pending.action, snapshot: pending.snapshot, target: pending.target,
+      phase: "recording-close-and-reopen-intent", boot: pending.boot,
+      candidate: pending.candidate, currentUsable: true,
     });
-    let current: PairAuthoritySnapshotV1;
+    const intent = validateCloseAndReopenIntent({
+      contractVersion: 1,
+      transitionId: `${pending.boot.bootId}.g${pendingGeneration}`,
+      confirmationGeneration: pendingGeneration,
+      sourceBootId: pending.boot.bootId,
+      sourceController: pending.boot.controller,
+      candidate: pending.candidate,
+      message: UPDATE_READY_MESSAGE,
+    });
     try {
-      current = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
+      await this.#ports.recordTransitionIntent(intent);
+      return this.#set(Object.freeze({
+        phase: "close-and-reopen-required", boot: pending.boot, intent,
+        message: UPDATE_READY_MESSAGE, currentUsable: true,
+      }));
     } catch (error) {
-      const currentAfterFailure = await this.#safeSnapshot(pending.snapshot);
-      return this.#set(failure(
-        pending.action === "update" ? "activate-update" : "rollback",
-        "transition-failed", currentAfterFailure, boundedMessage(error, "Pair authority could not be confirmed."),
+      return this.#set(failed(
+        "confirm-update", "intent-record-failed", pending.boot,
+        boundedMessage(error, "Close-and-reopen intent could not be recorded."),
       ));
     }
-    if (!sameSnapshot(current, pending.snapshot)) {
-      return this.#set(failure(
-        pending.action === "update" ? "activate-update" : "rollback",
-        "authority-stale", current, "Pair authority changed after confirmation was offered.",
+  }
+
+  async verifyNextBoot(intentInput: CloseAndReopenIntentV1): Promise<StaticUpdateCoordinatorStateV1> {
+    const fallback = this.#bootFromState();
+    let boot: ControllerBootProofV1;
+    try { boot = validateControllerBootProof(await this.#ports.readControllerBoot()); }
+    catch (error) {
+      if (!fallback) throw error;
+      return this.#set(failed("verify-next-boot", "preparation-failed", fallback, boundedMessage(error, "Controller proof is unavailable.")));
+    }
+    let intent: CloseAndReopenIntentV1;
+    try { intent = validateCloseAndReopenIntent(intentInput); }
+    catch (error) {
+      return this.#set(failed("verify-next-boot", "intent-stale", boot, boundedMessage(error, "Transition intent is invalid.")));
+    }
+    if (boot.bootId === intent.sourceBootId || !sameIdentity(boot.controller, intent.candidate)) {
+      return this.#set(failed(
+        "verify-next-boot", "controller-mismatch", boot,
+        "Fresh boot is not controlled by the exact confirmed app/release candidate.",
       ));
     }
     try {
-      const receipt = pending.action === "update"
-        ? await this.#ports.activate({ expected: pending.snapshot, candidate: pending.target, confirmationToken: token })
-        : await this.#ports.rollback({ expected: pending.snapshot, target: pending.target, confirmationToken: token });
-      const after = validateTransition(receipt, pending.snapshot, pending.target);
-      if (pending.action === "rollback") {
-        return this.#set(Object.freeze({ phase: "rolled-back", snapshot: after, cleanup: null, reloadAllowed: true }));
+      const consumed = await this.#ports.consumeTransitionIntent(intent, boot);
+      if (consumed !== "consumed") {
+        return this.#set(failed("verify-next-boot", "intent-stale", boot, "Transition intent is missing or was already consumed."));
       }
-      return await this.#finishActivation(pending.snapshot, after);
+      return this.#set(Object.freeze({
+        phase: "controller-verified-activation", boot, intent, currentUsable: true,
+      }));
     } catch (error) {
-      const currentAfterFailure = await this.#safeSnapshot(pending.snapshot);
-      return this.#set(failure(
-        pending.action === "update" ? "activate-update" : "rollback",
-        "transition-failed", currentAfterFailure, boundedMessage(error, "Atomic pair transition failed."),
+      return this.#set(failed(
+        "verify-next-boot", "intent-stale", boot,
+        boundedMessage(error, "Transition intent could not be consumed."),
       ));
     }
   }
 
-  async #finishActivation(
-    before: PairAuthoritySnapshotV1,
-    after: PairAuthoritySnapshotV1,
-  ): Promise<UpdateCoordinatorStateV1> {
-    if (!before.previous) {
-      return this.#set(Object.freeze({ phase: "activated", snapshot: after, cleanup: null, reloadAllowed: true }));
-    }
-    try {
-      const cleanup = validateCleanup(await this.#ports.cleanupRetiredPair({
-        protectedSnapshot: after,
-        pair: before.previous.pair,
-      }), before.previous.pair);
-      return this.#set(Object.freeze({ phase: "activated", snapshot: after, cleanup, reloadAllowed: true }));
-    } catch (error) {
-      return this.#set(failure("cleanup", "cleanup-failed", after, boundedMessage(error, "Retired-pair cleanup failed.")));
-    }
+  async requestRollback(): Promise<StaticUpdateCoordinatorStateV1> {
+    ++this.#sequence;
+    this.#pendingGeneration = null;
+    const boot = this.#bootFromState() ?? validateControllerBootProof(await this.#ports.readControllerBoot());
+    return this.#set(Object.freeze({
+      phase: "deployment-required", operation: "rollback", boot,
+      code: "rollback-unavailable", message: ROLLBACK_MESSAGE, currentUsable: true,
+    }));
   }
 
-  async #safeSnapshot(fallback: PairAuthoritySnapshotV1 | null): Promise<PairAuthoritySnapshotV1> {
-    try { return validatePairAuthoritySnapshot(await this.#ports.readSnapshot()); }
+  async #preparationFailure(
+    operation: number,
+    fallback: ControllerBootProofV1 | null,
+    error: unknown,
+    defaultMessage: string,
+  ): Promise<StaticUpdateCoordinatorStateV1> {
+    const boot = await this.#safeBoot(fallback);
+    if (operation !== this.#sequence) return this.#currentOr(boot);
+    return this.#set(failed("prepare-update", "preparation-failed", boot, boundedMessage(error, defaultMessage)));
+  }
+
+  async #safeBoot(fallback: ControllerBootProofV1 | null): Promise<ControllerBootProofV1> {
+    try { return validateControllerBootProof(await this.#ports.readControllerBoot()); }
     catch (error) {
       if (fallback) return fallback;
       throw error;
     }
   }
 
-  #beginPreparation(
-    action: "update" | "rollback",
-    snapshot: PairAuthoritySnapshotV1 | null,
-  ): number {
-    const generation = ++this.#sequence;
-    this.#pendingGeneration = null;
-    if (snapshot) this.#state = Object.freeze({ phase: "preparing", action, snapshot });
-    return generation;
+  #bootFromState(): ControllerBootProofV1 | null {
+    return this.#state && "boot" in this.#state ? this.#state.boot : null;
   }
 
-  async #preparationFailure(
-    generation: number,
-    operation: "prepare-update" | "prepare-rollback",
-    fallback: PairAuthoritySnapshotV1 | null,
-    error: unknown,
-    defaultMessage: string,
-  ): Promise<UpdateCoordinatorStateV1> {
-    const current = await this.#safeSnapshot(fallback);
-    if (generation !== this.#sequence) return this.#currentOr(current);
-    return this.#set(failure(
-      operation, "transition-failed", current, boundedMessage(error, defaultMessage),
-    ));
-  }
-
-  #currentOr(fallback: PairAuthoritySnapshotV1 | null): UpdateCoordinatorStateV1 {
+  #currentOr(fallback: ControllerBootProofV1 | null): StaticUpdateCoordinatorStateV1 {
     if (this.#state) return this.#state;
-    if (!fallback) throw new Error("Update coordinator is not initialized.");
-    return Object.freeze({ phase: "current", snapshot: fallback, cleanup: null });
+    if (!fallback) throw new Error("Static update coordinator is not initialized.");
+    return Object.freeze({ phase: "current", boot: fallback, currentUsable: true });
   }
 
-  #set<T extends UpdateCoordinatorStateV1>(state: T): T {
+  #set<T extends StaticUpdateCoordinatorStateV1>(state: T): T {
     this.#state = state;
-    if (state.phase !== "awaiting-confirmation") this.#pendingGeneration = null;
+    if (state.phase !== "waiting-candidate-verified") this.#pendingGeneration = null;
     return state;
   }
 }
+
+export { ROLLBACK_MESSAGE, UPDATE_READY_MESSAGE };
