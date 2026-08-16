@@ -22,6 +22,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Corrected the application live status after terminal projection failures so
+  assistive technology no longer announces that a completed failed operation
+  is still being checked, while any previous accepted outcome remains explicit.
+
 - Made the committed browser release checksum list an exact, canonical view of
   the manifest artifact inventory. Comments and blank lines can no longer be
   misread as artifacts, and missing, extra, duplicate, or stale entries fail
