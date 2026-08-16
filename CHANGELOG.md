@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added production-static browser journey evidence for all four ADR-024
+  outcomes and all nine scenario/horizon projections, including exact COG
+  values, release-scoped PMTiles identity, keyboard and reduced-motion flows,
+  URL restoration, stale-operation races, recoverable delivery failure, and
+  fail-closed range-integrity corruption. Screenshots and the exact projection
+  matrix are retained only as short-lived CI artifacts.
+
 - Added an explicitly browser-only synthetic `DataUnavailable` control at
   62°N, 44°E. The isolated v2 fixture polygon drives the real static geography
   and exact COG lookup chain, while deterministic gates prove all 27 source
