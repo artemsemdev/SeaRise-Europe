@@ -2,8 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { createHash } from "node:crypto";
-import { brotliCompressSync, brotliDecompressSync } from "node:zlib";
+import { brotliDecompressSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 import manifest from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
 import { installSearchWorker } from "./search.worker";
@@ -51,21 +50,11 @@ function transport(requests: string[] = []) {
 
 function compressedFixture() {
   const base = authority("europe-core");
-  const document = JSON.parse(readFileSync(resolve(releaseRoot, "search/europe-core.fixture.json"), "utf8"));
-  document.contentEncoding = "br";
-  const decoded = Buffer.from(`${JSON.stringify(document)}\n`);
-  const compressed = brotliCompressSync(decoded);
-  const value: SearchShardAuthority = {
-    ...base,
-    artifact: {
-      ...base.artifact,
-      url: base.artifact.url.replace(".fixture.json", ".codepoint-trie.json.br"),
-      byteSize: compressed.length,
-      sha256: createHash("sha256").update(compressed).digest("hex"),
-    },
-  };
-  return { authority: value, compressed, decoded };
+  const compressed = readFileSync(resolve(releaseRoot, "search/europe-core.codepoint-trie.json.br"));
+  return { authority: base, compressed, decoded: brotliDecompressSync(compressed) };
 }
+
+const decodeFixture = async (bytes: Uint8Array) => new Uint8Array(brotliDecompressSync(bytes));
 
 async function send(worker: ReturnType<typeof scope>, data: SearchWorkerRequest, expectResponse = true) {
   const previous = worker.messages.length;
@@ -81,7 +70,7 @@ describe("settlement search worker protocol", () => {
   it("makes core useful before coastal, merges without duplicates, and never transmits query text", async () => {
     const requests: string[] = [];
     const worker = scope();
-    installSearchWorker(worker.target, transport(requests));
+    installSearchWorker(worker.target, transport(requests), decodeFixture);
     await send(worker, { kind: "initialize", token: 1, authority: authority("europe-core") });
     expect(worker.messages.at(-1)).toMatchObject({ kind: "ready", shardId: "europe-core" });
     await send(worker, { kind: "query", token: 2, query: "Málaga" });
@@ -97,7 +86,7 @@ describe("settlement search worker protocol", () => {
 
   it("ignores stale query tokens and reports malformed index as a technical failure", async () => {
     const worker = scope();
-    installSearchWorker(worker.target, transport());
+    installSearchWorker(worker.target, transport(), decodeFixture);
     await send(worker, { kind: "initialize", token: 1, authority: authority("europe-core") });
     await send(worker, { kind: "query", token: 5, query: "Athens" });
     const count = worker.messages.length;
@@ -105,7 +94,7 @@ describe("settlement search worker protocol", () => {
     expect(worker.messages).toHaveLength(count);
 
     const malformed = scope();
-    installSearchWorker(malformed.target, async () => new Response("{}"));
+    installSearchWorker(malformed.target, async () => new Response("{}"), decodeFixture);
     await send(malformed, { kind: "initialize", token: 1, authority: authority("europe-core") });
     expect(malformed.messages.at(-1)).toMatchObject({
       kind: "error",
@@ -116,7 +105,7 @@ describe("settlement search worker protocol", () => {
   it("hashes exact generic-static Brotli bytes before explicit decoding", async () => {
     const fixture = compressedFixture();
     const worker = scope();
-    const decoder = vi.fn(async (bytes: Uint8Array) => new Uint8Array(brotliDecompressSync(bytes)));
+    const decoder = vi.fn(decodeFixture);
     installSearchWorker(
       worker.target,
       async () => new Response(Uint8Array.from(fixture.compressed)),
@@ -162,6 +151,46 @@ describe("settlement search worker protocol", () => {
     );
     await send(malformed, { kind: "initialize", token: 1, authority: fixture.authority });
     expect(malformed.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "DecodeFailed" } });
+  });
+
+  it("rejects a coastal shard with a different source identity without losing core search", async () => {
+    const worker = scope();
+    const core = authority("europe-core");
+    const coastal = authority("europe-coastal");
+    const changedCoastal = JSON.parse(brotliDecompressSync(readFileSync(resolve(
+      releaseRoot,
+      "search/europe-coastal.codepoint-trie.json.br",
+    ))).toString("utf8"));
+    changedCoastal.source.projectionSha256 = "0".repeat(64);
+    const transportWithDifferentIdentity = vi.fn(async (input: URL) => {
+      if (input.pathname.includes("europe-coastal")) {
+        const bytes = Buffer.from(JSON.stringify(changedCoastal));
+        return new Response(bytes);
+      }
+      return new Response(readFileSync(resolve(releaseRoot, "search/europe-core.codepoint-trie.json.br")));
+    });
+    const decode = async (bytes: Uint8Array) => {
+      try { return new Uint8Array(brotliDecompressSync(bytes)); }
+      catch { return bytes; }
+    };
+    installSearchWorker(worker.target, transportWithDifferentIdentity, decode);
+    await send(worker, { kind: "initialize", token: 1, authority: core });
+    await send(worker, { kind: "load-shard", token: 2, authority: {
+      ...coastal,
+      artifact: {
+        ...coastal.artifact,
+        byteSize: Buffer.byteLength(JSON.stringify(changedCoastal)),
+        sha256: await crypto.subtle.digest("SHA-256", Buffer.from(JSON.stringify(changedCoastal)))
+          .then((hash) => Buffer.from(hash).toString("hex")),
+      },
+    } });
+    expect(worker.messages.at(-1)).toMatchObject({
+      kind: "error",
+      operation: "load-shard",
+      error: { code: "IntegrityFailed" },
+    });
+    await send(worker, { kind: "query", token: 3, query: "Athens" });
+    expect(worker.messages.at(-1)).toMatchObject({ kind: "results", readyShards: ["europe-core"] });
   });
 
   it("aborts safely and closes without posting a scientific outcome", async () => {

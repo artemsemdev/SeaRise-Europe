@@ -48,7 +48,7 @@ export function hasQualifiedContext(
 }
 
 function numericId(value: string): bigint {
-  const match = /^(?:geonames|synthetic):([1-9][0-9]*)$/.exec(value);
+  const match = /^geonames:([1-9][0-9]*)$/.exec(value);
   if (!match) throw new Error("search place ID differs from the supported stable ID contract");
   return BigInt(match[1]);
 }
@@ -69,10 +69,14 @@ export function mergeRankedResults(
   coastal: readonly RankedSearchResult[],
   limit = 10,
 ): readonly SettlementSearchRecord[] {
-  const strongest = new Map<string, RankedSearchResult>();
-  for (const result of [...core, ...coastal]) {
-    const previous = strongest.get(result.record.placeId);
-    if (!previous || compareRankedResults(result, previous) < 0) strongest.set(result.record.placeId, result);
+  const result: SettlementSearchRecord[] = [];
+  const seen = new Set<string>();
+  for (const shard of [core, coastal]) {
+    for (const item of shard) {
+      numericId(item.record.placeId);
+      if (!seen.has(item.record.placeId) && result.length < limit) result.push(item.record);
+      seen.add(item.record.placeId);
+    }
   }
-  return [...strongest.values()].sort(compareRankedResults).slice(0, limit).map(({ record }) => record);
+  return result;
 }

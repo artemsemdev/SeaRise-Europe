@@ -4,51 +4,19 @@ import {
   normalizeSearchText,
   searchFuzzyAllowance,
 } from "./ranking";
+import { canonicalJson, compareCodePoints, validateSearchShardDocument, type IndexEnvelope } from "./contract";
 import type {
   RankedSearchResult,
   SearchShardAuthority,
-  SearchShardId,
   SettlementSearchRecord,
 } from "./types";
 
-const MAX_RAW_BYTES = 64 * 1024 * 1024;
+const MAX_COMPRESSED_BYTES = 256 * 1024 * 1024;
+const MAX_RAW_BYTES = 768 * 1024 * 1024;
 const MAX_QUERY_POINTS = 128;
 const MAX_QUERY_WORK = 250_000;
+const CANDIDATE_LIMIT = 128;
 const RESULT_LIMIT = 10;
-
-interface IndexedRecord extends SettlementSearchRecord {
-  readonly ordinal: number;
-}
-
-interface IndexEnvelope {
-  readonly formatVersion: "search-evaluation-index-v1";
-  readonly engine: {
-    readonly engineId: "searise-codepoint-trie";
-    readonly packageVersion: "1.0.0";
-    readonly serializationVersion: "codepoint-trie-json-v1";
-  };
-  readonly binding: {
-    readonly documentCount: number;
-    readonly evaluationId: "browser-search-shard-v2";
-    readonly shardId: SearchShardId;
-  };
-  readonly payload: {
-    readonly serializationVersion: 1;
-    readonly entries: readonly (readonly [string, readonly number[]])[];
-  };
-}
-
-interface ShardDocument {
-  readonly artifactType: "settlement-browser-search-shard";
-  readonly contentEncoding: "identity" | "br";
-  readonly dataProvenanceClass: "real-source" | "synthetic-fixture";
-  readonly dataReleaseId: string;
-  readonly formatVersion: "settlement-browser-search-shard-v2";
-  readonly indexBase64: string;
-  readonly recordCount: number;
-  readonly records: readonly IndexedRecord[];
-  readonly shardId: SearchShardId;
-}
 
 interface TrieNode {
   readonly children: Map<string, TrieNode>;
@@ -60,6 +28,7 @@ interface TrieNode {
 
 export interface SearchShardRuntime {
   readonly authority: SearchShardAuthority;
+  readonly commonIdentity: string;
   readonly records: ReadonlyMap<number, SettlementSearchRecord>;
   readonly root: TrieNode;
 }
@@ -76,14 +45,6 @@ async function sha256(bytes: Uint8Array): Promise<string> {
   return hex(await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes).buffer));
 }
 
-function decodeBase64(value: string): Uint8Array {
-  if (!value || !/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) {
-    return fail("search index is not canonical base64");
-  }
-  const binary = atob(value);
-  return Uint8Array.from(binary, (point) => point.charCodeAt(0));
-}
-
 function emptyNode(): TrieNode {
   return { children: new Map(), maxNameLength: 0, ordinals: [], signatureHigh: 0, signatureLow: 0 };
 }
@@ -92,65 +53,13 @@ function signatureBucket(point: string): number {
   return Math.imul(point.codePointAt(0)!, 0x9e3779b1) >>> 26;
 }
 
-function assertRecord(
-  value: unknown,
-  ordinal: number,
-  authority: SearchShardAuthority,
-): asserts value is IndexedRecord {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("search record is not an object");
-  const item = value as Record<string, unknown>;
-  const identifier = authority.dataProvenanceClass === "synthetic-fixture"
-    ? /^(?:synthetic|geonames):[1-9][0-9]*$/
-    : /^geonames:[1-9][0-9]*$/;
-  if (
-    item.ordinal !== ordinal
-    || typeof item.placeId !== "string" || !identifier.test(item.placeId)
-    || typeof item.displayName !== "string" || !item.displayName
-    || !Array.isArray(item.searchNames) || item.searchNames.some((name) => typeof name !== "string" || !name)
-    || typeof item.countryCode !== "string" || !/^[A-Z]{2}$/.test(item.countryCode)
-    || !(item.admin1Name === null || (typeof item.admin1Name === "string" && item.admin1Name.length > 0))
-    || !(item.population === null || (Number.isSafeInteger(item.population) && Number(item.population) >= 0))
-    || typeof item.featureCode !== "string"
-    || !Number.isSafeInteger(item.distanceToCoastMeters) || Number(item.distanceToCoastMeters) < 0
-    || typeof item.isCoastal !== "boolean"
-    || typeof item.latitude !== "number" || !Number.isFinite(item.latitude) || item.latitude < -90 || item.latitude > 90
-    || typeof item.longitude !== "number" || !Number.isFinite(item.longitude) || item.longitude < -180 || item.longitude > 180
-  ) {
-    fail("search record differs from the browser contract");
-  }
-  normalizeSearchText(item.displayName);
-  for (const name of item.searchNames as string[]) normalizeSearchText(name);
-}
-
-function parseEnvelope(value: string, count: number, shardId: SearchShardId): IndexEnvelope {
-  let envelope: IndexEnvelope;
-  try {
-    envelope = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(decodeBase64(value)));
-  } catch {
-    return fail("search index is not strict UTF-8 JSON");
-  }
-  if (
-    envelope.formatVersion !== "search-evaluation-index-v1"
-    || envelope.engine?.engineId !== "searise-codepoint-trie"
-    || envelope.engine.packageVersion !== "1.0.0"
-    || envelope.engine.serializationVersion !== "codepoint-trie-json-v1"
-    || envelope.binding?.documentCount !== count
-    || envelope.binding.evaluationId !== "browser-search-shard-v2"
-    || envelope.binding.shardId !== shardId
-    || envelope.payload?.serializationVersion !== 1
-    || !Array.isArray(envelope.payload.entries)
-  ) {
-    return fail("search index envelope differs from the browser contract");
-  }
-  return envelope;
-}
-
 function hydrateIndex(envelope: IndexEnvelope, count: number): TrieNode {
   const root = emptyNode();
   const path: TrieNode[] = [];
   let previous = "";
   for (const entry of envelope.payload.entries) {
-    if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || !entry[0] || entry[0] <= previous || !Array.isArray(entry[1])) {
+    if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || !entry[0]
+        || (previous && compareCodePoints(entry[0], previous) <= 0) || !Array.isArray(entry[1])) {
       return fail("search index entries are not unique and sorted");
     }
     const normalized = normalizeSearchText(entry[0]);
@@ -199,7 +108,7 @@ export async function verifySearchArtifactBytes(
 ): Promise<void> {
   if (
     raw.length !== authority.artifact.byteSize
-    || raw.length > MAX_RAW_BYTES
+    || raw.length > MAX_COMPRESSED_BYTES
     || !/^[a-f0-9]{64}$/.test(authority.artifact.sha256)
     || await sha256(raw) !== authority.artifact.sha256
   ) {
@@ -212,37 +121,36 @@ export async function decodeSearchShard(
   authority: SearchShardAuthority,
 ): Promise<SearchShardRuntime> {
   if (raw.length > MAX_RAW_BYTES) return fail("decoded search shard exceeds its browser limit");
-  let value: ShardDocument;
-  try {
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(raw));
-  } catch {
-    return fail("search shard is not strict UTF-8 JSON");
-  }
-  if (
-    value.artifactType !== "settlement-browser-search-shard"
-    || !["identity", "br"].includes(value.contentEncoding)
-    || value.dataReleaseId !== authority.dataReleaseId
-    || value.dataProvenanceClass !== authority.dataProvenanceClass
-    || value.formatVersion !== "settlement-browser-search-shard-v2"
-    || value.shardId !== authority.shardId
-    || !Array.isArray(value.records)
-    || value.recordCount !== value.records.length
-    || value.recordCount < 1 || value.recordCount > 250_000
-  ) {
-    return fail("search shard metadata differs from the pinned release authority");
-  }
+  const value = await validateSearchShardDocument(raw, authority);
   const records = new Map<number, SettlementSearchRecord>();
-  const identifiers = new Set<string>();
   value.records.forEach((record, index) => {
-    assertRecord(record, index + 1, authority);
-    if (identifiers.has(record.placeId)) fail("search shard contains a duplicate stable place ID");
-    identifiers.add(record.placeId);
     const { ordinal, ...publicRecord } = record;
     void ordinal;
     records.set(index + 1, Object.freeze(publicRecord));
   });
-  const envelope = parseEnvelope(value.indexBase64, records.size, value.shardId);
-  return Object.freeze({ authority, records, root: hydrateIndex(envelope, records.size) });
+  return Object.freeze({
+    authority,
+    commonIdentity: value.commonIdentity,
+    records,
+    root: hydrateIndex(value.envelope, records.size),
+  });
+}
+
+export function assertCompatibleShardSet(
+  core: SearchShardRuntime,
+  coastal: SearchShardRuntime,
+): void {
+  if (core.authority.shardId !== "europe-core" || coastal.authority.shardId !== "europe-coastal"
+      || core.commonIdentity !== coastal.commonIdentity) {
+    fail("core and coastal shards do not share one v4 release/source/spatial identity");
+  }
+  const coreById = new Map([...core.records.values()].map((record) => [record.placeId, record]));
+  for (const record of coastal.records.values()) {
+    const overlap = coreById.get(record.placeId);
+    if (overlap && canonicalJson(overlap) !== canonicalJson(record)) {
+      fail("core and coastal shards disagree on an overlapping GeoNames record");
+    }
+  }
 }
 
 interface Work { value: number }
@@ -272,7 +180,7 @@ function offer(
   best.byOrdinal.set(ordinal, candidate);
   best.values.push(candidate);
   best.values.sort(compareRankedResults);
-  if (best.values.length > RESULT_LIMIT) {
+  if (best.values.length > CANDIDATE_LIMIT) {
     const removed = best.values.pop()!;
     best.byOrdinal.delete([...runtime.records.entries()].find(([, item]) => item.placeId === removed.record.placeId)?.[0] ?? -1);
   }
@@ -391,7 +299,7 @@ export function searchShard(runtime: SearchShardRuntime, rawQuery: string): read
   }
   if (node) for (const child of node.children.values()) addPrefix(runtime, child, best, work);
   const maximum = searchFuzzyAllowance(query);
-  if (maximum && best.values.length < RESULT_LIMIT) {
+  if (maximum && best.values.length < CANDIDATE_LIMIT) {
     fuzzyWalk(
       runtime,
       runtime.root,
@@ -404,5 +312,5 @@ export function searchShard(runtime: SearchShardRuntime, rawQuery: string): read
       work,
     );
   }
-  return best.values;
+  return best.values.slice(0, RESULT_LIMIT);
 }

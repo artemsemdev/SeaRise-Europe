@@ -1,8 +1,8 @@
 /// <reference lib="webworker" />
 
 import type { TechnicalError, TechnicalErrorCode } from "../domain/release";
-import { compareRankedResults } from "./ranking";
 import {
+  assertCompatibleShardSet,
   decodeSearchShard,
   searchShard,
   verifySearchArtifactBytes,
@@ -67,6 +67,7 @@ async function fetchShard(
     !["http:", "https:"].includes(url.protocol)
     || url.username || url.password || url.search || url.hash
     || !url.pathname.includes(`/releases/${authority.dataReleaseId}/`)
+    || !url.pathname.endsWith(".codepoint-trie.json.br")
   ) {
     throw new SearchWorkerFailure("IntegrityFailed", "Settlement shard URL escapes the pinned release.", false);
   }
@@ -140,12 +141,15 @@ function mergeRanked(
   core: readonly RankedSearchResult[],
   coastal: readonly RankedSearchResult[],
 ): readonly RankedSearchResult[] {
-  const byId = new Map<string, RankedSearchResult>();
-  for (const result of [...core, ...coastal]) {
-    const previous = byId.get(result.record.placeId);
-    if (!previous || compareRankedResults(result, previous) < 0) byId.set(result.record.placeId, result);
+  const result: RankedSearchResult[] = [];
+  const seen = new Set<string>();
+  for (const shard of [core, coastal]) {
+    for (const item of shard) {
+      if (!seen.has(item.record.placeId) && result.length < 10) result.push(item);
+      seen.add(item.record.placeId);
+    }
   }
-  return [...byId.values()].sort(compareRankedResults).slice(0, 10);
+  return result;
 }
 
 export function installSearchWorker(
@@ -182,6 +186,13 @@ export function installSearchWorker(
         const started = performance.now();
         const runtime = await fetchShard(data.authority, controller.signal, transport, decodeBrotli);
         if (terminated || controller.signal.aborted) return;
+        if (data.authority.shardId === "europe-coastal") {
+          try {
+            assertCompatibleShardSet(shards.get("europe-core")!, runtime);
+          } catch (error) {
+            throw new SearchWorkerFailure("IntegrityFailed", bounded(error), false);
+          }
+        }
         shards.set(data.authority.shardId, runtime);
         controllers.delete(data.authority.shardId);
         scope.postMessage({
@@ -215,7 +226,10 @@ export function installSearchWorker(
       });
     } catch (error) {
       if (terminated) return;
-      scope.postMessage({ kind: "error", token, error: technical(error) });
+      const operation = data?.kind === "initialize" || data?.kind === "load-shard" || data?.kind === "query"
+        ? data.kind
+        : "protocol";
+      scope.postMessage({ kind: "error", token, operation, error: technical(error) });
     }
   };
 }

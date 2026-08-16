@@ -24,7 +24,12 @@ export type SearchWorkerResponse =
       readonly durationMilliseconds: number;
       readonly readyShards: readonly SearchShardId[];
     }
-  | { readonly kind: "error"; readonly token: number; readonly error: TechnicalError };
+  | {
+      readonly kind: "error";
+      readonly token: number;
+      readonly operation: "initialize" | "load-shard" | "query" | "protocol";
+      readonly error: TechnicalError;
+    };
 
 export interface SearchWorkerPort {
   onmessage: ((event: MessageEvent<SearchWorkerResponse>) => void) | null;
