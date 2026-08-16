@@ -34,7 +34,7 @@ export default function ArchitecturePage() {
         <div><dt>Application build</dt><dd><code>{runtimeConfig.appBuildId}</code></dd></div>
         <div><dt>Data release</dt><dd><code>{runtimeConfig.dataReleaseId}</code></dd></div>
         <div><dt>Release status</dt><dd>{releaseLabel()}</dd></div>
-        <div><dt>Manifest entry point</dt><dd><code>{runtimeConfig.manifestUrl}</code></dd></div>
+        <div><dt>Manifest entry point</dt><dd><code>{runtimeConfig.manifestPath}</code></dd></div>
       </dl>
 
       <section aria-labelledby="flow-title">

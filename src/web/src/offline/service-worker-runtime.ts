@@ -1,8 +1,10 @@
 import {
   cacheNamespaces,
+  exactRecord,
   validateAppReleasePair,
   type AppReleasePairV1,
 } from "./contracts/keys";
+import { validateBuildIdentity, type BuildIdentityV1 } from "../build-identity.mjs";
 import {
   OFFLINE_WORKER_PROTOCOL,
   validateClientToOfflineWorkerMessage,
@@ -10,12 +12,9 @@ import {
   type OfflineWorkerToClientV1,
 } from "./contracts/policy";
 
-export interface EmbeddedPrecacheV1 {
-  readonly contractVersion: 1;
-  readonly appBuildId: string;
-  readonly dataReleaseId: string;
-  readonly releaseDisposition: "synthetic-fixture" | "public-promoted";
-  readonly manifestPath: string;
+export interface EmbeddedPrecacheV2 {
+  readonly contractVersion: 2;
+  readonly buildIdentity: BuildIdentityV1;
   readonly urls: readonly string[];
   readonly precacheSetSha256: string;
 }
@@ -42,29 +41,35 @@ interface RuntimeDependencies {
   readonly origin: string;
   readonly caches: CacheStorageLike;
   readonly fetch: (request: Request) => Promise<Response>;
+  readonly crypto?: Pick<Crypto, "subtle">;
 }
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 
-function validatePrecache(value: EmbeddedPrecacheV1): Readonly<{
+function validatePrecache(value: EmbeddedPrecacheV2): Readonly<{
+  buildIdentity: BuildIdentityV1;
   pair: AppReleasePairV1;
   manifestPath: string;
   urls: readonly string[];
+  authorityPayload: Readonly<object>;
   precacheSetSha256: string;
 }> {
-  if (!new Set(["synthetic-fixture", "public-promoted"]).has(value.releaseDisposition)) {
-    throw new TypeError("The release disposition cannot install an offline worker.");
-  }
+  const record = exactRecord(value, [
+    "contractVersion", "buildIdentity", "urls", "precacheSetSha256",
+  ], "embedded precache authority");
+  if (record.contractVersion !== 2) throw new TypeError("The embedded precache contract is unsupported.");
+  const buildIdentity = validateBuildIdentity(record.buildIdentity);
   const pair = validateAppReleasePair({
-    contractVersion: value.contractVersion,
-    appBuildId: value.appBuildId,
-    dataReleaseId: value.dataReleaseId,
+    contractVersion: 1,
+    appBuildId: buildIdentity.appBuildId,
+    dataReleaseId: buildIdentity.dataReleaseId,
   });
-  const expectedManifest = `/releases/${pair.dataReleaseId}/manifest.json`;
-  if (value.manifestPath !== expectedManifest || !SHA256.test(value.precacheSetSha256)) {
+  const expectedManifest = buildIdentity.manifestPath;
+  if (typeof record.precacheSetSha256 !== "string" || !SHA256.test(record.precacheSetSha256)) {
     throw new TypeError("The embedded precache authority is invalid.");
   }
-  const urls = [...value.urls];
+  if (!Array.isArray(record.urls)) throw new TypeError("The embedded precache URL inventory is invalid.");
+  const urls = [...record.urls] as unknown[];
   if (
     urls.length < 3 ||
     urls[0] !== "/" ||
@@ -74,7 +79,9 @@ function validatePrecache(value: EmbeddedPrecacheV1): Readonly<{
   ) {
     throw new TypeError("The embedded precache URL inventory is not canonical.");
   }
-  for (const path of urls) {
+  for (const pathValue of urls) {
+    if (typeof pathValue !== "string") throw new TypeError("Precache URL must be a string.");
+    const path = pathValue;
     const parsed = new URL(path, "https://static.invalid");
     if (
       parsed.origin !== "https://static.invalid" ||
@@ -87,7 +94,15 @@ function validatePrecache(value: EmbeddedPrecacheV1): Readonly<{
       throw new TypeError(`Precache URL is outside the shell allowlist: ${path}`);
     }
   }
-  return Object.freeze({ pair, manifestPath: expectedManifest, urls: Object.freeze(urls), precacheSetSha256: value.precacheSetSha256 });
+  const canonicalUrls = Object.freeze(urls as string[]);
+  return Object.freeze({
+    buildIdentity,
+    pair,
+    manifestPath: expectedManifest,
+    urls: canonicalUrls,
+    authorityPayload: Object.freeze({ contractVersion: 2, buildIdentity, urls: canonicalUrls }),
+    precacheSetSha256: record.precacheSetSha256,
+  });
 }
 
 function exactPair(expected: AppReleasePairV1, value: unknown): boolean {
@@ -131,19 +146,36 @@ async function requireCacheableResponse(
 }
 
 export function createServiceWorkerRuntime(
-  embedded: EmbeddedPrecacheV1,
+  embedded: EmbeddedPrecacheV2,
   dependencies: RuntimeDependencies,
 ) {
   const precache = validatePrecache(embedded);
+  const cryptography = dependencies.crypto ?? globalThis.crypto;
+  if (!cryptography?.subtle) throw new TypeError("SHA-256 Web Crypto is required.");
   const absoluteUrls = new Map(
     precache.urls.map((path) => [path, new URL(path, dependencies.origin).href]),
   );
   const cacheName = `${cacheNamespaces(precache.pair).shell}:${precache.precacheSetSha256}`;
 
+  const verifyAuthorityDigest = async (): Promise<void> => {
+    const digest = await cryptography.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(JSON.stringify(precache.authorityPayload)),
+    );
+    const actual = [...new Uint8Array(digest)]
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+    if (actual !== precache.precacheSetSha256) {
+      throw new TypeError("The embedded build identity or precache inventory was tampered.");
+    }
+  };
+
   return Object.freeze({
+    buildIdentity: precache.buildIdentity,
     cacheName,
     pair: precache.pair,
     async install(): Promise<void> {
+      await verifyAuthorityDigest();
       if ((await dependencies.caches.keys()).includes(cacheName)) {
         try {
           const existing = await dependencies.caches.open(cacheName);

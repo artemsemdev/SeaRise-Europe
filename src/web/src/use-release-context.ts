@@ -14,7 +14,7 @@ export function useReleaseContext(): readonly [ReleaseBootstrapState, () => void
   const [attempt, setAttempt] = useState(1);
   const [state, setState] = useState<ReleaseBootstrapState>({ phase: "loading", attempt });
   const repository = useMemo(() => {
-    const manifestUrl = new URL(runtimeConfig.manifestUrl, window.location.href);
+    const manifestUrl = new URL(runtimeConfig.manifestPath, window.location.href);
     return new ManifestRepository({
       manifestUrl: manifestUrl.href,
       allowedOrigins: [manifestUrl.origin],

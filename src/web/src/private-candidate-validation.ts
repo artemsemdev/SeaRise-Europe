@@ -55,8 +55,9 @@ export async function runPrivateCandidateScientificValidation(): Promise<Readonl
     throw new Error("Private Candidate validation is unavailable outside private-engineering mode");
   }
   const origin = window.location.origin;
+  const manifestUrl = new URL(runtimeConfig.manifestPath, origin);
   const context = await new ManifestRepository({
-    manifestUrl: runtimeConfig.manifestUrl,
+    manifestUrl: manifestUrl.href,
     allowedOrigins: [origin],
     expectedDisposition: "private-engineering",
   }).load(runtimeConfig.dataReleaseId, new AbortController().signal);

@@ -1,8 +1,9 @@
 import { cpSync, createReadStream, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
-import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
+import { applicationBuildIdentityPlugin } from "./scripts/application-build-identity.mjs";
+import { buildIdentityFile, resolveBuildIdentity } from "./scripts/build-identity.mjs";
 import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
 
 const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
@@ -43,25 +44,23 @@ function forbiddenViteFilesystemRequest(requestUrl: string | undefined): boolean
   );
 }
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, repositoryRoot, "SEARISE_");
-  const releaseId =
-    process.env.SEARISE_DATA_RELEASE_ID ?? env.SEARISE_DATA_RELEASE_ID ?? fixtureReleaseId;
-  const releaseDisposition =
-    process.env.SEARISE_RELEASE_DISPOSITION ??
-    env.SEARISE_RELEASE_DISPOSITION ??
-    "synthetic-fixture";
-  if (!["synthetic-fixture", "private-engineering", "public-promoted"].includes(releaseDisposition)) {
-    throw new Error("Unsupported release disposition.");
-  }
-  if (releaseDisposition === "private-engineering") {
-    throw new Error(
-      "Private engineering mode is owned by scripts/run-local-candidate-e2e.mjs, not Vite serve/build.",
-    );
-  }
-  const manifestUrl = `/releases/${releaseId}/manifest.json`;
+  const buildIdentity = resolveBuildIdentity({ mode, repositoryRoot });
+  const releaseId = buildIdentity.dataReleaseId;
+  const releaseDisposition = buildIdentity.releaseDisposition;
 
   return {
     plugins: [
+      applicationBuildIdentityPlugin(buildIdentity),
+      {
+        name: "canonical-build-identity",
+        generateBundle() {
+          this.emitFile({
+            type: "asset",
+            fileName: buildIdentityFile,
+            source: `${JSON.stringify(buildIdentity)}\n`,
+          });
+        },
+      },
       {
         name: "strict-vite-filesystem-boundary",
         configureServer(server) {
@@ -189,11 +188,7 @@ export default defineConfig(({ mode }) => {
       },
     ],
     define: {
-      __APP_BUILD_ID__: JSON.stringify(process.env.SEARISE_APP_BUILD_ID ?? "local-fixture"),
-      __DATA_RELEASE_ID__: JSON.stringify(releaseId),
-      __RELEASE_DISPOSITION__: JSON.stringify(releaseDisposition),
-      __MANIFEST_URL__: JSON.stringify(manifestUrl),
-      __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V1__"),
+      __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V2__"),
     },
     server: {
       fs: {
