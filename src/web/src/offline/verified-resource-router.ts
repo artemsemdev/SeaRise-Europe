@@ -14,18 +14,11 @@ import {
 } from "./admission-receipt";
 import {
   assertVerifiedReleaseResourcePlan,
-  type ExactReleaseResourceIdentityV1,
   type VerifiedReleaseResourcePlanV1,
 } from "./release-resource-plan";
 import type { RangeIdentityV1, WholeResourceAuthorityV1 } from "./contracts/v1";
-import { validateAppReleasePair } from "./contracts/keys";
 import type { RangeStore, VerifiedRangeWrite } from "./range-store";
 import type { WholeResourceStore } from "./whole-resource-cache";
-import {
-  NetworkOnlyPmtilesSource,
-  type PmtilesFetch,
-  type VisualPmtilesAuthority,
-} from "../components/map/pmtiles-network-source";
 
 export interface AcceptedResourceSnapshotV1 {
   readonly contractVersion: 1;
@@ -40,10 +33,7 @@ export interface VerifiedResourceRouterOptionsV1 {
   readonly receiptStore: AdmissionReceiptStore;
   readonly subtle: SubtleCrypto;
   readonly fetchRange: typeof fetch;
-  readonly nextOperationId: () => string;
 }
-
-const OPERATION_ID = /^[A-Za-z0-9._-]{1,64}$/u;
 
 function technical(
   code: "SchemaInvalid" | "FetchFailed" | "RangeUnsupported" | "IntegrityFailed" | "UnsupportedBrowser" | "Aborted",
@@ -76,13 +66,6 @@ function sameRangeIdentity(left: RangeIdentityV1, right: RangeIdentityV1): boole
     left.authorizedIntervalSha256 === right.authorizedIntervalSha256;
 }
 
-function operationId(value: string): string {
-  if (!OPERATION_ID.test(value)) {
-    throw technical("SchemaInvalid", "Verified resource operation identity is invalid.");
-  }
-  return value;
-}
-
 function concatenate(parts: readonly ArrayBuffer[]): ArrayBuffer {
   const length = parts.reduce((sum, part) => sum + part.byteLength, 0);
   const output = new Uint8Array(length);
@@ -101,13 +84,11 @@ export class VerifiedResourceRouter {
   readonly #receiptStore: AdmissionReceiptStore;
   readonly #subtle: SubtleCrypto;
   readonly #fetchRange: typeof fetch;
-  readonly #nextOperationId: () => string;
   readonly #whole: readonly WholeResourceAuthorityV1[];
   readonly #assessmentSupport: readonly WholeResourceAuthorityV1[];
   readonly #ranges: readonly RangeIdentityV1[];
   readonly #wholeByUrl: ReadonlyMap<string, WholeResourceAuthorityV1>;
   readonly #rangesByArtifact: ReadonlyMap<string, readonly RangeIdentityV1[]>;
-  readonly #pmtiles: ReadonlyMap<string, ExactReleaseResourceIdentityV1>;
   #active: AcceptedResourceSnapshotV1 | undefined;
   #admissionTail: Promise<void> = Promise.resolve();
 
@@ -121,7 +102,6 @@ export class VerifiedResourceRouter {
     this.#receiptStore = options.receiptStore;
     this.#subtle = options.subtle;
     this.#fetchRange = options.fetchRange;
-    this.#nextOperationId = options.nextOperationId;
     const expectedMode = this.#releasePlan.persistence.mode;
     if (
       this.#wholeStore.mode !== expectedMode ||
@@ -152,10 +132,6 @@ export class VerifiedResourceRouter {
       key,
       Object.freeze(values.sort((left, right) => left.interval.start - right.interval.start)),
     ]));
-    this.#pmtiles = new Map(this.#releasePlan.routes.flatMap((route) =>
-      route.kind === "network-only" && route.reason === "visual-pmtiles"
-        ? [[route.identity.artifactId, route.identity] as const]
-        : []));
 
     this.artifactTransport = async (input, init) => {
       abortIfNeeded(init.signal);
@@ -224,7 +200,7 @@ export class VerifiedResourceRouter {
     ranges: readonly RangeIdentityV1[],
   ): Promise<AdmissionPlanIdentityV1> {
     return createAdmissionPlanIdentity({
-      pair: validateAppReleasePair(this.#releasePlan.pair),
+      releasePlan: this.#releasePlan,
       wholeResources: whole,
       rangeResources: ranges,
       subtle: this.#subtle,
@@ -314,7 +290,7 @@ export class VerifiedResourceRouter {
         }
         throw technical("FetchFailed", `COG delivery metadata for ${authority.artifactId} is unavailable.`, true);
       }
-      if (!head.ok) throw technical("FetchFailed", `COG delivery metadata returned HTTP ${head.status}.`, true);
+      if (head.status !== 200) throw technical("FetchFailed", `COG delivery metadata returned HTTP ${head.status}.`, true);
       if (
         head.redirected || (head.url !== "" && head.url !== authority.canonicalUrl) ||
         head.headers.get("accept-ranges") !== "bytes" ||
@@ -428,8 +404,6 @@ export class VerifiedResourceRouter {
     }
     const result = await coordinateVerifiedAdmission({
       plan,
-      operationId: operationId(this.#nextOperationId()),
-      expectedPreviousReceiptSha256: previous?.receiptSha256 ?? null,
       wholeResources: requiredWhole,
       rangeWrites: writes,
       wholeStore: this.#wholeStore,
@@ -449,7 +423,7 @@ export class VerifiedResourceRouter {
     signal: AbortSignal,
   ): Promise<AcceptedResourceSnapshotV1> {
     const previousTurn = this.#admissionTail;
-    let releaseTurn: (() => void) | undefined;
+    let releaseTurn!: () => void;
     this.#admissionTail = new Promise<void>((resolve) => { releaseTurn = resolve; });
     try {
       await previousTurn;
@@ -470,7 +444,7 @@ export class VerifiedResourceRouter {
       }
       throw technical("FetchFailed", message, true);
     } finally {
-      releaseTurn?.();
+      releaseTurn();
     }
   }
 
@@ -483,21 +457,10 @@ export class VerifiedResourceRouter {
     return this.#active ?? null;
   }
 
-  createPmtilesSource(artifactId: string, fetch?: PmtilesFetch): NetworkOnlyPmtilesSource {
-    const identity = this.#pmtiles.get(artifactId);
-    const match = /^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-pmtiles$/u.exec(artifactId);
-    if (!identity || !match) throw technical("SchemaInvalid", "PMTiles route is not an exact visual release identity.");
-    const authority: VisualPmtilesAuthority = Object.freeze({
-      kind: "projection",
-      artifactId: identity.artifactId,
-      scenario: match[1] as "ssp1-26" | "ssp2-45" | "ssp5-85",
-      horizon: Number(match[2]) as 2030 | 2050 | 2100,
-      byteSize: identity.byteSize,
-      dataReleaseId: this.#releasePlan.pair.dataReleaseId,
-      sha256: identity.sha256,
-      url: identity.canonicalUrl,
-      visualOnly: true,
-    });
-    return new NetworkOnlyPmtilesSource(authority, { fetch });
+  close(): void {
+    this.#receiptStore.close();
+    this.#rangeStore.close();
+    this.#wholeStore.close();
   }
+
 }

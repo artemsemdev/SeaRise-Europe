@@ -100,6 +100,10 @@ function equalNumbers(actual: readonly number[], expected: readonly number[]): b
   return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
 }
 
+function exactNoStore(value: string | null): boolean {
+  return value?.split(",").map((part) => part.trim().toLowerCase()).includes("no-store") === true;
+}
+
 class BrowserResponse extends BaseResponse {
   readonly #response: Response;
 
@@ -151,7 +155,7 @@ export class StrictNetworkCogRangeTransport implements CogRangeTransport {
       }
       throw technical("FetchFailed", `Delivery metadata for ${artifact.artifactId} is unavailable.`, true);
     }
-    if (!response.ok) {
+    if (response.status !== 200) {
       throw technical("FetchFailed", `Delivery metadata for ${artifact.artifactId} returned HTTP ${response.status}.`, true);
     }
     const etag = response.headers.get("etag");
@@ -160,6 +164,8 @@ export class StrictNetworkCogRangeTransport implements CogRangeTransport {
       (response.url !== "" && response.url !== artifact.url) ||
       response.headers.get("accept-ranges") !== "bytes" ||
       response.headers.get("content-length") !== String(artifact.byteSize) ||
+      response.headers.get("content-type") !== artifact.mediaType ||
+      !exactNoStore(response.headers.get("cache-control")) ||
       !etag
     ) {
       throw technical("RangeUnsupported", `Host delivery for ${artifact.artifactId} lacks exact HEAD range identity.`, true);
@@ -205,7 +211,7 @@ export class StrictNetworkCogRangeTransport implements CogRangeTransport {
       throw technical("FetchFailed", `A required byte range for ${artifact.artifactId} is unavailable.`, true);
     }
     const expectedLength = endExclusive - start;
-    if (response.status !== 200 && !response.ok) {
+    if (!response.ok) {
       throw technical("FetchFailed", `A required byte range for ${artifact.artifactId} returned HTTP ${response.status}.`, true);
     }
     if (
@@ -215,6 +221,8 @@ export class StrictNetworkCogRangeTransport implements CogRangeTransport {
       response.headers.get("accept-ranges") !== "bytes" ||
       response.headers.get("content-length") !== String(expectedLength) ||
       response.headers.get("content-range") !== `bytes ${start}-${endExclusive - 1}/${artifact.byteSize}` ||
+      response.headers.get("content-type") !== artifact.mediaType ||
+      !exactNoStore(response.headers.get("cache-control")) ||
       !response.headers.get("etag")
     ) {
       throw technical("RangeUnsupported", `Host delivery for ${artifact.artifactId} returned an inexact byte range.`, true);

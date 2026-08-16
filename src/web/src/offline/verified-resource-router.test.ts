@@ -7,7 +7,11 @@ import { fixtureArtifactPath, fixtureBytes, fixtureReleaseContext, responseBody,
 import { validateAppAuthority } from "./contracts/v1";
 import { validateStorageBudget } from "./contracts/policy";
 import { createRangeStore, type RangeStore } from "./range-store";
-import { createAdmissionReceiptStore, type AdmissionReceiptStore } from "./admission-receipt";
+import {
+  createAdmissionReceiptStore,
+  type AdmissionLockPort,
+  type AdmissionReceiptStore,
+} from "./admission-receipt";
 import { createVerifiedReleaseResourcePlan, type VerifiedReleaseResourcePlanV1 } from "./release-resource-plan";
 import {
   MemoryWholeResourceCache,
@@ -20,6 +24,7 @@ import {
 import { TechnicalFailure, type ReleaseContext, type ResolvedArtifact } from "../domain/release";
 import { CogAnalysisArtifactReader } from "../data/cog-analysis-reader";
 import { VerifiedResourceRouter } from "./verified-resource-router";
+import { NetworkOnlyPmtilesSource } from "../components/map/pmtiles-network-source";
 
 const subtle = webcrypto.subtle as SubtleCrypto;
 
@@ -43,6 +48,29 @@ class MemoryCaches implements CacheStoragePort {
   }
   async delete(name: string): Promise<boolean> { return this.stores.delete(name); }
   entryCount(): number { return [...this.stores.values()].reduce((sum, store) => sum + store.entries.size, 0); }
+}
+
+class TestAdmissionLocks implements AdmissionLockPort {
+  readonly #tails = new Map<string, Promise<void>>();
+
+  async request<T>(
+    name: string,
+    options: Readonly<{ mode: "exclusive"; signal: AbortSignal }>,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    expect(options.mode).toBe("exclusive");
+    const previous = this.#tails.get(name) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => { release = resolve; });
+    this.#tails.set(name, previous.then(() => current));
+    await previous;
+    try {
+      if (options.signal.aborted) throw new DOMException("aborted", "AbortError");
+      return await operation();
+    } finally {
+      release();
+    }
+  }
 }
 
 function authority() {
@@ -90,6 +118,7 @@ interface Harness {
   readonly rangeCalls: RequestInit[];
   readonly rangeUrls: string[];
   readonly router: VerifiedResourceRouter;
+  readonly createPeerRouter: () => VerifiedResourceRouter;
   readonly wholeFailure: { enabled: boolean };
 }
 
@@ -129,12 +158,14 @@ async function harness(options: Readonly<{
     eviction: "unleased-lru",
   });
   const idb = new IDBFactory();
+  const locks = new TestAdmissionLocks();
   const ranges = createRangeStore(app, budget, {
     ...(options.localCandidate ? {} : { indexedDB: idb }),
     subtle,
   }, { catalog: plan.rangeCatalog, localCandidate: options.localCandidate });
   const receipts = createAdmissionReceiptStore(app, subtle, {
     ...(options.localCandidate ? {} : { indexedDB: idb }),
+    ...(options.localCandidate ? {} : { locks }),
     localCandidate: options.localCandidate,
   });
   const caches = new MemoryCaches();
@@ -156,6 +187,7 @@ async function harness(options: Readonly<{
   const wholeFailure = { enabled: false };
   const controlledWhole: WholeResourceStore = {
     mode: whole.mode,
+    storageProfile: whole.storageProfile,
     fetchAndAdmit: (resource, signal) => whole.fetchAndAdmit(resource, signal),
     fetchAndAdmitBatch: (resources, admissionOptions) => {
       if (wholeFailure.enabled) return Promise.reject(new DOMException("quota", "QuotaExceededError"));
@@ -209,9 +241,31 @@ async function harness(options: Readonly<{
     receiptStore: receipts,
     subtle,
     fetchRange: strictRangeFetch,
-    nextOperationId: () => `router-${++sequence}`,
   });
-  return { context, plan, whole: controlledWhole, ranges, receipts, caches, rangeCalls, rangeUrls, router, wholeFailure };
+  const createPeerRouter = (): VerifiedResourceRouter => new VerifiedResourceRouter({
+    releasePlan: plan,
+    wholeStore: options.localCandidate
+      ? new MemoryWholeResourceCache(app, wholeDependencies, {
+          localCandidate: true,
+          maxBytes: 50_000_000,
+          maxEntries: 64,
+        })
+      : new WholeResourceCache(app, wholeDependencies),
+    rangeStore: createRangeStore(app, budget, {
+      ...(options.localCandidate ? {} : { indexedDB: idb }),
+      subtle,
+    }, { catalog: plan.rangeCatalog, localCandidate: options.localCandidate }),
+    receiptStore: createAdmissionReceiptStore(app, subtle, {
+      ...(options.localCandidate ? {} : { indexedDB: idb, locks }),
+      localCandidate: options.localCandidate,
+    }),
+    subtle,
+    fetchRange: strictRangeFetch,
+  });
+  return {
+    context, plan, whole: controlledWhole, ranges, receipts, caches, rangeCalls,
+    rangeUrls, router, createPeerRouter, wholeFailure,
+  };
 }
 
 beforeEach(() => { manifestArtifacts = []; });
@@ -231,10 +285,13 @@ function firstCog(test: Harness) {
   return { route, artifact, index, first: route.ranges[0] };
 }
 
-async function readFirstCog(test: Harness): Promise<ArrayBuffer> {
+async function readFirstCog(
+  test: Harness,
+  router: VerifiedResourceRouter = test.router,
+): Promise<ArrayBuffer> {
   const { artifact, index, first } = firstCog(test);
-  await test.router.cogRangeTransport.validateDelivery(artifact, index, new AbortController().signal);
-  return test.router.cogRangeTransport.readExpandedRange(
+  await router.cogRangeTransport.validateDelivery(artifact, index, new AbortController().signal);
+  return router.cogRangeTransport.readExpandedRange(
     artifact, index, first.interval.start, first.interval.endExclusive, new AbortController().signal,
   );
 }
@@ -302,6 +359,26 @@ describe("verified resource router", () => {
     expect(new Uint8Array(second)).toEqual(new Uint8Array(first));
     expect(test.rangeCalls.filter((call) => call.method === "HEAD")).toHaveLength(1);
     expect(test.rangeCalls.filter((call) => call.method === "GET")).toHaveLength(1);
+  });
+
+  it("serializes two router instances with one pair-scoped lock and cannot roll back the accepted peer", async () => {
+    const test = await harness();
+    const peer = test.createPeerRouter();
+    await Promise.all([
+      test.router.prepareAssessmentSupport(new AbortController().signal),
+      peer.prepareAssessmentSupport(new AbortController().signal),
+    ]);
+    const [first, second] = await Promise.all([
+      readFirstCog(test, test.router),
+      readFirstCog(test, peer),
+    ]);
+    expect(new Uint8Array(second)).toEqual(new Uint8Array(first));
+    expect(test.router.current()?.gate.receiptSha256).toBe(peer.current()?.gate.receiptSha256);
+    expect((await test.ranges.inventory()).entryCount).toBe(1);
+    test.rangeCalls.length = 0;
+    await Promise.all([readFirstCog(test, test.router), readFirstCog(test, peer)]);
+    expect(test.rangeCalls).toEqual([]);
+    peer.close();
   });
 
   it("keeps the prior receipt and active result when a cancelled refresh cannot complete", async () => {
@@ -384,7 +461,6 @@ describe("verified resource router", () => {
       receiptStore: test.receipts,
       subtle,
       fetchRange: vi.fn(),
-      nextOperationId: () => "forged-plan",
     })).toThrow(TechnicalFailure);
     await test.router.prepareAssessmentSupport(new AbortController().signal);
     const route = test.plan.routes.find((candidate) => candidate.kind === "analysis-cog-ranges")!;
@@ -412,7 +488,19 @@ describe("verified resource router", () => {
       route.kind === "network-only" && route.reason === "visual-pmtiles")!;
     if (pmtiles.kind !== "network-only") throw new Error("missing PMTiles route");
     const payload = fixtureBytes(pmtiles.identity.path);
-    const source = test.router.createPmtilesSource(pmtiles.identity.artifactId, async (request) => {
+    const match = /^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-pmtiles$/u
+      .exec(pmtiles.identity.artifactId)!;
+    const source = new NetworkOnlyPmtilesSource(Object.freeze({
+      kind: "projection" as const,
+      artifactId: pmtiles.identity.artifactId,
+      scenario: match[1] as "ssp1-26" | "ssp2-45" | "ssp5-85",
+      horizon: Number(match[2]) as 2030 | 2050 | 2100,
+      byteSize: pmtiles.identity.byteSize,
+      dataReleaseId: test.plan.pair.dataReleaseId,
+      sha256: pmtiles.identity.sha256,
+      url: pmtiles.identity.canonicalUrl,
+      visualOnly: true as const,
+    }), { fetch: async (request) => {
       expect(request.cache).toBe("no-store");
       const match = /^bytes=(\d+)-(\d+)$/u.exec(request.headers.get("range") ?? "")!;
       const start = Number(match[1]);
@@ -426,7 +514,7 @@ describe("verified resource router", () => {
         "content-type": "application/vnd.pmtiles",
         etag: `"sha256-${pmtiles.identity.sha256}"`,
       } });
-    });
+    } });
     await source.getBytes(0, Math.min(16, payload.byteLength), new AbortController().signal);
     expect(await test.ranges.inventory()).toEqual(beforeRanges);
     expect(test.caches.entryCount()).toBe(beforeCaches);
