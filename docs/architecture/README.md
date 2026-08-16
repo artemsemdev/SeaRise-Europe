@@ -81,6 +81,13 @@ Supporting current documents:
 - [Static-first migration plan](../delivery/README.md)
 - [Product requirements](../product/PRD.md)
 - [Content guidelines](../product/CONTENT_GUIDELINES.md)
+- [Canonical Flight visual and interaction contract](../product/Mock/DESIGN.md)
+
+Architecture components implement the canonical Flight experience rather than
+substituting a generic dashboard or map utility. ADR-024 overrides the mock's
+binary exposure, terrain comparison, modeled-water/flood meaning, and related
+scientific copy; it does not override Flight's layout, information hierarchy,
+map-first composition, controls, responsive behavior, or interaction character.
 
 ## Status model
 

@@ -1,16 +1,27 @@
 <!--
-  HISTORICAL EVIDENCE ONLY.
-  This preserved design export contains superseded binary exposure and terrain
-  comparison behavior. It is not application code, product copy, a scientific
-  contract, a rollback baseline, or an implementation source. ADR-024 and the
-  static browser application are authoritative.
+  ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.
+  PRESERVE: layout, information hierarchy, map-first composition, controls,
+  responsive behavior, and interaction character.
+
+  SCIENTIFIC CONTENT EXCEPTION (ADR-024):
+  - exposed and notexposed -> ProjectionAvailable; replace both binary cards
+    with median and q0.167/q0.5/q0.833 regional projection content.
+  - unavailable -> DataUnavailable; preserve its no-substitution meaning.
+  - outofscope -> OutOfScope; preserve its product-scope meaning.
+  - UnsupportedGeography is missing and must be added.
+  - technical failures stay outside the scientific outcome domain.
+
+  Do not implement terrain comparison, modeled water or flood extent, binary
+  exposure, flooding, inundation, flood probability, or property risk. The
+  PRD, Content Guidelines, release contracts, and ADR-024 govern scientific
+  meaning and product copy; they do not downgrade this file's visual and
+  interaction authority.
 -->
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Historical evidence — SeaRise Europe Flight Mock</title>
-  <meta name="robots" content="noindex">
+  <title>SeaRise Europe — Flight Mock · Canonical Visual Reference</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0d4a5b; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }

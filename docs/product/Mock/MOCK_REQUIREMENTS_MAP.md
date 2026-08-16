@@ -1,8 +1,8 @@
 # SeaRise Flight Mock — Scope Reconciliation Map
 
-> **Status:** Historical visual evidence with an active reconciliation record
+> **Status:** Active implementation contract
 >
-> **Historical export:** [SeaRise-Flight.html](SeaRise-Flight.html)
+> **Canonical reference:** [SeaRise-Flight.html](SeaRise-Flight.html)
 >
 > **Replaces:** the deleted `pages/` mock set and legacy preview images
 >
@@ -14,17 +14,35 @@
 
 ## Authority and intended use
 
-`SeaRise-Flight.html` is a preserved historical visual reference for the
-static browser experience. It demonstrates the landing composition, local
+`SeaRise-Flight.html` is the canonical visual and interaction reference for the
+static browser experience. It defines the landing composition, local
 settlement search, flight transition, scenario/horizon controls, release-scoped
 result, methodology disclosure, attribution, and technical/offline edge cases in
 one self-contained artifact.
 
-It is not application code, product copy, a scientific contract, a rollback
-baseline, or an implementation source. Its binary exposure, terrain comparison,
-and modeled-water behavior are superseded by ADR-024. The implemented static
-application, PRD, content guidelines, methodology, release contracts,
-accessibility requirements, and accepted ADRs are authoritative.
+It remains a design mock rather than executable production code. Its layout,
+information hierarchy, map-first composition, control placement, responsive
+behavior, and interaction character are active UI truth. When scientific
+meaning, product copy, fixture values, timing, or state coverage conflicts with
+the PRD, Content Guidelines, release contracts, accessibility requirements, or
+ADR-024, those authorities correct the conflicting content without discarding
+the Flight experience.
+
+## Non-negotiable preservation contract
+
+- Preserve the editorial, full-viewport, map-first composition and Atlantic
+  visual language.
+- Preserve the dominant settlement-search entry, geographic flight/arrival
+  character, and layered result panel over the map scene.
+- Preserve the visible scenario/horizon controls, progressive methodology and
+  limitations disclosure, attribution, replay/reset intent, and responsive
+  reprioritization.
+- Preserve cinematic motion with skip and reduced-motion paths; never delay a
+  ready result solely to complete animation.
+- Do not reuse scientifically invalid mock labels, binary classes, terrain
+  comparison, modeled-water/flood meaning, fixture facts, or property claims.
+- A materially different composition or interaction character requires an
+  owner-reviewed update to this canonical mock and contract.
 
 ## Mock inventory
 
@@ -62,10 +80,10 @@ accessibility requirements, and accepted ADRs are authoritative.
 
 | Domain outcome | Mock coverage | Production requirement |
 |---|---|---|
-| `ProjectionAvailable` | The mock's two binary cards are obsolete | Replace them with median + likely range, scenario/horizon/baseline, source distance/resolution, limitations, and a non-colour cue |
-| `DataUnavailable` | Present in the interactive fixture data | Keep distinct from missing network/cache/range data; never substitute another combination |
-| `OutOfScope` | Present in the interactive fixture data | Explain the release-scoped coastal boundary; do not imply absence of climate risk |
-| `UnsupportedGeography` | **Not represented as a named state in the export** | Add before #59 can close and cover outside-versioned-Europe support semantics |
+| `ProjectionAvailable` | Replace both `exposed` and `notexposed` binary cards; preserve their panel hierarchy and interaction placement, not their classification | Show median + likely range, scenario/horizon/baseline, source distance/resolution, limitations, and a non-colour cue |
+| `DataUnavailable` | Maps from `unavailable` | Keep nodata and inclusive-distance reasons distinct from missing network/cache/range data; never substitute another combination |
+| `OutOfScope` | Maps from `outofscope` | Preserve the release-scoped coastal-boundary meaning; do not imply absence of climate risk |
+| `UnsupportedGeography` | **Missing from the export** | Add as the fourth normal outcome for coordinates outside versioned Europe support while retaining the same result-panel system |
 
 The mock also demonstrates an incomplete-artifact technical failure. This is not
 a fifth scientific state and must not be stored as `DataUnavailable`.
@@ -108,11 +126,11 @@ a fifth scientific state and must not be stored as `DataUnavailable`.
 
 ## Artifact integrity
 
-The imported mock is intentionally self-contained so reviewers can open it
-without a build step. Its SHA-256 at import is:
+The canonical mock is intentionally self-contained so reviewers can open it
+without a build step. Its current SHA-256 is:
 
 ```text
-36c132bc3873d697e94084e45e7b6cee407be6ee6e8d81831f32e730792c164c
+2f39c5f4d9d1050df7613999bc205bd08086cd689deefed730db3515a5d0b00f
 ```
 
 If the HTML export changes, update this digest and review the reconciliation map

@@ -41,9 +41,9 @@
     },
     "local-2026-08-16-static-target-content": {
       "kind": "repository-inspection",
-      "observedAt": "2026-08-16T10:35:19+02:00",
-      "reference": "docs/evidence/phase-2/issue-59-content-review.md, src/web/scripts/check-target-content.mjs, and docs/testing/static-target-content-contract.md",
-      "environment": "macOS arm64; Node 20.20.1; deterministic source and emitted-asset scanner with per-category mutation controls; no network, browser, Candidate-v7, TAR, or local-only input"
+      "observedAt": "2026-08-16T11:16:35+02:00",
+      "reference": "docs/product/Mock/SeaRise-Flight.html, docs/product/Mock/MOCK_REQUIREMENTS_MAP.md, docs/evidence/phase-2/issue-59-content-review.md, src/web/scripts/check-target-content.mjs, and docs/testing/static-target-content-contract.md",
+      "environment": "macOS arm64; Node 20.20.1; deterministic source and emitted-asset scanner with per-category mutation controls plus exact canonical Flight annotation, requirements-map, and SHA-256 gates; no network, browser, Candidate-v7, TAR, or local-only input"
     },
     "local-2026-08-16-static-scientific-lookup": {
       "kind": "local-measurement",
@@ -267,11 +267,11 @@
       "id": "static-target-content",
       "layer": "static-analysis",
       "owner": "frontend",
-      "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, and product-copy limits fail closed in production source, active documentation, and emitted static assets while retaining only explicitly allowlisted historical evidence.",
-      "sourcePaths": ["src/web/scripts/check-target-content.mjs", "docs/testing/static-target-content-contract.md", "docs/evidence/phase-2/issue-59-content-review.md"],
+      "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, and product-copy limits fail closed in production source, active documentation, and emitted static assets while requiring an explicit scientific correction map on the active canonical Flight visual reference.",
+      "sourcePaths": ["src/web/scripts/check-target-content.mjs", "docs/testing/static-target-content-contract.md", "docs/evidence/phase-2/issue-59-content-review.md", "docs/product/Mock/SeaRise-Flight.html", "docs/product/Mock/DESIGN.md", "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"],
       "changedPaths": ["src/web/**", "docs/product/**", "docs/methodology.md", "docs/testing/static-target-content-contract.md"],
       "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent mutation-sensitive static target content and historical-evidence boundary." },
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent mutation-sensitive static target content, canonical Flight annotation, and historical-evidence boundary." },
       "commands": { "focused": "node src/web/scripts/check-target-content.mjs", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-16-static-target-content", "scope": "focused-suite" },
