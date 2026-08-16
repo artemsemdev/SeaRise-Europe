@@ -218,14 +218,22 @@ near-zero idle cost within current free allowances,” not “free forever.” U
 
 ## 9. Visual mock status
 
-The self-contained [SeaRise Flight mock](Mock/SeaRise-Flight.html) is preserved
-as historical visual evidence only. It is not application code, current product
-copy, a scientific contract, a rollback baseline, or an implementation source.
-The implemented static application and this guide are authoritative. The
-mock's synthetic values and superseded binary exposure behavior must not enter
-the target domain or production build. See
-[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for its explicit
-historical boundary and reconciliation record.
+The self-contained [SeaRise Flight mock](Mock/SeaRise-Flight.html) is the active
+canonical visual and interaction reference. Preserve its layout, information
+hierarchy, map-first composition, controls, responsive behavior, and
+interaction character. This guide, the PRD, release contracts, accessibility
+requirements, and ADR-024 override only conflicting scientific meaning,
+product copy, fixture facts, and implementation details; they do not downgrade
+Flight's design authority.
+
+The mock's `exposed` and `notexposed` cards both map to
+`ProjectionAvailable`; `unavailable` maps to `DataUnavailable`;
+`outofscope` maps to `OutOfScope`; and the missing `UnsupportedGeography`
+presentation must be added in the same result-panel system. Binary exposure,
+terrain comparison, modeled-water/flood meaning, and property or hazard claims
+must not enter the target domain or production build. See the active
+[mock requirements map](Mock/MOCK_REQUIREMENTS_MAP.md) for the complete
+preservation and correction contract.
 
 ## 10. Prohibited language
 

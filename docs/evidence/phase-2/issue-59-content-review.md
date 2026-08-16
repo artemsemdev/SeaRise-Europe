@@ -12,12 +12,26 @@
 
 ## Conclusion
 
-The static target passes the Phase 2 content review after correcting the
-landing/search/release-disposition copy and removing stale active-document
-claims about the implementation status and historical Flight mock. The target
-uses exactly the four ADR-024 scientific outcomes. Delivery, integrity,
-browser-capability, search, and other technical failures remain outside that
-domain.
+The static target passes the Phase 2 scientific-content review after correcting
+the landing/search/release-disposition copy. The target uses exactly the four
+ADR-024 scientific outcomes. Delivery, integrity, browser-capability, search,
+and other technical failures remain outside that domain.
+
+## Owner correction: Flight design authority
+
+The owner subsequently confirmed that `SeaRise-Flight.html` is the active
+canonical visual and interaction reference. It preserves the required layout,
+information hierarchy, map-first composition, controls, responsive behavior,
+and interaction character. This supersedes only this review's earlier
+historical-only classification; it does not change the scientific-content
+findings.
+
+The mock's invalid science is handled by an explicit anti-corruption map:
+`exposed` and `notexposed` become `ProjectionAvailable`; `unavailable` becomes
+`DataUnavailable`; `outofscope` becomes `OutOfScope`; and the missing
+`UnsupportedGeography` state must be added. Technical errors remain separate.
+Binary exposure, terrain comparison, modeled-water/flood meaning, and property
+or hazard claims remain prohibited.
 
 This is source, rendered-DOM contract, and emitted-asset evidence. It does not
 replace the separate Playwright journey evidence or manual VoiceOver review,
@@ -100,8 +114,9 @@ names, binary/five-state exposure, terrain comparison, flooding or risk
 certainty, property claims, relative `+N years` horizons, forecast-model
 framing, and unsupported coverage, precision, cost, or offline promises.
 Active documentation is scanned for legacy target-domain claims. Superseded
-material is retained only behind the explicit historical-evidence allowlist;
-the Flight mock declares that boundary in its own header.
+material is retained only behind the explicit historical-evidence allowlist.
+The active Flight mock has a separate fail-closed annotation that preserves its
+design authority while mapping and rejecting its obsolete scientific content.
 
 The committed clean-clone release is
 `searise-europe-v1.0.0-20260810-c096aeab4e09`, with
@@ -124,8 +139,8 @@ modified, built, or published by this review.
   content scanner and mutation controls, documented its two scan layers, and
   added permanent test-inventory ownership.
 - `bf07abd28675553b929b6dab688b7e08edc4868a`: aligned no-match guidance and
-  corrected the PRD and Content Guidelines so the implemented static target is
-  the sole baseline and the superseded Flight mock is historical evidence only.
+  corrected the PRD's static-runtime status. Its historical-only Flight
+  classification was later superseded by the explicit owner correction above.
 
 ## Reproducible validation
 

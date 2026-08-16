@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -5,6 +6,32 @@ import { fileURLToPath } from "node:url";
 const webRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repositoryRoot = resolve(webRoot, "../..");
 const historicalMethodologyMarker = "## Historical binary-method evidence (superseded)";
+const canonicalFlightMockPath = resolve(
+  repositoryRoot,
+  "docs/product/Mock/SeaRise-Flight.html",
+);
+const canonicalFlightRequirementsPath = resolve(
+  repositoryRoot,
+  "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
+);
+const canonicalFlightContractMarkers = Object.freeze([
+  "ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.",
+  "PRESERVE: layout, information hierarchy, map-first composition, controls,",
+  "SCIENTIFIC CONTENT EXCEPTION (ADR-024):",
+  "exposed and notexposed -> ProjectionAvailable",
+  "unavailable -> DataUnavailable",
+  "outofscope -> OutOfScope",
+  "UnsupportedGeography is missing and must be added.",
+  "technical failures stay outside the scientific outcome domain.",
+]);
+const canonicalFlightRequirementsMarkers = Object.freeze([
+  "> **Status:** Active implementation contract",
+  "## Non-negotiable preservation contract",
+  "| `ProjectionAvailable` | Replace both `exposed` and `notexposed` binary cards",
+  "| `DataUnavailable` | Maps from `unavailable` |",
+  "| `OutOfScope` | Maps from `outofscope` |",
+  "| `UnsupportedGeography` | **Missing from the export** |",
+]);
 
 const sourceExtensions = new Set([".css", ".html", ".md", ".ts", ".tsx"]);
 const builtExtensions = new Set([".css", ".html", ".js"]);
@@ -17,7 +44,6 @@ const historicalPathAllowlist = [
   `docs${sep}architecture${sep}adr${sep}`,
   `docs${sep}evidence${sep}`,
   `docs${sep}science${sep}`,
-  `docs${sep}product${sep}Mock${sep}SeaRise-Flight.html`,
 ];
 
 export const prohibitedTargetClaims = Object.freeze([
@@ -71,6 +97,31 @@ function activeMethodology(content, path) {
   return content.slice(0, marker);
 }
 
+function verifyCanonicalFlightContract() {
+  const content = readFileSync(canonicalFlightMockPath, "utf8");
+  const doctype = content.indexOf("<!DOCTYPE html>");
+  if (doctype < 0) throw new Error("Canonical Flight mock is missing its document boundary");
+  const annotation = content.slice(0, doctype);
+  if (annotation.includes("HISTORICAL EVIDENCE ONLY")) {
+    throw new Error("Canonical Flight mock is incorrectly labelled as historical-only evidence");
+  }
+  for (const marker of canonicalFlightContractMarkers) {
+    if (!annotation.includes(marker)) {
+      throw new Error(`Canonical Flight mock is missing its authority marker: ${marker}`);
+    }
+  }
+  const requirements = readFileSync(canonicalFlightRequirementsPath, "utf8");
+  for (const marker of canonicalFlightRequirementsMarkers) {
+    if (!requirements.includes(marker)) {
+      throw new Error(`Canonical Flight requirements are missing their authority marker: ${marker}`);
+    }
+  }
+  const digest = createHash("sha256").update(content).digest("hex");
+  if (!requirements.includes(digest)) {
+    throw new Error(`Canonical Flight requirements do not declare the current mock SHA-256: ${digest}`);
+  }
+}
+
 function scanClaims(content, claims) {
   const violations = [];
   for (const claim of claims) {
@@ -100,7 +151,8 @@ function repositorySources() {
     (path) => !excludedSourceParts.some((part) => path.includes(part)),
   );
   const documents = filesBelow(resolve(repositoryRoot, "docs"), sourceExtensions).filter(
-    (path) => !historicalPathAllowlist.some((part) => path.includes(part)),
+    (path) => path !== canonicalFlightMockPath &&
+      !historicalPathAllowlist.some((part) => path.includes(part)),
   );
   return [...production, resolve(webRoot, "index.html"), ...documents];
 }
@@ -140,6 +192,7 @@ function verifyMutationSensitivity() {
 
 function main() {
   verifyMutationSensitivity();
+  verifyCanonicalFlightContract();
   const builtIndex = process.argv.indexOf("--built");
   const builtRoot = builtIndex < 0 ? null : process.argv[builtIndex + 1];
   if (builtIndex >= 0 && !builtRoot) throw new Error("--built requires a directory");
