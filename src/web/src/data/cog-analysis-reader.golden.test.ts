@@ -6,7 +6,13 @@ import { resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReleaseManifestV2 } from "../contracts/generated/release-contract";
-import { ReleaseContext, type ResolvedArtifact } from "../domain/release";
+import {
+  ReleaseContext,
+  type GeographyClassification,
+  type ResolvedArtifact,
+  type Selection,
+} from "../domain/release";
+import { AssessmentEngine } from "../domain/scientific-lookup";
 import { CogAnalysisArtifactReader } from "./cog-analysis-reader";
 import {
   fixtureArtifactPath,
@@ -45,6 +51,64 @@ const goldens = JSON.parse(
 const available = goldens.results.filter(
   (result): result is AvailableGolden => result.state === "ProjectionAvailable",
 );
+
+type OutcomeState =
+  | "ProjectionAvailable"
+  | "DataUnavailable"
+  | "OutOfScope"
+  | "UnsupportedGeography";
+
+interface OutcomeParityCase {
+  readonly id: string;
+  readonly coordinates: { readonly latitude: number; readonly longitude: number };
+  readonly geographyClassification: GeographyClassification;
+  readonly expected: {
+    readonly resultState: OutcomeState;
+    readonly reason: string;
+    readonly source?: {
+      readonly locationId: number;
+      readonly latitude: number;
+      readonly longitude: number;
+      readonly distanceKilometres: number;
+    };
+    readonly projectionMillimetres?: {
+      readonly lower: number;
+      readonly median: number;
+      readonly upper: number;
+    };
+  };
+  readonly nodataEvidence?: {
+    readonly kind: "committed-cog-cell";
+    readonly storedNodata: -32768;
+    readonly bandValues: readonly [-32768, -32768, -32768];
+  };
+}
+
+interface OutcomeParityFixture {
+  readonly fixtureRole: "authoritative-adr-024-behavior-golden";
+  readonly dataProvenanceClass: "synthetic-fixture";
+  readonly release: { readonly dataReleaseId: string };
+  readonly selection: {
+    readonly scenario: "ssp2-45";
+    readonly horizon: 2050;
+  };
+  readonly contract: {
+    readonly resultStates: readonly OutcomeState[];
+    readonly requiredQuantiles: readonly number[];
+    readonly locationSelection: string;
+    readonly maximumDistanceKilometres: number;
+    readonly distanceLimitInclusive: boolean;
+    readonly prohibitedOperations: readonly string[];
+  };
+  readonly cases: readonly OutcomeParityCase[];
+}
+
+const outcomeParity = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "../pipeline/science/evidence/ar6-four-outcome-parity-v1.json"),
+    "utf8",
+  ),
+) as OutcomeParityFixture;
 
 interface RangeCall {
   readonly path: string;
@@ -178,6 +242,74 @@ describe("exact AR6 COG reader cross-runtime goldens", () => {
 
     expect(document.releaseContractId).toBe("ar6-europe-regional-release-v1");
     expect(document.locationIds).toHaveLength(76 * 46);
+  });
+
+  it("matches Python for all and only the four ADR-024 outcomes using a real COG nodata cell", async () => {
+    expect(outcomeParity.fixtureRole).toBe("authoritative-adr-024-behavior-golden");
+    expect(outcomeParity.dataProvenanceClass).toBe("synthetic-fixture");
+    expect(outcomeParity.contract).toEqual({
+      resultStates: [
+        "ProjectionAvailable",
+        "DataUnavailable",
+        "OutOfScope",
+        "UnsupportedGeography",
+      ],
+      requiredQuantiles: [0.167, 0.5, 0.833],
+      locationSelection: "nearest-source-grid-location",
+      maximumDistanceKilometres: 100,
+      distanceLimitInclusive: true,
+      prohibitedOperations: [
+        "interpolation",
+        "terrain-comparison",
+        "binary-exposure-classification",
+        "pmtiles-as-science",
+      ],
+    });
+
+    const context = await fixtureReleaseContext();
+    expect(context.dataReleaseId).toBe(outcomeParity.release.dataReleaseId);
+    const reader = new CogAnalysisArtifactReader();
+    const actualStates = new Set<OutcomeState>();
+    for (const golden of outcomeParity.cases) {
+      const engine = new AssessmentEngine({
+        geography: { classify: async () => golden.geographyClassification },
+        analysis: reader,
+      });
+      const selection: Selection = {
+        dataReleaseId: context.dataReleaseId,
+        scenario: outcomeParity.selection.scenario,
+        horizon: outcomeParity.selection.horizon,
+        location: { kind: "coordinate", coordinates: golden.coordinates },
+      };
+      const evaluation = await engine.evaluate(
+        context,
+        selection,
+        new AbortController().signal,
+      );
+      actualStates.add(evaluation.result.resultState);
+      expect(evaluation.result, golden.id).toMatchObject({
+        resultState: golden.expected.resultState,
+        reason: golden.expected.reason,
+        ...(golden.expected.source ? { source: golden.expected.source } : {}),
+      });
+      if (golden.expected.projectionMillimetres) {
+        expect(evaluation.result, golden.id).toMatchObject({
+          lowerMillimetres: golden.expected.projectionMillimetres.lower,
+          medianMillimetres: golden.expected.projectionMillimetres.median,
+          upperMillimetres: golden.expected.projectionMillimetres.upper,
+        });
+      }
+      if (golden.nodataEvidence) {
+        expect(golden.nodataEvidence).toMatchObject({
+          kind: "committed-cog-cell",
+          storedNodata: -32768,
+          bandValues: [-32768, -32768, -32768],
+        });
+        expect(evaluation.result.resultState, golden.id).toBe("DataUnavailable");
+      }
+    }
+
+    expect(actualStates).toEqual(new Set(outcomeParity.contract.resultStates));
   });
 
   const rangeCalls: RangeCall[] = [];
