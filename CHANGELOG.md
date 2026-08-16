@@ -82,6 +82,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a framework-neutral atomic projection state contract that binds every
+  accepted outcome to its immutable selection and release, retains prior
+  results explicitly during updates, and rejects stale asynchronous
+  completions by monotonic token, selection identity, and release identity.
+
 - Added a lazy MapLibre/PMTiles visualization path that resolves all nine
   visual-only overlays from the pinned release context, keeps map clicks on the
   shared selection command, degrades safely without the optional basemap, and
