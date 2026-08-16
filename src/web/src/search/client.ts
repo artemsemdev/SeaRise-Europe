@@ -1,4 +1,5 @@
 import type { ReleaseContext, ResolvedArtifact, TechnicalError } from "../domain/release";
+import { verifiedArtifactBytes, type ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent, SearchQueryOperation } from "../domain/projection-search";
 import type { SearchWorkerPort, SearchWorkerResponse } from "./worker-protocol";
 import type { SearchShardAuthority, SearchShardId, SettlementSearchState } from "./types";
@@ -59,6 +60,7 @@ function authority(context: ReleaseContext, shardId: SearchShardId): SearchShard
 export class SettlementSearchClient {
   readonly #context: ReleaseContext;
   readonly #factory: SearchWorkerFactory;
+  readonly #artifactTransport: ArtifactTransport | undefined;
   readonly #listeners = new Set<Listener>();
   readonly #lifecycleListeners = new Set<LifecycleListener>();
   readonly #searchGeneration = ++nextSearchGeneration;
@@ -69,13 +71,15 @@ export class SettlementSearchClient {
   #nextSearchToken = 0;
   #pendingQuery = "";
   #disposed = false;
+  #loadController: AbortController | null = null;
 
   constructor(context: ReleaseContext, factory: SearchWorkerFactory = () => new Worker(
     new URL("./search.worker.ts", import.meta.url),
     { name: `settlement-search-${context.dataReleaseId}`, type: "module" },
-  )) {
+  ), artifactTransport?: ArtifactTransport) {
     this.#context = context;
     this.#factory = factory;
+    this.#artifactTransport = artifactTransport;
   }
 
   get snapshot(): SettlementSearchState {
@@ -164,7 +168,7 @@ export class SettlementSearchClient {
       };
       worker.onerror = () => this.#workerCrashed(worker);
       this.#publish({ readiness: "loading-core", pending: true, results: [], error: null, coastalError: null });
-      worker.postMessage({ kind: "initialize", token: ++this.#token, authority: authority(this.#context, "europe-core") });
+      void this.#loadShard(worker, "initialize", "europe-core");
     } catch (error) {
       this.#worker?.terminate();
       this.#worker = null;
@@ -173,6 +177,36 @@ export class SettlementSearchClient {
         readiness: "idle",
       });
       this.#failActive(detail);
+    }
+  }
+
+  async #loadShard(
+    worker: SearchWorkerPort,
+    kind: "initialize" | "load-shard",
+    shardId: SearchShardId,
+  ): Promise<void> {
+    const controller = new AbortController();
+    this.#loadController?.abort("superseded shard load");
+    this.#loadController = controller;
+    try {
+      const shardAuthority = authority(this.#context, shardId);
+      if (!this.#artifactTransport) {
+        worker.postMessage({ kind, token: ++this.#token, authority: shardAuthority });
+        return;
+      }
+      const artifact = searchArtifact(this.#context, shardId);
+      const bytes = await verifiedArtifactBytes(artifact, controller.signal, this.#artifactTransport);
+      if (this.#disposed || this.#worker !== worker || controller.signal.aborted) return;
+      worker.postMessage({ kind, token: ++this.#token, authority: shardAuthority, verifiedBytes: bytes }, [bytes]);
+    } catch (error) {
+      if (controller.signal.aborted || this.#disposed || this.#worker !== worker) return;
+      const detail = error && typeof error === "object" && "detail" in error
+        ? (error as { detail: TechnicalError }).detail
+        : technical(error instanceof Error ? error.message : "Pinned settlement index is unavailable.");
+      if (kind === "load-shard") this.#publish({ readiness: "core-ready", coastalError: detail });
+      else this.#failActive(detail);
+    } finally {
+      if (this.#loadController === controller) this.#loadController = null;
     }
   }
 
@@ -245,20 +279,7 @@ export class SettlementSearchClient {
           coastalError: null,
           initializationMilliseconds: message.durationMilliseconds,
         });
-        try {
-          this.#worker!.postMessage({
-            kind: "load-shard",
-            token: ++this.#token,
-            authority: authority(this.#context, "europe-coastal"),
-          });
-        } catch (error) {
-          this.#publish({
-            readiness: "core-ready",
-            coastalError: technical(error instanceof Error
-              ? error.message
-              : "Pinned release has no coastal settlement index."),
-          });
-        }
+        void this.#loadShard(this.#worker!, "load-shard", "europe-coastal");
         if (this.#pendingQuery.trim()) this.#sendQuery(this.#pendingQuery);
       } else {
         this.#publish({ readiness: "all-ready", error: null, coastalError: null });
@@ -292,6 +313,8 @@ export class SettlementSearchClient {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#loadController?.abort("settlement search disposed");
+    this.#loadController = null;
     this.#cancelPending();
     if (this.#worker) {
       this.#worker.postMessage({ kind: "terminate", token: ++this.#token });

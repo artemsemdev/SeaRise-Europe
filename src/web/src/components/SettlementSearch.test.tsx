@@ -1,4 +1,7 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { webcrypto } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReleaseContext } from "../domain/release";
@@ -17,12 +20,14 @@ class FakeWorker implements SearchWorkerPort {
   onmessage: SearchWorkerPort["onmessage"] = null;
   onerror: SearchWorkerPort["onerror"] = null;
   readonly requests: SearchWorkerRequest[] = [];
+  readonly transfers: readonly Transferable[][] = [];
   terminated = false;
   holdQueries = false;
   failCoastalAfterQuery = false;
 
-  postMessage(message: SearchWorkerRequest): void {
+  postMessage(message: SearchWorkerRequest, transfer: Transferable[] = []): void {
     this.requests.push(message);
+    (this.transfers as Transferable[][]).push(transfer);
     queueMicrotask(() => {
       if (this.terminated) return;
       if (message.kind === "load-shard" && this.failCoastalAfterQuery) {
@@ -121,9 +126,38 @@ beforeEach(async () => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("settlement search combobox", () => {
+  it("routes pinned shard bytes through the verified artifact transport before handing them to the worker", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    const worker = new FakeWorker();
+    const transport = vi.fn(async (url: URL) => {
+      const artifact = Object.values(context.artifacts).find((value) => value.url === url.href);
+      if (!artifact) throw new Error(`Unexpected search resource: ${url.href}`);
+      const path = resolve(process.cwd(), "../../contracts/release/v1/fixtures/release", context.dataReleaseId, artifact.path);
+      const file = readFileSync(path);
+      const bytes = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
+      return { ok: true, status: 200, arrayBuffer: async () => bytes } as Response;
+    });
+    render(<SettlementSearch
+      release={context}
+      onSelect={vi.fn()}
+      workerFactory={() => worker}
+      artifactTransport={transport}
+    />);
+
+    screen.getByRole("combobox", { name: /find a city/i }).focus();
+    await waitFor(() => expect(worker.requests.filter(({ kind }) =>
+      kind === "initialize" || kind === "load-shard")).toHaveLength(2));
+    const shardRequests = worker.requests.filter((request) =>
+      request.kind === "initialize" || request.kind === "load-shard");
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect(shardRequests.every((request) => request.verifiedBytes?.byteLength === request.authority.artifact.byteSize)).toBe(true);
+    expect(worker.transfers.slice(0, 2).every((transfer, index) => transfer[0] === shardRequests[index].verifiedBytes)).toBe(true);
+  });
+
   it("uses the approved European-settlement prompt without synthetic control names", () => {
     render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => new FakeWorker()} />);
     const input = screen.getByRole("combobox", { name: /find a city/i });

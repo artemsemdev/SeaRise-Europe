@@ -164,6 +164,7 @@ async function fetchShard(
   signal: AbortSignal,
   transport: WorkerTransport,
   decodeBrotli: BrotliDecoder,
+  verifiedBytes?: ArrayBuffer,
 ): Promise<SearchShardRuntime> {
   expectedCompressedBytes(authority);
   const url = new URL(authority.artifact.url);
@@ -176,18 +177,25 @@ async function fetchShard(
     throw new SearchWorkerFailure("IntegrityFailed", "Settlement shard URL escapes the pinned release.", false);
   }
   let response: Response;
-  try {
-    response = await transport(url, {
-      signal,
-      cache: "force-cache",
-      credentials: "omit",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-      headers: { Accept: "application/vnd.searise.search-index+json, application/json" },
+  if (verifiedBytes) {
+    response = new Response(verifiedBytes, {
+      status: 200,
+      headers: { "content-length": String(verifiedBytes.byteLength) },
     });
-  } catch (error) {
-    if (signal.aborted) throw new SearchWorkerFailure("Aborted", "Settlement shard loading was cancelled.", false);
-    throw new SearchWorkerFailure("FetchFailed", bounded(error), true);
+  } else {
+    try {
+      response = await transport(url, {
+        signal,
+        cache: "force-cache",
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+        headers: { Accept: "application/vnd.searise.search-index+json, application/json" },
+      });
+    } catch (error) {
+      if (signal.aborted) throw new SearchWorkerFailure("Aborted", "Settlement shard loading was cancelled.", false);
+      throw new SearchWorkerFailure("FetchFailed", bounded(error), true);
+    }
   }
   if (!response.ok || response.type === "opaque") {
     throw new SearchWorkerFailure("FetchFailed", `Settlement shard returned HTTP ${response.status}.`, true);
@@ -348,7 +356,13 @@ export function installSearchWorker(
         const controller = new AbortController();
         controllers.set(data.authority.shardId, controller);
         const started = performance.now();
-        const runtime = await fetchShard(data.authority, controller.signal, transport, decodeBrotli);
+        const runtime = await fetchShard(
+          data.authority,
+          controller.signal,
+          transport,
+          decodeBrotli,
+          data.verifiedBytes,
+        );
         if (terminated || controller.signal.aborted) return;
         if (data.authority.shardId === "europe-coastal") {
           try {
