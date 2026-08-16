@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-16",
   "evidence": {
+    "local-2026-08-16-static-search-lifecycle": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T09:08:44+02:00",
+      "reference": "src/web/src/domain/projection-state.test.ts, src/web/src/application/assessment-controller.test.ts, src/web/src/application/use-assessment-runtime.test.tsx, and src/web/src/components/SettlementSearch.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; fast-check 4.9.0; 273 deterministic static-target tests including 92 focused reducer/controller/runtime/component cases; committed synthetic fixture only; no network, Candidate-v7, TAR, clock, or local-only input"
+    },
     "local-2026-08-16-static-assessment-controller": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T08:19:55+02:00",

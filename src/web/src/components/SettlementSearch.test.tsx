@@ -1,9 +1,10 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReleaseContext } from "../domain/release";
 import type { SearchWorkerPort, SearchWorkerRequest } from "../search/worker-protocol";
 import type { SettlementSearchRecord } from "../search/types";
+import type { SearchLifecycleEvent } from "../domain/projection-search";
 import { fixtureReleaseContext } from "../test/release-fixture";
 import { SettlementSearch } from "./SettlementSearch";
 
@@ -68,9 +69,25 @@ class FakeWorker implements SearchWorkerPort {
   terminate(): void {
     this.terminated = true;
   }
+
+  respond(token: number, queryResults: readonly SettlementSearchRecord[]): void {
+    this.onmessage?.({ data: {
+      kind: "results",
+      token,
+      results: queryResults.map((record) => ({
+        record, matchTier: 0 as const, editDistance: 0, shardId: "europe-core" as const,
+      })),
+      durationMilliseconds: 2,
+      readyShards: ["europe-core", "europe-coastal"],
+    } } as never);
+  }
 }
 
 let context: ReleaseContext;
+
+function lastMatching<T>(items: readonly T[], predicate: (item: T) => boolean): T | undefined {
+  return [...items].reverse().find(predicate);
+}
 
 function withoutArtifact(artifactId: string): ReleaseContext {
   const artifacts = { ...context.artifacts };
@@ -80,6 +97,19 @@ function withoutArtifact(artifactId: string): ReleaseContext {
     manifestUrl: context.manifestUrl,
     disposition: context.disposition,
     artifacts,
+    datasets: { ...context.datasets },
+  });
+}
+
+function replacementContext(): ReleaseContext {
+  const manifest = structuredClone(context.manifest);
+  (manifest as { dataReleaseId: string }).dataReleaseId =
+    "searise-europe-v1.0.1-20260816-aaaaaaaaaaaa";
+  return new ReleaseContext({
+    manifest,
+    manifestUrl: context.manifestUrl.replace(context.dataReleaseId, manifest.dataReleaseId),
+    disposition: context.disposition,
+    artifacts: { ...context.artifacts },
     datasets: { ...context.datasets },
   });
 }
@@ -94,6 +124,138 @@ afterEach(() => {
 });
 
 describe("settlement search combobox", () => {
+  it("emits immutable query lifecycle and only hands off a current frozen result", async () => {
+    const worker = new FakeWorker();
+    const lifecycle: SearchLifecycleEvent[] = [];
+    const selected = vi.fn();
+    const user = userEvent.setup();
+    render(<SettlementSearch
+      release={context}
+      onSelect={selected}
+      onSearchLifecycle={(event) => lifecycle.push(event)}
+      workerFactory={() => worker}
+      clearToken={0}
+    />);
+
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+    await user.type(input, "Spring");
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+    const started = lastMatching(lifecycle,
+      (event) => event.type === "search-started" && event.operation.normalizedQuery === "spring",
+    );
+    expect(started).toMatchObject({
+      type: "search-started",
+      operation: { dataReleaseId: context.dataReleaseId, normalizedQuery: "spring" },
+    });
+    expect(lifecycle.at(-1)).toMatchObject({
+      type: "search-completed",
+      queryKey: started?.type === "search-started" ? started.operation.queryKey : "missing",
+      searchToken: started?.type === "search-started" ? started.operation.searchToken : -1,
+    });
+
+    await user.keyboard("{Enter}");
+    const handedOff = selected.mock.calls[0][0] as SettlementSearchRecord;
+    expect(Object.isFrozen(handedOff)).toBe(true);
+    expect(Object.isFrozen(handedOff.searchNames)).toBe(true);
+  });
+
+  it("emits cancel on clear and ignores stale worker completion correlation", async () => {
+    const worker = new FakeWorker();
+    worker.holdQueries = true;
+    const lifecycle: SearchLifecycleEvent[] = [];
+    const selected = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<SettlementSearch
+      release={context}
+      onSelect={selected}
+      onSearchLifecycle={(event) => lifecycle.push(event)}
+      workerFactory={() => worker}
+      clearToken={0}
+    />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+    await user.type(input, "A");
+    const firstRequest = lastMatching(worker.requests,
+      (request): request is Extract<SearchWorkerRequest, { kind: "query" }> => request.kind === "query",
+    )!;
+    await user.type(input, "b");
+    const currentRequest = lastMatching(worker.requests,
+      (request): request is Extract<SearchWorkerRequest, { kind: "query" }> => request.kind === "query",
+    )!;
+    expect(currentRequest.token).not.toBe(firstRequest.token);
+
+    act(() => worker.respond(firstRequest.token, records));
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(lifecycle.filter(({ type }) => type === "search-completed")).toHaveLength(0);
+
+    act(() => worker.respond(currentRequest.token, records));
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+    expect(lifecycle.filter(({ type }) => type === "search-completed")).toHaveLength(1);
+
+    worker.holdQueries = true;
+    await user.type(input, "c");
+    const pendingStart = lastMatching(lifecycle, ({ type }) => type === "search-started");
+    rerender(<SettlementSearch
+      release={context}
+      onSelect={selected}
+      onSearchLifecycle={(event) => lifecycle.push(event)}
+      workerFactory={() => worker}
+      clearToken={1}
+    />);
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toHaveValue(""));
+    expect(lastMatching(lifecycle, ({ type }) => type === "search-cancelled")).toMatchObject({
+      type: "search-cancelled",
+      queryKey: pendingStart?.type === "search-started" ? pendingStart.operation.queryKey : "missing",
+      searchToken: pendingStart?.type === "search-started" ? pendingStart.operation.searchToken : -1,
+    });
+    expect(selected).not.toHaveBeenCalled();
+  });
+
+  it("clears prior-release text and results while disposing its pending lifecycle", async () => {
+    const first = new FakeWorker();
+    const second = new FakeWorker();
+    const factory = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const lifecycle: SearchLifecycleEvent[] = [];
+    const selected = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<SettlementSearch
+      release={context}
+      onSelect={selected}
+      onSearchLifecycle={(event) => lifecycle.push(event)}
+      workerFactory={factory}
+    />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+    await user.type(input, "Spring");
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+
+    first.holdQueries = true;
+    await user.type(input, "x");
+    const pending = lastMatching(lifecycle, ({ type }) => type === "search-started");
+    expect(input).toHaveValue("Springx");
+
+    rerender(<SettlementSearch
+      release={replacementContext()}
+      onSelect={selected}
+      onSearchLifecycle={(event) => lifecycle.push(event)}
+      workerFactory={factory}
+    />);
+    expect(screen.getByRole("combobox", { name: /find a city/i })).toHaveValue("");
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    await waitFor(() => expect(first.terminated).toBe(true));
+    expect(lastMatching(lifecycle, ({ type }) => type === "search-cancelled")).toMatchObject({
+      type: "search-cancelled",
+      queryKey: pending?.type === "search-started" ? pending.operation.queryKey : "missing",
+      searchToken: pending?.type === "search-started" ? pending.operation.searchToken : -1,
+    });
+
+    const oldQuery = first.requests.find(
+      (request): request is Extract<SearchWorkerRequest, { kind: "query" }> => request.kind === "query",
+    );
+    if (oldQuery) act(() => first.respond(oldQuery.token, records));
+    await user.keyboard("{Enter}");
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(selected).not.toHaveBeenCalled();
+  });
+
   it("supports active-descendant keyboard selection without moving focus or persisting the query", async () => {
     const worker = new FakeWorker();
     const selected = vi.fn();
