@@ -25,7 +25,11 @@ function harness(fetchOverride?: (request: Request) => Promise<Response>) {
   };
   const caches = {
     open: vi.fn(async (name: string) => { names.add(name); return cache; }),
-    delete: vi.fn(async (name: string) => { deleted.push(name); names.delete(name); return true; }),
+    delete: vi.fn(async (name: string) => {
+      deleted.push(name);
+      entries.clear();
+      return names.delete(name);
+    }),
     keys: vi.fn(async () => [...names]),
   };
   const fetcher = vi.fn(fetchOverride ?? (async (request: Request) => new Response("ok", {
@@ -64,6 +68,28 @@ describe("service worker shell runtime", () => {
     expect(test.deleted).toEqual([]);
   });
 
+  it.each(["partial", "policy-invalid"] as const)(
+    "deletes and rebuilds a %s existing exact-name cache",
+    async (failure) => {
+      const test = harness();
+      test.names.add(test.runtime.cacheName);
+      test.entries.set(`${origin}/`, new Response("shell"));
+      if (failure === "policy-invalid") {
+        test.entries.set(`${origin}/assets/app.js`, new Response("app"));
+        test.entries.set(`${origin}${embedded.manifestPath}`, new Response("{}", {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+        }));
+      }
+
+      await test.runtime.install();
+
+      expect(test.deleted).toEqual([test.runtime.cacheName]);
+      expect(test.fetcher).toHaveBeenCalledTimes(3);
+      expect([...test.entries.keys()]).toEqual(embedded.urls.map((path) => `${origin}${path}`));
+    },
+  );
+
   it("rolls back only its new cache on failed or private manifest delivery", async () => {
     const test = harness(async (value) => new Response("{}", {
       status: 200,
@@ -71,7 +97,7 @@ describe("service worker shell runtime", () => {
         ? { "Content-Type": "application/json", "Cache-Control": "private, no-store" }
         : undefined,
     }));
-    await expect(test.runtime.install()).rejects.toThrow(/Precache fetch failed/);
+    await expect(test.runtime.install()).rejects.toThrow(/Precache response is invalid/);
     expect(test.deleted).toEqual([test.runtime.cacheName]);
   });
 

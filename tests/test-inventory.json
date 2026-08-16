@@ -59,9 +59,9 @@
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-16T15:20:00+02:00",
+      "observedAt": "2026-08-16T15:25:00+02:00",
       "reference": "src/web/src/App.test.tsx, src/web/tests/static-shell.spec.ts, and src/web/scripts/inspect-build.mjs",
-      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vite 8.2.1; Vitest 4.1.10; 371 deterministic tests and 10 focused Chromium static-shell journeys, including root service-worker identity, natural first activation, reload control, and exact query-free precache inventory; committed synthetic fixture only"
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vite 8.2.1; Vitest 4.1.10; 373 deterministic tests and 10 focused Chromium static-shell journeys, including root service-worker identity, natural first activation, reload control, crash-safe cache recovery, and exact query-free precache inventory; committed synthetic fixture only"
     },
     "local-2026-08-16-static-map": {
       "kind": "local-measurement",
@@ -263,9 +263,9 @@
     },
     "local-2026-08-16-offline-authority-contracts": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-16T15:18:00+02:00",
+      "observedAt": "2026-08-16T15:25:00+02:00",
       "reference": "src/web/src/offline/contracts, src/web/src/offline/register-service-worker.test.ts, and src/web/src/offline/service-worker-runtime.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 68 deterministic authority, namespace, privacy, policy, registration, install, routing, and worker-message cases; committed synthetic identities and in-memory storage/network doubles only; no private candidate bytes, TAR, clock, or external storage"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 70 deterministic authority, namespace, privacy, policy, registration, crash-recovery, routing, and worker-message cases; committed synthetic identities and in-memory storage/network doubles only; no private candidate bytes, TAR, clock, or external storage"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",

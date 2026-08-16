@@ -99,6 +99,37 @@ function exactPair(expected: AppReleasePairV1, value: unknown): boolean {
   }
 }
 
+async function requireCacheableResponse(
+  url: string,
+  response: Response | undefined,
+  manifestPath: string,
+): Promise<Response> {
+  if (!response) throw new TypeError(`Precache response is missing for ${new URL(url).pathname}.`);
+  const responsePolicy = new Set(
+    (response.headers.get("cache-control") ?? "")
+      .split(",")
+      .map((directive) => directive.trim().toLowerCase().split("=", 1)[0])
+      .filter(Boolean),
+  );
+  if (
+    response.status !== 200 ||
+    response.type === "opaque" ||
+    response.redirected ||
+    responsePolicy.has("private") ||
+    responsePolicy.has("no-store") ||
+    (new URL(url).pathname === manifestPath &&
+      !response.headers.get("content-type")?.toLowerCase().includes("application/json"))
+  ) {
+    throw new TypeError(`Precache response is invalid for ${new URL(url).pathname}.`);
+  }
+  try {
+    await response.clone().arrayBuffer();
+  } catch {
+    throw new TypeError(`Precache response is unreadable for ${new URL(url).pathname}.`);
+  }
+  return response;
+}
+
 export function createServiceWorkerRuntime(
   embedded: EmbeddedPrecacheV1,
   dependencies: RuntimeDependencies,
@@ -113,7 +144,19 @@ export function createServiceWorkerRuntime(
     cacheName,
     pair: precache.pair,
     async install(): Promise<void> {
-      if ((await dependencies.caches.keys()).includes(cacheName)) return;
+      if ((await dependencies.caches.keys()).includes(cacheName)) {
+        try {
+          const existing = await dependencies.caches.open(cacheName);
+          for (const url of absoluteUrls.values()) {
+            await requireCacheableResponse(url, await existing.match(url), precache.manifestPath);
+          }
+          return;
+        } catch {
+          if (!await dependencies.caches.delete(cacheName)) {
+            throw new TypeError("The incomplete precache could not be removed.");
+          }
+        }
+      }
       try {
         const cache = await dependencies.caches.open(cacheName);
         for (const url of absoluteUrls.values()) {
@@ -122,24 +165,11 @@ export function createServiceWorkerRuntime(
             credentials: "omit",
             redirect: "error",
           });
-          const response = await dependencies.fetch(request);
-          const responsePolicy = new Set(
-            (response.headers.get("cache-control") ?? "")
-              .split(",")
-              .map((directive) => directive.trim().toLowerCase().split("=", 1)[0])
-              .filter(Boolean),
+          const response = await requireCacheableResponse(
+            url,
+            await dependencies.fetch(request),
+            precache.manifestPath,
           );
-          if (
-            response.status !== 200 ||
-            response.type === "opaque" ||
-            response.redirected ||
-            responsePolicy.has("private") ||
-            responsePolicy.has("no-store") ||
-            (new URL(url).pathname === precache.manifestPath &&
-              !response.headers.get("content-type")?.toLowerCase().includes("application/json"))
-          ) {
-            throw new TypeError(`Precache fetch failed for ${new URL(url).pathname}.`);
-          }
           await cache.put(url, response);
         }
       } catch (error) {
