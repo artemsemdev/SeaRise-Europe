@@ -1,7 +1,7 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-16",
+  "updatedAt": "2026-08-17",
   "evidence": {
     "local-2026-08-16-static-browser-assisted-keyboard": {
       "kind": "local-measurement",
@@ -415,6 +415,9 @@
     },
     {
       "id": "static-offline-contracts",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
       "purpose": "Keep one immutable app/release build identity across Vite, browser runtime, service worker, build inspection, and explicit local Candidate mode; keep canonical scenario configuration, network-only visual-map capability, canonical namespaces, private-candidate exclusion, privacy, lifecycle, and worker messages fail closed.",
@@ -429,6 +432,9 @@
     },
     {
       "id": "static-whole-resource-cache",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "platform",
       "purpose": "Keep complete shell and small immutable release-resource persistence release-scoped, same-origin, integrity-verified, private-data-free, staged, rollback-safe where Cache Storage permits, and aggregate-only before service-worker integration.",
@@ -443,6 +449,9 @@
     },
     {
       "id": "static-authoritative-range-store",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep release-authorized COG range persistence bound to an immutable trusted identity catalog, exact, bounded, private-safe, corruption-detecting, pair-isolated, and transactionally consistent while PMTiles remains network-only and outside every range store.",
@@ -457,6 +466,9 @@
     },
     {
       "id": "static-release-resource-plan",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Bind the verified COG range-integrity index and every deterministic storage route to one exact app/release/artifact identity, while keeping PMTiles network-only, private/local releases memory-only, technical failures outside science, and personal state outside persistence.",
@@ -471,6 +483,9 @@
     },
     {
       "id": "static-coordinated-admission",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep cross-store resource admission logically atomic through an exact receipt published last, with operation-owned conditional cleanup, prior-result preservation, receipt-gated reads, private Candidate memory-only handling, PMTiles exclusion, and technical failures outside ADR-024 outcomes.",
@@ -485,6 +500,9 @@
     },
     {
       "id": "static-verified-resource-router",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep final browser delivery bound to runtime-verified request-specific app/release plans: production geography, methodology, settlement search, and COG reads use the router; whole resources are lazy; only exact COG chunks needed by the selected assessment read are admitted; public COG misses use no-store requests with exact immutable HEAD/206 response authority; private Candidate stores and delivery remain memory-only and private/no-store; and PMTiles remains network-only with zero resource-store persistence.",
@@ -499,6 +517,9 @@
     },
     {
       "id": "static-range-cache-compatibility",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "platform",
       "purpose": "Measure real COG and PMTiles 206 persistence, whole-response range matching, IndexedDB byte retrieval, and exact partial-response synthesis across Chromium, Firefox, and WebKit before implementing the release-scoped production cache.",
@@ -547,6 +568,9 @@
     },
     {
       "id": "static-pmtiles-network-only",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep all nine visual-only PMTiles identities on the PMTiles-supported custom Source boundary with exact release URLs, manifest-bound byte size and strong ETag, bounded Range behavior, role-specific no-store requests and responses, bounded ephemeral decoded metadata only, no PMTiles persistence authority or structural browser-persistence trace, and no scientific interpretation.",

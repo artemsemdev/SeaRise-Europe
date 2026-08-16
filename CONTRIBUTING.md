@@ -107,8 +107,15 @@ Use `--run` only for the listed credential-free fast suites. Regional, release,
 browser, public-delivery, and scheduled gates remain separate and mandatory for
 their promotion stage.
 
+Test retirement is an explicit lifecycle transition. Keep retired suite and
+baseline records for audit history, set both to `status: retired`, cite the
+approved removal issue, and record equivalent-or-stronger target evidence.
+Retired suites are never selected or executed. Do not mark a suite or baseline
+retired while any declared test remains on disk, and do not assign an active
+baseline test to a retired suite.
+
 Do not delete or disable a useful test when adding its replacement. A later
-retirement PR must update the exact `baselineTests` entry in
+retirement PR must update the exact suite and `baselineTests` entries in
 `tests/test-inventory.json`, cite the approved removal issue, and link
 equivalent-or-stronger evidence. A flake needs an owner, defect issue, expiry,
 and inventory record; retrying until green is not an acceptance result.

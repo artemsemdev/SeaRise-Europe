@@ -156,6 +156,11 @@ All notable changes to this project will be documented in this file.
   supplies authoritative interval digests; the original browser observations
   remain unchanged.
 
+- Made test-suite retirement an explicit, fail-closed inventory lifecycle:
+  active suites alone own, route, and execute tests, while retired suite and
+  baseline records require an approved removal gate plus replacement evidence
+  and cannot conceal test files that remain on disk.
+
 - Bound the canonical frontend npm SBOM to the static `src/web` workspace in
   the root lockfile, including the Flight icon dependency and its exact
   registry integrity, instead of retaining the superseded Next.js lock as the
