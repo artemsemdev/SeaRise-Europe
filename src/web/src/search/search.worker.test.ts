@@ -129,6 +129,71 @@ describe("settlement search worker protocol", () => {
     });
   });
 
+  it("rejects an invalid authority and mismatched Content-Length before reading a body", async () => {
+    const fixture = compressedFixture();
+    const transportSpy = vi.fn(async () => new Response());
+    const invalidAuthority = {
+      ...fixture.authority,
+      artifact: { ...fixture.authority.artifact, byteSize: 16 * 1024 * 1024 + 1 },
+    };
+    const invalid = scope();
+    installSearchWorker(invalid.target, transportSpy, decodeFixture);
+    await send(invalid, { kind: "initialize", token: 1, authority: invalidAuthority });
+    expect(invalid.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "IntegrityFailed" } });
+    expect(transportSpy).not.toHaveBeenCalled();
+
+    const getReader = vi.fn();
+    const declared = scope();
+    installSearchWorker(declared.target, async () => ({
+      ok: true,
+      status: 200,
+      type: "default",
+      headers: new Headers({ "content-length": String(fixture.compressed.byteLength + 1) }),
+      body: { getReader },
+    }) as unknown as Response, decodeFixture);
+    await send(declared, { kind: "initialize", token: 1, authority: fixture.authority });
+    expect(declared.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "IntegrityFailed" } });
+    expect(getReader).not.toHaveBeenCalled();
+  });
+
+  it("rejects a search authority that is not the exact opaque Brotli artifact", async () => {
+    const fixture = compressedFixture();
+    const transportSpy = vi.fn(async () => new Response(fixture.compressed));
+    const worker = scope();
+    installSearchWorker(worker.target, transportSpy, decodeFixture);
+    await send(worker, { kind: "initialize", token: 1, authority: {
+      ...fixture.authority,
+      artifact: {
+        ...fixture.authority.artifact,
+        url: fixture.authority.artifact.url.replace(/\.br$/, ""),
+      },
+    } });
+    expect(worker.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "IntegrityFailed" } });
+    expect(transportSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["oversized", (bytes: Uint8Array) => [bytes, Uint8Array.of(0)]],
+    ["truncated", (bytes: Uint8Array) => [bytes.subarray(0, bytes.byteLength - 1)]],
+  ])("rejects a chunked %s compressed response before decoding", async (_name, chunks) => {
+    const fixture = compressedFixture();
+    const decoder = vi.fn(decodeFixture);
+    const worker = scope();
+    installSearchWorker(worker.target, async () => {
+      const queue = [...chunks(new Uint8Array(fixture.compressed))];
+      return new Response(new ReadableStream({
+        pull(controller) {
+          const chunk = queue.shift();
+          if (chunk) controller.enqueue(chunk);
+          else controller.close();
+        },
+      }));
+    }, decoder);
+    await send(worker, { kind: "initialize", token: 1, authority: fixture.authority });
+    expect(worker.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "IntegrityFailed" } });
+    expect(decoder).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["non-string search name", (document: { records: Array<{ searchNames: unknown[] }> }) => {
       document.records[0].searchNames = [42];

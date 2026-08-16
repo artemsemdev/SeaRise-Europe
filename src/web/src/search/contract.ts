@@ -29,6 +29,10 @@ const RUNTIME = { brotli: "1.1.0", icu: "78.2", node: "20.20.1", unicode: "17.0"
 const RANKING = { candidateLimit: 128, fuzzyDistance: "unicode-codepoint-levenshtein-max-2-v1", normalizationVersion: "unicode-nfkd-lowercase-v1", orderingVersion: "canonical-alternate-prefix-fuzzy-population-admin-coast-id-v1", queryWorkLimit: 250000, resultLimit: 100 } as const;
 const MERGE = { order: ["europe-core", "europe-coastal"], deduplicateBy: "placeId", resultOrder: "core-results-then-unseen-coastal-results" } as const;
 const OPTIONS_IDENTITY = "searise-codepoint-trie-1.0.0|full-name-codepoints|qualified-context|prefix|levenshtein-max-2|global-rank-cap|work=250000";
+const MAX_COMPRESSED_BYTES = 16 * 1024 * 1024;
+const MAX_RAW_BYTES = 64 * 1024 * 1024;
+
+export type SearchShardDecoder = (bytes: Uint8Array) => Promise<Uint8Array>;
 
 export interface IndexedRecord extends SettlementSearchRecord { readonly ordinal: number }
 export interface IndexEnvelope {
@@ -89,6 +93,10 @@ function hex(bytes: ArrayBuffer): string {
 
 async function digest(value: string): Promise<string> {
   return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function digestBytes(value: Uint8Array): Promise<string> {
+  return hex(await crypto.subtle.digest("SHA-256", Uint8Array.from(value).buffer));
 }
 
 function strictText(value: unknown, maximum: number, nullable = false): value is string | null {
@@ -275,10 +283,10 @@ async function validateEnvelope(
   return envelope as unknown as IndexEnvelope;
 }
 
-export async function validateSearchShardDocument(
+async function validateSearchShardDocumentInternal(
   raw: Uint8Array,
   authority: SearchShardAuthority,
-  artifactVerified = false,
+  artifactVerified: boolean,
 ): Promise<ValidatedSearchShard> {
   let text: string;
   let value: unknown;
@@ -332,4 +340,36 @@ export async function validateSearchShardDocument(
       merge: value.merge,
     }),
   });
+}
+
+/** Validate arbitrary decoded bytes without accepting a reusable verification capability. */
+export async function validateSearchShardDocument(
+  raw: Uint8Array,
+  authority: SearchShardAuthority,
+): Promise<ValidatedSearchShard> {
+  if (raw.length > MAX_RAW_BYTES) fail("decoded search shard exceeds its browser limit");
+  return validateSearchShardDocumentInternal(raw, authority, false);
+}
+
+/**
+ * Verify exact compressed authority, pass those bytes to the trusted deterministic
+ * Brotli decoder, then use the private fast parser exactly once.
+ */
+export async function validateVerifiedCompressedSearchShardDocument(
+  compressed: Uint8Array,
+  authority: SearchShardAuthority,
+  decoder: SearchShardDecoder,
+): Promise<ValidatedSearchShard> {
+  const expected = authority.artifact.byteSize;
+  if (!Number.isSafeInteger(expected) || expected < 1 || expected > MAX_COMPRESSED_BYTES
+      || compressed.length !== expected
+      || !SHA256.test(authority.artifact.sha256)
+      || await digestBytes(compressed) !== authority.artifact.sha256) {
+    fail("search shard bytes differ from the pinned release authority");
+  }
+  const decoded = await decoder(compressed);
+  if (!(decoded instanceof Uint8Array) || decoded.length > MAX_RAW_BYTES) {
+    fail("decoded search shard exceeds its browser limit");
+  }
+  return validateSearchShardDocumentInternal(decoded, authority, true);
 }

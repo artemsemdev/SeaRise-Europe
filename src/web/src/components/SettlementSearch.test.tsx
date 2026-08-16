@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import manifest from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
@@ -208,5 +208,33 @@ describe("settlement search combobox", () => {
     expect(await screen.findByText(/coastal index has a technical failure/i)).toBeVisible();
     expect(worker.requests.some(({ kind }) => kind === "load-shard")).toBe(false);
     expect(worker.requests.some(({ kind }) => kind === "query")).toBe(true);
+  });
+
+  it("leaves ready state after a worker crash and restarts without a hanging query", async () => {
+    const first = new FakeWorker();
+    const replacement = new FakeWorker();
+    const factory = vi.fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(replacement);
+    const user = userEvent.setup();
+    render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={factory} />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+
+    await user.type(input, "Spring");
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+
+    act(() => first.onerror?.({} as ErrorEvent));
+    expect(first.terminated).toBe(true);
+    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "idle");
+    expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+
+    await user.clear(input);
+    await user.type(input, "Spring");
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+    expect(screen.queryByText(/technical failure, not a no-match result/i)).not.toBeInTheDocument();
   });
 });
