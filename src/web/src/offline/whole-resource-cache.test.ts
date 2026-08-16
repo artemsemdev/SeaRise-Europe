@@ -187,6 +187,43 @@ describe("whole-resource cache admission", () => {
     expect(storage.stores.get(cacheNamespaces(resource().pair).release)?.entries.size ?? 0).toBe(0);
   });
 
+  it.each([
+    "Application/JSON; charset=utf-8",
+    "application/json; profile=release-v1; charset=\"utf-8\"",
+    "application/json; profile=\"release;v1\"",
+  ])("accepts the expected MIME essence with valid parameters: %s", async (contentType) => {
+    const { cache } = harness({ response: responseFor(BODY, { contentType }) });
+    await expect(cache.fetchAndAdmit(resource())).resolves.toBeInstanceOf(Response);
+  });
+
+  it("permits a charset parameter when the text/html essence matches", async () => {
+    const html = resource({
+      canonicalUrl: `${ORIGIN}/releases/release-a/docs/methodology.html`,
+      path: "docs/methodology.html",
+      mediaType: "text/html",
+    });
+    const { cache } = harness({ response: responseFor(BODY, {
+      contentType: "Text/HTML; charset=utf-8",
+      url: html.canonicalUrl,
+    }) });
+    await expect(cache.fetchAndAdmit(html)).resolves.toBeInstanceOf(Response);
+  });
+
+  it.each([
+    "",
+    "; charset=utf-8",
+    "application",
+    "application/",
+    "application/json;",
+    "application/json; charset",
+    "application/json; charset=\"unterminated",
+  ])("rejects an empty or malformed Content-Type: %j", async (contentType) => {
+    const { cache } = harness({ response: responseFor(BODY, { contentType }) });
+    await expect(cache.fetchAndAdmit(resource())).rejects.toMatchObject({
+      code: "ResponseRejected",
+    });
+  });
+
   it("rolls back a corrupt promoted write and always deletes staging", async () => {
     const { cache, storage } = harness();
     const names = cacheNamespaces(resource().pair);

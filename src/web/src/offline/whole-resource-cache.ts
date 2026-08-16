@@ -57,6 +57,13 @@ export class WholeResourceCacheError extends Error {
   }
 }
 
+const MEDIA_TYPE = /^[ \t]*([!#$%&'*+\-.^_`|~0-9A-Za-z]+)\/([!#$%&'*+\-.^_`|~0-9A-Za-z]+)(?:[ \t]*;[ \t]*[!#$%&'*+\-.^_`|~0-9A-Za-z]+[ \t]*=[ \t]*(?:[!#$%&'*+\-.^_`|~0-9A-Za-z]+|"(?:[^"\\\r\n]|\\[\t -~])*"))*[ \t]*$/u;
+
+function mediaTypeEssence(value: string): string | null {
+  const match = MEDIA_TYPE.exec(value);
+  return match ? `${match[1]}/${match[2]}`.toLowerCase() : null;
+}
+
 export class WholeResourceCache {
   readonly #authority: AppAuthorityV1;
   readonly #dependencies: WholeResourceCacheDependencies;
@@ -228,7 +235,13 @@ export class WholeResourceCache {
     if (cacheControl.split(",").some((token) => ["private", "no-store"].includes(token.trim().split("=")[0]))) {
       throw new WholeResourceCacheError("ResponseRejected", "Private or no-store responses cannot be persisted.");
     }
-    if ((response.headers.get("content-type") ?? "").trim().toLowerCase() !== authority.mediaType.toLowerCase()) {
+    const responseMediaType = mediaTypeEssence(response.headers.get("content-type") ?? "");
+    const authorityMediaType = mediaTypeEssence(authority.mediaType);
+    if (
+      responseMediaType === null
+      || authorityMediaType === null
+      || responseMediaType !== authorityMediaType
+    ) {
       throw new WholeResourceCacheError("ResponseRejected", "Response media type does not match resource authority.");
     }
     const expectedEtag = `"sha256-${authority.sha256}"`;
