@@ -186,9 +186,14 @@ export function useAssessmentRuntime(
       }
     });
   }, [active]);
-  const retry = useCallback((): Promise<boolean> => {
+  const retry = useCallback(async (): Promise<boolean> => {
     if (!active) return Promise.reject(unavailable());
-    return active.controller.retry();
+    const retried = await active.controller.retry();
+    const interaction = capabilityInteraction.current;
+    if (retried && interaction && active.controller.getSnapshot().phase === "result") {
+      await active.capability?.confirmInteractionAvailable(interaction);
+    }
+    return retried;
   }, [active]);
   const reset = useCallback((): void => {
     if (!active) throw unavailable();

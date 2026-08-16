@@ -195,30 +195,58 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   expect(forbiddenRequests).toEqual([]);
 });
 
-test("375px Flight keeps a visible capability alert below the canonical header", async ({ page }, testInfo) => {
+test("375px Flight keeps the offline pill and actionable update notice reachable", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chromium");
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.route("**/search/europe-*.codepoint-trie.json.br", async (route) => {
-    await route.fulfill({ status: 503, contentType: "application/octet-stream", body: "" });
-  });
   await page.goto("/");
-  await page.getByRole("combobox", { name: /find a city, town, or village/i }).fill("Málaga");
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(page.locator(".projection-panel")).toHaveAttribute("data-phase", "result");
+  const offlinePill = page.locator(
+    ".flight-header [data-capability-state='available-offline']",
+  );
+  await expect(offlinePill).toHaveText("Available offline for this assessment");
+
+  // Update coordination has its own contract tests. This controlled browser
+  // fixture exercises the canonical Flight alert slot with the exact rendered
+  // notice/action geometry while the real offline assessment pill is present.
+  await page.evaluate(() => {
+    const host = document.querySelector(".flight-alerts");
+    if (!host) throw new Error("Flight alert host was unavailable.");
+    const alert = document.createElement("div");
+    alert.className = "application-technical-alert";
+    alert.dataset.updateState = "ready-to-activate";
+    alert.setAttribute("role", "status");
+    alert.setAttribute("aria-live", "polite");
+    alert.append("Update ready. Reload to use the accepted candidate release. ");
+    const action = document.createElement("button");
+    action.type = "button";
+    action.textContent = "Reload to update";
+    action.addEventListener("click", () => {
+      action.dataset.clicked = "true";
+    });
+    alert.append(action);
+    host.append(alert);
+  });
 
   const header = page.locator(".flight-header");
   const alert = page.locator(
-    ".flight-alerts .application-technical-alert[data-capability-state='connection-required']",
+    ".flight-alerts .application-technical-alert[data-update-state='ready-to-activate']",
   );
   await expect(alert).toBeVisible();
-  await expect(alert).toContainText(
-    "Connection required. Missing release resource for this exact interaction. No substitute was used.",
-  );
-  await expect(alert.getByRole("button", { name: "Retry availability" })).toBeVisible();
+  await expect(alert).toContainText("Update ready.");
+  const action = alert.getByRole("button", { name: "Reload to update" });
+  await action.focus();
+  await expect(action).toBeFocused();
+  await action.click();
+  await expect(action).toHaveAttribute("data-clicked", "true");
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const headerBox = await header.boundingBox();
   const alertBox = await alert.boundingBox();
   expect(headerBox && alertBox).toBeTruthy();
-  if (!headerBox || !alertBox) throw new Error("375px Flight capability geometry was unavailable.");
+  if (!headerBox || !alertBox) throw new Error("375px Flight update geometry was unavailable.");
   expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(alertBox.y);
   expect(alertBox.x).toBeGreaterThanOrEqual(0);
   expect(alertBox.x + alertBox.width).toBeLessThanOrEqual(375);

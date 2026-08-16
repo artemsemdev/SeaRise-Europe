@@ -571,7 +571,7 @@ footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-
   .map-selection-pin { top: 8.7rem; right: auto; left: 50%; transform: translateX(-50%); }
   .map-status { top: 15.5rem; right: auto; bottom: auto; left: 0.5rem; max-width: 10.5rem; }
   .basemap-button { top: 11rem; right: auto; bottom: auto; left: 0.5rem; }
-  .flight-alerts { top: 11rem; left: 0.5rem; width: calc(100% - 1rem); }
+  .flight-alerts { top: 14rem; left: 0.5rem; width: calc(100% - 1rem); }
   .flight-progress { bottom: 1rem; }
   .site-header { align-items: flex-start; }
   .site-header nav { display: none; }
