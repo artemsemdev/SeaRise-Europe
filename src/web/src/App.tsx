@@ -86,6 +86,29 @@ function projectionScopeReady(state: ProjectionState | null, context: ReleaseCon
     state.release.methodologyVersion === context.methodologyVersion;
 }
 
+function projectionSelectionStatus(
+  scopeReady: boolean,
+  state: ProjectionState | null,
+  hasAcceptedProjection: boolean,
+): string {
+  if (!scopeReady) return "Waiting for the exact release runtime.";
+  if (!state || state.phase === "ready") return "Choose a settlement to continue.";
+  switch (state.phase) {
+    case "offline":
+    case "connection-required":
+    case "unsupported-browser":
+    case "integrity-error":
+    case "technical-error":
+      return hasAcceptedProjection
+        ? "The previous accepted projection remains shown below; the latest operation ended in a technical failure."
+        : "The selected operation ended in a technical failure. No scientific outcome was produced.";
+    default:
+      return hasAcceptedProjection
+        ? "The accepted projection is shown below."
+        : "The selected point is being checked below.";
+  }
+}
+
 function settlementSelection(
   context: ReleaseContext,
   projection: ProjectionState | null,
@@ -275,13 +298,7 @@ function LandingPageSession({
             }}
           />
           <p className="selection-status" aria-live="polite">
-            {!scopeReady
-              ? "Waiting for the exact release runtime."
-              : runtime.projection?.phase === "ready"
-                ? "Choose a settlement to continue."
-                : accepted
-                  ? "The accepted projection is shown below."
-                  : "The selected point is being checked below."}
+            {projectionSelectionStatus(scopeReady, runtime.projection, accepted !== null)}
           </p>
         </div>
         <aside className="scope-card" aria-label="Current data status">

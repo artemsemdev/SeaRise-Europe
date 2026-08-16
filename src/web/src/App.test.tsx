@@ -483,6 +483,61 @@ describe("production static application composition", () => {
     await waitFor(() => expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp5-85/2050/51.9"));
   });
 
+  it("announces a terminal assessment failure without implying that evaluation is still running", async () => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    controller.failNextAssessment({
+      kind: "technical-error",
+      code: "FetchFailed",
+      message: "Selected immutable bytes are temporarily unavailable.",
+      recoverable: true,
+    });
+
+    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
+    await user.click(await screen.findByRole("button", { name: /select test map point/i }));
+
+    const status = document.querySelector(".selection-status");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /technical failure.*not a DataUnavailable scientific outcome/i,
+    );
+    expect(status).toHaveTextContent(
+      "The selected operation ended in a technical failure. No scientific outcome was produced.",
+    );
+    expect(status).not.toHaveTextContent(/being checked/i);
+    expect(document.querySelector("[data-outcome]")).toBeNull();
+  });
+
+  it("announces a failed update separately while retaining the previous scientific outcome", async () => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment(urlFor())} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    expect(await screen.findByText(/outside the coastal analysis area/i)).toBeVisible();
+    expect(document.querySelector(".selection-status")).toHaveTextContent(
+      "The accepted projection is shown below.",
+    );
+    controller.failNextAssessment({
+      kind: "technical-error",
+      code: "FetchFailed",
+      message: "Selected immutable bytes are temporarily unavailable.",
+      recoverable: true,
+    });
+
+    await user.click(screen.getByLabelText("2100"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /technical failure.*not a DataUnavailable scientific outcome/i,
+    );
+    expect(document.querySelector(".selection-status")).toHaveTextContent(
+      "The previous accepted projection remains shown below; the latest operation ended in a technical failure.",
+    );
+    expect(document.querySelector(".selection-status")).not.toHaveTextContent(/being checked/i);
+    expect(document.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", "OutOfScope");
+    expect(screen.queryByText(/model data unavailable for this point/i)).not.toBeInTheDocument();
+  });
+
   it("routes panel, map, retry, reset, share, and methodology controls through their owned commands", async () => {
     const runtime = runtimeFactory();
     const environment = new TestUrlEnvironment(urlFor());
