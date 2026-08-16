@@ -85,6 +85,18 @@ function assertReleaseScopedUrl(url: CanonicalResourceUrl, pair: AppReleasePairV
   }
 }
 
+function assertExactReleaseArtifactUrl(
+  url: CanonicalResourceUrl,
+  pair: AppReleasePairV1,
+  path: string,
+  name: string,
+): void {
+  const expectedPath = `/releases/${pair.dataReleaseId}/${path}`;
+  if (new URL(url).pathname !== expectedPath) {
+    fail(`${name} must equal the exact canonical release artifact URL path ${expectedPath}.`);
+  }
+}
+
 export function sha256Hex(value: unknown, name = "sha256"): Sha256Hex {
   if (typeof value !== "string" || !SHA256_HEX.test(value)) {
     fail(`${name} must be a lowercase SHA-256 hexadecimal digest.`);
@@ -262,6 +274,9 @@ export function validateWholeResourceAuthority(value: unknown): WholeResourceAut
       || (record.role !== "scenario-config" && isScenarioConfigIdentity)
     ) {
       fail("scenario-config requires its exact role, artifact identity, path, and media type.");
+    }
+    if (record.role === "scenario-config") {
+      assertExactReleaseArtifactUrl(validated.canonicalUrl, validated.pair, validated.path, "scenario-config URL");
     }
     return Object.freeze({
       ...validated,

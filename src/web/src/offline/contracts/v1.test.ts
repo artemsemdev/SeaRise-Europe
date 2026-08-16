@@ -114,6 +114,13 @@ describe("offline authority foundation v1", () => {
     );
   });
 
+  it("rejects a scenario-config shadow URL outside the exact release base", () => {
+    expect(() => validateWholeResourceAuthority({
+      ...scenarioConfig(),
+      canonicalUrl: "https://static.example/releases/release-a/shadow/config/scenarios.json",
+    })).toThrow(/exact canonical release artifact URL path/);
+  });
+
   it("validates exact non-empty half-open intervals", () => {
     expect(validateByteInterval({ start: 0, endExclusive: 10 }, 10)).toEqual({ start: 0, endExclusive: 10 });
     expect(() => validateByteInterval({ start: 10, endExclusive: 10 }, 10)).toThrow(/non-empty/);
