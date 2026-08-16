@@ -43,6 +43,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Sealed Vite, the browser runtime, the service worker, build inspection, and
+  explicit local Candidate mode to one immutable build-identity object. Static
+  builds now fail closed on consumer mismatches, while private Candidate mode
+  remains local, session-only, and excluded from service-worker persistence.
+
 - Bound the complete-resource scenario configuration to its exact release
   artifact identity, canonical URL path, and media type. The versioned v2
   offline capability protocol now carries its interaction subject and treats

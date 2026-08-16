@@ -2,10 +2,18 @@ import { brotliCompressSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, relative, resolve } from "node:path";
+import {
+  assertSameBuildIdentity,
+  buildIdentityFile,
+  validateBuildIdentity,
+} from "./build-identity.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
-const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+const buildIdentity = validateBuildIdentity(
+  JSON.parse(readFileSync(resolve(dist, buildIdentityFile), "utf8")),
+);
+const releaseId = buildIdentity.dataReleaseId;
 const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
 function files(directory) {
@@ -22,6 +30,7 @@ const required = [
   resolve(dist, "releases", releaseId, "manifest.json"),
   resolve(dist, "vite-manifest.json"),
   resolve(dist, "service-worker.js"),
+  resolve(dist, buildIdentityFile),
 ];
 for (const path of required) {
   if (!paths.includes(path)) throw new Error(`Static build is missing ${relative(dist, path)}`);
@@ -93,11 +102,18 @@ const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
 if (/skipWaiting\s*\(|clients\s*\.\s*claim\s*\(/u.test(serviceWorker)) {
   throw new Error("Worker shell cannot force activation or claim existing clients");
 }
-const embedded = [...serviceWorker.matchAll(/JSON\.parse\((?:`((?:\\.|[^`\\])*)`|("(?:\\.|[^"\\])*"))\)/gu)]
-  .map((match) => {
-    try { return JSON.parse(JSON.parse(match[2] ?? `"${match[1]}"`)); } catch { return null; }
-  })
-  .find((value) => value?.contractVersion === 1 && Array.isArray(value.urls));
+function parsedEmbeddedJson(source) {
+  return [...source.matchAll(/JSON\.parse\((?:`((?:\\.|[^`\\])*)`|("(?:\\.|[^"\\])*"))\)/gu)]
+    .map((match) => {
+      try {
+        if (match[2]) return JSON.parse(JSON.parse(match[2]));
+        try { return JSON.parse(match[1]); }
+        catch { return JSON.parse(JSON.parse(`"${match[1]}"`)); }
+      } catch { return null; }
+    });
+}
+const embedded = parsedEmbeddedJson(serviceWorker)
+  .find((value) => value?.contractVersion === 2 && value?.buildIdentity && Array.isArray(value.urls));
 if (!embedded) throw new Error("Service worker has no readable embedded precache authority");
 
 const expectedPrecacheFiles = new Set();
@@ -129,25 +145,26 @@ const expectedPrecacheUrls = [
   `/releases/${releaseId}/manifest.json`,
 ].sort();
 const expectedPrecacheHash = createHash("sha256").update(JSON.stringify({
-  contractVersion: 1,
-  appBuildId: process.env.SEARISE_APP_BUILD_ID ?? "local-fixture",
-  dataReleaseId: releaseId,
+  contractVersion: 2,
+  buildIdentity,
   urls: expectedPrecacheUrls,
 })).digest("hex");
 if (
   JSON.stringify(embedded.urls) !== JSON.stringify(expectedPrecacheUrls) ||
-  embedded.appBuildId !== (process.env.SEARISE_APP_BUILD_ID ?? "local-fixture") ||
-  embedded.dataReleaseId !== releaseId ||
-  embedded.releaseDisposition !== "synthetic-fixture" ||
-  embedded.manifestPath !== `/releases/${releaseId}/manifest.json` ||
   embedded.precacheSetSha256 !== expectedPrecacheHash ||
   embedded.urls.some((url) => url.startsWith("/about/") ||
-    (url.startsWith("/releases/") && url !== embedded.manifestPath))
+    (url.startsWith("/releases/") && url !== buildIdentity.manifestPath))
 ) throw new Error("Service worker embedded precache differs from the independent shell inventory");
+assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
 const mainEntry = Object.values(viteManifest).find((entry) =>
   entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
 );
 if (!mainEntry) throw new Error("Vite manifest has no static application entry");
+const application = readFileSync(resolve(dist, mainEntry.file), "utf8");
+const applicationIdentity = parsedEmbeddedJson(application)
+  .find((value) => value?.schemaVersion === "1.0.0" && value?.manifestPath);
+if (!applicationIdentity) throw new Error("Application bundle has no readable canonical build identity");
+assertSameBuildIdentity(buildIdentity, applicationIdentity, "application bundle");
 const initialFiles = new Set();
 function collectInitial(entry) {
   if (!entry || initialFiles.has(entry.file)) return;
@@ -202,10 +219,7 @@ if (initialJavascript > 250 * 1024) {
 }
 
 const report = {
-  schemaVersion: "1.0.0",
-  appBuildId: process.env.SEARISE_APP_BUILD_ID ?? "local-fixture",
-  dataReleaseId: releaseId,
-  releaseDisposition: "synthetic-fixture",
+  ...buildIdentity,
   staticRoutes: ["/", "/about/architecture/"],
   bundleIsolation: {
     initialFiles: [...initialFiles].sort(),
@@ -216,8 +230,8 @@ const report = {
   serviceWorker: {
     path: "/service-worker.js",
     scope: "/",
-    appBuildId: embedded.appBuildId,
-    dataReleaseId: embedded.dataReleaseId,
+    appBuildId: buildIdentity.appBuildId,
+    dataReleaseId: buildIdentity.dataReleaseId,
     precacheSetSha256: embedded.precacheSetSha256,
     precacheUrls: embedded.urls,
     brotliBytes: brotliCompressSync(serviceWorker).length,

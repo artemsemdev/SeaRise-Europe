@@ -1,21 +1,31 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { OFFLINE_WORKER_PROTOCOL } from "./contracts/policy";
-import { createServiceWorkerRuntime, type EmbeddedPrecacheV1 } from "./service-worker-runtime";
+import { createServiceWorkerRuntime, type EmbeddedPrecacheV2 } from "./service-worker-runtime";
 
-const A = "a".repeat(64);
 const release = "release-a";
 const origin = "https://static.example";
-const embedded: EmbeddedPrecacheV1 = {
-  contractVersion: 1,
+const buildIdentity = {
+  schemaVersion: "1.0.0",
   appBuildId: "build-a",
   dataReleaseId: release,
   releaseDisposition: "synthetic-fixture",
   manifestPath: `/releases/${release}/manifest.json`,
+} as const;
+const authority = {
+  contractVersion: 2,
+  buildIdentity,
   urls: ["/", "/assets/app.js", `/releases/${release}/manifest.json`],
-  precacheSetSha256: A,
+} as const;
+const embedded: EmbeddedPrecacheV2 = {
+  ...authority,
+  precacheSetSha256: createHash("sha256").update(JSON.stringify(authority)).digest("hex"),
 };
 
-function harness(fetchOverride?: (request: Request) => Promise<Response>) {
+function harness(
+  fetchOverride?: (request: Request) => Promise<Response>,
+  candidate: EmbeddedPrecacheV2 = embedded,
+) {
   const entries = new Map<string, Response>();
   const names = new Set<string>();
   const deleted: string[] = [];
@@ -38,7 +48,7 @@ function harness(fetchOverride?: (request: Request) => Promise<Response>) {
       ? { "Content-Type": "application/json" }
       : undefined,
   })));
-  return { runtime: createServiceWorkerRuntime(embedded, { origin, caches, fetch: fetcher }), cache, caches, deleted, entries, fetcher, names };
+  return { runtime: createServiceWorkerRuntime(candidate, { origin, caches, fetch: fetcher }), cache, caches, deleted, entries, fetcher, names };
 }
 
 function request(path: string, overrides: Partial<{ method: string; mode: string; headers: Headers }> = {}) {
@@ -53,9 +63,20 @@ function request(path: string, overrides: Partial<{ method: string; mode: string
 describe("service worker shell runtime", () => {
   it("refuses unapproved release dispositions at the untyped JSON boundary", () => {
     expect(() => createServiceWorkerRuntime(
-      { ...embedded, releaseDisposition: "private-engineering" } as unknown as EmbeddedPrecacheV1,
+      {
+        ...embedded,
+        buildIdentity: { ...embedded.buildIdentity, releaseDisposition: "private-engineering" },
+      } as unknown as EmbeddedPrecacheV2,
       { origin, caches: harness().caches, fetch: vi.fn() },
-    )).toThrow(/disposition/);
+    )).toThrow(/local Candidate mode/);
+  });
+
+  it("fails closed when the embedded build identity differs from its sealed digest", async () => {
+    const tampered = {
+      ...embedded,
+      buildIdentity: { ...embedded.buildIdentity, appBuildId: "other-build" },
+    } as EmbeddedPrecacheV2;
+    await expect(harness(undefined, tampered).runtime.install()).rejects.toThrow(/tampered/);
   });
 
   it("populates only a new exact-pair cache and reuses a completed cache", async () => {
@@ -76,7 +97,7 @@ describe("service worker shell runtime", () => {
       test.entries.set(`${origin}/`, new Response("shell"));
       if (failure === "policy-invalid") {
         test.entries.set(`${origin}/assets/app.js`, new Response("app"));
-        test.entries.set(`${origin}${embedded.manifestPath}`, new Response("{}", {
+        test.entries.set(`${origin}${embedded.buildIdentity.manifestPath}`, new Response("{}", {
           status: 200,
           headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
         }));
@@ -122,7 +143,7 @@ describe("service worker shell runtime", () => {
   it("returns validated exact-pair identity and defers valid activation", () => {
     const { runtime } = harness();
     const pair = { contractVersion: 1, appBuildId: "build-a", dataReleaseId: release };
-    expect(runtime.message({ protocol: OFFLINE_WORKER_PROTOCOL, type: "inspect-identity", messageToken: "inspect-1", pair })).toMatchObject({ type: "worker-identity", pair, precacheSetSha256: A });
+    expect(runtime.message({ protocol: OFFLINE_WORKER_PROTOCOL, type: "inspect-identity", messageToken: "inspect-1", pair })).toMatchObject({ type: "worker-identity", pair, precacheSetSha256: embedded.precacheSetSha256 });
     expect(runtime.message({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activate-update", messageToken: "activate-1", candidatePair: pair, confirmationToken: "confirm-1" })).toMatchObject({ type: "activation-deferred", candidatePair: pair });
   });
 

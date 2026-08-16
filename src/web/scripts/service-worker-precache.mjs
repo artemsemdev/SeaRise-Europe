@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, posix } from "node:path";
 
-export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V1__";
+export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V2__";
 
 function collectEntry(viteManifest, key, files) {
   const entry = viteManifest[key];
@@ -36,18 +36,13 @@ export function shellPrecacheUrls({ dist, viteManifest, dataReleaseId }) {
   ].sort();
 }
 
-export function createEmbeddedPrecache({ appBuildId, dataReleaseId, releaseDisposition, urls }) {
-  const authority = { contractVersion: 1, appBuildId, dataReleaseId, urls };
+export function createEmbeddedPrecache({ buildIdentity, urls }) {
+  const authority = { contractVersion: 2, buildIdentity, urls };
   const precacheSetSha256 = createHash("sha256")
     .update(JSON.stringify(authority))
     .digest("hex");
   return {
-    contractVersion: 1,
-    appBuildId,
-    dataReleaseId,
-    releaseDisposition,
-    manifestPath: `/releases/${dataReleaseId}/manifest.json`,
-    urls,
+    ...authority,
     precacheSetSha256,
   };
 }

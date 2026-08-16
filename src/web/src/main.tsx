@@ -5,10 +5,11 @@ import "@fontsource-variable/geist-mono";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { runtimeConfig } from "./config";
 import { registerServiceWorkerAfterInteractivity } from "./offline/register-service-worker";
 import "./styles.css";
 
-if (__RELEASE_DISPOSITION__ === "private-engineering") {
+if (runtimeConfig.releaseDisposition === "private-engineering") {
   void import("./private-candidate-validation").then(({ installPrivateCandidateValidation }) =>
     installPrivateCandidateValidation(),
   );
