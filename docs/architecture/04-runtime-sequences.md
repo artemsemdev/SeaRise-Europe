@@ -273,6 +273,12 @@ precache hash, resource-plan hash, and core admission-receipt hash. Inspection
 can report only `sealed`, `incomplete`, `corrupt`, `mixed`, or `stale`; only a
 sealed candidate can produce a confirmation token.
 
+Starting any newer update or rollback preparation synchronously enters a
+`preparing` state and revokes the prior pending confirmation before the first
+asynchronous port call. The coordinator wraps the provider token in its own
+monotonic, one-time generation, so provider reuse or collision cannot authorize
+a later transition and a consumed confirmation cannot be replayed.
+
 Activation and rollback require that exact token and the unchanged authority
 snapshot. The persistence adapter must compare the snapshot revision and move
 both slots atomically: update moves current to previous and candidate to
@@ -288,6 +294,9 @@ deletion. A blocked or failed cleanup leaves the newly active pair usable and
 the exact previous pair available for rollback. Candidate, authority,
 transition, and cleanup failures are technical update states; they are never
 scientific outcomes.
+Snapshot, inspection-port, and token-provider failures are technical
+preparation failures; `candidate-corrupt` is reserved for candidate evidence
+that is explicitly corrupt or fails candidate validation.
 
 ## 12. Architecture and methodology access
 

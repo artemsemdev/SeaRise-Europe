@@ -3,6 +3,7 @@ import { validateClientLease, type ClientLeaseV1 } from "./contracts/policy";
 import { sha256Hex } from "./contracts/v1";
 
 const TOKEN = /^[A-Za-z0-9._-]{1,128}$/u;
+const PROVIDER_TOKEN = /^[A-Za-z0-9._-]{1,96}$/u;
 const REVISION = /^[A-Za-z0-9._-]{1,128}$/u;
 
 export interface AcceptedPairIdentityV1 {
@@ -56,6 +57,7 @@ export interface UpdateCoordinatorPorts {
   inspectCandidate(pair: AppReleasePairV1): Promise<CandidateInspectionV1>;
   issueConfirmationToken(request: Readonly<{
     action: "update" | "rollback";
+    coordinatorGeneration: number;
     expected: PairAuthoritySnapshotV1;
     target: AcceptedPairIdentityV1;
   }>): string;
@@ -82,6 +84,11 @@ export type UpdateCoordinatorFailureCodeV1 =
 
 export type UpdateCoordinatorStateV1 =
   | Readonly<{ phase: "current"; snapshot: PairAuthoritySnapshotV1; cleanup: null }>
+  | Readonly<{
+    phase: "preparing";
+    action: "update" | "rollback";
+    snapshot: PairAuthoritySnapshotV1;
+  }>
   | Readonly<{
     phase: "awaiting-confirmation";
     action: "update" | "rollback";
@@ -131,6 +138,14 @@ function boundedMessage(value: unknown, fallback: string): string {
 function opaque(value: unknown, name: string, pattern: RegExp): string {
   if (typeof value !== "string" || !pattern.test(value)) throw new TypeError(`${name} is invalid.`);
   return value;
+}
+
+function boundConfirmationToken(providerToken: unknown, generation: number): string {
+  if (!Number.isSafeInteger(generation) || generation <= 0) {
+    throw new TypeError("Coordinator confirmation generation is invalid.");
+  }
+  const provider = opaque(providerToken, "provider confirmation token", PROVIDER_TOKEN);
+  return opaque(`g${generation}.${provider}`, "bound confirmation token", TOKEN);
 }
 
 export function validateAcceptedPairIdentity(value: AcceptedPairIdentityV1): AcceptedPairIdentityV1 {
@@ -232,6 +247,7 @@ export class ExplicitUpdateCoordinator {
   readonly #ports: UpdateCoordinatorPorts;
   #state: UpdateCoordinatorStateV1 | null = null;
   #sequence = 0;
+  #pendingGeneration: number | null = null;
 
   constructor(ports: UpdateCoordinatorPorts) { this.#ports = ports; }
 
@@ -244,82 +260,107 @@ export class ExplicitUpdateCoordinator {
 
   async prepareUpdate(pairInput: AppReleasePairV1): Promise<UpdateCoordinatorStateV1> {
     if (this.#state?.phase === "transitioning") return this.#state;
-    const operation = ++this.#sequence;
-    let expected: PairAuthoritySnapshotV1 | null = null;
+    const fallback = this.#state && "snapshot" in this.#state ? this.#state.snapshot : null;
+    const operation = this.#beginPreparation("update", fallback);
+    let expected: PairAuthoritySnapshotV1;
     try {
       expected = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
-      const requested = validateAppReleasePair(pairInput);
-      if (samePair(requested, expected.active.pair) ||
-          (expected.previous && samePair(requested, expected.previous.pair))) {
-        return this.#set(failure("prepare-update", "candidate-stale", expected, "Update candidate is already retained by the current authority."));
-      }
-      const inspected = validateInspection(await this.#ports.inspectCandidate(requested), requested);
-      if (operation !== this.#sequence) return this.#currentOr(expected);
-      const current = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
-      if (operation !== this.#sequence) return this.#currentOr(expected);
-      if (!sameSnapshot(current, expected)) {
-        return this.#set(failure("prepare-update", "authority-stale", current, "Pair authority changed while the candidate was inspected."));
-      }
-      if (inspected.status !== "sealed") {
-        return this.#set(failure("prepare-update", `candidate-${inspected.status}`, expected, inspected.reason));
-      }
-      const confirmationToken = opaque(this.#ports.issueConfirmationToken({
-        action: "update", expected, target: inspected.candidate,
-      }), "confirmation token", TOKEN);
+    } catch (error) {
+      return await this.#preparationFailure(operation, "prepare-update", fallback, error, "Update authority could not be read.");
+    }
+    if (operation !== this.#sequence) return this.#currentOr(expected);
+
+    let requested: AppReleasePairV1;
+    try { requested = validateAppReleasePair(pairInput); }
+    catch (error) {
+      return this.#set(failure("prepare-update", "candidate-corrupt", expected, boundedMessage(error, "Candidate pair is invalid.")));
+    }
+    if (samePair(requested, expected.active.pair) ||
+        (expected.previous && samePair(requested, expected.previous.pair))) {
+      return this.#set(failure("prepare-update", "candidate-stale", expected, "Update candidate is already retained by the current authority."));
+    }
+
+    let rawInspection: CandidateInspectionV1;
+    try { rawInspection = await this.#ports.inspectCandidate(requested); }
+    catch (error) {
+      return await this.#preparationFailure(operation, "prepare-update", expected, error, "Candidate inspection port failed.");
+    }
+    if (operation !== this.#sequence) return this.#currentOr(expected);
+
+    let inspected: CandidateInspectionV1;
+    try { inspected = validateInspection(rawInspection, requested); }
+    catch (error) {
+      return this.#set(failure("prepare-update", "candidate-corrupt", expected, boundedMessage(error, "Candidate evidence is corrupt.")));
+    }
+    let current: PairAuthoritySnapshotV1;
+    try { current = validatePairAuthoritySnapshot(await this.#ports.readSnapshot()); }
+    catch (error) {
+      return await this.#preparationFailure(operation, "prepare-update", expected, error, "Update authority could not be confirmed.");
+    }
+    if (operation !== this.#sequence) return this.#currentOr(expected);
+    if (!sameSnapshot(current, expected)) {
+      return this.#set(failure("prepare-update", "authority-stale", current, "Pair authority changed while the candidate was inspected."));
+    }
+    if (inspected.status !== "sealed") {
+      return this.#set(failure("prepare-update", `candidate-${inspected.status}`, expected, inspected.reason));
+    }
+    try {
+      const confirmationToken = boundConfirmationToken(this.#ports.issueConfirmationToken({
+        action: "update", coordinatorGeneration: operation, expected, target: inspected.candidate,
+      }), operation);
+      this.#pendingGeneration = operation;
       return this.#set(Object.freeze({
         phase: "awaiting-confirmation", action: "update", snapshot: expected,
         target: inspected.candidate, confirmationToken,
       }));
     } catch (error) {
-      if (operation !== this.#sequence) {
-        const fallback = this.#state && "snapshot" in this.#state ? this.#state.snapshot : expected;
-        return this.#currentOr(fallback ?? await this.#safeSnapshot(null));
-      }
-      const current = await this.#safeSnapshot(this.#state && "snapshot" in this.#state ? this.#state.snapshot : null);
-      return this.#set(failure("prepare-update", "candidate-corrupt", current, boundedMessage(error, "Candidate inspection failed.")));
+      return await this.#preparationFailure(operation, "prepare-update", expected, error, "Update confirmation could not be issued.");
     }
   }
 
   async prepareRollback(): Promise<UpdateCoordinatorStateV1> {
     if (this.#state?.phase === "transitioning") return this.#state;
-    const operation = ++this.#sequence;
     const fallback = this.#state && "snapshot" in this.#state ? this.#state.snapshot : null;
+    const operation = this.#beginPreparation("rollback", fallback);
     try {
       const expected = validatePairAuthoritySnapshot(await this.#ports.readSnapshot());
       if (operation !== this.#sequence) return this.#currentOr(expected);
       if (!expected.previous) {
         return this.#set(failure("prepare-rollback", "rollback-unavailable", expected, "No exact previous pair is retained for rollback."));
       }
-      const confirmationToken = opaque(this.#ports.issueConfirmationToken({
-        action: "rollback", expected, target: expected.previous,
-      }), "confirmation token", TOKEN);
+      const confirmationToken = boundConfirmationToken(this.#ports.issueConfirmationToken({
+        action: "rollback", coordinatorGeneration: operation, expected, target: expected.previous,
+      }), operation);
+      this.#pendingGeneration = operation;
       return this.#set(Object.freeze({
         phase: "awaiting-confirmation", action: "rollback", snapshot: expected,
         target: expected.previous, confirmationToken,
       }));
     } catch (error) {
-      const current = await this.#safeSnapshot(fallback);
-      if (operation !== this.#sequence) return this.#currentOr(current);
-      return this.#set(failure(
-        "prepare-rollback", "transition-failed", current,
-        boundedMessage(error, "Rollback authority could not be prepared."),
-      ));
+      return await this.#preparationFailure(
+        operation, "prepare-rollback", fallback, error, "Rollback authority could not be prepared.",
+      );
     }
   }
 
   async confirm(tokenInput: string): Promise<UpdateCoordinatorStateV1> {
     const pending = this.#state;
     if (!pending || pending.phase !== "awaiting-confirmation") return this.#currentOr(null);
+    const pendingGeneration = this.#pendingGeneration;
     let token: string;
     try { token = opaque(tokenInput, "confirmation token", TOKEN); } catch {
-      return this.#set(failure("activate-update", "confirmation-rejected", pending.snapshot, "Confirmation token is invalid."));
+      return this.#set(failure(
+        pending.action === "update" ? "activate-update" : "rollback",
+        "confirmation-rejected", pending.snapshot, "Confirmation token is invalid.",
+      ));
     }
-    if (token !== pending.confirmationToken) {
+    if (pendingGeneration === null || pendingGeneration !== this.#sequence || token !== pending.confirmationToken) {
       return this.#set(failure(
         pending.action === "update" ? "activate-update" : "rollback",
         "confirmation-rejected", pending.snapshot, "Confirmation token does not authorize this exact transition.",
       ));
     }
+    this.#pendingGeneration = null;
     ++this.#sequence;
     this.#state = Object.freeze({
       phase: "transitioning", action: pending.action, snapshot: pending.snapshot, target: pending.target,
@@ -384,11 +425,39 @@ export class ExplicitUpdateCoordinator {
     }
   }
 
+  #beginPreparation(
+    action: "update" | "rollback",
+    snapshot: PairAuthoritySnapshotV1 | null,
+  ): number {
+    const generation = ++this.#sequence;
+    this.#pendingGeneration = null;
+    if (snapshot) this.#state = Object.freeze({ phase: "preparing", action, snapshot });
+    return generation;
+  }
+
+  async #preparationFailure(
+    generation: number,
+    operation: "prepare-update" | "prepare-rollback",
+    fallback: PairAuthoritySnapshotV1 | null,
+    error: unknown,
+    defaultMessage: string,
+  ): Promise<UpdateCoordinatorStateV1> {
+    const current = await this.#safeSnapshot(fallback);
+    if (generation !== this.#sequence) return this.#currentOr(current);
+    return this.#set(failure(
+      operation, "transition-failed", current, boundedMessage(error, defaultMessage),
+    ));
+  }
+
   #currentOr(fallback: PairAuthoritySnapshotV1 | null): UpdateCoordinatorStateV1 {
     if (this.#state) return this.#state;
     if (!fallback) throw new Error("Update coordinator is not initialized.");
     return Object.freeze({ phase: "current", snapshot: fallback, cleanup: null });
   }
 
-  #set<T extends UpdateCoordinatorStateV1>(state: T): T { this.#state = state; return state; }
+  #set<T extends UpdateCoordinatorStateV1>(state: T): T {
+    this.#state = state;
+    if (state.phase !== "awaiting-confirmation") this.#pendingGeneration = null;
+    return state;
+  }
 }
