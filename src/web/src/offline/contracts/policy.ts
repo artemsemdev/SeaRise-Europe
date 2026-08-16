@@ -42,20 +42,42 @@ function assertSamePair(expected: AppReleasePairV1, actual: AppReleasePairV1): v
 export type OfflineRequirementV1 =
   | Readonly<{ kind: "whole"; authority: WholeResourceAuthorityV1 }>
   | Readonly<{ kind: "range"; identity: RangeIdentityV1 }>;
+export type OfflineRequirementV2 = OfflineRequirementV1
+  | Readonly<{ kind: "network-only"; identity: string; reason: "visual-pmtiles" }>;
 export type InteractionSubjectV1 =
   | Readonly<{ kind: "core" }>
   | Readonly<{ kind: "search"; shards: readonly ("core" | "coastal")[] }>
   | Readonly<{ kind: "assessment" | "map"; scenario: ScenarioId; horizon: HorizonYear }>;
+export const OFFLINE_CAPABILITY_CONTRACT_VERSION_V2 = 2 as const;
 export interface InteractionRequirementsV1 {
   readonly contractVersion: 1;
   readonly pair: AppReleasePairV1;
   readonly subject: InteractionSubjectV1;
   readonly requirements: readonly OfflineRequirementV1[];
 }
+export interface InteractionRequirementsV2 {
+  readonly contractVersion: typeof OFFLINE_CAPABILITY_CONTRACT_VERSION_V2;
+  readonly pair: AppReleasePairV1;
+  readonly subject: InteractionSubjectV1;
+  readonly requirements: readonly OfflineRequirementV2[];
+}
 export interface MissingRequirementV1 { readonly kind: "whole" | "range"; readonly identity: string }
+export type MissingRequirementV2 = MissingRequirementV1
+  | Readonly<{ kind: "network-only"; identity: string }>;
 
 const SCENARIOS = new Set<unknown>(["ssp1-26", "ssp2-45", "ssp5-85"]);
 const HORIZONS = new Set<unknown>([2030, 2050, 2100]);
+const VISUAL_PMTILES_ID = /^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-pmtiles$/u;
+
+function visualPmtilesIdentity(subject: Readonly<{ scenario: ScenarioId; horizon: HorizonYear }>): string {
+  return `projection-${subject.scenario}-${subject.horizon}-pmtiles`;
+}
+
+function validateNetworkOnlyIdentity(value: unknown): string {
+  const identity = protocolId(value, "network-only identity");
+  if (!VISUAL_PMTILES_ID.test(identity)) fail("Network-only identity must name an exact visual PMTiles artifact.");
+  return identity;
+}
 
 function validateSubject(value: unknown): InteractionSubjectV1 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) fail("interaction subject must be an object.");
@@ -77,26 +99,65 @@ function validateSubject(value: unknown): InteractionSubjectV1 {
   return fail("interaction subject kind is unsupported.");
 }
 
+function validateOfflineRequirement(
+  value: unknown,
+  pair: AppReleasePairV1,
+  allowNetworkOnly: false,
+): OfflineRequirementV1;
+function validateOfflineRequirement(
+  value: unknown,
+  pair: AppReleasePairV1,
+  allowNetworkOnly: true,
+): OfflineRequirementV2;
+function validateOfflineRequirement(
+  value: unknown,
+  pair: AppReleasePairV1,
+  allowNetworkOnly: boolean,
+): OfflineRequirementV2 {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("requirement must be an object.");
+  const kind = (value as Record<string, unknown>).kind;
+  if (kind === "whole") {
+    const authority = validateWholeResourceAuthority(exactRecord(value, ["kind", "authority"], "whole requirement").authority);
+    assertSamePair(pair, authority.pair);
+    return Object.freeze({ kind, authority });
+  }
+  if (kind === "range") {
+    const identity = validateRangeIdentity(exactRecord(value, ["kind", "identity"], "range requirement").identity);
+    assertSamePair(pair, identity.authority.pair);
+    return Object.freeze({ kind, identity });
+  }
+  if (kind === "network-only" && allowNetworkOnly) {
+    const networkOnly = exactRecord(value, ["kind", "identity", "reason"], "network-only requirement");
+    if (networkOnly.reason !== "visual-pmtiles") fail("Network-only requirement reason is unsupported.");
+    return Object.freeze({ kind, identity: validateNetworkOnlyIdentity(networkOnly.identity), reason: networkOnly.reason });
+  }
+  return fail("requirement kind is unsupported.");
+}
+
 export function validateInteractionRequirements(value: unknown): InteractionRequirementsV1 {
   const record = exactRecord(value, ["contractVersion", "pair", "subject", "requirements"], "interaction requirements");
   if (record.contractVersion !== OFFLINE_CONTRACT_VERSION || !Array.isArray(record.requirements)) fail("Interaction requirements version or list is invalid.");
   const pair = validateAppReleasePair(record.pair);
-  const requirements = record.requirements.map((value): OfflineRequirementV1 => {
-    if (typeof value !== "object" || value === null || Array.isArray(value)) fail("requirement must be an object.");
-    const kind = (value as Record<string, unknown>).kind;
-    if (kind === "whole") {
-      const authority = validateWholeResourceAuthority(exactRecord(value, ["kind", "authority"], "whole requirement").authority);
-      assertSamePair(pair, authority.pair);
-      return Object.freeze({ kind, authority });
+  const subject = validateSubject(record.subject);
+  const requirements = record.requirements.map((requirement) => validateOfflineRequirement(requirement, pair, false));
+  return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, pair, subject, requirements: Object.freeze(requirements) });
+}
+
+export function validateInteractionRequirementsV2(value: unknown): InteractionRequirementsV2 {
+  const record = exactRecord(value, ["contractVersion", "pair", "subject", "requirements"], "v2 interaction requirements");
+  if (record.contractVersion !== OFFLINE_CAPABILITY_CONTRACT_VERSION_V2 || !Array.isArray(record.requirements)) fail("Interaction requirements version or list is invalid.");
+  const pair = validateAppReleasePair(record.pair);
+  const subject = validateSubject(record.subject);
+  const requirements = record.requirements.map((requirement) => validateOfflineRequirement(requirement, pair, true));
+  const networkOnly = requirements.filter((requirement) => requirement.kind === "network-only");
+  if (subject.kind === "map") {
+    if (networkOnly.length !== 1 || networkOnly[0]?.identity !== visualPmtilesIdentity(subject)) {
+      fail("Map requirements must contain exactly one matching visual PMTiles network-only resource.");
     }
-    if (kind === "range") {
-      const identity = validateRangeIdentity(exactRecord(value, ["kind", "identity"], "range requirement").identity);
-      assertSamePair(pair, identity.authority.pair);
-      return Object.freeze({ kind, identity });
-    }
-    return fail("requirement kind is unsupported.");
-  });
-  return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, pair, subject: validateSubject(record.subject), requirements: Object.freeze(requirements) });
+  } else if (networkOnly.length !== 0) {
+    fail("Only map interactions may require a network-only visual PMTiles resource.");
+  }
+  return Object.freeze({ contractVersion: OFFLINE_CAPABILITY_CONTRACT_VERSION_V2, pair, subject, requirements: Object.freeze(requirements) });
 }
 
 function validateMissing(value: unknown): MissingRequirementV1 {
@@ -109,16 +170,32 @@ function validateMissingList(value: unknown): readonly MissingRequirementV1[] {
   return Object.freeze(value.map(validateMissing));
 }
 
+function validateMissingV2(value: unknown): MissingRequirementV2 {
+  const record = exactRecord(value, ["kind", "identity"], "v2 missing requirement");
+  if (record.kind === "network-only") {
+    return Object.freeze({ kind: record.kind, identity: validateNetworkOnlyIdentity(record.identity) });
+  }
+  return validateMissing(record);
+}
+function validateMissingListV2(value: unknown): readonly MissingRequirementV2[] {
+  if (!Array.isArray(value)) fail("missing requirements must be an array.");
+  return Object.freeze(value.map(validateMissingV2));
+}
+
 export type DataCapabilityV1 =
   | Readonly<{ state: "online-complete"; pair: AppReleasePairV1 }>
   | Readonly<{ state: "available-offline"; pair: AppReleasePairV1; resourceCount: number; byteCount: number }>
   | Readonly<{ state: "connection-required"; pair: AppReleasePairV1; missing: readonly MissingRequirementV1[]; retryable: true }>
   | Readonly<{ state: "degraded-storage"; pair: AppReleasePairV1; reason: "quota" | "evicted" | "persistence-denied"; networkUsable: boolean }>;
+export type DataCapabilityV2 =
+  | Exclude<DataCapabilityV1, { state: "connection-required" }>
+  | Readonly<{ state: "connection-required"; pair: AppReleasePairV1; missing: readonly MissingRequirementV2[]; retryable: true }>;
 export type UpdateCapabilityV1 =
   | Readonly<{ state: "current" }>
   | Readonly<{ state: "update-available" | "installing" | "ready-to-activate"; candidate: AppReleasePairV1 }>
   | Readonly<{ state: "activation-blocked" | "failed"; reason: string }>;
 export interface RuntimeCapabilityV1 { readonly contractVersion: 1; readonly data: DataCapabilityV1; readonly update: UpdateCapabilityV1 }
+export interface RuntimeCapabilityV2 { readonly contractVersion: typeof OFFLINE_CAPABILITY_CONTRACT_VERSION_V2; readonly subject: InteractionSubjectV1; readonly data: DataCapabilityV2; readonly update: UpdateCapabilityV1 }
 
 export function validateDataCapability(value: unknown): DataCapabilityV1 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) fail("data capability must be an object.");
@@ -144,6 +221,15 @@ export function validateDataCapability(value: unknown): DataCapabilityV1 {
   return fail("data capability state is unsupported.");
 }
 
+export function validateDataCapabilityV2(value: unknown): DataCapabilityV2 {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("data capability must be an object.");
+  if ((value as Record<string, unknown>).state !== "connection-required") return validateDataCapability(value);
+  const record = exactRecord(value, ["state", "pair", "missing", "retryable"], "v2 connection-required capability");
+  const missing = validateMissingListV2(record.missing);
+  if (missing.length === 0 || record.retryable !== true) fail("Connection-required capability must be retryable and identify missing resources.");
+  return Object.freeze({ state: "connection-required", pair: validateAppReleasePair(record.pair), missing, retryable: true });
+}
+
 export function validateUpdateCapability(value: unknown): UpdateCapabilityV1 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) fail("update capability must be an object.");
   const state = (value as Record<string, unknown>).state;
@@ -167,6 +253,30 @@ export function validateRuntimeCapability(value: unknown): RuntimeCapabilityV1 {
   const update = validateUpdateCapability(record.update);
   if ("candidate" in update && samePair(data.pair, update.candidate)) fail("An update candidate must differ from the current data pair.");
   return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, data, update });
+}
+
+export function validateRuntimeCapabilityV2(value: unknown): RuntimeCapabilityV2 {
+  const record = exactRecord(value, ["contractVersion", "subject", "data", "update"], "v2 runtime capability");
+  if (record.contractVersion !== OFFLINE_CAPABILITY_CONTRACT_VERSION_V2) fail("Unsupported offline capability contract version.");
+  const subject = validateSubject(record.subject);
+  const data = validateDataCapabilityV2(record.data);
+  const update = validateUpdateCapability(record.update);
+  if ("candidate" in update && samePair(data.pair, update.candidate)) fail("An update candidate must differ from the current data pair.");
+  const networkOnlyMissing = data.state === "connection-required"
+    ? data.missing.filter((requirement) => requirement.kind === "network-only")
+    : [];
+  if (subject.kind === "map") {
+    if (data.state === "available-offline") fail("A map capability cannot be available offline because visual PMTiles is network-only.");
+    if (
+      data.state === "connection-required"
+      && (networkOnlyMissing.length !== 1 || networkOnlyMissing[0]?.identity !== visualPmtilesIdentity(subject))
+    ) {
+      fail("A connection-required map capability must identify its matching network-only visual PMTiles resource.");
+    }
+  } else if (networkOnlyMissing.length !== 0) {
+    fail("Only map capabilities may report a missing network-only visual PMTiles resource.");
+  }
+  return Object.freeze({ contractVersion: OFFLINE_CAPABILITY_CONTRACT_VERSION_V2, subject, data, update });
 }
 
 export interface StorageBudgetV1 {
@@ -239,9 +349,16 @@ export function validateClientLease(value: unknown): ClientLeaseV1 {
 export type OfflineTechnicalErrorV1 =
   | Readonly<{ kind: "technical-error"; code: "ConnectionRequired"; recoverable: true; pair: AppReleasePairV1; missing: readonly MissingRequirementV1[]; message: "This result is not available offline yet. Reconnect to load the selected data." }>
   | Readonly<{ kind: "technical-error"; code: "StorageLimitReached"; recoverable: true; pair: AppReleasePairV1; message: "Offline storage is full. Reconnect to continue without saving more data." }>;
+export type OfflineTechnicalErrorV2 =
+  | Readonly<{ kind: "technical-error"; code: "ConnectionRequired"; recoverable: true; pair: AppReleasePairV1; missing: readonly MissingRequirementV2[]; message: "This result is not available offline yet. Reconnect to load the selected data." }>
+  | Extract<OfflineTechnicalErrorV1, { code: "StorageLimitReached" }>;
 export function connectionRequired(pair: AppReleasePairV1, missing: readonly MissingRequirementV1[]): OfflineTechnicalErrorV1 {
   if (missing.length === 0) fail("ConnectionRequired must identify at least one missing resource.");
   return Object.freeze({ kind: "technical-error", code: "ConnectionRequired", recoverable: true, pair: validateAppReleasePair(pair), missing: Object.freeze(missing.map(validateMissing)), message: "This result is not available offline yet. Reconnect to load the selected data." });
+}
+export function connectionRequiredV2(pair: AppReleasePairV1, missing: readonly MissingRequirementV2[]): OfflineTechnicalErrorV2 {
+  if (missing.length === 0) fail("ConnectionRequired must identify at least one missing resource.");
+  return Object.freeze({ kind: "technical-error", code: "ConnectionRequired", recoverable: true, pair: validateAppReleasePair(pair), missing: Object.freeze(missing.map(validateMissingV2)), message: "This result is not available offline yet. Reconnect to load the selected data." });
 }
 export function storageLimitReached(pair: AppReleasePairV1): OfflineTechnicalErrorV1 {
   return Object.freeze({ kind: "technical-error", code: "StorageLimitReached", recoverable: true, pair: validateAppReleasePair(pair), message: "Offline storage is full. Reconnect to continue without saving more data." });
@@ -262,7 +379,21 @@ export function validateOfflineTechnicalError(value: unknown): OfflineTechnicalE
   return fail("offline technical error code is unsupported.");
 }
 
-export const OFFLINE_WORKER_PROTOCOL = "searise-offline-worker-v1" as const;
+export function validateOfflineTechnicalErrorV2(value: unknown): OfflineTechnicalErrorV2 {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("offline technical error must be an object.");
+  const code = (value as Record<string, unknown>).code;
+  if (code === "ConnectionRequired") {
+    const record = exactRecord(value, ["kind", "code", "recoverable", "pair", "missing", "message"], "v2 connection-required error");
+    if (record.kind !== "technical-error" || record.recoverable !== true || record.message !== "This result is not available offline yet. Reconnect to load the selected data.") fail("ConnectionRequired fields are invalid.");
+    return connectionRequiredV2(validateAppReleasePair(record.pair), validateMissingListV2(record.missing));
+  }
+  if (code === "StorageLimitReached") return validateOfflineTechnicalError(value);
+  return fail("offline technical error code is unsupported.");
+}
+
+export const OFFLINE_WORKER_PROTOCOL_V1 = "searise-offline-worker-v1" as const;
+export const OFFLINE_WORKER_PROTOCOL = OFFLINE_WORKER_PROTOCOL_V1;
+export const OFFLINE_WORKER_PROTOCOL_V2 = "searise-offline-worker-v2" as const;
 export type ClientToOfflineWorkerV1 =
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "inspect-identity"; messageToken: string; pair: AppReleasePairV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "acquire-lease" | "heartbeat-lease" | "release-lease"; messageToken: string; leaseId: string; pair: AppReleasePairV1 }>
@@ -279,6 +410,15 @@ export type OfflineWorkerToClientV1 =
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "update-state"; messageToken: string | null; update: UpdateCapabilityV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "cleanup-result"; messageToken: string; pair: AppReleasePairV1; deletedPairs: readonly AppReleasePairV1[]; freedBytes: number }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "technical-error"; messageToken: string | null; error: OfflineTechnicalErrorV1 }>;
+export type ClientToOfflineWorkerV2 = Readonly<{
+  protocol: typeof OFFLINE_WORKER_PROTOCOL_V2;
+  type: "query-capability";
+  messageToken: string;
+  requirements: InteractionRequirementsV2;
+}>;
+export type OfflineWorkerToClientV2 =
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL_V2; type: "capability"; messageToken: string; capability: RuntimeCapabilityV2 }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL_V2; type: "technical-error"; messageToken: string | null; error: OfflineTechnicalErrorV2 }>;
 
 export function validateClientToOfflineWorkerMessage(value: unknown): ClientToOfflineWorkerV1 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) fail("worker message must be an object.");
@@ -361,4 +501,42 @@ export function validateOfflineWorkerToClientMessage(value: unknown): OfflineWor
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: nullableId(record.messageToken), error: validateOfflineTechnicalError(record.error) });
   }
   return fail("worker response type is unsupported.");
+}
+
+export function validateClientToOfflineWorkerV2Message(value: unknown): ClientToOfflineWorkerV2 {
+  const record = exactRecord(value, ["protocol", "type", "messageToken", "requirements"], "v2 capability message");
+  if (record.protocol !== OFFLINE_WORKER_PROTOCOL_V2 || record.type !== "query-capability") {
+    fail("Offline worker protocol version or message type is unsupported.");
+  }
+  return Object.freeze({
+    protocol: OFFLINE_WORKER_PROTOCOL_V2,
+    type: "query-capability",
+    messageToken: protocolId(record.messageToken, "messageToken"),
+    requirements: validateInteractionRequirementsV2(record.requirements),
+  });
+}
+
+export function validateOfflineWorkerToClientV2Message(value: unknown): OfflineWorkerToClientV2 {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) fail("v2 worker response must be an object.");
+  const source = value as Record<string, unknown>;
+  if (source.protocol !== OFFLINE_WORKER_PROTOCOL_V2) fail("Offline worker protocol version is unsupported.");
+  if (source.type === "capability") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "capability"], "v2 capability response");
+    return Object.freeze({
+      protocol: OFFLINE_WORKER_PROTOCOL_V2,
+      type: "capability",
+      messageToken: protocolId(record.messageToken, "messageToken"),
+      capability: validateRuntimeCapabilityV2(record.capability),
+    });
+  }
+  if (source.type === "technical-error") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "error"], "v2 technical-error response");
+    return Object.freeze({
+      protocol: OFFLINE_WORKER_PROTOCOL_V2,
+      type: "technical-error",
+      messageToken: nullableId(record.messageToken),
+      error: validateOfflineTechnicalErrorV2(record.error),
+    });
+  }
+  return fail("v2 worker response type is unsupported.");
 }

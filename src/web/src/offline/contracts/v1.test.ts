@@ -27,6 +27,11 @@ const whole = (release = "release-a") => ({
   role: "methodology", canonicalUrl: `https://static.example/releases/${release}/docs/methodology.json`,
   path: "docs/methodology.json", mediaType: "application/json", byteSize: 256, sha256: B, etag: `"sha256-${B}"`,
 } as const);
+const scenarioConfig = (release = "release-a") => ({
+  contractVersion: 1, authorityKind: "release-artifact", pair: pair(release), artifactId: "scenario-config",
+  role: "scenario-config", canonicalUrl: `https://static.example/releases/${release}/config/scenarios.json`,
+  path: "config/scenarios.json", mediaType: "application/json", byteSize: 256, sha256: B, etag: `"sha256-${B}"`,
+} as const);
 const rangeAuthority = () => ({
   contractVersion: 1, pair: pair(), artifactId: "projection-ssp2-45-2050-cog", role: "projection-analysis-cog",
   canonicalUrl: "https://static.example/releases/release-a/analysis/ssp2-45/2050.tif",
@@ -88,8 +93,32 @@ describe("offline authority foundation v1", () => {
 
   it("allows only approved complete release resources with exact paths", () => {
     expect(validateWholeResourceAuthority(whole()).authorityKind).toBe("release-artifact");
+    expect(validateWholeResourceAuthority(scenarioConfig())).toMatchObject({
+      artifactId: "scenario-config", role: "scenario-config", path: "config/scenarios.json",
+    });
     expect(() => validateWholeResourceAuthority({ ...whole(), role: "projection-analysis-cog" })).toThrow(/not approved/);
     expect(() => validateWholeResourceAuthority({ ...whole(), canonicalUrl: "https://static.example/releases/release-a/other.json" })).toThrow(/declared path/);
+  });
+
+  it.each([
+    ["artifact identity", { artifactId: "scenarios" }],
+    ["path", {
+      path: "config/scenario.json",
+      canonicalUrl: "https://static.example/releases/release-a/config/scenario.json",
+    }],
+    ["media type", { mediaType: "application/octet-stream" }],
+    ["role", { role: "methodology" }],
+  ])("rejects scenario-config with substituted %s", (_name, mutation) => {
+    expect(() => validateWholeResourceAuthority({ ...scenarioConfig(), ...mutation })).toThrow(
+      /scenario-config requires its exact role, artifact identity, path, and media type/,
+    );
+  });
+
+  it("rejects a scenario-config shadow URL outside the exact release base", () => {
+    expect(() => validateWholeResourceAuthority({
+      ...scenarioConfig(),
+      canonicalUrl: "https://static.example/releases/release-a/shadow/config/scenarios.json",
+    })).toThrow(/exact canonical release artifact URL path/);
   });
 
   it("validates exact non-empty half-open intervals", () => {

@@ -381,7 +381,7 @@
       "id": "static-offline-contracts",
       "layer": "contract",
       "owner": "platform",
-      "purpose": "Keep app/release cache authority, canonical namespaces, private-candidate exclusion, privacy, lifecycle and worker messages fail closed, and verify the conservative release-pinned service worker shell without implementing runtime data caching.",
+      "purpose": "Keep app/release cache authority, canonical scenario configuration, network-only visual-map capability, canonical namespaces, private-candidate exclusion, privacy, lifecycle and worker messages fail closed, and verify the conservative release-pinned service worker shell without implementing runtime data caching.",
       "sourcePaths": ["src/web/src/offline/**"],
       "changedPaths": ["src/web/src/offline/**", "src/web/scripts/*service-worker*.mjs", "src/web/vite.config.ts"],
       "disposition": "keep-permanently",

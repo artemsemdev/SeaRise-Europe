@@ -1,17 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { validateAppReleasePair } from "./keys";
 import {
+  OFFLINE_CAPABILITY_CONTRACT_VERSION_V2,
   OFFLINE_WORKER_PROTOCOL,
+  OFFLINE_WORKER_PROTOCOL_V2,
   connectionRequired,
+  connectionRequiredV2,
   storageLimitReached,
   validateClientLease,
   validateClientToOfflineWorkerMessage,
+  validateClientToOfflineWorkerV2Message,
   validateInteractionRequirements,
+  validateInteractionRequirementsV2,
   validateOfflineTechnicalError,
   validateOfflineWorkerToClientMessage,
+  validateOfflineWorkerToClientV2Message,
   validatePairLifecycle,
   validateRollbackRequest,
   validateRuntimeCapability,
+  validateRuntimeCapabilityV2,
   validateStorageBudget,
 } from "./policy";
 
@@ -43,6 +50,10 @@ const appAuthority = (disposition: "public-promoted" | "private-engineering" = "
   contractVersion: 1, appBuildId: "build-b", dataReleaseId: release,
   manifestUrl: `https://static.example/releases/${release}/manifest.json`, releaseDisposition: disposition, precacheSetSha256: A,
 } as const);
+const mapSubject = { kind: "map", scenario: "ssp2-45", horizon: 2050 } as const;
+const mapNetworkRequirement = {
+  kind: "network-only", identity: "projection-ssp2-45-2050-pmtiles", reason: "visual-pmtiles",
+} as const;
 
 describe("offline interaction and capability policy v1", () => {
   it("accepts same-pair whole and authorized range requirements", () => {
@@ -61,6 +72,30 @@ describe("offline interaction and capability policy v1", () => {
     expect(() => validateInteractionRequirements({ contractVersion: 1, pair: pair(), subject: { kind: "map", scenario: "ssp9", horizon: 2050 }, requirements: [] })).toThrow(/unsupported/);
   });
 
+  it("binds v2 map requirements to one exact network-only visual PMTiles artifact", () => {
+    expect(validateInteractionRequirementsV2({
+      contractVersion: 2, pair: pair(), subject: mapSubject, requirements: [mapNetworkRequirement],
+    }).requirements).toEqual([mapNetworkRequirement]);
+    expect(() => validateInteractionRequirementsV2({
+      contractVersion: 2, pair: pair(), subject: mapSubject, requirements: [],
+    })).toThrow(/exactly one matching/);
+    expect(() => validateInteractionRequirementsV2({
+      contractVersion: 2, pair: pair(), subject: mapSubject,
+      requirements: [{ ...mapNetworkRequirement, identity: "projection-ssp5-85-2050-pmtiles" }],
+    })).toThrow(/exactly one matching/);
+    expect(() => validateInteractionRequirementsV2({
+      contractVersion: 2, pair: pair(), subject: mapSubject,
+      requirements: [mapNetworkRequirement, mapNetworkRequirement],
+    })).toThrow(/exactly one matching/);
+    expect(() => validateInteractionRequirementsV2({
+      contractVersion: 2, pair: pair(), subject: { kind: "assessment", scenario: "ssp2-45", horizon: 2050 },
+      requirements: [mapNetworkRequirement],
+    })).toThrow(/Only map interactions/);
+    expect(() => validateInteractionRequirements({
+      contractVersion: 1, pair: pair(), subject: mapSubject, requirements: [mapNetworkRequirement],
+    })).toThrow(/unsupported/);
+  });
+
   it("keeps offline availability and update availability orthogonal", () => {
     const result = validateRuntimeCapability({
       contractVersion: 1,
@@ -69,6 +104,50 @@ describe("offline interaction and capability policy v1", () => {
     });
     expect(result.data.state).toBe("available-offline");
     expect(result.update.state).toBe("update-available");
+  });
+
+  it("never reports a network-only visual map as available offline", () => {
+    expect(validateRuntimeCapabilityV2({
+      contractVersion: 2, subject: mapSubject,
+      data: { state: "online-complete", pair: pair() }, update: { state: "current" },
+    }).data.state).toBe("online-complete");
+    expect(validateRuntimeCapabilityV2({
+      contractVersion: 2, subject: mapSubject,
+      data: {
+        state: "connection-required", pair: pair(), retryable: true,
+        missing: [{ kind: "network-only", identity: mapNetworkRequirement.identity }],
+      },
+      update: { state: "current" },
+    }).data.state).toBe("connection-required");
+    expect(() => validateRuntimeCapabilityV2({
+      contractVersion: 2, subject: mapSubject,
+      data: { state: "available-offline", pair: pair(), resourceCount: 2, byteCount: 512 },
+      update: { state: "current" },
+    })).toThrow(/cannot be available offline/);
+    expect(() => validateRuntimeCapabilityV2({
+      contractVersion: 2, subject: mapSubject,
+      data: {
+        state: "connection-required", pair: pair(), retryable: true,
+        missing: [{ kind: "range", identity: "projection-ssp2-45-2050-pmtiles" }],
+      },
+      update: { state: "current" },
+    })).toThrow(/matching network-only/);
+    expect(() => validateRuntimeCapabilityV2({
+      contractVersion: 2, subject: { kind: "core" },
+      data: {
+        state: "connection-required", pair: pair(), retryable: true,
+        missing: [{ kind: "network-only", identity: mapNetworkRequirement.identity }],
+      },
+      update: { state: "current" },
+    })).toThrow(/Only map capabilities/);
+    expect(() => validateRuntimeCapabilityV2({
+      contractVersion: 2,
+      data: { state: "online-complete", pair: pair() }, update: { state: "current" },
+    })).toThrow(/missing or additional/);
+    expect(() => validateRuntimeCapability({
+      contractVersion: 1, subject: mapSubject,
+      data: { state: "online-complete", pair: pair() }, update: { state: "current" },
+    })).toThrow(/missing or additional/);
   });
 
   it("rejects a same-pair update and empty connection-required evidence", () => {
@@ -134,12 +213,68 @@ describe("offline worker, lease, and technical protocol v1", () => {
     expect(() => validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activation-deferred", messageToken: "activate-1", candidatePair: pair(), reason: "later", query: "private-sentinel" })).toThrow(/additional/);
   });
 
+  it("versions subject-bound capability messages without changing the v1 wire", () => {
+    expect(OFFLINE_CAPABILITY_CONTRACT_VERSION_V2).toBe(2);
+    const v1Capability = {
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "capability", messageToken: "capability-1",
+      capability: {
+        contractVersion: 1,
+        data: { state: "available-offline", pair: pair(), resourceCount: 2, byteCount: 512 },
+        update: { state: "current" },
+      },
+    } as const;
+    expect(validateOfflineWorkerToClientMessage(v1Capability).type).toBe("capability");
+    const v1Query = {
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "query-capability", messageToken: "capability-1",
+      requirements: { contractVersion: 1, pair: pair(), subject: mapSubject, requirements: [] },
+    } as const;
+    expect(validateClientToOfflineWorkerMessage(v1Query).type).toBe("query-capability");
+
+    const v2Query = {
+      protocol: OFFLINE_WORKER_PROTOCOL_V2, type: "query-capability", messageToken: "capability-2",
+      requirements: {
+        contractVersion: 2, pair: pair(), subject: mapSubject, requirements: [mapNetworkRequirement],
+      },
+    } as const;
+    expect(validateClientToOfflineWorkerV2Message(v2Query).protocol).toBe(OFFLINE_WORKER_PROTOCOL_V2);
+    expect(() => validateClientToOfflineWorkerV2Message(v1Query)).toThrow(/protocol version/);
+
+    const v2Capability = {
+      protocol: OFFLINE_WORKER_PROTOCOL_V2, type: "capability", messageToken: "capability-2",
+      capability: {
+        contractVersion: 2, subject: mapSubject,
+        data: {
+          state: "connection-required", pair: pair(), retryable: true,
+          missing: [{ kind: "network-only", identity: mapNetworkRequirement.identity }],
+        },
+        update: { state: "current" },
+      },
+    } as const;
+    expect(validateOfflineWorkerToClientV2Message(v2Capability).type).toBe("capability");
+    expect(() => validateOfflineWorkerToClientMessage(v2Capability)).toThrow(/protocol version/);
+    expect(() => validateOfflineWorkerToClientV2Message({
+      ...v2Capability,
+      capability: { ...v2Capability.capability, contractVersion: 1 },
+    })).toThrow(/contract version/);
+    expect(() => validateOfflineWorkerToClientV2Message({
+      ...v2Capability,
+      capability: {
+        contractVersion: 2,
+        data: v2Capability.capability.data,
+        update: { state: "current" },
+      },
+    })).toThrow(/missing or additional/);
+  });
+
   it("defines structured technical failures outside scientific outcomes", () => {
     const connection = connectionRequired(pair(), [{ kind: "range", identity: "chunk-1" }]);
     const storage = storageLimitReached(pair());
     expect(validateOfflineTechnicalError(connection).code).toBe("ConnectionRequired");
     expect(validateOfflineTechnicalError(storage).code).toBe("StorageLimitReached");
     expect([connection.code, storage.code]).not.toContain("DataUnavailable");
+    const visualConnection = connectionRequiredV2(pair(), [{ kind: "network-only", identity: mapNetworkRequirement.identity }]);
+    expect(visualConnection.kind).toBe("technical-error");
+    expect(visualConnection.code).toBe("ConnectionRequired");
     expect(() => connectionRequired(pair(), [])).toThrow(/at least one/);
   });
 });
