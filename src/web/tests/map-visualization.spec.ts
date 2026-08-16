@@ -103,35 +103,84 @@ test("all nine release selections resolve without mixing visual artifact identit
   const persistence = await page.evaluate(async () => {
     const cacheUrls = (await Promise.all((await caches.keys()).map(async (name) =>
       (await (await caches.open(name)).keys()).map((request) => request.url)))).flat();
-    const storedValues: unknown[] = [];
+    const structuralTokens: string[] = [];
+    let binaryValueCount = 0;
+    const inspect = (value: unknown, seen = new WeakSet<object>()): void => {
+      if (typeof value === "string") {
+        structuralTokens.push(value);
+        return;
+      }
+      if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+        binaryValueCount += 1;
+        structuralTokens.push(`binary:${value.byteLength}`);
+        return;
+      }
+      if (value === null || typeof value !== "object" || seen.has(value)) return;
+      seen.add(value);
+      if (Array.isArray(value)) {
+        for (const item of value) inspect(item, seen);
+        return;
+      }
+      for (const [key, item] of Object.entries(value)) {
+        structuralTokens.push(key);
+        inspect(item, seen);
+      }
+    };
     for (const database of await indexedDB.databases()) {
       if (!database.name) continue;
+      structuralTokens.push(`database:${database.name}`);
       const opened = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(database.name!);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
       for (const storeName of opened.objectStoreNames) {
-        const values = await new Promise<unknown[]>((resolve, reject) => {
-          const request = opened.transaction(storeName, "readonly").objectStore(storeName).getAll();
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
-        storedValues.push(...values);
+        structuralTokens.push(`store:${storeName}`);
+        const transaction = opened.transaction(storeName, "readonly");
+        const store = transaction.objectStore(storeName);
+        for (const indexName of store.indexNames) structuralTokens.push(`index:${indexName}`);
+        const [keys, values] = await Promise.all([
+          new Promise<IDBValidKey[]>((resolve, reject) => {
+            const request = store.getAllKeys();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          }),
+          new Promise<unknown[]>((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          }),
+        ]);
+        for (const key of keys) inspect(key);
+        for (const value of values) inspect(value);
       }
       opened.close();
     }
     return {
       cacheUrls,
-      durableRecords: JSON.stringify(storedValues),
-      local: Object.values(localStorage),
-      session: Object.values(sessionStorage),
+      structuralTokens,
+      binaryValueCount,
+      webStorageEntries: [localStorage, sessionStorage].flatMap((storage) =>
+        Array.from({ length: storage.length }, (_, index) => {
+          const key = storage.key(index) ?? "";
+          return `${key}=${storage.getItem(key) ?? ""}`;
+        })),
     };
   });
   expect(persistence.cacheUrls.filter((url) => url.includes(".pmtiles"))).toEqual([]);
-  expect(persistence.durableRecords).not.toContain(".pmtiles");
-  expect(persistence.durableRecords).not.toContain("-pmtiles");
-  expect([...persistence.local, ...persistence.session].join("\n")).not.toContain(".pmtiles");
+  const persistentAuthority = [
+    ...persistence.cacheUrls,
+    ...persistence.structuralTokens,
+    ...persistence.webStorageEntries,
+  ].join("\n");
+  expect(persistentAuthority).not.toContain(".pmtiles");
+  expect(persistentAuthority).not.toContain("-pmtiles");
+  for (const scenario of scenarios) {
+    for (const horizon of horizons) {
+      expect(persistentAuthority).not.toContain(`projection-${scenario}-${horizon}-pmtiles`);
+    }
+  }
+  expect(persistence.binaryValueCount).toBe(0);
 });
 
 test("basemap failure preserves release overlay, attribution, text, and coordinate selection", async ({ page }) => {
