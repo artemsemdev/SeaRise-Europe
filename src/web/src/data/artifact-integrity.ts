@@ -56,7 +56,15 @@ export async function verifiedArtifactBytes(
   if (!response.ok) {
     throw technical("FetchFailed", `Artifact ${artifact.artifactId} returned HTTP ${response.status}.`, true);
   }
-  const bytes = await response.arrayBuffer();
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await response.arrayBuffer();
+  } catch (error) {
+    if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+      throw technical("Aborted", `Artifact read for ${artifact.artifactId} was cancelled.`, true);
+    }
+    throw technical("FetchFailed", `Artifact body for ${artifact.artifactId} is unavailable.`, true);
+  }
   if (bytes.byteLength !== artifact.byteSize) {
     throw technical("IntegrityFailed", `Artifact ${artifact.artifactId} has the wrong byte size.`);
   }
@@ -64,6 +72,58 @@ export async function verifiedArtifactBytes(
     throw technical("IntegrityFailed", `Artifact ${artifact.artifactId} failed SHA-256 verification.`);
   }
   return bytes;
+}
+
+export interface SharedArtifactResource<T> {
+  readonly controller: AbortController;
+  readonly pending: Promise<T>;
+  consumers: number;
+  readonly settled: boolean;
+}
+
+export function createSharedArtifactResource<T>(
+  load: (signal: AbortSignal) => Promise<T>,
+): SharedArtifactResource<T> {
+  const controller = new AbortController();
+  let settled = false;
+  const pending = Promise.resolve()
+    .then(() => load(controller.signal))
+    .finally(() => {
+      settled = true;
+    });
+  return {
+    controller,
+    consumers: 0,
+    pending,
+    get settled() {
+      return settled;
+    },
+  };
+}
+
+export async function waitForSharedArtifact<T>(
+  resource: SharedArtifactResource<T>,
+  signal: AbortSignal,
+  message: string,
+  onOrphaned?: () => void,
+): Promise<T> {
+  if (signal.aborted) throw technical("Aborted", message, true);
+  resource.consumers += 1;
+  let listener: (() => void) | undefined;
+  const aborted = new Promise<never>((_, reject) => {
+    listener = () => reject(technical("Aborted", message, true));
+    signal.addEventListener("abort", listener, { once: true });
+  });
+  try {
+    return await Promise.race([resource.pending, aborted]);
+  } finally {
+    if (listener) signal.removeEventListener("abort", listener);
+    resource.consumers -= 1;
+    if (resource.consumers === 0 && !resource.settled) {
+      onOrphaned?.();
+      resource.controller.abort("all consumers cancelled");
+    }
+  }
 }
 
 export function artifactCacheIdentity(

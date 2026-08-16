@@ -88,9 +88,11 @@ describe("release-scoped geography classification", () => {
   it("does not let an aborted caller poison a shared boundary load", async () => {
     const context = await fixtureReleaseContext();
     const calls: string[] = [];
+    const resourceSignals: AbortSignal[] = [];
     const firstController = new AbortController();
     const classifier = new StaticGeographyClassifier({
       transport: async (input, init) => {
+        resourceSignals.push(init.signal);
         await new Promise((resolveDelay) => setTimeout(resolveDelay, 10));
         return fixtureTransport(calls)(input, init);
       },
@@ -108,8 +110,75 @@ describe("release-scoped geography classification", () => {
     firstController.abort("superseded");
 
     await expect(first).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    expect(resourceSignals.every((signal) => !signal.aborted)).toBe(true);
     await expect(second).resolves.toBe("InEuropeAndCoastalZone");
     expect(calls).toHaveLength(2);
+  });
+
+  it("cancels the shared boundary transport only after every caller aborts", async () => {
+    const context = await fixtureReleaseContext();
+    const resourceSignals: AbortSignal[] = [];
+    const classifier = new StaticGeographyClassifier({
+      transport: async (_input, init) => {
+        resourceSignals.push(init.signal);
+        return new Promise<Response>((_resolve, reject) => {
+          if (init.signal.aborted) {
+            reject(new DOMException("aborted", "AbortError"));
+            return;
+          }
+          init.signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("aborted", "AbortError")),
+            { once: true },
+          );
+        });
+      },
+    });
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    const first = classifier.classify(
+      context,
+      { latitude: 51.9244, longitude: 4.4777 },
+      firstController.signal,
+    );
+    const second = classifier.classify(
+      context,
+      { latitude: 51.9244, longitude: 4.4777 },
+      secondController.signal,
+    );
+    await Promise.resolve();
+
+    firstController.abort("first cancelled");
+    await expect(first).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    expect(resourceSignals).toHaveLength(2);
+    expect(new Set(resourceSignals).size).toBe(1);
+    expect(resourceSignals[0].aborted).toBe(false);
+
+    secondController.abort("second cancelled");
+    await expect(second).rejects.toMatchObject({ detail: { code: "Aborted" } });
+    expect(resourceSignals[0].aborted).toBe(true);
+  });
+
+  it("normalizes artifact-body failures without exposing transport exceptions", async () => {
+    const context = await fixtureReleaseContext();
+    const classifier = new StaticGeographyClassifier({
+      transport: async () => {
+        const response = new Response(null, { status: 200 });
+        Object.defineProperty(response, "arrayBuffer", {
+          value: async () => {
+            throw new Error("private transport implementation detail");
+          },
+        });
+        return response;
+      },
+    });
+
+    const failure = await classifier
+      .classify(context, { latitude: 51.9244, longitude: 4.4777 }, new AbortController().signal)
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(TechnicalFailure);
+    expect(failure).toMatchObject({ detail: { code: "FetchFailed", recoverable: true } });
+    expect((failure as Error).message).not.toContain("private transport implementation detail");
   });
 
   it("reports corrupt boundary bytes as an integrity failure, never a scientific outcome", async () => {
