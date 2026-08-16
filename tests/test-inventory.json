@@ -255,6 +255,12 @@
       "reference": "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
       "environment": "macOS arm64; Node 20.20.1; 3 deterministic 512px PMTiles renders checked in under 1 second from fixed local bytes"
     },
+    "local-2026-08-16-range-cache-compatibility": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T13:40:00+02:00",
+      "reference": "docs/evidence/phase-2/issue-60-range-cache-compatibility.md and docs/evidence/phase-2/issue-60-range-cache-compatibility.json",
+      "environment": "macOS 26.5.2 (25F84) arm64; Node 20.20.1; npm 11.12.1; Playwright 1.62.1; Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5; six COG/PMTiles cases over committed synthetic fixture bytes and a production-like same-origin loopback range server; no Candidate-v7, TAR, public origin, or external storage"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -346,6 +352,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred twenty-one Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; same-origin CSP, later-fourth-chunk SHA verification, and explicit 2,500 ms cold/100 ms cached-p95 budgets use the committed synthetic fixture. APIRequestContext inspects CORS headers but does not prove public browser enforcement." }
+    },
+    {
+      "id": "static-range-cache-compatibility",
+      "layer": "e2e",
+      "owner": "platform",
+      "purpose": "Measure real COG and PMTiles 206 persistence, whole-response range matching, IndexedDB byte retrieval, and exact partial-response synthesis across Chromium, Firefox, and WebKit before implementing the release-scoped production cache.",
+      "sourcePaths": ["src/web/tests/range-cache-compatibility.spec.ts", "src/web/playwright.range-cache.config.ts", "src/web/scripts/serve-range-cache-spike.mjs"],
+      "changedPaths": ["src/web/tests/range-cache-compatibility.spec.ts", "src/web/playwright.range-cache.config.ts", "src/web/scripts/serve-range-cache-spike.mjs", "contracts/release/v1/fixtures/release/**", "contracts/release/v2/fixtures/browser-release/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent supported-engine partial-response storage compatibility decision gate." },
+      "commands": { "focused": "npm run e2e:range-cache --workspace @searise/web", "full": "npm run web:check && npm run e2e:range-cache --workspace @searise/web" },
+      "execution": { "tier": "release", "ciWorkflow": null, "ciJob": null, "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 10, "class": "fast", "evidenceRef": "local-2026-08-16-range-cache-compatibility", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "The behavior is deterministic for pinned Playwright engines and committed fixture bytes, but the release-tier command requires all three managed browser binaries and loopback binding. Public-origin delivery is intentionally outside this suite." }
     },
     {
       "id": "static-private-candidate-binding",
@@ -1298,6 +1318,7 @@
     { "path": "src/web/src/search/search.worker.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/projection-ux.spec.ts", "suite": "static-projection-browser-ux", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/range-cache-compatibility.spec.ts", "suite": "static-range-cache-compatibility", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/local-candidate-binding.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/run-local-candidate-e2e.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/private/private-candidate-binding.spec.ts", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
