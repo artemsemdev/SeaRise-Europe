@@ -193,6 +193,14 @@ export type PersistenceEligibilityV1 =
   | Readonly<{ mode: "persistent"; pair: AppReleasePairV1 }>
   | Readonly<{ mode: "memory-only"; reason: "private-engineering" | "local-candidate" }>;
 
+export interface StorageProfileV1 {
+  readonly contractVersion: 1;
+  readonly pair: AppReleasePairV1;
+  readonly releaseDisposition: ReleaseDisposition;
+  readonly mode: "persistent" | "memory-only";
+  readonly memoryReason: "private-engineering" | "local-candidate" | null;
+}
+
 export function persistenceEligibility(authority: AppAuthorityV1, localCandidate = false): PersistenceEligibilityV1 {
   const validated = validateAppAuthority(authority);
   if (localCandidate) return Object.freeze({ mode: "memory-only", reason: "local-candidate" });
@@ -200,6 +208,22 @@ export function persistenceEligibility(authority: AppAuthorityV1, localCandidate
     return Object.freeze({ mode: "memory-only", reason: "private-engineering" });
   }
   return Object.freeze({ mode: "persistent", pair: pairFromRecord(validated as unknown as Record<string, unknown>) });
+}
+
+export function storageProfile(authorityInput: AppAuthorityV1, localCandidate = false): StorageProfileV1 {
+  const authority = validateAppAuthority(authorityInput);
+  const eligibility = persistenceEligibility(authority, localCandidate);
+  return Object.freeze({
+    contractVersion: 1,
+    pair: validateAppReleasePair({
+      contractVersion: 1,
+      appBuildId: authority.appBuildId,
+      dataReleaseId: authority.dataReleaseId,
+    }),
+    releaseDisposition: authority.releaseDisposition,
+    mode: eligibility.mode,
+    memoryReason: eligibility.mode === "memory-only" ? eligibility.reason : null,
+  });
 }
 
 export function assertPersistentEligibility(eligibility: PersistenceEligibilityV1): AppReleasePairV1 {

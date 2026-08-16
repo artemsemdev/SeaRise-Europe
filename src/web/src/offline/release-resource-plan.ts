@@ -6,10 +6,12 @@ import { validateAppReleasePair } from "./contracts/keys";
 import {
   WHOLE_RESOURCE_ROLES,
   persistenceEligibility,
+  storageProfile,
   validateWholeResourceAuthority,
   type AppAuthorityV1,
   type PersistenceEligibilityV1,
   type RangeIdentityV1,
+  type StorageProfileV1,
   type WholeResourceAuthorityV1,
 } from "./contracts/v1";
 import {
@@ -66,9 +68,21 @@ export interface VerifiedReleaseResourcePlanV1 {
   readonly contractVersion: 1;
   readonly pair: Readonly<{ contractVersion: 1; appBuildId: string; dataReleaseId: string }>;
   readonly persistence: PersistenceEligibilityV1;
+  readonly storageProfile: StorageProfileV1;
   readonly rangeIndex: VerifiedCogRangeIntegrityIndexV1;
   readonly rangeCatalog: RangeAuthorityCatalogV1;
   readonly routes: readonly ReleaseResourceRouteV1[];
+}
+
+const VERIFIED_RELEASE_RESOURCE_PLANS = new WeakSet<object>();
+
+export function assertVerifiedReleaseResourcePlan(
+  value: VerifiedReleaseResourcePlanV1,
+): VerifiedReleaseResourcePlanV1 {
+  if (!VERIFIED_RELEASE_RESOURCE_PLANS.has(value)) {
+    throw technical("Release resource plan authority was not produced by exact manifest and range-index verification.");
+  }
+  return value;
 }
 
 function technical(message: string): TechnicalFailure {
@@ -319,6 +333,7 @@ export async function createVerifiedReleaseResourcePlan(input: Readonly<{
   );
   const artifacts = assertExactContextArtifacts(input.context);
   const persistence = persistenceEligibility(appAuthority, input.localCandidate === true);
+  const exactStorageProfile = storageProfile(appAuthority, input.localCandidate === true);
   const rangeIndex = await verifyCogRangeIntegrityIndex(
     input.context,
     appAuthority,
@@ -369,7 +384,7 @@ export async function createVerifiedReleaseResourcePlan(input: Readonly<{
     });
   });
 
-  return Object.freeze({
+  const plan = Object.freeze({
     contractVersion: 1,
     pair: validateAppReleasePair({
       contractVersion: 1,
@@ -377,8 +392,11 @@ export async function createVerifiedReleaseResourcePlan(input: Readonly<{
       dataReleaseId: appAuthority.dataReleaseId,
     }),
     persistence,
+    storageProfile: exactStorageProfile,
     rangeIndex,
     rangeCatalog,
     routes: Object.freeze(routes),
   });
+  VERIFIED_RELEASE_RESOURCE_PLANS.add(plan);
+  return plan;
 }

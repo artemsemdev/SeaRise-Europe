@@ -1,12 +1,14 @@
 import {
   assertPersistentEligibility,
   persistenceEligibility,
+  storageProfile,
   validateAppAuthority,
   validateByteInterval,
   validateRangeIdentity,
   type AppAuthorityV1,
   type PersistenceEligibilityV1,
   type RangeIdentityV1,
+  type StorageProfileV1,
 } from "./contracts/v1";
 import {
   validateClientLease,
@@ -52,6 +54,7 @@ export interface RangeInventoryV1 {
 }
 export interface RangeStore {
   readonly mode: "memory-only" | "persistent";
+  readonly storageProfile: StorageProfileV1;
   readExactOrContaining(identity: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null>;
   putVerified(identity: RangeIdentityV1, bytes: ArrayBuffer): Promise<RangeWriteResult>;
   putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]>;
@@ -252,11 +255,15 @@ function matches(record: StoredRange, identity: RangeIdentityV1): boolean {
 
 export class MemoryRangeStore implements RangeStore {
   readonly mode = "memory-only" as const;
+  readonly storageProfile: StorageProfileV1;
   readonly #pair: AppReleasePairV1; readonly #budget: StorageBudgetV1; readonly #subtle: SubtleCrypto;
   readonly #now: () => number; readonly #approved: ReadonlySet<string>;
   readonly #entries = new Map<string, StoredRange>(); readonly #leases = new Map<string, ClientLeaseV1>();
   #sequence = 0; #active: AppReleasePairV1 | null = null; #previous: AppReleasePairV1 | null = null;
-  constructor(pair: AppReleasePairV1, budget: StorageBudgetV1, subtle: SubtleCrypto, approved: ReadonlySet<string>, now: () => number = Date.now) {
+  constructor(profile: StorageProfileV1, budget: StorageBudgetV1, subtle: SubtleCrypto, approved: ReadonlySet<string>, now: () => number = Date.now) {
+    if (profile.mode !== "memory-only") throw new RangeStoreIntegrityError("Memory range storage requires a memory-only storage profile.");
+    this.storageProfile = profile;
+    const pair = profile.pair;
     this.#pair = validateAppReleasePair(pair); this.#budget = validateStorageBudget(budget); this.#subtle = subtle;
     this.#approved = approved; this.#now = now;
   }
@@ -390,11 +397,12 @@ export interface RangeStoreOptionsV1 { readonly localCandidate?: boolean; readon
 export function createRangeStore(authorityInput: AppAuthorityV1, budget: StorageBudgetV1, apis: RangeStoreBrowserApis, options: RangeStoreOptionsV1): RangeStore {
   const authority = validateAppAuthority(authorityInput);
   const eligibility = persistenceEligibility(authority, options.localCandidate === true);
+  const profile = storageProfile(authority, options.localCandidate === true);
   const pair = pairFromAuthority(authority);
   const approved = catalogKeys(options.catalog, pair);
-  if (eligibility.mode === "memory-only") return new MemoryRangeStore(pair, budget, apis.subtle, approved, apis.now);
+  if (eligibility.mode === "memory-only") return new MemoryRangeStore(profile, budget, apis.subtle, approved, apis.now);
   if (!apis.indexedDB) throw new RangeStoreUnsupportedError("IndexedDB is unavailable for persistent range storage.");
-  return new IndexedDbRangeStore(eligibility, budget, approved, apis);
+  return new IndexedDbRangeStore(eligibility, profile, budget, approved, apis);
 }
 
 interface MetaRecord { key: "state"; rangeBytes: number; rangeEntries: number; nextSequence: number; activePair: AppReleasePairV1 | null; previousPair: AppReleasePairV1 | null }
@@ -407,9 +415,12 @@ function completed(transaction: IDBTransaction): Promise<void> { return new Prom
 
 class IndexedDbRangeStore implements RangeStore {
   readonly mode = "persistent" as const;
+  readonly storageProfile: StorageProfileV1;
   readonly #pair: AppReleasePairV1; readonly #budget: StorageBudgetV1; readonly #idb: IDBFactory;
   readonly #subtle: SubtleCrypto; readonly #approved: ReadonlySet<string>; readonly #now: () => number; #database: Promise<IDBDatabase> | null = null;
-  constructor(eligibility: PersistenceEligibilityV1, budget: StorageBudgetV1, approved: ReadonlySet<string>, apis: RangeStoreBrowserApis) {
+  constructor(eligibility: PersistenceEligibilityV1, profile: StorageProfileV1, budget: StorageBudgetV1, approved: ReadonlySet<string>, apis: RangeStoreBrowserApis) {
+    if (profile.mode !== "persistent") throw new RangeStoreIntegrityError("Persistent range storage requires a persistent storage profile.");
+    this.storageProfile = profile;
     this.#pair = assertPersistentEligibility(eligibility); this.#budget = validateStorageBudget(budget);
     if (!apis.indexedDB) throw new RangeStoreUnsupportedError("IndexedDB is unavailable.");
     this.#idb = apis.indexedDB; this.#subtle = apis.subtle; this.#approved = approved; this.#now = apis.now ?? Date.now;

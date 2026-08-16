@@ -1,11 +1,13 @@
 import { cacheNamespaces, validateAppReleasePair, type AppReleasePairV1 } from "./contracts/keys";
 import {
   persistenceEligibility,
+  storageProfile,
   validateAppAuthority,
   validateRangeIdentity,
   validateWholeResourceAuthority,
   type AppAuthorityV1,
   type RangeIdentityV1,
+  type StorageProfileV1,
   type WholeResourceAuthorityV1,
 } from "./contracts/v1";
 import type {
@@ -17,6 +19,10 @@ import type {
   RangeStore,
   VerifiedRangeWrite,
 } from "./range-store";
+import {
+  assertVerifiedReleaseResourcePlan,
+  type VerifiedReleaseResourcePlanV1,
+} from "./release-resource-plan";
 
 const RECEIPT_DATABASE = "searise-offline:admission-receipts:v1";
 const RECEIPT_STORE = "accepted-receipts";
@@ -32,6 +38,8 @@ export interface AdmissionResourceDigestV1 {
 export interface AdmissionPlanIdentityV1 {
   readonly contractVersion: 1;
   readonly pair: AppReleasePairV1;
+  readonly storageProfile: StorageProfileV1;
+  readonly releaseRoutesSha256: string;
   readonly resourcePlanSha256: string;
   readonly wholeResourcesSha256: string;
   readonly rangeResourcesSha256: string;
@@ -43,6 +51,8 @@ export interface VerifiedAdmissionReceiptV1 {
   readonly contractVersion: 1;
   readonly receiptKind: "verified-resource-admission";
   readonly pair: AppReleasePairV1;
+  readonly storageProfile: StorageProfileV1;
+  readonly releaseRoutesSha256: string;
   readonly resourcePlanSha256: string;
   readonly wholeResourcesSha256: string;
   readonly rangeResourcesSha256: string;
@@ -61,6 +71,12 @@ export interface AcceptedAdmissionGateV1 {
 
 export interface AdmissionReceiptStore {
   readonly mode: "persistent" | "memory-only";
+  readonly storageProfile: StorageProfileV1;
+  runExclusive<T>(
+    plan: AdmissionPlanIdentityV1,
+    signal: AbortSignal,
+    operation: (operationId: string) => Promise<T>,
+  ): Promise<T>;
   publishLast(
     proof: VerifiedAdmissionProofV1,
     signal: AbortSignal,
@@ -68,6 +84,29 @@ export interface AdmissionReceiptStore {
   accepted(plan: AdmissionPlanIdentityV1): Promise<AcceptedAdmissionGateV1 | null>;
   deleteIfCurrent(gate: AcceptedAdmissionGateV1): Promise<boolean>;
   close(): void;
+}
+
+export interface AdmissionLockPort {
+  request<T>(
+    name: string,
+    options: Readonly<{ mode: "exclusive"; signal: AbortSignal }>,
+    operation: () => Promise<T>,
+  ): Promise<T>;
+}
+
+export function browserAdmissionLockPort(locks: LockManager): AdmissionLockPort {
+  return Object.freeze({
+    request: async <T>(name: string, options: Readonly<{ mode: "exclusive"; signal: AbortSignal }>, operation: () => Promise<T>) =>
+      await locks.request(name, options, async () => await operation()) as T,
+  });
+}
+
+function randomOperationId(): string {
+  const crypto = globalThis.crypto;
+  if (!crypto?.randomUUID) {
+    throw new AdmissionReceiptError("StorageFailed", "Cryptographically strong operation identity is unavailable.");
+  }
+  return crypto.randomUUID();
 }
 
 export interface VerifiedAdmissionProofV1 {
@@ -113,6 +152,14 @@ function samePair(left: AppReleasePairV1, right: AppReleasePairV1): boolean {
   return left.appBuildId === right.appBuildId && left.dataReleaseId === right.dataReleaseId;
 }
 
+function sameStorageProfile(left: StorageProfileV1, right: StorageProfileV1): boolean {
+  return left.contractVersion === 1 && right.contractVersion === 1 &&
+    samePair(left.pair, right.pair) &&
+    left.releaseDisposition === right.releaseDisposition &&
+    left.mode === right.mode &&
+    left.memoryReason === right.memoryReason;
+}
+
 function abortFailure(): AdmissionReceiptError {
   return new AdmissionReceiptError("Aborted", "Coordinated resource admission was cancelled before receipt publication.");
 }
@@ -148,6 +195,32 @@ function exactKeys(value: object, expected: readonly string[], name: string): vo
   if (keys.length !== allowed.size || keys.some((key) => !allowed.has(key))) {
     throw new AdmissionReceiptError("IntegrityFailed", `${name} contains missing or additional fields.`);
   }
+}
+
+function validateStorageProfile(value: unknown): StorageProfileV1 {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new AdmissionReceiptError("IntegrityFailed", "Stored persistence profile is not an object.");
+  }
+  exactKeys(value, ["contractVersion", "pair", "releaseDisposition", "mode", "memoryReason"], "persistence profile");
+  const record = value as Record<string, unknown>;
+  const disposition = record.releaseDisposition;
+  if (!new Set(["synthetic-fixture", "private-engineering", "public-promoted"]).has(disposition as string)) {
+    throw new AdmissionReceiptError("IntegrityFailed", "Stored release disposition is invalid.");
+  }
+  const persistent = record.mode === "persistent" && record.memoryReason === null && disposition !== "private-engineering";
+  const memory = record.mode === "memory-only" &&
+    (record.memoryReason === "local-candidate" ||
+      (record.memoryReason === "private-engineering" && disposition === "private-engineering"));
+  if (record.contractVersion !== 1 || (!persistent && !memory)) {
+    throw new AdmissionReceiptError("IntegrityFailed", "Stored persistence mode and disposition are inconsistent.");
+  }
+  return Object.freeze({
+    contractVersion: 1,
+    pair: validateAppReleasePair(record.pair),
+    releaseDisposition: disposition as StorageProfileV1["releaseDisposition"],
+    mode: record.mode as StorageProfileV1["mode"],
+    memoryReason: record.memoryReason as StorageProfileV1["memoryReason"],
+  });
 }
 
 function hexadecimal(bytes: ArrayBuffer): string {
@@ -234,20 +307,53 @@ async function resourceSet(
 }
 
 export async function createAdmissionPlanIdentity(input: Readonly<{
-  pair: AppReleasePairV1;
-  wholeResources: readonly WholeResourceAuthorityV1[];
-  rangeResources: readonly RangeIdentityV1[];
+  releasePlan: VerifiedReleaseResourcePlanV1;
   subtle: SubtleCrypto;
 }>): Promise<AdmissionPlanIdentityV1> {
-  const pair = validateAppReleasePair(input.pair);
-  const whole = await resourceSet(await Promise.all(input.wholeResources.map(async (authority) => {
+  let releasePlan: VerifiedReleaseResourcePlanV1;
+  try {
+    releasePlan = assertVerifiedReleaseResourcePlan(input.releasePlan);
+  } catch (error) {
+    throw new AdmissionReceiptError(
+      "AuthorityRejected",
+      "Admission authority requires the exact verified release resource plan.",
+      error,
+    );
+  }
+  const pair = validateAppReleasePair(releasePlan.pair);
+  const profile = releasePlan.storageProfile;
+  if (!samePair(profile.pair, pair) || profile.mode !== releasePlan.persistence.mode) {
+    throw new AdmissionReceiptError("AuthorityRejected", "Verified release-plan persistence authority is inconsistent.");
+  }
+  const expectedWholeStorage = profile.mode === "persistent" ? "cache-storage" : "memory-only";
+  const expectedRangeStorage = profile.mode === "persistent" ? "indexeddb" : "memory-only";
+  const wholeResources = releasePlan.routes
+    .filter((route) => route.kind === "complete-resource")
+    .map((route) => {
+      if (route.storage !== expectedWholeStorage) {
+        throw new AdmissionReceiptError("AuthorityRejected", "Complete-resource route contradicts the verified persistence profile.");
+      }
+      return route.authority;
+    });
+  const rangeResources = releasePlan.routes
+    .filter((route) => route.kind === "analysis-cog-ranges")
+    .flatMap((route) => {
+      if (route.storage !== expectedRangeStorage) {
+        throw new AdmissionReceiptError("AuthorityRejected", "COG range route contradicts the verified persistence profile.");
+      }
+      return route.ranges;
+    });
+  if (wholeResources.length === 0 || rangeResources.length === 0) {
+    throw new AdmissionReceiptError("AuthorityRejected", "Exact release admission cannot use an empty or partial routed resource set.");
+  }
+  const whole = await resourceSet(await Promise.all(wholeResources.map(async (authority) => {
     const validated = validateWholeResourceAuthority(authority);
     if (!samePair(pair, validated.pair)) {
       throw new AdmissionReceiptError("AuthorityRejected", "Whole resource belongs to another app/release pair.");
     }
     return { identitySha256: await wholeResourceIdentitySha256(validated, input.subtle), byteSize: validated.byteSize };
   })), input.subtle);
-  const ranges = await resourceSet(await Promise.all(input.rangeResources.map(async (identity) => {
+  const ranges = await resourceSet(await Promise.all(rangeResources.map(async (identity) => {
     const validated = validateRangeIdentity(identity);
     if (!samePair(pair, validated.authority.pair)) {
       throw new AdmissionReceiptError("AuthorityRejected", "Range resource belongs to another app/release pair.");
@@ -257,15 +363,20 @@ export async function createAdmissionPlanIdentity(input: Readonly<{
       byteSize: validated.interval.endExclusive - validated.interval.start,
     };
   })), input.subtle);
+  const releaseRoutesSha256 = await digestJson(releasePlan.routes, input.subtle);
   const resourcePlanSha256 = await digestJson({
     contractVersion: 1,
     pair,
+    storageProfile: profile,
+    releaseRoutesSha256,
     wholeResourcesSha256: whole.sha256,
     rangeResourcesSha256: ranges.sha256,
   }, input.subtle);
   const plan = Object.freeze({
     contractVersion: 1 as const,
     pair,
+    storageProfile: profile,
+    releaseRoutesSha256,
     resourcePlanSha256,
     wholeResourcesSha256: whole.sha256,
     rangeResourcesSha256: ranges.sha256,
@@ -290,6 +401,8 @@ function receiptFor(
     contractVersion: 1,
     receiptKind: "verified-resource-admission",
     pair: plan.pair,
+    storageProfile: plan.storageProfile,
+    releaseRoutesSha256: plan.releaseRoutesSha256,
     resourcePlanSha256: plan.resourcePlanSha256,
     wholeResourcesSha256: plan.wholeResourcesSha256,
     rangeResourcesSha256: plan.rangeResourcesSha256,
@@ -305,7 +418,7 @@ function validateReceipt(value: unknown): VerifiedAdmissionReceiptV1 {
     throw new AdmissionReceiptError("IntegrityFailed", "Stored admission receipt is not an object.");
   }
   exactKeys(value, [
-    "contractVersion", "receiptKind", "pair", "resourcePlanSha256", "wholeResourcesSha256",
+    "contractVersion", "receiptKind", "pair", "storageProfile", "releaseRoutesSha256", "resourcePlanSha256", "wholeResourcesSha256",
     "rangeResourcesSha256", "wholeResourceCount", "wholeResourceBytes", "rangeResourceCount",
     "rangeResourceBytes",
   ], "admission receipt");
@@ -317,6 +430,8 @@ function validateReceipt(value: unknown): VerifiedAdmissionReceiptV1 {
     contractVersion: 1,
     receiptKind: "verified-resource-admission",
     pair: validateAppReleasePair(record.pair),
+    storageProfile: validateStorageProfile(record.storageProfile),
+    releaseRoutesSha256: sha256(record.releaseRoutesSha256, "release route set"),
     resourcePlanSha256: sha256(record.resourcePlanSha256, "resource plan"),
     wholeResourcesSha256: sha256(record.wholeResourcesSha256, "whole resource set"),
     rangeResourcesSha256: sha256(record.rangeResourcesSha256, "range resource set"),
@@ -329,6 +444,8 @@ function validateReceipt(value: unknown): VerifiedAdmissionReceiptV1 {
 
 function receiptMatchesPlan(receipt: VerifiedAdmissionReceiptV1, plan: AdmissionPlanIdentityV1): boolean {
   return samePair(receipt.pair, plan.pair) &&
+    sameStorageProfile(receipt.storageProfile, plan.storageProfile) &&
+    receipt.releaseRoutesSha256 === plan.releaseRoutesSha256 &&
     receipt.resourcePlanSha256 === plan.resourcePlanSha256 &&
     receipt.wholeResourcesSha256 === plan.wholeResourcesSha256 &&
     receipt.rangeResourcesSha256 === plan.rangeResourcesSha256 &&
@@ -406,17 +523,73 @@ export async function assertAcceptedRangeResource(
 abstract class BaseReceiptStore implements AdmissionReceiptStore {
   abstract readonly mode: "persistent" | "memory-only";
   readonly pair: AppReleasePairV1;
+  readonly storageProfile: StorageProfileV1;
   readonly subtle: SubtleCrypto;
+  readonly #locks: AdmissionLockPort | undefined;
+  readonly #nextOperationId: () => string;
+  #memoryTail: Promise<void> = Promise.resolve();
 
-  constructor(pair: AppReleasePairV1, subtle: SubtleCrypto) {
-    this.pair = validateAppReleasePair(pair);
+  constructor(
+    profile: StorageProfileV1,
+    subtle: SubtleCrypto,
+    locks: AdmissionLockPort | undefined,
+    nextOperationId: () => string,
+  ) {
+    this.storageProfile = profile;
+    this.pair = validateAppReleasePair(profile.pair);
     this.subtle = subtle;
+    this.#locks = locks;
+    this.#nextOperationId = nextOperationId;
   }
 
   abstract readStored(key: string): Promise<StoredReceipt | undefined>;
   abstract publishStored(stored: StoredReceipt, expectedPrevious: string | null, signal: AbortSignal): Promise<void>;
   abstract deleteStored(key: string, receiptSha256: string): Promise<boolean>;
   abstract close(): void;
+
+  async runExclusive<T>(
+    planInput: AdmissionPlanIdentityV1,
+    signal: AbortSignal,
+    action: (operationId: string) => Promise<T>,
+  ): Promise<T> {
+    const plan = checkedPlan(planInput, this.pair);
+    if (!sameStorageProfile(plan.storageProfile, this.storageProfile) || plan.storageProfile.mode !== this.mode) {
+      throw new AdmissionReceiptError("AuthorityRejected", "Receipt store does not match the exact release persistence profile.");
+    }
+    requireSignal(signal);
+    const execute = async (): Promise<T> => {
+      requireSignal(signal);
+      const identifier = operationId(this.#nextOperationId());
+      return action(identifier);
+    };
+    if (this.mode === "memory-only") {
+      const previous = this.#memoryTail;
+      let release!: () => void;
+      const current = new Promise<void>((resolve) => { release = resolve; });
+      this.#memoryTail = previous.then(() => current);
+      await previous;
+      try {
+        requireSignal(signal);
+        return await execute();
+      } finally {
+        release();
+      }
+    }
+    if (!this.#locks) {
+      throw new AdmissionReceiptError("StorageFailed", "A cross-context exclusive lock is required for persistent admission.");
+    }
+    try {
+      return await this.#locks.request(
+        `searise-offline:admission:${cacheNamespaces(this.pair).pairKey}`,
+        { mode: "exclusive", signal },
+        execute,
+      );
+    } catch (error) {
+      if (error instanceof AdmissionReceiptError) throw error;
+      if (signal.aborted) throw abortFailure();
+      throw new AdmissionReceiptError("StorageFailed", "Cross-context admission lock failed.", error);
+    }
+  }
 
   async publishLast(proof: VerifiedAdmissionProofV1, signal: AbortSignal): Promise<AcceptedAdmissionGateV1> {
     if (!VERIFIED_PROOFS.has(proof)) {
@@ -498,8 +671,14 @@ class IndexedDbAdmissionReceiptStore extends BaseReceiptStore {
   readonly #idb: IDBFactory;
   #database: Promise<IDBDatabase> | null = null;
 
-  constructor(pair: AppReleasePairV1, subtle: SubtleCrypto, indexedDB: IDBFactory) {
-    super(pair, subtle);
+  constructor(
+    profile: StorageProfileV1,
+    subtle: SubtleCrypto,
+    indexedDB: IDBFactory,
+    locks: AdmissionLockPort,
+    nextOperationId: () => string,
+  ) {
+    super(profile, subtle, locks, nextOperationId);
     this.#idb = indexedDB;
   }
 
@@ -578,13 +757,6 @@ class IndexedDbAdmissionReceiptStore extends BaseReceiptStore {
   }
 }
 
-function samePlan(left: AdmissionPlanIdentityV1, right: AdmissionPlanIdentityV1): boolean {
-  return samePair(left.pair, right.pair) &&
-    left.resourcePlanSha256 === right.resourcePlanSha256 &&
-    left.wholeResourcesSha256 === right.wholeResourcesSha256 &&
-    left.rangeResourcesSha256 === right.rangeResourcesSha256;
-}
-
 /**
  * Coordinates physical admission primitives but claims only receipt-gated
  * logical atomicity. Conditional rollback is best-effort; crash leftovers are
@@ -592,7 +764,6 @@ function samePlan(left: AdmissionPlanIdentityV1, right: AdmissionPlanIdentityV1)
  */
 export async function coordinateVerifiedAdmission(input: Readonly<{
   plan: AdmissionPlanIdentityV1;
-  operationId: string;
   expectedPreviousReceiptSha256: string | null;
   wholeResources: readonly WholeResourceAuthorityV1[];
   rangeWrites: readonly VerifiedRangeWrite[];
@@ -603,22 +774,48 @@ export async function coordinateVerifiedAdmission(input: Readonly<{
   signal: AbortSignal;
 }>): Promise<CoordinatedAdmissionResultV1> {
   const plan = checkedPlan(input.plan, input.plan.pair);
-  const operation = operationId(input.operationId);
   requireSignal(input.signal);
-  const actualPlan = await createAdmissionPlanIdentity({
-    pair: plan.pair,
-    wholeResources: input.wholeResources,
-    rangeResources: input.rangeWrites.map((write) => write.identity),
-    subtle: input.subtle,
-  });
-  if (!samePlan(plan, actualPlan)) {
+  if (
+    !sameStorageProfile(plan.storageProfile, input.wholeStore.storageProfile) ||
+    !sameStorageProfile(plan.storageProfile, input.rangeStore.storageProfile) ||
+    !sameStorageProfile(plan.storageProfile, input.receiptStore.storageProfile) ||
+    input.wholeStore.mode !== plan.storageProfile.mode ||
+    input.rangeStore.mode !== plan.storageProfile.mode ||
+    input.receiptStore.mode !== plan.storageProfile.mode
+  ) {
+    throw new AdmissionReceiptError("AuthorityRejected", "Admission stores do not share the exact verified persistence profile.");
+  }
+  const actualWhole = await resourceSet(await Promise.all(input.wholeResources.map(async (authority) => {
+    const validated = validateWholeResourceAuthority(authority);
+    if (!samePair(plan.pair, validated.pair)) {
+      throw new AdmissionReceiptError("AuthorityRejected", "Whole resource belongs to another app/release pair.");
+    }
+    return { identitySha256: await wholeResourceIdentitySha256(validated, input.subtle), byteSize: validated.byteSize };
+  })), input.subtle);
+  const actualRanges = await resourceSet(await Promise.all(input.rangeWrites.map(async ({ identity }) => {
+    const validated = validateRangeIdentity(identity);
+    if (!samePair(plan.pair, validated.authority.pair)) {
+      throw new AdmissionReceiptError("AuthorityRejected", "Range resource belongs to another app/release pair.");
+    }
+    return {
+      identitySha256: await rangeIdentitySha256(validated, input.subtle),
+      byteSize: validated.interval.endExclusive - validated.interval.start,
+    };
+  })), input.subtle);
+  if (
+    actualWhole.sha256 !== plan.wholeResourcesSha256 ||
+    actualRanges.sha256 !== plan.rangeResourcesSha256 ||
+    actualWhole.entries.length !== plan.wholeResources.length ||
+    actualRanges.entries.length !== plan.rangeResources.length
+  ) {
     throw new AdmissionReceiptError("AuthorityRejected", "Admission resources do not match the exact verified resource-plan identity.");
   }
 
-  let rangeAdmission: RangeAdmissionV1 | undefined;
-  let wholeAdmission: WholeResourceAdmissionV1 | undefined;
-  let published = false;
-  try {
+  return input.receiptStore.runExclusive(plan, input.signal, async (operation) => {
+    let rangeAdmission: RangeAdmissionV1 | undefined;
+    let wholeAdmission: WholeResourceAdmissionV1 | undefined;
+    let published = false;
+    try {
     rangeAdmission = await input.rangeStore.admitVerifiedBatch(input.rangeWrites, {
       operationId: operation,
       signal: input.signal,
@@ -660,32 +857,40 @@ export async function coordinateVerifiedAdmission(input: Readonly<{
       wholeAdmission,
       rangeAdmission,
     });
-  } catch (error) {
-    if (!published) {
-      await Promise.allSettled([
-        ...(wholeAdmission ? [input.wholeStore.rollbackAdmission(wholeAdmission)] : []),
-        ...(rangeAdmission ? [input.rangeStore.rollbackAdmission(rangeAdmission)] : []),
-      ]);
+    } catch (error) {
+      if (!published) {
+        await Promise.allSettled([
+          ...(wholeAdmission ? [input.wholeStore.rollbackAdmission(wholeAdmission)] : []),
+          ...(rangeAdmission ? [input.rangeStore.rollbackAdmission(rangeAdmission)] : []),
+        ]);
+      }
+      throw error;
     }
-    throw error;
-  }
+  });
 }
 
 export function createAdmissionReceiptStore(
   authorityInput: AppAuthorityV1,
   subtle: SubtleCrypto,
-  options: Readonly<{ indexedDB?: IDBFactory; localCandidate?: boolean }> = {},
+  options: Readonly<{
+    indexedDB?: IDBFactory;
+    localCandidate?: boolean;
+    locks?: AdmissionLockPort;
+    nextOperationId?: () => string;
+  }> = {},
 ): AdmissionReceiptStore {
   const authority = validateAppAuthority(authorityInput);
-  const pair = validateAppReleasePair({
-    contractVersion: 1,
-    appBuildId: authority.appBuildId,
-    dataReleaseId: authority.dataReleaseId,
-  });
+  const profile = storageProfile(authority, options.localCandidate === true);
   const eligibility = persistenceEligibility(authority, options.localCandidate === true);
-  if (eligibility.mode === "memory-only") return new MemoryAdmissionReceiptStore(pair, subtle);
+  const nextOperationId = options.nextOperationId ?? randomOperationId;
+  if (eligibility.mode === "memory-only") {
+    return new MemoryAdmissionReceiptStore(profile, subtle, undefined, nextOperationId);
+  }
   if (!options.indexedDB) {
     throw new AdmissionReceiptError("StorageFailed", "IndexedDB is unavailable for persistent admission receipts.");
   }
-  return new IndexedDbAdmissionReceiptStore(pair, subtle, options.indexedDB);
+  if (!options.locks) {
+    throw new AdmissionReceiptError("StorageFailed", "LockManager is unavailable for cross-context persistent admission.");
+  }
+  return new IndexedDbAdmissionReceiptStore(profile, subtle, options.indexedDB, options.locks, nextOperationId);
 }

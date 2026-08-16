@@ -72,11 +72,17 @@ static application therefore makes one narrower guarantee: a resource set is
 logically available only after all exact whole resources and authorized COG
 chunks have been admitted, read back, and bound by a versioned admission
 receipt published last. The receipt binds the exact app/release pair and
-deterministic hashes of the complete-resource and range-identity sets. It
+release disposition, the complete verified route set, its persistence mode,
+and deterministic hashes of the complete-resource and range-identity sets. It
 contains no query, coordinates, location, selection, scientific outcome, or
 other personal state.
 
-Batch adapters label newly written records with an opaque operation identity.
+The receipt store serializes the complete admission/readback/publication
+sequence through a pair-scoped browser-wide exclusive lock and mints a
+cryptographically strong operation identity. Batch adapters label newly
+written records with that opaque identity. A persistent admission fails closed
+when the cross-context lock is unavailable. Candidate and private admission
+does not request that lock or open a persistence API.
 Before receipt publication, cancellation, quota, integrity, or storage failure
 triggers conditional rollback of only records still owned by that operation;
 pre-existing verified records are retained. Cache Storage and IndexedDB cannot

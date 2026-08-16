@@ -306,6 +306,9 @@ describe("deterministic release resource plan", () => {
     };
 
     expect(plan.persistence.mode).toBe("persistent");
+    expect(plan.storageProfile).toMatchObject({
+      releaseDisposition: "synthetic-fixture", mode: "persistent", memoryReason: null,
+    });
     expect(complete.map(completeIdentity)).toEqual([
       { artifactId: "attribution", role: "source-attribution" },
       { artifactId: "coastal-analysis-zone-geoparquet", role: "coastal-boundary" },
@@ -352,6 +355,9 @@ describe("deterministic release resource plan", () => {
     });
 
     expect(plan.persistence).toEqual({ mode: "memory-only", reason: "local-candidate" });
+    expect(plan.storageProfile).toMatchObject({
+      releaseDisposition: "synthetic-fixture", mode: "memory-only", memoryReason: "local-candidate",
+    });
     expect(plan.routes.every((route) =>
       route.kind === "network-only" && route.reason === "visual-pmtiles"
         ? route.storage === "network-only"
@@ -368,6 +374,9 @@ describe("deterministic release resource plan", () => {
     });
 
     expect(plan.persistence).toEqual({ mode: "memory-only", reason: "private-engineering" });
+    expect(plan.storageProfile).toMatchObject({
+      releaseDisposition: "private-engineering", mode: "memory-only", memoryReason: "private-engineering",
+    });
     expect(plan.routes.every((route) =>
       route.kind === "network-only" && route.reason === "visual-pmtiles"
         ? route.storage === "network-only"

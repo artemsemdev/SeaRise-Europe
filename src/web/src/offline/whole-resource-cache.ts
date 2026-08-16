@@ -7,9 +7,11 @@ import {
   OfflineContractError,
   assertPersistentEligibility,
   persistenceEligibility,
+  storageProfile,
   validateAppAuthority,
   validateWholeResourceAuthority,
   type AppAuthorityV1,
+  type StorageProfileV1,
   type WholeResourceAuthorityV1,
 } from "./contracts/v1";
 
@@ -71,6 +73,7 @@ export interface WholeResourceRollbackResultV1 {
 
 export interface WholeResourceStore {
   readonly mode: "persistent" | "memory-only";
+  readonly storageProfile: StorageProfileV1;
   fetchAndAdmit(authority: WholeResourceAuthorityV1, signal?: AbortSignal): Promise<Response>;
   fetchAndAdmitBatch(
     authorities: readonly WholeResourceAuthorityV1[],
@@ -133,6 +136,7 @@ function mediaTypeEssence(value: string): string | null {
 
 export class WholeResourceCache implements WholeResourceStore {
   readonly mode = "persistent" as const;
+  readonly storageProfile: StorageProfileV1;
   readonly #authority: AppAuthorityV1;
   readonly #dependencies: WholeResourceCacheDependencies;
   readonly #origin: string;
@@ -144,9 +148,8 @@ export class WholeResourceCache implements WholeResourceStore {
     options: Readonly<{ localCandidate?: boolean }> = {},
   ) {
     this.#authority = validateAppAuthority(authority);
-    assertPersistentEligibility(
-      persistenceEligibility(this.#authority, options.localCandidate === true),
-    );
+    this.storageProfile = storageProfile(this.#authority, options.localCandidate === true);
+    assertPersistentEligibility(persistenceEligibility(this.#authority, options.localCandidate === true));
     this.#dependencies = dependencies;
     this.#origin = canonicalOrigin(dependencies.applicationOrigin);
   }
@@ -455,6 +458,7 @@ interface MemoryWholeRecord {
 
 export class MemoryWholeResourceCache implements WholeResourceStore {
   readonly mode = "memory-only" as const;
+  readonly storageProfile: StorageProfileV1;
   readonly #authority: AppAuthorityV1;
   readonly #dependencies: MemoryWholeResourceCacheDependencies;
   readonly #origin: string;
@@ -469,6 +473,7 @@ export class MemoryWholeResourceCache implements WholeResourceStore {
     options: Readonly<{ localCandidate?: boolean; maxBytes: number; maxEntries: number }>,
   ) {
     this.#authority = validateAppAuthority(authority);
+    this.storageProfile = storageProfile(this.#authority, options.localCandidate === true);
     const eligibility = persistenceEligibility(this.#authority, options.localCandidate === true);
     if (eligibility.mode !== "memory-only") {
       throw new WholeResourceCacheError("AuthorityRejected", "Memory whole-resource storage is only for private or local Candidate releases.");
