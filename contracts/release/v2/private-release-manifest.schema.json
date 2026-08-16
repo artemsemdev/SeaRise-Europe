@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-release-manifest.schema.json",
+  "title": "SeaRise Europe unsigned private release view v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "dataProvenanceClass",
+    "releaseAuthority",
+    "baseReleaseIdentity",
+    "browserDerivationIdentity",
+    "previousReleaseId",
+    "methodologyVersion",
+    "defaults",
+    "publication",
+    "sources",
+    "contractArtifacts",
+    "artifacts",
+    "datasets"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-release-manifest.schema.json"
+    },
+    "schemaVersion": { "$ref": "manifest.schema.json#/properties/schemaVersion" },
+    "dataReleaseId": { "$ref": "manifest.schema.json#/properties/dataReleaseId" },
+    "dataProvenanceClass": { "const": "real-source" },
+    "releaseAuthority": {
+      "allOf": [
+        { "$ref": "manifest.schema.json#/properties/releaseAuthority" },
+        {
+          "properties": {
+            "automatedValidation": { "const": "pending" },
+            "releaseDisposition": { "const": "pending-owner" },
+            "dataProvenanceClass": { "const": "real-source" },
+            "statusDisclosureRequired": { "const": true }
+          }
+        }
+      ]
+    },
+    "baseReleaseIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identityScope", "schemaVersion", "manifestSha256", "createdAt", "codeRevision"],
+      "properties": {
+        "identityScope": { "const": "private-phase-1-candidate" },
+        "schemaVersion": { "const": "2.0.0" },
+        "manifestSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "browserDerivationIdentity": { "$ref": "manifest.schema.json#/properties/browserDerivationIdentity" },
+    "previousReleaseId": { "$ref": "manifest.schema.json#/properties/previousReleaseId" },
+    "methodologyVersion": { "$ref": "manifest.schema.json#/properties/methodologyVersion" },
+    "defaults": { "$ref": "manifest.schema.json#/properties/defaults" },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releasePath", "cacheControl", "appendOnly"],
+      "properties": {
+        "releasePath": { "$ref": "manifest.schema.json#/properties/publication/properties/releasePath" },
+        "cacheControl": { "const": "private, no-store" },
+        "appendOnly": { "const": true }
+      }
+    },
+    "sources": { "$ref": "manifest.schema.json#/properties/sources" },
+    "contractArtifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioConfig",
+        "methodology",
+        "attribution",
+        "sourceReceipts",
+        "baseReleaseBuildReceipt",
+        "browserDerivationReceipt",
+        "sourceGridIdentity",
+        "rangeIntegrityIndex",
+        "sbom",
+        "searchRecords",
+        "qualitySummary",
+        "architectureEvidence",
+        "stacCatalog",
+        "stacCollection",
+        "stacItems",
+        "checksums",
+        "baseReleaseProvenance",
+        "browserDerivationProvenance",
+        "baseReleaseSignature"
+      ],
+      "properties": {
+        "scenarioConfig": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/scenarioConfig" },
+        "methodology": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/methodology" },
+        "attribution": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/attribution" },
+        "sourceReceipts": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/sourceReceipts" },
+        "baseReleaseBuildReceipt": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/baseReleaseBuildReceipt" },
+        "browserDerivationReceipt": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/browserDerivationReceipt" },
+        "sourceGridIdentity": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/sourceGridIdentity" },
+        "rangeIntegrityIndex": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/rangeIntegrityIndex" },
+        "sbom": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/sbom" },
+        "searchRecords": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/searchRecords" },
+        "qualitySummary": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/qualitySummary" },
+        "architectureEvidence": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/architectureEvidence" },
+        "stacCatalog": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/stacCatalog" },
+        "stacCollection": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/stacCollection" },
+        "stacItems": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/stacItems" },
+        "checksums": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/checksums" },
+        "baseReleaseProvenance": { "type": "null" },
+        "browserDerivationProvenance": { "$ref": "manifest.schema.json#/$defs/contractArtifacts/properties/browserDerivationProvenance" },
+        "baseReleaseSignature": { "type": "null" }
+      }
+    },
+    "artifacts": { "$ref": "manifest.schema.json#/properties/artifacts" },
+    "datasets": { "$ref": "manifest.schema.json#/properties/datasets" }
+  }
+}

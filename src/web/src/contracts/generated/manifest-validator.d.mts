@@ -1,9 +1,9 @@
 /** Generated with the release contract; do not edit. */
 import type { ErrorObject } from "ajv";
-import type { ReleaseManifestV1 } from "./release-contract";
+import type { ReleaseManifestV2 } from "./release-contract";
 
 declare const validateManifest: {
-  (value: unknown): value is ReleaseManifestV1;
+  (value: unknown): value is ReleaseManifestV2;
   errors?: ErrorObject[] | null;
 };
 

@@ -1,11 +1,10 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import manifest from "../../../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json";
-import { ManifestRepository } from "../data/manifest-repository";
 import { ReleaseContext } from "../domain/release";
 import type { SearchWorkerPort, SearchWorkerRequest } from "../search/worker-protocol";
 import type { SettlementSearchRecord } from "../search/types";
+import { fixtureReleaseContext } from "../test/release-fixture";
 import { SettlementSearch } from "./SettlementSearch";
 
 const records: readonly SettlementSearchRecord[] = [
@@ -86,13 +85,7 @@ function withoutArtifact(artifactId: string): ReleaseContext {
 }
 
 beforeEach(async () => {
-  const manifestUrl = `https://fixture.invalid/releases/${manifest.dataReleaseId}/manifest.json`;
-  context = await new ManifestRepository({
-    manifestUrl,
-    allowedOrigins: ["https://fixture.invalid"],
-    expectedDisposition: "synthetic-fixture",
-    transport: async () => new Response(JSON.stringify(manifest), { headers: { "content-type": "application/json" } }),
-  }).load(manifest.dataReleaseId, new AbortController().signal);
+  context = await fixtureReleaseContext();
 });
 
 afterEach(() => {

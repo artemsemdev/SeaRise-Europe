@@ -52,6 +52,13 @@ TypeScript verify the same source IDs, distances, quantiles, states, and reason
 codes. C# and the five-state fixture remain legacy controls until that runtime
 is removed.
 
+The neutral
+[`ar6-four-outcome-parity-v1.json`](../../src/pipeline/science/evidence/ar6-four-outcome-parity-v1.json)
+control proves all and only the four ADR-024 outcomes in both runtimes. It is a
+behavior-only synthetic fixture: its `DataUnavailable` case reads a three-band
+nodata cell from the committed COG, but it is not public scientific-release
+evidence.
+
 Test builders translate serialized fields into domain-intent inputs. They do
 not import or reproduce legacy HTTP DTOs, database entities, or blob paths.
 

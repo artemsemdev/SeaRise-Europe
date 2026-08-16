@@ -7,6 +7,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 
+if (__RELEASE_DISPOSITION__ === "private-engineering") {
+  void import("./private-candidate-validation").then(({ installPrivateCandidateValidation }) =>
+    installPrivateCandidateValidation(),
+  );
+}
+
 const root = document.getElementById("root");
 if (!root) throw new Error("SeaRise root element is missing");
 

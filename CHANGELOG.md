@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Pinned private overlay cleanup to an open directory identity so immediate
+  inode reuse cannot redirect recursive deletion to a replacement directory.
+
 - Enforced an exact static-document Content Security Policy and `no-referrer`
   policy on both browser entry routes, with browser/build gates for blocked
   unlisted origins and the one optional OpenFreeMap origin. Manifest schemas
@@ -18,6 +21,35 @@ All notable changes to this project will be documented in this file.
   locked restore while that test runtime awaits Phase 2 removal.
 
 ### Fixed
+
+- Separated the sealed v1 release identity from the deterministic browser
+  overlay identity. The v1 build receipt and provenance remain byte-identical;
+  the overlay now has dedicated versioned derivation evidence with no
+  fabricated run, workflow, platform, timestamp, revision, or SLSA claim, and
+  its acyclicity gate is scoped to the overlay-derived digest graph.
+
+- Bound browser support/coastal classification to a shared twelve-case Shapely
+  parity golden covering exterior and hole boundaries plus epsilon seams. Exact
+  COG reads now cancel uncached post-open range transport only after their last
+  caller leaves, preserve concurrent readers, and gate the inclusive 100 km
+  decision in the production reader.
+
+- Restored complete npm registry URL and SHA-512 integrity metadata for the
+  static browser dependency graph, pinned its scientific readers, and made the
+  dependency inventory fail closed if future registry identities are missing.
+
+- Strengthened static COG delivery validation with a deterministic valid COG
+  whose unchanged image tiles occupy a later fourth range chunk, strict
+  malformed-range rejection, and a production-built same-origin browser lookup
+  that proves CSP-compatible `HEAD`/`206` delivery, later-chunk SHA-256
+  verification, sub-artifact transfer, and scoped cold-versus-cached budgets.
+  CORS headers are inspected separately without claiming public cross-origin
+  browser enforcement or Candidate performance.
+
+- Replaced the cross-port private-candidate harness with one read-only,
+  same-origin loopback binding that derives only `verified: false` local
+  metadata, strictly allowlists immutable files and ranges, and proves the
+  complete ignored Candidate-v7 tree is unchanged after browser testing.
 
 - Bound private real-source candidates to reviewed STAC archive/member lineage,
   an existing Git code revision, the exact local dependency lock, build
@@ -55,6 +87,15 @@ All notable changes to this project will be documented in this file.
   shared selection command, degrades safely without the optional basemap, and
   preserves keyboard, text-alternative, attribution, range-request, and initial
   bundle gates.
+
+- Added an exact browser-side AR6 projection lookup that verifies release-bound
+  support geometry, consumes the verified release source-grid identity, checks
+  COG `HEAD` and canonical range-chunk hashes, validates embedded
+  scenario/horizon/source/quantile metadata, selects the nearest native
+  source-grid location within the inclusive 100 km limit, returns the three
+  required quantiles, and preserves technical failures outside the four
+  scientific outcomes. The committed synthetic release now carries the
+  browser-decodable boundary fixtures used by clean-clone tests.
 
 - Added a release-scoped static GeoNames search Worker with deterministic
   normalization and ranking, core-first partial readiness, exact transport-byte

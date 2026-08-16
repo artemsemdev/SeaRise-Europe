@@ -112,6 +112,15 @@ The analysis values come from the nearest native AR6 grid location within
 100 km. They are never interpolated or derived from rendered colour. Result,
 layer, and legend share the same release/scenario/horizon identity.
 
+The implemented adapters are `StaticGeographyClassifier` and
+`CogAnalysisArtifactReader`. The classifier verifies the release-bound support
+and coastal GeoParquet bytes before decoding them. The COG reader requires an
+HTTP `206` response for every range, validates the declared native grid and
+three-band contract, and reads the selected pixel with no resampling option.
+`AssessmentEngine` owns cancellation, monotonic evaluation tokens, and the
+exhaustive result mapping. See the
+[static scientific lookup runbook](../operations/static-scientific-lookup.md).
+
 ## 4. Scope short-circuits
 
 ```mermaid

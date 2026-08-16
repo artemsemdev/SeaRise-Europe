@@ -2,13 +2,16 @@ import type { ErrorObject } from "ajv";
 import {
   HORIZON_YEARS,
   SCENARIO_IDS,
+  type BrowserReleaseManifestV2,
   type HorizonYear,
-  type ReleaseArtifactV1,
-  type ReleaseDatasetV1,
-  type ReleaseManifestV1,
+  type PrivateBindingManifestV1,
+  type ReleaseArtifactV2,
+  type ReleaseDatasetV2,
+  type PrivateReleaseManifestV1,
   type ScenarioId,
 } from "../contracts/generated/release-contract";
 import validateManifest from "../contracts/generated/manifest-validator.mjs";
+import validatePrivateManifest from "../contracts/generated/private-binding-validator.mjs";
 import {
   ReleaseContext,
   TechnicalFailure,
@@ -51,7 +54,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-function expectedDisposition(manifest: ReleaseManifestV1, expected: ReleaseDisposition): void {
+function expectedDisposition(manifest: BrowserReleaseManifestV2, expected: ReleaseDisposition): void {
   const authority = manifest.releaseAuthority;
   if (expected === "synthetic-fixture" && manifest.dataProvenanceClass !== "synthetic-fixture") {
     throw technical("ReleaseIdentityMismatch", "A synthetic build must load a synthetic fixture release.");
@@ -68,6 +71,42 @@ function expectedDisposition(manifest: ReleaseManifestV1, expected: ReleaseDispo
   if (expected === "private-engineering" && manifest.dataProvenanceClass !== "real-source") {
     throw technical("ReleaseIdentityMismatch", "A private engineering binding must identify real-source data.");
   }
+  if (
+    expected === "private-engineering" &&
+    (authority.automatedValidation !== "pending" ||
+      authority.releaseDisposition !== "pending-owner" ||
+      authority.statusDisclosureRequired !== true ||
+      manifest.publication.cacheControl !== "private, no-store" ||
+      manifest.contractArtifacts.baseReleaseSignature !== null)
+  ) {
+    throw technical(
+      "ReleaseIdentityMismatch",
+      "A private engineering binding must remain pending, unsigned, disclosed, and non-cacheable.",
+    );
+  }
+}
+
+function privateReleaseManifest(value: PrivateBindingManifestV1, pinnedReleaseId: string): PrivateReleaseManifestV1 {
+  if (
+    value.dataReleaseId !== pinnedReleaseId ||
+    value.releaseManifest.dataReleaseId !== pinnedReleaseId ||
+    value.binding.baseCandidate.dataReleaseId !== pinnedReleaseId ||
+    value.releaseManifest.baseReleaseIdentity.manifestSha256 !==
+      value.binding.baseCandidate.manifestSha256 ||
+    value.releaseManifest.baseReleaseIdentity.createdAt !== value.binding.baseCandidate.createdAt ||
+    value.releaseManifest.baseReleaseIdentity.codeRevision !==
+      value.binding.baseCandidate.codeRevision ||
+    value.releaseManifest.browserDerivationIdentity.receiptArtifactId !==
+      value.releaseManifest.contractArtifacts.browserDerivationReceipt ||
+    value.releaseManifest.browserDerivationIdentity.provenanceArtifactId !==
+      value.releaseManifest.contractArtifacts.browserDerivationProvenance ||
+    value.privateEngineeringOnly !== true ||
+    value.verified !== false ||
+    value.publicPromotionAuthorized !== false
+  ) {
+    throw technical("ReleaseIdentityMismatch", "Private binding identities or fail-closed flags disagree.");
+  }
+  return value.releaseManifest;
 }
 
 function canonicalCombinations(): readonly (readonly [ScenarioId, HorizonYear])[] {
@@ -76,14 +115,18 @@ function canonicalCombinations(): readonly (readonly [ScenarioId, HorizonYear])[
   );
 }
 
-function referencedArtifactIds(manifest: ReleaseManifestV1): readonly string[] {
+function referencedArtifactIds(manifest: BrowserReleaseManifestV2): readonly string[] {
   const contracts = manifest.contractArtifacts;
-  return [
+  const identities = [
     contracts.scenarioConfig,
     contracts.methodology,
     contracts.attribution,
     ...contracts.sourceReceipts,
-    contracts.buildReceipt,
+    contracts.baseReleaseBuildReceipt,
+    contracts.browserDerivationReceipt,
+    contracts.sourceGridIdentity,
+    contracts.rangeIntegrityIndex,
+    contracts.sbom,
     contracts.searchRecords,
     contracts.qualitySummary,
     contracts.architectureEvidence,
@@ -91,16 +134,18 @@ function referencedArtifactIds(manifest: ReleaseManifestV1): readonly string[] {
     contracts.stacCollection,
     ...contracts.stacItems,
     contracts.checksums,
-    contracts.provenance,
-    contracts.signature,
+    contracts.baseReleaseProvenance,
+    contracts.browserDerivationProvenance,
+    contracts.baseReleaseSignature,
     ...manifest.sources.map((source) => source.receiptArtifactId),
   ];
+  return identities.filter((identity): identity is string => identity !== null);
 }
 
 function requireRole(
   artifacts: Readonly<Record<string, ResolvedArtifact>>,
   artifactId: string,
-  roles: readonly ReleaseArtifactV1["role"][],
+  roles: readonly ReleaseArtifactV2["role"][],
 ): void {
   if (!roles.includes(artifacts[artifactId]?.role)) {
     throw technical("SchemaInvalid", `Artifact ${artifactId} does not have its required release role.`);
@@ -108,7 +153,7 @@ function requireRole(
 }
 
 function resolveArtifactUrl(
-  artifact: ReleaseArtifactV1,
+  artifact: ReleaseArtifactV2,
   releaseRoot: URL,
   allowedOrigins: ReadonlySet<string>,
 ): string {
@@ -128,10 +173,10 @@ function resolveArtifactUrl(
 }
 
 function validateSemantics(
-  manifest: ReleaseManifestV1,
+  manifest: BrowserReleaseManifestV2,
   manifestUrl: URL,
   allowedOrigins: ReadonlySet<string>,
-): { artifacts: Record<string, ResolvedArtifact>; datasets: Record<string, ReleaseDatasetV1> } {
+): { artifacts: Record<string, ResolvedArtifact>; datasets: Record<string, ReleaseDatasetV2> } {
   const expectedPath = `releases/${manifest.dataReleaseId}`;
   if (manifest.publication.releasePath !== expectedPath) {
     throw technical("ReleaseIdentityMismatch", "Manifest release path does not match its immutable release ID.");
@@ -167,7 +212,11 @@ function validateSemantics(
   requireRole(artifacts, contracts.methodology, ["methodology"]);
   requireRole(artifacts, contracts.attribution, ["source-attribution"]);
   for (const artifactId of contracts.sourceReceipts) requireRole(artifacts, artifactId, ["source-receipt"]);
-  requireRole(artifacts, contracts.buildReceipt, ["build-receipt"]);
+  requireRole(artifacts, contracts.baseReleaseBuildReceipt, ["base-release-build-receipt"]);
+  requireRole(artifacts, contracts.browserDerivationReceipt, ["browser-derivation-receipt"]);
+  requireRole(artifacts, contracts.sourceGridIdentity, ["source-grid-identity"]);
+  requireRole(artifacts, contracts.rangeIntegrityIndex, ["range-integrity-index"]);
+  requireRole(artifacts, contracts.sbom, ["sbom"]);
   requireRole(artifacts, contracts.searchRecords, ["settlement-search-index", "settlement-geoparquet"]);
   requireRole(artifacts, contracts.qualitySummary, ["quality-summary"]);
   requireRole(artifacts, contracts.architectureEvidence, ["architecture-evidence"]);
@@ -175,11 +224,34 @@ function validateSemantics(
   requireRole(artifacts, contracts.stacCollection, ["stac-collection"]);
   for (const artifactId of contracts.stacItems) requireRole(artifacts, artifactId, ["stac-item"]);
   requireRole(artifacts, contracts.checksums, ["checksums"]);
-  requireRole(artifacts, contracts.provenance, ["provenance"]);
-  requireRole(artifacts, contracts.signature, ["signature"]);
+  if (contracts.baseReleaseProvenance != null) {
+    requireRole(artifacts, contracts.baseReleaseProvenance, ["base-release-provenance"]);
+  }
+  requireRole(artifacts, contracts.browserDerivationProvenance, ["browser-derivation-provenance"]);
+  if (contracts.baseReleaseSignature != null) {
+    requireRole(artifacts, contracts.baseReleaseSignature, ["base-release-signature"]);
+  }
   for (const source of manifest.sources) requireRole(artifacts, source.receiptArtifactId, ["source-receipt"]);
 
-  const datasets: Record<string, ReleaseDatasetV1> = Object.create(null);
+  for (const role of ["support-boundary", "coastal-boundary"] as const) {
+    const candidates = Object.values(artifacts).filter(
+      (artifact) =>
+        artifact.role === role &&
+        ["application/vnd.apache.parquet", "application/geo+json"].includes(artifact.mediaType),
+    );
+    if (candidates.length !== 1) {
+      throw technical(
+        "SchemaInvalid",
+        `The release must declare exactly one browser-decodable ${role} artifact.`,
+      );
+    }
+    const boundary = candidates[0];
+    if (boundary.scientificUse !== "not-applicable" || boundary.spatialBounds == null) {
+      throw technical("SchemaInvalid", `${role} must be a scoped non-scientific geometry artifact.`);
+    }
+  }
+
+  const datasets: Record<string, ReleaseDatasetV2> = Object.create(null);
   const combinations = canonicalCombinations();
   for (const [index, [scenario, horizon]] of combinations.entries()) {
     const dataset = manifest.datasets[index];
@@ -263,10 +335,22 @@ export class ManifestRepository {
     } catch {
       throw technical("DecodeFailed", "The pinned release manifest contains invalid JSON.", true);
     }
-    if (!validateManifest(value)) {
-      throw technical("SchemaInvalid", `Manifest contract rejected: ${validationSummary(validateManifest.errors)}.`);
+    let manifest: BrowserReleaseManifestV2;
+    if (this.#expectedDisposition === "private-engineering") {
+      if (!validatePrivateManifest(value)) {
+        throw technical(
+          "SchemaInvalid",
+          `Private binding contract rejected: ${validationSummary(validatePrivateManifest.errors)}.`,
+        );
+      }
+      manifest = privateReleaseManifest(value, pinnedReleaseId);
+    } else {
+      if (!validateManifest(value)) {
+        throw technical("SchemaInvalid", `Manifest contract rejected: ${validationSummary(validateManifest.errors)}.`);
+      }
+      manifest = value;
     }
-    const manifest = deepFreeze(value);
+    manifest = deepFreeze(manifest);
     if (manifest.dataReleaseId !== pinnedReleaseId) {
       throw technical("ReleaseIdentityMismatch", "Application and manifest release IDs disagree.");
     }

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-binding-manifest.schema.json",
+  "title": "SeaRise Europe private local browser binding manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "dataReleaseId",
+    "privateEngineeringOnly",
+    "verified",
+    "publicPromotionAuthorized",
+    "binding",
+    "releaseManifest"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/private-binding-manifest.schema.json"
+    },
+    "schemaVersion": { "const": "1.0.0" },
+    "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+    "privateEngineeringOnly": { "const": true },
+    "verified": { "const": false },
+    "publicPromotionAuthorized": { "const": false },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "baseCandidate", "sourceGrid"],
+      "properties": {
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["createdAt", "codeRevision"],
+          "properties": {
+            "createdAt": { "type": "string", "format": "date-time" },
+            "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+          }
+        },
+        "baseCandidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "candidateId",
+            "dataReleaseId",
+            "manifestSha256",
+            "snapshotSha256",
+            "createdAt",
+            "codeRevision"
+          ],
+          "properties": {
+            "candidateId": { "type": "string", "minLength": 1 },
+            "dataReleaseId": { "$ref": "defs.schema.json#/$defs/dataReleaseId" },
+            "manifestSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+            "snapshotSha256": { "$ref": "defs.schema.json#/$defs/sha256" },
+            "createdAt": { "type": "string", "format": "date-time" },
+            "codeRevision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+          }
+        },
+        "sourceGrid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["byteSize", "sha256"],
+          "properties": {
+            "byteSize": { "type": "integer", "minimum": 1 },
+            "sha256": { "$ref": "defs.schema.json#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "releaseManifest": {
+      "$ref": "private-release-manifest.schema.json"
+    }
+  }
+}
