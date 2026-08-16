@@ -13,10 +13,16 @@ terrain-comparison, inundation, or property-risk product claims. Built assets
 are scanned separately so source transforms or dependencies cannot reintroduce
 the language after the source check.
 
-The scanner executes mutation controls on every run. A future change that
-weakens detection of a legacy outcome, affirmative exposure claim, binary
-classification, or property-risk score fails before repository content is
-accepted.
+A second, product-copy-only layer scans production web source and emitted
+assets, but not guidance that must discuss rejected wording. It rejects
+certainty about flooding, safety, risk, personal property, or precision;
+unsupported promises about complete settlement coverage, permanent cost, or
+fully offline operation; relative `+N years` horizons; forecast-model framing;
+five-state target models; and affirmative flood-probability statements.
+
+The scanner executes mutation controls for every category on every run. A
+future change that weakens either the target-domain exclusions or the stricter
+product-copy rules fails before repository content is accepted.
 
 ## Historical evidence allowlist
 

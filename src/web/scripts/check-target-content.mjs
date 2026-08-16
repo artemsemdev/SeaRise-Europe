@@ -33,6 +33,21 @@ export const prohibitedTargetClaims = Object.freeze([
   Object.freeze({ id: "inundation-product", pattern: /\binundation (?:animation|map|outcome|result)\b/giu }),
 ]);
 
+export const prohibitedProductCopy = Object.freeze([
+  Object.freeze({ id: "future-flood-certainty", pattern: /\b(?:this|the) (?:location|place|settlement) will (?:flood|be underwater)\b/giu }),
+  Object.freeze({ id: "safety-certainty", pattern: /\b(?:this|the) (?:location|place|settlement) is (?:safe|protected)\b/giu }),
+  Object.freeze({ id: "risk-certainty", pattern: /\b(?:no risk|risk detected)\b/giu }),
+  Object.freeze({ id: "personal-property-claim", pattern: /\byour (?:home|property)\b/giu }),
+  Object.freeze({ id: "precision-certainty", pattern: /\b100% accurate\b/giu }),
+  Object.freeze({ id: "complete-settlement-coverage", pattern: /\ball European settlements\b/giu }),
+  Object.freeze({ id: "unqualified-offline-claim", pattern: /\bfully offline\b/giu }),
+  Object.freeze({ id: "permanent-cost-claim", pattern: /\bfree forever\b/giu }),
+  Object.freeze({ id: "relative-year-horizon", pattern: /(?:^|[^\w])\+\s*\d+\s*years?\b/giu }),
+  Object.freeze({ id: "forecast-model-framing", pattern: /\b(?:(?:IPCC|AR6|sea-level) forecast|(?:forecast|prediction) model)\b/giu }),
+  Object.freeze({ id: "five-state-target-model", pattern: /\bfive-state (?:result|outcome|product|model)\b/giu }),
+  Object.freeze({ id: "flood-probability-assertion", pattern: /\bflood probability (?:is|of|equals|:)\b/giu }),
+]);
+
 function filesBelow(root, extensions) {
   if (!existsSync(root)) throw new Error(`Content scan root does not exist: ${root}`);
   const files = [];
@@ -56,9 +71,9 @@ function activeMethodology(content, path) {
   return content.slice(0, marker);
 }
 
-export function scanContent(content) {
+function scanClaims(content, claims) {
   const violations = [];
-  for (const claim of prohibitedTargetClaims) {
+  for (const claim of claims) {
     claim.pattern.lastIndex = 0;
     for (const match of content.matchAll(claim.pattern)) {
       const prefix = content.slice(0, match.index);
@@ -72,6 +87,14 @@ export function scanContent(content) {
   return Object.freeze(violations);
 }
 
+export function scanContent(content) {
+  return scanClaims(content, prohibitedTargetClaims);
+}
+
+export function scanProductCopy(content) {
+  return scanClaims(content, prohibitedProductCopy);
+}
+
 function repositorySources() {
   const production = filesBelow(resolve(webRoot, "src"), sourceExtensions).filter(
     (path) => !excludedSourceParts.some((part) => path.includes(part)),
@@ -83,15 +106,34 @@ function repositorySources() {
 }
 
 function verifyMutationSensitivity() {
-  const controls = [
+  const targetControls = [
     "ModeledExposureDetected",
     "This location is modelled as exposed.",
     "Binary exposure classification",
     "Property risk score",
   ];
-  for (const control of controls) {
+  for (const control of targetControls) {
     if (scanContent(control).length === 0) {
       throw new Error(`Content scan mutation control was not rejected: ${control}`);
+    }
+  }
+  const productCopyControls = [
+    "This location will flood.",
+    "This place is safe.",
+    "Risk detected.",
+    "Your property is exposed.",
+    "This result is 100% accurate.",
+    "Search all European settlements.",
+    "Works fully offline.",
+    "Free forever.",
+    "Horizon +50 years.",
+    "IPCC forecast model.",
+    "Five-state outcome.",
+    "Flood probability is 20%.",
+  ];
+  for (const control of productCopyControls) {
+    if (scanProductCopy(control).length === 0) {
+      throw new Error(`Product-copy mutation control was not rejected: ${control}`);
     }
   }
 }
@@ -107,7 +149,12 @@ function main() {
   const violations = [];
   for (const path of files) {
     const content = activeMethodology(readFileSync(path, "utf8"), path);
-    for (const violation of scanContent(content)) {
+    const contentViolations = [...scanContent(content)];
+    const isProductCopy = builtRoot
+      || path === resolve(webRoot, "index.html")
+      || path.startsWith(`${resolve(webRoot, "src")}${sep}`);
+    if (isProductCopy) contentViolations.push(...scanProductCopy(content));
+    for (const violation of contentViolations) {
       violations.push(`${relative(repositoryRoot, path)}:${violation.line}: ${violation.claim} (${violation.text})`);
     }
   }
