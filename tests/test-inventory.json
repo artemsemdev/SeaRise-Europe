@@ -291,6 +291,12 @@
       "reference": "src/web/src/offline/range-integrity-catalog.ts, src/web/src/offline/release-resource-plan.ts, and src/web/src/offline/release-resource-plan.test.ts",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; nine deterministic exact-index, module-private trust, artifact-map isolation, canonical routing, public/private/local persistence, PMTiles refusal, technical-failure, and privacy cases over the committed synthetic fixture; no Candidate-v7, TAR, browser network, or external storage"
     },
+    "local-2026-08-16-coordinated-admission": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T19:30:00+02:00",
+      "reference": "src/web/src/offline/admission-receipt.test.ts, src/web/src/offline/whole-resource-cache.test.ts, and src/web/src/offline/range-store.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; deterministic receipt-last order, exact plan hashing, non-forgeable gates, append-only prior receipt, tamper, cancellation, readback failure, quota, operation ownership, conditional rollback, memory-only Candidate, PMTiles refusal, and privacy cases; synthetic bytes only; no Candidate-v7, TAR, browser network, personal state, or external storage"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -438,6 +444,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-16-release-resource-plan", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Committed manifest and range-index bytes, deterministic WebCrypto, immutable in-memory contexts, and adversarial reflected-symbol, spread, duplicate-key, role-relabel, digest, and privacy mutations require no network, browser storage, candidate artifact, or clock." }
+    },
+    {
+      "id": "static-coordinated-admission",
+      "layer": "integration",
+      "owner": "platform",
+      "purpose": "Keep cross-store resource admission logically atomic through an exact receipt published last, with operation-owned conditional cleanup, prior-result preservation, receipt-gated reads, private Candidate memory-only handling, PMTiles exclusion, and technical failures outside ADR-024 outcomes.",
+      "sourcePaths": ["src/web/src/offline/admission-receipt.ts", "src/web/src/offline/admission-receipt.test.ts", "src/web/src/offline/whole-resource-cache.ts", "src/web/src/offline/whole-resource-cache.test.ts", "src/web/src/offline/range-store.ts", "src/web/src/offline/range-store.test.ts"],
+      "changedPaths": ["src/web/src/offline/admission-receipt.ts", "src/web/src/offline/admission-receipt.test.ts", "src/web/src/offline/whole-resource-cache.ts", "src/web/src/offline/whole-resource-cache.test.ts", "src/web/src/offline/range-store.ts", "src/web/src/offline/range-store.test.ts", "src/web/src/offline/release-resource-plan.ts", "src/web/src/offline/contracts/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact resource-plan receipt, receipt-last publication, read gating, conditional ownership rollback, private-memory, PMTiles-refusal, cancellation, quota, and privacy gate." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline/admission-receipt.test.ts src/offline/whole-resource-cache.test.ts src/offline/range-store.test.ts", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-coordinated-admission", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Fresh fake IndexedDB, deterministic WebCrypto, injected Cache Storage/fetch ports, explicit AbortControllers, exact synthetic authorities, and operation logs use no clock, random input, browser network, Candidate bytes, or external service." }
     },
     {
       "id": "static-range-cache-compatibility",
@@ -1421,6 +1441,7 @@
     { "path": "src/web/src/offline/whole-resource-cache.test.ts", "suite": "static-whole-resource-cache", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/range-store.test.ts", "suite": "static-authoritative-range-store", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/release-resource-plan.test.ts", "suite": "static-release-resource-plan", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/admission-receipt.test.ts", "suite": "static-coordinated-admission", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
