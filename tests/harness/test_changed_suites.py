@@ -196,8 +196,25 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         self.assertEqual(fast_local_suites([suite]), [])
         output = io.StringIO()
         with redirect_stdout(output):
-            self.assertEqual(_run_commands([suite]), 0)
+            self.assertNotEqual(_run_commands([suite]), 0)
         self.assertNotIn("RUN ", output.getvalue())
+        self.assertIn("refusing to run non-active", output.getvalue())
+
+    def test_runner_fails_closed_on_malformed_suite_status(self) -> None:
+        for malformed_status in (None, "activ"):
+            with self.subTest(status=malformed_status):
+                suite = copy.deepcopy(self.inventory["suites"][0])
+                if malformed_status is None:
+                    del suite["status"]
+                else:
+                    suite["status"] = malformed_status
+                output = io.StringIO()
+
+                with redirect_stdout(output):
+                    self.assertNotEqual(_run_commands([suite]), 0)
+
+                self.assertNotIn("RUN ", output.getvalue())
+                self.assertIn("refusing to run non-active", output.getvalue())
 
     def test_compose_smoke_is_discovered_only_while_present(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -1681,6 +1681,7 @@
     { "path": "src/web/src/offline/contracts/policy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/privacy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/pair-lifecycle-store.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/register-service-worker.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/service-worker-runtime.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/whole-resource-cache.test.ts", "suite": "static-whole-resource-cache", "status": "active", "removalGate": null, "replacementEvidence": null },

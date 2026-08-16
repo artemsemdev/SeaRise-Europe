@@ -63,10 +63,21 @@ def _git_changed_paths(base_ref: str) -> list[str]:
 
 
 def _run_commands(suites: Sequence[dict[str, Any]]) -> int:
+    non_active = [
+        str(suite.get("id", "<missing-id>"))
+        for suite in suites
+        if suite.get("status") != "active"
+    ]
+    if non_active:
+        print(
+            "ERROR: refusing to run non-active or malformed suites: "
+            + ", ".join(non_active),
+            flush=True,
+        )
+        return 2
+
     commands_seen: set[str] = set()
     for suite in suites:
-        if suite.get("status") != "active":
-            continue
         command = suite["commands"]["focused"]
         if command in commands_seen:
             continue
