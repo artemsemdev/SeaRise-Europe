@@ -610,8 +610,13 @@ describe("production static application composition", () => {
     expect(screen.getByText(/share link is ready in the browser address bar/i)).toBeVisible();
     expect(environment.url.searchParams.get("release")).toBe(releaseContext.dataReleaseId);
 
+    const search = screen.getByRole("combobox", { name: /find a city/i });
+    await user.type(search, "Fixture");
+    expect(await screen.findByRole("option", { name: /Fixturehafen/i })).toBeVisible();
     await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
+    expect(search).toHaveValue("");
+    expect(screen.queryByRole("listbox", { name: /settlement results/i })).not.toBeInTheDocument();
     expect(controller.select).toHaveBeenLastCalledWith(expect.objectContaining({
       location: { kind: "coordinate", coordinates: { latitude: 42, longitude: 7 } },
     }));
