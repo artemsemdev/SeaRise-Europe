@@ -200,7 +200,7 @@ function SettlementSearchSession({
           value={query}
           disabled={!release}
           autoComplete="off"
-          placeholder="Try Málaga, Athens, or Border City"
+          placeholder="Try Rotterdam, Porto, or Galway"
           onFocus={() => {
             client?.start();
             if (query.trim()) setOpen(true);

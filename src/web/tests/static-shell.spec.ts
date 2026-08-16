@@ -30,7 +30,9 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
 
   await page.goto("/");
   await expectStaticDocumentSecurity(page);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Take me there");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Explore regional sea-level projections across Europe",
+  );
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await expect(page.getByText(/Synthetic fixture · illustrative only/i)).toBeVisible();

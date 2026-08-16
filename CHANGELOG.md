@@ -34,6 +34,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Aligned the static landing copy with the approved product language and bound
+  its release disclosure to the verified synthetic, private-engineering, or
+  public-promoted disposition instead of hard-coding fixture status.
+
 - Corrected the application live status after terminal projection failures so
   assistive technology no longer announces that a completed failed operation
   is still being checked, while any previous accepted outcome remains explicit.

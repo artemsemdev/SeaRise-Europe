@@ -32,6 +32,7 @@ import {
 } from "./domain/release";
 import type { SearchWorkerFactory } from "./search/client";
 import type { SettlementSearchRecord } from "./search/types";
+import { releaseScopeStatus } from "./release-copy";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
@@ -249,6 +250,7 @@ function LandingPageSession({
   }, [navigationIntent, scopeReady, submitSelection]);
 
   const accepted = runtime.projection ? visibleAcceptedProjection(runtime.projection) : null;
+  const scopeStatus = releaseScopeStatus(release);
   const verifiedMethodology = runtime.methodology.phase === "ready" && context &&
       runtime.methodology.dataReleaseId === context.dataReleaseId
     ? runtime.methodology.methodology
@@ -280,7 +282,7 @@ function LandingPageSession({
         <div className="hero-content">
           <p className="eyebrow">Regional projections · three scenarios · three horizons</p>
           <h1 id="hero-title">
-            Take me <em>there</em>.
+            Explore regional sea-level projections <em>across Europe</em>.
           </h1>
           <p className="hero-copy">
             Explore IPCC AR6 regional relative sea-level projections for European
@@ -305,8 +307,8 @@ function LandingPageSession({
           <span className="scope-number">3 × 3</span>
           <span>scenario and horizon combinations</span>
           <span className="scope-rule" />
-          <strong>Fixture mode</strong>
-          <span>No public scientific release is claimed.</span>
+          <strong>{scopeStatus.title}</strong>
+          <span>{scopeStatus.detail}</span>
         </aside>
       </section>
 
