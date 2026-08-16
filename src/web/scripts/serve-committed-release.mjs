@@ -37,13 +37,17 @@ createServer((request, response) => {
     return;
   }
   const size = statSync(path).size;
+  const responseCacheControl = extname(path) === ".pmtiles"
+    ? "no-store"
+    : "public, max-age=31536000, immutable";
+  const responseContentType = mediaTypes[extname(path)] ?? "application/octet-stream";
   const headers = {
     "Accept-Ranges": "bytes",
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, HEAD",
     "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, ETag",
-    "Cache-Control": "public, max-age=31536000, immutable",
-    "Content-Type": mediaTypes[extname(path)] ?? "application/octet-stream",
+    "Cache-Control": responseCacheControl,
+    "Content-Type": responseContentType,
     ...(artifact ? { ETag: `"sha256-${artifact.sha256}"` } : {}),
     Vary: "Origin",
   };

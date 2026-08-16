@@ -247,6 +247,27 @@ test("API inspection exposes the production-like HEAD, CORS-header, and byte-ran
   expect(head.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
 });
 
+test("Vite preview makes PMTiles network-only while other release artifacts stay immutable", async ({ page }) => {
+  const releaseRoot = `http://127.0.0.1:4173/releases/${releaseId}`;
+  const pmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
+    headers: { Range: "bytes=0-127" },
+  });
+  const refusedPmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
+    headers: { Range: "bytes=9999999-10000000" },
+  });
+  const analysis = await page.request.head(`${releaseRoot}/${multichunkArtifactPath}`);
+
+  expect(pmtiles.status()).toBe(206);
+  expect(pmtiles.headers()["cache-control"]).toBe("no-store");
+  expect(pmtiles.headers()["content-range"]).toBe("bytes 0-127/624674");
+  expect(pmtiles.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(refusedPmtiles.status()).toBe(416);
+  expect(refusedPmtiles.headers()["cache-control"]).toBe("no-store");
+  expect(refusedPmtiles.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(analysis.status()).toBe(200);
+  expect(analysis.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+});
+
 test("page context verifies a later COG chunk and measures cold versus cached lookup", async ({ page }, testInfo) => {
   await page.goto("/");
   await expectStaticDocumentSecurity(page);

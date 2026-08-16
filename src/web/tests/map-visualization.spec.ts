@@ -60,6 +60,16 @@ test("map is the static-first scene, loads bounded PMTiles ranges, and keeps one
 });
 
 test("all nine release selections resolve without mixing visual artifact identity", async ({ page }) => {
+  const requests: string[] = [];
+  const responsePolicies: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname.endsWith(".pmtiles")) requests.push(request.url());
+  });
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname.endsWith(".pmtiles")) {
+      responsePolicies.push(response.headers()["cache-control"] ?? "");
+    }
+  });
   await page.goto("/");
   await expect(page.getByRole("region", { name: /visual release map preview/i })).toBeVisible();
   await expect(page.locator(".map-status")).toContainText(/central visual band ready/i);
@@ -73,10 +83,55 @@ test("all nine release selections resolve without mixing visual artifact identit
       await page.locator(`input[name="projection-scenario"][value="${scenario}"]`).check();
       await page.locator(`input[name="projection-horizon"][value="${horizon}"]`).check();
       await expect(map).toHaveAttribute("data-artifact-id", `projection-${scenario}-${horizon}-pmtiles`);
+      await expect(page.locator(".map-status")).toContainText(
+        new RegExp(`${scenario} · ${horizon} · central visual band ready`, "i"),
+      );
       await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(`${scenario} · ${horizon}`);
       await expect(page.getByLabel("Map text alternative", { exact: true })).toContainText(/accepted result visualization/i);
     }
   }
+
+  await expect.poll(() => new Set(requests.map((url) => new URL(url).pathname)).size).toBe(9);
+  expect(new Set(requests.map((url) => new URL(url).pathname))).toEqual(new Set(
+    scenarios.flatMap((scenario) => horizons.map(
+      (horizon) => `/releases/${releaseId}/layers/${scenario}/${horizon}.pmtiles`,
+    )),
+  ));
+  expect(responsePolicies.length).toBeGreaterThanOrEqual(9);
+  expect(responsePolicies.every((policy) => policy.toLowerCase().split(",").map((value) => value.trim()).includes("no-store"))).toBe(true);
+
+  const persistence = await page.evaluate(async () => {
+    const cacheUrls = (await Promise.all((await caches.keys()).map(async (name) =>
+      (await (await caches.open(name)).keys()).map((request) => request.url)))).flat();
+    const storedValues: unknown[] = [];
+    for (const database of await indexedDB.databases()) {
+      if (!database.name) continue;
+      const opened = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(database.name!);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      for (const storeName of opened.objectStoreNames) {
+        const values = await new Promise<unknown[]>((resolve, reject) => {
+          const request = opened.transaction(storeName, "readonly").objectStore(storeName).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        storedValues.push(...values);
+      }
+      opened.close();
+    }
+    return {
+      cacheUrls,
+      durableRecords: JSON.stringify(storedValues),
+      local: Object.values(localStorage),
+      session: Object.values(sessionStorage),
+    };
+  });
+  expect(persistence.cacheUrls.filter((url) => url.includes(".pmtiles"))).toEqual([]);
+  expect(persistence.durableRecords).not.toContain(".pmtiles");
+  expect(persistence.durableRecords).not.toContain("-pmtiles");
+  expect([...persistence.local, ...persistence.session].join("\n")).not.toContain(".pmtiles");
 });
 
 test("basemap failure preserves release overlay, attribution, text, and coordinate selection", async ({ page }) => {

@@ -19,6 +19,7 @@ export interface ProjectionVisualLayer {
 
 export interface BoundaryVisualLayer {
   readonly kind: "support-boundary" | "coastal-boundary";
+  readonly dataReleaseId: string;
   readonly artifactId: string;
   readonly url: string;
   readonly mediaType: "application/vnd.pmtiles" | "application/geo+json";
@@ -62,6 +63,7 @@ function optionalBoundaries(context: ReleaseContext): readonly BoundaryVisualLay
     }
     boundaries.push(Object.freeze({
       kind: artifact.role,
+      dataReleaseId: context.dataReleaseId,
       artifactId: artifact.artifactId,
       url: artifact.url,
       mediaType: artifact.mediaType,

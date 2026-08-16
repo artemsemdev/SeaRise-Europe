@@ -139,10 +139,18 @@ export default defineConfig(({ mode }) => {
               response.writeHead(404).end();
               return;
             }
+            const responseCacheControl = extname(path) === ".pmtiles"
+              ? "no-store"
+              : "public, max-age=31536000, immutable";
+            const responseContentType = releaseMediaTypes[extname(path)] ?? "application/octet-stream";
             const rangeHeader = request.headers.range;
             const range = rangeHeader ? /^bytes=(\d+)-(\d*)$/.exec(rangeHeader) : null;
             if (rangeHeader && !range) {
-              response.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
+              response.writeHead(416, {
+                "Cache-Control": responseCacheControl,
+                "Content-Range": `bytes */${size}`,
+                "Content-Type": responseContentType,
+              }).end();
               return;
             }
             const start = range ? Number(range[1]) : 0;
@@ -154,7 +162,11 @@ export default defineConfig(({ mode }) => {
               start > end ||
               start >= size
             ) {
-              response.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
+              response.writeHead(416, {
+                "Cache-Control": responseCacheControl,
+                "Content-Range": `bytes */${size}`,
+                "Content-Type": responseContentType,
+              }).end();
               return;
             }
             const artifact = artifactByPath.get(relativePath);
@@ -163,9 +175,9 @@ export default defineConfig(({ mode }) => {
               "Access-Control-Allow-Origin": "http://127.0.0.1:4173",
               "Access-Control-Allow-Methods": "GET, HEAD",
               "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, ETag",
-              "Cache-Control": "public, max-age=31536000, immutable",
+              "Cache-Control": responseCacheControl,
               "Content-Length": String(end - start + 1),
-              "Content-Type": releaseMediaTypes[extname(path)] ?? "application/octet-stream",
+              "Content-Type": responseContentType,
               ...(artifact ? { ETag: `"sha256-${artifact.sha256}"` } : {}),
               ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}),
               Vary: "Origin",
