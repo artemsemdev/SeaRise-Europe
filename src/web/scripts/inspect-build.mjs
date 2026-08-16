@@ -39,6 +39,18 @@ for (const entry of ["index.html", "about/architecture/index.html"]) {
   }
 }
 
+const workerPaths = paths.filter((path) => /search\.worker-[^/]+\.js$/.test(path));
+if (workerPaths.length !== 1) throw new Error("Static build must contain one lazy settlement search worker chunk");
+const brotliWasmPaths = paths.filter((path) => /brotli_wasm_bg-[^/]+\.wasm$/.test(path));
+if (brotliWasmPaths.length !== 1) throw new Error("Static build must contain one lazy Brotli decoder asset");
+const lazySearchPaths = [...workerPaths, ...brotliWasmPaths];
+for (const htmlPath of paths.filter((path) => extname(path) === ".html")) {
+  const html = readFileSync(htmlPath, "utf8");
+  if (lazySearchPaths.some((path) => html.includes(relative(dist, path)))) {
+    throw new Error("Settlement search worker and decoder must remain outside the initial HTML dependency graph");
+  }
+}
+
 const scanned = paths.filter((path) => [".html", ".js", ".css", ".map"].includes(extname(path)));
 const forbidden = [/candidate-v7/i, /local-data\/phase-1/i, /["'`]\/[^"'`]*assess(?:[/?"'`]|$)/, /["'`]\/[^"'`]*geocode(?:[/?"'`]|$)/, /["'`]\/[^"'`]*config(?:[/?"'`]|$)/];
 for (const path of scanned) {
@@ -52,7 +64,7 @@ for (const path of scanned) {
 }
 
 const assets = paths
-  .filter((path) => [".js", ".css", ".woff2"].includes(extname(path)))
+  .filter((path) => [".js", ".css", ".wasm", ".woff2"].includes(extname(path)))
   .map((path) => {
     const bytes = readFileSync(path);
     return {
@@ -105,6 +117,7 @@ const report = {
     initialJavascriptBrotliBytes: initialJavascript,
     lazyMapFiles: mapFiles.sort(),
   },
+  lazyWorkerAssets: lazySearchPaths.map((path) => relative(dist, path)),
   assets,
 };
 writeFileSync(resolve(dist, "build-report.json"), `${JSON.stringify(report, null, 2)}\n`);
