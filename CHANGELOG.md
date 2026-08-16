@@ -59,9 +59,11 @@ All notable changes to this project will be documented in this file.
 
 - Added a release-scoped static GeoNames search Worker with deterministic
   normalization and ranking, core-first partial readiness, exact transport-byte
-  verification, pinned lazy Brotli decoding, private in-memory queries, and an
-  accessible keyboard combobox. Search failures remain technical errors and do
-  not expand the four scientific outcomes.
+  verification, authoritative v4 release/source/spatial/index validation,
+  pinned lazy Brotli decoding, core-then-unseen-coastal merge, private in-memory
+  queries, stale-selection prevention, and an accessible keyboard combobox.
+  Search failures remain technical errors and do not expand the four scientific
+  outcomes.
 
 - Added the browser's pinned-manifest anti-corruption layer: generated
   schema-derived TypeScript contracts, an immutable release context, exact

@@ -1,22 +1,9 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { brotliCompressSync } from "node:zlib";
-
-const manifestFixture = JSON.parse(readFileSync(resolve(
-  process.cwd(),
-  "../../contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json",
-), "utf8")) as {
-  dataReleaseId: string;
-  artifacts: Array<{ artifactId: string; path: string; byteSize: number; sha256: string }>;
-  [key: string]: unknown;
-};
 
 const forbiddenPaths = ["ass" + "ess", "geo" + "code", "con" + "fig"];
-const expectedCsp = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
+const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
 async function expectStaticDocumentSecurity(page: import("@playwright/test").Page) {
   const csp = page.locator('meta[http-equiv="Content-Security-Policy"]');
@@ -100,7 +87,7 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
   page.on("request", (request) => network.push(`${request.method()} ${request.url()} ${request.postData() ?? ""}`));
   let releaseCoastal!: () => void;
   const coastalGate = new Promise<void>((resolve) => { releaseCoastal = resolve; });
-  await page.route("**/search/europe-coastal.fixture.json", async (route) => {
+  await page.route("**/search/europe-coastal.codepoint-trie.json.br", async (route) => {
     await coastalGate;
     await route.continue();
   });
@@ -161,7 +148,7 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
 });
 
 test("settlement shard delivery failure remains a technical state", async ({ page }) => {
-  await page.route("**/search/europe-core.fixture.json", async (route) => {
+  await page.route("**/search/europe-core.codepoint-trie.json.br", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/vnd.searise.search-index+json", body: "{}" });
   });
   await page.goto("/");
@@ -174,34 +161,25 @@ test("settlement shard delivery failure remains a technical state", async ({ pag
   await expect(page.getByText(/Try another spelling/i)).toHaveCount(0);
 });
 
-test("generic static delivery verifies compressed bytes before the pinned Worker decoder", async ({ page }) => {
-  const releaseRoot = resolve(
-    process.cwd(),
-    "../../contracts/release/v1/fixtures/release",
-    manifestFixture.dataReleaseId,
-  );
-  const document = JSON.parse(readFileSync(resolve(releaseRoot, "search/europe-core.fixture.json"), "utf8"));
-  document.contentEncoding = "br";
-  const compressed = brotliCompressSync(Buffer.from(`${JSON.stringify(document)}\n`));
-  const manifest = structuredClone(manifestFixture);
-  const core = manifest.artifacts.find(({ artifactId }) => artifactId === "settlements-europe-core")!;
-  core.path = "search/europe-core.codepoint-trie.json.br";
-  core.byteSize = compressed.length;
-  core.sha256 = createHash("sha256").update(compressed).digest("hex");
-
-  await page.route("**/manifest.json", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(manifest) });
-  });
-  await page.route("**/search/europe-core.codepoint-trie.json.br", async (route) => {
+test("exact CSP permits the real Brotli Worker while blocking JavaScript eval", async ({ page }) => {
+  await page.route("**/csp-eval-probe.js", async (route) => {
     await route.fulfill({
-      status: 200,
-      contentType: "application/octet-stream",
-      body: compressed,
-      headers: { "cache-control": "public, max-age=31536000, immutable" },
+      contentType: "text/javascript",
+      body: `globalThis.__cspEvalProbe = {
+        evalBlocked: (() => { try { globalThis.eval("1 + 1"); return false; } catch { return true; } })(),
+        functionBlocked: (() => { try { return Function("return 2")() !== 2; } catch { return true; } })()
+      };`,
     });
   });
-
   await page.goto("/");
+  await expectStaticDocumentSecurity(page);
+  await page.evaluate(() => {
+    const probe = document.createElement("script");
+    probe.src = "/csp-eval-probe.js";
+    document.head.append(probe);
+  });
+  await expect.poll(() => page.evaluate(() => Reflect.get(globalThis, "__cspEvalProbe")))
+    .toEqual({ evalBlocked: true, functionBlocked: true });
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.fill("Athens");
   await expect(page.getByRole("option", { name: /Αθήνα.*Attica, GR/i })).toBeVisible();

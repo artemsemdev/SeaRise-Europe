@@ -5,7 +5,7 @@ import { extname, join, relative, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
-const expectedCsp = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
+const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
 function files(directory) {
   return readdirSync(directory).flatMap((name) => {
@@ -33,6 +33,9 @@ for (const entry of ["index.html", "about/architecture/index.html"]) {
   }
   if (csp.includes("frame-ancestors")) {
     throw new Error(`${entry} must leave frame-ancestors to the deployment response header`);
+  }
+  if (/(?:^|[;\s])'unsafe-eval'(?:[;\s]|$)/.test(csp)) {
+    throw new Error(`${entry} permits JavaScript eval`);
   }
   if (!/<meta\s+name="referrer"\s+content="no-referrer"\s*\/?\s*>/i.test(html)) {
     throw new Error(`${entry} does not enforce the no-referrer document policy`);
