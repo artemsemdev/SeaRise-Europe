@@ -1,8 +1,8 @@
 # Architecture Documentation
 
 > **Status:** Current for the accepted target architecture
-> **Last reviewed:** 2026-08-06
-> **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md)
+> **Last reviewed:** 2026-08-16
+> **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md), [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md), and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
 
 ## Architecture in one paragraph
 
@@ -38,17 +38,20 @@ Read in this order:
    alternatives, consequences, costs, scientific gates, and migration.
 2. [System context](01-system-context.md) — actors, boundaries, dependencies,
    and project outcomes.
-3. [Container view](02-container-view.md) — build, artifact, delivery, and
+3. [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) — exact
+   complete-resource, COG-range, PMTiles, failure, and private-candidate storage
+   boundaries.
+4. [Container view](02-container-view.md) — build, artifact, delivery, and
    browser responsibilities.
-4. [Browser application](03a-frontend-architecture.md) — runtime components,
+5. [Browser application](03a-frontend-architecture.md) — runtime components,
    search, assessment, map, state, and offline behaviour.
-5. [Atomic projection state](17-atomic-projection-state.md) — release-scoped
+6. [Atomic projection state](17-atomic-projection-state.md) — release-scoped
    transitions and stale-completion guards.
-6. [Data architecture](05-data-architecture.md) — immutable release layout and
+7. [Data architecture](05-data-architecture.md) — immutable release layout and
    public data contracts.
-7. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
+8. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
    processing and publication gates.
-8. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
+9. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
    and portable delivery requirements.
 
 ## Current document set
@@ -74,6 +77,7 @@ Read in this order:
 | [Public release contracts](../../contracts/release/README.md) | Authoritative JSON Schemas, version compatibility, deprecation, and rollback |
 | [ADR directory](adr/README.md) | Standalone architecture decision records and ADR conventions |
 | [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
+| [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) | Authoritative complete-resource, COG range, and PMTiles persistence boundary |
 
 Supporting current documents:
 
@@ -117,6 +121,9 @@ target architecture without executable evidence.
 - Projection lookup: nearest native AR6 grid location within 100 km, with no
   interpolation, fallback, or rendered-colour sampling.
 - Search: local qualifying records from a declared GeoNames snapshot.
+- Browser persistence: verified complete resources use Cache Storage;
+  integrity-authorized COG chunks may use bounded IndexedDB; PMTiles remains
+  network-only and visual-only with a `no-store` caching policy.
 
 ## Deliberately removed documents
 

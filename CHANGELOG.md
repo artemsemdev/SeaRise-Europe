@@ -32,11 +32,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Selected IndexedDB, rather than Cache Storage, for bounded COG and PMTiles
-  range persistence after real Chromium, Firefox, and WebKit measurements
-  showed that `206` responses are rejected and range requests can match a
-  cached whole `200`. Cache Storage remains suitable only for explicitly
-  routed complete resources; public-origin behavior is not yet claimed.
+- Accepted ADR-026 after real Chromium, Firefox, and WebKit measurements showed
+  that Cache Storage rejects `206` responses and range requests can match a
+  cached whole `200`. Verified complete resources use Cache Storage, while
+  only integrity-authorized COG chunks may use bounded IndexedDB. PMTiles stays
+  network-only, visual-only, and `no-store` until a separate promotion contract
+  supplies authoritative interval digests; the original browser observations
+  remain unchanged.
 
 - Bound the canonical frontend npm SBOM to the static `src/web` workspace in
   the root lockfile, including the Flight icon dependency and its exact

@@ -81,14 +81,23 @@
       }
     }
   },
+  "ownerScopeRefinement": {
+    "status": "accepted",
+    "decidedAt": "2026-08-16",
+    "authority": "docs/architecture/adr/ADR-026-authoritative-browser-range-persistence.md",
+    "measurementsChanged": false,
+    "interpretation": "The IndexedDB observation proves byte-storage mechanics for both sampled artifact types. Production admission additionally requires release-authorized interval digests, which currently exist only for COG chunks."
+  },
   "decision": {
-    "status": "accepted-for-issue-60-implementation",
-    "wholeResponsePersistence": "Cache Storage may be used for explicitly routed complete responses.",
-    "rangePersistence": "Persist COG and PMTiles range bytes and their authority, interval, size, and LRU metadata together in IndexedDB.",
-    "rangeResponse": "Synthesize an exact 206 only when stored intervals cover every requested byte and release/ETag authority matches.",
+    "status": "accepted-with-adr-026-owner-scope-refinement",
+    "wholeResponsePersistence": "Cache Storage may be used only for explicitly routed complete responses with exact byte, MIME, integrity, policy, and app/release authority.",
+    "rangePersistence": "Persist only complete release-authorized COG chunks in bounded IndexedDB. PMTiles remains network-only with no-store fetch and response caching policies and must not enter Cache Storage, IndexedDB, or the session-memory range store until a separately reviewed promotion contract supplies authoritative interval digests.",
+    "rangeResponse": "Return only an exact authorized COG chunk or a half-open slice contained by that single chunk; never assemble adjacent records to manufacture interval authority.",
     "cacheMatchRule": "Never rely on Cache.match(request-with-Range) to distinguish a partial request from a cached whole response.",
     "transactionRule": "Byte admission, metadata, accounting, and eviction must share one IndexedDB transaction boundary where practical.",
-    "releaseRule": "Every record must be isolated by application build and dataReleaseId; no range may cross a release authority."
+    "releaseRule": "Every record must be isolated by exact application build, dataReleaseId, and artifact identity; no range may cross an authority.",
+    "scientificFailureRule": "Cache, network, integrity, quota, transaction, storage, and update failures are technical states, not additional ADR-024 scientific outcomes.",
+    "privateCandidateRule": "Candidate-v7 remains explicit, local, read-only, and session-only; it is never a durable browser, build, CI, or external-storage input."
   },
   "limitations": [
     "This is a same-origin loopback measurement, not evidence for a deployed public origin, CDN, CORS policy, or R2 behavior.",

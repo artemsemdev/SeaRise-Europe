@@ -2,7 +2,7 @@
 
 > **Status:** Accepted target architecture; migration in progress
 >
-> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md)
 > **Important:** checked-in demo rasters and the current pipeline are not a validated real-data release.
 
 ## 1. Data model in one sentence
@@ -32,7 +32,7 @@ flowchart LR
 | Source cache | Original IPCC, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
 | Build workspace | Normalized arrays, temporary rasters, DuckDB files, intermediate tables | Ephemeral local/CI workspace | Offline pipeline | None |
 | Release artifacts | Manifest, config, boundaries, search indexes, COG, PMTiles, GeoParquet, STAC, provenance | Versioned static host/object storage | Controlled publish job | Browser and reviewers |
-| Browser cache | App shell, config, search indexes, and requested byte ranges | User device | Service worker/browser | Browser only |
+| Browser cache | Verified complete resources in Cache Storage and integrity-authorized COG chunks in bounded IndexedDB; PMTiles is network-only with a `no-store` caching policy | User device | Service worker/browser | Browser only |
 
 No project-controlled system stores user searches, selected places, or precise
 coordinates. GeoNames place coordinates and scientific source coordinates are
@@ -193,7 +193,7 @@ and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
 | Build intermediates | Disposable after a successful release; retain only when needed to investigate QA |
 | Published releases | Keep the active and rollback releases; archive or remove older versions only under a documented retention policy |
 | Manifests, source records, provenance, QA summaries | Retain with every published release |
-| Browser cache | Bounded and versioned; evict least-recently-used ranges first |
+| Browser cache | Bounded and versioned; evict least-recently-used unleased COG chunks first; PMTiles remains network-only with a `no-store` caching policy |
 | User search/location data | Never collected or retained by project infrastructure |
 
 ## 7. Licence and integrity rules

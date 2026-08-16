@@ -24,6 +24,7 @@ not as active guidance in this document.
 | ADR-023 | Use an uncertainty-aware EGM2008 mean-water baseline | Superseded for publication by ADR-024 | Historical acquisition and no-go evidence is retained; its terrain-classification path cannot produce a release. |
 | ADR-024 | Report AR6 regional relative sea-level projections | **Accepted; recovery gate approved** | Use one source-native 1° grid for map and point lookup, report q0.167/q0.5/q0.833 relative to 1995–2014, and never classify flooding or terrain exposure. Trusted #110 evidence and the owner disposition opened Phase 1. |
 | ADR-025 | Accelerate repository cutover to the static runtime | **Accepted** | Phase 2 removes the superseded repository runtime after target coverage exists. Git history is the source rollback; external cloud cleanup still requires separate explicit approval. |
+| ADR-026 | Use authoritative browser range persistence | **Accepted** | Cache Storage holds only verified complete resources; bounded IndexedDB holds only release-authorized COG chunks. PMTiles remains network-only, visual-only, and `no-store` until a separate reviewed interval-digest promotion contract exists. |
 
 ## Historical safety-gate decision
 
@@ -67,6 +68,8 @@ A new ADR is required before introducing any of the following:
 - paid always-on compute or a material recurring-cost increase;
 - removal of analysis COGs in favour of direct PMTiles lookup without bit-exact
   parity evidence.
+- persistence of PMTiles ranges without a separately reviewed promotion
+  contract containing exact release-authorized interval digests.
 
 Implementation details that stay inside ADR-021 constraints—such as choosing
 between measured open-source search libraries—may be recorded in a short design

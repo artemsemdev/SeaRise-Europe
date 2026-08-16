@@ -53,16 +53,28 @@ from a cached complete response.
 
 ## Decision
 
+The project owner accepted the measured storage behavior and refined its
+implementation scope in
+[ADR-026](../../architecture/adr/ADR-026-authoritative-browser-range-persistence.md).
+This refinement does not alter any engine, response, byte, header, or
+IndexedDB observation above. It distinguishes a demonstrated storage mechanism
+from the release-supplied interval integrity authority required for production
+admission.
+
 - Use Cache Storage only for explicitly routed complete shell and small
   immutable release responses.
-- Store COG and PMTiles range bytes in IndexedDB with application build,
-  `dataReleaseId`, artifact identity, expected ETag/SHA authority, total byte
-  size, interval, byte count, and LRU metadata.
+- Store only complete integrity-authorized COG chunks in bounded IndexedDB,
+  with exact application build, `dataReleaseId`, artifact identity, full
+  artifact authority, chunk interval/digest, byte count, and LRU metadata.
+- Keep PMTiles network-only and visual-only with a `no-store` caching policy.
+  PMTiles must not enter Cache Storage, IndexedDB, or the session-memory range
+  store until a separately reviewed promotion contract supplies exact interval
+  digests and the other ADR-026 gates.
 - Admit bytes, update accounting, and perform eviction in one IndexedDB
   transaction boundary where practical.
-- Synthesize a `206` only when stored intervals cover every requested byte and
-  the release plus artifact authority matches. A partial hit is a miss, not a
-  shortened response or scientific result.
+- Return only an exact authorized COG chunk or one half-open slice contained by
+  that single chunk. Adjacent records are not assembled. A partial hit is a
+  miss, not a shortened response or scientific result.
 - Never call `Cache.match()` with a range request and treat an arbitrary match
   as range-complete.
 
@@ -71,16 +83,19 @@ worker, caching policy, quotas, or UI.
 
 ## Scientific and privacy boundaries
 
-The range store is transport infrastructure. The analytical COG remains the
+The COG range store is transport infrastructure. The analytical COG remains the
 only exact scientific input and continues through ADR-024 identity, chunk,
 native-grid, quantile, nodata, and inclusive 100 km validation. PMTiles remains
 visual-only and cannot become science. A missing range must become a technical
 connection-required state, never a fifth outcome.
 
-The later production store must not persist search text, coordinates, place
+Technical cache, network, integrity, quota, transaction, and storage failures
+remain separate from all four ADR-024 outcomes. The later production store
+must not persist search text, coordinates, place
 labels, selection history, profile-like records, or query-bearing URLs. This
 spike contains no such inputs. Candidate-v7 and TAR files were not read,
-copied, served, cached, or uploaded.
+copied, served, cached, or uploaded. Explicit Candidate-v7 testing remains
+local, read-only, and session-only.
 
 ## Limitations
 

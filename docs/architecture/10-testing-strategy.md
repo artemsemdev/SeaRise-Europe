@@ -2,7 +2,7 @@
 
 > **Status:** Accepted target strategy; Phase 0R owner gate pending
 >
-> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md)
+> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](adr/ADR-024-ar6-regional-projection-contract.md), with browser persistence constrained by [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md)
 > **Quality rule:** no artifact is publishable merely because it builds. Scientific validity, contracts, browser parity, and delivery behaviour are release gates.
 
 The executable inventory, changed-path commands, fixture ownership, and legacy
@@ -210,11 +210,14 @@ the [static scientific lookup runbook](../operations/static-scientific-lookup.md
 
 ### 3.8 Offline, accessibility, and visual tests
 
-Offline tests warm only the explicitly supported cache, disable the network,
-and repeat shell, configuration, boundary, search, and cached-layer flows. An
-uncached required range must produce an honest connectivity/data-availability
-message. Tests must not imply that all nine Europe-wide layers are always
-offline.
+Offline tests warm only the explicitly supported stores, disable the network,
+and repeat complete-resource and integrity-authorized COG-chunk flows. They
+must reject `206` admission to Cache Storage and every PMTiles admission to
+Cache Storage, IndexedDB, or the session-memory range store, and verify
+PMTiles fetch and response caching policies are `no-store`. An uncached
+required COG range must produce an honest connectivity/data-availability
+message. Tests must not imply that PMTiles or all nine Europe-wide layers are
+always offline.
 
 Accessibility and visual coverage includes keyboard search, focus order,
 screen-reader result messaging, contrast, reduced motion, responsive layouts,
