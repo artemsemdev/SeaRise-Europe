@@ -9,6 +9,12 @@
       "reference": "src/web/src/application/assessment-controller.test.ts and src/web/src/application/use-assessment-runtime.test.tsx",
       "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; 23 deterministic controller/runtime cases over the committed synthetic release context"
     },
+    "local-2026-08-16-static-projection-url": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T09:05:11+02:00",
+      "reference": "src/web/src/application/use-projection-url.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; deterministic in-memory URL environment, committed synthetic release context, and synthetic privacy sentinel strings only; no network, Candidate-v7, or local-only input"
+    },
     "local-2026-08-16-static-projection-panel": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T08:44:07+02:00",
@@ -1218,6 +1224,7 @@
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/assessment-controller.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/use-assessment-runtime.test.tsx", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/application/use-projection-url.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/ProjectionPanel.test.tsx", "suite": "static-projection-panel", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
