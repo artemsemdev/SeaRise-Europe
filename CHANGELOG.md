@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added receipt-gated coordinated browser storage primitives with exact
+  verified-release route hashes, one release-disposition storage profile,
+  receipt-last logical publication, cross-context exclusive admission,
+  store-minted operation ownership, cancellation-aware conditional rollback,
+  and a bounded memory-only complete-resource adapter for private Candidates. Physical
+  crash orphans are non-authoritative until exact readback and receipt
+  publication; visual PMTiles remain outside every persistent and memory
+  resource store.
+
 - Added a deterministic verified-release resource plan that promotes only
   exact COG integrity chunks to range authority, routes approved complete
   resources to pair-scoped storage, keeps private and local candidates in

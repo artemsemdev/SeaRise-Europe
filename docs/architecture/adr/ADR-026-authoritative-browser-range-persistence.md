@@ -65,6 +65,39 @@ test may read authorized COG bytes into session memory, but it must not register
 a persistent worker, write durable range records, copy candidate bytes into a
 static build, or upload them.
 
+## Coordinated admission and receipt authority
+
+Cache Storage and IndexedDB do not provide a shared browser transaction. The
+static application therefore makes one narrower guarantee: a resource set is
+logically available only after all exact whole resources and authorized COG
+chunks have been admitted, read back, and bound by a versioned admission
+receipt published last. The receipt binds the exact app/release pair and
+release disposition, the complete verified route set, its persistence mode,
+and deterministic hashes of the complete-resource and range-identity sets. It
+contains no query, coordinates, location, selection, scientific outcome, or
+other personal state.
+
+The receipt store serializes the complete admission/readback/publication
+sequence through a pair-scoped browser-wide exclusive lock and mints a
+cryptographically strong operation identity. Batch adapters label newly
+written records with that opaque identity. A persistent admission fails closed
+when the cross-context lock is unavailable. Candidate and private admission
+does not request that lock or open a persistence API.
+Before receipt publication, cancellation, quota, integrity, or storage failure
+triggers conditional rollback of only records still owned by that operation;
+pre-existing verified records are retained. Cache Storage and IndexedDB cannot
+guarantee cross-store physical rollback after a browser crash, so cleanup of
+orphan bytes is conditional and best-effort. Such bytes remain unreceipted and
+must never be returned by authoritative reads or used for an offline
+availability claim.
+
+Private engineering releases and explicit local Candidates use bounded process
+memory for complete resources and COG chunks. They do not open Cache Storage or
+IndexedDB. PMTiles bypasses coordinated admission entirely and remains
+network-only with `no-store`; it never enters persistent or Candidate memory
+stores. Admission, quota, cancellation, and integrity failures remain technical
+failures and never become an ADR-024 scientific outcome.
+
 ## Scientific and failure boundary
 
 The scientific domain continues to expose exactly the four ADR-024 outcomes:
@@ -145,6 +178,11 @@ evidence text, while this ADR is the active owner decision.
   Storage, IndexedDB, or the session-memory range store.
 - Cache namespaces and range records are isolated by exact app/release
   identity, bounded, and fail closed on corruption or quota/transaction error.
+- Authoritative offline reads require an exact verified resource-plan receipt
+  published only after complete cross-store readback; unreceipted physical
+  bytes are unavailable.
+- Conditional rollback deletes only records still owned by the failed or
+  cancelled operation and never removes pre-existing accepted resources.
 - Candidate-v7 tests remain explicit, local, read-only, and session-only.
 - Tests keep technical failures separate from all four ADR-024 outcomes.
 - The compatibility evidence continues to report the original browser

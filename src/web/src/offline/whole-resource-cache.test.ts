@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { cacheNamespaces, validateAppReleasePair } from "./contracts/keys";
 import {
@@ -6,6 +7,7 @@ import {
   type WholeResourceAuthorityV1,
 } from "./contracts/v1";
 import {
+  MemoryWholeResourceCache,
   WholeResourceCache,
   WholeResourceCacheError,
   type CachePort,
@@ -21,6 +23,7 @@ class FakeCache implements CachePort {
   readonly entries = new Map<string, Response>();
   failPut = false;
   corruptPut = false;
+  afterPut: (() => void) | undefined;
 
   async match(key: string): Promise<Response | undefined> {
     return this.entries.get(key)?.clone();
@@ -29,6 +32,7 @@ class FakeCache implements CachePort {
   async put(key: string, response: Response): Promise<void> {
     if (this.failPut) throw new Error("quota");
     this.entries.set(key, this.corruptPut ? responseFor("wrong") : response.clone());
+    this.afterPut?.();
   }
 
   async delete(key: string): Promise<boolean> {
@@ -82,6 +86,15 @@ function resource(overrides: Record<string, unknown> = {}) {
     sha256: SHA,
     etag: `"sha256-${SHA}"`,
     ...overrides,
+  });
+}
+
+function attribution() {
+  return resource({
+    artifactId: "attribution",
+    role: "source-attribution",
+    canonicalUrl: `${ORIGIN}/releases/release-a/docs/attribution.json`,
+    path: "docs/attribution.json",
   });
 }
 
@@ -143,9 +156,9 @@ describe("whole-resource cache admission", () => {
     const { cache, storage, fetchResource, digest } = harness();
     const admitted = await cache.fetchAndAdmit(resource());
     expect(await admitted.text()).toBe("hello");
-    expect(fetchResource).toHaveBeenCalledWith(resource().canonicalUrl, {
-      cache: "no-store", credentials: "omit", redirect: "error",
-    });
+    expect(fetchResource).toHaveBeenCalledWith(resource().canonicalUrl, expect.objectContaining({
+      cache: "no-store", credentials: "omit", redirect: "error", signal: expect.any(AbortSignal),
+    }));
     expect(digest).toHaveBeenCalledTimes(4);
     const names = cacheNamespaces(resource().pair);
     expect(storage.stores.get(names.release)?.entries.has(resource().canonicalUrl)).toBe(true);
@@ -229,6 +242,10 @@ describe("whole-resource cache admission", () => {
     const names = cacheNamespaces(resource().pair);
     (await storage.open(names.release)).corruptPut = true;
     await expect(cache.fetchAndAdmit(resource())).rejects.toMatchObject({ code: "IntegrityFailed" });
+    // Corruption removed the operation ownership marker, so physical cleanup
+    // must not blindly delete. The unreceipted orphan is non-authoritative and
+    // the next verified read quarantines it exactly.
+    await expect(cache.read(resource())).resolves.toMatchObject({ state: "corrupt" });
     expect((await storage.open(names.release)).entries.size).toBe(0);
     expect(storage.deletedNames).toContain(`${names.release}:staging:operation-1`);
   });
@@ -239,6 +256,137 @@ describe("whole-resource cache admission", () => {
     (await storage.open(names.release)).failPut = true;
     await expect(cache.fetchAndAdmit(resource())).rejects.toMatchObject({ code: "AdmissionFailed" });
     expect((await storage.open(names.release)).entries.size).toBe(0);
+  });
+
+  it("stages an exact multi-resource batch and conditionally rolls back only operation-owned writes", async () => {
+    const storage = new FakeCacheStorage();
+    const dependencies: WholeResourceCacheDependencies = {
+      cacheStorage: storage,
+      fetchResource: vi.fn(async (url) => responseFor(BODY, { url })),
+      digest: harness().digest,
+      applicationOrigin: ORIGIN,
+      nextOperationId: () => "unused",
+    };
+    const cache = new WholeResourceCache(appAuthority(), dependencies);
+    const admission = await cache.fetchAndAdmitBatch([resource(), attribution()], {
+      operationId: "batch-1",
+      signal: new AbortController().signal,
+    });
+    expect(admission.entries.map((entry) => entry.disposition)).toEqual(["stored", "stored"]);
+    expect((await storage.open(cacheNamespaces(resource().pair).release)).entries.size).toBe(2);
+    await expect(cache.rollbackAdmission({ ...admission })).rejects.toMatchObject({ code: "AuthorityRejected" });
+    await expect(cache.rollbackAdmission(admission)).resolves.toEqual({
+      deleted: 2,
+      retainedAlreadyPresent: 0,
+      ownershipLost: 0,
+    });
+    expect((await storage.open(cacheNamespaces(resource().pair).release)).entries.size).toBe(0);
+  });
+
+  it("rolls back promoted operation-owned writes when cancellation arrives between promotions", async () => {
+    const storage = new FakeCacheStorage();
+    const controller = new AbortController();
+    const dependencies: WholeResourceCacheDependencies = {
+      cacheStorage: storage,
+      fetchResource: vi.fn(async (url) => responseFor(BODY, { url })),
+      digest: harness().digest,
+      applicationOrigin: ORIGIN,
+      nextOperationId: () => "unused",
+    };
+    const cache = new WholeResourceCache(appAuthority(), dependencies);
+    const target = await storage.open(cacheNamespaces(resource().pair).release);
+    target.afterPut = () => controller.abort();
+    await expect(cache.fetchAndAdmitBatch([resource(), attribution()], {
+      operationId: "batch-cancel",
+      signal: controller.signal,
+    })).rejects.toMatchObject({ code: "Aborted" });
+    expect(target.entries.size).toBe(0);
+  });
+
+  it("preserves an already-present verified resource when a later batch promotion fails", async () => {
+    const storage = new FakeCacheStorage();
+    const dependencies: WholeResourceCacheDependencies = {
+      cacheStorage: storage,
+      fetchResource: vi.fn(async (url) => responseFor(BODY, { url })),
+      digest: harness().digest,
+      applicationOrigin: ORIGIN,
+      nextOperationId: () => "seed",
+    };
+    const cache = new WholeResourceCache(appAuthority(), dependencies);
+    await cache.fetchAndAdmit(resource());
+    const target = await storage.open(cacheNamespaces(resource().pair).release);
+    target.failPut = true;
+    await expect(cache.fetchAndAdmitBatch([resource(), attribution()], {
+      operationId: "batch-fail",
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: "AdmissionFailed" });
+    target.failPut = false;
+    await expect(cache.read(resource())).resolves.toMatchObject({ state: "hit" });
+    await expect(cache.read(attribution())).resolves.toMatchObject({ state: "miss" });
+  });
+});
+
+describe("memory-only Candidate whole-resource admission", () => {
+  function memory(maxBytes = 10, maxEntries = 2) {
+    const fetchResource = vi.fn(async (url: string) => responseFor(BODY, {
+      url,
+      cacheControl: "private, no-store",
+    }));
+    const digest: WholeResourceCacheDependencies["digest"] = async (_algorithm, bytes) =>
+      Uint8Array.from(createHash("sha256").update(Buffer.from(bytes)).digest()).buffer;
+    const cache = new MemoryWholeResourceCache(appAuthority("private-engineering"), {
+      fetchResource,
+      digest,
+      applicationOrigin: ORIGIN,
+      nextOperationId: () => "memory-1",
+    }, { maxBytes, maxEntries });
+    return { cache, fetchResource, digest };
+  }
+
+  it("keeps private Candidate bytes in bounded memory with aggregate-only evidence", async () => {
+    const { cache, fetchResource } = memory();
+    await cache.fetchAndAdmit(resource());
+    await cache.fetchAndAdmit(resource());
+    expect(fetchResource).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(await cache.inventory([resource()]))).not.toMatch(
+      /query|latitude|longitude|ProjectionAvailable|DataUnavailable|OutOfScope|UnsupportedGeography/u,
+    );
+  });
+
+  it("plans quota before mutation and rolls back only exact operation-owned memory entries", async () => {
+    const { cache } = memory(5, 1);
+    const admission = await cache.fetchAndAdmitBatch([resource()], {
+      operationId: "memory-batch",
+      signal: new AbortController().signal,
+    });
+    await expect(cache.fetchAndAdmitBatch([attribution()], {
+      operationId: "memory-overflow",
+      signal: new AbortController().signal,
+    })).rejects.toMatchObject({ code: "AdmissionFailed" });
+    await expect(cache.read(resource())).resolves.toMatchObject({ state: "hit" });
+    await expect(cache.rollbackAdmission(admission)).resolves.toMatchObject({ deleted: 1, ownershipLost: 0 });
+    await expect(cache.read(resource())).resolves.toMatchObject({ state: "miss" });
+  });
+
+  it("rejects PMTiles and public releases without touching any browser persistence API", () => {
+    const dependencies = {
+      fetchResource: vi.fn(),
+      digest: harness().digest,
+      applicationOrigin: ORIGIN,
+      nextOperationId: () => "memory-1",
+    };
+    expect(() => new MemoryWholeResourceCache(appAuthority(), dependencies, {
+      maxBytes: 10, maxEntries: 2,
+    })).toThrow(/only for private or local Candidate/);
+    const cache = new MemoryWholeResourceCache(appAuthority("private-engineering"), dependencies, {
+      maxBytes: 10, maxEntries: 2,
+    });
+    return expect(cache.read({
+      ...resource(),
+      role: "projection-visual-pmtiles",
+      path: "layers/ssp2-45/2050.pmtiles",
+      mediaType: "application/vnd.pmtiles",
+    } as unknown as WholeResourceAuthorityV1)).rejects.toMatchObject({ code: "AuthorityRejected" });
   });
 });
 

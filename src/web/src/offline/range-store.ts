@@ -1,12 +1,14 @@
 import {
   assertPersistentEligibility,
   persistenceEligibility,
+  storageProfile,
   validateAppAuthority,
   validateByteInterval,
   validateRangeIdentity,
   type AppAuthorityV1,
   type PersistenceEligibilityV1,
   type RangeIdentityV1,
+  type StorageProfileV1,
 } from "./contracts/v1";
 import {
   validateClientLease,
@@ -15,6 +17,10 @@ import {
   type StorageBudgetV1,
 } from "./contracts/policy";
 import { cacheNamespaces, validateAppReleasePair, type AppReleasePairV1 } from "./contracts/keys";
+import {
+  assertAcceptedRangeResource,
+  type AcceptedAdmissionGateV1,
+} from "./admission-receipt";
 
 export type RangeWriteResult = "stored" | "already-present";
 export interface VerifiedRangeWrite {
@@ -48,15 +54,24 @@ export interface RangeInventoryV1 {
 }
 export interface RangeStore {
   readonly mode: "memory-only" | "persistent";
+  readonly storageProfile: StorageProfileV1;
   readExactOrContaining(identity: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null>;
   putVerified(identity: RangeIdentityV1, bytes: ArrayBuffer): Promise<RangeWriteResult>;
   putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]>;
+  admitVerifiedBatch(writes: readonly VerifiedRangeWrite[], options: RangeAdmissionOptionsV1): Promise<RangeAdmissionV1>;
+  rollbackAdmission(admission: RangeAdmissionV1): Promise<RangeRollbackResultV1>;
+  readAccepted(identity: RangeIdentityV1, gate: AcceptedAdmissionGateV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null>;
   acquireLease(lease: ClientLeaseV1): Promise<void>;
   releaseLease(lease: ClientLeaseV1): Promise<void>;
   setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void>;
   inventory(): Promise<RangeInventoryV1>;
   close(): void;
 }
+
+export interface RangeAdmissionOptionsV1 { readonly operationId: string; readonly signal: AbortSignal }
+export interface RangeAdmissionEntryV1 { readonly identity: RangeIdentityV1; readonly disposition: RangeWriteResult }
+export interface RangeAdmissionV1 { readonly contractVersion: 1; readonly operationId: string; readonly entries: readonly RangeAdmissionEntryV1[] }
+export interface RangeRollbackResultV1 { readonly deleted: number; readonly retainedAlreadyPresent: number; readonly ownershipLost: number }
 
 export class RangeStoreIntegrityError extends Error {
   constructor(message: string) { super(message); this.name = "RangeStoreIntegrityError"; }
@@ -67,6 +82,9 @@ export class RangeStoreQuotaError extends Error {
 export class RangeStoreUnsupportedError extends Error {
   constructor(message: string) { super(message); this.name = "RangeStoreUnsupportedError"; }
 }
+export class RangeStoreAbortedError extends Error {
+  constructor() { super("Range admission was cancelled before receipt publication."); this.name = "RangeStoreAbortedError"; }
+}
 
 interface StoredRange {
   key: string; pairKey: string; artifactKey: string; pair: AppReleasePairV1;
@@ -74,8 +92,16 @@ interface StoredRange {
   mediaType: string; totalByteSize: number; artifactSha256: string; integrityChunkSize: number;
   start: number; endExclusive: number;
   authorizedIntervalSha256: string; bytes: ArrayBuffer; byteLength: number;
-  contentSequence: number; lastAccessSequence: number;
+  contentSequence: number; lastAccessSequence: number; admissionOperationId: string | null;
 }
+
+const OPERATION_ID = /^[A-Za-z0-9._-]{1,64}$/u;
+const RANGE_ADMISSIONS = new WeakMap<object, ReadonlyMap<string, number>>();
+function checkedOperationId(value: string): string {
+  if (!OPERATION_ID.test(value)) throw new RangeStoreIntegrityError("Range admission operation identity is invalid.");
+  return value;
+}
+function abortIfNeeded(signal?: AbortSignal): void { if (signal?.aborted) throw new RangeStoreAbortedError(); }
 
 function samePair(left: AppReleasePairV1, right: AppReleasePairV1): boolean {
   return left.appBuildId === right.appBuildId && left.dataReleaseId === right.dataReleaseId;
@@ -184,17 +210,23 @@ async function verifyAdmissions(
   expectedPair: AppReleasePairV1,
   approved: ReadonlySet<string>,
   subtle: SubtleCrypto,
+  signal?: AbortSignal,
 ): Promise<readonly VerifiedAdmission[]> {
-  return Promise.all(writes.map(async ({ identity: input, bytes }) => {
+  abortIfNeeded(signal);
+  const admissions = await Promise.all(writes.map(async ({ identity: input, bytes }) => {
+    abortIfNeeded(signal);
     const identity = checkedCatalogIdentity(input, expectedPair, approved);
     if (bytes.byteLength !== identity.interval.endExclusive - identity.interval.start
       || await digest(bytes, subtle) !== identity.authorizedIntervalSha256) {
       throw new RangeStoreIntegrityError("Only exact release-authorized COG chunk bytes may enter a range store.");
     }
+    abortIfNeeded(signal);
     return Object.freeze({ identity, bytes, key: rangeKey(identity) });
   }));
+  abortIfNeeded(signal);
+  return admissions;
 }
-function recordFor(identity: RangeIdentityV1, bytes: ArrayBuffer, sequence: number): StoredRange {
+function recordFor(identity: RangeIdentityV1, bytes: ArrayBuffer, sequence: number, operationId: string | null = null): StoredRange {
   const authority = identity.authority;
   return {
     key: rangeKey(identity), pairKey: pairKey(authority.pair), artifactKey: artifactKey(identity),
@@ -204,6 +236,7 @@ function recordFor(identity: RangeIdentityV1, bytes: ArrayBuffer, sequence: numb
     start: identity.interval.start, endExclusive: identity.interval.endExclusive,
     authorizedIntervalSha256: identity.authorizedIntervalSha256, bytes: bytes.slice(0),
     byteLength: bytes.byteLength, contentSequence: sequence, lastAccessSequence: sequence,
+    admissionOperationId: operationId,
   };
 }
 function matches(record: StoredRange, identity: RangeIdentityV1): boolean {
@@ -222,11 +255,15 @@ function matches(record: StoredRange, identity: RangeIdentityV1): boolean {
 
 export class MemoryRangeStore implements RangeStore {
   readonly mode = "memory-only" as const;
+  readonly storageProfile: StorageProfileV1;
   readonly #pair: AppReleasePairV1; readonly #budget: StorageBudgetV1; readonly #subtle: SubtleCrypto;
   readonly #now: () => number; readonly #approved: ReadonlySet<string>;
   readonly #entries = new Map<string, StoredRange>(); readonly #leases = new Map<string, ClientLeaseV1>();
   #sequence = 0; #active: AppReleasePairV1 | null = null; #previous: AppReleasePairV1 | null = null;
-  constructor(pair: AppReleasePairV1, budget: StorageBudgetV1, subtle: SubtleCrypto, approved: ReadonlySet<string>, now: () => number = Date.now) {
+  constructor(profile: StorageProfileV1, budget: StorageBudgetV1, subtle: SubtleCrypto, approved: ReadonlySet<string>, now: () => number = Date.now) {
+    if (profile.mode !== "memory-only") throw new RangeStoreIntegrityError("Memory range storage requires a memory-only storage profile.");
+    this.storageProfile = profile;
+    const pair = profile.pair;
     this.#pair = validateAppReleasePair(pair); this.#budget = validateStorageBudget(budget); this.#subtle = subtle;
     this.#approved = approved; this.#now = now;
   }
@@ -243,8 +280,29 @@ export class MemoryRangeStore implements RangeStore {
     return (await this.putVerifiedBatch([{ identity: input, bytes }]))[0]!;
   }
   async putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]> {
-    const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle);
-    if (admissions.length === 0) return Object.freeze([]);
+    return (await this.#putBatch(writes, null)).results;
+  }
+  async admitVerifiedBatch(writes: readonly VerifiedRangeWrite[], options: RangeAdmissionOptionsV1): Promise<RangeAdmissionV1> {
+    const operation = checkedOperationId(options.operationId);
+    const admitted = await this.#putBatch(writes, operation, options.signal);
+    const handle = Object.freeze({
+      contractVersion: 1 as const,
+      operationId: operation,
+      entries: Object.freeze(admitted.admissions.map((admission, index) => Object.freeze({
+        identity: admission.identity,
+        disposition: admitted.results[index]!,
+      }))),
+    });
+    RANGE_ADMISSIONS.set(handle, admitted.ownership);
+    return handle;
+  }
+  async #putBatch(writes: readonly VerifiedRangeWrite[], operation: string | null, signal?: AbortSignal): Promise<Readonly<{
+    results: readonly RangeWriteResult[];
+    admissions: readonly VerifiedAdmission[];
+    ownership: ReadonlyMap<string, number>;
+  }>> {
+    const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle, signal);
+    if (admissions.length === 0) return Object.freeze({ results: Object.freeze([]), admissions, ownership: new Map() });
 
     const unique = new Map<string, VerifiedAdmission>();
     const initiallyPresent = new Set(this.#entries.keys());
@@ -260,8 +318,13 @@ export class MemoryRangeStore implements RangeStore {
       if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(key);
       else protectedKeys.add(pairKey(lease.pair));
     }
-    const ordered = [...this.#entries.values()].sort((a, b) => a.lastAccessSequence - b.lastAccessSequence || a.key.localeCompare(b.key));
-    let total = ordered.reduce((sum, record) => sum + record.byteLength, 0);
+    // Coordinated admission cannot evict prior accepted bytes before its
+    // receipt is published. Legacy standalone writes retain bounded LRU.
+    const currentEntries = [...this.#entries.values()];
+    const ordered = operation === null
+      ? currentEntries.sort((a, b) => a.lastAccessSequence - b.lastAccessSequence || a.key.localeCompare(b.key))
+      : [];
+    let total = currentEntries.reduce((sum, record) => sum + record.byteLength, 0);
     const additions = [...unique.values()].filter((admission) => !initiallyPresent.has(admission.key));
     const additionBytes = additions.reduce((sum, admission) => sum + admission.bytes.byteLength, 0);
     let projectedEntries = this.#entries.size + additions.length;
@@ -275,14 +338,42 @@ export class MemoryRangeStore implements RangeStore {
       throw new RangeStoreQuotaError();
     }
 
+    abortIfNeeded(signal);
     let nextSequence = this.#sequence;
-    const records = [...unique.values()].map((admission) =>
-      recordFor(admission.identity, admission.bytes, ++nextSequence));
+    const records = additions.map((admission) =>
+      recordFor(admission.identity, admission.bytes, ++nextSequence, operation));
     for (const candidate of evictions) this.#entries.delete(candidate.key);
     for (const key of expiredLeases) this.#leases.delete(key);
     for (const record of records) this.#entries.set(record.key, record);
     this.#sequence = nextSequence;
-    return Object.freeze(results);
+    return Object.freeze({
+      results: Object.freeze(results),
+      admissions,
+      ownership: new Map(records.map((record) => [record.key, record.contentSequence])),
+    });
+  }
+  async rollbackAdmission(admission: RangeAdmissionV1): Promise<RangeRollbackResultV1> {
+    const ownership = RANGE_ADMISSIONS.get(admission);
+    if (!ownership) throw new RangeStoreIntegrityError("Range admission handle is not verified.");
+    let deleted = 0;
+    for (const [key, contentSequence] of ownership) {
+      const current = this.#entries.get(key);
+      if (current?.contentSequence === contentSequence && current.admissionOperationId === admission.operationId) {
+        this.#entries.delete(key);
+        deleted += 1;
+      }
+    }
+    RANGE_ADMISSIONS.delete(admission);
+    return Object.freeze({
+      deleted,
+      retainedAlreadyPresent: admission.entries.filter((entry) => entry.disposition === "already-present").length,
+      ownershipLost: ownership.size - deleted,
+    });
+  }
+  async readAccepted(input: RangeIdentityV1, gate: AcceptedAdmissionGateV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
+    const identity = checkedCatalogIdentity(input, this.#pair, this.#approved);
+    await assertAcceptedRangeResource(gate, identity, this.#subtle);
+    return this.readExactOrContaining(identity, requested);
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.set(leaseKey(lease), lease); }
   async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.delete(leaseKey(lease)); }
@@ -307,11 +398,12 @@ export interface RangeStoreOptionsV1 { readonly localCandidate?: boolean; readon
 export function createRangeStore(authorityInput: AppAuthorityV1, budget: StorageBudgetV1, apis: RangeStoreBrowserApis, options: RangeStoreOptionsV1): RangeStore {
   const authority = validateAppAuthority(authorityInput);
   const eligibility = persistenceEligibility(authority, options.localCandidate === true);
+  const profile = storageProfile(authority, options.localCandidate === true);
   const pair = pairFromAuthority(authority);
   const approved = catalogKeys(options.catalog, pair);
-  if (eligibility.mode === "memory-only") return new MemoryRangeStore(pair, budget, apis.subtle, approved, apis.now);
+  if (eligibility.mode === "memory-only") return new MemoryRangeStore(profile, budget, apis.subtle, approved, apis.now);
   if (!apis.indexedDB) throw new RangeStoreUnsupportedError("IndexedDB is unavailable for persistent range storage.");
-  return new IndexedDbRangeStore(eligibility, budget, approved, apis);
+  return new IndexedDbRangeStore(eligibility, profile, budget, approved, apis);
 }
 
 interface MetaRecord { key: "state"; rangeBytes: number; rangeEntries: number; nextSequence: number; activePair: AppReleasePairV1 | null; previousPair: AppReleasePairV1 | null }
@@ -324,9 +416,12 @@ function completed(transaction: IDBTransaction): Promise<void> { return new Prom
 
 class IndexedDbRangeStore implements RangeStore {
   readonly mode = "persistent" as const;
+  readonly storageProfile: StorageProfileV1;
   readonly #pair: AppReleasePairV1; readonly #budget: StorageBudgetV1; readonly #idb: IDBFactory;
   readonly #subtle: SubtleCrypto; readonly #approved: ReadonlySet<string>; readonly #now: () => number; #database: Promise<IDBDatabase> | null = null;
-  constructor(eligibility: PersistenceEligibilityV1, budget: StorageBudgetV1, approved: ReadonlySet<string>, apis: RangeStoreBrowserApis) {
+  constructor(eligibility: PersistenceEligibilityV1, profile: StorageProfileV1, budget: StorageBudgetV1, approved: ReadonlySet<string>, apis: RangeStoreBrowserApis) {
+    if (profile.mode !== "persistent") throw new RangeStoreIntegrityError("Persistent range storage requires a persistent storage profile.");
+    this.storageProfile = profile;
     this.#pair = assertPersistentEligibility(eligibility); this.#budget = validateStorageBudget(budget);
     if (!apis.indexedDB) throw new RangeStoreUnsupportedError("IndexedDB is unavailable.");
     this.#idb = apis.indexedDB; this.#subtle = apis.subtle; this.#approved = approved; this.#now = apis.now ?? Date.now;
@@ -387,9 +482,32 @@ class IndexedDbRangeStore implements RangeStore {
     return (await this.putVerifiedBatch([{ identity: input, bytes }]))[0]!;
   }
   async putVerifiedBatch(writes: readonly VerifiedRangeWrite[]): Promise<readonly RangeWriteResult[]> {
-    const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle);
-    if (admissions.length === 0) return Object.freeze([]);
+    return (await this.#putBatch(writes, null)).results;
+  }
+  async admitVerifiedBatch(writes: readonly VerifiedRangeWrite[], options: RangeAdmissionOptionsV1): Promise<RangeAdmissionV1> {
+    const operation = checkedOperationId(options.operationId);
+    const admitted = await this.#putBatch(writes, operation, options.signal);
+    const handle = Object.freeze({
+      contractVersion: 1 as const,
+      operationId: operation,
+      entries: Object.freeze(admitted.admissions.map((admission, index) => Object.freeze({
+        identity: admission.identity,
+        disposition: admitted.results[index]!,
+      }))),
+    });
+    RANGE_ADMISSIONS.set(handle, admitted.ownership);
+    return handle;
+  }
+  async #putBatch(writes: readonly VerifiedRangeWrite[], operation: string | null, signal?: AbortSignal): Promise<Readonly<{
+    results: readonly RangeWriteResult[];
+    admissions: readonly VerifiedAdmission[];
+    ownership: ReadonlyMap<string, number>;
+  }>> {
+    const admissions = await verifyAdmissions(writes, this.#pair, this.#approved, this.#subtle, signal);
+    if (admissions.length === 0) return Object.freeze({ results: Object.freeze([]), admissions, ownership: new Map() });
     const database = await this.#open(); const tx = database.transaction([STORES.meta, STORES.ranges, STORES.leases], "readwrite"); const done = completed(tx); let quota = false;
+    const abort = () => { try { tx.abort(); } catch { /* Transaction already committed. */ } };
+    signal?.addEventListener("abort", abort, { once: true });
     try {
       const metaStore = tx.objectStore(STORES.meta); const rangeStore = tx.objectStore(STORES.ranges); const leaseStore = tx.objectStore(STORES.leases);
       const meta = await this.#meta(metaStore);
@@ -409,7 +527,9 @@ class IndexedDbRangeStore implements RangeStore {
       const leases = await request(leaseStore.getAll()) as LeaseRecord[]; const protectedPairs = new Set([meta.activePair, meta.previousPair].filter(Boolean).map((pair) => pairKey(pair!)));
       const expiredLeases: string[] = [];
       for (const lease of leases) { if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(lease.key); else protectedPairs.add(lease.pairKey); }
-      const candidates = await request(rangeStore.index("by-lru").getAll()) as StoredRange[];
+      const candidates = operation === null
+        ? await request(rangeStore.index("by-lru").getAll()) as StoredRange[]
+        : [];
       const additions = [...unique.values()].filter((admission) => !existingKeys.has(admission.key));
       let projectedBytes = meta.rangeBytes + additions.reduce((sum, admission) => sum + admission.bytes.byteLength, 0);
       let projectedEntries = meta.rangeEntries + additions.length;
@@ -420,20 +540,61 @@ class IndexedDbRangeStore implements RangeStore {
         evictions.push(candidate); projectedBytes -= candidate.byteLength; projectedEntries -= 1;
       }
       if (projectedBytes > this.#budget.maxRangeBytes || projectedEntries > this.#budget.maxRangeEntries) { quota = true; tx.abort(); await done; }
+      abortIfNeeded(signal);
       for (const key of expiredLeases) leaseStore.delete(key);
       for (const candidate of evictions) rangeStore.delete(candidate.key);
-      for (const admission of unique.values()) {
-        rangeStore.put(recordFor(admission.identity, admission.bytes, ++meta.nextSequence));
+      const ownership = new Map<string, number>();
+      for (const admission of additions) {
+        const record = recordFor(admission.identity, admission.bytes, ++meta.nextSequence, operation);
+        rangeStore.put(record);
+        ownership.set(record.key, record.contentSequence);
       }
       meta.rangeBytes = projectedBytes; meta.rangeEntries = projectedEntries; metaStore.put(meta);
-      await done; return Object.freeze(results);
+      await done;
+      return Object.freeze({ results: Object.freeze(results), admissions, ownership });
     } catch (error) {
       try { tx.abort(); } catch { /* Transaction already completed or aborted. */ }
       await done.catch(() => undefined);
       if (quota || (typeof error === "object" && error !== null && "name" in error
         && error.name === "QuotaExceededError")) throw new RangeStoreQuotaError();
+      if (signal?.aborted) throw new RangeStoreAbortedError();
       throw error;
+    } finally {
+      signal?.removeEventListener("abort", abort);
     }
+  }
+  async rollbackAdmission(admission: RangeAdmissionV1): Promise<RangeRollbackResultV1> {
+    const ownership = RANGE_ADMISSIONS.get(admission);
+    if (!ownership) throw new RangeStoreIntegrityError("Range admission handle is not verified.");
+    const database = await this.#open();
+    const tx = database.transaction([STORES.meta, STORES.ranges], "readwrite");
+    const done = completed(tx);
+    const rangeStore = tx.objectStore(STORES.ranges);
+    const metaStore = tx.objectStore(STORES.meta);
+    const meta = await this.#meta(metaStore);
+    let deleted = 0;
+    for (const [key, contentSequence] of ownership) {
+      const current = await request(rangeStore.get(key)) as StoredRange | undefined;
+      if (current?.contentSequence === contentSequence && current.admissionOperationId === admission.operationId) {
+        rangeStore.delete(key);
+        meta.rangeBytes = Math.max(0, meta.rangeBytes - current.byteLength);
+        meta.rangeEntries = Math.max(0, meta.rangeEntries - 1);
+        deleted += 1;
+      }
+    }
+    metaStore.put(meta);
+    await done;
+    RANGE_ADMISSIONS.delete(admission);
+    return Object.freeze({
+      deleted,
+      retainedAlreadyPresent: admission.entries.filter((entry) => entry.disposition === "already-present").length,
+      ownershipLost: ownership.size - deleted,
+    });
+  }
+  async readAccepted(input: RangeIdentityV1, gate: AcceptedAdmissionGateV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null> {
+    const identity = checkedCatalogIdentity(input, this.#pair, this.#approved);
+    await assertAcceptedRangeResource(gate, identity, this.#subtle);
+    return this.readExactOrContaining(identity, requested);
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> {
     const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx);
