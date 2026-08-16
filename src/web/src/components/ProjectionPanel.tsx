@@ -16,6 +16,7 @@ import {
 } from "../domain/release";
 import type { AssessmentResult } from "../domain/scientific-lookup";
 import type { ReleaseMethodology } from "../data/methodology-repository";
+import type { RefObject } from "react";
 import "./ProjectionPanel.css";
 
 const SCENARIO_LABELS: Readonly<Record<ScenarioId, string>> = Object.freeze({
@@ -39,6 +40,7 @@ export interface ProjectionPanelProps {
   readonly onReset: () => void;
   readonly onShare: () => void;
   readonly onOpenMethodology: () => void;
+  readonly methodologyTriggerRef?: RefObject<HTMLButtonElement | null>;
 }
 
 function assertNever(value: never): never {
@@ -392,6 +394,7 @@ export function ProjectionPanel({
   onReset,
   onShare,
   onOpenMethodology,
+  methodologyTriggerRef,
 }: ProjectionPanelProps): React.ReactNode {
   const accepted = visibleAcceptedProjection(state);
   const selection = currentSelection(state);
@@ -425,7 +428,7 @@ export function ProjectionPanel({
         <button type="button" onClick={onRetry} disabled={!canRetry}>Retry exact selection</button>
         <button type="button" onClick={onReset} disabled={!canReset}>Reset selection</button>
         <button type="button" onClick={onShare} disabled={!stableShare}>Share accepted result</button>
-        <button type="button" onClick={onOpenMethodology} disabled={!methodologyUsable}>Methodology and sources</button>
+        <button ref={methodologyTriggerRef} type="button" onClick={onOpenMethodology} disabled={!methodologyUsable}>Methodology and sources</button>
       </div>
     </section>
   );

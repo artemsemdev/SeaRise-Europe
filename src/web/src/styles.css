@@ -199,6 +199,20 @@ a { color: inherit; }
 .scope-rule { height: 1px; margin: 0.75rem 0; background: rgb(255 255 255 / 18%); }
 .scope-card strong { color: #a9e6df; }
 
+.application-technical-alert,
+.share-status {
+  margin: 1rem clamp(1.25rem, 7vw, 8rem) 0;
+}
+.application-technical-alert {
+  padding: 0.9rem 1rem;
+  border: 1px solid #b96b59;
+  border-radius: 0.65rem;
+  background: #fff1ec;
+  color: #702719;
+  line-height: 1.5;
+}
+.share-status { min-height: 1.5rem; color: var(--muted); }
+
 .map-launcher {
   min-height: 18rem;
   padding: clamp(4rem, 8vw, 7rem) clamp(1.25rem, 7vw, 8rem);
