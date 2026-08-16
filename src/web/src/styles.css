@@ -132,9 +132,50 @@ a { color: inherit; }
   cursor: pointer;
 }
 .search-control button:hover { background: var(--atlantic-700); }
+.search-control button:disabled { opacity: 0.45; cursor: not-allowed; }
 .search-control button:focus-visible, a:focus-visible { outline: 3px solid #f5c66b; outline-offset: 3px; }
 .search-hint, .status { margin: 0.75rem 1.25rem 0; color: rgb(255 255 255 / 74%); font-size: 0.78rem; }
 .status { min-height: 1.2rem; color: #b8eee7; }
+.status.error { color: #ffd2bd; }
+.selection-status { margin: 0.55rem 1.25rem 0; color: #d0ebdf; font-size: 0.78rem; }
+.search-results {
+  position: absolute;
+  z-index: 12;
+  left: 0;
+  right: 0;
+  max-height: min(22rem, 46vh);
+  margin-top: 0.45rem;
+  overflow-y: auto;
+  border: 1px solid rgb(16 39 45 / 18%);
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 98%);
+  color: var(--ink);
+  box-shadow: 0 1.2rem 3rem rgb(2 21 27 / 42%);
+}
+.search-shell { position: relative; }
+.search-results [role="option"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.15rem;
+  cursor: pointer;
+}
+.search-results [role="option"] + [role="option"] { border-top: 1px solid #e4e9e5; }
+.search-results [role="option"].active { background: #e5f2ef; }
+.search-results [role="option"] > span:first-child { display: grid; gap: 0.16rem; }
+.search-results small { color: var(--muted); }
+.settlement-kind {
+  border-radius: 999px;
+  padding: 0.24rem 0.48rem;
+  background: #edf1ef;
+  color: var(--atlantic-700);
+  font-family: "Geist Mono Variable", monospace;
+  font-size: 0.63rem;
+  text-transform: uppercase;
+}
+.search-empty { margin: 0; padding: 1rem 1.15rem; color: var(--muted); }
+.search-empty.error { color: #8c291b; }
 .release-startup { margin: 0 0 1rem; font-size: 0.82rem; color: rgb(255 255 255 / 78%); }
 .release-startup.ready { color: #d0ebdf; }
 .release-startup.error { max-width: 42rem; padding: 0.75rem 0.9rem; border: 1px solid rgb(255 219 202 / 60%); background: rgb(82 24 16 / 72%); }

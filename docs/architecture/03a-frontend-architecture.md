@@ -160,13 +160,15 @@ typed protocol:
 
 ```typescript
 type SearchWorkerRequest =
-  | { type: 'initialize'; releaseId: string; coreUrl: string; coastalUrl: string }
-  | { type: 'query'; token: number; text: string; limit: number };
+  | { kind: 'initialize'; token: number; authority: SearchShardAuthority }
+  | { kind: 'load-shard'; token: number; authority: SearchShardAuthority }
+  | { kind: 'query'; token: number; query: string }
+  | { kind: 'terminate'; token: number };
 
 type SearchWorkerResponse =
-  | { type: 'ready'; shard: 'core' | 'coastal' }
-  | { type: 'results'; token: number; items: Place[] }
-  | { type: 'error'; token?: number; code: SearchErrorCode };
+  | { kind: 'ready'; token: number; shardId: SearchShardId; durationMilliseconds: number }
+  | { kind: 'results'; token: number; results: RankedSearchResult[]; readyShards: SearchShardId[] }
+  | { kind: 'error'; token: number; error: TechnicalError };
 ```
 
 The core shard becomes searchable first. Coastal results merge deterministically
@@ -178,6 +180,12 @@ Queries are debounced only to reduce unnecessary worker messages, not to make a
 network call. The client applies a monotonically increasing token and ignores a
 response for any earlier query. Country and first-level administration remain
 visible for duplicate names, and all candidates are keyboard navigable.
+
+The implemented static target verifies each shard's exact release-authorized
+transport bytes before decoding. Identity JSON is parsed directly; Brotli
+objects use a pinned decoder loaded lazily inside the Worker. Raw query text is
+memory-only and never enters URLs, request bodies, storage, caches, logs, or
+analytics. See the [static settlement search runbook](../operations/static-settlement-search.md).
 
 ## Assessment engine
 

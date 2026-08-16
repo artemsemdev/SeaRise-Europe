@@ -1,4 +1,5 @@
-import { lazy, Suspense, useId, useState } from "react";
+import { lazy, Suspense, useState } from "react";
+import { SettlementSearch } from "./components/SettlementSearch";
 import { releaseLabel, runtimeConfig } from "./config";
 import { technicalErrorPresentation } from "./domain/release";
 import type { Selection } from "./domain/release";
@@ -51,11 +52,9 @@ function ReleaseStartup({ state, retry }: { state: ReleaseBootstrapState; retry:
 }
 
 function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry: () => void }) {
-  const hintId = useId();
-  const [place, setPlace] = useState("");
-  const [status, setStatus] = useState("Place search loads locally in the next Phase 2 slice.");
   const [mapOpen, setMapOpen] = useState(false);
   const [selection, applySelection] = useState<Selection>();
+  const [selectionStatus, setSelectionStatus] = useState("Choose a settlement to continue.");
 
   return (
     <main id="main" className="landing">
@@ -73,38 +72,13 @@ function LandingPage({ release, retry }: { release: ReleaseBootstrapState; retry
             settlements. Values are regional—not predictions of flooding or property risk.
           </p>
           <ReleaseStartup state={release} retry={retry} />
-          <form
-            className="search-shell"
-            role="search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setStatus(
-                place.trim()
-                  ? `“${place.trim()}” stayed in this browser. The local search index is not enabled in this shell yet.`
-                  : "Enter a European city, town, or village.",
-              );
-            }}
-          >
-            <label htmlFor="place-search">Find a city, town, or village</label>
-            <div className="search-control">
-              <span className="search-icon" aria-hidden="true" />
-              <input
-                id="place-search"
-                value={place}
-                onChange={(event) => setPlace(event.target.value)}
-                aria-describedby={hintId}
-                autoComplete="off"
-                placeholder="Try Rotterdam, Porto, or Galway"
-              />
-              <button type="submit">Explore</button>
-            </div>
-            <p id={hintId} className="search-hint">
-              Settlements only. Your text stays in this browser.
-            </p>
-            <p className="status" role="status" aria-live="polite">
-              {status}
-            </p>
-          </form>
+          <SettlementSearch
+            release={release.phase === "ready" ? release.context : null}
+            onSelect={(record) => setSelectionStatus(
+              `${record.displayName}, ${record.admin1Name ?? record.countryCode} selected at ${record.latitude}, ${record.longitude}.`,
+            )}
+          />
+          <p className="selection-status" aria-live="polite">{selectionStatus}</p>
         </div>
         <aside className="scope-card" aria-label="Current data status">
           <span className="scope-number">3 × 3</span>

@@ -1128,7 +1128,12 @@ def test_committed_public_release_tree_is_complete_and_fail_closed() -> None:
         if path.is_file()
     }
     assert committed == inventoried | {"manifest.json"}
-    assert (summary.artifact_count, summary.dataset_count) == (41, 9)
+    assert (summary.artifact_count, summary.dataset_count) == (43, 9)
+    assert {
+        artifact["artifactId"]
+        for artifact in manifest["artifacts"]
+        if artifact["role"] == "settlement-search-index"
+    } == {"settlements-europe-core", "settlements-europe-coastal"}
     assert manifest["releaseAuthority"] == {
         "automatedValidation": "passed",
         "releaseDisposition": "pending-owner",

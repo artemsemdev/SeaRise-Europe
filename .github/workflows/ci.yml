@@ -426,14 +426,14 @@ jobs:
           run_root="${RUNNER_TEMP}/offline-release-run"
           test ! -e "${run_root}/failure-clean.json"
           test ! -e "${run_root}/failure-resumed.json"
-          test "$(find "${run_root}/candidate-clean" -type f | wc -l | tr -d ' ')" = "42"
+          test "$(find "${run_root}/candidate-clean" -type f | wc -l | tr -d ' ')" = "44"
           diff --recursive --brief \
             "${run_root}/candidate-clean" \
             "${run_root}/candidate-resumed"
           jq -e '
             .status == "complete" and
             .networkAccess == "disabled" and
-            .candidate.fileCount == 42 and
+            .candidate.fileCount == 44 and
             .resourceUsage.peakProcessRssBytes > 0 and
             ([.stages[].cacheStatus] | all(. == "miss"))
           ' "${run_root}/execution-clean.json"

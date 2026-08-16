@@ -33,8 +33,9 @@ also show that target parity alone does not authorize legacy deletion.
 | Measured evidence | `tests/evidence/` | `<experiment-or-gate>.json` |
 | Repository harness tests | `tests/harness/` | `test_<behavior>.py` |
 | Pipeline target tests | `src/pipeline/tests/<domain>/` | `test_<behavior>.py` |
-| Static browser target tests | `src/web/src/<domain>/` | `<behavior>.<kind>.test.ts[x]` |
-| Browser journeys | `src/web/tests/` | `<journey>.spec.ts` |
+| Static browser unit/component tests | `src/web/src/<domain>/` | `<behavior>.test.ts[x]` |
+| Static browser journeys | `src/web/tests/` | `<journey>.spec.ts` |
+| Legacy frontend evidence | `src/frontend/src/` | Historical test names remain until their approved retirement PR |
 
 Builders belong next to the consuming test suite under a `builders/` directory.
 They expose domain intent and must not copy legacy request, database, TiTiler,
@@ -85,6 +86,10 @@ The tiers have different purposes:
 
 A fast pass cannot waive regional or release evidence. Promotion workflows in
 #61 must consume the same suite IDs rather than maintain an unrelated path map.
+
+Settlement search validation and its fixture-versus-production evidence limits
+are documented in the
+[static settlement search runbook](../operations/static-settlement-search.md).
 
 ## Path-aware pull request CI
 

@@ -79,6 +79,12 @@ export default defineConfig(({ command, mode }) => {
         },
       },
     },
+    preview: {
+      // Preserve precompressed release artifacts as opaque bytes. Without this
+      // explicit identity override, Vite preview infers Content-Encoding from
+      // the .br suffix and fetch() receives transformed bytes before hashing.
+      headers: { "Content-Encoding": "identity" },
+    },
     test: {
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
