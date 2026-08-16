@@ -72,6 +72,15 @@ def _discover_test_files() -> set[str]:
     )
     files.update(
         str(path.relative_to(ROOT))
+        for pattern in ("*.test.ts", "*.test.tsx")
+        for path in (ROOT / "src/web/src").rglob(pattern)
+    )
+    files.update(
+        str(path.relative_to(ROOT))
+        for path in (ROOT / "src/web/tests").rglob("*.spec.ts")
+    )
+    files.update(
+        str(path.relative_to(ROOT))
         for path in (ROOT / "tests/harness").rglob("test_*.py")
     )
     for path in (ROOT / "src/api/SeaRise.Api.Tests").rglob("*.cs"):

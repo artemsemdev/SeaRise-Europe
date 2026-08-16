@@ -99,7 +99,7 @@ def test_cli_builds_candidate_and_commits_complete_execution_receipt(
     assert receipt["status"] == "complete"
     assert receipt["networkAccess"] == "disabled"
     assert len(receipt["stages"]) == 7  # type: ignore[arg-type]
-    assert receipt["candidate"]["fileCount"] == 42  # type: ignore[index]
+    assert receipt["candidate"]["fileCount"] == 44  # type: ignore[index]
     assert receipt["candidate"]["byteSize"] > 0  # type: ignore[index]
     assert len(receipt["candidate"]["inventorySha256"]) == 64  # type: ignore[index]
     assert receipt["resourceUsage"]["totalDurationSeconds"] >= 0  # type: ignore[index]

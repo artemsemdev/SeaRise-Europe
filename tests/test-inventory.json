@@ -21,6 +21,12 @@
       "reference": "src/web/src/data/map-layer-resolver.test.ts and src/web/tests/map-visualization.spec.ts",
       "environment": "macOS arm64; Node 20.20.1; MapLibre GL JS 5.19.0; PMTiles 4.4.0; Chromium desktop/mobile; committed synthetic fixture only"
     },
+    "local-2026-08-16-static-settlement-search": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T14:30:00+02:00",
+      "reference": "docs/operations/static-settlement-search.md and src/web/tests/static-shell.spec.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; Chromium desktop/mobile; committed synthetic fixture; production-scale memory not measured"
+    },
     "ci-30949490661": {
       "kind": "github-actions",
       "observedAt": "2026-08-04T20:51:42Z",
@@ -244,6 +250,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-16-static-map", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Thirty-five Vitest cases and fourteen desktop/mobile Playwright cases passed; map E2E covers all nine visual identities, restrictive-CSP compatibility, and deterministic basemap failure." }
+    },
+    {
+      "id": "static-settlement-search",
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Verify release-bound GeoNames shards, deterministic normalization and ranking, exact coordinates, private Worker-only queries, accessible keyboard search, partial readiness, integrity-first decode, and technical failure isolation.",
+      "sourcePaths": ["src/web/src/search/**", "src/web/src/components/SettlementSearch.test.tsx", "src/web/src/local-candidate-harness.test.ts", "src/web/src/local-measurement-paths.test.ts", "src/web/tests/static-shell.spec.ts", "contracts/release/v1/fixtures/release/*/search/*.br"],
+      "changedPaths": ["package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/supply-chain/v1/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent static settlement-search, privacy, accessibility, integrity, and no-runtime-geocoder contract." },
+      "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-16-static-settlement-search", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Deterministic Vitest and desktop/mobile Chromium cases passed against exact committed fixture bytes; production-corpus performance remains a separate local-only gate." }
     },
     {
       "id": "quality-inventory-harness",
@@ -1129,6 +1149,20 @@
     { "path": "src/frontend/src/search/shards/browser-shards.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/search/worker/browser-runtime.test.ts", "suite": "frontend-search-evaluation-foundation", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts", "suite": "frontend-settlement-worker-performance", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/map/render-token.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/SettlementSearch.test.tsx", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/data/map-layer-resolver.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/data/manifest-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/domain/release.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/local-measurement-paths.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/search/runtime.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/search/search.worker.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/static-shell.spec.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cog_range_evidence.py", "suite": "pipeline-reviewed-cog-range-access", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/offline_release/test_cli.py", "suite": "pipeline-offline-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },

@@ -27,13 +27,12 @@ All notable changes to this project will be documented in this file.
   new lock is included in the reviewed dependency inventory and regenerated
   build-plane CycloneDX SBOM.
 
-- Fixed bounded settlement search failing closed on the production europe-core
-  and europe-coastal shards. The fuzzy walk opened every shallow trie subtree
-  regardless of the query, so the multi-script alternate-name index exhausted
-  the traversal-work limit before any result was ranked. Subtrees are now
-  skipped by two admissible edit-distance lower bounds, and the walk is skipped
-  entirely when better-ranked matches already fill the candidate set. Results,
-  ranking, shard bytes, and the 250,000-unit work limit are unchanged.
+- Fixed bounded settlement search failing closed on production-scale core and
+  coastal shards. The browser now searches the canonical sorted entries through
+  compact length and signature-count indexes, applies admissible lower bounds
+  before banded fuzzy distance, and uses direct ordinal-array lookup. Results,
+  ranking, candidate bytes, and the 250,000-unit work limit are unchanged;
+  exact manifest-bound artifacts now pass the browser latency and memory gates.
 
 ### Changed
 
@@ -56,6 +55,14 @@ All notable changes to this project will be documented in this file.
   shared selection command, degrades safely without the optional basemap, and
   preserves keyboard, text-alternative, attribution, range-request, and initial
   bundle gates.
+
+- Added a release-scoped static GeoNames search Worker with deterministic
+  normalization and ranking, core-first partial readiness, exact transport-byte
+  verification, authoritative v4 release/source/spatial/index validation,
+  pinned lazy Brotli decoding, core-then-unseen-coastal merge, private in-memory
+  queries, stale-selection prevention, and an accessible keyboard combobox.
+  Search failures remain technical errors and do not expand the four scientific
+  outcomes.
 
 - Added the browser's pinned-manifest anti-corruption layer: generated
   schema-derived TypeScript contracts, an immutable release context, exact

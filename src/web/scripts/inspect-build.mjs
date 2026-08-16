@@ -5,7 +5,7 @@ import { extname, join, relative, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
-const expectedCsp = "default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
+const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
 function files(directory) {
   return readdirSync(directory).flatMap((name) => {
@@ -34,8 +34,23 @@ for (const entry of ["index.html", "about/architecture/index.html"]) {
   if (csp.includes("frame-ancestors")) {
     throw new Error(`${entry} must leave frame-ancestors to the deployment response header`);
   }
+  if (/(?:^|[;\s])'unsafe-eval'(?:[;\s]|$)/.test(csp)) {
+    throw new Error(`${entry} permits JavaScript eval`);
+  }
   if (!/<meta\s+name="referrer"\s+content="no-referrer"\s*\/?\s*>/i.test(html)) {
     throw new Error(`${entry} does not enforce the no-referrer document policy`);
+  }
+}
+
+const workerPaths = paths.filter((path) => /search\.worker-[^/]+\.js$/.test(path));
+if (workerPaths.length !== 1) throw new Error("Static build must contain one lazy settlement search worker chunk");
+const brotliWasmPaths = paths.filter((path) => /brotli_wasm_bg-[^/]+\.wasm$/.test(path));
+if (brotliWasmPaths.length !== 1) throw new Error("Static build must contain one lazy Brotli decoder asset");
+const lazySearchPaths = [...workerPaths, ...brotliWasmPaths];
+for (const htmlPath of paths.filter((path) => extname(path) === ".html")) {
+  const html = readFileSync(htmlPath, "utf8");
+  if (lazySearchPaths.some((path) => html.includes(relative(dist, path)))) {
+    throw new Error("Settlement search worker and decoder must remain outside the initial HTML dependency graph");
   }
 }
 
@@ -52,7 +67,7 @@ for (const path of scanned) {
 }
 
 const assets = paths
-  .filter((path) => [".js", ".css", ".woff2"].includes(extname(path)))
+  .filter((path) => [".js", ".css", ".wasm", ".woff2"].includes(extname(path)))
   .map((path) => {
     const bytes = readFileSync(path);
     return {
@@ -105,6 +120,7 @@ const report = {
     initialJavascriptBrotliBytes: initialJavascript,
     lazyMapFiles: mapFiles.sort(),
   },
+  lazyWorkerAssets: lazySearchPaths.map((path) => relative(dist, path)),
   assets,
 };
 writeFileSync(resolve(dist, "build-report.json"), `${JSON.stringify(report, null, 2)}\n`);
