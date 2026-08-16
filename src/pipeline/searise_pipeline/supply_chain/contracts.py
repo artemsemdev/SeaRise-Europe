@@ -407,6 +407,66 @@ def _safe_inventory_path(repository_root: Path, value: str) -> Path:
     return candidate
 
 
+def _validate_npm_lock_integrity(lock_path: Path, logical_path: str) -> None:
+    """Require immutable registry identities for every non-workspace package."""
+    lock = load_json(lock_path)
+    packages = lock.get("packages")
+    if lock.get("lockfileVersion") != 3 or not isinstance(packages, dict):
+        raise SupplyChainContractError(
+            f"npm lock must use package-lock v3 with a packages map: {logical_path}"
+        )
+    root = packages.get("")
+    if not isinstance(root, dict):
+        raise SupplyChainContractError(f"npm lock root package is missing: {logical_path}")
+    raw_workspaces = root.get("workspaces", [])
+    if not isinstance(raw_workspaces, list) or not all(
+        isinstance(value, str) and value and "*" not in value for value in raw_workspaces
+    ):
+        raise SupplyChainContractError(f"npm lock workspaces must be exact paths: {logical_path}")
+    workspaces = set(raw_workspaces)
+
+    for package_path, entry in packages.items():
+        if not isinstance(package_path, str) or not isinstance(entry, dict):
+            raise SupplyChainContractError(
+                f"npm lock package entries must be objects: {logical_path}"
+            )
+        if package_path == "":
+            continue
+        if entry.get("link") is True:
+            if entry.get("resolved") not in workspaces:
+                raise SupplyChainContractError(
+                    f"npm link must resolve to a declared workspace: {logical_path}:{package_path}"
+                )
+            continue
+        if package_path in workspaces:
+            continue
+        if "node_modules" not in PurePosixPath(package_path).parts:
+            raise SupplyChainContractError(
+                f"npm package is neither registry, workspace, nor link: "
+                f"{logical_path}:{package_path}"
+            )
+        resolved = entry.get("resolved")
+        if not isinstance(resolved, str) or not resolved.startswith("https://registry.npmjs.org/"):
+            raise SupplyChainContractError(
+                f"npm registry package resolved URL is missing: {logical_path}:{package_path}"
+            )
+        integrity = entry.get("integrity")
+        if not isinstance(integrity, str) or not integrity.startswith("sha512-"):
+            raise SupplyChainContractError(
+                f"npm registry package SHA-512 integrity is missing: {logical_path}:{package_path}"
+            )
+        try:
+            digest = base64.b64decode(integrity.removeprefix("sha512-"), validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise SupplyChainContractError(
+                f"npm registry package SHA-512 integrity is invalid: {logical_path}:{package_path}"
+            ) from exc
+        if len(digest) != 64:
+            raise SupplyChainContractError(
+                f"npm registry package SHA-512 integrity is invalid: {logical_path}:{package_path}"
+            )
+
+
 def validate_dependency_inventory(
     inventory_path: Path,
     *,
@@ -478,6 +538,8 @@ def validate_dependency_inventory(
     for value, (item, path) in recorded.items():
         if _sha256(path) != item["sha256"]:
             raise SupplyChainContractError(f"dependency input SHA-256 mismatch: {value}")
+        if path.name == "package-lock.json":
+            _validate_npm_lock_integrity(path, value)
 
     projects = {Path(path).parent for path in discovered if path.endswith(".csproj")}
     project_locks = {

@@ -19,6 +19,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Restored complete npm registry URL and SHA-512 integrity metadata for the
+  static browser dependency graph, pinned its scientific readers, and made the
+  dependency inventory fail closed if future registry identities are missing.
+
 - Bound private real-source candidates to reviewed STAC archive/member lineage,
   an existing Git code revision, the exact local dependency lock, build
   parameters, and pipeline identity. The superseded candidate with fixture

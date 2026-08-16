@@ -244,6 +244,57 @@ def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
     )
 
 
+def test_static_web_lock_pins_scientific_readers_with_complete_integrity() -> None:
+    lock = load_json(REPOSITORY_ROOT / "package-lock.json")
+    packages = lock["packages"]
+    direct = packages["src/web"]["dependencies"]
+    expected = {
+        "brotli-wasm": "3.0.1",
+        "geotiff": "3.0.5",
+        "hyparquet": "1.28.2",
+        "hyparquet-compressors": "1.1.1",
+    }
+
+    assert {name: direct[name] for name in expected} == expected
+    assert {name: packages[f"node_modules/{name}"]["version"] for name in expected} == expected
+    assert packages["node_modules/@searise/web"] == {
+        "resolved": "src/web",
+        "link": True,
+    }
+    assert all(
+        isinstance(entry.get("resolved"), str)
+        and entry["resolved"].startswith("https://registry.npmjs.org/")
+        and isinstance(entry.get("integrity"), str)
+        and entry["integrity"].startswith("sha512-")
+        for path, entry in packages.items()
+        if path and "node_modules" in Path(path).parts and entry.get("link") is not True
+    )
+
+
+@pytest.mark.parametrize("field", ["resolved", "integrity"])
+def test_dependency_inventory_rejects_incomplete_npm_registry_identity(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    lock_path = repository / "package-lock.json"
+    lock = load_json(lock_path)
+    del lock["packages"]["node_modules/geotiff"][field]
+    _write_json(lock_path, lock)
+
+    inventory = _dependency_document()
+    component = _dependency_component(inventory, "frontend-npm")
+    root_lock = next(item for item in component["inputs"] if item["path"] == "package-lock.json")
+    root_lock["sha256"] = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+
+    with pytest.raises(SupplyChainContractError, match=rf"npm registry package .*{field}"):
+        validate_dependency_inventory(
+            _write_json(tmp_path / "inventory.json", inventory),
+            repository_root=repository,
+        )
+
+
 def test_dependency_discovery_binds_real_python_graphs_but_not_synthetic_fixtures() -> None:
     discovered = set(discover_dependency_inputs())
     document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
