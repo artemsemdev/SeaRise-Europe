@@ -190,7 +190,7 @@ describe("release methodology dialog", () => {
     const releaseMethodology = verifiedMethodology(release);
     render(<MethodologyDialog methodology={releaseMethodology} release={release} open onClose={() => undefined} />);
 
-    expect(screen.getByRole("status")).toHaveTextContent(disclosure);
+    expect(screen.getByText(disclosure)).toBeVisible();
     expect(screen.getByRole("dialog")).toHaveAttribute("data-release-disposition", disposition);
   });
 

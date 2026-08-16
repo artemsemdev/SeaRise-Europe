@@ -127,7 +127,7 @@ describe("settlement search combobox", () => {
   it("uses the approved European-settlement prompt without synthetic control names", () => {
     render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => new FakeWorker()} />);
     const input = screen.getByRole("combobox", { name: /find a city/i });
-    expect(input).toHaveAttribute("placeholder", "Try Rotterdam, Porto, or Galway");
+    expect(input).toHaveAttribute("placeholder", "Wilhelmshaven, Ravenna, Bergen…");
     expect(input).not.toHaveAttribute("placeholder", expect.stringMatching(/Border City/i));
   });
 
@@ -305,9 +305,28 @@ describe("settlement search combobox", () => {
     expect(await screen.findByText(
       "No matching places found. Check the spelling or try a nearby city, town, or village.",
     )).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent(
+    expect(document.querySelector(".search-shell .status")).toHaveTextContent(
       /No matching places found in the loaded index.*try a nearby city, town, or village/i,
     );
+  });
+
+  it("announces only the current completed result count in its dedicated live region", async () => {
+    const worker = new FakeWorker();
+    const user = userEvent.setup();
+    render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => worker} />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+    const searchStatus = screen.getByRole("status");
+
+    expect(searchStatus).toHaveClass("status");
+    expect(searchStatus).toHaveAttribute("aria-live", "polite");
+    expect(searchStatus).toHaveAttribute("aria-atomic", "true");
+    await user.type(input, "Spring");
+    await waitFor(() => expect(searchStatus).toHaveTextContent(/^2 settlements found\./));
+
+    worker.holdQueries = true;
+    await user.type(input, "x");
+    expect(searchStatus).toHaveTextContent("Searching settlements in this browser.");
+    expect(searchStatus).not.toHaveTextContent(/2 settlements found/i);
   });
 
   it("clears old results immediately so Enter and Fly there cannot select a stale query", async () => {
@@ -354,7 +373,7 @@ describe("settlement search combobox", () => {
     await user.type(input, "Spring");
     expect(await screen.findAllByRole("option")).toHaveLength(2);
     expect(await screen.findByText(/coastal index has a technical failure/i)).toBeVisible();
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "core-ready");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "core-ready");
     expect(screen.getByRole("button", { name: /fly there/i })).toBeEnabled();
   });
 
@@ -397,11 +416,11 @@ describe("settlement search combobox", () => {
 
     await user.type(input, "Spring");
     expect(await screen.findAllByRole("option")).toHaveLength(2);
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "all-ready");
 
     act(() => first.onerror?.({} as ErrorEvent));
     expect(first.terminated).toBe(true);
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "idle");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "idle");
     expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
 
@@ -409,7 +428,7 @@ describe("settlement search combobox", () => {
     await user.type(input, "Spring");
     expect(await screen.findAllByRole("option")).toHaveLength(2);
     expect(factory).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "all-ready");
     expect(screen.queryByText(/technical failure, not a no-match result/i)).not.toBeInTheDocument();
   });
 });

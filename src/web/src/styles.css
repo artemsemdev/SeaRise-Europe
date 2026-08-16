@@ -66,6 +66,9 @@ a { color: inherit; }
   padding: clamp(1rem, 2vw, 1.65rem) clamp(1.125rem, 2.4vw, 2.125rem);
   color: white;
 }
+.flight-header { pointer-events: none; }
+.flight-header .brand,
+.flight-header button { pointer-events: auto; }
 .flight-header__actions {
   display: flex;
   align-items: center;
@@ -108,6 +111,23 @@ a { color: inherit; }
 }
 .flight-map-layer { z-index: 0; }
 .flight-map-fallback { background: linear-gradient(160deg, #0b3f4d, #10586b 48%, #0d4a5b); }
+.flight-overview {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 700ms ease;
+}
+.flight-overview img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+.flight-app.has-projection .flight-overview,
+.flight-app.is-journey .flight-overview { opacity: 0; }
+.flight-app:not(.has-projection) .map-surface-shell { opacity: 0; }
 .map-explorer { overflow: hidden; }
 .map-title {
   position: absolute;
@@ -189,6 +209,10 @@ a { color: inherit; }
 }
 .map-status.degraded,
 .map-status.unavailable { background: rgb(91 46 15 / 92%); }
+.map-surface-shell[data-interaction-enabled="false"] .map-status,
+.map-surface-shell[data-interaction-enabled="false"] .maplibregl-control-container {
+  display: none;
+}
 .basemap-button {
   position: absolute;
   z-index: 6;
@@ -257,7 +281,7 @@ a { color: inherit; }
 .flight-command h1 { color: white; text-shadow: 0 2px 30px rgb(4 20 25 / 55%); }
 .flight-command h1 em { font-weight: 400; }
 .hero-copy {
-  max-width: 44ch;
+  max-width: 40ch;
   margin: 0.85rem auto 1.75rem;
   color: rgb(255 255 255 / 86%);
   font-size: 1rem;
@@ -417,6 +441,16 @@ a { color: inherit; }
 }
 .flight-progress button:hover { background: rgb(255 255 255 / 18%); }
 .flight-progress button:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
+.flight-progress__focus-target {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 .flight-app.is-journey .map-surface { transform: scale(1.012); transition: transform 900ms cubic-bezier(.62, .01, .24, 1); }
 @keyframes flight-progress-drift {
   from { transform: translateX(-0.18rem); }
@@ -441,8 +475,10 @@ a { color: inherit; }
   line-height: 1.45;
   box-shadow: 0 0.75rem 2rem rgb(4 20 25 / 24%);
 }
-.share-status { margin: 0; color: white; font-size: 0.75rem; }
-.share-status:empty { display: none; }
+.application-technical-alert:focus-visible {
+  outline: 3px solid #f5c66b;
+  outline-offset: 3px;
+}
 .map-module-loading {
   position: absolute;
   inset: 0;
@@ -496,17 +532,22 @@ code { font-family: "Geist Mono Variable", ui-monospace, monospace; font-size: 0
 footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; padding: 1.5rem clamp(1.25rem, 3vw, 3rem); background: #04161b; color: rgb(255 255 255 / 68%); font-size: 0.72rem; }
 
 @media (max-width: 760px) {
-  .flight-header { align-items: flex-start; }
-  .flight-header__actions { align-items: flex-end; flex-direction: column-reverse; gap: 0.45rem; }
-  .release-pill { max-width: 10rem; text-align: center; }
-  .flight-command { place-items: end center; padding: 8.5rem 1rem 8vh; }
+  .flight-header { align-items: flex-start; flex-direction: column; gap: 0.45rem; }
+  .flight-header__actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-left: 0;
+  }
+  .release-pill { max-width: 10rem; text-align: left; }
+  .flight-command { place-items: center; padding: 0 1.5rem; }
   .flight-command__content { width: min(36rem, 100%); }
-  .flight-command h1 { font-size: clamp(2.75rem, 13vw, 4rem); }
-  .hero-copy { margin-bottom: 1.35rem; font-size: 0.92rem; }
-  .search-control { min-height: 3.75rem; padding-left: 1rem; }
-  .search-control button { height: 2.75rem; padding-inline: 1rem; }
-  .search-control input { font-size: 0.92rem; }
-  .search-hint { font-size: 0.69rem; }
+  .flight-command h1 { font-size: 2.375rem; letter-spacing: -0.03em; }
+  .hero-copy { max-width: 44ch; margin-bottom: 1.875rem; font-size: 1rem; }
+  .search-control { min-height: 4.125rem; padding-left: 1rem; }
+  .search-control button { height: 3rem; padding-inline: 1.375rem; }
+  .search-control input { font-size: 1.0625rem; }
+  .search-hint { font-size: 0.78125rem; line-height: 1.45; }
   .map-copy {
     top: 8.7rem;
     right: 0.5rem;
@@ -518,14 +559,18 @@ footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-
     font-size: 0.62rem;
   }
   .maplibregl-ctrl-top-right { display: none; }
-  .map-selection-pin { top: 12.2rem; left: 25%; }
+  .map-selection-pin { top: 8.7rem; right: auto; left: 50%; transform: translateX(-50%); }
   .map-status { top: 15.5rem; right: auto; bottom: auto; left: 0.5rem; max-width: 10.5rem; }
-  .basemap-button { top: 8.7rem; right: auto; bottom: auto; left: 0.5rem; }
-  .flight-alerts { top: 8.7rem; left: 0.5rem; width: calc(100% - 1rem); }
+  .basemap-button { top: 11rem; right: auto; bottom: auto; left: 0.5rem; }
+  .flight-alerts { top: 11rem; left: 0.5rem; width: calc(100% - 1rem); }
   .flight-progress { bottom: 1rem; }
   .site-header { align-items: flex-start; }
   .site-header nav { display: none; }
   .architecture-flow, .evidence-grid, .boundary-panel { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 761px) {
+  .flight-command__content { transform: translateY(-2.5rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {

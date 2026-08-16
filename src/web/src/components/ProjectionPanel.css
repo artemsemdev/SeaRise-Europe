@@ -93,6 +93,10 @@
   border-left-color: #98472f;
   background: #fff1eb;
 }
+.projection-panel__failure:focus-visible {
+  outline: 3px solid #f5c66b;
+  outline-offset: 3px;
+}
 
 .projection-panel__controls { display: grid; gap: 0.7rem; }
 
@@ -110,6 +114,7 @@
 
 .projection-panel fieldset legend {
   float: left;
+  grid-column: 1 / -1;
   width: 100%;
   padding: 0.1rem 0.25rem 0.4rem;
   color: #314b50;
@@ -162,27 +167,37 @@
   gap: 0.75rem;
 }
 
-#projection-outcome-title { display: grid; gap: 0.65rem; }
-#projection-outcome-title > h3 {
+.projection-panel__outcome-content { display: grid; gap: 0.65rem; }
+.projection-panel__outcome-content > h3 {
   font-family: "Instrument Serif", serif;
   font-size: clamp(1.75rem, 3vw, 2.25rem);
   font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 0.98;
 }
-#projection-outcome-title > p,
+.projection-panel__outcome-content > p,
 .projection-panel__outcome > p,
 .projection-panel__outcome li {
   color: #3d5154;
   font-size: 0.79rem;
   line-height: 1.48;
 }
-#projection-outcome-title section { display: grid; gap: 0.45rem; }
-#projection-outcome-title section h4 { font-size: 0.8rem; }
-#projection-outcome-title ul { margin: 0; padding-left: 1.1rem; }
+.projection-panel__outcome-content section { display: grid; gap: 0.45rem; }
+.projection-panel__outcome-content section h4 { font-size: 0.8rem; }
+.projection-panel__outcome-content ul { margin: 0; padding-left: 1.1rem; }
 
 .projection-panel__location { display: grid; gap: 0.15rem; }
 .projection-panel__location span { color: #526568; font-family: "Geist Mono Variable", monospace; font-size: 0.65rem; }
+.projection-panel__result-caveat {
+  padding: 0.65rem 0.75rem;
+  border-left: 0.2rem solid #386d70;
+  border-radius: 0.35rem;
+  background: #e8f0ed;
+  color: #294a4f !important;
+  font-size: 0.72rem !important;
+  line-height: 1.45 !important;
+}
+#projection-outcome-heading:focus-visible { outline: 0.2rem solid #007e78; outline-offset: 0.18rem; }
 
 .projection-panel__primary-facts {
   display: grid;
@@ -277,7 +292,7 @@
     border-radius: 1.5rem;
   }
   .projection-panel > header h2 { font-size: 1.15rem; }
-  #projection-outcome-title > h3 { font-size: 1.75rem; }
+  .projection-panel__outcome-content > h3 { font-size: 1.75rem; }
   .projection-panel__metadata { grid-template-columns: 1fr; }
 }
 

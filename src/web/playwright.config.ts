@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: "./tests",
   testIgnore: /tests\/private\//,
   fullyParallel: true,
+  // Keep timing-gate samples isolated from high-core host contention.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   preserveOutput: "always",
   retries: process.env.CI ? 1 : 0,
