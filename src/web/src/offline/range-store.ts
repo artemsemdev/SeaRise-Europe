@@ -88,6 +88,14 @@ function pairFromAuthority(authority: AppAuthorityV1): AppReleasePairV1 {
   });
 }
 function pairKey(pair: AppReleasePairV1): string { return cacheNamespaces(pair).pairKey; }
+function leaseKey(lease: ClientLeaseV1): string { return JSON.stringify([pairKey(lease.pair), lease.leaseId]); }
+function checkedLease(input: ClientLeaseV1, expectedPair: AppReleasePairV1): ClientLeaseV1 {
+  const lease = validateClientLease(input);
+  if (!samePair(lease.pair, expectedPair)) {
+    throw new RangeStoreIntegrityError("Lease authority belongs to another app/release pair.");
+  }
+  return lease;
+}
 function artifactKey(identity: RangeIdentityV1): string {
   const authority = identity.authority;
   return JSON.stringify([pairKey(authority.pair), authority.artifactId, authority.path,
@@ -248,8 +256,8 @@ export class MemoryRangeStore implements RangeStore {
     const incomingKeys = new Set(unique.keys());
     const protectedKeys = new Set([this.#active, this.#previous].filter(Boolean).map((pair) => pairKey(pair!)));
     const expiredLeases: string[] = [];
-    for (const lease of this.#leases.values()) {
-      if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(lease.leaseId);
+    for (const [key, lease] of this.#leases) {
+      if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(key);
       else protectedKeys.add(pairKey(lease.pair));
     }
     const ordered = [...this.#entries.values()].sort((a, b) => a.lastAccessSequence - b.lastAccessSequence || a.key.localeCompare(b.key));
@@ -271,13 +279,13 @@ export class MemoryRangeStore implements RangeStore {
     const records = [...unique.values()].map((admission) =>
       recordFor(admission.identity, admission.bytes, ++nextSequence));
     for (const candidate of evictions) this.#entries.delete(candidate.key);
-    for (const leaseId of expiredLeases) this.#leases.delete(leaseId);
+    for (const key of expiredLeases) this.#leases.delete(key);
     for (const record of records) this.#entries.set(record.key, record);
     this.#sequence = nextSequence;
     return Object.freeze(results);
   }
-  async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = validateClientLease(input); this.#leases.set(lease.leaseId, lease); }
-  async releaseLease(input: ClientLeaseV1): Promise<void> { this.#leases.delete(validateClientLease(input).leaseId); }
+  async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.set(leaseKey(lease), lease); }
+  async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.delete(leaseKey(lease)); }
   async setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void> {
     this.#active = active ? validateAppReleasePair(active) : null; this.#previous = previous ? validateAppReleasePair(previous) : null;
     if (this.#active && this.#previous && samePair(this.#active, this.#previous)) throw new RangeStoreIntegrityError("Active and previous pairs must differ.");
@@ -305,8 +313,9 @@ export function createRangeStore(authorityInput: AppAuthorityV1, budget: Storage
 }
 
 interface MetaRecord { key: "state"; rangeBytes: number; rangeEntries: number; nextSequence: number; activePair: AppReleasePairV1 | null; previousPair: AppReleasePairV1 | null }
-interface LeaseRecord { leaseId: string; pairKey: string; pair: AppReleasePairV1; expiresAtEpochMs: number }
+interface LeaseRecord { key: string; leaseId: string; pairKey: string; pair: AppReleasePairV1; expiresAtEpochMs: number }
 const STORES = { meta: "range-meta", ranges: "ranges", leases: "leases" } as const;
+const RANGE_DATABASE_VERSION = 2;
 const initialMeta = (): MetaRecord => ({ key: "state", rangeBytes: 0, rangeEntries: 0, nextSequence: 0, activePair: null, previousPair: null });
 function request<T>(value: IDBRequest<T>): Promise<T> { return new Promise((resolve, reject) => { value.onsuccess = () => resolve(value.result); value.onerror = () => reject(value.error); }); }
 function completed(transaction: IDBTransaction): Promise<void> { return new Promise((resolve, reject) => { transaction.oncomplete = () => resolve(); transaction.onabort = transaction.onerror = () => reject(transaction.error ?? new DOMException("IndexedDB transaction aborted.", "AbortError")); }); }
@@ -322,14 +331,22 @@ class IndexedDbRangeStore implements RangeStore {
   }
   #open(): Promise<IDBDatabase> {
     if (!this.#database) this.#database = new Promise((resolve, reject) => {
-      const open = this.#idb.open(cacheNamespaces(this.#pair).rangeDatabase, 1);
-      open.onupgradeneeded = () => {
+      const open = this.#idb.open(cacheNamespaces(this.#pair).rangeDatabase, RANGE_DATABASE_VERSION);
+      open.onupgradeneeded = (event) => {
         const database = open.result;
-        database.createObjectStore(STORES.meta, { keyPath: "key" });
-        const ranges = database.createObjectStore(STORES.ranges, { keyPath: "key" });
-        ranges.createIndex("by-pair", "pairKey"); ranges.createIndex("by-lru", ["lastAccessSequence", "key"], { unique: true });
-        const leases = database.createObjectStore(STORES.leases, { keyPath: "leaseId" });
-        leases.createIndex("by-pair", "pairKey"); leases.createIndex("by-expiry", ["expiresAtEpochMs", "leaseId"], { unique: true });
+        if (!database.objectStoreNames.contains(STORES.meta)) database.createObjectStore(STORES.meta, { keyPath: "key" });
+        if (!database.objectStoreNames.contains(STORES.ranges)) {
+          const ranges = database.createObjectStore(STORES.ranges, { keyPath: "key" });
+          ranges.createIndex("by-pair", "pairKey"); ranges.createIndex("by-lru", ["lastAccessSequence", "key"], { unique: true });
+        }
+        if (event.oldVersion < RANGE_DATABASE_VERSION && database.objectStoreNames.contains(STORES.leases)) {
+          database.deleteObjectStore(STORES.leases);
+        }
+        if (!database.objectStoreNames.contains(STORES.leases)) {
+          const leases = database.createObjectStore(STORES.leases, { keyPath: "key" });
+          leases.createIndex("by-pair", "pairKey");
+          leases.createIndex("by-expiry", ["expiresAtEpochMs", "pairKey", "leaseId"], { unique: true });
+        }
       };
       open.onsuccess = () => { open.result.onversionchange = () => open.result.close(); resolve(open.result); };
       open.onerror = () => reject(open.error ?? new RangeStoreUnsupportedError("IndexedDB open failed."));
@@ -389,7 +406,7 @@ class IndexedDbRangeStore implements RangeStore {
       }
       const leases = await request(leaseStore.getAll()) as LeaseRecord[]; const protectedPairs = new Set([meta.activePair, meta.previousPair].filter(Boolean).map((pair) => pairKey(pair!)));
       const expiredLeases: string[] = [];
-      for (const lease of leases) { if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(lease.leaseId); else protectedPairs.add(lease.pairKey); }
+      for (const lease of leases) { if (lease.expiresAtEpochMs <= this.#now()) expiredLeases.push(lease.key); else protectedPairs.add(lease.pairKey); }
       const candidates = await request(rangeStore.index("by-lru").getAll()) as StoredRange[];
       const additions = [...unique.values()].filter((admission) => !existingKeys.has(admission.key));
       let projectedBytes = meta.rangeBytes + additions.reduce((sum, admission) => sum + admission.bytes.byteLength, 0);
@@ -401,7 +418,7 @@ class IndexedDbRangeStore implements RangeStore {
         evictions.push(candidate); projectedBytes -= candidate.byteLength; projectedEntries -= 1;
       }
       if (projectedBytes > this.#budget.maxRangeBytes || projectedEntries > this.#budget.maxRangeEntries) { quota = true; tx.abort(); await done; }
-      for (const leaseId of expiredLeases) leaseStore.delete(leaseId);
+      for (const key of expiredLeases) leaseStore.delete(key);
       for (const candidate of evictions) rangeStore.delete(candidate.key);
       for (const admission of unique.values()) {
         rangeStore.put(recordFor(admission.identity, admission.bytes, ++meta.nextSequence));
@@ -417,10 +434,10 @@ class IndexedDbRangeStore implements RangeStore {
     }
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> {
-    const lease = validateClientLease(input); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx);
-    tx.objectStore(STORES.leases).put({ leaseId: lease.leaseId, pairKey: pairKey(lease.pair), pair: lease.pair, expiresAtEpochMs: lease.expiresAtEpochMs } satisfies LeaseRecord); await done;
+    const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx);
+    tx.objectStore(STORES.leases).put({ key, leaseId: lease.leaseId, pairKey: pairKey(lease.pair), pair: lease.pair, expiresAtEpochMs: lease.expiresAtEpochMs } satisfies LeaseRecord); await done;
   }
-  async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = validateClientLease(input); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx); const current = await request(tx.objectStore(STORES.leases).get(lease.leaseId)) as LeaseRecord | undefined; if (current?.pairKey === pairKey(lease.pair)) tx.objectStore(STORES.leases).delete(lease.leaseId); await done; }
+  async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction(STORES.leases, "readwrite"); const done = completed(tx); tx.objectStore(STORES.leases).delete(key); await done; }
   async setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void> {
     const nextActive = active ? validateAppReleasePair(active) : null; const nextPrevious = previous ? validateAppReleasePair(previous) : null;
     if (nextActive && nextPrevious && samePair(nextActive, nextPrevious)) throw new RangeStoreIntegrityError("Active and previous pairs must differ.");

@@ -98,7 +98,7 @@ function storeFor(mode: "persistent" | "memory-only", factory: IDBFactory, appro
 }
 async function rawRecords(factory: IDBFactory): Promise<Record<string, unknown>[]> {
   const database = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = factory.open("searise-offline:v1", 1);
+    const request = factory.open("searise-offline:v1");
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
   const records = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
@@ -106,6 +106,29 @@ async function rawRecords(factory: IDBFactory): Promise<Record<string, unknown>[
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
   database.close(); return records;
+}
+async function rawLeases(factory: IDBFactory): Promise<Record<string, unknown>[]> {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = factory.open("searise-offline:v1");
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+  });
+  const records = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
+    const request = database.transaction("leases").objectStore("leases").getAll();
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+  });
+  database.close(); return records;
+}
+async function seedLegacyLeaseStore(factory: IDBFactory): Promise<void> {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = factory.open("searise-offline:v1", 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore("leases", { keyPath: "leaseId" }).put({
+        leaseId: "shared-lease", pairKey: "legacy", pair: pair(), expiresAtEpochMs: 2_000,
+      });
+    };
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+  });
+  database.close();
 }
 
 describe("authoritative IndexedDB range store", () => {
@@ -276,7 +299,7 @@ describe("authoritative IndexedDB range store", () => {
     const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
     const store = persistent(factory, [range]);
     await store.putVerified(range, value); const database = await new Promise<IDBDatabase>((resolve) => {
-      const request = factory.open("searise-offline:v1", 1); request.onsuccess = () => resolve(request.result);
+      const request = factory.open("searise-offline:v1"); request.onsuccess = () => resolve(request.result);
     });
     const transaction = database.transaction("ranges", "readwrite"); const objectStore = transaction.objectStore("ranges");
     const record = await new Promise<Record<string, unknown>>((resolve) => { const request = objectStore.getAll(); request.onsuccess = () => resolve(request.result[0]); });
@@ -311,6 +334,39 @@ describe("authoritative IndexedDB range store", () => {
     const afterExpiry = persistent(factory, [second], secondApp, 4, 1, () => 2_001);
     await expect(afterExpiry.putVerified(second, bytes(2, 2, 2, 2))).resolves.toBe("stored");
     expect((await afterExpiry.inventory()).entries[0].pair.dataReleaseId).toBe("release-b");
+  });
+
+  it("upgrades the v1 lease store and isolates the same active lease ID across two release pairs", async () => {
+    await seedLegacyLeaseStore(factory);
+    const firstBytes = bytes(1, 1, 1, 1); const secondBytes = bytes(2, 2, 2, 2);
+    const first = await identity({ payload: firstBytes });
+    const second = await identity({ build: "build-b", release: "release-b", payload: secondBytes });
+    const firstStore = persistent(factory, [first]);
+    const secondStore = persistent(factory, [second], app("build-b", "release-b"));
+    await firstStore.putVerified(first, firstBytes); await secondStore.putVerified(second, secondBytes);
+    const expiresAtEpochMs = 2_000;
+    await firstStore.acquireLease({ contractVersion: 1, leaseId: "shared-lease", pair: pair(), expiresAtEpochMs, state: "active" });
+    await secondStore.acquireLease({ contractVersion: 1, leaseId: "shared-lease", pair: pair("build-b", "release-b"), expiresAtEpochMs, state: "active" });
+
+    const thirdBytes = bytes(3, 3, 3, 3);
+    const third = await identity({ build: "build-c", release: "release-c", payload: thirdBytes });
+    const thirdStore = persistent(factory, [third], app("build-c", "release-c"), 4, 1, () => 1_500);
+    await expect(thirdStore.putVerified(third, thirdBytes)).rejects.toBeInstanceOf(RangeStoreQuotaError);
+    const leases = await rawLeases(factory);
+    expect(leases).toHaveLength(2);
+    expect(new Set(leases.map((lease) => lease.key)).size).toBe(2);
+  });
+
+  it.each(["persistent", "memory-only"] as const)("binds %s lease acquire and release to the store pair", async (mode) => {
+    const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
+    const store = storeFor(mode, factory, [range]);
+    const foreignLease = {
+      contractVersion: 1, leaseId: "foreign", pair: pair("build-b", "release-b"),
+      expiresAtEpochMs: 2_000, state: "active",
+    } as const;
+    await expect(store.acquireLease(foreignLease)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.releaseLease(foreignLease)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 0, entryCount: 0 });
   });
 
   it("rolls back earlier eviction and counters when a quota transaction cannot fit", async () => {
