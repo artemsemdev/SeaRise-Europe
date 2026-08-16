@@ -172,6 +172,34 @@ describe("static browser runtime adapter", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it("classifies a missing release resource as connection-required", async () => {
+    const runtime = await createBrowserRuntime(firstContext, new AbortController().signal, {
+      resourceRouter: {
+        artifactTransport: vi.fn(async () => {
+          throw new TechnicalFailure({
+            kind: "technical-error",
+            code: "FetchFailed",
+            message: "COG delivery metadata for projection-ssp2-45-2050-cog is unavailable.",
+            recoverable: true,
+          });
+        }),
+        cogRangeTransport: {
+          validateDelivery: vi.fn(async () => undefined),
+          readExpandedRange: vi.fn(async () => new ArrayBuffer(0)),
+        },
+        close: vi.fn(),
+      },
+    });
+
+    await runtime.controller.select(selected(firstContext));
+
+    expect(runtime.controller.getSnapshot()).toMatchObject({
+      phase: "connection-required",
+      error: { code: "FetchFailed" },
+    });
+    runtime.dispose();
+  });
+
   it("constructs once per context, keeps snapshots stable, and exposes every controller command", async () => {
     const records: RuntimeRecord[] = [];
     const factory: BrowserRuntimeFactory = vi.fn((context) => {

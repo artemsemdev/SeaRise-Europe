@@ -385,7 +385,7 @@
       "id": "static-web-shell",
       "layer": "e2e",
       "owner": "frontend",
-      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, same-origin page-context later-chunk COG delivery and cold/cached lookup budgets, production-like delivery-header inspection, blocked unlisted origins, build inventory, and zero legacy application API traffic without claiming public cross-origin enforcement.",
+      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, independently reconstructed recursive shell inventory, a warm full-offline reload with loaded search and one cached assessment, honest connection-required handling for an uncached COG, same-origin page-context later-chunk COG delivery and cold/cached lookup budgets, production-like delivery-header inspection, blocked unlisted origins, and zero legacy application API traffic without claiming public cross-origin enforcement.",
       "sourcePaths": ["src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts"],
       "changedPaths": [".nvmrc", "package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
@@ -393,7 +393,7 @@
       "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred twenty-one Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; same-origin CSP, later-fourth-chunk SHA verification, and explicit 2,500 ms cold/100 ms cached-p95 budgets use the committed synthetic fixture. APIRequestContext inspects CORS headers but does not prove public browser enforcement." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Production build inspection independently reconstructs the recursive Vite, lazy map, Worker, WASM, CSS, and font closure. A Chromium journey warms the committed synthetic fixture, removes the network, reloads the full Flight app, repeats search and one accepted assessment, and observes connection-required for an uncached horizon. Same-origin CSP, later-fourth-chunk SHA verification, and explicit 2,500 ms cold/100 ms cached-p95 budgets remain covered. APIRequestContext inspects CORS headers but does not prove public browser enforcement." }
     },
     {
       "id": "static-offline-contracts",

@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a recursively generated, independently inspected production Flight
+  shell precache covering the Vite main graph, lazy map modules and styles,
+  settlement-search Worker, Brotli WASM decoder, fonts, and dynamic scientific
+  decoder chunks. A production Chromium journey now warms the exact shell,
+  search shards, and one assessment, removes the network, reloads the complete
+  app, repeats search and the cached result, and proves an uncached COG remains
+  `connection-required`; PMTiles and the nine COG payloads are not precached.
+
 - Added the final verified browser resource router: exact public whole
   resources are admitted only when requested through receipt-gated Cache
   Storage, and only COG chunks needed by the selected read use no-store

@@ -65,12 +65,64 @@ test("root worker activates naturally, reports its exact pair, and controls only
     return requests.map((request) => {
       const url = new URL(request.url);
       return { pathname: url.pathname, search: url.search };
-    }).sort((left, right) => left.pathname.localeCompare(right.pathname));
+    });
   });
-  expect(cachedRequests.map(({ pathname }) => pathname)).toEqual(
+  expect(cachedRequests.map(({ pathname }) => pathname).sort()).toEqual(
     [...buildReport.serviceWorker.precacheUrls].sort(),
   );
   expect(cachedRequests.every(({ search }) => search === "")).toBe(true);
+});
+
+test("warmed Flight shell, search, and one assessment survive a full offline reload", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await expect(page.locator(".search-shell .status[data-search-readiness]"))
+    .toHaveAttribute("data-search-readiness", "all-ready");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  const panel = page.locator(".projection-panel");
+  const outcome = page.locator(".projection-panel__outcome");
+  await expect(panel).toHaveAttribute("data-phase", "result");
+  await expect(outcome).toHaveAttribute("data-outcome", "ProjectionAvailable");
+  await expect(outcome).toContainText("0.194 m");
+  await expect.poll(() => page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    return (await caches.keys()).some((name) => name.startsWith("searise-offline:v1:shell:"));
+  })).toBe(true);
+
+  const shellPaths = new Set(buildReport.serviceWorker.precacheUrls);
+  const recursiveAssets = {
+    mapExplorer: viteManifest["src/components/map/MapExplorer.tsx"].file,
+    mapRuntime: viteManifest["src/components/map/map-runtime.ts"].file,
+  };
+  expect(shellPaths.has(`/${recursiveAssets.mapExplorer}`)).toBe(true);
+  expect(shellPaths.has(`/${recursiveAssets.mapRuntime}`)).toBe(true);
+  expect([...shellPaths].some((path) => /\/search\.worker-[^/]+\.js$/u.test(path))).toBe(true);
+  expect([...shellPaths].some((path) => /\/brotli_wasm_bg-[^/]+\.wasm$/u.test(path))).toBe(true);
+  expect([...shellPaths].some((path) => path.endsWith(".pmtiles"))).toBe(false);
+  expect([...shellPaths].some((path) => /\/analysis\/[^/]+\/\d{4}\.tif$/u.test(path))).toBe(false);
+
+  await page.context().setOffline(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Take me there.");
+  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const offlineSearch = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await offlineSearch.fill("Málaga");
+  await expect(page.getByRole("option", { name: /Málaga.*Andalucía, ES/i })).toBeVisible();
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(panel).toHaveAttribute("data-phase", "result");
+  await expect(outcome).toHaveAttribute("data-outcome", "ProjectionAvailable");
+  await expect(outcome).toContainText("0.194 m");
+
+  await page.getByRole("radio", { name: "2100", exact: true }).check();
+  await expect(panel).toHaveAttribute("data-phase", "connection-required");
+  await expect(panel.getByRole("alert")).toContainText(/Connection required for selected data/i);
+  await expect(panel.getByText(/Previous accepted result — separate from the failed operation/i)).toBeVisible();
+  await expect(outcome).toContainText("2050");
+  await expect(outcome).not.toContainText("2100");
 });
 
 test("landing shell is static, keyboard reachable, and has no serious accessibility findings", async ({ page }, testInfo) => {
