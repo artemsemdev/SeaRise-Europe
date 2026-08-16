@@ -360,7 +360,14 @@ footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-
   .hero { min-height: 780px; place-items: start center; padding-top: 10rem; }
   .search-control { grid-template-columns: auto 1fr; border-radius: 1.4rem; }
   .search-control button { grid-column: 1 / -1; width: 100%; }
-  .scope-card { left: 1rem; right: 1rem; bottom: 1rem; width: auto; }
+  .scope-card {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    width: min(730px, 100%);
+    margin-top: 2rem;
+  }
   .principle-grid, .architecture-flow, .evidence-grid, .boundary-panel { grid-template-columns: 1fr; }
   .map-explorer { grid-template-columns: 1fr; }
   .map-controls { grid-template-columns: 1fr; }
