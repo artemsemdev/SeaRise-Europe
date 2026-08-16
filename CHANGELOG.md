@@ -57,6 +57,13 @@ All notable changes to this project will be documented in this file.
   preserves keyboard, text-alternative, attribution, range-request, and initial
   bundle gates.
 
+- Added an exact browser-side AR6 projection lookup that verifies release-bound
+  support geometry, reads only COG byte ranges, selects the nearest native
+  source-grid location within the inclusive 100 km limit, returns the three
+  required quantiles, and preserves technical failures outside the four
+  scientific outcomes. The committed synthetic release now carries the
+  browser-decodable boundary fixtures used by clean-clone tests.
+
 - Added the browser's pinned-manifest anti-corruption layer: generated
   schema-derived TypeScript contracts, an immutable release context, exact
   nine-combination and artifact-reference validation, origin-safe URLs,

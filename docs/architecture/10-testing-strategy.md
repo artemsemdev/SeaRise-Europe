@@ -193,6 +193,14 @@ Browser lookup and Python pipeline sampling run against shared golden fixtures.
 Any difference in source-grid selection, distance, quantile values, nodata, or
 result state fails the parity gate.
 
+The checked-in exact-lookup suite exercises all nine scenario/horizon
+combinations across seven independently recorded available locations (63
+browser/Python comparisons). It also covers COG range enforcement, corrupt and
+missing ranges, cancellation, stale-work suppression, boundary classification,
+nodata, the inclusive distance limit, lowest-ID ties, and generated coordinate
+and grid candidates. The operational commands and measured local gate are in
+the [static scientific lookup runbook](../operations/static-scientific-lookup.md).
+
 ### 3.8 Offline, accessibility, and visual tests
 
 Offline tests warm only the explicitly supported cache, disable the network,

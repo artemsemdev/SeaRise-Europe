@@ -33,8 +33,8 @@ also show that target parity alone does not authorize legacy deletion.
 | Measured evidence | `tests/evidence/` | `<experiment-or-gate>.json` |
 | Repository harness tests | `tests/harness/` | `test_<behavior>.py` |
 | Pipeline target tests | `src/pipeline/tests/<domain>/` | `test_<behavior>.py` |
-| Frontend target tests | `src/frontend/src/__tests__/<domain>/` | `<behavior>.<kind>.test.ts[x]` |
-| Browser journeys | `tests/browser/` | `<journey>.spec.ts` when #70 adds Playwright |
+| Static browser target tests | `src/web/src/<domain>/` | `<behavior>.<kind>.test.ts[x]` |
+| Browser journeys | `src/web/tests/` | `<journey>.spec.ts` |
 
 Builders belong next to the consuming test suite under a `builders/` directory.
 They expose domain intent and must not copy legacy request, database, TiTiler,
