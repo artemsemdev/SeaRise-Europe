@@ -11,6 +11,7 @@ import {
   type ControllerBootProofV1,
   type IntentConsumptionResultV1,
   type StaticUpdateCoordinatorPorts,
+  type TransitionArmPermitV1,
 } from "./update-coordinator";
 
 function pair(build: string, release: string): AppReleasePairV1 {
@@ -51,6 +52,34 @@ function deferred<T>() {
   };
 }
 
+function durableIntentStore() {
+  let record: Readonly<{ intent: CloseAndReopenIntentV1; state: "pending" | "armed" | "consumed" }> | null = null;
+  return {
+    pendingIntent: () => record?.intent ?? null,
+    state: () => record?.state ?? null,
+    recordPending: async (intent: CloseAndReopenIntentV1) => {
+      record = Object.freeze({ intent, state: "pending" as const });
+    },
+    arm: async (intent: CloseAndReopenIntentV1, permit: TransitionArmPermitV1) => {
+      if (permit.signal.aborted) throw new Error("arm cancelled");
+      if (!record) return "missing" as const;
+      if (record.intent.transitionId !== intent.transitionId || record.state !== "pending") return "mismatch" as const;
+      record = Object.freeze({ intent: record.intent, state: "armed" as const });
+      return "armed" as const;
+    },
+    discardPending: async (intent: CloseAndReopenIntentV1) => {
+      if (record?.state === "pending" && record.intent.transitionId === intent.transitionId) record = null;
+    },
+    consume: async (intent: CloseAndReopenIntentV1) => {
+      if (!record || record.intent.transitionId !== intent.transitionId) return "missing" as const;
+      if (record.state === "pending") return "not-armed" as const;
+      if (record.state === "consumed") return "already-consumed" as const;
+      record = Object.freeze({ intent: record.intent, state: "consumed" as const });
+      return "consumed" as const;
+    },
+  };
+}
+
 function harness(options: Readonly<{
   boot?: ControllerBootProofV1;
   instanceId?: string;
@@ -58,8 +87,9 @@ function harness(options: Readonly<{
   read?: StaticUpdateCoordinatorPorts["readControllerBoot"];
   inspect?: StaticUpdateCoordinatorPorts["inspectWaitingCandidate"];
   token?: StaticUpdateCoordinatorPorts["issueConfirmationToken"];
-  record?: StaticUpdateCoordinatorPorts["recordTransitionIntent"];
-  revoke?: StaticUpdateCoordinatorPorts["revokeTransitionIntent"];
+  record?: StaticUpdateCoordinatorPorts["recordPendingTransitionIntent"];
+  arm?: StaticUpdateCoordinatorPorts["armTransitionIntent"];
+  discard?: StaticUpdateCoordinatorPorts["discardPendingTransitionIntent"];
   consume?: StaticUpdateCoordinatorPorts["consumeTransitionIntent"];
 }> = {}) {
   let currentBoot = options.boot ?? boot();
@@ -69,8 +99,12 @@ function harness(options: Readonly<{
     readControllerBoot: options.read ?? vi.fn(async () => currentBoot),
     inspectWaitingCandidate: options.inspect ?? vi.fn(async () => ({ status: "sealed" as const, candidate })),
     issueConfirmationToken: options.token ?? vi.fn(() => `provider-${++tokenSequence}`),
-    recordTransitionIntent: options.record ?? vi.fn(async (intent) => { recorded.splice(0, recorded.length, intent); }),
-    revokeTransitionIntent: options.revoke ?? vi.fn(async (intent) => {
+    recordPendingTransitionIntent: options.record ?? vi.fn(async (intent) => { recorded.splice(0, recorded.length, intent); }),
+    armTransitionIntent: options.arm ?? vi.fn(async (_intent, permit) => {
+      if (permit.signal.aborted) throw new Error("arm cancelled");
+      return "armed" as const;
+    }),
+    discardPendingTransitionIntent: options.discard ?? vi.fn(async (intent) => {
       if (recorded[0]?.transitionId === intent.transitionId) recorded.splice(0, 1);
     }),
     consumeTransitionIntent: options.consume ?? vi.fn(async () => "consumed" as const),
@@ -107,7 +141,7 @@ describe("conservative static-host update coordinator", () => {
       confirmationToken: "g1.provider-1",
       currentUsable: true,
     });
-    expect(test.ports.recordTransitionIntent).not.toHaveBeenCalled();
+    expect(test.ports.recordPendingTransitionIntent).not.toHaveBeenCalled();
     expect("reloadAllowed" in state).toBe(false);
   });
 
@@ -242,7 +276,7 @@ describe("conservative static-host update coordinator", () => {
     const stale = await test.coordinator.confirmUpdate(older.confirmationToken);
 
     expect(stale).toMatchObject({ phase: "preparing", currentUsable: true });
-    expect(test.ports.recordTransitionIntent).not.toHaveBeenCalled();
+    expect(test.ports.recordPendingTransitionIntent).not.toHaveBeenCalled();
     release?.();
     await expect(newer).resolves.toMatchObject({ phase: "waiting-candidate-verified", candidate: anotherCandidate });
   });
@@ -264,7 +298,7 @@ describe("conservative static-host update coordinator", () => {
     expect(older.confirmationToken).toBe("g1.provider-collision");
     expect(newer.confirmationToken).toBe("g2.provider-collision");
     await test.coordinator.confirmUpdate(older.confirmationToken);
-    expect(test.ports.recordTransitionIntent).not.toHaveBeenCalled();
+    expect(test.ports.recordPendingTransitionIntent).not.toHaveBeenCalled();
   });
 
   it("records a generation-bound intent exactly once", async () => {
@@ -272,7 +306,7 @@ describe("conservative static-host update coordinator", () => {
 
     await test.coordinator.confirmUpdate(prepared.confirmationToken);
 
-    expect(test.ports.recordTransitionIntent).toHaveBeenCalledTimes(1);
+    expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledTimes(1);
   });
 
   it("uses collision-resistant instance identity when coordinators share one boot", async () => {
@@ -298,7 +332,7 @@ describe("conservative static-host update coordinator", () => {
     expect(() => harness({ instanceId })).toThrow("already active");
   });
 
-  it("revokes a persisted intent when a newer operation cancels confirmation", async () => {
+  it("discards a persisted pending intent when a newer operation cancels confirmation", async () => {
     let releaseRecord: (() => void) | undefined;
     const recordGate = new Promise<void>((resolve) => { releaseRecord = resolve; });
     const persisted: CloseAndReopenIntentV1[] = [];
@@ -307,7 +341,7 @@ describe("conservative static-host update coordinator", () => {
         persisted.splice(0, persisted.length, intent);
         await recordGate;
       }),
-      revoke: vi.fn(async (intent) => {
+      discard: vi.fn(async (intent) => {
         if (persisted[0]?.transitionId === intent.transitionId) persisted.splice(0, 1);
       }),
     });
@@ -315,14 +349,14 @@ describe("conservative static-host update coordinator", () => {
     if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
-    await vi.waitFor(() => expect(test.ports.recordTransitionIntent).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
     const rollback = await test.coordinator.requestRollback();
     releaseRecord?.();
     const cancelled = await confirming;
 
     expect(rollback).toMatchObject({ phase: "deployment-required", currentUsable: true });
     expect(cancelled).toEqual(rollback);
-    expect(test.ports.revokeTransitionIntent).toHaveBeenCalledOnce();
+    expect(test.ports.discardPendingTransitionIntent).toHaveBeenCalledOnce();
     expect(persisted).toEqual([]);
   });
 
@@ -333,7 +367,7 @@ describe("conservative static-host update coordinator", () => {
     if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
-    await vi.waitFor(() => expect(test.ports.recordTransitionIntent).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
     const rollback = await test.coordinator.requestRollback();
     record.reject(new Error("record rejected"));
 
@@ -343,23 +377,86 @@ describe("conservative static-host update coordinator", () => {
 
   it("does not let a rejected stale-intent revocation overwrite its cancelling operation", async () => {
     const record = deferred<void>();
-    const revoke = deferred<void>();
+    const discard = deferred<void>();
     const test = harness({
       record: vi.fn(async () => await record.promise),
-      revoke: vi.fn(async () => await revoke.promise),
+      discard: vi.fn(async () => await discard.promise),
     });
     const prepared = await test.coordinator.prepareUpdate(candidate.pair);
     if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
 
     const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
-    await vi.waitFor(() => expect(test.ports.recordTransitionIntent).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(test.ports.recordPendingTransitionIntent).toHaveBeenCalledOnce());
     const rollback = await test.coordinator.requestRollback();
     record.resolve();
-    await vi.waitFor(() => expect(test.ports.revokeTransitionIntent).toHaveBeenCalledOnce());
-    revoke.reject(new Error("revoke rejected"));
+    await vi.waitFor(() => expect(test.ports.discardPendingTransitionIntent).toHaveBeenCalledOnce());
+    discard.reject(new Error("discard rejected"));
 
     await expect(confirming).resolves.toEqual(rollback);
     expect(test.coordinator.state()).toEqual(rollback);
+  });
+
+  it("never arms a pending intent when cancellation races a failed cleanup", async () => {
+    const store = durableIntentStore();
+    const recordGate = deferred<void>();
+    const arm = vi.fn(store.arm);
+    const test = harness({
+      record: vi.fn(async (intent) => {
+        await store.recordPending(intent);
+        await recordGate.promise;
+      }),
+      arm,
+      discard: vi.fn(async () => { throw new Error("cleanup rejected"); }),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(store.state()).toBe("pending"));
+    const poisonedIntent = store.pendingIntent();
+    if (!poisonedIntent) throw new Error("expected pending intent");
+    const rollback = await test.coordinator.requestRollback();
+    recordGate.resolve();
+
+    await expect(confirming).resolves.toEqual(rollback);
+    expect(arm).not.toHaveBeenCalled();
+    expect(store.state()).toBe("pending");
+
+    const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
+    await expect(reopened.coordinator.verifyNextBoot(poisonedIntent)).resolves.toMatchObject({
+      phase: "failed", code: "intent-stale", currentUsable: true,
+    });
+    expect(store.state()).toBe("pending");
+  });
+
+  it("reports a current record and cleanup failure without arming durable poison", async () => {
+    const store = durableIntentStore();
+    const test = harness({
+      record: vi.fn(async (intent) => {
+        await store.recordPending(intent);
+        throw new Error("record completion ambiguous");
+      }),
+      arm: vi.fn(store.arm),
+      discard: vi.fn(async () => { throw new Error("cleanup rejected"); }),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const state = await test.coordinator.confirmUpdate(prepared.confirmationToken);
+    const poisonedIntent = store.pendingIntent();
+    if (!poisonedIntent) throw new Error("expected pending intent");
+
+    expect(state).toMatchObject({
+      phase: "failed", operation: "confirm-update", code: "intent-record-failed",
+      message: "cleanup rejected", currentUsable: true,
+    });
+    expect(test.ports.armTransitionIntent).not.toHaveBeenCalled();
+    expect(store.state()).toBe("pending");
+
+    const reopened = harness({ boot: boot("boot-2", candidate), consume: vi.fn(store.consume) });
+    await expect(reopened.coordinator.verifyNextBoot(poisonedIntent)).resolves.toMatchObject({
+      phase: "failed", code: "intent-stale", currentUsable: true,
+    });
   });
 
   it("does not overwrite a newer operation after concurrent intent consumption", async () => {
@@ -473,9 +570,9 @@ describe("conservative static-host update coordinator", () => {
       message: ROLLBACK_MESSAGE,
       currentUsable: true,
     });
-    expect(test.ports.recordTransitionIntent).not.toHaveBeenCalled();
+    expect(test.ports.recordPendingTransitionIntent).not.toHaveBeenCalled();
     await test.coordinator.confirmUpdate(prepared.confirmationToken);
-    expect(test.ports.recordTransitionIntent).not.toHaveBeenCalled();
+    expect(test.ports.recordPendingTransitionIntent).not.toHaveBeenCalled();
   });
 });
 

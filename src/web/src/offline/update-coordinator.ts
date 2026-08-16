@@ -36,7 +36,14 @@ export interface CloseAndReopenIntentV1 {
   readonly message: typeof UPDATE_READY_MESSAGE;
 }
 
-export type IntentConsumptionResultV1 = "consumed" | "missing" | "already-consumed";
+export type IntentConsumptionResultV1 = "consumed" | "missing" | "already-consumed" | "not-armed";
+export type IntentArmResultV1 = "armed" | "missing" | "mismatch";
+
+export interface TransitionArmPermitV1 {
+  readonly coordinatorGeneration: number;
+  /** A durable adapter must abort its arm transaction while this signal is aborted. */
+  readonly signal: AbortSignal;
+}
 
 export interface StaticUpdateCoordinatorPorts {
   readControllerBoot(): Promise<ControllerBootProofV1>;
@@ -46,11 +53,17 @@ export interface StaticUpdateCoordinatorPorts {
     boot: ControllerBootProofV1;
     candidate: AcceptedPairIdentityV1;
   }>): string;
-  /** Persist only the latest unconsumed intent for this exact source boot. */
-  recordTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
-  /** Conditionally remove only this exact intent; never remove a newer intent. */
-  revokeTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
-  /** Consume the intent once; this record is not controller or rollback authority. */
+  /** Persist a non-consumable PENDING intent for this exact source boot. */
+  recordPendingTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  /**
+   * Atomically change this exact PENDING intent to ARMED. The durable transaction
+   * must observe and remain bound to the permit signal until commit. Rejection,
+   * abort, `missing`, or `mismatch` must guarantee that no ARMED write committed.
+   */
+  armTransitionIntent(intent: CloseAndReopenIntentV1, permit: TransitionArmPermitV1): Promise<IntentArmResultV1>;
+  /** Conditionally remove only this exact PENDING intent; never remove a newer or ARMED intent. */
+  discardPendingTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
+  /** Atomically consume only the exact ARMED intent once. */
   consumeTransitionIntent(
     intent: CloseAndReopenIntentV1,
     boot: ControllerBootProofV1,
@@ -263,6 +276,7 @@ export class StaticHostUpdateCoordinator {
   #launchBoot: ControllerBootProofV1 | null = null;
   #sequence = 0;
   #pendingGeneration: number | null = null;
+  #operationAbortController: AbortController | null = null;
 
   constructor(ports: StaticUpdateCoordinatorPorts, options: StaticUpdateCoordinatorOptions = {}) {
     this.#ports = ports;
@@ -369,8 +383,8 @@ export class StaticHostUpdateCoordinator {
       );
     }
 
-    this.#pendingGeneration = null;
-    const operation = ++this.#sequence;
+    const operation = this.#beginOperation();
+    const armSignal = this.#operationSignal(operation);
     this.#commit(operation, Object.freeze({
       phase: "recording-close-and-reopen-intent", boot: pending.boot,
       candidate: pending.candidate, currentUsable: true,
@@ -385,30 +399,41 @@ export class StaticHostUpdateCoordinator {
       message: UPDATE_READY_MESSAGE,
     });
     try {
-      await this.#ports.recordTransitionIntent(intent);
+      await this.#ports.recordPendingTransitionIntent(intent);
       if (!this.#isCurrentOperation(operation)) {
-        try { await this.#ports.revokeTransitionIntent(intent); }
+        try { await this.#ports.discardPendingTransitionIntent(intent); }
         catch (error) {
           if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
           return this.#commit(operation, failed(
             "confirm-update", "intent-record-failed", pending.boot,
-            boundedMessage(error, "Cancelled transition intent could not be revoked."),
+            boundedMessage(error, "Cancelled pending transition intent could not be discarded."),
           ), pending.boot);
         }
         if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
         return this.#currentOr(pending.boot);
+      }
+      const armed = await this.#ports.armTransitionIntent(intent, {
+        coordinatorGeneration: operation,
+        signal: armSignal,
+      });
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
+      if (armed !== "armed") {
+        return this.#commit(operation, failed(
+          "confirm-update", "intent-record-failed", pending.boot,
+          "Pending transition intent could not be armed exactly once.",
+        ), pending.boot);
       }
       return this.#commit(operation, Object.freeze({
         phase: "close-and-reopen-required", boot: pending.boot, intent,
         message: UPDATE_READY_MESSAGE, currentUsable: true,
       }), pending.boot);
     } catch (error) {
-      try { await this.#ports.revokeTransitionIntent(intent); }
-      catch (revokeError) {
+      try { await this.#ports.discardPendingTransitionIntent(intent); }
+      catch (discardError) {
         if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
         return this.#commit(operation, failed(
           "confirm-update", "intent-record-failed", pending.boot,
-          boundedMessage(revokeError, "Failed transition intent could not be revoked."),
+          boundedMessage(discardError, "Failed pending transition intent could not be discarded."),
         ), pending.boot);
       }
       if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
@@ -524,8 +549,17 @@ export class StaticHostUpdateCoordinator {
   }
 
   #beginOperation(): number {
+    this.#operationAbortController?.abort();
+    this.#operationAbortController = new AbortController();
     this.#pendingGeneration = null;
     return ++this.#sequence;
+  }
+
+  #operationSignal(operation: number): AbortSignal {
+    if (!this.#isCurrentOperation(operation) || !this.#operationAbortController) {
+      throw new Error("Coordinator operation is no longer current.");
+    }
+    return this.#operationAbortController.signal;
   }
 
   #isCurrentOperation(operation: number): boolean {

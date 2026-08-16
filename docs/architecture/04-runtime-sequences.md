@@ -288,23 +288,30 @@ JavaScript realm. Two coordinators created during the same page boot therefore
 cannot mint the same transition identity. The first validated controller proof
 is pinned as that coordinator's immutable launch boot.
 
-Explicit confirmation records only a one-shot transition intent and presents
-the exact instruction: `Update ready. Close all SeaRise tabs and reopen to use
-it.` It does not swap browser-storage authority, activate a worker, call
+Explicit confirmation first records a non-consumable `PENDING` transition
+intent. Only after that write resolves unambiguously and the same coordinator
+generation remains current may a second durable transaction change the exact
+intent to `ARMED`. That arm transaction remains bound to an abort signal until
+commit. Only an exact `ARMED` intent can be consumed once; `PENDING`, consumed,
+missing, mismatched, tombstoned, and unknown records fail closed. The
+coordinator then presents the exact instruction: `Update ready. Close all
+SeaRise tabs and reopen to use it.` It does not swap browser-storage authority,
+activate a worker, call
 `skipWaiting`, call `clients.claim`, navigate, reload, or claim that the new
 pair is current. Existing tabs remain pinned to their controlling worker. A
 verified waiting worker becomes eligible to activate naturally only after all
-clients of the prior worker close. If a newer operation cancels confirmation
-while its intent write is in flight, the coordinator conditionally revokes only
-that exact stale intent before returning; it cannot remove a newer intent.
+clients of the prior worker close. Cancellation or an ambiguous first write can
+leave only harmless `PENDING` evidence. Conditional cleanup may remove that
+exact pending record, but cleanup failure can never make it consumable.
 
 On the subsequent fresh boot, activation is recognized only when the page
 proves a different boot identity controlled by the exact confirmed
 app/release/precache/core identity and atomically consumes the matching
 one-shot intent. Same-page, mismatched-controller, stale-intent, missing-intent,
-and replay attempts fail closed while the actually controlling pair remains
-usable. A changed controller proof reported to the original coordinator is
-still the same page, not a fresh boot, and cannot finalize activation. Async
+pending-intent, and replay attempts fail closed while the actually controlling
+pair remains usable. A changed controller proof reported to the original
+coordinator is still the same page, not a fresh boot, and cannot finalize
+activation. Async
 completion from a cancelled generation cannot overwrite a newer operation.
 Candidate evidence failures remain distinct from technical controller,
 inspection-port, token-provider, and intent-store failures. All are technical

@@ -13,7 +13,9 @@ All notable changes to this project will be documented in this file.
   immutable launch-boot pinning prevents same-page finalization, while
   internally minted cryptographic per-instance entropy and generation binding
   prevent transition collisions, stale-token reuse, async state overwrite, and
-  replay. Browser
+  replay. Durable intent publication is two-phase: ambiguous or cancelled writes
+  remain non-consumable `PENDING` evidence, and only a same-generation,
+  abort-bound transaction can arm an intent for one-shot consumption. Browser
   rollback is reported as deployment-required because Git/deployment history,
   not browser storage, is the application rollback authority.
 
