@@ -1,7 +1,7 @@
-import { createHash } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { OFFLINE_WORKER_PROTOCOL } from "./contracts/policy";
-import { createServiceWorkerRuntime, type EmbeddedPrecacheV2 } from "./service-worker-runtime";
+import { createServiceWorkerRuntime, type EmbeddedPrecacheV3 } from "./service-worker-runtime";
 
 const release = "release-a";
 const origin = "https://static.example";
@@ -12,43 +12,79 @@ const buildIdentity = {
   releaseDisposition: "synthetic-fixture",
   manifestPath: `/releases/${release}/manifest.json`,
 } as const;
+const resourceBodies = Object.freeze({
+  "/": "<html>shell</html>",
+  "/assets/app.js": "console.log('app');",
+  [`/releases/${release}/manifest.json`]: '{"release":"release-a"}',
+});
+const resourceMediaTypes = Object.freeze({
+  "/": "text/html",
+  "/assets/app.js": "text/javascript",
+  [`/releases/${release}/manifest.json`]: "application/json",
+});
+const entries = Object.keys(resourceBodies).sort().map((path) => ({
+  path,
+  mediaType: resourceMediaTypes[path as keyof typeof resourceMediaTypes],
+  byteSize: Buffer.byteLength(resourceBodies[path as keyof typeof resourceBodies]),
+  sha256: createHash("sha256").update(resourceBodies[path as keyof typeof resourceBodies]).digest("hex"),
+}));
 const authority = {
-  contractVersion: 2,
+  authorityKind: "searise-shell-precache-v3",
+  contractVersion: 3,
   buildIdentity,
-  urls: ["/", "/assets/app.js", `/releases/${release}/manifest.json`],
+  entries,
 } as const;
-const embedded: EmbeddedPrecacheV2 = {
+const embedded: EmbeddedPrecacheV3 = {
   ...authority,
   precacheSetSha256: createHash("sha256").update(JSON.stringify(authority)).digest("hex"),
 };
 
+function responseFor(path: string, body: string = resourceBodies[path as keyof typeof resourceBodies]) {
+  return new Response(body, {
+    status: 200,
+    headers: { "Content-Type": resourceMediaTypes[path as keyof typeof resourceMediaTypes] },
+  });
+}
+
 function harness(
   fetchOverride?: (request: Request) => Promise<Response>,
-  candidate: EmbeddedPrecacheV2 = embedded,
+  candidate: EmbeddedPrecacheV3 = embedded,
 ) {
-  const entries = new Map<string, Response>();
-  const names = new Set<string>();
+  const stores = new Map<string, Map<string, Response>>();
   const deleted: string[] = [];
-  const cache = {
-    match: vi.fn(async (url: string) => entries.get(url)),
-    put: vi.fn(async (url: string, response: Response) => { entries.set(url, response); }),
-  };
   const caches = {
-    open: vi.fn(async (name: string) => { names.add(name); return cache; }),
+    open: vi.fn(async (name: string) => {
+      let entriesForCache = stores.get(name);
+      if (!entriesForCache) {
+        entriesForCache = new Map();
+        stores.set(name, entriesForCache);
+      }
+      return {
+        match: vi.fn(async (url: string) => entriesForCache!.get(url)),
+        put: vi.fn(async (url: string, response: Response) => { entriesForCache!.set(url, response); }),
+      };
+    }),
     delete: vi.fn(async (name: string) => {
       deleted.push(name);
-      entries.clear();
-      return names.delete(name);
+      return stores.delete(name);
     }),
-    keys: vi.fn(async () => [...names]),
+    keys: vi.fn(async () => [...stores.keys()]),
   };
-  const fetcher = vi.fn(fetchOverride ?? (async (request: Request) => new Response("ok", {
-    status: 200,
-    headers: new URL(request.url).pathname.endsWith("manifest.json")
-      ? { "Content-Type": "application/json" }
-      : undefined,
-  })));
-  return { runtime: createServiceWorkerRuntime(candidate, { origin, caches, fetch: fetcher }), cache, caches, deleted, entries, fetcher, names };
+  const fetcher = vi.fn(fetchOverride ?? (async (request: Request) => responseFor(new URL(request.url).pathname)));
+  const runtime = createServiceWorkerRuntime(candidate, {
+    origin,
+    caches,
+    fetch: fetcher,
+    crypto: webcrypto,
+  });
+  return {
+    runtime,
+    caches,
+    deleted,
+    fetcher,
+    stores,
+    candidateStore: () => stores.get(runtime.cacheName),
+  };
 }
 
 function request(path: string, overrides: Partial<{ method: string; mode: string; headers: Headers }> = {}) {
@@ -66,69 +102,163 @@ describe("service worker shell runtime", () => {
       {
         ...embedded,
         buildIdentity: { ...embedded.buildIdentity, releaseDisposition: "private-engineering" },
-      } as unknown as EmbeddedPrecacheV2,
+      } as unknown as EmbeddedPrecacheV3,
       { origin, caches: harness().caches, fetch: vi.fn() },
     )).toThrow(/local Candidate mode/);
   });
 
-  it("fails closed when the embedded build identity differs from its sealed digest", async () => {
-    const tampered = {
+  it.each([
+    ["identity", {
       ...embedded,
       buildIdentity: { ...embedded.buildIdentity, appBuildId: "other-build" },
-    } as EmbeddedPrecacheV2;
-    await expect(harness(undefined, tampered).runtime.install()).rejects.toThrow(/tampered/);
+    }],
+    ["entry", {
+      ...embedded,
+      entries: embedded.entries.map((entry, index) => index === 1
+        ? { ...entry, byteSize: entry.byteSize + 1 }
+        : entry),
+    }],
+  ])("fails closed when the embedded %s differs from its sealed digest", async (_name, tampered) => {
+    await expect(harness(undefined, tampered as EmbeddedPrecacheV3).runtime.install()).rejects.toThrow(/tampered/);
   });
 
-  it("populates only a new exact-pair cache and reuses a completed cache", async () => {
+  it.each([
+    ["missing", entries.slice(0, -1)],
+    ["duplicate", [entries[0], entries[0], ...entries.slice(1)]],
+  ])("rejects a %s entry inventory", (_name, invalidEntries) => {
+    const invalidAuthority = { ...authority, entries: invalidEntries };
+    expect(() => harness(undefined, {
+      ...invalidAuthority,
+      precacheSetSha256: createHash("sha256").update(JSON.stringify(invalidAuthority)).digest("hex"),
+    } as EmbeddedPrecacheV3)).toThrow(/inventory is not canonical/);
+  });
+
+  it("populates only a new exact-pair cache and reuses a byte-verified completed cache", async () => {
     const test = harness();
     await test.runtime.install();
     expect(test.fetcher).toHaveBeenCalledTimes(3);
-    expect([...test.entries.keys()]).toEqual(embedded.urls.map((path) => `${origin}${path}`));
+    expect([...test.candidateStore()!.keys()]).toEqual(entries.map(({ path }) => `${origin}${path}`));
     await test.runtime.install();
     expect(test.fetcher).toHaveBeenCalledTimes(3);
     expect(test.deleted).toEqual([]);
   });
 
-  it.each(["partial", "policy-invalid"] as const)(
-    "deletes and rebuilds a %s existing exact-name cache",
+  it.each(["missing", "mime", "size", "hash"] as const)(
+    "deletes and rebuilds an existing candidate cache with an invalid %s entry",
     async (failure) => {
       const test = harness();
-      test.names.add(test.runtime.cacheName);
-      test.entries.set(`${origin}/`, new Response("shell"));
-      if (failure === "policy-invalid") {
-        test.entries.set(`${origin}/assets/app.js`, new Response("app"));
-        test.entries.set(`${origin}${embedded.buildIdentity.manifestPath}`, new Response("{}", {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-        }));
-      }
+      const existing = new Map(entries.map(({ path }) => [`${origin}${path}`, responseFor(path)]));
+      const appUrl = `${origin}/assets/app.js`;
+      if (failure === "missing") existing.delete(appUrl);
+      if (failure === "mime") existing.set(appUrl, new Response(resourceBodies["/assets/app.js"], {
+        headers: { "Content-Type": "text/css" },
+      }));
+      if (failure === "size") existing.set(appUrl, responseFor("/assets/app.js", "x"));
+      if (failure === "hash") existing.set(appUrl, responseFor("/assets/app.js", "x".repeat(resourceBodies["/assets/app.js"].length)));
+      test.stores.set(test.runtime.cacheName, existing);
 
       await test.runtime.install();
 
       expect(test.deleted).toEqual([test.runtime.cacheName]);
       expect(test.fetcher).toHaveBeenCalledTimes(3);
-      expect([...test.entries.keys()]).toEqual(embedded.urls.map((path) => `${origin}${path}`));
+      expect([...test.candidateStore()!.keys()]).toEqual(entries.map(({ path }) => `${origin}${path}`));
     },
   );
 
-  it("rolls back only its new cache on failed or private manifest delivery", async () => {
-    const test = harness(async (value) => new Response("{}", {
-      status: 200,
-      headers: new URL(value.url).pathname.endsWith("manifest.json")
-        ? { "Content-Type": "application/json", "Cache-Control": "private, no-store" }
-        : undefined,
-    }));
+  it.each(["mime", "size", "hash"] as const)(
+    "rejects a network response with a %s mismatch and deletes only the incomplete candidate cache",
+    async (failure) => {
+      const test = harness(async (value) => {
+        const path = new URL(value.url).pathname;
+        if (path !== "/assets/app.js") return responseFor(path);
+        if (failure === "mime") return new Response(resourceBodies[path], { headers: { "Content-Type": "text/css" } });
+        if (failure === "size") return responseFor(path, "x");
+        return responseFor(path, "x".repeat(resourceBodies[path].length));
+      });
+      test.stores.set("unrelated-active-cache", new Map([["safe", new Response("safe")]]));
+
+      await expect(test.runtime.install()).rejects.toThrow(/invalid|sealed authority/);
+
+      expect(test.deleted).toEqual([test.runtime.cacheName]);
+      expect(test.stores.get("unrelated-active-cache")?.has("safe")).toBe(true);
+      expect(test.candidateStore()).toBeUndefined();
+    },
+  );
+
+  it("rolls back its incomplete cache when a response is unreadable or private", async () => {
+    const test = harness(async (value) => {
+      const path = new URL(value.url).pathname;
+      const response = responseFor(path);
+      if (path === buildIdentity.manifestPath) response.headers.set("Cache-Control", "private, no-store");
+      return response;
+    });
     await expect(test.runtime.install()).rejects.toThrow(/Precache response is invalid/);
     expect(test.deleted).toEqual([test.runtime.cacheName]);
   });
 
   it("serves exact cached resources and canonicalizes only root navigation queries", async () => {
     const test = harness();
-    test.entries.set(`${origin}/`, new Response("shell"));
-    expect(await (await test.runtime.fetch(request("/?scenario=ssp2-45", { mode: "navigate" }))!)!.text()).toBe("shell");
-    expect(test.cache.match).toHaveBeenCalledWith(`${origin}/`);
+    test.stores.set(test.runtime.cacheName, new Map([[`${origin}/`, responseFor("/")]]));
+    expect(await (await test.runtime.fetch(request("/?scenario=ssp2-45", { mode: "navigate" }))!)!.text()).toBe(resourceBodies["/"]);
     expect(test.runtime.fetch(request("/assets/app.js?query=private"))).toBeUndefined();
-    expect(test.entries.has(`${origin}/?scenario=ssp2-45`)).toBe(false);
+    expect(test.candidateStore()!.has(`${origin}/?scenario=ssp2-45`)).toBe(false);
+  });
+
+  it.each(["mime", "hash"] as const)(
+    "rejects and quarantines a post-install cached %s mutation",
+    async (failure) => {
+      const test = harness();
+      test.stores.set("unrelated-active-cache", new Map([["safe", new Response("safe")]]));
+      await test.runtime.install();
+      const appUrl = `${origin}/assets/app.js`;
+      test.candidateStore()!.set(appUrl, failure === "mime"
+        ? new Response(resourceBodies["/assets/app.js"], { headers: { "Content-Type": "text/css" } })
+        : responseFor("/assets/app.js", "x".repeat(resourceBodies["/assets/app.js"].length)));
+
+      await expect(test.runtime.fetch(request("/assets/app.js"))!).rejects.toThrow(
+        /invalid|sealed authority/,
+      );
+
+      expect(test.deleted).toEqual([test.runtime.cacheName]);
+      expect(test.candidateStore()).toBeUndefined();
+      expect(test.stores.get("unrelated-active-cache")?.has("safe")).toBe(true);
+      expect(test.fetcher).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it("verifies and restores an exact missing entry before serving it", async () => {
+    const test = harness();
+    await test.runtime.install();
+    const appUrl = `${origin}/assets/app.js`;
+    test.candidateStore()!.delete(appUrl);
+
+    const response = await test.runtime.fetch(request("/assets/app.js"))!;
+
+    expect(await response.text()).toBe(resourceBodies["/assets/app.js"]);
+    expect(test.fetcher).toHaveBeenCalledTimes(4);
+    expect(await test.candidateStore()!.get(appUrl)!.text()).toBe(resourceBodies["/assets/app.js"]);
+    expect(test.deleted).toEqual([]);
+  });
+
+  it("rejects a corrupt missing-entry fallback without serving or storing its bytes", async () => {
+    let corruptFallback = false;
+    const test = harness(async (value) => {
+      const path = new URL(value.url).pathname;
+      if (corruptFallback && path === "/assets/app.js") {
+        return responseFor(path, "x".repeat(resourceBodies[path].length));
+      }
+      return responseFor(path);
+    });
+    test.stores.set("unrelated-active-cache", new Map([["safe", new Response("safe")]]));
+    await test.runtime.install();
+    test.candidateStore()!.delete(`${origin}/assets/app.js`);
+    corruptFallback = true;
+
+    await expect(test.runtime.fetch(request("/assets/app.js"))!).rejects.toThrow(/sealed authority/);
+
+    expect(test.deleted).toEqual([test.runtime.cacheName]);
+    expect(test.candidateStore()).toBeUndefined();
+    expect(test.stores.get("unrelated-active-cache")?.has("safe")).toBe(true);
   });
 
   it("bypasses ranges, non-GET, cross-origin, architecture, and release artifacts", () => {

@@ -4,8 +4,8 @@ import { validateApplicationBuildIdentity } from "./application-build-identity.m
 import { buildIdentityFile, validateBuildIdentity } from "./build-identity.mjs";
 import {
   createEmbeddedPrecache,
+  deriveShellPrecacheEntries,
   precachePlaceholder,
-  shellPrecacheUrls,
 } from "./service-worker-precache.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -26,12 +26,12 @@ const buildIdentity = validateBuildIdentity(
   JSON.parse(readFileSync(resolve(dist, buildIdentityFile), "utf8")),
 );
 validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
-const urls = shellPrecacheUrls({
+const entries = deriveShellPrecacheEntries({
   dist,
   viteManifest,
   dataReleaseId: buildIdentity.dataReleaseId,
 });
-const payload = createEmbeddedPrecache({ buildIdentity, urls });
+const payload = createEmbeddedPrecache({ buildIdentity, entries });
 let worker = readFileSync(workerPath, "utf8");
 const occurrences = worker.split(precachePlaceholder).length - 1;
 if (occurrences !== 1) throw new Error("Service worker precache placeholder is missing or duplicated");
@@ -42,4 +42,4 @@ worker = worker.replace(
 worker = worker.replace(/\n?\/\/# sourceMappingURL=service-worker\.js\.map\s*$/u, "");
 writeFileSync(workerPath, worker);
 rmSync(`${workerPath}.map`, { force: true });
-console.log(`embedded ${urls.length} exact shell resources in service-worker.js`);
+console.log(`embedded ${entries.length} byte-verified shell resources in service-worker.js`);

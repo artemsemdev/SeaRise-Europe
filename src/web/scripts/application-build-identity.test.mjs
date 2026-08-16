@@ -12,7 +12,10 @@ import {
   serializeApplicationBuildIdentity,
   validateApplicationBuildIdentity,
 } from "./application-build-identity.mjs";
-import { extractEmbeddedPrecachePayload } from "./service-worker-precache.mjs";
+import {
+  createEmbeddedPrecache,
+  extractEmbeddedPrecachePayload,
+} from "./service-worker-precache.mjs";
 
 const roots = [];
 const oldIdentity = Object.freeze({
@@ -88,14 +91,32 @@ describe("authoritative application build identity", () => {
 
   it("requires exactly one readable worker authority instead of selecting a decoy", () => {
     const precache = {
-      contractVersion: 2,
+      authorityKind: "searise-shell-precache-v3",
+      contractVersion: 3,
       buildIdentity: oldIdentity,
-      urls: ["/", oldIdentity.manifestPath],
+      entries: [
+        { path: "/", mediaType: "text/html", byteSize: 1, sha256: "1".repeat(64) },
+        { path: oldIdentity.manifestPath, mediaType: "application/json", byteSize: 1, sha256: "2".repeat(64) },
+      ],
       precacheSetSha256: "0".repeat(64),
     };
     const embedded = `JSON.parse(${JSON.stringify(JSON.stringify(precache))})`;
     expect(extractEmbeddedPrecachePayload(embedded)).toEqual(precache);
     expect(() => extractEmbeddedPrecachePayload("void 0;")).toThrow(/found 0/);
     expect(() => extractEmbeddedPrecachePayload(`${embedded};${embedded}`)).toThrow(/found 2/);
+  });
+
+  it("freezes the generated worker authority and every byte-identity entry", () => {
+    const entry = {
+      path: "/",
+      mediaType: "text/html",
+      byteSize: 1,
+      sha256: "1".repeat(64),
+    };
+    const precache = createEmbeddedPrecache({ buildIdentity: oldIdentity, entries: [entry] });
+    expect(Object.isFrozen(precache)).toBe(true);
+    expect(Object.isFrozen(precache.entries)).toBe(true);
+    expect(Object.isFrozen(precache.entries[0])).toBe(true);
+    expect(precache.entries[0]).not.toBe(entry);
   });
 });

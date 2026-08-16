@@ -133,22 +133,47 @@ for (const file of [...expectedPrecacheFiles].filter((path) => path.endsWith(".c
       : join(dirname(file), match[1]).replaceAll("\\", "/"));
   }
 }
-const expectedPrecacheUrls = [
+const expectedPrecachePaths = [
   "/",
   `/${applicationBuildIdentityFile}`,
   ...[...expectedPrecacheFiles].map((path) => `/${path}`),
   `/releases/${releaseId}/manifest.json`,
 ].sort();
+const precacheMediaTypes = Object.freeze({
+  ".css": "text/css",
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+});
+const expectedPrecacheEntries = expectedPrecachePaths.map((path) => {
+  const bytes = readFileSync(path === "/" ? resolve(dist, "index.html") : resolve(dist, `.${path}`));
+  const mediaType = precacheMediaTypes[path === "/" ? ".html" : extname(path)];
+  if (!mediaType) throw new Error(`No independent shell media type exists for ${path}`);
+  return {
+    path,
+    mediaType,
+    byteSize: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+});
 const expectedPrecacheHash = createHash("sha256").update(JSON.stringify({
-  contractVersion: 2,
+  authorityKind: "searise-shell-precache-v3",
+  contractVersion: 3,
   buildIdentity,
-  urls: expectedPrecacheUrls,
+  entries: expectedPrecacheEntries,
 })).digest("hex");
 if (
-  JSON.stringify(embedded.urls) !== JSON.stringify(expectedPrecacheUrls) ||
+  embedded.authorityKind !== "searise-shell-precache-v3" ||
+  embedded.contractVersion !== 3 ||
+  JSON.stringify(embedded.entries) !== JSON.stringify(expectedPrecacheEntries) ||
   embedded.precacheSetSha256 !== expectedPrecacheHash ||
-  embedded.urls.some((url) => url.startsWith("/about/") ||
-    (url.startsWith("/releases/") && url !== buildIdentity.manifestPath))
+  embedded.entries.some(({ path }) => path.startsWith("/about/") ||
+    (path.startsWith("/releases/") && path !== buildIdentity.manifestPath))
 ) throw new Error("Service worker embedded precache differs from the independent shell inventory");
 assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
 validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
@@ -199,7 +224,7 @@ const mapRuntimeJavascript = readFileSync(resolve(dist, mapRuntimeEntry.file), "
 if (!/cache:[`'"]no-store[`'"]/u.test(mapRuntimeJavascript)) {
   throw new Error("Emitted PMTiles adapter does not preserve Request.cache=no-store");
 }
-if (embedded.urls.some((url) => url.endsWith(".pmtiles"))) {
+if (embedded.entries.some(({ path }) => path.endsWith(".pmtiles"))) {
   throw new Error("Visual PMTiles cannot enter the service-worker precache");
 }
 const initialJavascript = assets
@@ -224,7 +249,8 @@ const report = {
     appBuildId: buildIdentity.appBuildId,
     dataReleaseId: buildIdentity.dataReleaseId,
     precacheSetSha256: embedded.precacheSetSha256,
-    precacheUrls: embedded.urls,
+    precacheUrls: embedded.entries.map(({ path }) => path),
+    precacheEntries: embedded.entries,
     brotliBytes: brotliCompressSync(serviceWorker).length,
   },
   assets,
