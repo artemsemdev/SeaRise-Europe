@@ -351,7 +351,10 @@ export async function validateSearchShardDocument(
   return validateSearchShardDocumentInternal(raw, authority, false);
 }
 
-/** Verify exact compressed authority, decode those bytes, then use the private fast parser once. */
+/**
+ * Verify exact compressed authority, pass those bytes to the trusted deterministic
+ * Brotli decoder, then use the private fast parser exactly once.
+ */
 export async function validateVerifiedCompressedSearchShardDocument(
   compressed: Uint8Array,
   authority: SearchShardAuthority,

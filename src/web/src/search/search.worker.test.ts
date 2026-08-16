@@ -156,6 +156,22 @@ describe("settlement search worker protocol", () => {
     expect(getReader).not.toHaveBeenCalled();
   });
 
+  it("rejects a search authority that is not the exact opaque Brotli artifact", async () => {
+    const fixture = compressedFixture();
+    const transportSpy = vi.fn(async () => new Response(fixture.compressed));
+    const worker = scope();
+    installSearchWorker(worker.target, transportSpy, decodeFixture);
+    await send(worker, { kind: "initialize", token: 1, authority: {
+      ...fixture.authority,
+      artifact: {
+        ...fixture.authority.artifact,
+        url: fixture.authority.artifact.url.replace(/\.br$/, ""),
+      },
+    } });
+    expect(worker.messages.at(-1)).toMatchObject({ kind: "error", error: { code: "IntegrityFailed" } });
+    expect(transportSpy).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["oversized", (bytes: Uint8Array) => [bytes, Uint8Array.of(0)]],
     ["truncated", (bytes: Uint8Array) => [bytes.subarray(0, bytes.byteLength - 1)]],
