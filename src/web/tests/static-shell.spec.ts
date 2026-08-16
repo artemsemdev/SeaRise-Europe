@@ -195,6 +195,36 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   expect(forbiddenRequests).toEqual([]);
 });
 
+test("375px Flight keeps a visible capability alert below the canonical header", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium");
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.route("**/search/europe-*.codepoint-trie.json.br", async (route) => {
+    await route.fulfill({ status: 503, contentType: "application/octet-stream", body: "" });
+  });
+  await page.goto("/");
+  await page.getByRole("combobox", { name: /find a city, town, or village/i }).fill("Málaga");
+
+  const header = page.locator(".flight-header");
+  const alert = page.locator(
+    ".flight-alerts .application-technical-alert[data-capability-state='connection-required']",
+  );
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText(
+    "Connection required. Missing release resource for this exact interaction. No substitute was used.",
+  );
+  await expect(alert.getByRole("button", { name: "Retry availability" })).toBeVisible();
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const headerBox = await header.boundingBox();
+  const alertBox = await alert.boundingBox();
+  expect(headerBox && alertBox).toBeTruthy();
+  if (!headerBox || !alertBox) throw new Error("375px Flight capability geometry was unavailable.");
+  expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(alertBox.y);
+  expect(alertBox.x).toBeGreaterThanOrEqual(0);
+  expect(alertBox.x + alertBox.width).toBeLessThanOrEqual(375);
+  expect(alertBox.y + alertBox.height).toBeLessThanOrEqual(812);
+});
+
 test("document CSP blocks an unlisted network origin before a request leaves the page", async ({ page }) => {
   const blockedOriginRequests: string[] = [];
   page.on("request", (request) => {

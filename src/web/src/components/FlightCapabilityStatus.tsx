@@ -28,7 +28,7 @@ function offlineLabel(capability: RuntimeCapabilityV2): string | null {
   switch (capability.subject.kind) {
     case "search": return "Search available offline";
     case "assessment": return "Available offline for this assessment";
-    case "core": return "Available offline";
+    case "core": return null;
   }
 }
 
@@ -92,7 +92,7 @@ export function FlightCapabilityAlerts({
   const updateButton = updateAction(capability.update);
   return (
     <>
-      {capability.data.state === "connection-required" ? (
+      {capability.subject.kind !== "core" && capability.data.state === "connection-required" ? (
         <div className="application-technical-alert" role="alert" data-capability-state="connection-required">
           <strong>Connection required.</strong>{" "}
           Missing {missingResourceClasses(capability.data.missing)} for this exact interaction. No substitute was used.
@@ -106,7 +106,7 @@ export function FlightCapabilityAlerts({
           </button>
         </div>
       ) : null}
-      {capability.data.state === "degraded-storage" ? (
+      {capability.subject.kind !== "core" && capability.data.state === "degraded-storage" ? (
         <div className="application-technical-alert" role="alert" data-capability-state="degraded-storage">
           <strong>Browser storage degraded ({capability.data.reason}).</strong>{" "}
           The current accepted result remains visible. New data may require a connection.

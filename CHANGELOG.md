@@ -45,7 +45,9 @@ All notable changes to this project will be documented in this file.
   inventory, plus visible connection, storage, and safe-update notices in the
   existing alert slot with explicit retry/activation actions. Visual PMTiles
   remain network-only, online completion does not add header chrome, and
-  generic browser connectivity never authorizes an offline claim.
+  generic browser connectivity never authorizes an offline claim. Exact
+  interaction generations prevent one location's cached assessment from
+  authorizing another location with the same scenario and horizon.
 
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,

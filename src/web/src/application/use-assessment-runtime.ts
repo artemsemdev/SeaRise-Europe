@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -17,6 +18,7 @@ import {
   type BrowserRuntimeFactory,
   type BrowserRuntimeScope,
 } from "./browser-runtime";
+import type { RuntimeCapabilityInteractionV1 } from "./runtime-capability";
 
 export type MethodologyState =
   | { readonly phase: "idle" }
@@ -85,6 +87,7 @@ export function useAssessmentRuntime(
 ): AssessmentRuntimeView {
   const [runtime, setRuntime] = useState<BrowserRuntimeScope | null>(null);
   const [methodologyRecord, setMethodologyRecord] = useState<MethodologyRecord | null>(null);
+  const capabilityInteraction = useRef<RuntimeCapabilityInteractionV1 | null>(null);
   const active = runtime?.context === context ? runtime : null;
 
   useEffect(() => {
@@ -130,7 +133,6 @@ export function useAssessmentRuntime(
                 methodology,
               },
         });
-        void next?.capability?.confirmCurrentInteractionAvailable().catch(() => undefined);
       },
       (error: unknown) => {
         if (!current || controller.signal.aborted) return;
@@ -172,14 +174,15 @@ export function useAssessmentRuntime(
 
   const select = useCallback((selection: Selection): Promise<void> => {
     if (!active) return Promise.reject(unavailable());
-    active.capability?.selectSubject(Object.freeze({
+    const interaction = active.capability?.beginInteraction(Object.freeze({
       kind: "assessment",
       scenario: selection.scenario,
       horizon: selection.horizon,
     }));
+    capabilityInteraction.current = interaction ?? null;
     return active.controller.select(selection).then(async () => {
-      if (active.controller.getSnapshot().phase === "result") {
-        await active.capability?.confirmCurrentInteractionAvailable();
+      if (interaction && active.controller.getSnapshot().phase === "result") {
+        await active.capability?.confirmInteractionAvailable(interaction);
       }
     });
   }, [active]);
@@ -189,18 +192,23 @@ export function useAssessmentRuntime(
   }, [active]);
   const reset = useCallback((): void => {
     if (!active) throw unavailable();
-    active.capability?.selectSubject(Object.freeze({ kind: "core" }));
+    capabilityInteraction.current = active.capability?.beginInteraction(
+      Object.freeze({ kind: "core" }),
+    ) ?? null;
     active.controller.reset();
   }, [active]);
   const handleSearchLifecycle = useCallback((event: SearchLifecycleEvent): void => {
     if (!active) return;
     if (event.type === "search-started") {
-      active.capability?.selectSubject(Object.freeze({
+      capabilityInteraction.current = active.capability?.beginInteraction(Object.freeze({
         kind: "search",
         shards: Object.freeze(["core", "coastal"] as const),
-      }));
+      })) ?? null;
     } else if (event.type === "search-completed") {
-      void active.capability?.confirmCurrentInteractionAvailable().catch(() => undefined);
+      const interaction = capabilityInteraction.current;
+      if (interaction) {
+        void active.capability?.confirmInteractionAvailable(interaction).catch(() => undefined);
+      }
     }
     active.controller.handleSearchLifecycle(event);
   }, [active]);

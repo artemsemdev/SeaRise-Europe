@@ -51,7 +51,7 @@ describe("Flight capability presentation", () => {
     expect(screen.queryByText(/online/u)).not.toBeInTheDocument();
   });
 
-  it("uses subject-specific offline copy and never claims offline map availability", () => {
+  it("uses only approved subject-specific copy and never renders core or map offline pills", () => {
     const data = Object.freeze({ state: "available-offline" as const, pair, resourceCount: 2, byteCount: 512 });
     const { container, rerender } = render(<FlightCapabilityPill capability={runtimeCapability(
       data,
@@ -59,6 +59,13 @@ describe("Flight capability presentation", () => {
       Object.freeze({ kind: "search", shards: Object.freeze(["core", "coastal"] as const) }),
     )} />);
     expect(screen.getByText("Search available offline")).toBeVisible();
+
+    rerender(<FlightCapabilityPill capability={runtimeCapability(
+      data,
+      undefined,
+      Object.freeze({ kind: "core" }),
+    )} />);
+    expect(container).toBeEmptyDOMElement();
 
     rerender(<FlightCapabilityPill capability={runtimeCapability(
       online,

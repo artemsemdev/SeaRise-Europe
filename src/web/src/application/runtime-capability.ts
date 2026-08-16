@@ -7,11 +7,16 @@ import type { RuntimeCapabilityInspectionV1 } from "../offline/verified-resource
 export interface RuntimeCapabilityPort {
   readonly getSnapshot: () => RuntimeCapabilityV2 | null;
   readonly subscribe: (listener: () => void) => () => void;
-  readonly selectSubject: (subject: InteractionSubjectV1) => void;
-  readonly confirmCurrentInteractionAvailable: () => Promise<void>;
+  readonly beginInteraction: (subject: InteractionSubjectV1) => RuntimeCapabilityInteractionV1;
+  readonly confirmInteractionAvailable: (interaction: RuntimeCapabilityInteractionV1) => Promise<void>;
   readonly retry: () => Promise<void>;
   readonly requestUpdateAction: () => Promise<void>;
   readonly dispose: () => void;
+}
+
+export interface RuntimeCapabilityInteractionV1 {
+  readonly generation: number;
+  readonly subject: InteractionSubjectV1;
 }
 
 export interface RuntimeUpdateActionPort {
@@ -52,6 +57,7 @@ export class RuntimeCapabilityController implements RuntimeCapabilityPort {
   #snapshot: RuntimeCapabilityV2 | null = null;
   #networkProof = false;
   #generation = 0;
+  #interactionGeneration = 0;
   #disposed = false;
 
   constructor(options: RuntimeCapabilityControllerOptions) {
@@ -68,15 +74,28 @@ export class RuntimeCapabilityController implements RuntimeCapabilityPort {
     return () => this.#listeners.delete(listener);
   };
 
-  readonly selectSubject = (subject: InteractionSubjectV1): void => {
-    if (sameSubject(this.#subject, subject)) return;
+  readonly beginInteraction = (subject: InteractionSubjectV1): RuntimeCapabilityInteractionV1 => {
     this.#subject = subject;
+    const generation = ++this.#interactionGeneration;
+    // Invalidate an inspection already running for a prior interaction even
+    // when the new point has the same scenario/horizon wire subject.
+    this.#generation += 1;
     this.#networkProof = false;
     this.#publish(null);
-    void this.#refresh().catch(() => undefined);
+    // Assessment availability is location-specific even though the wire
+    // subject carries only scenario/horizon. Do not inspect a prior point's
+    // active ranges until this exact generation completes successfully.
+    if (subject.kind !== "assessment") void this.#refresh().catch(() => undefined);
+    return Object.freeze({ generation, subject });
   };
 
-  readonly confirmCurrentInteractionAvailable = async (): Promise<void> => {
+  readonly confirmInteractionAvailable = async (
+    interaction: RuntimeCapabilityInteractionV1,
+  ): Promise<void> => {
+    if (
+      interaction.generation !== this.#interactionGeneration ||
+      !sameSubject(interaction.subject, this.#subject)
+    ) return;
     this.#networkProof = true;
     await this.#refresh();
   };
