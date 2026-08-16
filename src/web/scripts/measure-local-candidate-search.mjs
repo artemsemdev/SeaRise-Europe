@@ -6,6 +6,7 @@ import { cpus, platform, release, totalmem } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { chromium, devices } from "@playwright/test";
+import { assertPrivateMeasurementOutput } from "./local-measurement-paths.mjs";
 
 const options = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -13,7 +14,7 @@ for (let index = 2; index < process.argv.length; index += 2) {
 }
 const candidateRoot = resolve(options.get("--candidate-root") ?? "");
 const querySetPath = resolve(options.get("--query-set") ?? "");
-const outputPath = resolve(options.get("--output") ?? "");
+const requestedOutputPath = resolve(options.get("--output") ?? "");
 const sampleCount = Number(options.get("--samples") ?? "5");
 if (!options.get("--candidate-root") || !options.get("--query-set") || !options.get("--output")
     || !Number.isSafeInteger(sampleCount) || sampleCount < 1 || sampleCount > 30) {
@@ -21,6 +22,11 @@ if (!options.get("--candidate-root") || !options.get("--query-set") || !options.
 }
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const distRoot = resolve(import.meta.dirname, "../dist");
+const outputPath = assertPrivateMeasurementOutput({
+  outputPath: requestedOutputPath,
+  candidateRoot,
+  distRoot,
+});
 const workerName = readdirSync(resolve(distRoot, "assets"))
   .find((name) => /^search\.worker-[A-Za-z0-9_-]+\.js$/.test(name));
 if (!workerName) throw new Error("Run npm run build before this local measurement.");
@@ -58,7 +64,7 @@ for (const shardId of ["europe-core", "europe-coastal"]) {
 
 const pageScript = [
   "let sequence=0;const pending=new Map();",
-  "function makeWorker(){const worker=new Worker('/assets/" + workerName + "',{type:'module'});",
+  "function makeWorker(){const worker=new Worker('/search.worker.js',{type:'module'});",
   "worker.onmessage=({data})=>{const item=pending.get(data.token);if(!item)return;",
   "pending.delete(data.token);data.kind==='error'?item.reject(new Error(data.error.message)):item.resolve(data)};return worker}",
   "function request(worker,message){return new Promise((resolve,reject)=>{const token=++sequence;",
@@ -76,8 +82,8 @@ const pageScript = [
   "if(typeof performance.measureUserAgentSpecificMemory==='function'){try{memory.push((await performance.measureUserAgentSpecificMemory()).bytes)}catch{}}",
   "globalThis.liveWorker=worker;return{initialization,query,counts,memory}};",
 ].join("");
-const html = "<!doctype html><meta charset=utf-8><title>Local measurement</title><script type=module>"
-  + pageScript + "</script>";
+const html = "<!doctype html><meta charset=utf-8><title>Local measurement</title>"
+  + "<script type=module src=/measurement-harness.js></script>";
 
 const server = createServer((request, response) => {
   response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
@@ -86,8 +92,24 @@ const server = createServer((request, response) => {
   response.setHeader("Origin-Agent-Cluster", "?1");
   response.setHeader("Content-Encoding", "identity");
   if (request.url === "/") {
+    response.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'",
+    );
     response.setHeader("Content-Type", "text/html; charset=utf-8");
     response.end(html);
+    return;
+  }
+  if (request.url === "/measurement-harness.js") {
+    response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+    response.end(pageScript);
+    return;
+  }
+  if (request.url === "/search.worker.js") {
+    response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+    createReadStream(resolve(distRoot, "assets", workerName))
+      .on("error", () => response.destroy())
+      .pipe(response);
     return;
   }
   if (request.url?.startsWith("/assets/")) {
@@ -119,7 +141,9 @@ async function workerHeapUsage(browser) {
   const session = await browser.newBrowserCDPSession();
   try {
     const targets = await session.send("Target.getTargets");
-    const target = targets.targetInfos.find((item) => item.type === "worker" && item.url.includes(workerName));
+    const target = targets.targetInfos.find(
+      (item) => item.type === "worker" && new URL(item.url).pathname === "/search.worker.js",
+    );
     if (!target) throw new Error("Live Worker target was not found.");
     const attached = await session.send("Target.attachToTarget", { flatten: false, targetId: target.targetId });
     const response = new Promise((resolvePromise, reject) => {

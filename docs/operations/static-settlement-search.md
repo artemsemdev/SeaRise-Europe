@@ -145,7 +145,9 @@ explicit candidate root in place, verifies each compressed shard against the
 candidate manifest, serves the production Worker bundle and those source files
 from a cross-origin-isolated loopback origin, and writes its raw report with
 exclusive creation. Keep that report under `/tmp` or another ignored private
-directory:
+directory outside every Git worktree, the Candidate tree, and the deployable
+`dist` tree. The command resolves canonical paths and rejects those locations
+before it reads or opens the report path:
 
 ```bash
 cd src/web
