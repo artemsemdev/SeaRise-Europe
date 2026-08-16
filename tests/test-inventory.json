@@ -6,7 +6,7 @@
     "local-2026-08-16-static-release-domain": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T01:20:00+02:00",
-      "reference": "src/web/src/data/manifest-repository.test.ts and src/web/src/domain/url-state.test.ts",
+      "reference": "src/web/src/data/browser-overlay-evidence.test.ts, src/web/src/data/manifest-repository.test.ts, and src/web/src/domain/url-state.test.ts",
       "environment": "macOS arm64; Node 20.20.1; AJV 8.20.0; Vitest 4.1.10; fast-check 4.9.0; committed synthetic fixture only"
     },
     "local-2026-08-16-static-scientific-lookup": {
@@ -220,7 +220,7 @@
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry, exact range-only native-grid COG lookup, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
-      "sourcePaths": ["src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
+      "sourcePaths": ["contracts/release/v2/**", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
       "changedPaths": ["src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static release/domain anti-corruption contract." },
@@ -1162,6 +1162,7 @@
     { "path": "src/web/src/data/cog-analysis-reader.golden.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/geography-classifier.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/map-layer-resolver.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/data/browser-overlay-evidence.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/manifest-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/release.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },

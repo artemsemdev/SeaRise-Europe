@@ -1,9 +1,9 @@
 /**
- * Generated from contracts/release/v2/{defs,manifest,artifact}.schema.json.
+ * Generated from the versioned contracts in contracts/release/v2.
  * Run `npm run generate:contracts --workspace @searise/web`; do not edit.
  */
 
-export const RELEASE_CONTRACT_SOURCE_SHA256 = "7a32f764bfec5dd9603fe58d6811469ffb4acc15f4dd31d10c9397de72c83204";
+export const RELEASE_CONTRACT_SOURCE_SHA256 = "b9d97a892d942555c6ecc3910bda423c8b097ac905308ff099d7be8f4c5d85f6";
 export type SchemaVersion = "2.0.0";
 export const SCENARIO_IDS = ["ssp1-26", "ssp2-45", "ssp5-85"] as const;
 export type ScenarioId = "ssp1-26" | "ssp2-45" | "ssp5-85";
@@ -12,7 +12,7 @@ export type HorizonYear = 2030 | 2050 | 2100;
 export const RESULT_STATES = ["ProjectionAvailable", "DataUnavailable", "OutOfScope", "UnsupportedGeography"] as const;
 export type ResultState = "ProjectionAvailable" | "DataUnavailable" | "OutOfScope" | "UnsupportedGeography";
 export type DataProvenanceClass = "real-source" | "synthetic-fixture";
-export type ArtifactRole = "release-manifest" | "contract-schema" | "scenario-config" | "methodology" | "source-attribution" | "source-receipt" | "build-receipt" | "support-boundary" | "coastal-boundary" | "settlement-search-index" | "settlement-search-receipt" | "settlement-geoparquet" | "projection-analysis-cog" | "source-grid-identity" | "range-integrity-index" | "sbom" | "projection-visual-pmtiles" | "projection-geoparquet" | "quality-summary" | "release-gate-report" | "architecture-evidence" | "stac-catalog" | "stac-collection" | "stac-item" | "checksums" | "provenance" | "signature";
+export type ArtifactRole = "release-manifest" | "contract-schema" | "scenario-config" | "methodology" | "source-attribution" | "source-receipt" | "build-receipt" | "base-release-build-receipt" | "browser-derivation-receipt" | "support-boundary" | "coastal-boundary" | "settlement-search-index" | "settlement-search-receipt" | "settlement-geoparquet" | "projection-analysis-cog" | "source-grid-identity" | "range-integrity-index" | "sbom" | "projection-visual-pmtiles" | "projection-geoparquet" | "quality-summary" | "release-gate-report" | "architecture-evidence" | "stac-catalog" | "stac-collection" | "stac-item" | "checksums" | "provenance" | "base-release-provenance" | "browser-derivation-provenance" | "base-release-signature" | "signature";
 export type MediaType = "application/json" | "application/gzip" | "application/geo+json" | "application/vnd.apache.parquet" | "application/vnd.in-toto+json" | "application/vnd.pmtiles" | "application/vnd.searise.search-index+json" | "application/vnd.dev.sigstore.bundle+json;version=0.3" | "application/x-ndjson" | "image/tiff; application=geotiff; profile=cloud-optimized" | "text/markdown" | "text/plain";
 export type DataReleaseId = string;
 export type Sha256 = string;
@@ -155,8 +155,19 @@ export interface ReleaseManifestV2 {
   readonly dataReleaseId: DataReleaseId;
   readonly dataProvenanceClass: DataProvenanceClass;
   readonly releaseAuthority: ReleaseAuthorityV2;
-  readonly createdAt: string;
-  readonly codeRevision: string;
+  readonly baseReleaseIdentity: Readonly<{
+    identityScope: "sealed-release-v1";
+    schemaVersion: "1.0.0";
+    manifestSha256: Sha256;
+    createdAt: string;
+    codeRevision: string;
+  }>;
+  readonly browserDerivationIdentity: Readonly<{
+    identityScope: "browser-overlay-derivation";
+    executionIdentity: "not-recorded";
+    receiptArtifactId: string;
+    provenanceArtifactId: string;
+  }>;
   readonly previousReleaseId: DataReleaseId | null;
   readonly methodologyVersion: "ar6-regional-projection-v1";
   readonly defaults: { readonly scenario: "ssp2-45"; readonly horizon: 2050 };
@@ -177,7 +188,8 @@ export interface ReleaseManifestV2 {
     methodology: string;
     attribution: string;
     sourceReceipts: readonly string[];
-    buildReceipt: string;
+    baseReleaseBuildReceipt: string;
+    browserDerivationReceipt: string;
     sourceGridIdentity: string;
     rangeIntegrityIndex: string;
     sbom: string;
@@ -188,8 +200,9 @@ export interface ReleaseManifestV2 {
     stacCollection: string;
     stacItems: readonly string[];
     checksums: string;
-    provenance: string;
-    signature: string;
+    baseReleaseProvenance: string;
+    browserDerivationProvenance: string;
+    baseReleaseSignature: string;
   }>;
   readonly artifacts: readonly ReleaseArtifactV2[];
   readonly datasets: readonly [ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2, ReleaseDatasetV2];

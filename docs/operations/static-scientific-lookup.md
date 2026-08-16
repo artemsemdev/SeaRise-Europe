@@ -34,6 +34,32 @@ release-identity, and cancellation failures remain technical failures. They are
 never converted into a scientific outcome. PMTiles supplies only the matching
 visual identity and never supplies analysis values.
 
+## Browser-overlay evidence boundary
+
+The committed browser fixture is an overlay on the byte-sealed release v1
+fixture. Its v2 manifest separates two identities:
+
+- `baseReleaseIdentity` records the inherited v1 manifest digest, timestamp,
+  and code revision with the explicit `sealed-release-v1` scope;
+- `browserDerivationIdentity` points to a versioned deterministic derivation
+  receipt and in-toto statement and explicitly says that execution identity was
+  not recorded.
+
+The v1 build receipt and provenance statement remain byte-identical and are
+labelled as base-release evidence. The browser derivation receipt is not a build
+receipt and does not claim a CI run, workflow, platform, time, or code revision.
+Its materials distinguish the prebuilt scientific support inputs from the
+attribution and SBOM outputs that the JavaScript overlay generator actually
+derives. Every identity is an exact SHA-256; the companion statement uses a
+project-specific predicate rather than an unearned SLSA predicate.
+
+The overlay-derived digest graph is acyclic: derived data depends on the
+browser derivation receipt, and the derivation statement depends on that
+receipt and its outputs. This claim is intentionally limited to the overlay
+graph. Inherited sealed v1 evidence is retained unchanged, including its
+historical lineage structure; v2 does not rewrite that evidence to manufacture
+a whole-release acyclicity claim.
+
 ## Clean-clone verification
 
 From the repository root with the pinned Node and npm versions:
@@ -68,10 +94,13 @@ are:
   exact lookup against the committed 139,264-byte COG. The gate observes
   same-origin `HEAD` and `206` requests under the shipped CSP, verifies the
   transferred chunk hashes, rejects multi-ranges, and proves lookup transfer
-  remains smaller than the artifact.
+  remains smaller than the artifact;
+- `src/web/src/data/browser-overlay-evidence.test.ts` for the first-class v2
+  derivation schemas, byte-identical v1 evidence, scoped identities, absence of
+  fabricated execution claims, and overlay-only digest-DAG acyclicity.
 
 The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 29 focused
-lookup tests, 114 static-target unit/integration tests, and 24 desktop/mobile
+lookup tests, 117 static-target unit/integration tests, and 24 desktop/mobile
 Playwright tests. Its warm in-memory
 100-lookup sample had p95 below the required
 100 ms gate. This is a synthetic-fixture engineering measurement, not a claim
