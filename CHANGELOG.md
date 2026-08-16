@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the final verified browser resource router: exact public whole
+  resources are admitted only when requested through receipt-gated Cache
+  Storage, and only COG chunks needed by the selected read use strict no-store
+  HEAD/206 admission and receipt-gated range reads. Private
+  Candidates remain memory-only, and visual PMTiles remain network-only and
+  outside every application resource store. The COG reader now accepts an
+  injected range transport without changing scientific lookup behavior.
+
 - Added receipt-gated coordinated browser storage primitives with exact
   verified-release route hashes, one release-disposition storage profile,
   receipt-last logical publication, cross-context exclusive admission,

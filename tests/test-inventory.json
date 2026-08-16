@@ -297,6 +297,12 @@
       "reference": "src/web/src/offline/admission-receipt.test.ts, src/web/src/offline/whole-resource-cache.test.ts, and src/web/src/offline/range-store.test.ts",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; deterministic receipt-last order, exact plan hashing, non-forgeable gates, append-only prior receipt, tamper, cancellation, readback failure, quota, operation ownership, conditional rollback, memory-only Candidate, PMTiles refusal, and privacy cases; synthetic bytes only; no Candidate-v7, TAR, browser network, personal state, or external storage"
     },
+    "local-2026-08-16-verified-resource-router": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T19:48:00+02:00",
+      "reference": "src/web/src/offline/verified-resource-router.test.ts, src/web/src/offline/verified-resource-router.ts, and src/web/src/data/cog-analysis-reader.golden.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; committed synthetic release bytes, deterministic WebCrypto, injected Cache Storage and strict range fetch ports; no browser network, Candidate bytes, TAR, personal state, or external service"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -458,6 +464,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-coordinated-admission", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Fresh fake IndexedDB, deterministic WebCrypto, injected Cache Storage/fetch ports, explicit AbortControllers, exact synthetic authorities, and operation logs use no clock, random input, browser network, Candidate bytes, or external service." }
+    },
+    {
+      "id": "static-verified-resource-router",
+      "layer": "integration",
+      "owner": "platform",
+      "purpose": "Keep final browser delivery bound to runtime-verified request-specific app/release plans: whole resources are lazy, only exact COG chunks needed by the selected assessment read are admitted, strict range misses use exact no-store HEAD and 206 delivery, private Candidate stores remain memory-only, and PMTiles remains network-only with zero resource-store persistence.",
+      "sourcePaths": ["src/web/src/offline/verified-resource-router.ts", "src/web/src/offline/verified-resource-router.test.ts", "src/web/src/data/cog-analysis-reader.ts", "src/web/src/data/cog-analysis-reader.golden.test.ts"],
+      "changedPaths": ["src/web/src/offline/verified-resource-router.ts", "src/web/src/offline/verified-resource-router.test.ts", "src/web/src/offline/release-resource-plan.ts", "src/web/src/data/cog-analysis-reader.ts", "src/web/src/offline/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact router authority, offline zero-network COG hit, strict miss, receipt-last rollback, private-memory, PMTiles zero-persistence, cancellation, quota, mixed-identity, privacy, and cross-runtime golden gate." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline/verified-resource-router.test.ts src/offline/admission-receipt.test.ts src/data/cog-analysis-reader.golden.test.ts", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 4, "class": "fast", "evidenceRef": "local-2026-08-16-verified-resource-router", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Committed fixture bytes, fresh fake IndexedDB, deterministic WebCrypto, explicit cancellation, and injected strict network/cache ports make every authority and failure path repeatable without external state." }
     },
     {
       "id": "static-range-cache-compatibility",
@@ -1442,6 +1462,7 @@
     { "path": "src/web/src/offline/range-store.test.ts", "suite": "static-authoritative-range-store", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/release-resource-plan.test.ts", "suite": "static-release-resource-plan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/admission-receipt.test.ts", "suite": "static-coordinated-admission", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/verified-resource-router.test.ts", "suite": "static-verified-resource-router", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
