@@ -11,8 +11,9 @@ All notable changes to this project will be documented in this file.
   without activating a worker, reloading, or changing current authority. A
   subsequent fresh boot must prove the exact confirmed controller identity;
   immutable launch-boot pinning prevents same-page finalization, while
-  per-instance entropy and generation binding prevent transition collisions,
-  stale-token reuse, async state overwrite, and replay. Browser
+  internally minted cryptographic per-instance entropy and generation binding
+  prevent transition collisions, stale-token reuse, async state overwrite, and
+  replay. Browser
   rollback is reported as deployment-required because Git/deployment history,
   not browser storage, is the application rollback authority.
 

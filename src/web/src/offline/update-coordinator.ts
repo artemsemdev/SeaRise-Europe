@@ -4,7 +4,7 @@ import { sha256Hex } from "./contracts/v1";
 const OPAQUE_ID = /^[A-Za-z0-9._-]{1,128}$/u;
 const PROVIDER_TOKEN = /^[A-Za-z0-9._-]{1,96}$/u;
 const BOOT_ID = /^[A-Za-z0-9._-]{1,64}$/u;
-const INSTANCE_ID = /^[A-Za-z0-9_-]{16,32}$/u;
+const INSTANCE_ID = /^[A-Za-z0-9_-]{16,40}$/u;
 const UPDATE_READY_MESSAGE = "Update ready. Close all SeaRise tabs and reopen to use it." as const;
 const ROLLBACK_MESSAGE = "Application rollback requires a verified static deployment or Git-history restoration." as const;
 
@@ -46,8 +46,6 @@ export interface StaticUpdateCoordinatorPorts {
     boot: ControllerBootProofV1;
     candidate: AcceptedPairIdentityV1;
   }>): string;
-  /** Return a collision-resistant identifier minted once for this coordinator instance. */
-  issueCoordinatorInstanceId(): string;
   /** Persist only the latest unconsumed intent for this exact source boot. */
   recordTransitionIntent(intent: CloseAndReopenIntentV1): Promise<void>;
   /** Conditionally remove only this exact intent; never remove a newer intent. */
@@ -116,6 +114,13 @@ export type StaticUpdateCoordinatorStateV1 =
     currentUsable: true;
   }>;
 
+export interface StaticUpdateCoordinatorOptions {
+  /** Deterministic test seam. Production callers must use the secure default. */
+  readonly instanceId?: string;
+}
+
+const claimedCoordinatorInstanceIds = new Set<string>();
+
 function samePair(left: AppReleasePairV1, right: AppReleasePairV1): boolean {
   return left.appBuildId === right.appBuildId && left.dataReleaseId === right.dataReleaseId;
 }
@@ -143,6 +148,23 @@ function generation(value: unknown): number {
     throw new TypeError("Confirmation generation is invalid.");
   }
   return value as number;
+}
+
+function secureCoordinatorInstanceId(): string {
+  const cryptoProvider = globalThis.crypto;
+  if (!cryptoProvider) throw new Error("Secure coordinator entropy is unavailable.");
+  if (typeof cryptoProvider.randomUUID === "function") return cryptoProvider.randomUUID();
+  const bytes = cryptoProvider.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+function claimCoordinatorInstanceId(value: unknown): string {
+  const instanceId = opaque(value, "coordinator instance id", INSTANCE_ID);
+  if (claimedCoordinatorInstanceIds.has(instanceId)) {
+    throw new Error("Coordinator instance id is already active in this JavaScript realm.");
+  }
+  claimedCoordinatorInstanceIds.add(instanceId);
+  return instanceId;
 }
 
 export function validateAcceptedPairIdentity(value: AcceptedPairIdentityV1): AcceptedPairIdentityV1 {
@@ -242,32 +264,34 @@ export class StaticHostUpdateCoordinator {
   #sequence = 0;
   #pendingGeneration: number | null = null;
 
-  constructor(ports: StaticUpdateCoordinatorPorts) {
+  constructor(ports: StaticUpdateCoordinatorPorts, options: StaticUpdateCoordinatorOptions = {}) {
     this.#ports = ports;
-    this.#instanceId = opaque(
-      ports.issueCoordinatorInstanceId(),
-      "coordinator instance id",
-      INSTANCE_ID,
-    );
+    this.#instanceId = claimCoordinatorInstanceId(options.instanceId ?? secureCoordinatorInstanceId());
   }
 
   state(): StaticUpdateCoordinatorStateV1 | null { return this.#state; }
 
   async initialize(): Promise<StaticUpdateCoordinatorStateV1> {
-    const boot = await this.#readAndPinLaunchBoot();
+    const operation = this.#beginOperation();
+    let boot: ControllerBootProofV1;
+    try { boot = await this.#readBootFor(operation); }
+    catch (error) {
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(null);
+      throw error;
+    }
+    if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
     if (!this.#isLaunchBoot(boot)) throw new Error("Controller authority changed within one page boot.");
-    return this.#set(Object.freeze({ phase: "current", boot, currentUsable: true }));
+    return this.#commit(operation, Object.freeze({ phase: "current", boot, currentUsable: true }), boot);
   }
 
   async prepareUpdate(pairInput: AppReleasePairV1): Promise<StaticUpdateCoordinatorStateV1> {
     if (this.#state?.phase === "recording-close-and-reopen-intent") return this.#state;
     const fallback = this.#bootFromState();
-    const operation = ++this.#sequence;
-    this.#pendingGeneration = null;
+    const operation = this.#beginOperation();
     if (fallback) this.#state = Object.freeze({ phase: "preparing", boot: fallback, currentUsable: true });
 
     let boot: ControllerBootProofV1;
-    try { boot = await this.#readAndPinLaunchBoot(); }
+    try { boot = await this.#readBootFor(operation); }
     catch (error) {
       return await this.#preparationFailure(operation, fallback, error, "Controller authority could not be read.");
     }
@@ -299,7 +323,7 @@ export class StaticHostUpdateCoordinator {
     }
 
     let current: ControllerBootProofV1;
-    try { current = await this.#readAndPinLaunchBoot(); }
+    try { current = await this.#readBootFor(operation); }
     catch (error) {
       return await this.#preparationFailure(operation, boot, error, "Controller authority could not be confirmed.");
     }
@@ -329,18 +353,28 @@ export class StaticHostUpdateCoordinator {
     let token: string;
     try { token = opaque(tokenInput, "confirmation token"); }
     catch {
-      return this.#set(failed("confirm-update", "confirmation-rejected", pending.boot, "Confirmation token is invalid."));
+      const operation = this.#beginOperation();
+      return this.#commit(
+        operation,
+        failed("confirm-update", "confirmation-rejected", pending.boot, "Confirmation token is invalid."),
+        pending.boot,
+      );
     }
     if (pendingGeneration === null || pendingGeneration !== this.#sequence || token !== pending.confirmationToken) {
-      return this.#set(failed("confirm-update", "confirmation-rejected", pending.boot, "Confirmation token does not authorize this waiting candidate."));
+      const operation = this.#beginOperation();
+      return this.#commit(
+        operation,
+        failed("confirm-update", "confirmation-rejected", pending.boot, "Confirmation token does not authorize this waiting candidate."),
+        pending.boot,
+      );
     }
 
     this.#pendingGeneration = null;
     const operation = ++this.#sequence;
-    this.#state = Object.freeze({
+    this.#commit(operation, Object.freeze({
       phase: "recording-close-and-reopen-intent", boot: pending.boot,
       candidate: pending.candidate, currentUsable: true,
-    });
+    }), pending.boot);
     const intent = validateCloseAndReopenIntent({
       contractVersion: 1,
       transitionId: `${pending.boot.bootId}.${this.#instanceId}.g${pendingGeneration}`,
@@ -352,50 +386,62 @@ export class StaticHostUpdateCoordinator {
     });
     try {
       await this.#ports.recordTransitionIntent(intent);
-      if (operation !== this.#sequence) {
+      if (!this.#isCurrentOperation(operation)) {
         try { await this.#ports.revokeTransitionIntent(intent); }
         catch (error) {
-          return this.#set(failed(
+          if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
+          return this.#commit(operation, failed(
             "confirm-update", "intent-record-failed", pending.boot,
             boundedMessage(error, "Cancelled transition intent could not be revoked."),
-          ));
+          ), pending.boot);
         }
+        if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
         return this.#currentOr(pending.boot);
       }
-      return this.#set(Object.freeze({
+      return this.#commit(operation, Object.freeze({
         phase: "close-and-reopen-required", boot: pending.boot, intent,
         message: UPDATE_READY_MESSAGE, currentUsable: true,
-      }));
+      }), pending.boot);
     } catch (error) {
       try { await this.#ports.revokeTransitionIntent(intent); }
       catch (revokeError) {
-        return this.#set(failed(
+        if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
+        return this.#commit(operation, failed(
           "confirm-update", "intent-record-failed", pending.boot,
           boundedMessage(revokeError, "Failed transition intent could not be revoked."),
-        ));
+        ), pending.boot);
       }
-      return this.#set(failed(
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(pending.boot);
+      return this.#commit(operation, failed(
         "confirm-update", "intent-record-failed", pending.boot,
         boundedMessage(error, "Close-and-reopen intent could not be recorded."),
-      ));
+      ), pending.boot);
     }
   }
 
   async verifyNextBoot(intentInput: CloseAndReopenIntentV1): Promise<StaticUpdateCoordinatorStateV1> {
-    const operation = ++this.#sequence;
-    this.#pendingGeneration = null;
+    const operation = this.#beginOperation();
     const fallback = this.#bootFromState();
     let boot: ControllerBootProofV1;
-    try { boot = await this.#readAndPinLaunchBoot(); }
+    try { boot = await this.#readBootFor(operation); }
     catch (error) {
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(fallback);
       if (!fallback) throw error;
-      return this.#set(failed("verify-next-boot", "preparation-failed", fallback, boundedMessage(error, "Controller proof is unavailable.")));
+      return this.#commit(
+        operation,
+        failed("verify-next-boot", "preparation-failed", fallback, boundedMessage(error, "Controller proof is unavailable.")),
+        fallback,
+      );
     }
     if (operation !== this.#sequence) return this.#currentOr(boot);
     let intent: CloseAndReopenIntentV1;
     try { intent = validateCloseAndReopenIntent(intentInput); }
     catch (error) {
-      return this.#set(failed("verify-next-boot", "intent-stale", boot, boundedMessage(error, "Transition intent is invalid.")));
+      return this.#commit(
+        operation,
+        failed("verify-next-boot", "intent-stale", boot, boundedMessage(error, "Transition intent is invalid.")),
+        boot,
+      );
     }
     if (
       !this.#isLaunchBoot(boot) ||
@@ -403,36 +449,49 @@ export class StaticHostUpdateCoordinator {
       boot.bootId === intent.sourceBootId ||
       !sameIdentity(boot.controller, intent.candidate)
     ) {
-      return this.#set(failed(
+      return this.#commit(operation, failed(
         "verify-next-boot", "controller-mismatch", boot,
         "Fresh boot is not controlled by the exact confirmed app/release candidate.",
-      ));
+      ), boot);
     }
     try {
       const consumed = await this.#ports.consumeTransitionIntent(intent, boot);
       if (operation !== this.#sequence) return this.#currentOr(boot);
       if (consumed !== "consumed") {
-        return this.#set(failed("verify-next-boot", "intent-stale", boot, "Transition intent is missing or was already consumed."));
+        return this.#commit(
+          operation,
+          failed("verify-next-boot", "intent-stale", boot, "Transition intent is missing or was already consumed."),
+          boot,
+        );
       }
-      return this.#set(Object.freeze({
+      return this.#commit(operation, Object.freeze({
         phase: "controller-verified-activation", boot, intent, currentUsable: true,
-      }));
+      }), boot);
     } catch (error) {
-      return this.#set(failed(
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
+      return this.#commit(operation, failed(
         "verify-next-boot", "intent-stale", boot,
         boundedMessage(error, "Transition intent could not be consumed."),
-      ));
+      ), boot);
     }
   }
 
   async requestRollback(): Promise<StaticUpdateCoordinatorStateV1> {
-    ++this.#sequence;
-    this.#pendingGeneration = null;
-    const boot = this.#bootFromState() ?? validateControllerBootProof(await this.#ports.readControllerBoot());
-    return this.#set(Object.freeze({
+    const operation = this.#beginOperation();
+    const fallback = this.#bootFromState();
+    let boot = fallback;
+    if (!boot) {
+      try { boot = await this.#readBootFor(operation); }
+      catch (error) {
+        if (!this.#isCurrentOperation(operation)) return this.#currentOr(null);
+        throw error;
+      }
+      if (!this.#isCurrentOperation(operation)) return this.#currentOr(boot);
+    }
+    return this.#commit(operation, Object.freeze({
       phase: "deployment-required", operation: "rollback", boot,
       code: "rollback-unavailable", message: ROLLBACK_MESSAGE, currentUsable: true,
-    }));
+    }), boot);
   }
 
   async #preparationFailure(
@@ -441,13 +500,13 @@ export class StaticHostUpdateCoordinator {
     error: unknown,
     defaultMessage: string,
   ): Promise<StaticUpdateCoordinatorStateV1> {
-    const boot = await this.#safeBoot(fallback);
+    const boot = await this.#safeBoot(operation, fallback);
     if (operation !== this.#sequence) return this.#currentOr(boot);
     return this.#set(failed("prepare-update", "preparation-failed", boot, boundedMessage(error, defaultMessage)));
   }
 
-  async #safeBoot(fallback: ControllerBootProofV1 | null): Promise<ControllerBootProofV1> {
-    try { return await this.#readAndPinLaunchBoot(); }
+  async #safeBoot(operation: number, fallback: ControllerBootProofV1 | null): Promise<ControllerBootProofV1> {
+    try { return await this.#readBootFor(operation); }
     catch (error) {
       if (fallback) return fallback;
       throw error;
@@ -458,10 +517,28 @@ export class StaticHostUpdateCoordinator {
     return this.#state && "boot" in this.#state ? this.#state.boot : null;
   }
 
-  async #readAndPinLaunchBoot(): Promise<ControllerBootProofV1> {
+  async #readBootFor(operation: number): Promise<ControllerBootProofV1> {
     const boot = validateControllerBootProof(await this.#ports.readControllerBoot());
-    this.#launchBoot ??= boot;
+    if (this.#isCurrentOperation(operation)) this.#launchBoot ??= boot;
     return boot;
+  }
+
+  #beginOperation(): number {
+    this.#pendingGeneration = null;
+    return ++this.#sequence;
+  }
+
+  #isCurrentOperation(operation: number): boolean {
+    return operation === this.#sequence;
+  }
+
+  #commit<T extends StaticUpdateCoordinatorStateV1>(
+    operation: number,
+    state: T,
+    fallback: ControllerBootProofV1,
+  ): StaticUpdateCoordinatorStateV1 {
+    if (!this.#isCurrentOperation(operation)) return this.#currentOr(fallback);
+    return this.#set(state);
   }
 
   #isLaunchBoot(boot: ControllerBootProofV1): boolean {

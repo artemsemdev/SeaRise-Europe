@@ -263,9 +263,12 @@ display a new domain result for the uncached selection.
 
 An active session remains pinned to one release. A newer deployment may notify
 the visitor that an update is available, but it does not mix manifests,
-indexes, geometries, or byte ranges. On reload, the new app/release pairing
-initializes in a new cache namespace. Rollback deploys the previous complete
-pair; immutable artifacts are never overwritten.
+indexes, geometries, or byte ranges. An ordinary reload does not activate the
+new app/release pairing while any tab remains controlled by the prior worker.
+Every SeaRise tab must close first, allowing natural service-worker activation; only
+the subsequent reopen initializes the new pairing in a new cache namespace.
+Rollback deploys the previous complete pair; immutable artifacts are never
+overwritten.
 
 The static-host update coordinator is a pure user-intent state machine over
 injected ports. Its waiting-candidate identity binds the exact app/release pair
@@ -278,11 +281,12 @@ Starting newer preparation synchronously enters `preparing` and revokes the
 prior pending confirmation before the first asynchronous port call. The
 coordinator wraps the provider token in its own monotonic, one-time generation,
 so provider reuse or collision cannot authorize a later intent and a consumed
-confirmation cannot be replayed. Each coordinator also receives a
-collision-resistant instance identifier from an injected entropy port, so two
-coordinators created during the same page boot cannot mint the same transition
-identity. The first validated controller proof is pinned as that coordinator's
-immutable launch boot.
+confirmation cannot be replayed. Each production coordinator mints its own
+instance identifier from browser cryptographic entropy; deterministic injection
+exists only as a test seam, and duplicate identifiers are rejected within one
+JavaScript realm. Two coordinators created during the same page boot therefore
+cannot mint the same transition identity. The first validated controller proof
+is pinned as that coordinator's immutable launch boot.
 
 Explicit confirmation records only a one-shot transition intent and presents
 the exact instruction: `Update ready. Close all SeaRise tabs and reopen to use

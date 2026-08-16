@@ -9,6 +9,7 @@ import {
   type AcceptedPairIdentityV1,
   type CloseAndReopenIntentV1,
   type ControllerBootProofV1,
+  type IntentConsumptionResultV1,
   type StaticUpdateCoordinatorPorts,
 } from "./update-coordinator";
 
@@ -30,14 +31,31 @@ function accepted(value: AppReleasePairV1, suffix = ""): AcceptedPairIdentityV1 
 const active = accepted(pair("build-1", "release-1"));
 const candidate = accepted(pair("build-2", "release-2"));
 const anotherCandidate = accepted(pair("build-3", "release-3"), "d");
+let instanceSequence = 0;
 
 function boot(bootId = "boot-1", controller = active): ControllerBootProofV1 {
   return Object.freeze({ contractVersion: 1, bootId, controller });
 }
 
+function deferred<T>() {
+  let resolve: ((value: T) => void) | undefined;
+  let reject: ((reason: unknown) => void) | undefined;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return {
+    promise,
+    resolve: (value: T) => resolve?.(value),
+    reject: (reason: unknown) => reject?.(reason),
+  };
+}
+
 function harness(options: Readonly<{
   boot?: ControllerBootProofV1;
   instanceId?: string;
+  useDefaultEntropy?: boolean;
+  read?: StaticUpdateCoordinatorPorts["readControllerBoot"];
   inspect?: StaticUpdateCoordinatorPorts["inspectWaitingCandidate"];
   token?: StaticUpdateCoordinatorPorts["issueConfirmationToken"];
   record?: StaticUpdateCoordinatorPorts["recordTransitionIntent"];
@@ -48,18 +66,20 @@ function harness(options: Readonly<{
   const recorded: CloseAndReopenIntentV1[] = [];
   let tokenSequence = 0;
   const ports: StaticUpdateCoordinatorPorts = {
-    readControllerBoot: vi.fn(async () => currentBoot),
+    readControllerBoot: options.read ?? vi.fn(async () => currentBoot),
     inspectWaitingCandidate: options.inspect ?? vi.fn(async () => ({ status: "sealed" as const, candidate })),
     issueConfirmationToken: options.token ?? vi.fn(() => `provider-${++tokenSequence}`),
-    issueCoordinatorInstanceId: vi.fn(() => options.instanceId ?? "instance-00000001"),
     recordTransitionIntent: options.record ?? vi.fn(async (intent) => { recorded.splice(0, recorded.length, intent); }),
     revokeTransitionIntent: options.revoke ?? vi.fn(async (intent) => {
       if (recorded[0]?.transitionId === intent.transitionId) recorded.splice(0, 1);
     }),
     consumeTransitionIntent: options.consume ?? vi.fn(async () => "consumed" as const),
   };
+  const coordinatorOptions = options.useDefaultEntropy
+    ? undefined
+    : { instanceId: options.instanceId ?? `test-instance-${String(++instanceSequence).padStart(8, "0")}` };
   return {
-    coordinator: new StaticHostUpdateCoordinator(ports),
+    coordinator: new StaticHostUpdateCoordinator(ports, coordinatorOptions),
     ports,
     recorded,
     setBoot: (value: ControllerBootProofV1) => { currentBoot = value; },
@@ -264,6 +284,20 @@ describe("conservative static-host update coordinator", () => {
     expect(first.intent.transitionId).not.toBe(second.intent.transitionId);
   });
 
+  it("mints distinct coordinator identities from production cryptographic entropy", async () => {
+    const first = await confirmedIntent(harness({ useDefaultEntropy: true }));
+    const second = await confirmedIntent(harness({ useDefaultEntropy: true }));
+
+    expect(first.intent.transitionId).not.toBe(second.intent.transitionId);
+  });
+
+  it("rejects duplicate injected coordinator identities in one JavaScript realm", () => {
+    const instanceId = `duplicate-test-${String(++instanceSequence).padStart(8, "0")}`;
+    harness({ instanceId });
+
+    expect(() => harness({ instanceId })).toThrow("already active");
+  });
+
   it("revokes a persisted intent when a newer operation cancels confirmation", async () => {
     let releaseRecord: (() => void) | undefined;
     const recordGate = new Promise<void>((resolve) => { releaseRecord = resolve; });
@@ -292,6 +326,42 @@ describe("conservative static-host update coordinator", () => {
     expect(persisted).toEqual([]);
   });
 
+  it("does not let a rejected record overwrite the operation that cancelled it", async () => {
+    const record = deferred<void>();
+    const test = harness({ record: vi.fn(async () => await record.promise) });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(test.ports.recordTransitionIntent).toHaveBeenCalledOnce());
+    const rollback = await test.coordinator.requestRollback();
+    record.reject(new Error("record rejected"));
+
+    await expect(confirming).resolves.toEqual(rollback);
+    expect(test.coordinator.state()).toEqual(rollback);
+  });
+
+  it("does not let a rejected stale-intent revocation overwrite its cancelling operation", async () => {
+    const record = deferred<void>();
+    const revoke = deferred<void>();
+    const test = harness({
+      record: vi.fn(async () => await record.promise),
+      revoke: vi.fn(async () => await revoke.promise),
+    });
+    const prepared = await test.coordinator.prepareUpdate(candidate.pair);
+    if (prepared.phase !== "waiting-candidate-verified") throw new Error("expected verified waiting candidate");
+
+    const confirming = test.coordinator.confirmUpdate(prepared.confirmationToken);
+    await vi.waitFor(() => expect(test.ports.recordTransitionIntent).toHaveBeenCalledOnce());
+    const rollback = await test.coordinator.requestRollback();
+    record.resolve();
+    await vi.waitFor(() => expect(test.ports.revokeTransitionIntent).toHaveBeenCalledOnce());
+    revoke.reject(new Error("revoke rejected"));
+
+    await expect(confirming).resolves.toEqual(rollback);
+    expect(test.coordinator.state()).toEqual(rollback);
+  });
+
   it("does not overwrite a newer operation after concurrent intent consumption", async () => {
     const { intent } = await confirmedIntent();
     let releaseConsume: (() => void) | undefined;
@@ -312,6 +382,81 @@ describe("conservative static-host update coordinator", () => {
     await expect(verifying).resolves.toEqual(rollback);
     expect(reopened.coordinator.state()).toEqual(rollback);
   });
+
+  it("does not let a rejected intent consumption overwrite a newer operation", async () => {
+    const { intent } = await confirmedIntent();
+    const consume = deferred<IntentConsumptionResultV1>();
+    const reopened = harness({
+      boot: boot("boot-2", candidate),
+      consume: vi.fn(async () => await consume.promise),
+    });
+
+    const verifying = reopened.coordinator.verifyNextBoot(intent);
+    await vi.waitFor(() => expect(reopened.ports.consumeTransitionIntent).toHaveBeenCalledOnce());
+    const rollback = await reopened.coordinator.requestRollback();
+    consume.reject(new Error("consume rejected"));
+
+    await expect(verifying).resolves.toEqual(rollback);
+    expect(reopened.coordinator.state()).toEqual(rollback);
+  });
+
+  it.each(["resolve", "reject"] as const)(
+    "does not let stale initialize read %s overwrite a newer rollback",
+    async (settlement) => {
+      const firstRead = deferred<ControllerBootProofV1>();
+      const read = vi.fn()
+        .mockImplementationOnce(async () => await firstRead.promise)
+        .mockResolvedValue(boot());
+      const test = harness({ read });
+
+      const initializing = test.coordinator.initialize();
+      const rollback = await test.coordinator.requestRollback();
+      if (settlement === "resolve") firstRead.resolve(boot());
+      else firstRead.reject(new Error("initialize read rejected"));
+
+      await expect(initializing).resolves.toEqual(rollback);
+      expect(test.coordinator.state()).toEqual(rollback);
+    },
+  );
+
+  it.each(["resolve", "reject"] as const)(
+    "does not let stale rollback read %s overwrite a newer initialization",
+    async (settlement) => {
+      const firstRead = deferred<ControllerBootProofV1>();
+      const read = vi.fn()
+        .mockImplementationOnce(async () => await firstRead.promise)
+        .mockResolvedValue(boot());
+      const test = harness({ read });
+
+      const rollingBack = test.coordinator.requestRollback();
+      const initialized = await test.coordinator.initialize();
+      if (settlement === "resolve") firstRead.resolve(boot());
+      else firstRead.reject(new Error("rollback read rejected"));
+
+      await expect(rollingBack).resolves.toEqual(initialized);
+      expect(test.coordinator.state()).toEqual(initialized);
+    },
+  );
+
+  it.each(["resolve", "reject"] as const)(
+    "does not let stale verification read %s overwrite a newer rollback",
+    async (settlement) => {
+      const { intent } = await confirmedIntent();
+      const firstRead = deferred<ControllerBootProofV1>();
+      const read = vi.fn()
+        .mockImplementationOnce(async () => await firstRead.promise)
+        .mockResolvedValue(boot("boot-2", candidate));
+      const reopened = harness({ read });
+
+      const verifying = reopened.coordinator.verifyNextBoot(intent);
+      const rollback = await reopened.coordinator.requestRollback();
+      if (settlement === "resolve") firstRead.resolve(boot("boot-2", candidate));
+      else firstRead.reject(new Error("verification read rejected"));
+
+      await expect(verifying).resolves.toEqual(rollback);
+      expect(reopened.coordinator.state()).toEqual(rollback);
+    },
+  );
 
   it("reports rollback as deployment-required without changing browser authority", async () => {
     const test = harness();
