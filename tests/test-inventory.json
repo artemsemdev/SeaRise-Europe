@@ -289,7 +289,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-16T18:47:09+02:00",
       "reference": "src/web/src/offline/range-integrity-catalog.ts, src/web/src/offline/release-resource-plan.ts, and src/web/src/offline/release-resource-plan.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; eight deterministic exact-index, module-private trust, artifact-map isolation, canonical routing, public/private/local persistence, PMTiles refusal, technical-failure, and privacy cases over the committed synthetic fixture; no Candidate-v7, TAR, browser network, or external storage"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; nine deterministic exact-index, module-private trust, artifact-map isolation, canonical routing, public/private/local persistence, PMTiles refusal, technical-failure, and privacy cases over the committed synthetic fixture; no Candidate-v7, TAR, browser network, or external storage"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
