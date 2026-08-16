@@ -1,5 +1,7 @@
 // @vitest-environment node
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { StaticGeographyClassifier, type GeographyTransport } from "./geography-classifier";
 import { ReleaseContext, TechnicalFailure, type ResolvedArtifact } from "../domain/release";
@@ -10,6 +12,35 @@ import {
   fixtureReleaseContext,
   responseBody,
 } from "../test/release-fixture";
+
+interface GeographyParityFixture {
+  readonly fixtureRole: "cross-runtime-geography-classifier-golden";
+  readonly dataProvenanceClass: "synthetic-fixture";
+  readonly release: {
+    readonly dataReleaseId: string;
+    readonly supportArtifact: { readonly artifactId: string; readonly sha256: string };
+    readonly coastalArtifact: { readonly artifactId: string; readonly sha256: string };
+  };
+  readonly semantics: {
+    readonly operation: "OGC-covers";
+    readonly boundaryInclusive: true;
+    readonly epsilonDegrees: number;
+  };
+  readonly cases: readonly {
+    readonly id: string;
+    readonly boundaryRole: "support" | "coastal";
+    readonly relation: "exterior-boundary" | "hole-boundary" | "epsilon-inside" | "epsilon-outside";
+    readonly coordinates: { readonly latitude: number; readonly longitude: number };
+    readonly expectedClassification: "OutsideEurope" | "InEuropeOutsideCoastalZone" | "InEuropeAndCoastalZone";
+  }[];
+}
+
+const parity = JSON.parse(
+  readFileSync(
+    resolve(process.cwd(), "../pipeline/science/evidence/geography-classifier-parity-v1.json"),
+    "utf8",
+  ),
+) as GeographyParityFixture;
 
 function fixtureTransport(paths: string[]): GeographyTransport {
   return async (input, init) => {
@@ -24,6 +55,39 @@ function fixtureTransport(paths: string[]): GeographyTransport {
 }
 
 describe("release-scoped geography classification", () => {
+  it("matches the independent Shapely golden at exterior and hole boundary seams", async () => {
+    const context = await fixtureReleaseContext();
+    const calls: string[] = [];
+    const classifier = new StaticGeographyClassifier({ transport: fixtureTransport(calls) });
+
+    expect(parity).toMatchObject({
+      fixtureRole: "cross-runtime-geography-classifier-golden",
+      dataProvenanceClass: "synthetic-fixture",
+      release: { dataReleaseId: context.dataReleaseId },
+      semantics: { operation: "OGC-covers", boundaryInclusive: true, epsilonDegrees: 0.00001 },
+    });
+    expect(context.artifact(parity.release.supportArtifact.artifactId).sha256).toBe(
+      parity.release.supportArtifact.sha256,
+    );
+    expect(context.artifact(parity.release.coastalArtifact.artifactId).sha256).toBe(
+      parity.release.coastalArtifact.sha256,
+    );
+    expect(new Set(parity.cases.map(({ relation }) => relation))).toEqual(
+      new Set(["exterior-boundary", "hole-boundary", "epsilon-inside", "epsilon-outside"]),
+    );
+    expect(new Set(parity.cases.map(({ boundaryRole }) => boundaryRole))).toEqual(
+      new Set(["support", "coastal"]),
+    );
+
+    for (const golden of parity.cases) {
+      await expect(
+        classifier.classify(context, golden.coordinates, new AbortController().signal),
+        golden.id,
+      ).resolves.toBe(golden.expectedClassification);
+    }
+    expect(calls).toHaveLength(2);
+  });
+
   it.each([
     [51.9244, 4.4777, "InEuropeAndCoastalZone"],
     [52.52, 13.405, "InEuropeOutsideCoastalZone"],

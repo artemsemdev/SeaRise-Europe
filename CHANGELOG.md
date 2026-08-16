@@ -25,6 +25,12 @@ All notable changes to this project will be documented in this file.
   fabricated run, workflow, platform, timestamp, revision, or SLSA claim, and
   its acyclicity gate is scoped to the overlay-derived digest graph.
 
+- Bound browser support/coastal classification to a shared twelve-case Shapely
+  parity golden covering exterior and hole boundaries plus epsilon seams. Exact
+  COG reads now cancel uncached post-open range transport only after their last
+  caller leaves, preserve concurrent readers, and gate the inclusive 100 km
+  decision in the production reader.
+
 - Restored complete npm registry URL and SHA-512 integrity metadata for the
   static browser dependency graph, pinned its scientific readers, and made the
   dependency inventory fail closed if future registry identities are missing.
