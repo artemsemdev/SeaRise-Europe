@@ -43,6 +43,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Bound the complete-resource scenario configuration to its exact release
+  artifact identity, path, and media type. Offline capability reports now carry
+  their interaction subject and treat each visual PMTiles map as explicitly
+  network-only, so a map can never claim `available-offline`.
+
 - Routed every visual PMTiles byte request through a supported custom PMTiles
   `Source` that enforces the exact release URL, manifest byte size and SHA-bound
   strong ETag, bounded Range and short-archive retry

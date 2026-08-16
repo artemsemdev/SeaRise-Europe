@@ -41,7 +41,8 @@ function assertSamePair(expected: AppReleasePairV1, actual: AppReleasePairV1): v
 
 export type OfflineRequirementV1 =
   | Readonly<{ kind: "whole"; authority: WholeResourceAuthorityV1 }>
-  | Readonly<{ kind: "range"; identity: RangeIdentityV1 }>;
+  | Readonly<{ kind: "range"; identity: RangeIdentityV1 }>
+  | Readonly<{ kind: "network-only"; identity: string; reason: "visual-pmtiles" }>;
 export type InteractionSubjectV1 =
   | Readonly<{ kind: "core" }>
   | Readonly<{ kind: "search"; shards: readonly ("core" | "coastal")[] }>
@@ -52,10 +53,21 @@ export interface InteractionRequirementsV1 {
   readonly subject: InteractionSubjectV1;
   readonly requirements: readonly OfflineRequirementV1[];
 }
-export interface MissingRequirementV1 { readonly kind: "whole" | "range"; readonly identity: string }
+export interface MissingRequirementV1 { readonly kind: "whole" | "range" | "network-only"; readonly identity: string }
 
 const SCENARIOS = new Set<unknown>(["ssp1-26", "ssp2-45", "ssp5-85"]);
 const HORIZONS = new Set<unknown>([2030, 2050, 2100]);
+const VISUAL_PMTILES_ID = /^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-pmtiles$/u;
+
+function visualPmtilesIdentity(subject: Readonly<{ scenario: ScenarioId; horizon: HorizonYear }>): string {
+  return `projection-${subject.scenario}-${subject.horizon}-pmtiles`;
+}
+
+function validateNetworkOnlyIdentity(value: unknown): string {
+  const identity = protocolId(value, "network-only identity");
+  if (!VISUAL_PMTILES_ID.test(identity)) fail("Network-only identity must name an exact visual PMTiles artifact.");
+  return identity;
+}
 
 function validateSubject(value: unknown): InteractionSubjectV1 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) fail("interaction subject must be an object.");
@@ -81,6 +93,7 @@ export function validateInteractionRequirements(value: unknown): InteractionRequ
   const record = exactRecord(value, ["contractVersion", "pair", "subject", "requirements"], "interaction requirements");
   if (record.contractVersion !== OFFLINE_CONTRACT_VERSION || !Array.isArray(record.requirements)) fail("Interaction requirements version or list is invalid.");
   const pair = validateAppReleasePair(record.pair);
+  const subject = validateSubject(record.subject);
   const requirements = record.requirements.map((value): OfflineRequirementV1 => {
     if (typeof value !== "object" || value === null || Array.isArray(value)) fail("requirement must be an object.");
     const kind = (value as Record<string, unknown>).kind;
@@ -94,15 +107,31 @@ export function validateInteractionRequirements(value: unknown): InteractionRequ
       assertSamePair(pair, identity.authority.pair);
       return Object.freeze({ kind, identity });
     }
+    if (kind === "network-only") {
+      const networkOnly = exactRecord(value, ["kind", "identity", "reason"], "network-only requirement");
+      if (networkOnly.reason !== "visual-pmtiles") fail("Network-only requirement reason is unsupported.");
+      return Object.freeze({ kind, identity: validateNetworkOnlyIdentity(networkOnly.identity), reason: networkOnly.reason });
+    }
     return fail("requirement kind is unsupported.");
   });
-  return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, pair, subject: validateSubject(record.subject), requirements: Object.freeze(requirements) });
+  const networkOnly = requirements.filter((requirement) => requirement.kind === "network-only");
+  if (subject.kind === "map") {
+    if (networkOnly.length !== 1 || networkOnly[0]?.identity !== visualPmtilesIdentity(subject)) {
+      fail("Map requirements must contain exactly one matching visual PMTiles network-only resource.");
+    }
+  } else if (networkOnly.length !== 0) {
+    fail("Only map interactions may require a network-only visual PMTiles resource.");
+  }
+  return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, pair, subject, requirements: Object.freeze(requirements) });
 }
 
 function validateMissing(value: unknown): MissingRequirementV1 {
   const record = exactRecord(value, ["kind", "identity"], "missing requirement");
-  if (record.kind !== "whole" && record.kind !== "range") fail("Missing requirement kind is unsupported.");
-  return Object.freeze({ kind: record.kind, identity: protocolId(record.identity, "missing identity") });
+  if (record.kind !== "whole" && record.kind !== "range" && record.kind !== "network-only") fail("Missing requirement kind is unsupported.");
+  const identity = record.kind === "network-only"
+    ? validateNetworkOnlyIdentity(record.identity)
+    : protocolId(record.identity, "missing identity");
+  return Object.freeze({ kind: record.kind, identity });
 }
 function validateMissingList(value: unknown): readonly MissingRequirementV1[] {
   if (!Array.isArray(value)) fail("missing requirements must be an array.");
@@ -118,7 +147,7 @@ export type UpdateCapabilityV1 =
   | Readonly<{ state: "current" }>
   | Readonly<{ state: "update-available" | "installing" | "ready-to-activate"; candidate: AppReleasePairV1 }>
   | Readonly<{ state: "activation-blocked" | "failed"; reason: string }>;
-export interface RuntimeCapabilityV1 { readonly contractVersion: 1; readonly data: DataCapabilityV1; readonly update: UpdateCapabilityV1 }
+export interface RuntimeCapabilityV1 { readonly contractVersion: 1; readonly subject: InteractionSubjectV1; readonly data: DataCapabilityV1; readonly update: UpdateCapabilityV1 }
 
 export function validateDataCapability(value: unknown): DataCapabilityV1 {
   if (typeof value !== "object" || value === null || Array.isArray(value)) fail("data capability must be an object.");
@@ -161,12 +190,27 @@ export function validateUpdateCapability(value: unknown): UpdateCapabilityV1 {
 }
 
 export function validateRuntimeCapability(value: unknown): RuntimeCapabilityV1 {
-  const record = exactRecord(value, ["contractVersion", "data", "update"], "runtime capability");
+  const record = exactRecord(value, ["contractVersion", "subject", "data", "update"], "runtime capability");
   if (record.contractVersion !== OFFLINE_CONTRACT_VERSION) fail("Unsupported offline contract version.");
+  const subject = validateSubject(record.subject);
   const data = validateDataCapability(record.data);
   const update = validateUpdateCapability(record.update);
   if ("candidate" in update && samePair(data.pair, update.candidate)) fail("An update candidate must differ from the current data pair.");
-  return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, data, update });
+  const networkOnlyMissing = data.state === "connection-required"
+    ? data.missing.filter((requirement) => requirement.kind === "network-only")
+    : [];
+  if (subject.kind === "map") {
+    if (data.state === "available-offline") fail("A map capability cannot be available offline because visual PMTiles is network-only.");
+    if (
+      data.state === "connection-required"
+      && (networkOnlyMissing.length !== 1 || networkOnlyMissing[0]?.identity !== visualPmtilesIdentity(subject))
+    ) {
+      fail("A connection-required map capability must identify its matching network-only visual PMTiles resource.");
+    }
+  } else if (networkOnlyMissing.length !== 0) {
+    fail("Only map capabilities may report a missing network-only visual PMTiles resource.");
+  }
+  return Object.freeze({ contractVersion: OFFLINE_CONTRACT_VERSION, subject, data, update });
 }
 
 export interface StorageBudgetV1 {

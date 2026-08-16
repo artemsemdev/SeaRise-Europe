@@ -197,7 +197,7 @@ export function assertPersistentEligibility(eligibility: PersistenceEligibilityV
 
 export const WHOLE_RESOURCE_ROLES = [
   "methodology", "source-attribution", "support-boundary", "coastal-boundary",
-  "settlement-search-index", "source-grid-identity", "range-integrity-index",
+  "settlement-search-index", "source-grid-identity", "range-integrity-index", "scenario-config",
 ] as const;
 export type WholeResourceRoleV1 = (typeof WHOLE_RESOURCE_ROLES)[number];
 
@@ -252,10 +252,21 @@ export function validateWholeResourceAuthority(value: unknown): WholeResourceAut
     if (!(WHOLE_RESOURCE_ROLES as readonly unknown[]).includes(record.role)) fail("release artifact role is not approved for whole-resource persistence.");
     const validated = validateWholeCommon(record);
     assertReleaseScopedUrl(validated.canonicalUrl, validated.pair, "release artifact URL");
+    const artifactId = safeIdentifier(record.artifactId, "artifactId");
+    const isScenarioConfigIdentity = artifactId === "scenario-config" || validated.path === "config/scenarios.json";
+    const isCanonicalScenarioConfig = artifactId === "scenario-config"
+      && validated.path === "config/scenarios.json"
+      && validated.mediaType === "application/json";
+    if (
+      (record.role === "scenario-config" && !isCanonicalScenarioConfig)
+      || (record.role !== "scenario-config" && isScenarioConfigIdentity)
+    ) {
+      fail("scenario-config requires its exact role, artifact identity, path, and media type.");
+    }
     return Object.freeze({
       ...validated,
       authorityKind: kind,
-      artifactId: safeIdentifier(record.artifactId, "artifactId"),
+      artifactId,
       role: record.role as WholeResourceRoleV1,
       etag: validateOptionalEtag(record.etag, "etag"),
     });
