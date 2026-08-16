@@ -12,6 +12,13 @@ const viteManifest = JSON.parse(
   readFileSync(resolve(import.meta.dirname, "../dist/vite-manifest.json"), "utf8"),
 ) as Record<string, { readonly file: string }>;
 const scientificRuntimeUrl = `/${viteManifest["src/scientific-runtime.ts"].file}`;
+const buildReport = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, "../dist/build-report.json"), "utf8"),
+) as {
+  appBuildId: string;
+  dataReleaseId: string;
+  serviceWorker: { precacheSetSha256: string; precacheUrls: string[] };
+};
 
 async function expectStaticDocumentSecurity(page: import("@playwright/test").Page) {
   const csp = page.locator('meta[http-equiv="Content-Security-Policy"]');
@@ -20,6 +27,51 @@ async function expectStaticDocumentSecurity(page: import("@playwright/test").Pag
   expect(await csp.getAttribute("content")).not.toContain("frame-ancestors");
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
 }
+
+test("root worker activates naturally, reports its exact pair, and controls only after reload", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium");
+  await page.goto("/");
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+  const identity = await page.evaluate(async ({ appBuildId, dataReleaseId }) => {
+    const registration = await navigator.serviceWorker.ready;
+    const target = registration.active;
+    if (!target) throw new Error("Active service worker was unavailable");
+    return new Promise((resolveIdentity, rejectIdentity) => {
+      const channel = new MessageChannel();
+      const timeout = window.setTimeout(() => rejectIdentity(new Error("Worker identity timed out")), 2_000);
+      channel.port1.onmessage = (event) => {
+        window.clearTimeout(timeout);
+        resolveIdentity(event.data);
+      };
+      target.postMessage({
+        protocol: "searise-offline-worker-v1",
+        type: "inspect-identity",
+        messageToken: "e2e-identity",
+        pair: { contractVersion: 1, appBuildId, dataReleaseId },
+      }, [channel.port2]);
+    });
+  }, buildReport);
+  expect(identity).toMatchObject({
+    type: "worker-identity",
+    pair: { appBuildId: buildReport.appBuildId, dataReleaseId: buildReport.dataReleaseId },
+    precacheSetSha256: buildReport.serviceWorker.precacheSetSha256,
+  });
+
+  await page.goto("/?scenario=ssp2-45&horizon=2050");
+  expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  const cachedRequests = await page.evaluate(async () => {
+    const names = await caches.keys();
+    const requests = await (await caches.open(names[0])).keys();
+    return requests.map((request) => {
+      const url = new URL(request.url);
+      return { pathname: url.pathname, search: url.search };
+    }).sort((left, right) => left.pathname.localeCompare(right.pathname));
+  });
+  expect(cachedRequests.map(({ pathname }) => pathname)).toEqual(
+    [...buildReport.serviceWorker.precacheUrls].sort(),
+  );
+  expect(cachedRequests.every(({ search }) => search === "")).toBe(true);
+});
 
 test("landing shell is static, keyboard reachable, and has no serious accessibility findings", async ({ page }, testInfo) => {
   if (testInfo.project.name === "mobile-chromium") {

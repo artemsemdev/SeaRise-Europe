@@ -109,6 +109,9 @@ describe("offline worker, lease, and technical protocol v1", () => {
     const message = { protocol: OFFLINE_WORKER_PROTOCOL, type: "acquire-lease", messageToken: "request-1", leaseId: "lease-1", pair: pair() };
     expect(validateClientToOfflineWorkerMessage(message).type).toBe("acquire-lease");
     expect(() => validateClientToOfflineWorkerMessage({ ...message, query: "private-sentinel" })).toThrow(/additional/);
+    const identity = { protocol: OFFLINE_WORKER_PROTOCOL, type: "inspect-identity", messageToken: "identity-1", pair: pair() };
+    expect(validateClientToOfflineWorkerMessage(identity).type).toBe("inspect-identity");
+    expect(() => validateClientToOfflineWorkerMessage({ ...identity, query: "private-sentinel" })).toThrow(/additional/);
   });
 
   it("rejects wrong protocol, private update persistence, and same-pair updates", () => {
@@ -126,6 +129,9 @@ describe("offline worker, lease, and technical protocol v1", () => {
     });
     expect(response.type).toBe("cleanup-result");
     expect(() => validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "cleanup-result", messageToken: "one", pair: pair(), deletedPairs: [pair()], freedBytes: 123 })).toThrow(/protected/);
+    expect(validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "worker-identity", messageToken: "identity-1", pair: pair(), precacheSetSha256: A }).type).toBe("worker-identity");
+    expect(validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activation-deferred", messageToken: "activate-1", candidatePair: pair(), reason: "update-coordinator-not-installed" }).type).toBe("activation-deferred");
+    expect(() => validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activation-deferred", messageToken: "activate-1", candidatePair: pair(), reason: "later", query: "private-sentinel" })).toThrow(/additional/);
   });
 
   it("defines structured technical failures outside scientific outcomes", () => {

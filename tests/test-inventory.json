@@ -59,9 +59,9 @@
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-16T00:29:00+02:00",
-      "reference": "src/web/src/App.test.tsx and src/web/tests/static-shell.spec.ts",
-      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vite 8.2.1; Vitest 4.1.10; Chromium desktop/mobile; committed synthetic fixture"
+      "observedAt": "2026-08-16T15:25:00+02:00",
+      "reference": "src/web/src/App.test.tsx, src/web/tests/static-shell.spec.ts, and src/web/scripts/inspect-build.mjs",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vite 8.2.1; Vitest 4.1.10; 373 deterministic tests and 10 focused Chromium static-shell journeys, including root service-worker identity, natural first activation, reload control, crash-safe cache recovery, and exact query-free precache inventory; committed synthetic fixture only"
     },
     "local-2026-08-16-static-map": {
       "kind": "local-measurement",
@@ -263,9 +263,9 @@
     },
     "local-2026-08-16-offline-authority-contracts": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-16T14:29:00+02:00",
-      "reference": "src/web/src/offline/contracts/keys.test.ts, src/web/src/offline/contracts/v1.test.ts, src/web/src/offline/contracts/privacy.test.ts, and src/web/src/offline/contracts/policy.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 56 deterministic authority, namespace, integrity, persistence-eligibility, privacy, capability, budget, lifecycle, lease, update, rollback, worker-message, and technical-failure contract cases; committed synthetic identities and in-memory sentinel values only; no browser, network, private candidate bytes, TAR, clock, or external storage"
+      "observedAt": "2026-08-16T15:25:00+02:00",
+      "reference": "src/web/src/offline/contracts, src/web/src/offline/register-service-worker.test.ts, and src/web/src/offline/service-worker-runtime.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 70 deterministic authority, namespace, privacy, policy, registration, crash-recovery, routing, and worker-message cases; committed synthetic identities and in-memory storage/network doubles only; no private candidate bytes, TAR, clock, or external storage"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -363,12 +363,12 @@
       "id": "static-offline-contracts",
       "layer": "contract",
       "owner": "platform",
-      "purpose": "Keep app/release cache authority, canonical namespaces, whole-resource and authorized half-open range identities, private-candidate persistence exclusion, durable-record privacy, capability, budget, lifecycle, lease, update, rollback, worker-message, and technical-failure schemas fail closed before offline storage is implemented.",
-      "sourcePaths": ["src/web/src/offline/contracts/**"],
-      "changedPaths": ["src/web/src/offline/contracts/**"],
+      "purpose": "Keep app/release cache authority, canonical namespaces, private-candidate exclusion, privacy, lifecycle and worker messages fail closed, and verify the conservative release-pinned service worker shell without implementing runtime data caching.",
+      "sourcePaths": ["src/web/src/offline/**"],
+      "changedPaths": ["src/web/src/offline/**", "src/web/scripts/*service-worker*.mjs", "src/web/vite.config.ts"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent versioned offline authority and privacy boundary." },
-      "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline/contracts", "full": "npm run web:check" },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-offline-authority-contracts", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "All cases use exact immutable objects and deterministic validators with no browser, storage API, network, candidate artifact, or clock dependency." }
@@ -1334,6 +1334,8 @@
     { "path": "src/web/src/offline/contracts/policy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/privacy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/register-service-worker.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/service-worker-runtime.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },

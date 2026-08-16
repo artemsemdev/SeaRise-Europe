@@ -22,7 +22,7 @@
     "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-target-content.mjs && npm run check:contracts && npm run check:search-fixture && npm run check:scientific-fixture",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "build": "vite build && node scripts/check-target-content.mjs --built dist && node scripts/inspect-build.mjs",
+    "build": "vite build && node scripts/finalize-service-worker.mjs && node scripts/check-target-content.mjs --built dist && node scripts/inspect-build.mjs",
     "serve": "vite preview --host 127.0.0.1 --port 4173",
     "e2e": "playwright test",
     "e2e:range-cache": "playwright test --config playwright.range-cache.config.ts"
