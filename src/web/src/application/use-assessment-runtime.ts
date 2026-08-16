@@ -7,6 +7,7 @@ import {
 } from "react";
 import { technicalErrorFrom } from "../data/manifest-repository";
 import type { ReleaseMethodology } from "../data/methodology-repository";
+import type { SearchLifecycleEvent } from "../domain/projection-search";
 import type { ProjectionState } from "../domain/projection-state";
 import type { ReleaseContext, Selection, TechnicalError } from "../domain/release";
 import {
@@ -35,6 +36,8 @@ export interface AssessmentRuntimeView {
   readonly select: (selection: Selection) => Promise<void>;
   readonly retry: () => Promise<boolean>;
   readonly reset: () => void;
+  readonly handleSearchLifecycle: (event: SearchLifecycleEvent) => void;
+  readonly cancelSearch: () => void;
 }
 
 interface MethodologyRecord {
@@ -157,6 +160,14 @@ export function useAssessmentRuntime(
     if (!active) throw unavailable();
     active.controller.reset();
   }, [active]);
+  const handleSearchLifecycle = useCallback((event: SearchLifecycleEvent): void => {
+    if (!active) return;
+    active.controller.handleSearchLifecycle(event);
+  }, [active]);
+  const cancelSearch = useCallback((): void => {
+    if (!active) return;
+    active.controller.cancelSearch();
+  }, [active]);
 
-  return { projection, methodology, select, retry, reset };
+  return { projection, methodology, select, retry, reset, handleSearchLifecycle, cancelSearch };
 }

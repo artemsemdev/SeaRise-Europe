@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ReleaseMethodology } from "../data/methodology-repository";
 import type { AcceptedProjection, ProjectionOperation, ProjectionState } from "../domain/projection-state";
+import { createSearchQueryOperation } from "../search/lifecycle";
 import type { AssessmentResult } from "../domain/scientific-lookup";
 import type { ReleaseDisposition, Selection, TechnicalError } from "../domain/release";
 import { ProjectionPanel, type ProjectionPanelProps } from "./ProjectionPanel";
@@ -165,6 +166,7 @@ function failureState(
     release,
     expectedDataReleaseId: RELEASE_ID,
     operationToken: 2,
+    searchToken: 0,
     operation: operation("update"),
     previous: accepted(),
     error: failureError,
@@ -193,13 +195,14 @@ function renderPanel(
 afterEach(cleanup);
 
 describe("projection panel phases", () => {
+  const search = Object.freeze({ ...createSearchQueryOperation(RELEASE_ID, "Rotterdam", 1)!, kind: "search" as const });
   const phases: readonly [ProjectionState, RegExp][] = [
-    [{ phase: "booting", expectedDataReleaseId: RELEASE_ID, operationToken: 0 }, /loading and verifying the pinned data release/i],
-    [{ phase: "ready", release, operationToken: 0 }, /choose a settlement or point/i],
-    [{ phase: "searching", release, operationToken: 2, operation: operation("search"), previous: null }, /searching places locally/i],
-    [{ phase: "evaluating", release, operationToken: 2, operation: operation("evaluation") }, /checking the selected point/i],
-    [{ phase: "updating", release, operationToken: 2, operation: operation("update"), previous: accepted() }, /checking a new selection/i],
-    [{ phase: "result", release, operationToken: 2, accepted: accepted() }, /scientific outcome updated: ProjectionAvailable/i],
+    [{ phase: "booting", expectedDataReleaseId: RELEASE_ID, operationToken: 0, searchToken: 0 }, /loading and verifying the pinned data release/i],
+    [{ phase: "ready", release, operationToken: 0, searchToken: 0 }, /choose a settlement or point/i],
+    [{ phase: "searching", release, operationToken: 0, searchToken: 1, operation: search, previous: null }, /searching places locally/i],
+    [{ phase: "evaluating", release, operationToken: 2, searchToken: 0, operation: operation("evaluation") }, /checking the selected point/i],
+    [{ phase: "updating", release, operationToken: 2, searchToken: 0, operation: operation("update"), previous: accepted() }, /checking a new selection/i],
+    [{ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() }, /scientific outcome updated: ProjectionAvailable/i],
     [failureState("offline"), /not available offline/i],
     [failureState("connection-required"), /connection required/i],
     [failureState("unsupported-browser"), /browser capability unavailable/i],
@@ -216,7 +219,7 @@ describe("projection panel phases", () => {
   it("visibly separates the previous accepted tuple from the new updating selection", () => {
     const previous = accepted();
     const next = selection("ssp5-85", 2100, 52.1);
-    renderPanel({ phase: "updating", release, operationToken: 2, operation: operation("update", next), previous });
+    renderPanel({ phase: "updating", release, operationToken: 2, searchToken: 0, operation: operation("update", next), previous });
 
     const update = screen.getByRole("status", { name: "" });
     expect(update).toHaveTextContent("Checking a new selection");
@@ -235,7 +238,7 @@ describe("projection panel scientific outcomes", () => {
     ["OutOfScope", /outside the coastal analysis area/i],
     ["UnsupportedGeography", /outside the supported Europe area/i],
   ] as const)("renders only the authoritative %s meaning", (outcome, headline) => {
-    const { container } = renderPanel({ phase: "result", release, operationToken: 2, accepted: accepted(outcome) });
+    const { container } = renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted(outcome) });
     expect(screen.getByRole("heading", { name: headline })).toBeVisible();
     expect(container.querySelectorAll("[data-outcome]")).toHaveLength(1);
     expect(container.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", outcome);
@@ -246,7 +249,7 @@ describe("projection panel scientific outcomes", () => {
   });
 
   it("shows the exact approved available metadata, attribution, licence, limitations, and exclusions", () => {
-    renderPanel({ phase: "result", release, operationToken: 2, accepted: accepted() });
+    renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() });
     expect(screen.getByText(/selected settlement: geonames:2747891/i)).toBeVisible();
     expect(screen.getByText(/0\.247 m/)).toBeVisible();
     expect(screen.getByText(/0\.156–0\.351 m/)).toBeVisible();
@@ -271,7 +274,7 @@ describe("projection panel scientific outcomes", () => {
 
   it("distinguishes both DataUnavailable reasons without substitution or zero meaning", () => {
     const tooDistant = accepted("DataUnavailable");
-    const { rerender } = renderPanel({ phase: "result", release, operationToken: 2, accepted: tooDistant });
+    const { rerender } = renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: tooDistant });
     expect(screen.getByText(/100\.001 km away, beyond the inclusive 100 km limit/i)).toBeVisible();
     expect(screen.getByText(/no other scenario, year, dataset, source-grid location, or value was substituted/i)).toBeVisible();
 
@@ -285,15 +288,15 @@ describe("projection panel scientific outcomes", () => {
       ...tooDistant,
       result: nodataResult,
     });
-    rerender(<ProjectionPanel state={{ phase: "result", release, operationToken: 3, accepted: nodata }} methodology={methodology()} {...callbacks()} />);
+    rerender(<ProjectionPanel state={{ phase: "result", release, operationToken: 3, searchToken: 0, accepted: nodata }} methodology={methodology()} {...callbacks()} />);
     expect(screen.getByText(/at least one required source quantile/i)).toBeVisible();
     expect(screen.getByText(/does not mean zero change/i)).toBeVisible();
   });
 
   it("keeps scope outcomes useful without a no-hazard implication or application failure", () => {
-    const { rerender } = renderPanel({ phase: "result", release, operationToken: 2, accepted: accepted("OutOfScope") });
+    const { rerender } = renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted("OutOfScope") });
     expect(screen.getByText(/does not imply absence of coastal or climate hazards/i)).toBeVisible();
-    rerender(<ProjectionPanel state={{ phase: "result", release, operationToken: 3, accepted: accepted("UnsupportedGeography") }} methodology={methodology()} {...callbacks()} />);
+    rerender(<ProjectionPanel state={{ phase: "result", release, operationToken: 3, searchToken: 0, accepted: accepted("UnsupportedGeography") }} methodology={methodology()} {...callbacks()} />);
     expect(screen.getByText(/normal domain outcome, not an application error/i)).toBeVisible();
   });
 });
@@ -302,7 +305,7 @@ describe("projection panel controls and fail-closed presentation", () => {
   it("offers exactly three scenarios and horizons and emits one immutable selection identity", async () => {
     const handlers = callbacks();
     const current = selection();
-    renderPanel({ phase: "result", release, operationToken: 2, accepted: { ...accepted(), selection: current } }, methodology(), handlers);
+    renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: { ...accepted(), selection: current } }, methodology(), handlers);
     const user = userEvent.setup();
     const scenarioGroup = screen.getByRole("group", { name: /emissions scenario/i });
     const horizonGroup = screen.getByRole("group", { name: /absolute horizon/i });
@@ -326,7 +329,7 @@ describe("projection panel controls and fail-closed presentation", () => {
   it("routes enabled actions and disables actions that cannot be honest in the current phase", async () => {
     const handlers = callbacks();
     const user = userEvent.setup();
-    const { rerender } = renderPanel({ phase: "result", release, operationToken: 2, accepted: accepted() }, methodology(), handlers);
+    const { rerender } = renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() }, methodology(), handlers);
     expect(screen.getByRole("button", { name: /retry/i })).toBeDisabled();
     expect(screen.getByRole("button", { name: /reset/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /share/i })).toBeEnabled();
@@ -356,12 +359,12 @@ describe("projection panel controls and fail-closed presentation", () => {
     ["private-engineering", /private engineering candidate — local validation only/i],
     ["public-promoted", /public promoted release — approved immutable release artifacts/i],
   ] as const)("discloses the %s release disposition", (disposition, disclosure) => {
-    renderPanel({ phase: "result", release, operationToken: 2, accepted: accepted() }, methodology(disposition));
+    renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() }, methodology(disposition));
     expect(screen.getByText(disclosure)).toBeVisible();
   });
 
   it("hides scientific values until verified matching methodology is available", () => {
-    const state: ProjectionState = { phase: "result", release, operationToken: 2, accepted: accepted() };
+    const state: ProjectionState = { phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() };
     const { rerender } = renderPanel(state, null);
     expect(screen.getByText(/verifying methodology before showing/i)).toHaveAttribute("role", "status");
     expect(screen.queryByText(/0\.247 m/)).not.toBeInTheDocument();
@@ -375,7 +378,7 @@ describe("projection panel controls and fail-closed presentation", () => {
   });
 
   it("contains no obsolete binary state or affirmative risk wording", () => {
-    const { container } = renderPanel({ phase: "result", release, operationToken: 2, accepted: accepted() });
+    const { container } = renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() });
     const rendered = container.textContent ?? "";
     for (const prohibited of ["Expo" + "sed", "Not" + "Exposed", "sa" + "fe", "risk detected"]) {
       expect(rendered.toLowerCase()).not.toContain(prohibited.toLowerCase());

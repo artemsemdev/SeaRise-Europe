@@ -16,6 +16,7 @@ import {
   type Selection,
 } from "../domain/release";
 import { fixtureReleaseContext } from "../test/release-fixture";
+import { createSearchQueryOperation } from "../search/lifecycle";
 import { AssessmentController } from "./assessment-controller";
 import {
   createBrowserRuntime,
@@ -70,6 +71,8 @@ class TestController implements AssessmentControllerPort {
   readonly select = vi.fn(async () => undefined);
   readonly retry = vi.fn(async () => true);
   readonly reset = vi.fn(() => undefined);
+  readonly handleSearchLifecycle = vi.fn(() => undefined);
+  readonly cancelSearch = vi.fn(() => undefined);
   readonly dispose = vi.fn(() => undefined);
   #snapshot: ProjectionState;
   readonly #listeners = new Set<() => void>();
@@ -176,6 +179,8 @@ describe("static browser runtime adapter", () => {
       select: result.current.select,
       retry: result.current.retry,
       reset: result.current.reset,
+      handleSearchLifecycle: result.current.handleSearchLifecycle,
+      cancelSearch: result.current.cancelSearch,
     };
     rerender({ context: firstContext });
 
@@ -184,16 +189,25 @@ describe("static browser runtime adapter", () => {
     expect(result.current.select).toBe(stableCommands.select);
     expect(result.current.retry).toBe(stableCommands.retry);
     expect(result.current.reset).toBe(stableCommands.reset);
+    expect(result.current.handleSearchLifecycle).toBe(stableCommands.handleSearchLifecycle);
+    expect(result.current.cancelSearch).toBe(stableCommands.cancelSearch);
 
     const selection = selected(firstContext);
     await act(async () => {
       await result.current.select(selection);
       expect(await result.current.retry()).toBe(true);
+      result.current.handleSearchLifecycle({
+        type: "search-started",
+        operation: createSearchQueryOperation(firstContext.dataReleaseId, "Athens", 1)!,
+      });
+      result.current.cancelSearch();
       result.current.reset();
     });
     expect(records[0].controller.select).toHaveBeenCalledWith(selection);
     expect(records[0].controller.retry).toHaveBeenCalledOnce();
     expect(records[0].controller.reset).toHaveBeenCalledOnce();
+    expect(records[0].controller.handleSearchLifecycle).toHaveBeenCalledOnce();
+    expect(records[0].controller.cancelSearch).toHaveBeenCalledOnce();
 
     unmount();
     expect(records[0].signals[0].aborted).toBe(true);
