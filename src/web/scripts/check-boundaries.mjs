@@ -43,6 +43,15 @@ for (const path of sourceFiles) {
       if (rule.pattern.test(text)) violations.push(`${relative(root, path)}: ${rule.label}`);
     }
   }
+  if (path.includes(`${join("src", "components", "map")}`) || path.endsWith(join("src", "data", "map-layer-resolver.ts"))) {
+    const mapRules = [
+      { label: "analysis artifact access from visual map", pattern: /analysisArtifactId|projection-analysis-cog|\.tiff?\b/i },
+      { label: "rendered-pixel sampling from visual map", pattern: /queryRenderedFeatures|readPixels|getImageData/i },
+    ];
+    for (const rule of mapRules) {
+      if (rule.pattern.test(text)) violations.push(`${relative(root, path)}: ${rule.label}`);
+    }
+  }
 }
 
 if (violations.length > 0) {
