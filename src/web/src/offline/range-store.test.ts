@@ -322,6 +322,23 @@ describe("authoritative IndexedDB range store", () => {
     ]);
   });
 
+  it("keeps memory protection state and eviction behavior unchanged after a rejected update", async () => {
+    const firstBytes = bytes(1, 1, 1, 1); const secondBytes = bytes(2, 2, 2, 2);
+    const first = await identity({ payload: firstBytes });
+    const second = await identity({ projection: ["ssp1-26", "2030"], payload: secondBytes });
+    const store = memory([first, second], app(), 4, 1);
+    const active = pair(); const previous = pair("previous-build", "previous-release");
+    await store.putVerified(first, firstBytes); await store.setProtectedPairs(active, previous);
+    const invalid = pair("invalid-build", "invalid-release");
+
+    await expect(store.setProtectedPairs(invalid, invalid)).rejects.toBeInstanceOf(RangeStoreIntegrityError);
+    await expect(store.inventory()).resolves.toMatchObject({ activePair: active, previousPair: previous });
+    await expect(store.putVerified(second, secondBytes)).rejects.toBeInstanceOf(RangeStoreQuotaError);
+    expect((await store.inventory()).entries.map((entry) => entry.artifactId)).toEqual([
+      "projection-ssp2-45-2050-cog",
+    ]);
+  });
+
   it("prunes expired leases but preserves live leased pairs", async () => {
     const first = await identity({ payload: bytes(1, 1, 1, 1) });
     const firstStore = persistent(factory, [first]);

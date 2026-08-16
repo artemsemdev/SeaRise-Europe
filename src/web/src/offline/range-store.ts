@@ -287,8 +287,10 @@ export class MemoryRangeStore implements RangeStore {
   async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.set(leaseKey(lease), lease); }
   async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.delete(leaseKey(lease)); }
   async setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void> {
-    this.#active = active ? validateAppReleasePair(active) : null; this.#previous = previous ? validateAppReleasePair(previous) : null;
-    if (this.#active && this.#previous && samePair(this.#active, this.#previous)) throw new RangeStoreIntegrityError("Active and previous pairs must differ.");
+    const nextActive = active ? validateAppReleasePair(active) : null;
+    const nextPrevious = previous ? validateAppReleasePair(previous) : null;
+    if (nextActive && nextPrevious && samePair(nextActive, nextPrevious)) throw new RangeStoreIntegrityError("Active and previous pairs must differ.");
+    this.#active = nextActive; this.#previous = nextPrevious;
   }
   async inventory(): Promise<RangeInventoryV1> {
     const entries = [...this.#entries.values()];
