@@ -46,6 +46,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Restored the canonical SeaRise Flight landing and result composition across
+  desktop and mobile, with durable same-viewport visual QA evidence, while
+  retaining the corrected ADR-024 scientific outcomes and accessibility flow.
+
 - Corrected Flight search-result announcements, first-selection failure focus,
   segmented control rows, mobile landing composition, and idle map chrome while
   keeping assessment and search live regions distinct.

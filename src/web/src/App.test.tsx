@@ -485,6 +485,10 @@ describe("production static application composition", () => {
     expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
     expect(document.querySelector(".flight-scene")).toBeInTheDocument();
+    expect(document.querySelector(".flight-overview[aria-hidden='true'] img")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^data:image\/svg\+xml,/),
+    );
     expect(document.querySelector("[data-flight-phase='idle']")).toBeInTheDocument();
     expect(screen.getAllByRole("status")).toHaveLength(2);
     expect(document.querySelector(".selection-status")).toHaveAttribute("aria-live", "polite");
