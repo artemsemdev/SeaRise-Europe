@@ -40,6 +40,7 @@ import type {
 } from "./search/worker-protocol";
 import { fixtureReleaseContext } from "./test/release-fixture";
 import type { HorizonYear, ScenarioId } from "./contracts/generated/release-contract";
+import { isForbiddenApplicationApiPath } from "./test/application-api-boundary";
 
 vi.mock("./components/map/MapExplorer", () => ({
   default: ({ selection, onSelection, context }: {
@@ -421,6 +422,31 @@ async function waitForRuntime(records: RuntimeRecord[]): Promise<TestController>
 }
 
 describe("production static application composition", () => {
+  it("matches only removed application API roots, not immutable release configuration", () => {
+    const assessRoot = "/ass" + "ess";
+    const geocodeRoot = "/geo" + "code";
+    const configRoot = "/con" + "fig";
+    for (const pathname of [
+      assessRoot,
+      `${assessRoot}/point`,
+      geocodeRoot.toUpperCase(),
+      `${geocodeRoot}/search`,
+      configRoot,
+      `${configRoot}/runtime.json`,
+    ]) {
+      expect(isForbiddenApplicationApiPath(pathname), pathname).toBe(true);
+    }
+    for (const pathname of [
+      "/assessment",
+      "/geocoded-place",
+      "/configuration",
+      `/releases/${releaseContext.dataReleaseId}${configRoot}/methodology.json`,
+      `/releases/${releaseContext.dataReleaseId}${configRoot}/source-attribution.json`,
+    ]) {
+      expect(isForbiddenApplicationApiPath(pathname), pathname).toBe(false);
+    }
+  });
+
   it("renders the shell and enables local search only after the exact runtime scope is ready", async () => {
     const runtime = runtimeFactory();
     render(<App runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);

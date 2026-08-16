@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { isForbiddenApplicationApiPath } from "../../src/test/application-api-boundary";
 
-const forbiddenPaths = ["/ass" + "ess", "/geo" + "code", "/con" + "fig"];
 const expectedCsp =
   "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
@@ -9,7 +9,7 @@ test("binds Candidate-v7 read-only through one private loopback origin", async (
   const forbiddenRequests: string[] = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
-    if (forbiddenPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+    if (isForbiddenApplicationApiPath(pathname)) {
       forbiddenRequests.push(pathname);
     }
   });

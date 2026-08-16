@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 import { Buffer } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { isForbiddenApplicationApiPath } from "../src/test/application-api-boundary";
 
-const forbiddenPaths = ["ass" + "ess", "geo" + "code", "con" + "fig"];
 const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const multichunkArtifactPath = "analysis/ssp2-45/2050.tif";
@@ -24,8 +24,8 @@ async function expectStaticDocumentSecurity(page: import("@playwright/test").Pag
 test("landing shell is static, keyboard reachable, and has no serious accessibility findings", async ({ page }) => {
   const forbiddenRequests: string[] = [];
   page.on("request", (request) => {
-    const path = new URL(request.url()).pathname.toLowerCase();
-    if (forbiddenPaths.some((part) => path.includes(part))) forbiddenRequests.push(path);
+    const path = new URL(request.url()).pathname;
+    if (isForbiddenApplicationApiPath(path)) forbiddenRequests.push(path);
   });
 
   await page.goto("/");
@@ -364,22 +364,23 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
 
   await page.goto("/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.focus();
   await input.fill("Athens");
   await expect(page.getByRole("option", { name: /Αθήνα.*Attica, GR/i })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText(/coastal settlements are still loading/i);
-  const initialization = Number(await page.getByRole("status").getAttribute("data-init-duration-ms"));
+  await expect(searchStatus).toContainText(/coastal settlements are still loading/i);
+  const initialization = Number(await searchStatus.getAttribute("data-init-duration-ms"));
   expect(initialization).toBeGreaterThanOrEqual(0);
   expect(initialization).toBeLessThan(1_000);
 
   releaseCoastal();
-  await expect(page.getByRole("status")).toHaveAttribute("data-search-readiness", "all-ready");
+  await expect(searchStatus).toHaveAttribute("data-search-readiness", "all-ready");
   const observations: number[] = [];
   for (const query of ["Málaga", "Athens", "Spring", "Border City", "Islet Village", "malagx", "Athina", "Springfield AA", "Springfield South", "missing", "Málaga", "Athens", "Spring", "Border City", "Islet Village", "malagx", "Athina", "Springfield AA", "Springfield South", "missing"]) {
     await input.fill(query);
-    await expect(page.getByRole("status")).not.toContainText(/Searching settlements/i);
-    observations.push(Number(await page.getByRole("status").getAttribute("data-query-duration-ms")));
+    await expect(searchStatus).not.toContainText(/Searching settlements/i);
+    observations.push(Number(await searchStatus.getAttribute("data-query-duration-ms")));
   }
   const ordered = [...observations].sort((left, right) => left - right);
   const percentile = (value: number) => ordered[Math.max(0, Math.ceil(ordered.length * value) - 1)];
@@ -405,11 +406,12 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
   await expect(page.getByRole("option", { name: /Springfield.*South, BB/i })).toBeVisible();
   await input.press("ArrowDown");
   await input.press("Enter");
-  await expect(page.getByText(/Springfield, South selected at 50.1, 10.1/i)).toBeVisible();
+  await expect(page.locator(".selection-status")).toContainText(/accepted projection is shown below/i);
+  await expect(page.locator(".projection-panel__location")).toContainText(/50\.10000°, 10\.10000°/i);
   await expect(input).toBeFocused();
 
   await input.fill("PrivateSearchTokenXYZ");
-  await expect(page.getByRole("status")).toContainText(/No matching settlement/i);
+  await expect(searchStatus).toContainText(/No matching settlement/i);
   expect(network.join("\n")).not.toContain("PrivateSearchTokenXYZ");
   expect(network.filter((request) => request.includes("/search/")).length).toBe(2);
 
@@ -423,11 +425,14 @@ test("settlement shard delivery failure remains a technical state", async ({ pag
   });
   await page.goto("/");
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.focus();
   await input.fill("Athens");
-  await expect(page.getByRole("status")).toContainText(/technical failure, not a no-match result/i, { timeout: 10_000 });
-  await expect(page.getByText(/No scientific outcome was produced/i)).toBeVisible();
+  await expect(searchStatus).toContainText(/technical failure, not a no-match result/i, { timeout: 10_000 });
+  await expect(page.locator(".search-shell .search-empty.error")).toContainText(
+    /No scientific outcome was produced/i,
+  );
   await expect(page.getByText(/Try another spelling/i)).toHaveCount(0);
 });
 
@@ -450,8 +455,9 @@ test("exact CSP permits the real Brotli Worker while blocking JavaScript eval", 
   });
   await expect.poll(() => page.evaluate(() => Reflect.get(globalThis, "__cspEvalProbe")))
     .toEqual({ evalBlocked: true, functionBlocked: true });
+  const searchStatus = page.locator(".search-shell .status[data-search-readiness]");
   const input = page.getByRole("combobox", { name: /find a city/i });
   await input.fill("Athens");
   await expect(page.getByRole("option", { name: /Αθήνα.*Attica, GR/i })).toBeVisible();
-  await expect(page.getByRole("status")).not.toContainText(/technical failure/i);
+  await expect(searchStatus).not.toContainText(/technical failure/i);
 });
