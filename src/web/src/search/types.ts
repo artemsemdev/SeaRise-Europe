@@ -39,6 +39,7 @@ export interface SettlementSearchState {
   readonly results: readonly SettlementSearchRecord[];
   readonly pending: boolean;
   readonly error: TechnicalError | null;
+  readonly coastalError: TechnicalError | null;
   readonly durationMilliseconds: number | null;
   readonly initializationMilliseconds: number | null;
 }

@@ -16,6 +16,7 @@ const initialState: SettlementSearchState = Object.freeze({
   results: [],
   pending: false,
   error: null,
+  coastalError: null,
   durationMilliseconds: null,
   initializationMilliseconds: null,
 });
@@ -88,6 +89,7 @@ export class SettlementSearchClient {
       this.#worker.onmessage = ({ data }) => this.#receive(data);
       this.#worker.onerror = () => this.#publish({
         pending: false,
+        results: [],
         error: Object.freeze({
           kind: "technical-error",
           code: "DecodeFailed",
@@ -95,12 +97,13 @@ export class SettlementSearchClient {
           recoverable: true,
         }),
       });
-      this.#publish({ readiness: "loading-core", pending: true, error: null });
+      this.#publish({ readiness: "loading-core", pending: true, results: [], error: null, coastalError: null });
       this.#worker.postMessage({ kind: "initialize", token: ++this.#token, authority: authority(this.#context, "europe-core") });
     } catch (error) {
       this.#publish({
         readiness: "idle",
         pending: false,
+        results: [],
         error: technical(error instanceof Error ? error.message : "Pinned release has no settlement indexes."),
       });
     }
@@ -110,10 +113,16 @@ export class SettlementSearchClient {
     if (this.#disposed) return;
     this.#pendingQuery = value;
     if (this.#state.error && !["core-ready", "all-ready"].includes(this.#state.readiness)) {
-      this.#publish({ query: value, pending: false });
+      this.#publish({ query: value, results: [], pending: false, durationMilliseconds: null });
       return;
     }
-    this.#publish({ query: value, pending: Boolean(value.trim()), error: null });
+    this.#publish({
+      query: value,
+      results: [],
+      pending: Boolean(value.trim()),
+      error: null,
+      durationMilliseconds: null,
+    });
     this.start();
     if (this.#state.readiness === "core-ready" || this.#state.readiness === "all-ready") {
       this.#sendQuery(value);
@@ -135,6 +144,7 @@ export class SettlementSearchClient {
           readiness: "core-ready",
           pending: Boolean(this.#pendingQuery.trim()),
           error: null,
+          coastalError: null,
           initializationMilliseconds: message.durationMilliseconds,
         });
         this.#worker!.postMessage({
@@ -144,7 +154,7 @@ export class SettlementSearchClient {
         });
         if (this.#pendingQuery.trim()) this.#sendQuery(this.#pendingQuery);
       } else {
-        this.#publish({ readiness: "all-ready", error: null });
+        this.#publish({ readiness: "all-ready", error: null, coastalError: null });
         if (this.#pendingQuery.trim()) this.#sendQuery(this.#pendingQuery);
       }
       return;
@@ -160,8 +170,12 @@ export class SettlementSearchClient {
       });
       return;
     }
-    if (message.token < this.#latestQueryToken) return;
-    this.#publish({ pending: false, error: message.error });
+    if (message.operation === "load-shard") {
+      this.#publish({ readiness: "core-ready", coastalError: message.error });
+      return;
+    }
+    if (message.operation === "query" && message.token !== this.#latestQueryToken) return;
+    this.#publish({ pending: false, results: [], error: message.error, durationMilliseconds: null });
   }
 
   dispose(): void {

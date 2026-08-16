@@ -22,6 +22,7 @@ const unavailable: SettlementSearchState = Object.freeze({
   results: [],
   pending: false,
   error: null,
+  coastalError: null,
   durationMilliseconds: null,
   initializationMilliseconds: null,
 });
@@ -48,6 +49,9 @@ function liveMessage(state: SettlementSearchState): string {
   if (state.error) {
     return `Settlement index unavailable. This is a technical failure, not a no-match result. ${state.error.message}`;
   }
+  if (state.coastalError) {
+    return `Core settlements remain searchable. The coastal index has a technical failure. ${state.coastalError.message}`;
+  }
   if (state.readiness === "loading-core") return "Loading the core settlement index in this browser.";
   if (!state.query.trim()) {
     return state.readiness === "all-ready"
@@ -71,7 +75,8 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
   const listId = useId();
   const statusId = useId();
   const safeActive = Math.min(active, Math.max(0, state.results.length - 1));
-  const activeResult = state.results[safeActive];
+  const resultsAreCurrent = state.query === query && !state.pending && !state.error;
+  const activeResult = resultsAreCurrent ? state.results[safeActive] : undefined;
   const activeId = activeResult ? `${listId}-option-${safeActive}` : undefined;
 
   useEffect(() => {
@@ -89,7 +94,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
   }, [client]);
 
   const select = (record: SettlementSearchRecord | undefined) => {
-    if (!record) return;
+    if (!record || !resultsAreCurrent) return;
     setQuery(record.displayName);
     setOpen(false);
     onSelect(record);
@@ -120,7 +125,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
   };
 
   const listVisible = open && Boolean(query.trim());
-  const optionsVisible = listVisible && state.results.length > 0;
+  const optionsVisible = listVisible && resultsAreCurrent && state.results.length > 0;
 
   return (
     <form
@@ -179,10 +184,10 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
         <div
           className="search-results"
           id={listId}
-          role={state.results.length ? "listbox" : undefined}
-          aria-label={state.results.length ? "Settlement results" : undefined}
+          role={optionsVisible ? "listbox" : undefined}
+          aria-label={optionsVisible ? "Settlement results" : undefined}
         >
-          {state.results.map((record, index) => (
+          {(resultsAreCurrent ? state.results : []).map((record, index) => (
             <div
               id={`${listId}-option-${index}`}
               key={record.placeId}
@@ -200,7 +205,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
               <span className="settlement-kind">{record.isCoastal ? "Coastal" : "Inland"}</span>
             </div>
           ))}
-          {!state.pending && !state.error && state.results.length === 0 ? (
+          {!state.pending && !state.error && resultsAreCurrent && state.results.length === 0 ? (
             <p className="search-empty">No matching settlement. Try another spelling.</p>
           ) : null}
           {state.error ? (
