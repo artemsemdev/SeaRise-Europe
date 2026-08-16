@@ -269,9 +269,9 @@
     },
     "local-2026-08-16-whole-resource-cache": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-16T15:07:00+02:00",
+      "observedAt": "2026-08-16T16:07:36+02:00",
       "reference": "src/web/src/offline/whole-resource-cache.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 22 deterministic complete-resource cache cases with injected in-memory Cache Storage, fetch, and SHA-256 ports; synthetic bytes and authorities only; no browser storage, network, private candidate bytes, TAR, clock, or external service"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 33 deterministic complete-resource cache cases with injected in-memory Cache Storage, fetch, and SHA-256 ports; synthetic bytes and authorities only; no browser storage, network, private candidate bytes, TAR, clock, or external service"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
