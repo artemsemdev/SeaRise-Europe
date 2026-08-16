@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-16",
   "evidence": {
+    "local-2026-08-16-static-browser-assisted-keyboard": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T11:05:00+02:00",
+      "reference": "docs/evidence/phase-2/issue-59-manual-accessibility.md",
+      "environment": "macOS 26.5.2 (25F84); Google Chrome 151.0.7922.138; exact production static build at 2f835e195e706467991fab50f22c13ca08c050f5; committed synthetic fixture only; browser-assisted keyboard and semantic-tree review passed; human VoiceOver narration blocked by unavailable Computer Use permission and explicitly not claimed"
+    },
     "local-2026-08-16-static-search-lifecycle": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T09:08:44+02:00",
