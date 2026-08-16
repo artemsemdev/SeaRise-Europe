@@ -47,7 +47,11 @@ All notable changes to this project will be documented in this file.
   remain network-only, online completion does not add header chrome, and
   generic browser connectivity never authorizes an offline claim. Exact
   interaction generations prevent one location's cached assessment from
-  authorizing another location with the same scenario and horizon.
+  authorizing another location with the same scenario and horizon. Static-host
+  coordinator state and actions now flow through the production browser
+  runtime, while pending and failed actions are fenced to the exact capability
+  subject and candidate identity. The canonical chip uses the mock's mint
+  translucent treatment and status dot.
 
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,
