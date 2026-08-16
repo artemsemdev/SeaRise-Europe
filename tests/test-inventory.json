@@ -6,8 +6,8 @@
     "local-2026-08-16-static-assessment-controller": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T08:19:55+02:00",
-      "reference": "src/web/src/application/assessment-controller.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 17 deterministic controller cases over the committed synthetic release context"
+      "reference": "src/web/src/application/assessment-controller.test.ts and src/web/src/application/use-assessment-runtime.test.tsx",
+      "environment": "macOS arm64; Node 20.20.1; React 19.2.8; Vitest 4.1.10; 23 deterministic controller/runtime cases over the committed synthetic release context"
     },
     "local-2026-08-16-static-projection-panel": {
       "kind": "local-measurement",
@@ -251,15 +251,15 @@
       "id": "static-assessment-controller",
       "layer": "unit",
       "owner": "frontend",
-      "purpose": "Keep selection orchestration atomic across rapid updates, cancellation, four scientific outcomes, technical delivery failures, exact retry, reset, release replacement, and disposal.",
-      "sourcePaths": ["src/web/src/application/assessment-controller.ts", "src/web/src/application/assessment-controller.test.ts", "src/web/src/domain/projection-state.ts", "src/web/src/domain/scientific-lookup.ts"],
+      "purpose": "Keep selection orchestration and its React runtime adapter atomic across rapid updates, cancellation, four scientific outcomes, verified methodology loading, technical delivery failures, exact retry, reset, release replacement, and disposal.",
+      "sourcePaths": ["src/web/src/application/**", "src/web/src/domain/projection-state.ts", "src/web/src/domain/scientific-lookup.ts"],
       "changedPaths": ["src/web/src/application/**", "src/web/src/domain/projection-state.ts", "src/web/src/domain/scientific-lookup.ts"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent release-scoped atomic assessment orchestration and stale-completion gate." },
-      "commands": { "focused": "npm test --workspace @searise/web -- --run src/application/assessment-controller.test.ts", "full": "npm run web:check" },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/application/assessment-controller.test.ts src/application/use-assessment-runtime.test.tsx", "full": "npm run web:check" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-static-assessment-controller", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Seventeen deterministic cases use injected evaluators and the committed synthetic release context; no clock, network, worker, Candidate-v7, or local-only input is involved." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-three deterministic cases use injected evaluators/runtime scopes and the committed synthetic release context; no clock, network, worker, Candidate-v7, or local-only input is involved." }
     },
     {
       "id": "static-release-domain",
@@ -1217,6 +1217,7 @@
     { "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts", "suite": "frontend-settlement-worker-performance", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/assessment-controller.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/application/use-assessment-runtime.test.tsx", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/ProjectionPanel.test.tsx", "suite": "static-projection-panel", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
