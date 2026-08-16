@@ -7,7 +7,9 @@ import {
   type TechnicalErrorCode,
 } from "../domain/release";
 import { visibleAcceptedProjection } from "../domain/projection-state";
+import type { SearchQueryOperation } from "../domain/projection-search";
 import { fixtureReleaseContext } from "../test/release-fixture";
+import { createSearchQueryOperation } from "../search/lifecycle";
 import {
   AssessmentController,
   type AssessmentService,
@@ -69,6 +71,10 @@ function technical(code: TechnicalErrorCode): TechnicalFailure {
   return new TechnicalFailure({
     kind: "technical-error", code, message: `${code} from test`, recoverable: true,
   });
+}
+
+function search(query = "Rotterdam", token = 1, generation = 1): SearchQueryOperation {
+  return createSearchQueryOperation(context.dataReleaseId, query, token, generation)!;
 }
 
 function immediate(
@@ -141,6 +147,121 @@ describe("AssessmentController", () => {
     service.calls[1].resolve(result("ProjectionAvailable", secondSelection));
     await second;
     expect(visibleAcceptedProjection(controller.getSnapshot())?.selection).toEqual(secondSelection);
+  });
+
+  it("cancels assessment transport when text search starts and requires explicit selection", async () => {
+    const service = deferred();
+    const controller = new AssessmentController({ context, assessment: service });
+    const selected = selection(51);
+    const evaluation = controller.select(selected);
+    const query = search();
+
+    controller.handleSearchLifecycle({
+      type: "search-started",
+      operation: { ...query, queryKey: `${query.queryKey}:malformed` },
+    });
+    expect(service.calls[0].signal.aborted).toBe(false);
+    expect(controller.getSnapshot().phase).toBe("evaluating");
+
+    controller.handleSearchLifecycle({ type: "search-started", operation: query });
+    expect(service.calls[0].signal.aborted).toBe(true);
+    expect(service.cancel).toHaveBeenCalledOnce();
+    expect(controller.getSnapshot()).toMatchObject({
+      phase: "searching",
+      operation: { normalizedQuery: "rotterdam", queryKey: query.queryKey },
+    });
+
+    controller.handleSearchLifecycle({ type: "search-completed", ...query });
+    expect(controller.getSnapshot().phase).toBe("ready");
+    service.calls[0].resolve(result("ProjectionAvailable", selected));
+    await evaluation;
+    expect(controller.getSnapshot().phase).toBe("ready");
+  });
+
+  it("retains the previous accepted tuple through matching search completion, cancel, and failure", async () => {
+    const service = immediate(async (_context, selected) => ({
+      evaluationToken: 1, result: result("ProjectionAvailable", selected),
+    }));
+    const controller = new AssessmentController({ context, assessment: service });
+    await controller.select(selection());
+    const previous = visibleAcceptedProjection(controller.getSnapshot());
+
+    const completedQuery = search("Athens", 7);
+    controller.handleSearchLifecycle({ type: "search-started", operation: completedQuery });
+    expect(visibleAcceptedProjection(controller.getSnapshot())).toBe(previous);
+    controller.handleSearchLifecycle({ type: "search-completed", ...completedQuery });
+    expect(controller.getSnapshot()).toMatchObject({ phase: "result", accepted: previous });
+
+    const cancelledQuery = search("Lisbon", 8);
+    controller.handleSearchLifecycle({ type: "search-started", operation: cancelledQuery });
+    controller.cancelSearch();
+    expect(controller.getSnapshot()).toMatchObject({ phase: "result", accepted: previous });
+
+    const failedQuery = search("Málaga", 9);
+    controller.handleSearchLifecycle({ type: "search-started", operation: failedQuery });
+    controller.handleSearchLifecycle({
+      type: "search-failed",
+      ...failedQuery,
+      error: technical("DecodeFailed").detail,
+    });
+    expect(controller.getSnapshot()).toMatchObject({ phase: "technical-error", previous });
+    expect(await controller.retry()).toBe(false);
+    expect(JSON.stringify(controller.getSnapshot())).not.toContain('"resultState":"DataUnavailable"');
+  });
+
+  it("ignores late query events after select, reset, and release replacement", async () => {
+    const service = deferred();
+    const controller = new AssessmentController({ context, assessment: service });
+
+    const beforeSelect = search("Athens", 1, 3);
+    controller.handleSearchLifecycle({ type: "search-started", operation: beforeSelect });
+    const evaluation = controller.select(selection());
+    const selecting = controller.getSnapshot();
+    controller.handleSearchLifecycle({ type: "search-completed", ...beforeSelect });
+    expect(controller.getSnapshot()).toBe(selecting);
+
+    const beforeReset = search("Lisbon", 2, 3);
+    controller.handleSearchLifecycle({ type: "search-started", operation: beforeReset });
+    controller.reset();
+    const reset = controller.getSnapshot();
+    controller.handleSearchLifecycle({
+      type: "search-failed", ...beforeReset, error: technical("DecodeFailed").detail,
+    });
+    expect(controller.getSnapshot()).toBe(reset);
+
+    const beforeRelease = search("Málaga", 3, 3);
+    controller.handleSearchLifecycle({ type: "search-started", operation: beforeRelease });
+    controller.replaceRelease(context);
+    const replaced = controller.getSnapshot();
+    controller.handleSearchLifecycle({ type: "search-cancelled", ...beforeRelease });
+    expect(controller.getSnapshot()).toBe(replaced);
+
+    service.calls[0].resolve(result("ProjectionAvailable", selection()));
+    await evaluation;
+  });
+
+  it("maps resettable worker tokens into an independent monotonic controller search sequence", async () => {
+    const controller = new AssessmentController({
+      context,
+      assessment: immediate(async (_context, selected) => ({
+        evaluationToken: 1, result: result("OutOfScope", selected),
+      })),
+    });
+    await controller.select(selection());
+    expect(controller.getSnapshot().operationToken).toBe(1);
+
+    const firstClient = search("Athens", 1, 10);
+    controller.handleSearchLifecycle({ type: "search-started", operation: firstClient });
+    expect(controller.getSnapshot()).toMatchObject({ operationToken: 1, searchToken: 1 });
+
+    const replacementClient = search("Athens", 1, 11);
+    controller.handleSearchLifecycle({ type: "search-started", operation: replacementClient });
+    expect(controller.getSnapshot()).toMatchObject({ operationToken: 1, searchToken: 2 });
+    const current = controller.getSnapshot();
+    controller.handleSearchLifecycle({ type: "search-completed", ...firstClient });
+    expect(controller.getSnapshot()).toBe(current);
+    controller.handleSearchLifecycle({ type: "search-completed", ...replacementClient });
+    expect(controller.getSnapshot().phase).toBe("result");
   });
 
   it("keeps the accepted tuple visible while a later selection is updating", async () => {

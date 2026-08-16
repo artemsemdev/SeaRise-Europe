@@ -62,6 +62,7 @@ function selectedLocation(selection: Selection): React.ReactNode {
 function currentSelection(state: ProjectionState): Selection | null {
   switch (state.phase) {
     case "searching":
+      return state.previous?.selection ?? null;
     case "evaluating":
     case "updating":
       return state.operation.selection;
@@ -72,7 +73,9 @@ function currentSelection(state: ProjectionState): Selection | null {
     case "unsupported-browser":
     case "integrity-error":
     case "technical-error":
-      return state.operation?.selection ?? state.previous?.selection ?? null;
+      return state.operation?.kind === "search"
+        ? state.previous?.selection ?? null
+        : state.operation?.selection ?? state.previous?.selection ?? null;
     case "booting":
     case "ready":
       return null;
@@ -398,7 +401,7 @@ export function ProjectionPanel({
     (accepted === null || methodologyMatches(accepted, methodology));
   const canRetry = (state.phase === "offline" || state.phase === "connection-required" ||
     state.phase === "unsupported-browser" || state.phase === "integrity-error" || state.phase === "technical-error") &&
-    state.error.recoverable;
+    state.error.recoverable && state.operation?.kind !== "search";
   const canReset = state.phase !== "booting" && state.phase !== "ready" && selection !== null;
 
   return (

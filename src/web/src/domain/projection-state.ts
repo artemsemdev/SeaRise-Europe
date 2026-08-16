@@ -1,6 +1,12 @@
 import type { DataReleaseId } from "../contracts/generated/release-contract";
 import type { AssessmentResult } from "./scientific-lookup";
 import {
+  searchQueryKey,
+  type SearchLifecycleEvent,
+  type SearchOperationGuard,
+  type SearchQueryOperation,
+} from "./projection-search";
+import {
   TechnicalFailure,
   validateCoordinates,
   type ReleaseContext,
@@ -15,6 +21,7 @@ export const PROJECTION_STATE_PHASES = [
 
 export const PROJECTION_EVENT_TYPES = [
   "release-ready", "bootstrap-failed", "search-started", "search-completed",
+  "search-failed", "search-cancelled",
   "evaluation-started", "update-started", "assessment-completed",
   "operation-unavailable", "operation-failed", "retry-started", "reset",
   "release-update-started",
@@ -32,9 +39,13 @@ export interface OperationGuard {
 }
 
 export interface ProjectionOperation extends OperationGuard {
-  readonly kind: "search" | "evaluation" | "update";
+  readonly kind: "evaluation" | "update";
   readonly selection: Selection;
 }
+
+export type ActiveProjectionOperation = ProjectionOperation | (SearchQueryOperation & {
+  readonly kind: "search";
+});
 
 /** The sole authority for a completed result, marker, layer, legend, and URL. */
 export interface AcceptedProjection {
@@ -47,6 +58,7 @@ export interface AcceptedProjection {
 type Loaded = {
   readonly release: ProjectionReleaseIdentity;
   readonly operationToken: number;
+  readonly searchToken: number;
 };
 type FailurePhase =
   | "offline" | "connection-required" | "unsupported-browser" | "integrity-error" | "technical-error";
@@ -54,7 +66,8 @@ type FailureBase = {
   readonly release: ProjectionReleaseIdentity | null;
   readonly expectedDataReleaseId: DataReleaseId;
   readonly operationToken: number;
-  readonly operation: ProjectionOperation | null;
+  readonly searchToken: number;
+  readonly operation: ActiveProjectionOperation | null;
   readonly previous: AcceptedProjection | null;
 };
 type ErrorWithCode<C extends TechnicalError["code"]> = TechnicalError & { readonly code: C };
@@ -68,9 +81,9 @@ type FailureState = FailureBase & (
 );
 
 export type ProjectionState =
-  | { readonly phase: "booting"; readonly expectedDataReleaseId: DataReleaseId; readonly operationToken: number }
+  | { readonly phase: "booting"; readonly expectedDataReleaseId: DataReleaseId; readonly operationToken: number; readonly searchToken: number }
   | (Loaded & { readonly phase: "ready" })
-  | (Loaded & { readonly phase: "searching"; readonly operation: ProjectionOperation & { readonly kind: "search" }; readonly previous: AcceptedProjection | null })
+  | (Loaded & { readonly phase: "searching"; readonly operation: SearchQueryOperation & { readonly kind: "search" }; readonly previous: AcceptedProjection | null })
   | (Loaded & { readonly phase: "evaluating"; readonly operation: ProjectionOperation & { readonly kind: "evaluation" } })
   | (Loaded & { readonly phase: "updating"; readonly operation: ProjectionOperation & { readonly kind: "update" }; readonly previous: AcceptedProjection })
   | (Loaded & { readonly phase: "result"; readonly accepted: AcceptedProjection })
@@ -80,8 +93,7 @@ type Completion = OperationGuard;
 export type ProjectionEvent =
   | { readonly type: "release-ready"; readonly operationToken: number; readonly release: ProjectionReleaseIdentity }
   | { readonly type: "bootstrap-failed"; readonly operationToken: number; readonly expectedDataReleaseId: DataReleaseId; readonly error: TechnicalError; readonly availability?: "offline" | "connection-required" }
-  | { readonly type: "search-started"; readonly operationToken: number; readonly selection: Selection }
-  | ({ readonly type: "search-completed" } & Completion)
+  | SearchLifecycleEvent
   | { readonly type: "evaluation-started"; readonly operationToken: number; readonly selection: Selection }
   | { readonly type: "update-started"; readonly operationToken: number; readonly selection: Selection }
   | ({ readonly type: "assessment-completed"; readonly result: AssessmentResult } & Completion)
@@ -107,8 +119,9 @@ export function selectionKey(selection: Selection): string {
 export function createBootingProjectionState(
   expectedDataReleaseId: DataReleaseId,
   operationToken = 0,
+  searchToken = 0,
 ): ProjectionState {
-  return Object.freeze({ phase: "booting", expectedDataReleaseId, operationToken });
+  return Object.freeze({ phase: "booting", expectedDataReleaseId, operationToken, searchToken });
 }
 
 function freezeSelection(selection: Selection): Selection {
@@ -162,7 +175,7 @@ export function visibleAcceptedProjection(state: ProjectionState): AcceptedProje
   }
 }
 
-function operationOf(state: ProjectionState): ProjectionOperation | null {
+function operationOf(state: ProjectionState): ActiveProjectionOperation | null {
   switch (state.phase) {
     case "searching":
     case "evaluating":
@@ -188,10 +201,18 @@ function newer(state: ProjectionState, token: number): boolean {
 
 function matches(state: ProjectionState, completion: Completion): boolean {
   const active = operationOf(state);
-  return active !== null
+  return active !== null && active.kind !== "search"
     && active.operationToken === completion.operationToken
     && active.selectionKey === completion.selectionKey
     && active.dataReleaseId === completion.dataReleaseId;
+}
+
+function matchesSearch(state: ProjectionState, completion: SearchOperationGuard): boolean {
+  return state.phase === "searching"
+    && state.operation.searchToken === completion.searchToken
+    && state.operation.searchGeneration === completion.searchGeneration
+    && state.operation.queryKey === completion.queryKey
+    && state.operation.dataReleaseId === completion.dataReleaseId;
 }
 
 function accept(
@@ -224,6 +245,7 @@ function failed(
     expectedDataReleaseId: release?.dataReleaseId
       ?? (state as Extract<ProjectionState, { expectedDataReleaseId: DataReleaseId }>).expectedDataReleaseId,
     operationToken: state.operationToken,
+    searchToken: state.searchToken,
     operation: operationOf(state),
     previous: visibleAcceptedProjection(state),
     error: Object.freeze({ ...error }),
@@ -239,7 +261,7 @@ function technicalFailure(state: ProjectionState, error: TechnicalError): Failur
 }
 
 function begin(
-  phase: "searching" | "evaluating" | "updating",
+  phase: "evaluating" | "updating",
   state: ProjectionState,
   token: number,
   selection: Selection,
@@ -248,10 +270,35 @@ function begin(
   const previous = visibleAcceptedProjection(state);
   if (!release || !newer(state, token) || selection.dataReleaseId !== release.dataReleaseId
       || (phase === "updating") !== (previous !== null)) return state;
-  const operation = makeOperation(phase === "searching" ? "search" : phase === "updating" ? "update" : "evaluation", token, selection);
-  if (phase === "searching") return Object.freeze({ phase, release, operationToken: token, operation: operation as ProjectionOperation & { kind: "search" }, previous });
-  if (phase === "updating") return Object.freeze({ phase, release, operationToken: token, operation: operation as ProjectionOperation & { kind: "update" }, previous: previous! });
-  return Object.freeze({ phase, release, operationToken: token, operation: operation as ProjectionOperation & { kind: "evaluation" } });
+  const operation = makeOperation(phase === "updating" ? "update" : "evaluation", token, selection);
+  if (phase === "updating") return Object.freeze({ phase, release, operationToken: token, searchToken: state.searchToken, operation: operation as ProjectionOperation & { kind: "update" }, previous: previous! });
+  return Object.freeze({ phase, release, operationToken: token, searchToken: state.searchToken, operation: operation as ProjectionOperation & { kind: "evaluation" } });
+}
+
+function beginSearch(state: ProjectionState, input: SearchQueryOperation): ProjectionState {
+  const release = releaseOf(state);
+  const previous = visibleAcceptedProjection(state);
+  if (!release || !Number.isSafeInteger(input.searchToken) || input.searchToken <= state.searchToken
+      || !Number.isSafeInteger(input.searchGeneration) || input.searchGeneration < 1
+      || input.dataReleaseId !== release.dataReleaseId || !input.normalizedQuery
+      || input.queryKey !== searchQueryKey(input.dataReleaseId, input.normalizedQuery)) return state;
+  const operation = Object.freeze({ ...input, kind: "search" as const });
+  return Object.freeze({
+    phase: "searching", release, operationToken: state.operationToken,
+    searchToken: input.searchToken, operation, previous,
+  });
+}
+
+function settleSearch(state: Extract<ProjectionState, { phase: "searching" }>): ProjectionState {
+  return state.previous
+    ? Object.freeze({
+      phase: "result", release: state.release, operationToken: state.operationToken,
+      searchToken: state.searchToken, accepted: state.previous,
+    })
+    : Object.freeze({
+      phase: "ready", release: state.release, operationToken: state.operationToken,
+      searchToken: state.searchToken,
+    });
 }
 
 function assertNever(value: never): never {
@@ -263,21 +310,20 @@ export function projectionReducer(state: ProjectionState, event: ProjectionEvent
     case "release-ready":
       if (state.phase !== "booting" || event.operationToken !== state.operationToken
           || event.release.dataReleaseId !== state.expectedDataReleaseId) return state;
-      return Object.freeze({ phase: "ready", release: Object.freeze({ ...event.release }), operationToken: state.operationToken });
+      return Object.freeze({ phase: "ready", release: Object.freeze({ ...event.release }), operationToken: state.operationToken, searchToken: state.searchToken });
     case "bootstrap-failed":
       if (state.phase !== "booting" || event.operationToken !== state.operationToken
           || event.expectedDataReleaseId !== state.expectedDataReleaseId) return state;
       return event.availability ? failed(event.availability, state, event.error) : technicalFailure(state, event.error);
     case "search-started":
-      return begin("searching", state, event.operationToken, event.selection);
-    case "search-completed": {
-      if (state.phase !== "searching" || !matches(state, event)) return state;
-      const kind = state.previous ? "update" : "evaluation";
-      const operation = Object.freeze({ ...state.operation, kind });
-      return state.previous
-        ? Object.freeze({ phase: "updating", release: state.release, operationToken: state.operationToken, operation: operation as ProjectionOperation & { kind: "update" }, previous: state.previous })
-        : Object.freeze({ phase: "evaluating", release: state.release, operationToken: state.operationToken, operation: operation as ProjectionOperation & { kind: "evaluation" } });
-    }
+      return beginSearch(state, event.operation);
+    case "search-completed":
+    case "search-cancelled":
+      return state.phase === "searching" && matchesSearch(state, event)
+        ? settleSearch(state)
+        : state;
+    case "search-failed":
+      return matchesSearch(state, event) ? technicalFailure(state, event.error) : state;
     case "evaluation-started":
       return begin("evaluating", state, event.operationToken, event.selection);
     case "update-started":
@@ -285,7 +331,7 @@ export function projectionReducer(state: ProjectionState, event: ProjectionEvent
     case "assessment-completed":
       if ((state.phase !== "evaluating" && state.phase !== "updating") || !matches(state, event)) return state;
       try {
-        return Object.freeze({ phase: "result", release: state.release, operationToken: state.operationToken, accepted: accept(state.release, state.operation.selection, event.result) });
+        return Object.freeze({ phase: "result", release: state.release, operationToken: state.operationToken, searchToken: state.searchToken, accepted: accept(state.release, state.operation.selection, event.result) });
       } catch (error) {
         if (error instanceof TechnicalFailure) return technicalFailure(state, error.detail);
         throw error;
@@ -297,16 +343,19 @@ export function projectionReducer(state: ProjectionState, event: ProjectionEvent
     case "retry-started": {
       if (!["offline", "connection-required", "unsupported-browser", "integrity-error", "technical-error"].includes(state.phase)) return state;
       const failure = state as FailureState;
+      const failedSelectionKey = failure.operation?.kind === "search"
+        ? null
+        : failure.operation?.selectionKey ?? null;
       if (!newer(state, event.operationToken) || event.dataReleaseId !== failure.expectedDataReleaseId
-          || event.selectionKey !== (failure.operation?.selectionKey ?? null)) return state;
+          || event.selectionKey !== failedSelectionKey) return state;
       if (!failure.operation) return createBootingProjectionState(failure.expectedDataReleaseId, event.operationToken);
-      if (failure.operation.kind === "search") return begin("searching", state, event.operationToken, failure.operation.selection);
+      if (failure.operation.kind === "search") return state;
       return begin(failure.previous ? "updating" : "evaluating", state, event.operationToken, failure.operation.selection);
     }
     case "reset": {
       const release = releaseOf(state);
       if (!release || !newer(state, event.operationToken) || event.dataReleaseId !== release.dataReleaseId) return state;
-      return Object.freeze({ phase: "ready", release, operationToken: event.operationToken });
+      return Object.freeze({ phase: "ready", release, operationToken: event.operationToken, searchToken: state.searchToken });
     }
     case "release-update-started":
       return newer(state, event.operationToken)

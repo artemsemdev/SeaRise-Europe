@@ -11,6 +11,11 @@ import {
   type ProjectionState,
 } from "../domain/projection-state";
 import type { AssessmentEvaluation } from "../domain/scientific-lookup";
+import type {
+  SearchLifecycleEvent,
+  SearchOperationGuard,
+  SearchQueryOperation,
+} from "../domain/projection-search";
 import {
   TechnicalFailure,
   type ReleaseContext,
@@ -43,6 +48,10 @@ type ActiveEvaluation = Readonly<{
   controller: AbortController;
   guard: OperationGuard;
 }>;
+type ActiveSearch = Readonly<{
+  source: SearchOperationGuard;
+  projected: SearchOperationGuard;
+}>;
 
 function activeOperation(state: ProjectionState): ProjectionOperation | null {
   return state.phase === "evaluating" || state.phase === "updating"
@@ -64,7 +73,9 @@ export class AssessmentController {
   #context: ReleaseContext;
   #state: ProjectionState;
   #nextOperationToken = 0;
+  #nextSearchToken = 0;
   #active: ActiveEvaluation | null = null;
+  #activeSearch: ActiveSearch | null = null;
   #disposed = false;
 
   constructor(options: AssessmentControllerOptions) {
@@ -100,12 +111,51 @@ export class AssessmentController {
     }
 
     this.#cancelActive("superseded");
+    this.#activeSearch = null;
     const operationToken = this.#token();
     const type = visibleAcceptedProjection(this.#state)
       ? "update-started"
       : "evaluation-started";
     this.#dispatch({ type, operationToken, selection });
     await this.#runOperation(operationToken);
+  };
+
+  /** Maps an untrusted worker-client lifecycle onto controller-owned correlation. */
+  readonly handleSearchLifecycle = (event: SearchLifecycleEvent): void => {
+    this.#assertUsable();
+    if (event.type === "search-started") {
+      if (event.operation.dataReleaseId !== this.#context.dataReleaseId) return;
+      const projected: SearchQueryOperation = Object.freeze({
+        ...event.operation,
+        searchToken: ++this.#nextSearchToken,
+      });
+      const next = projectionReducer(this.#state, { type: "search-started", operation: projected });
+      if (next === this.#state || next.phase !== "searching" ||
+          next.operation.searchToken !== projected.searchToken) return;
+      this.#cancelActive("search-started");
+      this.#publish(next);
+      this.#activeSearch = Object.freeze({
+        source: Object.freeze(this.#searchGuard(event.operation)),
+        projected: Object.freeze(this.#searchGuard(projected)),
+      });
+      return;
+    }
+
+    const active = this.#activeSearch;
+    if (!active || !this.#sameSearch(active.source, event)) return;
+    this.#activeSearch = null;
+    this.#dispatch(event.type === "search-failed"
+      ? { type: event.type, ...active.projected, error: event.error }
+      : { type: event.type, ...active.projected });
+  };
+
+  /** Invalidates the current query when UI clear/reset happens outside the worker. */
+  readonly cancelSearch = (): void => {
+    this.#assertUsable();
+    const active = this.#activeSearch;
+    if (!active) return;
+    this.#activeSearch = null;
+    this.#dispatch({ type: "search-cancelled", ...active.projected });
   };
 
   /** Replays only the selection retained by the current failure state. */
@@ -121,7 +171,7 @@ export class AssessmentController {
     ) {
       return false;
     }
-    if (!failure.operation) return false;
+    if (!failure.operation || failure.operation.kind === "search") return false;
 
     this.#cancelActive("retry");
     const operationToken = this.#token();
@@ -138,6 +188,7 @@ export class AssessmentController {
   readonly reset = (): void => {
     this.#assertUsable();
     this.#cancelActive("reset");
+    this.#activeSearch = null;
     this.#dispatch({
       type: "reset",
       operationToken: this.#token(),
@@ -149,6 +200,7 @@ export class AssessmentController {
   readonly replaceRelease = (context: ReleaseContext): void => {
     this.#assertUsable();
     this.#cancelActive("release-update");
+    this.#activeSearch = null;
     const operationToken = this.#token();
     this.#dispatch({
       type: "release-update-started",
@@ -167,6 +219,7 @@ export class AssessmentController {
     if (this.#disposed) return;
     this.#disposed = true;
     this.#cancelActive("disposed");
+    this.#activeSearch = null;
     this.#listeners.clear();
   };
 
@@ -178,8 +231,28 @@ export class AssessmentController {
   #dispatch(event: ProjectionEvent): void {
     const next = projectionReducer(this.#state, event);
     if (next === this.#state) return;
+    this.#publish(next);
+  }
+
+  #publish(next: ProjectionState): void {
     this.#state = next;
     for (const listener of [...this.#listeners]) listener();
+  }
+
+  #searchGuard(operation: SearchQueryOperation): SearchOperationGuard {
+    return {
+      dataReleaseId: operation.dataReleaseId,
+      queryKey: operation.queryKey,
+      searchGeneration: operation.searchGeneration,
+      searchToken: operation.searchToken,
+    };
+  }
+
+  #sameSearch(left: SearchOperationGuard, right: SearchOperationGuard): boolean {
+    return left.dataReleaseId === right.dataReleaseId &&
+      left.queryKey === right.queryKey &&
+      left.searchGeneration === right.searchGeneration &&
+      left.searchToken === right.searchToken;
   }
 
   #cancelActive(reason: string): void {

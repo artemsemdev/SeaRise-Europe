@@ -6,6 +6,7 @@ import {
   type ReleaseMethodology,
 } from "../data/methodology-repository";
 import { AssessmentEngine } from "../domain/scientific-lookup";
+import type { SearchLifecycleEvent } from "../domain/projection-search";
 import type { ProjectionState } from "../domain/projection-state";
 import type { ReleaseContext, Selection } from "../domain/release";
 import { AssessmentController } from "./assessment-controller";
@@ -16,6 +17,8 @@ export interface AssessmentControllerPort {
   readonly select: (selection: Selection) => Promise<void>;
   readonly retry: () => Promise<boolean>;
   readonly reset: () => void;
+  readonly handleSearchLifecycle: (event: SearchLifecycleEvent) => void;
+  readonly cancelSearch: () => void;
   readonly dispose: () => void;
 }
 

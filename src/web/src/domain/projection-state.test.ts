@@ -2,6 +2,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { AssessmentResult } from "./scientific-lookup";
 import type { Selection, TechnicalError } from "./release";
+import type { SearchOperationGuard } from "./projection-search";
+import { createSearchQueryOperation } from "../search/lifecycle";
 import {
   PROJECTION_EVENT_TYPES,
   PROJECTION_STATE_PHASES,
@@ -75,9 +77,18 @@ function evaluating(selection = selected(), token = 1): ProjectionState {
 }
 
 function guard(state: ProjectionState): OperationGuard {
-  if (state.phase !== "searching" && state.phase !== "evaluating" && state.phase !== "updating") {
+  if (state.phase !== "evaluating" && state.phase !== "updating") {
     throw new Error("test expected an active operation");
   }
+  return state.operation;
+}
+
+function search(query = "Rotterdam", token = 1, generation = 1) {
+  return createSearchQueryOperation(RELEASE, query, token, generation)!;
+}
+
+function searchGuard(state: ProjectionState): SearchOperationGuard {
+  if (state.phase !== "searching") throw new Error("test expected an active search");
   return state.operation;
 }
 
@@ -92,7 +103,7 @@ describe("atomic projection state", () => {
       "booting", "ready", "searching", "evaluating", "updating", "result",
       "offline", "connection-required", "unsupported-browser", "integrity-error", "technical-error",
     ]);
-    expect(PROJECTION_EVENT_TYPES).toHaveLength(12);
+    expect(PROJECTION_EVENT_TYPES).toHaveLength(14);
     expect(new Set(PROJECTION_EVENT_TYPES).size).toBe(PROJECTION_EVENT_TYPES.length);
   });
 
@@ -104,11 +115,15 @@ describe("atomic projection state", () => {
     expect(selectionKey(selected(51.9, "ssp1-26"))).not.toBe(selectionKey(selected()));
   });
 
-  it("transitions through search and evaluation without publishing a pending tuple", () => {
-    const searching = projectionReducer(ready(), { type: "search-started", operationToken: 1, selection: selected() });
+  it("settles text search without evaluating until an immutable selection is explicit", () => {
+    const searching = projectionReducer(ready(), { type: "search-started", operation: search() });
     expect(searching.phase).toBe("searching");
     expect(visibleAcceptedProjection(searching)).toBeNull();
-    const evaluation = projectionReducer(searching, { type: "search-completed", ...guard(searching) });
+    const settled = projectionReducer(searching, { type: "search-completed", ...searchGuard(searching) });
+    expect(settled.phase).toBe("ready");
+    const evaluation = projectionReducer(settled, {
+      type: "evaluation-started", operationToken: 1, selection: selected(),
+    });
     expect(evaluation.phase).toBe("evaluating");
     const result = projectionReducer(evaluation, {
       type: "assessment-completed", ...guard(evaluation), result: outcome("ProjectionAvailable"),
@@ -117,16 +132,38 @@ describe("atomic projection state", () => {
     expect(visibleAcceptedProjection(result)?.selectionKey).toBe(selectionKey(selected()));
   });
 
-  it("rejects stale search completions by token, selection, and release", () => {
-    const searching = projectionReducer(ready(), { type: "search-started", operationToken: 1, selection: selected() });
-    const current = guard(searching);
+  it("rejects stale search completions by token, generation, query, and release", () => {
+    const searching = projectionReducer(ready(), { type: "search-started", operation: search() });
+    const current = searchGuard(searching);
     for (const stale of [
-      { ...current, operationToken: 0 },
-      { ...current, selectionKey: `${current.selectionKey}:old` },
+      { ...current, searchToken: 0 },
+      { ...current, searchGeneration: 2 },
+      { ...current, queryKey: `${current.queryKey}:old` },
       { ...current, dataReleaseId: OTHER_RELEASE },
     ]) {
-      expect(projectionReducer(searching, { type: "search-completed", ...stale })).toBe(searching);
+      expect(
+        projectionReducer(searching, { type: "search-completed", ...stale }),
+        JSON.stringify(stale),
+      ).toBe(searching);
     }
+  });
+
+  it("retains the prior accepted tuple through search completion, cancel, and failure", () => {
+    const acceptedState = completed();
+    const previous = visibleAcceptedProjection(acceptedState)!;
+    const searching = projectionReducer(acceptedState, { type: "search-started", operation: search("Athens") });
+    expect(visibleAcceptedProjection(searching)).toBe(previous);
+    expect(projectionReducer(searching, {
+      type: "search-completed", ...searchGuard(searching),
+    })).toMatchObject({ phase: "result", accepted: previous });
+    expect(projectionReducer(searching, {
+      type: "search-cancelled", ...searchGuard(searching),
+    })).toMatchObject({ phase: "result", accepted: previous });
+    const failure = projectionReducer(searching, {
+      type: "search-failed", ...searchGuard(searching), error: technical("DecodeFailed"),
+    });
+    expect(failure).toMatchObject({ phase: "technical-error", previous });
+    expect(JSON.stringify(failure)).not.toContain('"resultState":"DataUnavailable"');
   });
 
   it.each(["ProjectionAvailable", "DataUnavailable", "OutOfScope", "UnsupportedGeography"] as const)(
@@ -189,6 +226,20 @@ describe("atomic projection state", () => {
     expect(booting.phase).toBe("booting");
     expect(projectionReducer(booting, {
       type: "assessment-completed", ...staleGuard, result: outcome("ProjectionAvailable"),
+    })).toBe(booting);
+  });
+
+  it("rejects search events invalidated by reset or release update", () => {
+    const active = projectionReducer(ready(), { type: "search-started", operation: search() });
+    const stale = searchGuard(active);
+    const reset = projectionReducer(active, { type: "reset", operationToken: 1, dataReleaseId: RELEASE });
+    expect(projectionReducer(reset, { type: "search-completed", ...stale })).toBe(reset);
+
+    const booting = projectionReducer(active, {
+      type: "release-update-started", operationToken: 1, expectedDataReleaseId: OTHER_RELEASE,
+    });
+    expect(projectionReducer(booting, {
+      type: "search-failed", ...stale, error: technical("DecodeFailed"),
     })).toBe(booting);
   });
 
@@ -278,6 +329,32 @@ describe("atomic projection state", () => {
           type: "evaluation-started", operationToken: candidateToken, selection: selected(),
         });
         expect(next === current).toBe(candidateToken <= currentToken);
+      },
+    ));
+  });
+
+  it("enforces an independent monotonic search token for arbitrary query sequences", () => {
+    fc.assert(fc.property(
+      fc.integer({ min: 1, max: 10_000 }),
+      fc.integer({ min: 1, max: 10_000 }),
+      (currentToken, candidateToken) => {
+        const first = projectionReducer(ready(), {
+          type: "search-started",
+          operation: search("Málaga", currentToken),
+        });
+        if (first.phase !== "searching") throw new Error("expected initial search");
+        const settled = projectionReducer(first, {
+          type: "search-completed", ...searchGuard(first),
+        });
+        const next = projectionReducer(settled, {
+          type: "search-started",
+          operation: search("  Malaga  ", candidateToken),
+        });
+        expect(next === settled).toBe(candidateToken <= currentToken);
+        if (next.phase === "searching") {
+          expect(next.operation.queryKey).toBe(first.operation.queryKey);
+          expect(next.operation.normalizedQuery).toBe("malaga");
+        }
       },
     ));
   });
