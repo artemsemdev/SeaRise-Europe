@@ -80,7 +80,7 @@ export interface AdmissionReceiptStore {
   runExclusive<T>(
     plan: AdmissionPlanIdentityV1,
     signal: AbortSignal,
-    operation: (operationId: string) => Promise<T>,
+    operation: (operationId: string, issuer: ReceiptStoreAuthority) => Promise<T>,
   ): Promise<T>;
   publishLast(
     proof: VerifiedAdmissionProofV1,
@@ -138,13 +138,20 @@ interface StoredReceipt {
   readonly receiptSha256: string;
 }
 
+interface ReceiptStoreAuthority {
+  readonly token: object;
+  readonly storageProfile: StorageProfileV1;
+  readonly mode: "persistent" | "memory-only";
+}
+
 interface GateAuthority {
+  readonly issuer: ReceiptStoreAuthority;
   readonly whole: ReadonlySet<string>;
   readonly ranges: ReadonlySet<string>;
 }
 
 const VERIFIED_PLANS = new WeakSet<object>();
-const VERIFIED_PROOFS = new WeakSet<object>();
+const VERIFIED_PROOFS = new WeakMap<object, ReceiptStoreAuthority>();
 const ACCEPTED_GATES = new WeakMap<object, GateAuthority>();
 
 function samePair(left: AppReleasePairV1, right: AppReleasePairV1): boolean {
@@ -487,6 +494,7 @@ async function validateStored(
   stored: StoredReceipt | undefined,
   plan: AdmissionPlanIdentityV1,
   subtle: SubtleCrypto,
+  issuer: ReceiptStoreAuthority,
 ): Promise<AcceptedAdmissionGateV1 | null> {
   if (!stored) return null;
   try {
@@ -505,6 +513,7 @@ async function validateStored(
       receiptSha256: actualSha256,
     });
     ACCEPTED_GATES.set(gate, {
+      issuer,
       whole: new Set(plan.wholeResources.map((resource) => resource.identitySha256)),
       ranges: new Set(plan.rangeResources.map((resource) => resource.identitySha256)),
     });
@@ -518,10 +527,12 @@ export async function assertAcceptedWholeResource(
   gate: AcceptedAdmissionGateV1,
   authority: WholeResourceAuthorityV1,
   subtle: SubtleCrypto,
+  consumer: Pick<WholeResourceStore, "mode" | "storageProfile">,
 ): Promise<void> {
   const accepted = ACCEPTED_GATES.get(gate);
+  assertAcceptedConsumer(accepted, consumer);
   const validated = validateWholeResourceAuthority(authority);
-  if (!accepted || !samePair(gate.pair, validated.pair) ||
+  if (!samePair(gate.pair, validated.pair) ||
       !accepted.whole.has(await wholeResourceIdentitySha256(validated, subtle))) {
     throw new AdmissionReceiptError("AuthorityRejected", "Whole resource is not covered by the current accepted receipt.");
   }
@@ -531,12 +542,26 @@ export async function assertAcceptedRangeResource(
   gate: AcceptedAdmissionGateV1,
   identity: RangeIdentityV1,
   subtle: SubtleCrypto,
+  consumer: Pick<RangeStore, "mode" | "storageProfile">,
 ): Promise<void> {
   const accepted = ACCEPTED_GATES.get(gate);
+  assertAcceptedConsumer(accepted, consumer);
   const validated = validateRangeIdentity(identity);
-  if (!accepted || !samePair(gate.pair, validated.authority.pair) ||
+  if (!samePair(gate.pair, validated.authority.pair) ||
       !accepted.ranges.has(await rangeIdentitySha256(validated, subtle))) {
     throw new AdmissionReceiptError("AuthorityRejected", "Range resource is not covered by the current accepted receipt.");
+  }
+}
+
+function assertAcceptedConsumer(
+  accepted: GateAuthority | undefined,
+  consumer: Readonly<{ mode: "persistent" | "memory-only"; storageProfile: StorageProfileV1 }>,
+): asserts accepted is GateAuthority {
+  if (!accepted || !sameStorageProfile(accepted.issuer.storageProfile, consumer.storageProfile) ||
+      accepted.issuer.mode !== consumer.mode || consumer.storageProfile.mode !== consumer.mode) {
+    throw new AdmissionReceiptError(
+      "AuthorityRejected", "Accepted receipt does not match the consuming resource store authority.",
+    );
   }
 }
 
@@ -548,6 +573,7 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
   readonly #locks: AdmissionLockPort | undefined;
   readonly #nextOperationId: () => string;
   readonly #assertAdmissionOpen: (() => Promise<void>) | undefined;
+  readonly #authority: ReceiptStoreAuthority;
   #memoryTail: Promise<void> = Promise.resolve();
 
   constructor(
@@ -563,6 +589,11 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
     this.#locks = locks;
     this.#nextOperationId = nextOperationId;
     this.#assertAdmissionOpen = assertAdmissionOpen;
+    this.#authority = Object.freeze({
+      token: Object.freeze({}),
+      storageProfile: profile,
+      mode: profile.mode,
+    });
   }
 
   abstract readStored(key: string): Promise<StoredReceipt | undefined>;
@@ -570,20 +601,49 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
   abstract deleteStored(key: string, receiptSha256: string): Promise<boolean>;
   abstract close(): void;
 
+  #assertStorageAuthority(
+    profile: StorageProfileV1,
+    mode: "persistent" | "memory-only",
+  ): void {
+    if (!sameStorageProfile(profile, this.storageProfile) ||
+        profile.mode !== mode || mode !== this.mode) {
+      throw new AdmissionReceiptError(
+        "AuthorityRejected", "Receipt store does not match the exact release persistence profile.",
+      );
+    }
+  }
+
+  #assertPlanAuthority(planInput: AdmissionPlanIdentityV1): AdmissionPlanIdentityV1 {
+    const plan = checkedPlan(planInput, this.pair);
+    this.#assertStorageAuthority(plan.storageProfile, plan.storageProfile.mode);
+    return plan;
+  }
+
+  #assertIssuerAuthority(issuer: ReceiptStoreAuthority | undefined): void {
+    if (!issuer) {
+      throw new AdmissionReceiptError(
+        "AuthorityRejected", "Receipt authority was not issued by a verified receipt store.",
+      );
+    }
+    this.#assertStorageAuthority(issuer.storageProfile, issuer.mode);
+    if (issuer.token !== this.#authority.token) {
+      throw new AdmissionReceiptError(
+        "AuthorityRejected", "Receipt authority belongs to another receipt store instance.",
+      );
+    }
+  }
+
   async runExclusive<T>(
     planInput: AdmissionPlanIdentityV1,
     signal: AbortSignal,
-    action: (operationId: string) => Promise<T>,
+    action: (operationId: string, issuer: ReceiptStoreAuthority) => Promise<T>,
   ): Promise<T> {
-    const plan = checkedPlan(planInput, this.pair);
-    if (!sameStorageProfile(plan.storageProfile, this.storageProfile) || plan.storageProfile.mode !== this.mode) {
-      throw new AdmissionReceiptError("AuthorityRejected", "Receipt store does not match the exact release persistence profile.");
-    }
+    this.#assertPlanAuthority(planInput);
     requireSignal(signal);
     const execute = async (): Promise<T> => {
       requireSignal(signal);
       const identifier = operationId(this.#nextOperationId());
-      return action(identifier);
+      return action(identifier, this.#authority);
     };
     if (this.mode === "memory-only") {
       const previous = this.#memoryTail;
@@ -625,10 +685,10 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
   }
 
   async publishLast(proof: VerifiedAdmissionProofV1, signal: AbortSignal): Promise<AcceptedAdmissionGateV1> {
-    if (!VERIFIED_PROOFS.has(proof)) {
-      throw new AdmissionReceiptError("AuthorityRejected", "Admission receipt proof was not minted after exact resource readback.");
-    }
-    const plan = checkedPlan(proof.plan, this.pair);
+    const plan = this.#assertPlanAuthority(proof.plan);
+    const issuer = VERIFIED_PROOFS.get(proof);
+    this.#assertIssuerAuthority(issuer);
+    VERIFIED_PROOFS.delete(proof);
     requireSignal(signal);
     const receipt = receiptFor(plan);
     const receiptSha256 = await digestJson(receipt, this.subtle);
@@ -638,7 +698,7 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
       receipt,
       receiptSha256,
     }), proof.expectedPreviousReceiptSha256, signal);
-    const gate = await validateStored(await this.readStored(receiptKey(plan)), plan, this.subtle);
+    const gate = await validateStored(await this.readStored(receiptKey(plan)), plan, this.subtle, this.#authority);
     if (!gate || gate.receiptSha256 !== receiptSha256) {
       await this.deleteStored(receiptKey(plan), receiptSha256).catch(() => false);
       throw new AdmissionReceiptError("StorageFailed", "Published admission receipt failed exact readback.");
@@ -647,12 +707,14 @@ abstract class BaseReceiptStore implements AdmissionReceiptStore {
   }
 
   async accepted(planInput: AdmissionPlanIdentityV1): Promise<AcceptedAdmissionGateV1 | null> {
-    const plan = checkedPlan(planInput, this.pair);
-    return validateStored(await this.readStored(receiptKey(plan)), plan, this.subtle);
+    const plan = this.#assertPlanAuthority(planInput);
+    return validateStored(await this.readStored(receiptKey(plan)), plan, this.subtle, this.#authority);
   }
 
   async deleteIfCurrent(gate: AcceptedAdmissionGateV1): Promise<boolean> {
-    if (!ACCEPTED_GATES.has(gate) || !samePair(gate.pair, this.pair)) {
+    const authority = ACCEPTED_GATES.get(gate);
+    this.#assertIssuerAuthority(authority?.issuer);
+    if (!samePair(gate.pair, this.pair)) {
       throw new AdmissionReceiptError("AuthorityRejected", "Admission gate was not issued by a verified receipt store.");
     }
     return this.deleteStored(receiptKeyFor(this.pair, gate.resourcePlanSha256), gate.receiptSha256);
@@ -857,7 +919,7 @@ export async function coordinateVerifiedAdmission(input: Readonly<{
     throw new AdmissionReceiptError("AuthorityRejected", "Admission resources do not match the exact verified resource-plan identity.");
   }
 
-  return input.receiptStore.runExclusive(plan, input.signal, async (operation) => {
+  return input.receiptStore.runExclusive(plan, input.signal, async (operation, issuer) => {
     const previous = await input.receiptStore.accepted(plan);
     let rangeAdmission: RangeAdmissionV1 | undefined;
     let wholeAdmission: WholeResourceAdmissionV1 | undefined;
@@ -895,8 +957,13 @@ export async function coordinateVerifiedAdmission(input: Readonly<{
       operationId: operation,
       expectedPreviousReceiptSha256: previous?.receiptSha256 ?? null,
     });
-    VERIFIED_PROOFS.add(proof);
-    const gate = await input.receiptStore.publishLast(proof, input.signal);
+    VERIFIED_PROOFS.set(proof, issuer);
+    let gate: AcceptedAdmissionGateV1;
+    try {
+      gate = await input.receiptStore.publishLast(proof, input.signal);
+    } finally {
+      VERIFIED_PROOFS.delete(proof);
+    }
     published = true;
     return Object.freeze({
       contractVersion: 1,

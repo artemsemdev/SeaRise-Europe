@@ -159,6 +159,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Bound one-shot coordinated-admission proofs and accepted receipt gates to
+  their exact issuing and consuming storage profiles. Cross-profile
+  Candidate/public reads, publication, and deletion now fail before any
+  persistent browser API call.
+
 - Bound the committed Brotli settlement indexes to their exact manifest IDs,
   roles, paths, and search-index media type so strict static preview can load
   them without allowing generic `.br` MIME spoofing. Verified transport
