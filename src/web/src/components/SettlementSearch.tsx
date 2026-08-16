@@ -2,17 +2,22 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
 } from "react";
 import type { ReleaseContext } from "../domain/release";
+import type { SearchLifecycleEvent } from "../domain/projection-search";
 import { SettlementSearchClient, type SearchWorkerFactory } from "../search/client";
 import type { SettlementSearchRecord, SettlementSearchState } from "../search/types";
 
 interface SettlementSearchProps {
   readonly release: ReleaseContext | null;
   readonly onSelect: (record: SettlementSearchRecord) => void;
+  readonly onSearchLifecycle?: (event: SearchLifecycleEvent) => void;
+  /** Increment to clear the local query from an application-level reset. */
+  readonly clearToken?: number;
   readonly workerFactory?: SearchWorkerFactory;
 }
 
@@ -25,14 +30,30 @@ const unavailable: SettlementSearchState = Object.freeze({
   coastalError: null,
   durationMilliseconds: null,
   initializationMilliseconds: null,
+  operation: null,
+  completedOperation: null,
 });
 
-function useClient(release: ReleaseContext | null, factory?: SearchWorkerFactory) {
+function useClient(
+  release: ReleaseContext | null,
+  factory: SearchWorkerFactory | undefined,
+  onLifecycle: ((event: SearchLifecycleEvent) => void) | undefined,
+) {
   const client = useMemo(
     () => release ? new SettlementSearchClient(release, factory) : null,
     [factory, release],
   );
-  useEffect(() => () => client?.dispose(), [client]);
+  const lifecycleListener = useRef(onLifecycle);
+  useEffect(() => {
+    lifecycleListener.current = onLifecycle;
+  }, [onLifecycle]);
+  useEffect(() => {
+    const unsubscribe = client?.subscribeLifecycle((event) => lifecycleListener.current?.(event));
+    return () => {
+      client?.dispose();
+      unsubscribe?.();
+    };
+  }, [client]);
   const state = useSyncExternalStore(
     (listener) => client?.subscribe(listener) ?? (() => undefined),
     () => client?.snapshot ?? unavailable,
@@ -66,18 +87,47 @@ function liveMessage(state: SettlementSearchState): string {
     : `No matching settlement in the loaded index.${partial}`;
 }
 
-export function SettlementSearch({ release, onSelect, workerFactory }: SettlementSearchProps) {
-  const [client, state] = useClient(release, workerFactory);
+interface SettlementSearchSessionProps {
+  readonly release: ReleaseContext | null;
+  readonly client: SettlementSearchClient | null;
+  readonly state: SettlementSearchState;
+  readonly onSelect: (record: SettlementSearchRecord) => void;
+  readonly clearToken: number;
+}
+
+function SettlementSearchSession({
+  release,
+  client,
+  state,
+  onSelect,
+  clearToken,
+}: SettlementSearchSessionProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const hintId = useId();
   const listId = useId();
   const statusId = useId();
+  const observedClearToken = useRef(clearToken);
   const safeActive = Math.min(active, Math.max(0, state.results.length - 1));
-  const resultsAreCurrent = state.query === query && !state.pending && !state.error;
+  const resultsAreCurrent = state.query === query && !state.pending && !state.error &&
+    state.operation !== null && state.completedOperation !== null &&
+    state.operation.searchToken === state.completedOperation.searchToken &&
+    state.operation.searchGeneration === state.completedOperation.searchGeneration &&
+    state.operation.queryKey === state.completedOperation.queryKey &&
+    state.operation.dataReleaseId === state.completedOperation.dataReleaseId &&
+    state.operation.dataReleaseId === release?.dataReleaseId;
   const activeResult = resultsAreCurrent ? state.results[safeActive] : undefined;
   const activeId = activeResult ? `${listId}-option-${safeActive}` : undefined;
+
+  useEffect(() => {
+    if (observedClearToken.current === clearToken) return;
+    observedClearToken.current = clearToken;
+    setQuery("");
+    setOpen(false);
+    setActive(0);
+    client?.query("");
+  }, [clearToken, client]);
 
   useEffect(() => {
     if (!client) return;
@@ -97,7 +147,7 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
     if (!record || !resultsAreCurrent) return;
     setQuery(record.displayName);
     setOpen(false);
-    onSelect(record);
+    onSelect(Object.freeze({ ...record, searchNames: Object.freeze([...record.searchNames]) }));
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -214,5 +264,25 @@ export function SettlementSearch({ release, onSelect, workerFactory }: Settlemen
         </div>
       ) : null}
     </form>
+  );
+}
+
+export function SettlementSearch({
+  release,
+  onSelect,
+  onSearchLifecycle,
+  clearToken = 0,
+  workerFactory,
+}: SettlementSearchProps) {
+  const [client, state] = useClient(release, workerFactory, onSearchLifecycle);
+  return (
+    <SettlementSearchSession
+      key={client?.generation ?? "unavailable"}
+      release={release}
+      client={client}
+      state={state}
+      onSelect={onSelect}
+      clearToken={clearToken}
+    />
   );
 }

@@ -1,4 +1,5 @@
 import type { ResolvedArtifact, TechnicalError } from "../domain/release";
+import type { SearchQueryOperation } from "../domain/projection-search";
 
 export const SEARCH_SHARD_IDS = ["europe-core", "europe-coastal"] as const;
 export type SearchShardId = (typeof SEARCH_SHARD_IDS)[number];
@@ -42,4 +43,8 @@ export interface SettlementSearchState {
   readonly coastalError: TechnicalError | null;
   readonly durationMilliseconds: number | null;
   readonly initializationMilliseconds: number | null;
+  /** Current immutable query identity, including completed queries. */
+  readonly operation: SearchQueryOperation | null;
+  /** Identity that produced `results`; null while pending, cancelled, or failed. */
+  readonly completedOperation: SearchQueryOperation | null;
 }
