@@ -169,11 +169,16 @@ coverage, and artifact metadata before assessment. HTTPS plus the pinned release
 is the normal runtime trust boundary; full signature and checksum verification
 runs in CI and is exposed as evidence on `/about/architecture`.
 
-Service-worker caches are versioned. Activation must either expose a complete
-new shell/manifest pair or retain the previous pair. Data ranges from two
-releases must never share a cache namespace. On a mismatch, malformed response,
-or missing uncached range, the UI returns an honest availability state and does
-not infer a scientific result.
+Service-worker caches are versioned. The built worker contains exactly one
+immutable bootstrap authority with the canonical path, media type, byte size,
+and SHA-256 for every shell resource. Installation verifies both fetched bytes
+and an existing exact-name candidate cache before it can complete. A mismatch
+removes only the incomplete candidate cache; it cannot delete an active or
+unrelated cache. Activation must either expose a complete new shell/manifest
+pair or retain the previous pair. Data ranges from two releases must never
+share a cache namespace. On a mismatch, malformed response, or missing uncached
+range, the UI returns an honest availability state and does not infer a
+scientific result.
 
 ## Incident response and recovery
 

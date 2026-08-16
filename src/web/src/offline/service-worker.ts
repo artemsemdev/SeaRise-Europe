@@ -1,12 +1,12 @@
 /// <reference lib="webworker" />
 
-import { createServiceWorkerRuntime, type EmbeddedPrecacheV2 } from "./service-worker-runtime";
+import { createServiceWorkerRuntime, type EmbeddedPrecacheV3 } from "./service-worker-runtime";
 
 declare const __SEARISE_PRECACHE_JSON__: string;
 
 const worker = self as unknown as ServiceWorkerGlobalScope;
 const runtime = createServiceWorkerRuntime(
-  JSON.parse(__SEARISE_PRECACHE_JSON__) as EmbeddedPrecacheV2,
+  JSON.parse(__SEARISE_PRECACHE_JSON__) as EmbeddedPrecacheV3,
   {
     origin: worker.location.origin,
     caches: worker.caches,

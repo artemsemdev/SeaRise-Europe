@@ -12,10 +12,18 @@ import {
   type OfflineWorkerToClientV1,
 } from "./contracts/policy";
 
-export interface EmbeddedPrecacheV2 {
-  readonly contractVersion: 2;
+export interface EmbeddedPrecacheEntryV3 {
+  readonly path: string;
+  readonly mediaType: string;
+  readonly byteSize: number;
+  readonly sha256: string;
+}
+
+export interface EmbeddedPrecacheV3 {
+  readonly authorityKind: "searise-shell-precache-v3";
+  readonly contractVersion: 3;
   readonly buildIdentity: BuildIdentityV1;
-  readonly urls: readonly string[];
+  readonly entries: readonly EmbeddedPrecacheEntryV3[];
   readonly precacheSetSha256: string;
 }
 
@@ -41,23 +49,41 @@ interface RuntimeDependencies {
   readonly origin: string;
   readonly caches: CacheStorageLike;
   readonly fetch: (request: Request) => Promise<Response>;
-  readonly crypto?: Pick<Crypto, "subtle">;
+  readonly crypto?: Readonly<{ subtle: Pick<SubtleCrypto, "digest"> }>;
 }
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 
-function validatePrecache(value: EmbeddedPrecacheV2): Readonly<{
+function expectedMediaType(path: string): string | undefined {
+  if (path === "/") return "text/html";
+  const extension = path.slice(path.lastIndexOf("."));
+  const mediaTypes: Readonly<Record<string, string>> = Object.freeze({
+    ".css": "text/css",
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".wasm": "application/wasm",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+  });
+  return mediaTypes[extension];
+}
+
+function validatePrecache(value: EmbeddedPrecacheV3): Readonly<{
   buildIdentity: BuildIdentityV1;
   pair: AppReleasePairV1;
-  manifestPath: string;
-  urls: readonly string[];
+  entries: readonly Readonly<EmbeddedPrecacheEntryV3>[];
   authorityPayload: Readonly<object>;
   precacheSetSha256: string;
 }> {
   const record = exactRecord(value, [
-    "contractVersion", "buildIdentity", "urls", "precacheSetSha256",
+    "authorityKind", "contractVersion", "buildIdentity", "entries", "precacheSetSha256",
   ], "embedded precache authority");
-  if (record.contractVersion !== 2) throw new TypeError("The embedded precache contract is unsupported.");
+  if (record.authorityKind !== "searise-shell-precache-v3" || record.contractVersion !== 3) {
+    throw new TypeError("The embedded precache contract is unsupported.");
+  }
   const buildIdentity = validateBuildIdentity(record.buildIdentity);
   const pair = validateAppReleasePair({
     contractVersion: 1,
@@ -68,20 +94,40 @@ function validatePrecache(value: EmbeddedPrecacheV2): Readonly<{
   if (typeof record.precacheSetSha256 !== "string" || !SHA256.test(record.precacheSetSha256)) {
     throw new TypeError("The embedded precache authority is invalid.");
   }
-  if (!Array.isArray(record.urls)) throw new TypeError("The embedded precache URL inventory is invalid.");
-  const urls = [...record.urls] as unknown[];
+  if (!Array.isArray(record.entries)) throw new TypeError("The embedded precache entry inventory is invalid.");
+  const entryValues = [...record.entries] as unknown[];
+  const entries = entryValues.map((value) => {
+    const entry = exactRecord(value, ["path", "mediaType", "byteSize", "sha256"], "precache entry");
+    if (typeof entry.path !== "string") throw new TypeError("Precache path must be a string.");
+    const mediaType = expectedMediaType(entry.path);
+    if (
+      !mediaType ||
+      entry.mediaType !== mediaType ||
+      !Number.isSafeInteger(entry.byteSize) ||
+      (entry.byteSize as number) < 0 ||
+      typeof entry.sha256 !== "string" ||
+      !SHA256.test(entry.sha256)
+    ) {
+      throw new TypeError(`Precache byte authority is invalid for ${entry.path}.`);
+    }
+    return Object.freeze({
+      path: entry.path,
+      mediaType,
+      byteSize: entry.byteSize as number,
+      sha256: entry.sha256,
+    });
+  });
+  const paths = entries.map((entry) => entry.path);
   if (
-    urls.length < 3 ||
-    urls[0] !== "/" ||
-    urls.some((url, index) => url !== [...urls].sort()[index]) ||
-    new Set(urls).size !== urls.length ||
-    !urls.includes(expectedManifest)
+    entries.length < 3 ||
+    paths[0] !== "/" ||
+    paths.some((path, index) => path !== [...paths].sort()[index]) ||
+    new Set(paths).size !== paths.length ||
+    !paths.includes(expectedManifest)
   ) {
-    throw new TypeError("The embedded precache URL inventory is not canonical.");
+    throw new TypeError("The embedded precache entry inventory is not canonical.");
   }
-  for (const pathValue of urls) {
-    if (typeof pathValue !== "string") throw new TypeError("Precache URL must be a string.");
-    const path = pathValue;
+  for (const { path } of entries) {
     const parsed = new URL(path, "https://static.invalid");
     if (
       parsed.origin !== "https://static.invalid" ||
@@ -94,13 +140,17 @@ function validatePrecache(value: EmbeddedPrecacheV2): Readonly<{
       throw new TypeError(`Precache URL is outside the shell allowlist: ${path}`);
     }
   }
-  const canonicalUrls = Object.freeze(urls as string[]);
+  const canonicalEntries = Object.freeze(entries);
   return Object.freeze({
     buildIdentity,
     pair,
-    manifestPath: expectedManifest,
-    urls: canonicalUrls,
-    authorityPayload: Object.freeze({ contractVersion: 2, buildIdentity, urls: canonicalUrls }),
+    entries: canonicalEntries,
+    authorityPayload: Object.freeze({
+      authorityKind: "searise-shell-precache-v3",
+      contractVersion: 3,
+      buildIdentity,
+      entries: canonicalEntries,
+    }),
     precacheSetSha256: record.precacheSetSha256,
   });
 }
@@ -114,10 +164,11 @@ function exactPair(expected: AppReleasePairV1, value: unknown): boolean {
   }
 }
 
-async function requireCacheableResponse(
+async function requireVerifiedResponse(
   url: string,
   response: Response | undefined,
-  manifestPath: string,
+  entry: Readonly<EmbeddedPrecacheEntryV3>,
+  cryptography: Readonly<{ subtle: Pick<SubtleCrypto, "digest"> }>,
 ): Promise<Response> {
   if (!response) throw new TypeError(`Precache response is missing for ${new URL(url).pathname}.`);
   const responsePolicy = new Set(
@@ -132,28 +183,41 @@ async function requireCacheableResponse(
     response.redirected ||
     responsePolicy.has("private") ||
     responsePolicy.has("no-store") ||
-    (new URL(url).pathname === manifestPath &&
-      !response.headers.get("content-type")?.toLowerCase().includes("application/json"))
+    response.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== entry.mediaType
   ) {
     throw new TypeError(`Precache response is invalid for ${new URL(url).pathname}.`);
   }
+  let bytes: ArrayBuffer;
   try {
-    await response.clone().arrayBuffer();
+    bytes = await response.clone().arrayBuffer();
   } catch {
     throw new TypeError(`Precache response is unreadable for ${new URL(url).pathname}.`);
+  }
+  // Copy into this execution realm before Web Crypto. Test/runtime Response
+  // implementations may return an ArrayBuffer created by another realm.
+  const verifiedBytes = Uint8Array.from(new Uint8Array(bytes));
+  const digest = await cryptography.subtle.digest("SHA-256", verifiedBytes);
+  const actualSha256 = [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+  if (verifiedBytes.byteLength !== entry.byteSize || actualSha256 !== entry.sha256) {
+    throw new TypeError(`Precache bytes do not match the sealed authority for ${new URL(url).pathname}.`);
   }
   return response;
 }
 
 export function createServiceWorkerRuntime(
-  embedded: EmbeddedPrecacheV2,
+  embedded: EmbeddedPrecacheV3,
   dependencies: RuntimeDependencies,
 ) {
   const precache = validatePrecache(embedded);
   const cryptography = dependencies.crypto ?? globalThis.crypto;
   if (!cryptography?.subtle) throw new TypeError("SHA-256 Web Crypto is required.");
-  const absoluteUrls = new Map(
-    precache.urls.map((path) => [path, new URL(path, dependencies.origin).href]),
+  const absoluteEntries = new Map(
+    precache.entries.map((entry) => [entry.path, Object.freeze({
+      entry,
+      url: new URL(entry.path, dependencies.origin).href,
+    })]),
   );
   const cacheName = `${cacheNamespaces(precache.pair).shell}:${precache.precacheSetSha256}`;
 
@@ -179,8 +243,8 @@ export function createServiceWorkerRuntime(
       if ((await dependencies.caches.keys()).includes(cacheName)) {
         try {
           const existing = await dependencies.caches.open(cacheName);
-          for (const url of absoluteUrls.values()) {
-            await requireCacheableResponse(url, await existing.match(url), precache.manifestPath);
+          for (const { entry, url } of absoluteEntries.values()) {
+            await requireVerifiedResponse(url, await existing.match(url), entry, cryptography);
           }
           return;
         } catch {
@@ -191,16 +255,17 @@ export function createServiceWorkerRuntime(
       }
       try {
         const cache = await dependencies.caches.open(cacheName);
-        for (const url of absoluteUrls.values()) {
+        for (const { entry, url } of absoluteEntries.values()) {
           const request = new Request(url, {
             cache: "reload",
             credentials: "omit",
             redirect: "error",
           });
-          const response = await requireCacheableResponse(
+          const response = await requireVerifiedResponse(
             url,
             await dependencies.fetch(request),
-            precache.manifestPath,
+            entry,
+            cryptography,
           );
           await cache.put(url, response);
         }
@@ -222,10 +287,10 @@ export function createServiceWorkerRuntime(
         : parsed.search || parsed.hash
           ? null
           : parsed.pathname;
-      const canonicalUrl = path ? absoluteUrls.get(path) : undefined;
-      if (!canonicalUrl) return undefined;
+      const candidate = path ? absoluteEntries.get(path) : undefined;
+      if (!candidate) return undefined;
       return dependencies.caches.open(cacheName).then(async (cache) =>
-        (await cache.match(canonicalUrl)) ?? dependencies.fetch(request as Request));
+        (await cache.match(candidate.url)) ?? dependencies.fetch(request as Request));
     },
     message(value: unknown): OfflineWorkerToClientV1 | undefined {
       let request;

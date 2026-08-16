@@ -188,7 +188,7 @@ export default defineConfig(({ mode }) => {
       },
     ],
     define: {
-      __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V2__"),
+      __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V3__"),
     },
     server: {
       fs: {

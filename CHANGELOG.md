@@ -48,6 +48,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Replaced the URL-only application-shell precache with one immutable
+  per-resource byte authority. Service-worker installation now verifies the
+  exact path, media type, byte size, and SHA-256 of both network responses and
+  existing candidate-cache entries before installation can complete, and
+  removes only that incomplete candidate cache on failure.
+
 - Sealed Vite, the browser runtime, the service worker, build inspection, and
   explicit local Candidate mode to one immutable build-identity object. Static
   builds now fail closed on consumer mismatches, while private Candidate mode

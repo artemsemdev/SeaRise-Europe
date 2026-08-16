@@ -1,9 +1,29 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { dirname, posix } from "node:path";
+import { dirname, extname, posix, resolve } from "node:path";
 import { applicationBuildIdentityFile } from "./application-build-identity.mjs";
 
-export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V2__";
+export const precachePlaceholder = "__SEARISE_PRECACHE_PENDING_V3__";
+export const precacheAuthorityKind = "searise-shell-precache-v3";
+
+const MEDIA_TYPES = Object.freeze({
+  ".css": "text/css",
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+});
+
+function mediaTypeForPath(path) {
+  const extension = path === "/" ? ".html" : extname(path);
+  const mediaType = MEDIA_TYPES[extension];
+  if (!mediaType) throw new Error(`No canonical shell media type exists for ${path}`);
+  return mediaType;
+}
 
 function collectEntry(viteManifest, key, files) {
   const entry = viteManifest[key];
@@ -14,7 +34,7 @@ function collectEntry(viteManifest, key, files) {
   for (const imported of entry.imports ?? []) collectEntry(viteManifest, imported, files);
 }
 
-export function shellPrecacheUrls({ dist, viteManifest, dataReleaseId }) {
+export function shellPrecachePaths({ dist, viteManifest, dataReleaseId }) {
   const files = new Set();
   const mainKey = Object.entries(viteManifest).find(([, entry]) =>
     entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
@@ -38,6 +58,23 @@ export function shellPrecacheUrls({ dist, viteManifest, dataReleaseId }) {
   ].sort();
 }
 
+export function deriveShellPrecacheEntries({ dist, viteManifest, dataReleaseId }) {
+  const paths = shellPrecachePaths({ dist, viteManifest, dataReleaseId });
+  if (new Set(paths).size !== paths.length) {
+    throw new Error("The generated shell precache contains duplicate paths");
+  }
+  return Object.freeze(paths.map((path) => {
+    const filePath = path === "/" ? resolve(dist, "index.html") : resolve(dist, `.${path}`);
+    const bytes = readFileSync(filePath);
+    return Object.freeze({
+      path,
+      mediaType: mediaTypeForPath(path),
+      byteSize: bytes.length,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
+  }));
+}
+
 export function extractEmbeddedPrecachePayload(source) {
   const candidates = [...source.matchAll(/JSON\.parse\((?:`((?:\\.|[^`\\])*)`|("(?:\\.|[^"\\])*"))\)/gu)]
     .map((match) => {
@@ -47,20 +84,25 @@ export function extractEmbeddedPrecachePayload(source) {
         catch { return JSON.parse(JSON.parse(`"${match[1]}"`)); }
       } catch { return null; }
     })
-    .filter((value) => value?.contractVersion === 2 && value?.buildIdentity && Array.isArray(value.urls));
+    .filter((value) => value?.authorityKind === precacheAuthorityKind);
   if (candidates.length !== 1) {
     throw new Error(`Service worker must contain exactly one readable precache authority; found ${candidates.length}`);
   }
   return candidates[0];
 }
 
-export function createEmbeddedPrecache({ buildIdentity, urls }) {
-  const authority = { contractVersion: 2, buildIdentity, urls };
+export function createEmbeddedPrecache({ buildIdentity, entries }) {
+  const authority = Object.freeze({
+    authorityKind: precacheAuthorityKind,
+    contractVersion: 3,
+    buildIdentity,
+    entries: Object.freeze(entries.map((entry) => Object.freeze({ ...entry }))),
+  });
   const precacheSetSha256 = createHash("sha256")
     .update(JSON.stringify(authority))
     .digest("hex");
-  return {
+  return Object.freeze({
     ...authority,
     precacheSetSha256,
-  };
+  });
 }
