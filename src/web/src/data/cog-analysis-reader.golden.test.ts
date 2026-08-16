@@ -154,7 +154,7 @@ function relocateMainTiffTile(bytes: Uint8Array): Uint8Array {
     throw new Error("expected one LONG TileOffsets and TileByteCounts value");
   }
   const originalOffset = source.getUint32(tileOffsetEntry + 8, true);
-  const relocatedOffset = 2 * 65_536;
+  const relocatedOffset = (Math.ceil(bytes.byteLength / 65_536) + 1) * 65_536;
   const relocated = new Uint8Array(relocatedOffset + tileByteCount);
   relocated.set(bytes);
   relocated.set(bytes.slice(originalOffset, originalOffset + tileByteCount), relocatedOffset);

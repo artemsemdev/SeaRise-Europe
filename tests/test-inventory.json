@@ -13,7 +13,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-16T06:19:05+02:00",
       "reference": "src/pipeline/tests/release/test_boundary_geoparquet.py, src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 121 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, 12 Shapely/browser geography comparisons, exact three-chunk COG integrity, page-context exact lookup under shipped CSP, abort-safe shared open and post-open range transport"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 121 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, 12 Shapely/browser geography comparisons, exact later-fourth-chunk COG integrity, same-origin page-context lookup under shipped CSP, scoped cold/cached budgets, abort-safe shared open and post-open range transport"
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
@@ -219,7 +219,7 @@
       "id": "static-release-domain",
       "layer": "contract",
       "owner": "frontend",
-      "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry, exact range-only native-grid COG lookup, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
+      "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry, exact range-only native-grid COG lookup including a real later-chunk tile, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
       "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
       "changedPaths": ["src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
@@ -227,13 +227,13 @@
       "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 15, "class": "fast", "evidenceRef": "local-2026-08-16-static-scientific-lookup", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, 12 exact-GeoParquet Shapely/browser classifier comparisons, strict range and failure cases, post-open cancellation, cross-release cache isolation, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, 12 exact-GeoParquet Shapely/browser classifier comparisons, strict range and failure cases, post-open cancellation, cross-release cache isolation, a valid deterministic later-chunk COG, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
     },
     {
       "id": "static-web-shell",
       "layer": "e2e",
       "owner": "frontend",
-      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, page-context COG range delivery and lookup, blocked unlisted origins, build inventory, and zero legacy application API traffic.",
+      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, same-origin page-context later-chunk COG delivery and cold/cached lookup budgets, production-like delivery-header inspection, blocked unlisted origins, build inventory, and zero legacy application API traffic without claiming public cross-origin enforcement.",
       "sourcePaths": ["src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts"],
       "changedPaths": [".nvmrc", "package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
@@ -241,7 +241,7 @@
       "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred twenty-one Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; CSP and three-chunk range behavior use deterministic browser enforcement over the same immutable fixture scope." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred twenty-one Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; same-origin CSP, later-fourth-chunk SHA verification, and explicit 2,500 ms cold/100 ms cached-p95 budgets use the committed synthetic fixture. APIRequestContext inspects CORS headers but does not prove public browser enforcement." }
     },
     {
       "id": "static-map-visualization",
@@ -724,11 +724,11 @@
       "layer": "scientific",
       "owner": "science",
       "purpose": "Verify analysis COGs preserve exact AR6 integer-millimetre bands, deterministic bytes, grid metadata, and nodata semantics.",
-      "sourcePaths": ["src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
-      "changedPaths": ["src/pipeline/searise_pipeline/release/cog.py", "src/pipeline/searise_pipeline/release/source_grid.py", "src/pipeline/searise_pipeline/release/range_integrity.py", "src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
+      "sourcePaths": ["scripts/release/build-browser-integrity-fixture.py", "src/pipeline/tests/release/test_browser_integrity_fixture.py", "src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
+      "changedPaths": ["contracts/release/v2/fixtures/browser-release/**", "scripts/release/build-browser-integrity-fixture.py", "src/pipeline/searise_pipeline/release/cog.py", "src/pipeline/searise_pipeline/release/source_grid.py", "src/pipeline/searise_pipeline/release/range_integrity.py", "src/pipeline/tests/release/test_browser_integrity_fixture.py", "src/pipeline/tests/release/test_cog.py", "src/pipeline/tests/release/test_source_grid.py", "src/pipeline/tests/release/test_range_integrity.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-analysis-artifact structure, value, and determinism gate." },
-      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_cog.py src/pipeline/tests/release/test_source_grid.py src/pipeline/tests/release/test_range_integrity.py -q", "full": "python -m pytest src/pipeline/tests -q" },
+      "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_browser_integrity_fixture.py src/pipeline/tests/release/test_cog.py src/pipeline/tests/release/test_source_grid.py src/pipeline/tests/release/test_range_integrity.py -q", "full": "python -m pytest src/pipeline/tests -q" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "pipeline", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-05", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "science", "issue": null, "expiresAt": null, "evidence": "Deterministic synthetic release layer, exact Rasterio readback, and fixed COG structure assertions." }
@@ -1189,6 +1189,7 @@
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_14_gate.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/regional_fixture/test_phase_0_9_attempt.py", "suite": "pipeline-regional-fixture", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_builder.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/pipeline/tests/release/test_browser_integrity_fixture.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_cog.py", "suite": "pipeline-ar6-release-cog", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_delivery.py", "suite": "pipeline-ar6-release-delivery", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/pipeline/tests/release/test_evidence.py", "suite": "pipeline-ar6-release-builder", "status": "active", "removalGate": null, "replacementEvidence": null },

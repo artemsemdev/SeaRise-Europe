@@ -90,7 +90,9 @@ test("architecture direct navigation works from static output", async ({ page })
   await expect(page.getByRole("link", { name: /back to explorer/i })).toHaveAttribute("href", "/");
 });
 
-test("production-like release delivery exposes exact HEAD, CORS, and byte-range identity", async ({ page }) => {
+test("API inspection exposes the production-like HEAD, CORS-header, and byte-range contract", async ({ page }) => {
+  // APIRequestContext can inspect the configured headers, but it does not
+  // enforce browser CORS. Public cross-origin enforcement remains a #65 gate.
   const artifactUrl = `http://127.0.0.1:8091/releases/${releaseId}/${multichunkArtifactPath}`;
   const head = await page.request.head(artifactUrl, {
     headers: { Origin: "http://127.0.0.1:4173" },
@@ -121,19 +123,19 @@ test("production-like release delivery exposes exact HEAD, CORS, and byte-range 
   expect(observed.head).toEqual({
     status: 200,
     acceptRanges: "bytes",
-    contentLength: "139264",
-    etag: '"sha256-9630a20038a11e577a2203db0ba9ec03e79c295d4aaf945886ca4d9fe58411f7"',
+    contentLength: "216928",
+    etag: '"sha256-595338f5d3f439497b3bb0992c54f57c7b3514a01806286baa684cf570d21721"',
   });
   expect(observed.ranged).toMatchObject({
     status: 206,
     acceptRanges: "bytes",
     contentLength: "32",
-    contentRange: "bytes 16-47/139264",
+    contentRange: "bytes 16-47/216928",
     etag: observed.head.etag,
   });
   expect(observed.ranged.bytes).toHaveLength(32);
   expect(malformed.status()).toBe(416);
-  expect(malformed.headers()["content-range"]).toBe("bytes */139264");
+  expect(malformed.headers()["content-range"]).toBe("bytes */216928");
 
   expect(head.headers()["access-control-allow-origin"]).toBe("http://127.0.0.1:4173");
   expect(head.headers()["access-control-allow-methods"]).toBe("GET, HEAD");
@@ -143,7 +145,7 @@ test("production-like release delivery exposes exact HEAD, CORS, and byte-range 
   expect(head.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
 });
 
-test("page context performs an exact multichunk COG lookup under the shipped CSP", async ({ page }) => {
+test("page context verifies a later COG chunk and measures cold versus cached lookup", async ({ page }, testInfo) => {
   await page.goto("/");
   await expectStaticDocumentSecurity(page);
 
@@ -156,7 +158,6 @@ test("page context performs an exact multichunk COG lookup under the shipped CSP
       contentLength: number;
       contentRange: string | null;
       acceptRanges: string | null;
-      allowOrigin: string | null;
       chunkHashes: string[];
     }> = [];
     const originalFetch = window.fetch.bind(window);
@@ -180,7 +181,6 @@ test("page context performs an exact multichunk COG lookup under the shipped CSP
           contentLength: Number(response.headers.get("content-length") ?? "0"),
           contentRange: response.headers.get("content-range"),
           acceptRanges: response.headers.get("accept-ranges"),
-          allowOrigin: response.headers.get("access-control-allow-origin"),
           chunkHashes,
         });
       }
@@ -209,13 +209,24 @@ test("page context performs an exact multichunk COG lookup under the shipped CSP
       expectedDisposition: "synthetic-fixture",
     });
     const context = await repository.load(releaseId, new AbortController().signal);
-    const result = await new runtime.CogAnalysisArtifactReader().lookup(
+    const reader = new runtime.CogAnalysisArtifactReader();
+    const lookup = () => reader.lookup(
       context,
       "ssp2-45",
       2050,
       { latitude: 51.9244, longitude: 4.4777 },
       new AbortController().signal,
     );
+    const coldStarted = performance.now();
+    const result = await lookup();
+    const coldMilliseconds = performance.now() - coldStarted;
+    const cachedMilliseconds: number[] = [];
+    const cachedResults: unknown[] = [];
+    for (let sample = 0; sample < 5; sample += 1) {
+      const cachedStarted = performance.now();
+      cachedResults.push(await lookup());
+      cachedMilliseconds.push(performance.now() - cachedStarted);
+    }
     const rangeIndex = await originalFetch(
       `/releases/${releaseId}/analysis/cog-range-integrity.json`,
     ).then((response) => response.json());
@@ -225,6 +236,10 @@ test("page context performs an exact multichunk COG lookup under the shipped CSP
     return {
       calls,
       result,
+      cachedResultsMatch: cachedResults.every(
+        (cached) => JSON.stringify(cached) === JSON.stringify(result),
+      ),
+      timing: { coldMilliseconds, cachedMilliseconds },
       rangeIndex,
       malformedRange: {
         status: malformedRange.status,
@@ -248,18 +263,17 @@ test("page context performs an exact multichunk COG lookup under the shipped CSP
   const identity = observed.rangeIndex.artifacts.find(
     (artifact: { artifactId: string }) => artifact.artifactId === "projection-ssp2-45-2050-cog",
   );
-  expect(identity.byteSize).toBe(139264);
-  expect(identity.chunks).toHaveLength(3);
+  expect(identity.byteSize).toBe(216928);
+  expect(identity.chunks).toHaveLength(4);
   expect(observed.malformedRange).toEqual({
     status: 416,
-    contentRange: "bytes */139264",
+    contentRange: "bytes */216928",
   });
   const head = observed.calls.find((call) => call.method === "HEAD");
   expect(head).toMatchObject({
     status: 200,
     contentLength: identity.byteSize,
     acceptRanges: "bytes",
-    allowOrigin: "http://127.0.0.1:4173",
   });
   const ranged = observed.calls.filter((call) => call.method !== "HEAD");
   expect(ranged.length).toBeGreaterThan(0);
@@ -279,6 +293,63 @@ test("page context performs an exact multichunk COG lookup under the shipped CSP
       expectedChunks.map((chunk: { sha256: string }) => chunk.sha256),
     );
   }
+  const laterChunk = identity.chunks.at(-1) as {
+    start: number;
+    endExclusive: number;
+    sha256: string;
+  };
+  expect(laterChunk.start).toBeGreaterThan(65_536);
+  const laterCall = ranged.find((call) => {
+    const match = /^bytes=(\d+)-(\d+)$/.exec(call.range ?? "");
+    return match !== null
+      && Number(match[1]) <= laterChunk.start
+      && Number(match[2]) + 1 >= laterChunk.endExclusive;
+  });
+  const laterChunkVerified = laterCall?.chunkHashes.includes(laterChunk.sha256) ?? false;
+  expect(laterChunkVerified).toBe(true);
+  expect(observed.cachedResultsMatch).toBe(true);
+
+  const cached = [...observed.timing.cachedMilliseconds].sort((left, right) => left - right);
+  const cachedP95 = cached[Math.ceil(cached.length * 0.95) - 1];
+  const budgets = {
+    coldMaximumMilliseconds: 2_500,
+    cachedP95MaximumMilliseconds: 100,
+  };
+  const performanceEvidence = {
+    schemaVersion: "1.0.0",
+    dataReleaseId: releaseId,
+    dataProvenanceClass: "synthetic-fixture",
+    artifact: {
+      path: multichunkArtifactPath,
+      byteSize: identity.byteSize,
+      sha256: identity.sha256,
+    },
+    profile: `${testInfo.project.name}: production-built page context on loopback`,
+    scope: "cold reader lookup after manifest load versus same-reader in-memory cache",
+    budgets,
+    cold: { samples: 1, milliseconds: observed.timing.coldMilliseconds },
+    cached: { samples: cached.length, p95Milliseconds: cachedP95 },
+    delivery: {
+      rangeRequests: ranged.length,
+      transferredBytes: ranged.reduce((total, call) => total + call.contentLength, 0),
+      artifactBytes: identity.byteSize,
+      laterChunk: {
+        start: laterChunk.start,
+        endExclusive: laterChunk.endExclusive,
+        sha256: laterChunk.sha256,
+        verified: laterChunkVerified,
+      },
+    },
+    candidatePerformanceClaim: false,
+    publicHostingPerformanceClaim: false,
+  };
+  await testInfo.attach("cog-lookup-performance.json", {
+    body: Buffer.from(JSON.stringify(performanceEvidence)),
+    contentType: "application/json",
+  });
+  console.log(`[cog-lookup-performance] ${JSON.stringify(performanceEvidence)}`);
+  expect(observed.timing.coldMilliseconds).toBeLessThan(budgets.coldMaximumMilliseconds);
+  expect(cachedP95).toBeLessThan(budgets.cachedP95MaximumMilliseconds);
 });
 
 test("local settlement worker is private, partial-ready, keyboard accessible, and fast on fixture", async ({ page }, testInfo) => {

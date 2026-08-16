@@ -94,20 +94,39 @@ are:
   post-open last-caller cancellation, shared-reader safety, and malformed
   responses;
 - `src/web/tests/static-shell.spec.ts` for a production-built, page-context
-  exact lookup against the committed 139,264-byte COG. The gate observes
-  same-origin `HEAD` and `206` requests under the shipped CSP, verifies the
-  transferred chunk hashes, rejects multi-ranges, and proves lookup transfer
-  remains smaller than the artifact;
+  exact lookup against the committed 216,928-byte transport fixture. Its valid
+  TIFF structure places unchanged compressed image tiles in the fourth 64 KiB
+  chunk, so the gate observes and SHA-verifies a real later-tile request under
+  the shipped same-origin CSP, rejects multi-ranges, and proves total lookup
+  transfer remains smaller than the artifact;
 - `src/web/src/data/browser-overlay-evidence.test.ts` for the first-class v2
   derivation schemas, byte-identical v1 evidence, scoped identities, absence of
   fabricated execution claims, and overlay-only digest-DAG acyclicity.
 
 The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 33 focused
 lookup tests, 121 static-target unit/integration tests, and 24 desktop/mobile
-Playwright tests. Its warm in-memory
-100-lookup sample had p95 below the required
-100 ms gate. This is a synthetic-fixture engineering measurement, not a claim
-about public hosting latency or private production-sized bytes.
+Playwright tests.
+
+The transport fixture inserts deterministic TIFF spacing before the original
+image tiles and rewrites their standard offsets; strict COG validation,
+deterministic rebuild, and byte-exact raster readback prove that it remains a
+valid COG with unchanged scientific values and metadata. The spacing exists
+only to exercise later range chunks. It does not simulate production encoding
+or production artifact size.
+
+Each desktop/mobile Playwright profile records one cold reader lookup after the
+manifest is loaded and five same-reader cached lookups against that committed
+synthetic fixture. The explicit engineering budgets are 2,500 ms maximum for
+the cold lookup and 100 ms maximum cached p95. The JSON evidence is attached to
+the test result with exact release/artifact identity, profile, sample counts,
+scope, and nonclaims. It is not Candidate-v7 performance evidence and makes no
+public-hosting or production-corpus latency claim.
+
+The page-context lookup is same-origin and proves behavior under the shipped
+CSP. The separate Playwright `APIRequestContext` check only inspects the
+production-like server's configured CORS headers; it does not enforce browser
+CORS. Public cross-origin enforcement remains part of issue #65 and must not be
+claimed from this fixture.
 
 ## Private candidate check
 
