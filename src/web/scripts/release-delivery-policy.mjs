@@ -5,6 +5,7 @@ const policyPath = resolve(import.meta.dirname, "../../../contracts/http-deliver
 export const RELEASE_DELIVERY_POLICY = Object.freeze(JSON.parse(readFileSync(policyPath, "utf8")));
 
 const SHA256 = /^[0-9a-f]{64}$/u;
+const search = RELEASE_DELIVERY_POLICY.searchIndex;
 const visual = RELEASE_DELIVERY_POLICY.visualPmtiles;
 
 function fail(message) {
@@ -23,13 +24,23 @@ function matchesIdentity(relativePath, artifact) {
     artifactMatch[1] === pathMatch[1] && artifactMatch[2] === pathMatch[2];
 }
 
+function matchesSearchIndexIdentity(relativePath, artifact) {
+  return artifact.role === search.role &&
+    artifact.mediaType === search.mediaType &&
+    search.identities[artifact.artifactId] === relativePath;
+}
+
 export function releaseDeliveryPolicy(relativePath, artifact, actualByteSize) {
   if (typeof relativePath !== "string" || relativePath.length === 0 || relativePath.startsWith("/")) {
     fail("Release delivery path must be canonical and relative.");
   }
   const extension = extname(relativePath);
   const contentType = RELEASE_DELIVERY_POLICY.mediaTypes[extension] ?? "application/octet-stream";
+  const isSearchIndex = extension === ".br";
   const isPmtiles = extension === ".pmtiles";
+  if (isSearchIndex && (!artifact || !matchesSearchIndexIdentity(relativePath, artifact))) {
+    fail("Brotli search-index delivery requires an exact manifest artifact role, identity, media type, and path.");
+  }
   if (isPmtiles && (!artifact || !matchesIdentity(relativePath, artifact))) {
     fail("PMTiles delivery requires an exact visual artifact role, identity, and path.");
   }
@@ -46,7 +57,7 @@ export function releaseDeliveryPolicy(relativePath, artifact, actualByteSize) {
   }
   return Object.freeze({
     cacheControl: isPmtiles ? visual.cacheControl : RELEASE_DELIVERY_POLICY.defaultCacheControl,
-    contentType: isPmtiles ? visual.mediaType : contentType,
+    contentType: isPmtiles ? visual.mediaType : isSearchIndex ? search.mediaType : contentType,
     etag: artifact ? `"sha256-${artifact.sha256}"` : null,
     networkOnly: isPmtiles,
   });

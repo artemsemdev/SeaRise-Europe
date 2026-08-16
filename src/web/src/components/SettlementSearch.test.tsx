@@ -465,4 +465,57 @@ describe("settlement search combobox", () => {
     expect(document.querySelector(".search-shell .status")).toHaveAttribute("data-search-readiness", "all-ready");
     expect(screen.queryByText(/technical failure, not a no-match result/i)).not.toBeInTheDocument();
   });
+
+  it("replaces a worker after recoverable core admission failure and completes the next query", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    const first = new FakeWorker();
+    const replacement = new FakeWorker();
+    const factory = vi.fn()
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(replacement);
+    let admissionAttempt = 0;
+    const transport = vi.fn(async (url: URL) => {
+      admissionAttempt += 1;
+      if (admissionAttempt === 1) throw new Error("temporary fixture delivery failure");
+      const artifact = Object.values(context.artifacts).find((value) => value.url === url.href);
+      if (!artifact) throw new Error(`Unexpected search resource: ${url.href}`);
+      const path = resolve(
+        process.cwd(),
+        "../../contracts/release/v1/fixtures/release",
+        context.dataReleaseId,
+        artifact.path,
+      );
+      const file = readFileSync(path);
+      const bytes = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength);
+      return { ok: true, status: 200, arrayBuffer: async () => bytes } as Response;
+    });
+    const lifecycle: SearchLifecycleEvent[] = [];
+    const user = userEvent.setup();
+    render(<SettlementSearch
+      release={context}
+      onSelect={vi.fn()}
+      onSearchLifecycle={(event) => lifecycle.push(event)}
+      workerFactory={factory}
+      artifactTransport={transport}
+    />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+
+    await user.click(input);
+    expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute(
+      "data-search-readiness",
+      "loading-core",
+    );
+
+    await user.type(input, "Spring");
+    expect(await screen.findAllByRole("option")).toHaveLength(2);
+    expect(first.terminated).toBe(true);
+    expect(factory).toHaveBeenCalledTimes(2);
+    expect(document.querySelector(".search-shell .status")).toHaveAttribute(
+      "data-search-readiness",
+      "all-ready",
+    );
+    expect(screen.queryByText(/technical failure, not a no-match result/i)).not.toBeInTheDocument();
+    expect(lifecycle.some((event) => event.type === "search-completed")).toBe(true);
+  });
 });

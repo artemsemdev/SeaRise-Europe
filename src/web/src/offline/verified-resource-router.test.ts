@@ -23,6 +23,7 @@ import {
 } from "./whole-resource-cache";
 import { TechnicalFailure, type ReleaseContext, type ResolvedArtifact } from "../domain/release";
 import { CogAnalysisArtifactReader } from "../data/cog-analysis-reader";
+import { verifiedArtifactBytes } from "../data/artifact-integrity";
 import { VerifiedResourceRouter } from "./verified-resource-router";
 import { NetworkOnlyPmtilesSource } from "../components/map/pmtiles-network-source";
 
@@ -126,6 +127,7 @@ async function harness(options: Readonly<{
   maxRangeBytes?: number;
   rangeFetch?: typeof fetch;
   localCandidate?: boolean;
+  mutateWholeResponse?: (response: Response) => Response | Promise<Response>;
   mutateRangeResponse?: (response: Response, init: RequestInit) => Response | Promise<Response>;
 }> = {}): Promise<Harness> {
   const context = await fixtureReleaseContext();
@@ -174,7 +176,10 @@ async function harness(options: Readonly<{
     applicationOrigin: FIXTURE_ORIGIN,
     cacheStorage: caches,
     digest: (algorithm, bytes) => subtle.digest(algorithm, bytes),
-    fetchResource: async (url) => wholeResponse(url),
+    fetchResource: async (url) => {
+      const response = wholeResponse(url);
+      return options.mutateWholeResponse?.(response) ?? response;
+    },
     nextOperationId: () => `whole-${++sequence}`,
   };
   const whole: WholeResourceStore = options.localCandidate
@@ -424,6 +429,34 @@ describe("verified resource router", () => {
       detail: { kind: "technical-error", code: "UnsupportedBrowser" },
     });
     expect((await test.ranges.inventory()).entryCount).toBe(0);
+  });
+
+  it("classifies an inexact whole-resource response as a non-recoverable integrity failure", async () => {
+    const test = await harness({
+      mutateWholeResponse: async (response) => new Response(await response.arrayBuffer(), {
+        status: response.status,
+        headers: { ...Object.fromEntries(response.headers), "content-type": "application/octet-stream" },
+      }),
+    });
+    const whole = test.plan.routes.find((route) =>
+      route.kind === "complete-resource" && route.authority.authorityKind === "release-artifact");
+    if (!whole || whole.kind !== "complete-resource" ||
+        whole.authority.authorityKind !== "release-artifact") throw new Error("missing whole route");
+
+    await expect(test.router.artifactTransport(new URL(whole.authority.canonicalUrl), {
+      signal: new AbortController().signal,
+      headers: Object.freeze({ Accept: whole.authority.mediaType }),
+    })).rejects.toMatchObject({
+      detail: { kind: "technical-error", code: "IntegrityFailed", recoverable: false },
+    });
+    const artifact = test.context.artifact(whole.authority.artifactId);
+    await expect(verifiedArtifactBytes(
+      artifact,
+      new AbortController().signal,
+      test.router.artifactTransport,
+    )).rejects.toMatchObject({
+      detail: { kind: "technical-error", code: "IntegrityFailed", recoverable: false },
+    });
   });
 
   it.each([

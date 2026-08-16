@@ -104,6 +104,10 @@ function exactNoStore(value: string | null): boolean {
   return value?.split(",").map((part) => part.trim().toLowerCase()).includes("no-store") === true;
 }
 
+function exactCogCacheAuthority(value: string | null): boolean {
+  return value === "public, max-age=31536000, immutable" || exactNoStore(value);
+}
+
 class BrowserResponse extends BaseResponse {
   readonly #response: Response;
 
@@ -165,7 +169,7 @@ export class StrictNetworkCogRangeTransport implements CogRangeTransport {
       response.headers.get("accept-ranges") !== "bytes" ||
       response.headers.get("content-length") !== String(artifact.byteSize) ||
       response.headers.get("content-type") !== artifact.mediaType ||
-      !exactNoStore(response.headers.get("cache-control")) ||
+      !exactCogCacheAuthority(response.headers.get("cache-control")) ||
       !etag
     ) {
       throw technical("RangeUnsupported", `Host delivery for ${artifact.artifactId} lacks exact HEAD range identity.`, true);
@@ -222,7 +226,7 @@ export class StrictNetworkCogRangeTransport implements CogRangeTransport {
       response.headers.get("content-length") !== String(expectedLength) ||
       response.headers.get("content-range") !== `bytes ${start}-${endExclusive - 1}/${artifact.byteSize}` ||
       response.headers.get("content-type") !== artifact.mediaType ||
-      !exactNoStore(response.headers.get("cache-control")) ||
+      !exactCogCacheAuthority(response.headers.get("cache-control")) ||
       !response.headers.get("etag")
     ) {
       throw technical("RangeUnsupported", `Host delivery for ${artifact.artifactId} returned an inexact byte range.`, true);

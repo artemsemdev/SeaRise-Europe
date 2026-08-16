@@ -18,7 +18,7 @@ import {
 } from "./release-resource-plan";
 import type { RangeIdentityV1, WholeResourceAuthorityV1 } from "./contracts/v1";
 import type { RangeStore, VerifiedRangeWrite } from "./range-store";
-import type { WholeResourceStore } from "./whole-resource-cache";
+import { WholeResourceCacheError, type WholeResourceStore } from "./whole-resource-cache";
 
 export interface AcceptedResourceSnapshotV1 {
   readonly contractVersion: 1;
@@ -431,6 +431,15 @@ export class VerifiedResourceRouter {
       return await this.#coordinateResources(requiredWhole, requiredRanges, signal);
     } catch (error) {
       if (error instanceof TechnicalFailure) throw error;
+      if (error instanceof WholeResourceCacheError) {
+        if (error.code === "Aborted") {
+          throw technical("Aborted", "Verified resource admission was cancelled.", true);
+        }
+        if (["AuthorityRejected", "ResponseRejected", "IntegrityFailed"].includes(error.code)) {
+          throw technical("IntegrityFailed", error.message);
+        }
+        throw technical("FetchFailed", error.message, true);
+      }
       if (signal.aborted || (error instanceof DOMException && error.name === "AbortError") ||
           (error instanceof Error && /Aborted/u.test(error.name))) {
         throw technical("Aborted", "Verified resource admission was cancelled.", true);

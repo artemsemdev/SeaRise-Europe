@@ -158,6 +158,19 @@ export class SettlementSearchClient {
     this.#failActive(error);
   }
 
+  #retireWorkerForCoreRetry(): void {
+    this.#loadController?.abort("retrying core shard load");
+    this.#loadController = null;
+    if (this.#worker) {
+      this.#worker.onmessage = null;
+      this.#worker.onerror = null;
+      this.#worker.terminate();
+    }
+    this.#worker = null;
+    this.#latestQueryToken = -1;
+    this.#publish({ readiness: "idle", coastalError: null });
+  }
+
   start(): void {
     if (this.#disposed || this.#worker) return;
     try {
@@ -214,6 +227,10 @@ export class SettlementSearchClient {
     if (this.#disposed) return;
     this.#cancelPending();
     this.#pendingQuery = value;
+    if (this.#state.error?.recoverable &&
+        !["core-ready", "all-ready"].includes(this.#state.readiness)) {
+      this.#retireWorkerForCoreRetry();
+    }
     let operation: SearchQueryOperation | null;
     try {
       operation = createSearchQueryOperation(

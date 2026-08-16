@@ -144,6 +144,14 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Bound the committed Brotli settlement indexes to their exact manifest IDs,
+  roles, paths, and search-index media type so strict static preview can load
+  them without allowing generic `.br` MIME spoofing. Verified transport
+  integrity failures now retain their technical classification, recoverable
+  core-index failures replace the failed worker before retry, and the fallback
+  COG transport accepts the release contract's exact immutable public cache
+  authority while preserving private `no-store` delivery.
+
 - Bound every persisted COG range to an immutable trusted identity catalog,
   isolated lease IDs by app/release pair across the IndexedDB v1-to-v2
   migration, and made rejected memory protection updates non-mutating.
