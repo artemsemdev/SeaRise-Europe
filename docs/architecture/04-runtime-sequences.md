@@ -1,7 +1,7 @@
 # 04 — Browser Runtime Sequences
 
 > **Status:** Accepted target architecture
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
 
 All sequences below run without an application API, runtime database,
 geocoding service, or tile server. `CDN` represents static assets and immutable
@@ -229,13 +229,13 @@ sequenceDiagram
     participant UI as Browser app
     participant SW as Service worker / caches
 
-    Note over SW: Shell, manifest, boundaries, index and required ranges cached
+    Note over SW: Complete resources cached; required authorized COG chunks in IndexedDB
     U->>UI: Reopen site without network
     UI->>SW: Request core resources
     SW-->>UI: Release-matched cached resources
     U->>UI: Search and select cached location/layer
-    UI->>SW: Request analysis range
-    SW-->>UI: Cached range
+    UI->>SW: Request analysis COG range
+    SW-->>UI: Verified single-chunk slice
     UI-->>U: Complete result marked available offline
 ```
 

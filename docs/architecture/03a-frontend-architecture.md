@@ -1,7 +1,7 @@
 # 03a — Browser Application Architecture
 
 > **Status:** Accepted target architecture
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
 > **Role:** Primary runtime component view
 > **Experience authority:** [SeaRise Flight](../product/Mock/SeaRise-Flight.html)
 > and its [design contract](../product/Mock/DESIGN.md)
@@ -316,10 +316,13 @@ context shown in clean-clone tests.
 
 ## Offline and cache behaviour
 
-The service worker uses release-scoped cache names. It precaches the app shell
-and minimal config, caches the core search index after use, and caches the
-coastal shard and geospatial ranges opportunistically. Cache cleanup may delete
-old releases only when no active client uses them.
+The service worker uses release-scoped cache names. Cache Storage holds only
+byte-verified complete shell and approved release resources. Bounded IndexedDB
+may hold only complete integrity-authorized analysis COG chunks. PMTiles stays
+network-only and visual-only with a `no-store` caching policy; it cannot enter
+Cache Storage, IndexedDB, or the session-memory range store without the
+separate promotion contract required by ADR-026. Cache cleanup may delete old
+releases only when no active client uses them.
 
 The UI distinguishes:
 
