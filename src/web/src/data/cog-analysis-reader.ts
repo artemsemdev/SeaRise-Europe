@@ -28,6 +28,11 @@ import {
   type ArtifactTransport,
   type SharedArtifactResource,
 } from "./artifact-integrity";
+import {
+  parseCogRangeIntegrityDocument,
+  type CogRangeArtifactIdentityV1 as RangeArtifactIdentity,
+  type CogRangeIntegrityIndexV1 as RangeIntegrityIndex,
+} from "../offline/range-integrity-catalog";
 
 interface NativeLocation {
   readonly locationId: number;
@@ -61,28 +66,6 @@ interface SourceGridDocument {
     sourceColumn: "cogColumn";
   }>;
   readonly locationIds: readonly number[];
-}
-
-interface RangeChunkIdentity {
-  readonly start: number;
-  readonly endExclusive: number;
-  readonly sha256: string;
-}
-
-interface RangeArtifactIdentity {
-  readonly artifactId: string;
-  readonly path: string;
-  readonly byteSize: number;
-  readonly sha256: string;
-  readonly chunks: readonly RangeChunkIdentity[];
-}
-
-interface RangeIntegrityIndex {
-  readonly schemaVersion: 1;
-  readonly dataReleaseId: string;
-  readonly algorithm: "sha256";
-  readonly chunkSize: 65_536;
-  readonly artifacts: readonly RangeArtifactIdentity[];
 }
 
 interface ScientificMetadata {
@@ -466,85 +449,6 @@ function parseSourceGrid(value: unknown, context: ReleaseContext): SourceGridDoc
   });
 }
 
-function sha256String(value: unknown): value is string {
-  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-}
-
-function parseRangeIntegrity(value: unknown, context: ReleaseContext): RangeIntegrityIndex {
-  if (!value || typeof value !== "object") {
-    throw technical("SchemaInvalid", "The COG range-integrity artifact is not an object.");
-  }
-  const document = value as Record<string, unknown>;
-  if (
-    !exactKeys(document, ["schemaVersion", "dataReleaseId", "algorithm", "chunkSize", "artifacts"]) ||
-    document.schemaVersion !== 1 ||
-    document.dataReleaseId !== context.dataReleaseId ||
-    document.algorithm !== "sha256" ||
-    document.chunkSize !== 65_536 ||
-    !Array.isArray(document.artifacts)
-  ) {
-    throw technical("IntegrityFailed", "The COG range-integrity header is invalid.");
-  }
-  const artifacts = document.artifacts as unknown[];
-  const byId = new Map<string, RangeArtifactIdentity>();
-  for (const rawArtifact of artifacts) {
-    if (!rawArtifact || typeof rawArtifact !== "object") {
-      throw technical("IntegrityFailed", "The COG range-integrity index contains an invalid artifact.");
-    }
-    const record = rawArtifact as Record<string, unknown>;
-    const releaseArtifact = typeof record.artifactId === "string" ? context.artifacts[record.artifactId] : undefined;
-    if (
-      !exactKeys(record, ["artifactId", "path", "byteSize", "sha256", "chunks"]) ||
-      releaseArtifact?.role !== "projection-analysis-cog" ||
-      record.path !== releaseArtifact.path ||
-      record.byteSize !== releaseArtifact.byteSize ||
-      record.sha256 !== releaseArtifact.sha256 ||
-      !Array.isArray(record.chunks) ||
-      byId.has(releaseArtifact.artifactId)
-    ) {
-      throw technical("IntegrityFailed", "The COG range-integrity index does not match the release manifest.");
-    }
-    const chunks = (record.chunks as unknown[]).map((rawChunk, index) => {
-      if (!rawChunk || typeof rawChunk !== "object") {
-        throw technical("IntegrityFailed", "The COG range-integrity index contains an invalid chunk.");
-      }
-      const chunk = rawChunk as Record<string, unknown>;
-      const expectedStart = index * 65_536;
-      const expectedEnd = Math.min(expectedStart + 65_536, releaseArtifact.byteSize);
-      if (
-        !exactKeys(chunk, ["start", "endExclusive", "sha256"]) ||
-        chunk.start !== expectedStart ||
-        chunk.endExclusive !== expectedEnd ||
-        !sha256String(chunk.sha256)
-      ) {
-        throw technical("IntegrityFailed", "The COG range-integrity index has non-canonical chunk coverage.");
-      }
-      return Object.freeze(chunk as unknown as RangeChunkIdentity);
-    });
-    if (chunks.length !== Math.ceil(releaseArtifact.byteSize / 65_536)) {
-      throw technical("IntegrityFailed", "The COG range-integrity index has incomplete object coverage.");
-    }
-    byId.set(releaseArtifact.artifactId, Object.freeze({
-      ...(record as unknown as RangeArtifactIdentity),
-      chunks: Object.freeze(chunks),
-    }));
-  }
-  const expectedIds = Object.values(context.artifacts)
-    .filter((artifact) => artifact.role === "projection-analysis-cog")
-    .map((artifact) => artifact.artifactId)
-    .sort();
-  if ([...byId.keys()].sort().join("\0") !== expectedIds.join("\0")) {
-    throw technical("IntegrityFailed", "The COG range-integrity index does not cover the exact release COG set.");
-  }
-  return Object.freeze({
-    schemaVersion: 1,
-    dataReleaseId: context.dataReleaseId,
-    algorithm: "sha256",
-    chunkSize: 65_536,
-    artifacts: Object.freeze([...byId.values()]),
-  });
-}
-
 function classifyReadError(error: unknown, artifactId: string, signal: AbortSignal): TechnicalFailure {
   if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
     return technical("Aborted", `Analysis read for ${artifactId} was cancelled.`, true);
@@ -622,7 +526,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
               await decodeGzipJson(sourceGridBytes, sourceGridArtifact.artifactId),
               context,
             ),
-            rangeIntegrity: parseRangeIntegrity(rangeValue, context),
+            rangeIntegrity: parseCogRangeIntegrityDocument(rangeValue, context),
           });
         }),
       );
