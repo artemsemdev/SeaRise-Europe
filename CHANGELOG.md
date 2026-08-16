@@ -10,6 +10,13 @@ All notable changes to this project will be documented in this file.
   app/manifest precache, delayed public-static registration, private Candidate
   refusal, conservative lifecycle behavior, and exact worker identity checks.
 
+- Added a bounded authoritative IndexedDB range store for release-authorized
+  COG chunks, with exact app/release/artifact isolation, verified containing
+  slices, atomic accounting and eviction, active/previous and lease protection,
+  corruption quarantine, atomic multi-chunk admission, and memory-only
+  private-candidate handling. Visual-only PMTiles remain network-only and are
+  rejected by every range-store implementation.
+
 - Added versioned release-scoped offline authority contracts for whole and
   authorized range resources, with fail-closed private-candidate persistence
   and an exact privacy allowlist for durable records.
@@ -82,6 +89,12 @@ All notable changes to this project will be documented in this file.
   locked restore while that test runtime awaits Phase 2 removal.
 
 ### Fixed
+
+- Bound every persisted COG range to an immutable trusted identity catalog,
+  isolated lease IDs by app/release pair across the IndexedDB v1-to-v2
+  migration, and made rejected memory protection updates non-mutating.
+  COG-shaped relabeling cannot authorize bytes that are absent from the
+  verified range-index authority.
 
 - Restored the canonical SeaRise Flight landing and result composition across
   desktop and mobile, with durable same-viewport visual QA evidence, while
