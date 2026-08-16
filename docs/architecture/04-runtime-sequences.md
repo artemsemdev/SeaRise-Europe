@@ -267,6 +267,28 @@ indexes, geometries, or byte ranges. On reload, the new app/release pairing
 initializes in a new cache namespace. Rollback deploys the previous complete
 pair; immutable artifacts are never overwritten.
 
+The explicit update coordinator is a pure state machine over injected ports.
+Its candidate identity binds the exact app/release pair to the accepted shell
+precache hash, resource-plan hash, and core admission-receipt hash. Inspection
+can report only `sealed`, `incomplete`, `corrupt`, `mixed`, or `stale`; only a
+sealed candidate can produce a confirmation token.
+
+Activation and rollback require that exact token and the unchanged authority
+snapshot. The persistence adapter must compare the snapshot revision and move
+both slots atomically: update moves current to previous and candidate to
+active, while rollback swaps the exact active and previous identities. The
+coordinator exposes reload permission only after receiving and validating that
+atomic transition receipt. It has no service-worker lifecycle or reload port,
+so inspection alone cannot silently switch the application.
+
+After update activation, only the older former-previous pair is eligible for
+cleanup. The cleanup adapter receives the new active/previous snapshot as a
+fence and must test live client leases under the same exclusion boundary as
+deletion. A blocked or failed cleanup leaves the newly active pair usable and
+the exact previous pair available for rollback. Candidate, authority,
+transition, and cleanup failures are technical update states; they are never
+scientific outcomes.
+
 ## 12. Architecture and methodology access
 
 Opening methodology uses already loaded release metadata or a small immutable

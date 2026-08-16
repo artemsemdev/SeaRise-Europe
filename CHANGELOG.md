@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a pure explicit update and rollback coordinator that binds confirmation
+  to an unchanged active/previous snapshot and a fully sealed shell/core
+  candidate identity. Atomic transition receipts preserve the exact rollback
+  pair, while lease-fenced cleanup and technical failures keep the current pair
+  usable without silent service-worker activation or reload.
+
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,
   settlement-search Worker, Brotli WASM decoder, fonts, and dynamic scientific
