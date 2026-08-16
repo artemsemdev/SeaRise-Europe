@@ -261,6 +261,12 @@
       "reference": "docs/evidence/phase-2/issue-60-range-cache-compatibility.md and docs/evidence/phase-2/issue-60-range-cache-compatibility.json",
       "environment": "macOS 26.5.2 (25F84) arm64; Node 20.20.1; npm 11.12.1; Playwright 1.62.1; Chromium 151.0.7922.34, Firefox 153.0, WebKit 26.5; six COG/PMTiles cases over committed synthetic fixture bytes and a production-like same-origin loopback range server; no Candidate-v7, TAR, public origin, or external storage"
     },
+    "local-2026-08-16-offline-authority-contracts": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T14:29:00+02:00",
+      "reference": "src/web/src/offline/contracts/keys.test.ts, src/web/src/offline/contracts/v1.test.ts, and src/web/src/offline/contracts/privacy.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; 36 deterministic authority, namespace, integrity, persistence-eligibility, and privacy contract cases; committed synthetic identities and in-memory sentinel values only; no browser, network, private candidate bytes, TAR, clock, or external storage"
+    },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
       "observedAt": "2026-08-05T00:10:00+02:00",
@@ -352,6 +358,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred twenty-one Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; same-origin CSP, later-fourth-chunk SHA verification, and explicit 2,500 ms cold/100 ms cached-p95 budgets use the committed synthetic fixture. APIRequestContext inspects CORS headers but does not prove public browser enforcement." }
+    },
+    {
+      "id": "static-offline-contracts",
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep app/release cache authority, canonical namespaces, whole-resource and authorized half-open range identities, private-candidate persistence exclusion, and durable-record privacy schemas fail closed before offline storage is implemented.",
+      "sourcePaths": ["src/web/src/offline/contracts/**"],
+      "changedPaths": ["src/web/src/offline/contracts/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent versioned offline authority and privacy boundary." },
+      "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline/contracts", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-16-offline-authority-contracts", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "All cases use exact immutable objects and deterministic validators with no browser, storage API, network, candidate artifact, or clock dependency." }
     },
     {
       "id": "static-range-cache-compatibility",
@@ -1310,6 +1330,9 @@
     { "path": "src/web/src/data/methodology-repository.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/projection-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/release.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/contracts/keys.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/contracts/privacy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
