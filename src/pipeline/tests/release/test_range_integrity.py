@@ -122,7 +122,7 @@ def test_committed_range_index_is_the_exact_production_writer_output(
     assert COMMITTED_INDEX.read_bytes() == generated.read_bytes()
 
 
-def test_committed_browser_fixture_has_exact_multichunk_cog_integrity() -> None:
+def test_committed_browser_fixture_has_exact_later_chunk_cog_integrity() -> None:
     document = json.loads(COMMITTED_INDEX.read_text(encoding="utf-8"))
     record = next(
         item
@@ -131,9 +131,9 @@ def test_committed_browser_fixture_has_exact_multichunk_cog_integrity() -> None:
     )
     payload = (OVERLAY_ROOT / record["path"]).read_bytes()
 
-    assert record["byteSize"] == len(payload) == 139_264
-    assert len(payload) > 2 * 65_536
-    assert len(record["chunks"]) == 3
+    assert record["byteSize"] == len(payload) == 216_928
+    assert len(payload) > 3 * 65_536
+    assert len(record["chunks"]) == 4
     for chunk in record["chunks"]:
         body = payload[chunk["start"] : chunk["endExclusive"]]
         assert len(body) <= 65_536
