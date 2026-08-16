@@ -40,6 +40,7 @@ interface BrotliRuntime {
 }
 
 const MAX_DECODED_BYTES = 64 * 1024 * 1024;
+const MAX_COMPRESSED_BYTES = 16 * 1024 * 1024;
 const DECODE_CHUNK_BYTES = 1024 * 1024;
 
 class SearchWorkerFailure extends Error {
@@ -78,12 +79,101 @@ function technical(error: unknown): TechnicalError {
   });
 }
 
+function expectedCompressedBytes(authority: SearchShardAuthority): number {
+  const expected = authority.artifact.byteSize;
+  if (!Number.isSafeInteger(expected) || expected < 1 || expected > MAX_COMPRESSED_BYTES) {
+    throw new SearchWorkerFailure(
+      "IntegrityFailed",
+      "Settlement shard compressed size differs from its browser authority.",
+      false,
+    );
+  }
+  return expected;
+}
+
+function contentLength(response: Response): number | null {
+  const header = response.headers.get("content-length");
+  if (header === null) return null;
+  if (!/^(0|[1-9][0-9]*)$/.test(header)) {
+    throw new SearchWorkerFailure("IntegrityFailed", "Settlement shard Content-Length is invalid.", false);
+  }
+  const value = Number(header);
+  if (!Number.isSafeInteger(value)) {
+    throw new SearchWorkerFailure("IntegrityFailed", "Settlement shard Content-Length is invalid.", false);
+  }
+  return value;
+}
+
+async function readCompressedBody(
+  response: Response,
+  authority: SearchShardAuthority,
+  signal: AbortSignal,
+): Promise<Uint8Array> {
+  const expected = expectedCompressedBytes(authority);
+  const declared = contentLength(response);
+  if (declared !== null && declared !== expected) {
+    throw new SearchWorkerFailure(
+      "IntegrityFailed",
+      "Settlement shard Content-Length differs from its pinned release authority.",
+      false,
+    );
+  }
+  if (!response.body) {
+    throw new SearchWorkerFailure("DecodeFailed", "Settlement shard response has no readable body.", true);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    while (true) {
+      if (signal.aborted) {
+        throw new SearchWorkerFailure("Aborted", "Settlement shard loading was cancelled.", false);
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array) || received + value.byteLength > expected) {
+        throw new SearchWorkerFailure(
+          "IntegrityFailed",
+          "Settlement shard response exceeds its pinned compressed size.",
+          false,
+        );
+      }
+      if (value.byteLength > 0) {
+        chunks.push(value);
+        received += value.byteLength;
+      }
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+  if (received !== expected) {
+    throw new SearchWorkerFailure(
+      "IntegrityFailed",
+      "Settlement shard response is truncated against its pinned compressed size.",
+      false,
+    );
+  }
+
+  const raw = new Uint8Array(expected);
+  let offset = 0;
+  for (const chunk of chunks) {
+    raw.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return raw;
+}
+
 async function fetchShard(
   authority: SearchShardAuthority,
   signal: AbortSignal,
   transport: WorkerTransport,
   decodeBrotli: BrotliDecoder,
 ): Promise<SearchShardRuntime> {
+  expectedCompressedBytes(authority);
   const url = new URL(authority.artifact.url);
   if (
     !["http:", "https:"].includes(url.protocol)
@@ -112,8 +202,10 @@ async function fetchShard(
   }
   let raw: Uint8Array;
   try {
-    raw = new Uint8Array(await response.arrayBuffer());
-  } catch {
+    raw = await readCompressedBody(response, authority, signal);
+  } catch (error) {
+    if (error instanceof SearchWorkerFailure) throw error;
+    if (signal.aborted) throw new SearchWorkerFailure("Aborted", "Settlement shard loading was cancelled.", false);
     throw new SearchWorkerFailure("DecodeFailed", "Settlement shard bytes could not be read.", true);
   }
   try {
