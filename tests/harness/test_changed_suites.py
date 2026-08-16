@@ -1,9 +1,24 @@
 from __future__ import annotations
 
+import copy
+import io
+import tempfile
 import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
 
-from scripts.tests.changed_suites import fast_local_suites, path_matches, select_suites
-from scripts.tests.validate_test_inventory import load_inventory, validate_inventory
+from scripts.tests.changed_suites import (
+    _run_commands,
+    fast_local_suites,
+    path_matches,
+    select_suites,
+)
+from scripts.tests.validate_test_inventory import (
+    _discover_test_files,
+    load_inventory,
+    validate_inventory,
+)
 
 
 class ChangedSuiteRoutingTests(unittest.TestCase):
@@ -66,6 +81,143 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         self.assertIn(
             "pipeline-supply-chain-contract", {suite["id"] for suite in suites}
         )
+
+    def test_every_current_suite_has_explicit_active_lifecycle(self) -> None:
+        self.assertTrue(self.inventory["suites"])
+        for suite in self.inventory["suites"]:
+            self.assertEqual(suite["status"], "active")
+            self.assertIsNone(suite["removalGate"])
+            self.assertIsNone(suite["replacementEvidence"])
+
+    def test_retired_suite_can_reference_removed_sources_with_evidence(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        suite = inventory["suites"][0]
+        suite.update(
+            status="retired",
+            removalGate=73,
+            replacementEvidence="PR #999 target contract evidence",
+            sourcePaths=["removed/legacy-suite/*.test.ts"],
+        )
+        for item in inventory["baselineTests"]:
+            if item["suite"] == suite["id"]:
+                item.update(
+                    status="retired",
+                    removalGate=73,
+                    replacementEvidence="PR #999 target contract evidence",
+                )
+
+        errors = validate_inventory(inventory)
+
+        self.assertFalse(any("matches no files" in error for error in errors), errors)
+
+    def test_retired_suite_requires_gate_and_replacement_evidence(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        suite = inventory["suites"][0]
+        suite.update(status="retired", removalGate=None, replacementEvidence=None)
+
+        errors = validate_inventory(inventory)
+
+        self.assertTrue(
+            any("retired suite requires gate and evidence" in error for error in errors),
+            errors,
+        )
+
+    def test_active_suite_rejects_retirement_metadata(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        inventory["suites"][0].update(
+            removalGate=73,
+            replacementEvidence="not valid while active",
+        )
+
+        errors = validate_inventory(inventory)
+
+        self.assertTrue(
+            any("active suite cannot carry retirement metadata" in error for error in errors),
+            errors,
+        )
+
+    def test_active_baseline_cannot_be_owned_by_retired_suite(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        suite_id = inventory["baselineTests"][0]["suite"]
+        suite = next(item for item in inventory["suites"] if item["id"] == suite_id)
+        suite.update(
+            status="retired",
+            removalGate=73,
+            replacementEvidence="PR #999 target contract evidence",
+        )
+
+        errors = validate_inventory(inventory)
+
+        self.assertTrue(
+            any("active baseline is owned by retired suite" in error for error in errors),
+            errors,
+        )
+
+    def test_existing_test_cannot_be_declared_retired(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        baseline = inventory["baselineTests"][0]
+        baseline.update(
+            status="retired",
+            removalGate=73,
+            replacementEvidence="PR #999 target contract evidence",
+        )
+
+        errors = validate_inventory(inventory)
+
+        self.assertTrue(
+            any("on-disk test cannot be declared retired" in error for error in errors),
+            errors,
+        )
+
+    def test_retired_baseline_requires_gate_and_evidence(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        inventory["baselineTests"][0].update(
+            status="retired", removalGate=None, replacementEvidence=None
+        )
+
+        errors = validate_inventory(inventory)
+
+        self.assertTrue(
+            any("retired test requires gate and evidence" in error for error in errors),
+            errors,
+        )
+
+    def test_retired_suite_is_excluded_at_every_routing_boundary(self) -> None:
+        inventory = copy.deepcopy(self.inventory)
+        suite = inventory["suites"][0]
+        suite.update(
+            status="retired",
+            removalGate=73,
+            replacementEvidence="PR #999 target contract evidence",
+            changedPaths=["retired/**"],
+        )
+
+        self.assertEqual(select_suites(inventory, ["retired/test.ts"]), [])
+        self.assertEqual(fast_local_suites([suite]), [])
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(_run_commands([suite]), 0)
+        self.assertNotIn("RUN ", output.getvalue())
+
+    def test_compose_smoke_is_discovered_only_while_present(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                "src/pipeline/tests",
+                "src/frontend/src",
+                "src/web/src",
+                "src/web/scripts",
+                "src/web/tests",
+                "tests/harness",
+                "src/api/SeaRise.Api.Tests",
+                "scripts",
+            ):
+                (root / relative).mkdir(parents=True, exist_ok=True)
+
+            with patch("scripts.tests.validate_test_inventory.ROOT", root):
+                self.assertNotIn("scripts/compose-smoke.sh", _discover_test_files())
+                (root / "scripts/compose-smoke.sh").write_text("#!/bin/sh\n")
+                self.assertIn("scripts/compose-smoke.sh", _discover_test_files())
 
 
 if __name__ == "__main__":
