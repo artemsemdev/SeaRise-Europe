@@ -33,7 +33,7 @@ export interface VerifiedResourceRouterOptionsV1 {
   readonly receiptStore: AdmissionReceiptStore;
   readonly subtle: SubtleCrypto;
   readonly fetchRange: typeof fetch;
-  readonly clientLease?: Readonly<{ close(): Promise<void> }>;
+  readonly clientLease?: Readonly<{ close(): Promise<void>; assertActive(): void }>;
 }
 
 function technical(
@@ -81,7 +81,7 @@ export class VerifiedResourceRouter {
   readonly #receiptStore: AdmissionReceiptStore;
   readonly #subtle: SubtleCrypto;
   readonly #fetchRange: typeof fetch;
-  readonly #clientLease: Readonly<{ close(): Promise<void> }> | undefined;
+  readonly #clientLease: Readonly<{ close(): Promise<void>; assertActive(): void }> | undefined;
   readonly #cogResponseCacheControl: string;
   readonly #whole: readonly WholeResourceAuthorityV1[];
   readonly #assessmentSupport: readonly WholeResourceAuthorityV1[];
@@ -90,6 +90,7 @@ export class VerifiedResourceRouter {
   readonly #rangesByArtifact: ReadonlyMap<string, readonly RangeIdentityV1[]>;
   #active: AcceptedResourceSnapshotV1 | undefined;
   #admissionTail: Promise<void> = Promise.resolve();
+  readonly #pendingOperations = new Set<Promise<unknown>>();
   #closed = false;
 
   readonly artifactTransport: ArtifactTransport;
@@ -137,7 +138,7 @@ export class VerifiedResourceRouter {
       Object.freeze(values.sort((left, right) => left.interval.start - right.interval.start)),
     ]));
 
-    this.artifactTransport = async (input, init) => {
+    this.artifactTransport = async (input, init) => this.#runWhileOpen(async () => {
       abortIfNeeded(init.signal);
       const authority = this.#wholeByUrl.get(input.href);
       if (!authority || Object.keys(init.headers).some((name) => name.toLowerCase() !== "accept") ||
@@ -154,24 +155,24 @@ export class VerifiedResourceRouter {
       }
       abortIfNeeded(init.signal);
       return result.response.clone();
-    };
+    });
 
     this.cogRangeTransport = Object.freeze({
       validateDelivery: async (
         artifact: ResolvedArtifact,
         identity: CogRangeArtifactIdentityV1,
         signal: AbortSignal,
-      ) => {
+      ) => this.#runWhileOpen(async () => {
         abortIfNeeded(signal);
         this.#assertCogAuthority(artifact, identity);
-      },
+      }),
       readExpandedRange: async (
         artifact: ResolvedArtifact,
         identity: CogRangeArtifactIdentityV1,
         start: number,
         endExclusive: number,
         signal: AbortSignal,
-      ) => {
+      ) => this.#runWhileOpen(async () => {
         abortIfNeeded(signal);
         const ranges = this.#assertCogAuthority(artifact, identity).filter((range) =>
           range.interval.endExclusive > start && range.interval.start < endExclusive);
@@ -195,8 +196,30 @@ export class VerifiedResourceRouter {
           abortIfNeeded(signal);
         }
         return concatenate(parts);
-      },
+      }),
     });
+  }
+
+  #assertOpenAndLeased(): void {
+    if (this.#closed) {
+      throw technical("UnsupportedBrowser", "The verified resource router is closed.");
+    }
+    try {
+      this.#clientLease?.assertActive();
+    } catch {
+      throw technical("UnsupportedBrowser", "The persistent client lease is unavailable.", true);
+    }
+  }
+
+  #runWhileOpen<T>(operation: () => Promise<T>): Promise<T> {
+    this.#assertOpenAndLeased();
+    const pending = Promise.resolve().then(async () => {
+      this.#assertOpenAndLeased();
+      return operation();
+    });
+    this.#pendingOperations.add(pending);
+    void pending.finally(() => this.#pendingOperations.delete(pending)).catch(() => undefined);
+    return pending;
   }
 
   async #admissionPlan(
@@ -364,12 +387,14 @@ export class VerifiedResourceRouter {
   }
 
   async restoreAssessmentSupport(): Promise<AcceptedResourceSnapshotV1 | null> {
-    const plan = await this.#admissionPlan(this.#assessmentSupport, []);
-    const gate = await this.#receiptStore.accepted(plan);
-    if (!gate) return null;
-    const snapshot = Object.freeze({ contractVersion: 1 as const, plan, gate });
-    this.#active = snapshot;
-    return snapshot;
+    return this.#runWhileOpen(async () => {
+      const plan = await this.#admissionPlan(this.#assessmentSupport, []);
+      const gate = await this.#receiptStore.accepted(plan);
+      if (!gate) return null;
+      const snapshot = Object.freeze({ contractVersion: 1 as const, plan, gate });
+      this.#active = snapshot;
+      return snapshot;
+    });
   }
 
   async #coordinateResources(
@@ -463,7 +488,7 @@ export class VerifiedResourceRouter {
 
   /** Installs only the two exact whole resources required before an assessment. COG chunks remain lazy. */
   async prepareAssessmentSupport(signal: AbortSignal): Promise<AcceptedResourceSnapshotV1> {
-    return this.#admitResources(this.#assessmentSupport, [], signal);
+    return this.#runWhileOpen(() => this.#admitResources(this.#assessmentSupport, [], signal));
   }
 
   current(): AcceptedResourceSnapshotV1 | null {
@@ -478,11 +503,15 @@ export class VerifiedResourceRouter {
       this.#rangeStore.close();
       this.#wholeStore.close();
     };
-    if (!this.#clientLease) {
+    if (!this.#clientLease && this.#pendingOperations.size === 0) {
       closeStores();
       return;
     }
-    void this.#clientLease.close().catch(() => undefined).finally(closeStores);
+    const pending = [...this.#pendingOperations];
+    void Promise.allSettled(pending)
+      .then(() => this.#clientLease?.close())
+      .catch(() => undefined)
+      .finally(closeStores);
   }
 
 }

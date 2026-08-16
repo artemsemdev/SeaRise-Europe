@@ -190,7 +190,9 @@ describe("authoritative IndexedDB range store", () => {
     await expect(store.putVerified(range, chunk)).resolves.toBe("already-present");
     expect([...new Uint8Array((await store.readExactOrContaining(range))!)]).toEqual([10, 20, 30, 40]);
     expect([...new Uint8Array((await store.readExactOrContaining(range, { start: 1, endExclusive: 3 }))!)]).toEqual([20, 30]);
-    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 4, entryCount: 1 });
+    await expect(store.inventory()).resolves.toMatchObject({
+      payloadBytes: 4, entryCount: 1, activePair: null, previousPair: null,
+    });
   });
 
   it("refuses range admission and lease acquisition or renewal after an exact-pair cleanup fence", async () => {
@@ -217,12 +219,21 @@ describe("authoritative IndexedDB range store", () => {
       expiresAtEpochMs: 2_000,
       state: "active",
     })).rejects.toThrow(/cleanup is pending/);
+    await expect(store.activateClientLease({
+      contractVersion: 1,
+      leaseId: "late-activation",
+      pair: pair(),
+      expiresAtEpochMs: 2_000,
+      state: "active",
+    })).rejects.toThrow(/cleanup is pending/);
     await expect(store.putVerified(second, secondBytes)).rejects.toThrow(/cleanup is pending/);
     await expect(store.admitVerifiedBatch([{ identity: second, bytes: secondBytes }], {
       operationId: "late-admission",
       signal: new AbortController().signal,
     })).rejects.toThrow(/cleanup is pending/);
-    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 4, entryCount: 1 });
+    await expect(store.inventory()).resolves.toMatchObject({
+      payloadBytes: 4, entryCount: 1, activePair: null, previousPair: null,
+    });
     await expect(store.readExactOrContaining(first)).resolves.not.toBeNull();
   });
 
@@ -431,6 +442,34 @@ describe("authoritative IndexedDB range store", () => {
     const afterExpiry = persistent(factory, [second], secondApp, 4, 1, () => 2_001);
     await expect(afterExpiry.putVerified(second, bytes(2, 2, 2, 2))).resolves.toBe("stored");
     expect((await afterExpiry.inventory()).entries[0].pair.dataReleaseId).toBe("release-b");
+  });
+
+  it("atomically rotates active/previous protection with initial lease activation and preserves it for a second tab", async () => {
+    const firstPair = pair();
+    const first = await identity({ payload: bytes(1, 1, 1, 1) });
+    const firstStore = persistent(factory, [first]);
+    await firstStore.activateClientLease({
+      contractVersion: 1, leaseId: "first-tab", pair: firstPair,
+      expiresAtEpochMs: 2_000, state: "active",
+    });
+    await firstStore.activateClientLease({
+      contractVersion: 1, leaseId: "second-tab", pair: firstPair,
+      expiresAtEpochMs: 2_000, state: "active",
+    });
+    await expect(firstStore.inventory()).resolves.toMatchObject({
+      activePair: firstPair, previousPair: null,
+    });
+
+    const secondPair = pair("build-b", "release-b");
+    const second = await identity({ build: "build-b", release: "release-b", payload: bytes(2, 2, 2, 2) });
+    const secondStore = persistent(factory, [second], app("build-b", "release-b"));
+    await secondStore.activateClientLease({
+      contractVersion: 1, leaseId: "new-build-tab", pair: secondPair,
+      expiresAtEpochMs: 2_000, state: "active",
+    });
+    await expect(secondStore.inventory()).resolves.toMatchObject({
+      activePair: secondPair, previousPair: firstPair,
+    });
   });
 
   it("upgrades the v1 lease store and isolates the same active lease ID across two release pairs", async () => {

@@ -5,9 +5,9 @@ export const CLIENT_LEASE_TTL_MS = 120_000;
 export const CLIENT_LEASE_HEARTBEAT_MS = 30_000;
 
 export interface ClientLeaseStorePort {
+  activateClientLease(lease: ClientLeaseV1): Promise<void>;
   acquireLease(lease: ClientLeaseV1): Promise<void>;
   releaseLease(lease: ClientLeaseV1): Promise<void>;
-  setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void>;
 }
 
 export interface RepeatingTimerPort {
@@ -22,7 +22,6 @@ export interface ClientLeaseLifecyclePort {
 
 export interface ClientLeaseControllerOptions {
   readonly pair: AppReleasePairV1;
-  readonly previousPair?: AppReleasePairV1 | null;
   readonly store: ClientLeaseStorePort;
   readonly timer?: RepeatingTimerPort;
   readonly lifecycle?: ClientLeaseLifecyclePort;
@@ -37,6 +36,14 @@ export interface ClientLeaseController {
   start(): Promise<void>;
   close(): Promise<void>;
   settled(): Promise<void>;
+  assertActive(): void;
+}
+
+export class ClientLeaseUnavailableError extends Error {
+  constructor(message = "The persistent client lease is not active.") {
+    super(message);
+    this.name = "ClientLeaseUnavailableError";
+  }
 }
 
 function browserTimer(): RepeatingTimerPort {
@@ -74,20 +81,23 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
       start: async () => undefined,
       close: async () => undefined,
       settled: async () => undefined,
+      assertActive: () => undefined,
     });
   }
 
   const pair = validateAppReleasePair(options.pair);
-  const previousPair = options.previousPair ? validateAppReleasePair(options.previousPair) : null;
   const timer = options.timer ?? browserTimer();
   const lifecycle = options.lifecycle ?? browserLifecycle();
   const now = options.now ?? Date.now;
   const randomUUID = options.randomUUID ?? (() => globalThis.crypto.randomUUID());
-  let state: "new" | "active" | "closing" | "closed" = "new";
+  let state: "new" | "starting" | "active" | "failed" | "closing" | "closed" = "new";
   let generation = 0;
   let interval: number | undefined;
   let lease: ClientLeaseV1 | undefined;
   let tail = Promise.resolve();
+  let startPromise: Promise<void> | undefined;
+  let closePromise: Promise<void> | undefined;
+  let closeRequested = false;
 
   const reportFailure = (error: unknown): void => { options.onHeartbeatFailure?.(error); };
   const pageHide = (): void => { void close().catch(reportFailure); };
@@ -109,6 +119,14 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
         await options.store.acquireLease(next);
         if (state === "active" && generation === expectedGeneration) lease = next;
       } catch (error) {
+        if (state === "active" && generation === expectedGeneration) {
+          state = "failed";
+          generation += 1;
+          if (interval !== undefined) {
+            try { timer.clear(interval); } catch (timerError) { reportFailure(timerError); }
+          }
+          interval = undefined;
+        }
         reportFailure(error);
       }
     });
@@ -116,43 +134,70 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
 
   const start = async (): Promise<void> => {
     if (state === "active") return;
-    if (state !== "new") throw new TypeError("A closed client lease controller cannot be restarted.");
+    if (state === "starting" && startPromise) return startPromise;
+    if (state !== "new") throw new ClientLeaseUnavailableError("A stopped client lease controller cannot be restarted.");
+    state = "starting";
     const nextLease = exactLease(pair, `client-${randomUUID()}`, now());
-    await options.store.setProtectedPairs(pair, previousPair);
-    await options.store.acquireLease(nextLease);
-    lease = nextLease;
-    state = "active";
-    lifecycle.addPageHideListener(pageHide);
-    interval = timer.set(renew, CLIENT_LEASE_HEARTBEAT_MS);
+    startPromise = (async () => {
+      try {
+        await options.store.activateClientLease(nextLease);
+        lease = nextLease;
+        if (closeRequested) return;
+        state = "active";
+        lifecycle.addPageHideListener(pageHide);
+        interval = timer.set(renew, CLIENT_LEASE_HEARTBEAT_MS);
+      } catch (error) {
+        state = "failed";
+        throw error;
+      }
+    })();
+    return startPromise;
   };
 
   const close = async (): Promise<void> => {
+    closeRequested = true;
+    if (closePromise) return closePromise;
     if (state === "closed") return tail;
     if (state === "new") {
       state = "closed";
       return;
     }
-    if (state === "closing") return tail;
-    state = "closing";
-    generation += 1;
-    lifecycle.removePageHideListener(pageHide);
-    if (interval !== undefined) timer.clear(interval);
-    interval = undefined;
-    const current = lease;
-    await enqueue(async () => {
-      try {
-        if (current) await options.store.releaseLease(current);
-      } finally {
-        lease = undefined;
-        state = "closed";
+    closePromise = (async () => {
+      await startPromise?.catch(() => undefined);
+      state = "closing";
+      generation += 1;
+      try { lifecycle.removePageHideListener(pageHide); } catch (error) { reportFailure(error); }
+      if (interval !== undefined) {
+        try { timer.clear(interval); } catch (error) { reportFailure(error); }
       }
-    });
+      interval = undefined;
+      const current = lease;
+      await enqueue(async () => {
+        try {
+          if (current) await options.store.releaseLease(current);
+        } finally {
+          lease = undefined;
+          state = "closed";
+        }
+      });
+    })();
+    return closePromise;
   };
 
   return Object.freeze({
     mode,
     start,
     close,
-    settled: () => tail,
+    settled: async () => {
+      if (closePromise) {
+        await closePromise.catch(() => undefined);
+        return;
+      }
+      await startPromise?.catch(() => undefined);
+      await tail;
+    },
+    assertActive: () => {
+      if (state !== "active") throw new ClientLeaseUnavailableError();
+    },
   });
 }

@@ -205,16 +205,8 @@ export async function createProductionResourceRouter(
   });
   let clientLease: ReturnType<typeof createClientLeaseController> | undefined;
   try {
-    const protectedPrevious = localCandidate ? null : await rangeStore.inventory().then((inventory) => {
-      if (!inventory.activePair) return null;
-      return inventory.activePair.appBuildId === releasePlan.pair.appBuildId &&
-        inventory.activePair.dataReleaseId === releasePlan.pair.dataReleaseId
-        ? inventory.previousPair
-        : inventory.activePair;
-    });
     clientLease = createClientLeaseController({
       pair: validateAppReleasePair(releasePlan.pair),
-      previousPair: protectedPrevious,
       store: rangeStore,
       persistence: releasePlan.persistence.mode,
     });
