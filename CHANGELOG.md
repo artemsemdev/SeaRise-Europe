@@ -65,6 +65,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Routed production geography, methodology, settlement-index, and exact COG
+  reads through the verified resource router. Search shard bytes are verified
+  and admitted on the main thread before transfer to the Web Worker, persistent
+  adapters require service-worker identity plus Cache Storage, IndexedDB, and
+  Web Locks, and private Candidate sessions use memory-only adapters.
+
 - Replaced the URL-only application-shell precache with one immutable
   per-resource byte authority. Service-worker installation now verifies the
   exact path, media type, byte size, and SHA-256 of both network responses and

@@ -300,8 +300,8 @@
     "local-2026-08-16-verified-resource-router": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T19:48:00+02:00",
-      "reference": "src/web/src/offline/verified-resource-router.test.ts, src/web/src/offline/verified-resource-router.ts, and src/web/src/data/cog-analysis-reader.golden.test.ts",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; committed synthetic release bytes, deterministic WebCrypto, injected Cache Storage and strict range fetch ports; no browser network, Candidate bytes, TAR, personal state, or external service"
+      "reference": "src/web/src/offline/verified-resource-router.test.ts, src/web/src/offline/admission-receipt.test.ts, src/web/src/application/use-assessment-runtime.test.tsx, src/web/src/components/SettlementSearch.test.tsx, and src/web/src/data/cog-analysis-reader.golden.test.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; fake-indexeddb 6.2.5; 581 deterministic web tests; committed synthetic release bytes, deterministic WebCrypto, injected Cache Storage and strict range fetch ports; two-router cross-context admission and verified search-byte transfer; no browser network, Candidate bytes, TAR, personal state, or external service"
     },
     "repository-2026-08-05": {
       "kind": "repository-inspection",
@@ -469,9 +469,9 @@
       "id": "static-verified-resource-router",
       "layer": "integration",
       "owner": "platform",
-      "purpose": "Keep final browser delivery bound to runtime-verified request-specific app/release plans: whole resources are lazy, only exact COG chunks needed by the selected assessment read are admitted, strict range misses use exact no-store HEAD and 206 delivery, private Candidate stores remain memory-only, and PMTiles remains network-only with zero resource-store persistence.",
-      "sourcePaths": ["src/web/src/offline/verified-resource-router.ts", "src/web/src/offline/verified-resource-router.test.ts", "src/web/src/data/cog-analysis-reader.ts", "src/web/src/data/cog-analysis-reader.golden.test.ts"],
-      "changedPaths": ["src/web/src/offline/verified-resource-router.ts", "src/web/src/offline/verified-resource-router.test.ts", "src/web/src/offline/release-resource-plan.ts", "src/web/src/data/cog-analysis-reader.ts", "src/web/src/offline/**"],
+      "purpose": "Keep final browser delivery bound to runtime-verified request-specific app/release plans: production geography, methodology, settlement search, and COG reads use the router; whole resources are lazy; only exact COG chunks needed by the selected assessment read are admitted; strict range misses use exact no-store HEAD and 206 delivery; private Candidate stores remain memory-only; and PMTiles remains network-only with zero resource-store persistence.",
+      "sourcePaths": ["src/web/src/offline/verified-resource-router.ts", "src/web/src/offline/verified-resource-router.test.ts", "src/web/src/offline/create-production-resource-router.ts", "src/web/src/offline/admission-receipt.test.ts", "src/web/src/application/browser-runtime.ts", "src/web/src/application/use-assessment-runtime.test.tsx", "src/web/src/components/SettlementSearch.test.tsx", "src/web/src/search/**", "src/web/src/data/cog-analysis-reader.ts", "src/web/src/data/cog-analysis-reader.golden.test.ts"],
+      "changedPaths": ["src/web/src/application/**", "src/web/src/components/SettlementSearch*", "src/web/src/search/**", "src/web/src/offline/**", "src/web/src/data/cog-analysis-reader.ts"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact router authority, offline zero-network COG hit, strict miss, receipt-last rollback, private-memory, PMTiles zero-persistence, cancellation, quota, mixed-identity, privacy, and cross-runtime golden gate." },
       "commands": { "focused": "npm test --workspace @searise/web -- --run src/offline/verified-resource-router.test.ts src/offline/admission-receipt.test.ts src/data/cog-analysis-reader.golden.test.ts", "full": "npm run web:check" },
