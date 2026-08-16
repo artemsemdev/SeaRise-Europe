@@ -483,25 +483,159 @@ describe("production static application composition", () => {
     await waitFor(() => expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp5-85/2050/51.9"));
   });
 
-  it("validates the pinned fixture and reports all nine combinations", async () => {
-    render(<App />);
-    expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.objectContaining({ pathname: expect.stringContaining(`/releases/${fixture.dataReleaseId}/manifest.json`) }),
-      expect.objectContaining({ credentials: "omit" }),
-    );
+  it("routes panel, map, retry, reset, share, and methodology controls through their owned commands", async () => {
+    const runtime = runtimeFactory();
+    const environment = new TestUrlEnvironment(urlFor());
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    await screen.findByText(/outside the coastal analysis area/i);
+
+    const methodologyButton = screen.getByRole("button", { name: /methodology and sources/i });
+    methodologyButton.focus();
+    await user.click(methodologyButton);
+    expect(await screen.findByRole("dialog", { name: /methodology and data/i })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /close methodology/i }));
+    await waitFor(() => expect(methodologyButton).toHaveFocus());
+
+    await user.click(screen.getByRole("button", { name: /share accepted result/i }));
+    expect(screen.getByText(/share link is ready in the browser address bar/i)).toBeVisible();
+    expect(environment.url.searchParams.get("release")).toBe(releaseContext.dataReleaseId);
+
+    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
+    await user.click(await screen.findByRole("button", { name: /select test map point/i }));
+    expect(controller.select).toHaveBeenLastCalledWith(expect.objectContaining({
+      location: { kind: "coordinate", coordinates: { latitude: 42, longitude: 7 } },
+    }));
+    await waitFor(() => expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp2-45/2050/42"));
+    await user.click(screen.getByRole("button", { name: /select test map scenario/i }));
+    expect(controller.select).toHaveBeenLastCalledWith(expect.objectContaining({ scenario: "ssp5-85" }));
+    await waitFor(() => expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp5-85/2050/42"));
+
+    controller.failNextAssessment({
+      kind: "technical-error",
+      code: "FetchFailed",
+      message: "Selected immutable bytes are temporarily unavailable.",
+      recoverable: true,
+    });
+    await user.click(screen.getByLabelText("2100"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/technical failure.*not a DataUnavailable scientific outcome/i);
+    await user.click(screen.getByRole("button", { name: /retry exact selection/i }));
+    expect(controller.retry).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole("button", { name: /reset selection/i }));
+    expect(controller.cancelSearch).toHaveBeenCalled();
+    expect(controller.reset).toHaveBeenCalledOnce();
+    expect(environment.url.searchParams.has("release")).toBe(false);
+    expect(screen.getByText(/choose a settlement or point/i)).toBeVisible();
   });
 
-  it("bounds manual retries without substituting another release", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 503 })));
+  it("deduplicates only duplicate StrictMode initial delivery and accepts the same later popstate", async () => {
+    const runtime = runtimeFactory();
+    const environment = new TestUrlEnvironment(urlFor());
+    render(
+      <StrictMode>
+        <LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />
+      </StrictMode>,
+    );
+    const controller = await waitForRuntime(runtime.records);
+    await waitFor(() => expect(runtime.records.reduce(
+      (count, record) => count + record.controller.select.mock.calls.length,
+      0,
+    )).toBe(1));
+
     const user = userEvent.setup();
-    render(<App />);
+    await user.click(screen.getByRole("button", { name: /reset selection/i }));
+    expect(controller.reset).toHaveBeenCalledOnce();
+    act(() => environment.pop(urlFor()));
+    await waitFor(() => expect(runtime.records.reduce(
+      (count, record) => count + record.controller.select.mock.calls.length,
+      0,
+    )).toBe(2));
+  });
 
-    await user.click(await screen.findByRole("button", { name: /retry pinned release/i }));
-    await user.click(await screen.findByRole("button", { name: /retry pinned release/i }));
+  it.each([
+    ["empty", "https://app.example/?campaign=kept"],
+    ["malformed", "https://app.example/?lat=91&lon=4"],
+  ])("invalidates a queued initial URL when %s popstate arrives before runtime readiness", async (_label, nextUrl) => {
+    const runtime = runtimeFactory({ initiallyBooting: true });
+    const environment = new TestUrlEnvironment(urlFor());
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
+    await waitFor(() => expect(runtime.records).toHaveLength(1));
+    const controller = runtime.records[0].controller;
+    expect(controller.select).not.toHaveBeenCalled();
 
-    expect(await screen.findByText(/retry limit reached/i)).toBeVisible();
-    expect(screen.queryByRole("button", { name: /retry pinned release/i })).not.toBeInTheDocument();
+    act(() => environment.pop(nextUrl));
+    act(() => controller.markReady());
+    await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
+
+    expect(controller.select).not.toHaveBeenCalled();
+    expect(controller.reset).not.toHaveBeenCalled();
+    if (_label === "malformed") {
+      expect(screen.getByRole("alert")).toHaveTextContent(/share or navigation failed/i);
+    } else {
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    }
+  });
+
+  it("handles URL reload, explicit publication, popstate clear, and invalid URL as technical state", async () => {
+    const runtime = runtimeFactory();
+    const environment = new TestUrlEnvironment(urlFor(releaseContext, "ssp1-26", 2100));
+    const { unmount } = render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    await waitFor(() => expect(controller.select).toHaveBeenCalledWith(expect.objectContaining({ scenario: "ssp1-26", horizon: 2100 })));
+    expect(environment.replacements).toHaveLength(0);
+
+    act(() => environment.pop("https://app.example/?campaign=kept"));
+    await waitFor(() => expect(controller.reset).toHaveBeenCalledOnce());
+    expect(environment.url.searchParams.get("campaign")).toBe("kept");
+    unmount();
+
+    const invalid = runtimeFactory();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={invalid.factory} urlEnvironment={new TestUrlEnvironment("https://app.example/?lat=91&lon=4") } searchWorkerFactory={searchFactory()} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/share or navigation failed.*technical failure, not a scientific outcome/i);
+    expect(screen.queryByText(/model data unavailable/i)).not.toBeInTheDocument();
+  });
+
+  it("shows methodology and command failures as technical alerts, never outcomes", async () => {
+    const failedMethodology = runtimeFactory({ methodologyFailure: true });
+    const first = render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={failedMethodology.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/methodology verification failed.*not a scientific outcome/i);
+    first.unmount();
+
+    const failedCommand = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={failedCommand.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(failedCommand.records);
+    controller.rejectNextSelection(new TechnicalFailure({
+      kind: "technical-error",
+      code: "ReleaseIdentityMismatch",
+      message: "Stale release selection.",
+      recoverable: false,
+    }));
+    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
+    await user.click(await screen.findByRole("button", { name: /select test map point/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/selection command failed.*not a scientific outcome/i);
+  });
+
+  it("isolates replacement releases and ignores stale URL listeners and rejected old commands", async () => {
+    const runtime = runtimeFactory();
+    const environment = new TestUrlEnvironment(urlFor());
+    const { rerender } = render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
+    await waitForRuntime(runtime.records);
+    const staleListener = [...environment.listeners][0];
+
+    environment.url = new URL(urlFor(replacementContext));
+    rerender(<LandingPage release={ready(replacementContext)} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
+    await waitFor(() => expect(runtime.records.at(-1)?.context).toBe(replacementContext));
+    const current = runtime.records.at(-1)!.controller;
+    await waitFor(() => expect(current.select).toHaveBeenCalledWith(expect.objectContaining({
+      dataReleaseId: replacementContext.dataReleaseId,
+    })));
+    const currentCalls = current.select.mock.calls.length;
+    act(() => staleListener());
+    expect(current.select).toHaveBeenCalledTimes(currentCalls);
+    expect(screen.queryByText(releaseContext.dataReleaseId)).not.toBeInTheDocument();
   });
 
   it("makes zero application API requests and never publishes raw search text during normal selection", async () => {
