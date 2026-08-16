@@ -1197,6 +1197,7 @@
     { "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts", "suite": "frontend-settlement-worker-performance", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/assessment-controller.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/components/MethodologyDialog.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/render-token.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/SettlementSearch.test.tsx", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
