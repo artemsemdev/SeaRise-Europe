@@ -40,6 +40,7 @@ describe("Flight capability presentation", () => {
       <span className="release-pill">Synthetic fixture</span>
     </div>);
     expect(screen.getByText("Available offline for this assessment")).toBeVisible();
+    expect(document.querySelector(".flight-capability-pill__dot")).not.toBeNull();
     expect(screen.queryByText(/verified resources/u)).not.toBeInTheDocument();
     expect(document.querySelectorAll("[data-capability-state='available-offline']")).toHaveLength(1);
 
@@ -189,6 +190,32 @@ describe("Flight capability presentation", () => {
       "Capability action failed. Update coordinator unavailable. This is a technical failure, not a scientific outcome.",
     );
     expect(screen.getByRole("alert")).toBeVisible();
+  });
+
+  it("discards a pending action and its late error when the exact capability identity changes", async () => {
+    let rejectAction: ((error: Error) => void) | undefined;
+    const action = new Promise<void>((_resolve, reject) => { rejectAction = reject; });
+    const first = runtimeCapability(online, Object.freeze({
+      state: "update-available",
+      candidate: validateAppReleasePair({ ...pair, appBuildId: "next-build", dataReleaseId: "next-release" }),
+    }));
+    const { rerender } = render(<FlightCapabilityAlerts
+      capability={first}
+      onRetry={noAction}
+      onUpdateAction={() => action}
+    />);
+    await userEvent.click(screen.getByRole("button", { name: "Prepare update" }));
+    expect(screen.getByRole("button", { name: "Working…" })).toBeDisabled();
+
+    rerender(<FlightCapabilityAlerts
+      capability={runtimeCapability(online)}
+      onRetry={noAction}
+      onUpdateAction={noAction}
+    />);
+    rejectAction?.(new Error("late failure for previous candidate"));
+    await Promise.resolve();
+    expect(screen.queryByText(/late failure/u)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Capability action failed/u)).not.toBeInTheDocument();
   });
 
   it("reconciles the status with the unchanged canonical Flight authority", () => {

@@ -18,6 +18,7 @@ import {
 } from "../domain/release";
 import { fixtureReleaseContext } from "../test/release-fixture";
 import { createSearchQueryOperation } from "../search/lifecycle";
+import { validateAppReleasePair } from "../offline/contracts/keys";
 import { AssessmentController } from "./assessment-controller";
 import type {
   RuntimeCapabilityInteractionV1,
@@ -196,6 +197,54 @@ describe("static browser runtime adapter", () => {
     });
     runtime.dispose();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("wires coordinator update state and actions through the production capability controller", async () => {
+    const candidate = validateAppReleasePair({
+      contractVersion: 1,
+      appBuildId: "next-static-build",
+      dataReleaseId: "next-static-release",
+    });
+    const inspectCapability = vi.fn(async (subject, inspection) => Object.freeze({
+      contractVersion: 2 as const,
+      subject,
+      data: Object.freeze({
+        state: "online-complete" as const,
+        pair: validateAppReleasePair({
+          contractVersion: 1,
+          appBuildId: "current-static-build",
+          dataReleaseId: firstContext.dataReleaseId,
+        }),
+      }),
+      update: inspection.update ?? Object.freeze({ state: "current" as const }),
+    }));
+    const requestAction = vi.fn(async () => undefined);
+    const runtime = await createBrowserRuntime(firstContext, new AbortController().signal, {
+      resourceRouter: {
+        artifactTransport: vi.fn(),
+        cogRangeTransport: {
+          validateDelivery: vi.fn(async () => undefined),
+          readExpandedRange: vi.fn(async () => new ArrayBuffer(0)),
+        },
+        inspectCapability,
+        updateCoordinator: {
+          inspect: async () => Object.freeze({ state: "update-available" as const, candidate }),
+          requestAction,
+        },
+        close: vi.fn(),
+      },
+    });
+
+    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update).toEqual({
+      state: "update-available",
+      candidate,
+    }));
+    await runtime.capability?.requestUpdateAction();
+    expect(requestAction).toHaveBeenCalledOnce();
+    expect(requestAction).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({ state: "update-available", candidate }),
+    }));
+    runtime.dispose();
   });
 
   it("classifies a missing release resource as connection-required", async () => {

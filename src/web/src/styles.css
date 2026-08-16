@@ -85,6 +85,20 @@ a { color: inherit; }
   font-size: 0.68rem;
   backdrop-filter: blur(12px);
 }
+.flight-capability-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgb(134 214 192 / 22%);
+}
+.flight-capability-pill__dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #86d6c0;
+  box-shadow: 0 0 0 0.16rem rgb(134 214 192 / 14%);
+}
 .flight-header button {
   min-height: 2.75rem;
   padding: 0.5rem 0.95rem;

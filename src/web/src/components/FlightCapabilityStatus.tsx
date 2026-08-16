@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   MissingRequirementV2,
   RuntimeCapabilityV2,
@@ -36,7 +36,20 @@ function offlineLabel(capability: RuntimeCapabilityV2): string | null {
 export function FlightCapabilityPill({ capability }: Pick<CapabilityActions, "capability">) {
   if (!capability) return null;
   const label = offlineLabel(capability);
-  return label ? <span className="release-pill" data-capability-state="available-offline">{label}</span> : null;
+  return label ? (
+    <span className="release-pill flight-capability-pill" data-capability-state="available-offline">
+      <span className="flight-capability-pill__dot" aria-hidden="true" />
+      {label}
+    </span>
+  ) : null;
+}
+
+function capabilityIdentity(capability: RuntimeCapabilityV2): string {
+  return JSON.stringify({
+    subject: capability.subject,
+    data: capability.data,
+    update: capability.update,
+  });
 }
 
 /** Technical, connection, storage, and update state stays in Flight's alert slot. */
@@ -45,19 +58,38 @@ export function FlightCapabilityAlerts({
   onRetry,
   onUpdateAction,
 }: CapabilityActions) {
+  if (!capability) return null;
+  return (
+    <FlightCapabilityAlertsForIdentity
+      key={capabilityIdentity(capability)}
+      capability={capability}
+      onRetry={onRetry}
+      onUpdateAction={onUpdateAction}
+    />
+  );
+}
+
+function FlightCapabilityAlertsForIdentity({
+  capability,
+  onRetry,
+  onUpdateAction,
+}: CapabilityActions & { readonly capability: RuntimeCapabilityV2 }) {
   const [pending, setPending] = useState<"retry" | "update" | null>(null);
   const [actionError, setActionError] = useState("");
-  if (!capability) return null;
+  const actionGeneration = useRef(0);
 
   const run = async (kind: "retry" | "update", action: () => Promise<void>): Promise<void> => {
+    const generation = ++actionGeneration.current;
     setPending(kind);
     setActionError("");
     try {
       await action();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Capability action failed.");
+      if (generation === actionGeneration.current) {
+        setActionError(error instanceof Error ? error.message : "Capability action failed.");
+      }
     } finally {
-      setPending(null);
+      if (generation === actionGeneration.current) setPending(null);
     }
   };
 
