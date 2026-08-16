@@ -1,16 +1,116 @@
-import {
-  cacheNamespaces,
-  exactRecord,
-  validateAppReleasePair,
-  type AppReleasePairV1,
-} from "./contracts/keys";
-import { validateBuildIdentity, type BuildIdentityV1 } from "../build-identity.mjs";
-import {
-  OFFLINE_WORKER_PROTOCOL,
-  validateClientToOfflineWorkerMessage,
-  validateOfflineWorkerToClientMessage,
-  type OfflineWorkerToClientV1,
-} from "./contracts/policy";
+const OFFLINE_WORKER_PROTOCOL = "searise-offline-worker-v1" as const;
+const AUTHORITY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
+const BUILD_DISPOSITIONS = new Set(["synthetic-fixture", "public-promoted"]);
+
+interface AppReleasePairV1 {
+  readonly contractVersion: 1;
+  readonly appBuildId: string;
+  readonly dataReleaseId: string;
+}
+
+interface BuildIdentityV1 {
+  readonly schemaVersion: "1.0.0";
+  readonly appBuildId: string;
+  readonly dataReleaseId: string;
+  readonly releaseDisposition: "synthetic-fixture" | "public-promoted";
+  readonly manifestPath: string;
+}
+
+type OfflineWorkerToClientV1 =
+  | Readonly<{
+      protocol: typeof OFFLINE_WORKER_PROTOCOL;
+      type: "worker-identity";
+      messageToken: string;
+      pair: AppReleasePairV1;
+      precacheSetSha256: string;
+    }>
+  | Readonly<{
+      protocol: typeof OFFLINE_WORKER_PROTOCOL;
+      type: "activation-deferred";
+      messageToken: string;
+      candidatePair: AppReleasePairV1;
+      reason: "update-coordinator-not-installed";
+    }>;
+
+function exactRecord(value: unknown, keys: readonly string[], name: string): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError(`${name} must be an object.`);
+  const record = value as Record<string, unknown>;
+  const expected = new Set(keys);
+  if (Object.keys(record).length !== expected.size || Object.keys(record).some((key) => !expected.has(key))) {
+    throw new TypeError(`${name} contains missing or additional properties.`);
+  }
+  return record;
+}
+
+function validateAppReleasePair(value: unknown): AppReleasePairV1 {
+  const record = exactRecord(value, ["contractVersion", "appBuildId", "dataReleaseId"], "app/release pair");
+  if (record.contractVersion !== 1 || typeof record.appBuildId !== "string" || !AUTHORITY_ID.test(record.appBuildId) ||
+      typeof record.dataReleaseId !== "string" || !AUTHORITY_ID.test(record.dataReleaseId)) {
+    throw new TypeError("App/release pair is invalid.");
+  }
+  return Object.freeze({ contractVersion: 1, appBuildId: record.appBuildId, dataReleaseId: record.dataReleaseId });
+}
+
+function validateBuildIdentity(value: unknown): BuildIdentityV1 {
+  const record = exactRecord(
+    value,
+    ["schemaVersion", "appBuildId", "dataReleaseId", "releaseDisposition", "manifestPath"],
+    "build identity",
+  );
+  if (record.releaseDisposition === "private-engineering") {
+    throw new TypeError("Private engineering identity is restricted to explicit local Candidate mode.");
+  }
+  if (record.schemaVersion !== "1.0.0" || typeof record.appBuildId !== "string" || !AUTHORITY_ID.test(record.appBuildId) ||
+      typeof record.dataReleaseId !== "string" || !AUTHORITY_ID.test(record.dataReleaseId) ||
+      typeof record.releaseDisposition !== "string" || !BUILD_DISPOSITIONS.has(record.releaseDisposition) ||
+      record.manifestPath !== `/releases/${record.dataReleaseId}/manifest.json`) {
+    throw new TypeError("Build identity is invalid.");
+  }
+  return Object.freeze({
+    schemaVersion: "1.0.0",
+    appBuildId: record.appBuildId,
+    dataReleaseId: record.dataReleaseId,
+    releaseDisposition: record.releaseDisposition as BuildIdentityV1["releaseDisposition"],
+    manifestPath: record.manifestPath,
+  });
+}
+
+function cacheNamespaces(pair: AppReleasePairV1): Readonly<{ shell: string }> {
+  const exact = validateAppReleasePair(pair);
+  return Object.freeze({ shell: `searise-offline:v1:shell:${exact.appBuildId}::${exact.dataReleaseId}` });
+}
+
+function protocolId(value: unknown): string {
+  if (typeof value !== "string" || !AUTHORITY_ID.test(value)) throw new TypeError("Protocol identity is invalid.");
+  return value;
+}
+
+function validateWorkerRequest(value: unknown):
+  | Readonly<{ type: "inspect-identity"; messageToken: string; pair: AppReleasePairV1 }>
+  | Readonly<{ type: "activate-update"; messageToken: string; candidatePair: AppReleasePairV1 }>
+  | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const source = value as Record<string, unknown>;
+  if (source.protocol !== OFFLINE_WORKER_PROTOCOL) return undefined;
+  if (source.type === "inspect-identity") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "pair"], "identity message");
+    return Object.freeze({ type: "inspect-identity", messageToken: protocolId(record.messageToken), pair: validateAppReleasePair(record.pair) });
+  }
+  if (source.type === "activate-update") {
+    const record = exactRecord(
+      value,
+      ["protocol", "type", "messageToken", "candidatePair", "confirmationToken"],
+      "activation message",
+    );
+    protocolId(record.confirmationToken);
+    return Object.freeze({
+      type: "activate-update",
+      messageToken: protocolId(record.messageToken),
+      candidatePair: validateAppReleasePair(record.candidatePair),
+    });
+  }
+  return undefined;
+}
 
 export interface EmbeddedPrecacheEntryV3 {
   readonly path: string;
@@ -324,12 +424,13 @@ export function createServiceWorkerRuntime(
     message(value: unknown): OfflineWorkerToClientV1 | undefined {
       let request;
       try {
-        request = validateClientToOfflineWorkerMessage(value);
+        request = validateWorkerRequest(value);
       } catch {
         return undefined;
       }
+      if (!request) return undefined;
       if (request.type === "inspect-identity" && exactPair(precache.pair, request.pair)) {
-        return validateOfflineWorkerToClientMessage({
+        return Object.freeze({
           protocol: OFFLINE_WORKER_PROTOCOL,
           type: "worker-identity",
           messageToken: request.messageToken,
@@ -338,7 +439,7 @@ export function createServiceWorkerRuntime(
         });
       }
       if (request.type === "activate-update" && exactPair(precache.pair, request.candidatePair)) {
-        return validateOfflineWorkerToClientMessage({
+        return Object.freeze({
           protocol: OFFLINE_WORKER_PROTOCOL,
           type: "activation-deferred",
           messageToken: request.messageToken,
