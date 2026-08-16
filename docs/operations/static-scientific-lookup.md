@@ -86,10 +86,13 @@ are:
   mapping, cancellation, exact scaling, distance limits, tie breaks, and 500
   generated candidate sets;
 - `src/web/src/data/geography-classifier.test.ts` for real GeoParquet decoding,
-  support/coastal precedence, geometry boundaries, caching, and corruption;
+  support/coastal precedence, caching, corruption, and twelve shared Shapely
+  parity cases at exterior boundaries, hole boundaries, and epsilon seams;
 - `src/web/src/data/cog-analysis-reader.golden.test.ts` for all nine
   scenario/horizon combinations, 63 Python/TypeScript golden comparisons,
-  native-grid edges, nodata, strict ranges, aborts, and malformed responses;
+  native-grid edges, the inclusive 100 km reader policy, nodata, strict ranges,
+  post-open last-caller cancellation, shared-reader safety, and malformed
+  responses;
 - `src/web/tests/static-shell.spec.ts` for a production-built, page-context
   exact lookup against the committed 139,264-byte COG. The gate observes
   same-origin `HEAD` and `206` requests under the shipped CSP, verifies the
@@ -99,8 +102,8 @@ are:
   derivation schemas, byte-identical v1 evidence, scoped identities, absence of
   fabricated execution claims, and overlay-only digest-DAG acyclicity.
 
-The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 29 focused
-lookup tests, 117 static-target unit/integration tests, and 24 desktop/mobile
+The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 33 focused
+lookup tests, 121 static-target unit/integration tests, and 24 desktop/mobile
 Playwright tests. Its warm in-memory
 100-lookup sample had p95 below the required
 100 ms gate. This is a synthetic-fixture engineering measurement, not a claim

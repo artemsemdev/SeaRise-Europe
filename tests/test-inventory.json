@@ -11,9 +11,9 @@
     },
     "local-2026-08-16-static-scientific-lookup": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-16T02:12:32+02:00",
-      "reference": "src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 114 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, exact three-chunk COG integrity, page-context exact lookup under shipped CSP, abort-safe shared caches"
+      "observedAt": "2026-08-16T06:19:05+02:00",
+      "reference": "src/pipeline/tests/release/test_boundary_geoparquet.py, src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 121 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, 12 Shapely/browser geography comparisons, exact three-chunk COG integrity, page-context exact lookup under shipped CSP, abort-safe shared open and post-open range transport"
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
@@ -220,14 +220,14 @@
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry, exact range-only native-grid COG lookup, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
-      "sourcePaths": ["contracts/release/v2/**", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
-      "changedPaths": ["src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
+      "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
+      "changedPaths": ["src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static release/domain anti-corruption contract." },
       "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 15, "class": "fast", "evidenceRef": "local-2026-08-16-static-scientific-lookup", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, strict range and failure cases, cross-release cache isolation, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, 12 exact-GeoParquet Shapely/browser classifier comparisons, strict range and failure cases, post-open cancellation, cross-release cache isolation, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
     },
     {
       "id": "static-web-shell",
@@ -241,7 +241,7 @@
       "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred fourteen Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; CSP and three-chunk range behavior use deterministic browser enforcement over the same immutable fixture scope." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred twenty-one Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; CSP and three-chunk range behavior use deterministic browser enforcement over the same immutable fixture scope." }
     },
     {
       "id": "static-map-visualization",
