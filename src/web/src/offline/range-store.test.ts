@@ -519,6 +519,23 @@ describe("authoritative IndexedDB range store", () => {
     await expect(store.readExactOrContaining(second)).resolves.toBeNull();
   });
 
+  it("counts retained bytes when a coordinated memory batch checks byte quota", async () => {
+    const firstBytes = bytes(1, 2, 3, 4); const secondBytes = bytes(5, 6, 7, 8);
+    const first = await identity({ payload: firstBytes });
+    const second = await identity({ projection: ["ssp1-26", "2030"], payload: secondBytes });
+    const store = memory([first, second], app(), 4, 2);
+    await store.putVerified(first, firstBytes);
+
+    await expect(store.admitVerifiedBatch([{ identity: second, bytes: secondBytes }], {
+      operationId: "range-byte-overflow",
+      signal: new AbortController().signal,
+    })).rejects.toBeInstanceOf(RangeStoreQuotaError);
+
+    await expect(store.inventory()).resolves.toMatchObject({ payloadBytes: 4, entryCount: 1 });
+    await expect(store.readExactOrContaining(first)).resolves.toBeInstanceOf(ArrayBuffer);
+    await expect(store.readExactOrContaining(second)).resolves.toBeNull();
+  });
+
   it.each(["persistent", "memory-only"] as const)("cancels a %s coordinated batch before mutation", async (mode) => {
     const value = bytes(1, 2, 3, 4); const range = await identity({ payload: value });
     const store = storeFor(mode, factory, [range]);

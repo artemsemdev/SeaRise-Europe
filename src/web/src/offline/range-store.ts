@@ -320,10 +320,11 @@ export class MemoryRangeStore implements RangeStore {
     }
     // Coordinated admission cannot evict prior accepted bytes before its
     // receipt is published. Legacy standalone writes retain bounded LRU.
+    const currentEntries = [...this.#entries.values()];
     const ordered = operation === null
-      ? [...this.#entries.values()].sort((a, b) => a.lastAccessSequence - b.lastAccessSequence || a.key.localeCompare(b.key))
+      ? currentEntries.sort((a, b) => a.lastAccessSequence - b.lastAccessSequence || a.key.localeCompare(b.key))
       : [];
-    let total = ordered.reduce((sum, record) => sum + record.byteLength, 0);
+    let total = currentEntries.reduce((sum, record) => sum + record.byteLength, 0);
     const additions = [...unique.values()].filter((admission) => !initiallyPresent.has(admission.key));
     const additionBytes = additions.reduce((sum, admission) => sum + admission.bytes.byteLength, 0);
     let projectedEntries = this.#entries.size + additions.length;
