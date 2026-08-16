@@ -6,6 +6,7 @@ import { cpus, platform, release, totalmem } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { chromium, devices } from "@playwright/test";
+import { assertPrivateMeasurementOutput } from "./local-measurement-paths.mjs";
 
 const options = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -13,7 +14,7 @@ for (let index = 2; index < process.argv.length; index += 2) {
 }
 const candidateRoot = resolve(options.get("--candidate-root") ?? "");
 const querySetPath = resolve(options.get("--query-set") ?? "");
-const outputPath = resolve(options.get("--output") ?? "");
+const requestedOutputPath = resolve(options.get("--output") ?? "");
 const sampleCount = Number(options.get("--samples") ?? "5");
 if (!options.get("--candidate-root") || !options.get("--query-set") || !options.get("--output")
     || !Number.isSafeInteger(sampleCount) || sampleCount < 1 || sampleCount > 30) {
@@ -21,6 +22,11 @@ if (!options.get("--candidate-root") || !options.get("--query-set") || !options.
 }
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const distRoot = resolve(import.meta.dirname, "../dist");
+const outputPath = assertPrivateMeasurementOutput({
+  outputPath: requestedOutputPath,
+  candidateRoot,
+  distRoot,
+});
 const workerName = readdirSync(resolve(distRoot, "assets"))
   .find((name) => /^search\.worker-[A-Za-z0-9_-]+\.js$/.test(name));
 if (!workerName) throw new Error("Run npm run build before this local measurement.");
