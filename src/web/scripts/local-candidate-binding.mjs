@@ -380,31 +380,63 @@ export function allowlistedRecord(path, identity, source) {
 }
 
 export function overlayIdentity(path) {
-  const info = lstatSync(path);
-  return Object.freeze({
-    path,
-    realpath: realpathSync(path),
-    dev: info.dev,
-    ino: info.ino,
-  });
+  const descriptor = openSync(path, constants.O_RDONLY | (constants.O_DIRECTORY ?? 0));
+  try {
+    const pathInfo = lstatSync(path);
+    const descriptorInfo = fstatSync(descriptor);
+    if (
+      pathInfo.isSymbolicLink() ||
+      !pathInfo.isDirectory() ||
+      !descriptorInfo.isDirectory() ||
+      pathInfo.dev !== descriptorInfo.dev ||
+      pathInfo.ino !== descriptorInfo.ino
+    ) {
+      throw new Error("Private overlay identity changed while it was pinned");
+    }
+    return Object.freeze({
+      path,
+      realpath: realpathSync(path),
+      dev: descriptorInfo.dev,
+      ino: descriptorInfo.ino,
+      descriptor,
+      lifecycle: { closed: false },
+    });
+  } catch (error) {
+    closeSync(descriptor);
+    throw error;
+  }
 }
 
 export function removePrivateOverlay(identity) {
-  if (!existsSync(identity.path)) return;
-  const temporaryRoot = realpathSync(tmpdir());
-  const info = lstatSync(identity.path);
-  if (
-    info.isSymbolicLink() ||
-    !info.isDirectory() ||
-    identity.path !== identity.realpath ||
-    realpathSync(identity.path) !== identity.realpath ||
-    info.dev !== identity.dev ||
-    info.ino !== identity.ino ||
-    !identity.path.startsWith(`${temporaryRoot}${sep}searise-private-binding-`)
-  ) {
-    throw new Error("Refusing to remove a replaced private overlay directory");
+  try {
+    if (!existsSync(identity.path)) return;
+    if (identity.lifecycle.closed) {
+      throw new Error("Refusing to remove with a released private overlay identity");
+    }
+    const temporaryRoot = realpathSync(tmpdir());
+    const info = lstatSync(identity.path);
+    const pinnedInfo = fstatSync(identity.descriptor);
+    if (
+      info.isSymbolicLink() ||
+      !info.isDirectory() ||
+      !pinnedInfo.isDirectory() ||
+      identity.path !== identity.realpath ||
+      realpathSync(identity.path) !== identity.realpath ||
+      pinnedInfo.dev !== identity.dev ||
+      pinnedInfo.ino !== identity.ino ||
+      info.dev !== pinnedInfo.dev ||
+      info.ino !== pinnedInfo.ino ||
+      !identity.path.startsWith(`${temporaryRoot}${sep}searise-private-binding-`)
+    ) {
+      throw new Error("Refusing to remove a replaced private overlay directory");
+    }
+    rmSync(identity.path, { recursive: true });
+  } finally {
+    if (!identity.lifecycle.closed) {
+      closeSync(identity.descriptor);
+      identity.lifecycle.closed = true;
+    }
   }
-  rmSync(identity.path, { recursive: true });
 }
 
 export function createPrivateCandidateBinding(options) {

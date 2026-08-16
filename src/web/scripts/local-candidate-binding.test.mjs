@@ -1,6 +1,15 @@
 // @vitest-environment node
 
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -45,8 +54,25 @@ describe("private Candidate local file isolation", () => {
     try {
       expect(() => removePrivateOverlay(identity)).toThrow("replaced private overlay");
       expect(existsSync(sentinel)).toBe(true);
+      expect(readFileSync(sentinel, "utf8")).toBe("replacement");
+      expect(() => removePrivateOverlay(identity)).toThrow("released private overlay identity");
+      expect(readFileSync(sentinel, "utf8")).toBe("replacement");
     } finally {
-      rmSync(root, { recursive: true });
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("removes only the directory held by the pinned overlay identity", () => {
+    const root = mkdtempSync(join(realpathSync(tmpdir()), "searise-private-binding-"));
+    chmodSync(root, 0o700);
+    const identity = overlayIdentity(root);
+    writeFileSync(join(root, "owned-overlay.txt"), "private");
+    try {
+      expect(() => removePrivateOverlay(identity)).not.toThrow();
+      expect(existsSync(root)).toBe(false);
+      expect(() => removePrivateOverlay(identity)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

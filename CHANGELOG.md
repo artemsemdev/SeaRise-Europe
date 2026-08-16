@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Pinned private overlay cleanup to an open directory identity so immediate
+  inode reuse cannot redirect recursive deletion to a replacement directory.
+
 - Enforced an exact static-document Content Security Policy and `no-referrer`
   policy on both browser entry routes, with browser/build gates for blocked
   unlisted origins and the one optional OpenFreeMap origin. Manifest schemas
