@@ -242,10 +242,8 @@ def _validate_sbom_authority(logical: str, path: Path, root: Path) -> dict[str, 
         inventory = root / "contracts/supply-chain/v1/dependency-inventory.json"
         return validate_build_plane_sbom(path, inventory, repository_root=root)
     elif logical == _SBOM_PATHS[1]:
-        lock = root / "src/frontend/package-lock.json"
-        return validate_npm_sbom(
-            path, lock, repository_root=root, logical_path="src/frontend/package-lock.json"
-        )
+        lock = root / "package-lock.json"
+        return validate_npm_sbom(path, lock, repository_root=root, logical_path="package-lock.json")
     elif logical.startswith("sbom/nuget/"):
         component = logical.split("searise-", 1)[1].split("-net8.0", 1)[0].title()
         project = root / f"src/api/SeaRise.{component}"

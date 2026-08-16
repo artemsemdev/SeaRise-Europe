@@ -21,6 +21,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Bound the canonical frontend npm SBOM to the static `src/web` workspace in
+  the root lockfile, including the Flight icon dependency and its exact
+  registry integrity, instead of retaining the superseded Next.js lock as the
+  active frontend authority.
+
 - Confirmed the SeaRise Flight mock as the active canonical visual and
   interaction reference while adding an explicit ADR-024 correction map and a
   fail-closed annotation gate. Its layout, hierarchy, map-first composition,
