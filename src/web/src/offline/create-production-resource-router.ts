@@ -23,6 +23,29 @@ function technical(message: string, recoverable = false): TechnicalFailure {
   });
 }
 
+function rangeIntegrityBootstrapArtifact(context: ReleaseContext) {
+  const artifact = context.artifact(context.manifest.contractArtifacts.rangeIntegrityIndex);
+  const expectedUrl = new URL(
+    "analysis/cog-range-integrity.json",
+    new URL("./", context.manifestUrl),
+  ).href;
+  if (
+    artifact.role !== "range-integrity-index" ||
+    artifact.path !== "analysis/cog-range-integrity.json" ||
+    artifact.mediaType !== "application/json" ||
+    artifact.url !== expectedUrl ||
+    artifact.dataReleaseId !== context.dataReleaseId
+  ) {
+    throw new TechnicalFailure({
+      kind: "technical-error",
+      code: "IntegrityFailed",
+      message: "The range-integrity bootstrap does not match the exact release authority.",
+      recoverable: false,
+    });
+  }
+  return artifact;
+}
+
 function hexadecimal(bytes: ArrayBuffer): string {
   return [...new Uint8Array(bytes)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
@@ -112,7 +135,11 @@ export async function createProductionResourceRouter(
     releaseDisposition: context.disposition,
     precacheSetSha256,
   });
-  const rangeIndexArtifact = context.artifact(context.manifest.contractArtifacts.rangeIntegrityIndex);
+  // For a controlled persistent build, this exact path is a sealed member of
+  // the build-bound service-worker precache. A warm offline reload therefore
+  // receives verified bytes without a network fallback. Private Candidate
+  // mode has no worker and performs the same manifest-bound read into memory.
+  const rangeIndexArtifact = rangeIntegrityBootstrapArtifact(context);
   const rangeIntegrityBytes = await verifiedArtifactBytes(
     rangeIndexArtifact,
     signal,

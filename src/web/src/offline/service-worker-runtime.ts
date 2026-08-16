@@ -191,6 +191,8 @@ function validatePrecache(value: EmbeddedPrecacheV3): Readonly<{
     dataReleaseId: buildIdentity.dataReleaseId,
   });
   const expectedManifest = buildIdentity.manifestPath;
+  const expectedRangeIntegrity =
+    `/releases/${buildIdentity.dataReleaseId}/analysis/cog-range-integrity.json`;
   if (typeof record.precacheSetSha256 !== "string" || !SHA256.test(record.precacheSetSha256)) {
     throw new TypeError("The embedded precache authority is invalid.");
   }
@@ -223,7 +225,8 @@ function validatePrecache(value: EmbeddedPrecacheV3): Readonly<{
     paths[0] !== "/" ||
     paths.some((path, index) => path !== [...paths].sort()[index]) ||
     new Set(paths).size !== paths.length ||
-    !paths.includes(expectedManifest)
+    !paths.includes(expectedManifest) ||
+    !paths.includes(expectedRangeIntegrity)
   ) {
     throw new TypeError("The embedded precache entry inventory is not canonical.");
   }
@@ -234,8 +237,10 @@ function validatePrecache(value: EmbeddedPrecacheV3): Readonly<{
       parsed.search ||
       parsed.hash ||
       parsed.pathname !== path ||
-      (path.startsWith("/releases/") && path !== expectedManifest) ||
-      (path !== "/" && path !== expectedManifest && !path.startsWith("/assets/"))
+      (path.startsWith("/releases/") &&
+        path !== expectedManifest && path !== expectedRangeIntegrity) ||
+      (path !== "/" && path !== expectedManifest && path !== expectedRangeIntegrity &&
+        !path.startsWith("/assets/"))
     ) {
       throw new TypeError(`Precache URL is outside the shell allowlist: ${path}`);
     }
