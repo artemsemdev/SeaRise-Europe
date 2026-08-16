@@ -364,7 +364,11 @@ function LandingPageSession({
               <MapExplorer
                 context={context}
                 selection={accepted?.selection}
-                onSelection={submitSelection}
+                onSelection={(selection) => {
+                  runtime.cancelSearch();
+                  setClearSearchToken((token) => token + 1);
+                  submitSelection(selection);
+                }}
               />
             </Suspense>
           )}

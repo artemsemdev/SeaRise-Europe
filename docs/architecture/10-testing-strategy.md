@@ -220,6 +220,14 @@ Accessibility and visual coverage includes keyboard search, focus order,
 screen-reader result messaging, contrast, reduced motion, responsive layouts,
 map alternatives, and visible data/basemap attribution.
 
+The production-static browser journey suite runs the committed synthetic
+fixture in desktop, mobile, and reduced-motion Chromium profiles. It records
+screenshots and a machine-readable nine-combination matrix under Playwright's
+ignored `test-results` directory; CI retains successful evidence and failure
+diagnostics for 14 days. These artifacts are test evidence only and are never
+committed release assets. Automated axe, ARIA, focus, and keyboard assertions
+do not replace a manual screen-reader narration review before public launch.
+
 ## 4. Shared fixtures and test data
 
 Fixtures are small, licensed or generated, deterministic, and labelled by

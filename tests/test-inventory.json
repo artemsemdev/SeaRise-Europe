@@ -45,6 +45,12 @@
       "reference": "src/pipeline/tests/release/test_boundary_geoparquet.py, src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 121 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, 12 Shapely/browser geography comparisons, exact later-fourth-chunk COG integrity, same-origin page-context lookup under shipped CSP, scoped cold/cached budgets, abort-safe shared open and post-open range transport"
     },
+    "local-2026-08-16-static-projection-browser-ux": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-16T10:40:00+02:00",
+      "reference": "src/web/tests/projection-ux.spec.ts",
+      "environment": "macOS arm64; Node 20.20.1; Playwright 1.62.1; Chromium desktop, Pixel 7 mobile, and reduced-motion desktop profiles; committed synthetic fixture only; no Candidate-v7, TAR, external storage, or runtime service"
+    },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T00:29:00+02:00",
@@ -306,6 +312,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 15, "class": "fast", "evidenceRef": "local-2026-08-16-static-scientific-lookup", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The deterministic suite includes standalone AJV validation, all nine combinations, 63 cross-runtime projection comparisons, 12 audited-boundary Shapely/browser seam comparisons plus one browser-only nodata control, strict range and failure cases, post-open cancellation, cross-release cache isolation, a valid deterministic later-chunk COG, and 500 generated nearest-grid candidate sets over the committed synthetic fixture." }
+    },
+    {
+      "id": "static-projection-browser-ux",
+      "layer": "e2e",
+      "owner": "frontend",
+      "purpose": "Prove the complete production-static projection journey: all four ADR-024 outcomes, exact values for all nine combinations, COG and PMTiles release identity, separate integrity and recoverable delivery failures, stale-completion rejection, atomic map/result/URL state, share/reload/popstate/reset, keyboard and dialog focus, reduced motion, responsive mobile operation, axe gates, and zero legacy application API roots.",
+      "sourcePaths": ["src/web/tests/projection-ux.spec.ts", "src/web/playwright.config.ts"],
+      "changedPaths": ["src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent four-outcome projection UX, atomic-state, accessibility, failure, and no-legacy-API browser contract." },
+      "commands": { "focused": "npm run e2e --workspace @searise/web -- tests/projection-ux.spec.ts", "full": "npm run web:check && npm run web:e2e" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 40, "class": "fast", "evidenceRef": "local-2026-08-16-static-projection-browser-ux", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Twenty-one production-static journeys use only the immutable committed fixture. Success screenshots and JSON matrices are ignored locally and retained by CI for 14 days; failure traces and diagnostics have the same bounded retention." }
     },
     {
       "id": "static-web-shell",
@@ -1271,6 +1291,7 @@
     { "path": "src/web/src/search/runtime.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/search/search.worker.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/projection-ux.spec.ts", "suite": "static-projection-browser-ux", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/local-candidate-binding.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/run-local-candidate-e2e.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/private/private-candidate-binding.spec.ts", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },
