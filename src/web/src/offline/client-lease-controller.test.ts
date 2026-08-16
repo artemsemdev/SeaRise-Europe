@@ -59,10 +59,12 @@ class Timer implements RepeatingTimerPort {
 }
 
 class Lifecycle implements ClientLeaseLifecyclePort {
-  readonly listeners = new Set<() => void>();
-  addPageHideListener(listener: () => void): void { this.listeners.add(listener); }
-  removePageHideListener(listener: () => void): void { this.listeners.delete(listener); }
-  pageHide(): void { for (const listener of [...this.listeners]) listener(); }
+  readonly listeners = new Set<(event: Readonly<{ persisted: boolean }>) => void>();
+  addPageHideListener(listener: (event: Readonly<{ persisted: boolean }>) => void): void { this.listeners.add(listener); }
+  removePageHideListener(listener: (event: Readonly<{ persisted: boolean }>) => void): void { this.listeners.delete(listener); }
+  pageHide(persisted = false): void {
+    for (const listener of [...this.listeners]) listener({ persisted });
+  }
 }
 
 function deferred(): Readonly<{ promise: Promise<void>; resolve: () => void }> {
@@ -116,6 +118,21 @@ describe("production client lease controller", () => {
     firstLifecycle.pageHide();
     await first.settled();
     expect([...store.active.keys()]).toEqual(["client-22222222-2222-4222-8222-222222222222"]);
+  });
+
+  it("does not irreversibly close a live lease when pagehide enters the back-forward cache", async () => {
+    const store = new LeaseStore();
+    const lifecycle = new Lifecycle();
+    const controller = createClientLeaseController({
+      pair: pair(), store, timer: new Timer(), lifecycle,
+      now: () => 1_000, randomUUID: () => "11111111-1111-4111-8111-111111111111",
+    });
+    await controller.start();
+
+    lifecycle.pageHide(true);
+    await controller.settled();
+    controller.assertActive();
+    expect(store.released).toEqual([]);
   });
 
   it("coalesces concurrent starts and releases a lease acquired while close is pending", async () => {
@@ -206,6 +223,44 @@ describe("production client lease controller", () => {
     lifecycle.pageHide();
     await vi.waitFor(() => expect(store.released).toHaveLength(1));
     expect(onHeartbeatFailure).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it("cannot authorize or resurrect a lease after suspension passes its exact expiry", async () => {
+    const store = new LeaseStore();
+    const timer = new Timer();
+    const onHeartbeatFailure = vi.fn();
+    let now = 1_000;
+    const controller = createClientLeaseController({
+      pair: pair(), store, timer, lifecycle: new Lifecycle(), now: () => now,
+      randomUUID: () => "11111111-1111-4111-8111-111111111111",
+      onHeartbeatFailure,
+    });
+    await controller.start();
+    controller.assertActive();
+
+    now = 121_000;
+    expect(() => controller.assertActive()).toThrow(ClientLeaseUnavailableError);
+    timer.tick();
+    await controller.settled();
+    expect(store.acquired).toEqual([]);
+    expect(timer.callbacks.size).toBe(0);
+    expect(onHeartbeatFailure).toHaveBeenCalledWith(expect.any(ClientLeaseUnavailableError));
+  });
+
+  it("fails closed when the lease clock becomes invalid", async () => {
+    const store = new LeaseStore();
+    let clockFails = false;
+    const controller = createClientLeaseController({
+      pair: pair(), store, timer: new Timer(), lifecycle: new Lifecycle(),
+      now: () => {
+        if (clockFails) throw new Error("clock failed");
+        return 1_000;
+      },
+      randomUUID: () => "11111111-1111-4111-8111-111111111111",
+    });
+    await controller.start();
+    clockFails = true;
+    expect(() => controller.assertActive()).toThrow(ClientLeaseUnavailableError);
   });
 
   it("performs no storage, timer, lifecycle, or UUID work for local Candidate mode", async () => {

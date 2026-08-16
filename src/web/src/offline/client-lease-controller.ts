@@ -16,8 +16,8 @@ export interface RepeatingTimerPort {
 }
 
 export interface ClientLeaseLifecyclePort {
-  addPageHideListener(listener: () => void): void;
-  removePageHideListener(listener: () => void): void;
+  addPageHideListener(listener: (event: Readonly<{ persisted: boolean }>) => void): void;
+  removePageHideListener(listener: (event: Readonly<{ persisted: boolean }>) => void): void;
 }
 
 export interface ClientLeaseControllerOptions {
@@ -55,8 +55,8 @@ function browserTimer(): RepeatingTimerPort {
 
 function browserLifecycle(): ClientLeaseLifecyclePort {
   return {
-    addPageHideListener: (listener) => globalThis.addEventListener("pagehide", listener),
-    removePageHideListener: (listener) => globalThis.removeEventListener("pagehide", listener),
+    addPageHideListener: (listener) => globalThis.addEventListener("pagehide", listener as unknown as EventListener),
+    removePageHideListener: (listener) => globalThis.removeEventListener("pagehide", listener as unknown as EventListener),
   };
 }
 
@@ -100,7 +100,20 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
   let closeRequested = false;
 
   const reportFailure = (error: unknown): void => { options.onHeartbeatFailure?.(error); };
-  const pageHide = (): void => { void close().catch(reportFailure); };
+  const pageHide = ({ persisted }: Readonly<{ persisted: boolean }>): void => {
+    if (!persisted) void close().catch(reportFailure);
+  };
+
+  const failClosed = (error: unknown): void => {
+    if (state !== "active") return;
+    state = "failed";
+    generation += 1;
+    if (interval !== undefined) {
+      try { timer.clear(interval); } catch (timerError) { reportFailure(timerError); }
+    }
+    interval = undefined;
+    reportFailure(error);
+  };
 
   const enqueue = (operation: () => Promise<void>): Promise<void> => {
     const next = tail.then(operation, operation);
@@ -114,20 +127,17 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
     const current = lease;
     void enqueue(async () => {
       if (state !== "active" || generation !== expectedGeneration) return;
-      const next = exactLease(pair, current.leaseId, now());
       try {
+        const timestamp = now();
+        if (!Number.isSafeInteger(timestamp) || timestamp >= current.expiresAtEpochMs) {
+          failClosed(new ClientLeaseUnavailableError("The persistent client lease expired before renewal."));
+          return;
+        }
+        const next = exactLease(pair, current.leaseId, timestamp);
         await options.store.acquireLease(next);
         if (state === "active" && generation === expectedGeneration) lease = next;
       } catch (error) {
-        if (state === "active" && generation === expectedGeneration) {
-          state = "failed";
-          generation += 1;
-          if (interval !== undefined) {
-            try { timer.clear(interval); } catch (timerError) { reportFailure(timerError); }
-          }
-          interval = undefined;
-        }
-        reportFailure(error);
+        if (state === "active" && generation === expectedGeneration) failClosed(error);
       }
     });
   };
@@ -197,7 +207,16 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
       await tail;
     },
     assertActive: () => {
-      if (state !== "active") throw new ClientLeaseUnavailableError();
+      if (state === "active" && lease) {
+        let timestamp: number;
+        try { timestamp = now(); } catch (error) {
+          failClosed(error);
+          throw new ClientLeaseUnavailableError("The persistent client lease clock failed.");
+        }
+        if (Number.isSafeInteger(timestamp) && timestamp < lease.expiresAtEpochMs) return;
+        failClosed(new ClientLeaseUnavailableError("The persistent client lease expired."));
+      }
+      throw new ClientLeaseUnavailableError();
     },
   });
 }

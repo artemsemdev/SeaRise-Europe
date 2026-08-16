@@ -248,6 +248,10 @@ async function harness(options: Readonly<{
     const response = new Response(responseBody(body), { status: 206, headers });
     return options.mutateRangeResponse?.(response, init) ?? response;
   });
+  const clientLease = options.localCandidate ? undefined : options.clientLease ?? Object.freeze({
+    close: async () => undefined,
+    assertActive: () => undefined,
+  });
   const router = new VerifiedResourceRouter({
     releasePlan: plan,
     wholeStore: controlledWhole,
@@ -255,7 +259,7 @@ async function harness(options: Readonly<{
     receiptStore: receipts,
     subtle,
     fetchRange: strictRangeFetch,
-    clientLease: options.clientLease,
+    clientLease,
   });
   const createPeerRouter = (): VerifiedResourceRouter => new VerifiedResourceRouter({
     releasePlan: plan,
@@ -276,6 +280,10 @@ async function harness(options: Readonly<{
     }),
     subtle,
     fetchRange: strictRangeFetch,
+    clientLease: options.localCandidate ? undefined : Object.freeze({
+      close: async () => undefined,
+      assertActive: () => undefined,
+    }),
   });
   return {
     context, plan, whole: controlledWhole, ranges, receipts, caches, rangeCalls,
@@ -319,6 +327,29 @@ describe("verified resource router", () => {
     test.router.close();
     test.router.close();
     await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
+  });
+
+  it("requires a live lease for persistent routing and forbids one in memory-only Candidate mode", async () => {
+    const persistent = await harness();
+    expect(() => new VerifiedResourceRouter({
+      releasePlan: persistent.plan,
+      wholeStore: persistent.whole,
+      rangeStore: persistent.ranges,
+      receiptStore: persistent.receipts,
+      subtle,
+      fetchRange: vi.fn(),
+    })).toThrow(TechnicalFailure);
+
+    const candidate = await harness({ localCandidate: true });
+    expect(() => new VerifiedResourceRouter({
+      releasePlan: candidate.plan,
+      wholeStore: candidate.whole,
+      rangeStore: candidate.ranges,
+      receiptStore: candidate.receipts,
+      subtle,
+      fetchRange: vi.fn(),
+      clientLease: { close: async () => undefined, assertActive: () => undefined },
+    })).toThrow(TechnicalFailure);
   });
 
   it("drains active work before lease release and rejects every post-close operation", async () => {

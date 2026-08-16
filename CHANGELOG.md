@@ -27,7 +27,9 @@ All notable changes to this project will be documented in this file.
   Public static tabs acquire before the resource router becomes available,
   renew every 30 seconds with a 120-second expiry, isolate concurrent tabs,
   fail closed after a renewal error, drain active work before orderly release,
-  and rotate active/previous protection atomically with initial acquisition.
+  reject use after exact expiry, preserve live leases across back-forward-cache
+  page transitions, and rotate active/previous protection atomically with
+  initial acquisition.
   Private Candidate sessions remain memory-only and create no lease, timer,
   lifecycle listener, or persistent storage activity.
 

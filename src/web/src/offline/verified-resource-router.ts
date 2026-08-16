@@ -115,6 +115,17 @@ export class VerifiedResourceRouter {
     ) {
       throw technical("SchemaInvalid", "Resource stores do not match the verified release persistence mode.");
     }
+    if (expectedMode === "persistent" && !this.#clientLease) {
+      throw technical("SchemaInvalid", "Persistent resource routing requires an active client lease controller.");
+    }
+    if (expectedMode === "memory-only" && this.#clientLease) {
+      throw technical("SchemaInvalid", "Memory-only Candidate routing cannot install a persistent client lease.");
+    }
+    try {
+      this.#clientLease?.assertActive();
+    } catch {
+      throw technical("UnsupportedBrowser", "The persistent client lease is unavailable.", true);
+    }
 
     this.#whole = Object.freeze(this.#releasePlan.routes.flatMap((route) =>
       route.kind === "complete-resource" ? [route.authority] : []));
