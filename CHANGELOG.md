@@ -22,6 +22,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Made the committed browser release checksum list an exact, canonical view of
+  the manifest artifact inventory. Comments and blank lines can no longer be
+  misread as artifacts, and missing, extra, duplicate, or stale entries fail
+  the deterministic fixture gate.
+
 - Corrected the methodology dialog definitions so `OutOfScope` means inside
   supported Europe but outside the versioned coastal analysis area, while
   `UnsupportedGeography` means outside the versioned Europe support geometry.
