@@ -13,7 +13,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-16T02:12:32+02:00",
       "reference": "src/web/src/domain/scientific-lookup.test.ts, src/web/src/data/geography-classifier.test.ts, src/web/src/data/cog-analysis-reader.golden.test.ts, and docs/operations/static-scientific-lookup.md",
-      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 29 focused cases, 56 static-target tests, 500 generated candidate sets, 63 Python/TypeScript projection comparisons, exact source-grid/range-chunk identities, abort-safe shared caches, warm cached p95 below 100 ms"
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; committed synthetic release only; 114 static-target tests, 24 desktop/mobile Playwright tests, 63 Python/TypeScript projection comparisons, exact three-chunk COG integrity, page-context exact lookup under shipped CSP, abort-safe shared caches"
     },
     "local-2026-08-16-static-shell": {
       "kind": "local-measurement",
@@ -221,7 +221,7 @@
       "owner": "frontend",
       "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry, exact range-only native-grid COG lookup, four-outcome domain vocabulary, separate technical failures, and release-scoped URL reload state.",
       "sourcePaths": ["src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
-      "changedPaths": ["src/web/**", "contracts/release/v1/**"],
+      "changedPaths": ["src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static release/domain anti-corruption contract." },
       "commands": { "focused": "npm run web:check", "full": "npm run web:check && npm run web:e2e" },
@@ -233,15 +233,15 @@
       "id": "static-web-shell",
       "layer": "e2e",
       "owner": "frontend",
-      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, blocked unlisted origins, build inventory, and zero legacy application API traffic.",
+      "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, page-context COG range delivery and lookup, blocked unlisted origins, build inventory, and zero legacy application API traffic.",
       "sourcePaths": ["src/web/src/**/*.test.tsx", "src/web/tests/*.spec.ts"],
-      "changedPaths": [".nvmrc", "package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**"],
+      "changedPaths": [".nvmrc", "package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static-runtime shell and zero-API contract." },
       "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Three Vitest cases and eight desktop/mobile Playwright cases passed locally; CSP behavior uses deterministic browser enforcement and CI reruns the same immutable fixture scope." }
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "One hundred fourteen Vitest cases and twenty-four desktop/mobile Playwright cases passed locally; CSP and three-chunk range behavior use deterministic browser enforcement over the same immutable fixture scope." }
     },
     {
       "id": "static-map-visualization",

@@ -74,9 +74,15 @@ const boundaries = [
   bytes: readFileSync(resolve(overlayRoot, boundary.path)),
 }));
 
-const cogArtifacts = v1Manifest.artifacts.filter(
-  (artifact) => artifact.role === "projection-analysis-cog",
-);
+const cogBodies = new Map();
+const cogArtifacts = v1Manifest.artifacts
+  .filter((artifact) => artifact.role === "projection-analysis-cog")
+  .map((artifact) => {
+    const overlayPath = resolve(overlayRoot, artifact.path);
+    const bytes = readFileSync(existsSync(overlayPath) ? overlayPath : resolve(payloadRoot, artifact.path));
+    cogBodies.set(artifact.path, bytes);
+    return { ...artifact, byteSize: bytes.length, sha256: sha256(bytes) };
+  });
 const rangeIntegrity = JSON.parse(rangeIntegrityBytes.toString("utf8"));
 if (
   rangeIntegrity.dataReleaseId !== RELEASE_ID ||
@@ -113,6 +119,9 @@ const sbom = {
   components: [
     ["analysis/source-grid.json.gz", sourceGridBytes],
     ["analysis/cog-range-integrity.json", rangeIntegrityBytes],
+    ...cogArtifacts
+      .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
+      .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
     ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
   ].map(([path, bytes]) => ({
     type: "data",
@@ -159,6 +168,13 @@ const buildReceipt = JSON.parse(readFileSync(resolve(payloadRoot, "receipts/buil
 buildReceipt.$schema =
   "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/build-receipt.schema.json";
 buildReceipt.schemaVersion = "2.0.0";
+for (const output of buildReceipt.outputs) {
+  const replacement = cogArtifacts.find((artifact) => artifact.path === output.path);
+  if (replacement) {
+    output.byteSize = replacement.byteSize;
+    output.sha256 = replacement.sha256;
+  }
+}
 buildReceipt.outputs.push(
   { path: "analysis/source-grid.json.gz", role: "source-grid-identity", mediaType: "application/gzip", byteSize: sourceGridBytes.length, sha256: sha256(sourceGridBytes) },
   { path: "analysis/cog-range-integrity.json", role: "range-integrity-index", mediaType: "application/json", byteSize: rangeIntegrityBytes.length, sha256: sha256(rangeIntegrityBytes) },
@@ -190,6 +206,9 @@ for (const [name, bytes] of [
   ["sbom/browser-integrity.cdx.json", sbomBytes],
   ["config/source-attribution.json", attributionBytes],
   ["receipts/build.json", buildReceiptBytes],
+  ...cogArtifacts
+    .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
+    .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
   ...boundaries.map((boundary) => [boundary.path, boundary.bytes]),
 ]) {
   subjects.set(name, { name, digest: { sha256: sha256(bytes) } });
@@ -208,6 +227,11 @@ for (const artifact of manifest.artifacts) {
   artifact.$schema =
     "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/artifact.schema.json";
   artifact.schemaVersion = "2.0.0";
+  const replacement = cogArtifacts.find((candidate) => candidate.artifactId === artifact.artifactId);
+  if (replacement) {
+    artifact.byteSize = replacement.byteSize;
+    artifact.sha256 = replacement.sha256;
+  }
 }
 const buildSha256 = sha256(buildReceiptBytes);
 for (const artifact of manifest.artifacts) {
@@ -264,6 +288,9 @@ const replacements = new Map([
   ["config/source-attribution.json", attributionBytes],
   ["receipts/build.json", buildReceiptBytes],
   ["provenance.intoto.jsonl", provenanceBytes],
+  ...cogArtifacts
+    .filter((artifact) => existsSync(resolve(overlayRoot, artifact.path)))
+    .map((artifact) => [artifact.path, cogBodies.get(artifact.path)]),
 ]);
 const checksums = readFileSync(resolve(payloadRoot, "checksums.txt"), "utf8")
   .trimEnd()

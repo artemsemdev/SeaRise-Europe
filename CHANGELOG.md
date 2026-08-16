@@ -23,6 +23,11 @@ All notable changes to this project will be documented in this file.
   static browser dependency graph, pinned its scientific readers, and made the
   dependency inventory fail closed if future registry identities are missing.
 
+- Strengthened static COG delivery validation with a deterministic three-chunk
+  synthetic artifact, strict malformed-range rejection, and a production-built
+  browser lookup that proves CSP-compatible `HEAD`/`206` delivery, exact chunk
+  hashes, and sub-artifact transfer.
+
 - Bound private real-source candidates to reviewed STAC archive/member lineage,
   an existing Git code revision, the exact local dependency lock, build
   parameters, and pipeline identity. The superseded candidate with fixture

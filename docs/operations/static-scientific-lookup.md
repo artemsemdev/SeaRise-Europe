@@ -48,6 +48,7 @@ PYTHONPATH=src/pipeline .venv/bin/python -m pytest \
   src/pipeline/tests/science/test_ar6_regional_release_contract.py \
   src/pipeline/tests/science/test_projection_contract.py \
   src/pipeline/tests/offline_release/test_cog_range.py \
+  src/pipeline/tests/release/test_range_integrity.py \
   src/pipeline/tests/release/test_boundary_geoparquet.py -q
 ```
 
@@ -62,10 +63,15 @@ are:
   support/coastal precedence, geometry boundaries, caching, and corruption;
 - `src/web/src/data/cog-analysis-reader.golden.test.ts` for all nine
   scenario/horizon combinations, 63 Python/TypeScript golden comparisons,
-  native-grid edges, nodata, strict ranges, aborts, and malformed responses.
+  native-grid edges, nodata, strict ranges, aborts, and malformed responses;
+- `src/web/tests/static-shell.spec.ts` for a production-built, page-context
+  exact lookup against the committed 139,264-byte COG. The gate observes
+  same-origin `HEAD` and `206` requests under the shipped CSP, verifies the
+  transferred chunk hashes, rejects multi-ranges, and proves lookup transfer
+  remains smaller than the artifact.
 
 The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 29 focused
-lookup tests, 65 static-target unit/integration tests, and 16 desktop/mobile
+lookup tests, 114 static-target unit/integration tests, and 24 desktop/mobile
 Playwright tests. Its warm in-memory
 100-lookup sample had p95 below the required
 100 ms gate. This is a synthetic-fixture engineering measurement, not a claim

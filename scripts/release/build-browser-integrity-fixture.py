@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
+import tempfile
 from pathlib import Path
 
 from searise_pipeline.release import (
@@ -20,10 +23,31 @@ PAYLOAD_ROOT = REPOSITORY_ROOT / "contracts/release/v1/fixtures/release" / RELEA
 OVERLAY_ROOT = (
     REPOSITORY_ROOT / "contracts/release/v2/fixtures/browser-release" / RELEASE_ID
 )
+MULTICHUNK_ARTIFACT_ID = "projection-ssp2-45-2050-cog"
+MULTICHUNK_TARGET_SIZE = 2 * 65_536 + 8_192
 
 
 def _read_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_multichunk_cog(source: Path, target: Path) -> None:
+    """Keep the valid COG byte stream and add deterministic inert fixture padding."""
+    payload = source.read_bytes()
+    if len(payload) >= MULTICHUNK_TARGET_SIZE:
+        raise ValueError("The source fixture COG no longer needs multichunk padding")
+    padding = bytearray()
+    counter = 0
+    while len(payload) + len(padding) < MULTICHUNK_TARGET_SIZE:
+        padding.extend(
+            hashlib.sha256(
+                b"SeaRise synthetic browser multichunk COG fixture\0"
+                + counter.to_bytes(4, "big")
+            ).digest()
+        )
+        counter += 1
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload + padding[: MULTICHUNK_TARGET_SIZE - len(payload)])
 
 
 def main() -> None:
@@ -47,21 +71,37 @@ def main() -> None:
     if not isinstance(artifacts, list):
         raise TypeError("The byte-sealed payload manifest has no artifact list")
     cogs = [item for item in artifacts if item.get("role") == "projection-analysis-cog"]
-    write_range_integrity_index(
-        PAYLOAD_ROOT,
-        OVERLAY_ROOT / "analysis/cog-range-integrity.json",
-        data_release_id=RELEASE_ID,
-        artifact_path="analysis/cog-range-integrity.json",
-        objects=(
-            RangeObject(
-                artifact_id=str(item["artifactId"]),
-                path=str(item["path"]),
-                byte_size=int(item["byteSize"]),
-                sha256=str(item["sha256"]),
-            )
-            for item in cogs
-        ),
+    target = next(item for item in cogs if item["artifactId"] == MULTICHUNK_ARTIFACT_ID)
+    _write_multichunk_cog(
+        PAYLOAD_ROOT / str(target["path"]),
+        OVERLAY_ROOT / str(target["path"]),
     )
+    with tempfile.TemporaryDirectory(prefix="searise-browser-cogs-") as temporary:
+        assembled_root = Path(temporary)
+        identities = []
+        for item in cogs:
+            relative_path = str(item["path"])
+            overlay = OVERLAY_ROOT / relative_path
+            source = overlay if overlay.is_file() else PAYLOAD_ROOT / relative_path
+            destination = assembled_root / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, destination)
+            payload = source.read_bytes()
+            identities.append(
+                RangeObject(
+                    artifact_id=str(item["artifactId"]),
+                    path=relative_path,
+                    byte_size=len(payload),
+                    sha256=hashlib.sha256(payload).hexdigest(),
+                )
+            )
+        write_range_integrity_index(
+            assembled_root,
+            OVERLAY_ROOT / "analysis/cog-range-integrity.json",
+            data_release_id=RELEASE_ID,
+            artifact_path="analysis/cog-range-integrity.json",
+            objects=identities,
+        )
 
 
 if __name__ == "__main__":

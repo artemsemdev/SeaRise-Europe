@@ -69,10 +69,21 @@ createServer((request, response) => {
       : {}),
     "Vary": "Origin",
   };
-  const match = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
+  const rangeHeader = request.headers.range;
+  const match = rangeHeader ? /^bytes=(\d+)-(\d*)$/.exec(rangeHeader) : null;
+  if (rangeHeader && !match) {
+    response.writeHead(416, { ...headers, "Content-Range": `bytes */${size}` }).end();
+    return;
+  }
   const start = match ? Number(match[1]) : 0;
-  const end = match?.[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
-  if (start > end || start >= size) {
+  const requestedEnd = match?.[2] ? Number(match[2]) : size - 1;
+  const end = Math.min(requestedEnd, size - 1);
+  if (
+    !Number.isSafeInteger(start) ||
+    !Number.isSafeInteger(requestedEnd) ||
+    start > end ||
+    start >= size
+  ) {
     response.writeHead(416, { ...headers, "Content-Range": `bytes */${size}` }).end();
     return;
   }
