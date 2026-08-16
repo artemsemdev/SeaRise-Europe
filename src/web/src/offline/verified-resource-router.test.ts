@@ -29,6 +29,12 @@ import { NetworkOnlyPmtilesSource } from "../components/map/pmtiles-network-sour
 
 const subtle = webcrypto.subtle as SubtleCrypto;
 
+function deferred<T>(): Readonly<{ promise: Promise<T>; resolve: (value: T) => void }> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 class MemoryCache implements CachePort {
   readonly entries = new Map<string, Response>();
   failPut = false;
@@ -127,6 +133,7 @@ async function harness(options: Readonly<{
   maxRangeBytes?: number;
   rangeFetch?: typeof fetch;
   localCandidate?: boolean;
+  clientLease?: Readonly<{ close(): Promise<void>; assertActive(): void }>;
   mutateWholeResponse?: (response: Response) => Response | Promise<Response>;
   mutateRangeResponse?: (response: Response, init: RequestInit) => Response | Promise<Response>;
 }> = {}): Promise<Harness> {
@@ -241,6 +248,10 @@ async function harness(options: Readonly<{
     const response = new Response(responseBody(body), { status: 206, headers });
     return options.mutateRangeResponse?.(response, init) ?? response;
   });
+  const clientLease = options.localCandidate ? undefined : options.clientLease ?? Object.freeze({
+    close: async () => undefined,
+    assertActive: () => undefined,
+  });
   const router = new VerifiedResourceRouter({
     releasePlan: plan,
     wholeStore: controlledWhole,
@@ -248,6 +259,7 @@ async function harness(options: Readonly<{
     receiptStore: receipts,
     subtle,
     fetchRange: strictRangeFetch,
+    clientLease,
   });
   const createPeerRouter = (): VerifiedResourceRouter => new VerifiedResourceRouter({
     releasePlan: plan,
@@ -268,6 +280,10 @@ async function harness(options: Readonly<{
     }),
     subtle,
     fetchRange: strictRangeFetch,
+    clientLease: options.localCandidate ? undefined : Object.freeze({
+      close: async () => undefined,
+      assertActive: () => undefined,
+    }),
   });
   return {
     context, plan, whole: controlledWhole, ranges, receipts, caches, rangeCalls,
@@ -304,6 +320,77 @@ async function readFirstCog(
 }
 
 describe("verified resource router", () => {
+  it("requests orderly client-lease release once when the runtime closes", async () => {
+    const close = vi.fn(async () => undefined);
+    const test = await harness({ clientLease: { close, assertActive: () => undefined } });
+
+    test.router.close();
+    test.router.close();
+    await vi.waitFor(() => expect(close).toHaveBeenCalledTimes(1));
+  });
+
+  it("requires a live lease for persistent routing and forbids one in memory-only Candidate mode", async () => {
+    const persistent = await harness();
+    expect(() => new VerifiedResourceRouter({
+      releasePlan: persistent.plan,
+      wholeStore: persistent.whole,
+      rangeStore: persistent.ranges,
+      receiptStore: persistent.receipts,
+      subtle,
+      fetchRange: vi.fn(),
+    })).toThrow(TechnicalFailure);
+
+    const candidate = await harness({ localCandidate: true });
+    expect(() => new VerifiedResourceRouter({
+      releasePlan: candidate.plan,
+      wholeStore: candidate.whole,
+      rangeStore: candidate.ranges,
+      receiptStore: candidate.receipts,
+      subtle,
+      fetchRange: vi.fn(),
+      clientLease: { close: async () => undefined, assertActive: () => undefined },
+    })).toThrow(TechnicalFailure);
+  });
+
+  it("drains active work before lease release and rejects every post-close operation", async () => {
+    const responseGate = deferred<void>();
+    const responseStarted = deferred<void>();
+    const close = vi.fn(async () => undefined);
+    const test = await harness({
+      clientLease: { close, assertActive: () => undefined },
+      mutateWholeResponse: async (response) => {
+        responseStarted.resolve();
+        await responseGate.promise;
+        return response;
+      },
+    });
+    const operation = test.router.prepareAssessmentSupport(new AbortController().signal);
+    await responseStarted.promise;
+
+    test.router.close();
+    expect(close).not.toHaveBeenCalled();
+    await expect(test.router.prepareAssessmentSupport(new AbortController().signal)).rejects.toMatchObject({
+      detail: { kind: "technical-error", code: "UnsupportedBrowser" },
+    });
+    responseGate.resolve();
+    await operation;
+    await vi.waitFor(() => expect(close).toHaveBeenCalledOnce());
+  });
+
+  it("rejects persistent operations immediately after the lease controller fails closed", async () => {
+    let active = true;
+    const test = await harness({
+      clientLease: {
+        close: async () => undefined,
+        assertActive: () => { if (!active) throw new Error("lease lost"); },
+      },
+    });
+    active = false;
+    await expect(test.router.prepareAssessmentSupport(new AbortController().signal)).rejects.toMatchObject({
+      detail: { kind: "technical-error", code: "UnsupportedBrowser", recoverable: true },
+    });
+  });
+
   it("admits only assessment support without preloading nine COGs, then admits the requested range and serves its offline hit with zero network", async () => {
     const test = await harness();
     const snapshot = await test.router.prepareAssessmentSupport(new AbortController().signal);

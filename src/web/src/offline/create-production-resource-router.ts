@@ -2,6 +2,7 @@ import { runtimeConfig } from "../config";
 import { verifiedArtifactBytes } from "../data/artifact-integrity";
 import { TechnicalFailure, type ReleaseContext } from "../domain/release";
 import { validateOfflineWorkerToClientMessage, OFFLINE_WORKER_PROTOCOL } from "./contracts/policy";
+import { validateAppReleasePair } from "./contracts/keys";
 import { validateAppAuthority } from "./contracts/v1";
 import { browserAdmissionLockPort, createAdmissionReceiptStore } from "./admission-receipt";
 import { createVerifiedReleaseResourcePlan } from "./release-resource-plan";
@@ -9,6 +10,7 @@ import { createRangeStore } from "./range-store";
 import { validateStorageBudget } from "./contracts/policy";
 import { MemoryWholeResourceCache, WholeResourceCache } from "./whole-resource-cache";
 import { VerifiedResourceRouter } from "./verified-resource-router";
+import { createClientLeaseController } from "./client-lease-controller";
 
 const RANGE_BUDGET_BYTES = 96 * 1024 * 1024;
 const WHOLE_BUDGET_BYTES = 64 * 1024 * 1024;
@@ -201,12 +203,28 @@ export async function createProductionResourceRouter(
     }),
     localCandidate,
   });
-  return new VerifiedResourceRouter({
-    releasePlan,
-    wholeStore,
-    rangeStore,
-    receiptStore,
-    subtle,
-    fetchRange: fetch.bind(globalThis),
-  });
+  let clientLease: ReturnType<typeof createClientLeaseController> | undefined;
+  try {
+    clientLease = createClientLeaseController({
+      pair: validateAppReleasePair(releasePlan.pair),
+      store: rangeStore,
+      persistence: releasePlan.persistence.mode,
+    });
+    await clientLease.start();
+    return new VerifiedResourceRouter({
+      releasePlan,
+      wholeStore,
+      rangeStore,
+      receiptStore,
+      subtle,
+      fetchRange: fetch.bind(globalThis),
+      ...(localCandidate ? {} : { clientLease }),
+    });
+  } catch (error) {
+    await clientLease?.close().catch(() => undefined);
+    receiptStore.close();
+    rangeStore.close();
+    wholeStore.close();
+    throw error;
+  }
 }

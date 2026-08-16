@@ -207,6 +207,7 @@ function admissionStores(profile: StorageProfileV1, options: Readonly<{
       return new ArrayBuffer(identity.interval.endExclusive - identity.interval.start);
     },
     readAccepted: async () => new ArrayBuffer(4),
+    activateClientLease: async () => undefined,
     acquireLease: async () => undefined,
     releaseLease: async () => undefined,
     setProtectedPairs: async () => undefined,

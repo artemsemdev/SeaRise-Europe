@@ -65,6 +65,7 @@ export interface RangeStore {
   admitVerifiedBatch(writes: readonly VerifiedRangeWrite[], options: RangeAdmissionOptionsV1): Promise<RangeAdmissionV1>;
   rollbackAdmission(admission: RangeAdmissionV1): Promise<RangeRollbackResultV1>;
   readAccepted(identity: RangeIdentityV1, gate: AcceptedAdmissionGateV1, requested?: Readonly<{ start: number; endExclusive: number }>): Promise<ArrayBuffer | null>;
+  activateClientLease(lease: ClientLeaseV1): Promise<void>;
   acquireLease(lease: ClientLeaseV1): Promise<void>;
   releaseLease(lease: ClientLeaseV1): Promise<void>;
   setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void>;
@@ -379,6 +380,14 @@ export class MemoryRangeStore implements RangeStore {
     await assertAcceptedRangeResource(gate, identity, this.#subtle, this);
     return this.readExactOrContaining(identity, requested);
   }
+  async activateClientLease(input: ClientLeaseV1): Promise<void> {
+    const lease = checkedLease(input, this.#pair);
+    if (!this.#active || !samePair(this.#active, lease.pair)) {
+      this.#previous = this.#active;
+      this.#active = lease.pair;
+    }
+    this.#leases.set(leaseKey(lease), lease);
+  }
   async acquireLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.set(leaseKey(lease), lease); }
   async releaseLease(input: ClientLeaseV1): Promise<void> { const lease = checkedLease(input, this.#pair); this.#leases.delete(leaseKey(lease)); }
   async setProtectedPairs(active: AppReleasePairV1 | null, previous: AppReleasePairV1 | null): Promise<void> {
@@ -582,6 +591,33 @@ class IndexedDbRangeStore implements RangeStore {
     const identity = checkedCatalogIdentity(input, this.#pair, this.#approved);
     await assertAcceptedRangeResource(gate, identity, this.#subtle, this);
     return this.readExactOrContaining(identity, requested);
+  }
+  async activateClientLease(input: ClientLeaseV1): Promise<void> {
+    const lease = checkedLease(input, this.#pair);
+    const key = leaseKey(lease);
+    const database = await this.#open();
+    const tx = database.transaction([STORES.meta, STORES.leases, STORES.cleanupFences], "readwrite");
+    const done = completed(tx);
+    if (await request(tx.objectStore(STORES.cleanupFences).get(pairKey(lease.pair))) !== undefined) {
+      tx.abort();
+      await done.catch(() => undefined);
+      throw new RangeStoreIntegrityError("Exact-pair cleanup is pending; lease activation is refused.");
+    }
+    const metaStore = tx.objectStore(STORES.meta);
+    const meta = await this.#meta(metaStore);
+    if (!meta.activePair || !samePair(meta.activePair, lease.pair)) {
+      meta.previousPair = meta.activePair;
+      meta.activePair = lease.pair;
+    }
+    metaStore.put(meta);
+    tx.objectStore(STORES.leases).put({
+      key,
+      leaseId: lease.leaseId,
+      pairKey: pairKey(lease.pair),
+      pair: lease.pair,
+      expiresAtEpochMs: lease.expiresAtEpochMs,
+    } satisfies LeaseRecord);
+    await done;
   }
   async acquireLease(input: ClientLeaseV1): Promise<void> {
     const lease = checkedLease(input, this.#pair); const key = leaseKey(lease); const database = await this.#open(); const tx = database.transaction([

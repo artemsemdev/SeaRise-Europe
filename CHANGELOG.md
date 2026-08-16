@@ -23,6 +23,16 @@ All notable changes to this project will be documented in this file.
   as `adapter-stalled` if a port never acknowledges settlement. Git/deployment
   history, not browser storage, remains the application rollback authority.
 
+- Added a per-document production lease for the exact active app/release pair.
+  Public static tabs acquire before the resource router becomes available,
+  renew every 30 seconds with a 120-second expiry, isolate concurrent tabs,
+  fail closed after a renewal error, drain active work before orderly release,
+  reject use after exact expiry, preserve live leases across back-forward-cache
+  page transitions, and rotate active/previous protection atomically with
+  initial acquisition.
+  Private Candidate sessions remain memory-only and create no lease, timer,
+  lifecycle listener, or persistent storage activity.
+
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,
   settlement-search Worker, Brotli WASM decoder, fonts, and dynamic scientific
