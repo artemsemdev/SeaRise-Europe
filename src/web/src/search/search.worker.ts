@@ -123,7 +123,7 @@ async function readCompressedBody(
   }
 
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const raw = new Uint8Array(expected);
   let received = 0;
   try {
     while (true) {
@@ -140,7 +140,7 @@ async function readCompressedBody(
         );
       }
       if (value.byteLength > 0) {
-        chunks.push(value);
+        raw.set(value, received);
         received += value.byteLength;
       }
     }
@@ -156,13 +156,6 @@ async function readCompressedBody(
       "Settlement shard response is truncated against its pinned compressed size.",
       false,
     );
-  }
-
-  const raw = new Uint8Array(expected);
-  let offset = 0;
-  for (const chunk of chunks) {
-    raw.set(chunk, offset);
-    offset += chunk.byteLength;
   }
   return raw;
 }
