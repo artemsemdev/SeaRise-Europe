@@ -1,4 +1,5 @@
 import { exactRecord } from "./keys";
+import { validateClientLease, type ClientLeaseV1 } from "./policy";
 import {
   OfflineContractError,
   validateRangeIdentity,
@@ -26,6 +27,10 @@ export type PersistedOfflineRecordV1 =
       state: "verified";
       byteLength: number;
       lastAccessSequence: number;
+    }>
+  | Readonly<{
+      recordType: "lease";
+      lease: ClientLeaseV1;
     }>;
 
 function safeCount(value: unknown, name: string): number {
@@ -55,6 +60,10 @@ export function validatePersistedOfflineRecord(value: unknown): PersistedOffline
     const byteLength = safeCount(record.byteLength, "byteLength");
     if (byteLength !== identity.interval.endExclusive - identity.interval.start) throw new OfflineContractError("Persisted range length must equal its half-open interval.");
     return Object.freeze({ recordType, identity, state: "verified", byteLength, lastAccessSequence: safeCount(record.lastAccessSequence, "lastAccessSequence") });
+  }
+  if (recordType === "lease") {
+    const record = exactRecord(value, ["recordType", "lease"], "persisted lease");
+    return Object.freeze({ recordType, lease: validateClientLease(record.lease) });
   }
   throw new OfflineContractError("Persisted offline record type is unsupported.");
 }
