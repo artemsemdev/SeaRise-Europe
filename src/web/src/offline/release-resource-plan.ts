@@ -1,4 +1,5 @@
 import type { ArtifactRole } from "../contracts/generated/release-contract";
+import validateManifest from "../contracts/generated/manifest-validator.mjs";
 import type { ReleaseContext, ResolvedArtifact } from "../domain/release";
 import { TechnicalFailure } from "../domain/release";
 import { validateAppReleasePair } from "./contracts/keys";
@@ -91,16 +92,132 @@ function exactIdentity(artifact: ResolvedArtifact): ExactReleaseResourceIdentity
   });
 }
 
+function boundaryIdentity(
+  artifact: ResolvedArtifact,
+  basename: "europe" | "coastal-analysis-zone",
+): boolean {
+  const parquet = artifact.path === `boundaries/${basename}.parquet` &&
+    artifact.mediaType === "application/vnd.apache.parquet";
+  const geojson = artifact.path === `boundaries/${basename}.geojson` &&
+    artifact.mediaType === "application/geo+json";
+  return (parquet || geojson) && artifact.scientificUse === "not-applicable";
+}
+
+function projectionIdentity(
+  artifact: ResolvedArtifact,
+  suffix: "cog" | "pmtiles",
+  root: "analysis" | "layers",
+  extension: "tif" | "pmtiles",
+  mediaType: string,
+  scientificUse: "exact-lookup" | "visual-only",
+): boolean {
+  const id = new RegExp(`^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-${suffix}$`, "u")
+    .exec(artifact.artifactId);
+  const path = new RegExp(`^${root}/(ssp1-26|ssp2-45|ssp5-85)/(2030|2050|2100)\\.${extension}$`, "u")
+    .exec(artifact.path);
+  return Boolean(id && path && id[1] === path[1] && id[2] === path[2]) &&
+    artifact.mediaType === mediaType && artifact.scientificUse === scientificUse;
+}
+
+function assertCanonicalPersistedSemantics(
+  context: ReleaseContext,
+  artifacts: readonly ResolvedArtifact[],
+): void {
+  const counts = new Map<ArtifactRole, number>();
+  for (const artifact of artifacts) counts.set(artifact.role, (counts.get(artifact.role) ?? 0) + 1);
+  for (const role of [
+    "methodology", "source-attribution", "support-boundary", "coastal-boundary",
+    "source-grid-identity", "range-integrity-index",
+  ] as const) {
+    if (counts.get(role) !== 1) throw technical(`The release must contain exactly one canonical ${role} resource.`);
+  }
+  if (counts.get("settlement-search-index") !== 2) {
+    throw technical("The release must contain exactly two canonical settlement search shards.");
+  }
+  if (counts.get("projection-analysis-cog") !== 9 || counts.get("projection-visual-pmtiles") !== 9) {
+    throw technical("The release must contain the exact nine COG and nine PMTiles projection identities.");
+  }
+  const searchPaths = new Set(artifacts
+    .filter((artifact) => artifact.role === "settlement-search-index")
+    .map((artifact) => artifact.path));
+  if (
+    searchPaths.size !== 2 ||
+    !searchPaths.has("search/europe-core.codepoint-trie.json.br") ||
+    !searchPaths.has("search/europe-coastal.codepoint-trie.json.br")
+  ) {
+    throw technical("The release search shard set is not canonical.");
+  }
+
+  const contracts = context.manifest.contractArtifacts;
+  for (const artifact of artifacts) {
+    let valid = true;
+    switch (artifact.role) {
+      case "methodology":
+        valid = artifact.artifactId === contracts.methodology &&
+          artifact.path === "config/methodology.json" && artifact.mediaType === "application/json" &&
+          artifact.scientificUse === "not-applicable";
+        break;
+      case "source-attribution":
+        valid = artifact.artifactId === contracts.attribution &&
+          artifact.path === "config/source-attribution.json" && artifact.mediaType === "application/json" &&
+          artifact.scientificUse === "not-applicable";
+        break;
+      case "support-boundary":
+        valid = boundaryIdentity(artifact, "europe");
+        break;
+      case "coastal-boundary":
+        valid = boundaryIdentity(artifact, "coastal-analysis-zone");
+        break;
+      case "settlement-search-index":
+        valid = /^search\/europe-(core|coastal)\.codepoint-trie\.json\.br$/u.test(artifact.path) &&
+          artifact.mediaType === "application/vnd.searise.search-index+json" &&
+          artifact.scientificUse === "not-applicable";
+        break;
+      case "source-grid-identity":
+        valid = artifact.artifactId === contracts.sourceGridIdentity &&
+          artifact.path === "analysis/source-grid.json.gz" && artifact.mediaType === "application/gzip" &&
+          artifact.scientificUse === "exact-lookup-support";
+        break;
+      case "range-integrity-index":
+        valid = artifact.artifactId === contracts.rangeIntegrityIndex &&
+          artifact.path === "analysis/cog-range-integrity.json" && artifact.mediaType === "application/json" &&
+          artifact.scientificUse === "exact-lookup-support";
+        break;
+      case "projection-analysis-cog":
+        valid = projectionIdentity(
+          artifact, "cog", "analysis", "tif",
+          "image/tiff; application=geotiff; profile=cloud-optimized", "exact-lookup",
+        );
+        break;
+      case "projection-visual-pmtiles":
+        valid = projectionIdentity(
+          artifact, "pmtiles", "layers", "pmtiles", "application/vnd.pmtiles", "visual-only",
+        );
+        break;
+      default:
+        break;
+    }
+    if (!valid) throw technical(`Artifact ${artifact.artifactId} violates canonical ${artifact.role} semantics.`);
+  }
+}
+
 function assertExactContextArtifacts(context: ReleaseContext): readonly ResolvedArtifact[] {
+  if (context.disposition !== "private-engineering" && !validateManifest(context.manifest)) {
+    throw technical("The release context does not contain a schema-valid public manifest.");
+  }
   const manifestArtifacts = new Map(context.manifest.artifacts.map((artifact) => [artifact.artifactId, artifact]));
-  const resolved = Object.values(context.artifacts);
+  const resolvedEntries = Object.entries(context.artifacts);
+  const resolved = resolvedEntries.map(([, artifact]) => artifact);
   if (manifestArtifacts.size !== context.manifest.artifacts.length || resolved.length !== manifestArtifacts.size) {
     throw technical("The verified release artifact set is duplicated or incomplete.");
   }
   const releaseRoot = new URL("./", context.manifestUrl);
-  for (const artifact of resolved) {
+  const seen = new Set<string>();
+  for (const [key, artifact] of resolvedEntries) {
     const declared = manifestArtifacts.get(artifact.artifactId);
     if (
+      key !== artifact.artifactId ||
+      seen.has(artifact.artifactId) ||
       !declared ||
       !KNOWN_ARTIFACT_ROLES.has(artifact.role) ||
       artifact.dataReleaseId !== context.dataReleaseId ||
@@ -115,8 +232,14 @@ function assertExactContextArtifacts(context: ReleaseContext): readonly Resolved
     ) {
       throw technical(`Artifact ${artifact.artifactId} does not match its exact verified manifest identity.`);
     }
+    seen.add(artifact.artifactId);
   }
-  return Object.freeze(resolved.sort((left, right) => left.artifactId.localeCompare(right.artifactId)));
+  if ([...manifestArtifacts.keys()].some((artifactId) => !seen.has(artifactId))) {
+    throw technical("The resolved release context does not cover the exact manifest artifact ID set.");
+  }
+  const ordered = Object.freeze(resolved.sort((left, right) => left.artifactId.localeCompare(right.artifactId)));
+  assertCanonicalPersistedSemantics(context, ordered);
+  return ordered;
 }
 
 function wholeAuthority(

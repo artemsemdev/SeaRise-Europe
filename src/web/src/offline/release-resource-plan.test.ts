@@ -110,6 +110,43 @@ function privateContext(source: ReleaseContext): ReleaseContext {
   });
 }
 
+function relabeledPmtilesContext(source: ReleaseContext): ReleaseContext {
+  const artifactId = "projection-ssp2-45-2050-pmtiles";
+  const path = "config/visual-context.json";
+  const manifestArtifacts = source.manifest.artifacts.map((artifact) => {
+    if (artifact.artifactId !== artifactId) return artifact;
+    const relabeled = { ...artifact } as Record<string, unknown>;
+    delete relabeled.projectionContext;
+    relabeled.role = "methodology";
+    relabeled.path = path;
+    relabeled.mediaType = "application/json";
+    relabeled.scientificUse = "not-applicable";
+    return relabeled;
+  });
+  const manifest = {
+    ...source.manifest,
+    artifacts: manifestArtifacts,
+  } as unknown as BrowserReleaseManifestV2;
+  const artifacts = Object.fromEntries(Object.entries(source.artifacts).map(([key, artifact]) => {
+    if (key !== artifactId) return [key, artifact];
+    const relabeled = { ...artifact } as Record<string, unknown>;
+    delete relabeled.projectionContext;
+    relabeled.role = "methodology";
+    relabeled.path = path;
+    relabeled.url = `https://fixture.example/releases/${RELEASE_ID}/${path}`;
+    relabeled.mediaType = "application/json";
+    relabeled.scientificUse = "not-applicable";
+    return [key, relabeled];
+  })) as Record<string, ResolvedArtifact>;
+  return new ReleaseContext({
+    manifest,
+    manifestUrl: source.manifestUrl,
+    disposition: source.disposition,
+    artifacts,
+    datasets: { ...source.datasets },
+  });
+}
+
 function allKeys(value: unknown, result = new Set<string>()): ReadonlySet<string> {
   if (value && typeof value === "object") {
     if (!Array.isArray(value)) for (const key of Object.keys(value)) result.add(key);
@@ -177,7 +214,24 @@ describe("verified COG range-integrity authority", () => {
       release,
       appAuthority(),
       unverified as unknown as VerifiedCogRangeIntegrityIndexV1,
-    )).toThrowError(/verified range index/);
+    )).toThrowError(/not verified/);
+  });
+
+  it("keeps verification authority module-private and rejects reflected or mutated copies", async () => {
+    const release = await context();
+    const verified = await verifyCogRangeIntegrityIndex(release, appAuthority(), await indexBytes());
+    expect(Object.getOwnPropertySymbols(verified)).toEqual([]);
+    expect(Reflect.set(verified.artifacts[0].chunks[0], "sha256", "f".repeat(64))).toBe(false);
+
+    const copied = {
+      ...verified,
+      artifacts: verified.artifacts.map((artifact, index) => index === 0
+        ? { ...artifact, chunks: [{ ...artifact.chunks[0], sha256: "f".repeat(64) }, ...artifact.chunks.slice(1)] }
+        : artifact),
+    } as unknown as VerifiedCogRangeIntegrityIndexV1;
+    expect(() => createCogRangeAuthorityCatalog(release, appAuthority(), copied)).toThrowError(
+      /not verified by this module instance/,
+    );
   });
 });
 
@@ -284,6 +338,27 @@ describe("deterministic release resource plan", () => {
         rangeIntegrityBytes: bytes,
       })).rejects.toMatchObject({ detail: { kind: "technical-error", code: "IntegrityFailed" } });
     }
+
+    const duplicatedUnderPmtilesKey = forgedContext(release, (artifacts) => {
+      artifacts["projection-ssp2-45-2050-pmtiles"] = artifacts.methodology;
+    });
+    await expect(createVerifiedReleaseResourcePlan({
+      context: duplicatedUnderPmtilesKey,
+      appAuthority: appAuthority(),
+      rangeIntegrityBytes: bytes,
+    })).rejects.toMatchObject({ detail: { kind: "technical-error", code: "IntegrityFailed" } });
+
+    await expect(createVerifiedReleaseResourcePlan({
+      context: relabeledPmtilesContext(release),
+      appAuthority: appAuthority(),
+      rangeIntegrityBytes: bytes,
+    })).rejects.toMatchObject({ detail: { kind: "technical-error", code: "IntegrityFailed" } });
+
+    await expect(createVerifiedReleaseResourcePlan({
+      context: relabeledPmtilesContext(privateContext(release)),
+      appAuthority: appAuthority("private-engineering"),
+      rangeIntegrityBytes: bytes,
+    })).rejects.toMatchObject({ detail: { kind: "technical-error", code: "IntegrityFailed" } });
   });
 
   it("is resource-only and cannot persist queries, coordinates, selections, or a scientific outcome", async () => {

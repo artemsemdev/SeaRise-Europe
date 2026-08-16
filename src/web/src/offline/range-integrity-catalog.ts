@@ -39,11 +39,10 @@ export interface CogRangeIntegrityIndexV1 {
   readonly artifacts: readonly CogRangeArtifactIdentityV1[];
 }
 
-const VERIFIED_RANGE_INDEX: unique symbol = Symbol("verified-cog-range-integrity-index");
+const VERIFIED_RANGE_INDEXES = new WeakSet<object>();
 
 export interface VerifiedCogRangeIntegrityIndexV1 extends CogRangeIntegrityIndexV1 {
   readonly indexAuthority: WholeResourceAuthorityV1;
-  readonly [VERIFIED_RANGE_INDEX]: true;
 }
 
 function technical(
@@ -250,11 +249,12 @@ export async function verifyCogRangeIntegrityIndex(
     throw technical("IntegrityFailed", "The COG range-integrity bytes do not match their release authority.");
   }
   const parsed = parseCogRangeIntegrityDocument(decodeIndex(bytes), context);
-  return Object.freeze({
+  const verified: VerifiedCogRangeIntegrityIndexV1 = Object.freeze({
     ...parsed,
     indexAuthority: verifiedIndexAuthority,
-    [VERIFIED_RANGE_INDEX]: true as const,
   });
+  VERIFIED_RANGE_INDEXES.add(verified);
+  return verified;
 }
 
 function rangeAuthority(
@@ -292,11 +292,13 @@ export function createCogRangeAuthorityCatalog(
   index: VerifiedCogRangeIntegrityIndexV1,
 ): RangeAuthorityCatalogV1 {
   const authority = bindAppAuthorityToRelease(context, authorityInput);
+  if (!VERIFIED_RANGE_INDEXES.has(index)) {
+    throw technical("IntegrityFailed", "The range index was not verified by this module instance.");
+  }
   const expectedIndexAuthority = indexAuthority(context, authority);
   const expectedCogs = exactCogArtifacts(context);
   const indexedById = new Map(index.artifacts.map((artifact) => [artifact.artifactId, artifact]));
   if (
-    index[VERIFIED_RANGE_INDEX] !== true ||
     index.dataReleaseId !== context.dataReleaseId ||
     index.chunkSize !== 65_536 ||
     index.indexAuthority.authorityKind !== "release-artifact" ||
@@ -316,8 +318,15 @@ export function createCogRangeAuthorityCatalog(
   ) {
     throw technical("IntegrityFailed", "The verified range index belongs to another release.");
   }
+  const revalidated = parseCogRangeIntegrityDocument({
+    schemaVersion: index.schemaVersion,
+    dataReleaseId: index.dataReleaseId,
+    algorithm: index.algorithm,
+    chunkSize: index.chunkSize,
+    artifacts: index.artifacts,
+  }, context);
   const identities: RangeIdentityV1[] = [];
-  for (const indexed of index.artifacts) {
+  for (const indexed of revalidated.artifacts) {
     const artifactAuthority = rangeAuthority(context, authority, indexed);
     for (const chunk of indexed.chunks) {
       try {
