@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a release-pinned root service worker shell with a generated minimal
+  app/manifest precache, delayed public-static registration, private Candidate
+  refusal, conservative lifecycle behavior, and exact worker identity checks.
+
 - Added versioned release-scoped offline authority contracts for whole and
   authorized range resources, with fail-closed private-candidate persistence
   and an exact privacy allowlist for durable records.

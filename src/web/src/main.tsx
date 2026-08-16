@@ -5,6 +5,7 @@ import "@fontsource-variable/geist-mono";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { registerServiceWorkerAfterInteractivity } from "./offline/register-service-worker";
 import "./styles.css";
 
 if (__RELEASE_DISPOSITION__ === "private-engineering") {
@@ -21,3 +22,5 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 );
+
+registerServiceWorkerAfterInteractivity();

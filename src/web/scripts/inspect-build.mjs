@@ -1,6 +1,7 @@
 import { brotliCompressSync } from "node:zlib";
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
@@ -20,6 +21,7 @@ const required = [
   resolve(dist, "about/architecture/index.html"),
   resolve(dist, "releases", releaseId, "manifest.json"),
   resolve(dist, "vite-manifest.json"),
+  resolve(dist, "service-worker.js"),
 ];
 for (const path of required) {
   if (!paths.includes(path)) throw new Error(`Static build is missing ${relative(dist, path)}`);
@@ -79,6 +81,69 @@ const assets = paths
   .sort((left, right) => left.path.localeCompare(right.path));
 
 const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
+const serviceWorkerEntry = viteManifest["src/offline/service-worker.ts"];
+if (
+  !serviceWorkerEntry ||
+  serviceWorkerEntry.file !== "service-worker.js" ||
+  (serviceWorkerEntry.imports?.length ?? 0) !== 0 ||
+  (serviceWorkerEntry.dynamicImports?.length ?? 0) !== 0 ||
+  paths.includes(resolve(dist, "service-worker.js.map"))
+) throw new Error("Service worker must be one self-contained root entry without a stale source map");
+const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
+if (/skipWaiting\s*\(|clients\s*\.\s*claim\s*\(/u.test(serviceWorker)) {
+  throw new Error("Worker shell cannot force activation or claim existing clients");
+}
+const embedded = [...serviceWorker.matchAll(/JSON\.parse\((?:`((?:\\.|[^`\\])*)`|("(?:\\.|[^"\\])*"))\)/gu)]
+  .map((match) => {
+    try { return JSON.parse(JSON.parse(match[2] ?? `"${match[1]}"`)); } catch { return null; }
+  })
+  .find((value) => value?.contractVersion === 1 && Array.isArray(value.urls));
+if (!embedded) throw new Error("Service worker has no readable embedded precache authority");
+
+const expectedPrecacheFiles = new Set();
+function collectPrecache(key) {
+  const entry = viteManifest[key];
+  if (!entry || expectedPrecacheFiles.has(entry.file)) return;
+  expectedPrecacheFiles.add(entry.file);
+  for (const css of entry.css ?? []) expectedPrecacheFiles.add(css);
+  for (const asset of entry.assets ?? []) expectedPrecacheFiles.add(asset);
+  for (const imported of entry.imports ?? []) collectPrecache(imported);
+}
+const precacheMainKey = Object.entries(viteManifest).find(([, entry]) =>
+  entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
+)?.[0];
+if (!precacheMainKey) throw new Error("Vite manifest has no precache application entry");
+collectPrecache(precacheMainKey);
+for (const file of [...expectedPrecacheFiles].filter((path) => path.endsWith(".css"))) {
+  const css = readFileSync(resolve(dist, file), "utf8");
+  for (const match of css.matchAll(/url\((?:["']?)([^"')]+)(?:["']?)\)/gu)) {
+    if (/^(?:data:|https?:)/u.test(match[1])) continue;
+    expectedPrecacheFiles.add(match[1].startsWith("/")
+      ? match[1].slice(1)
+      : join(dirname(file), match[1]).replaceAll("\\", "/"));
+  }
+}
+const expectedPrecacheUrls = [
+  "/",
+  ...[...expectedPrecacheFiles].map((path) => `/${path}`),
+  `/releases/${releaseId}/manifest.json`,
+].sort();
+const expectedPrecacheHash = createHash("sha256").update(JSON.stringify({
+  contractVersion: 1,
+  appBuildId: process.env.SEARISE_APP_BUILD_ID ?? "local-fixture",
+  dataReleaseId: releaseId,
+  urls: expectedPrecacheUrls,
+})).digest("hex");
+if (
+  JSON.stringify(embedded.urls) !== JSON.stringify(expectedPrecacheUrls) ||
+  embedded.appBuildId !== (process.env.SEARISE_APP_BUILD_ID ?? "local-fixture") ||
+  embedded.dataReleaseId !== releaseId ||
+  embedded.releaseDisposition !== "synthetic-fixture" ||
+  embedded.manifestPath !== `/releases/${releaseId}/manifest.json` ||
+  embedded.precacheSetSha256 !== expectedPrecacheHash ||
+  embedded.urls.some((url) => url.startsWith("/about/") ||
+    (url.startsWith("/releases/") && url !== embedded.manifestPath))
+) throw new Error("Service worker embedded precache differs from the independent shell inventory");
 const mainEntry = Object.values(viteManifest).find((entry) =>
   entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
 );
@@ -121,6 +186,15 @@ const report = {
     lazyMapFiles: mapFiles.sort(),
   },
   lazyWorkerAssets: lazySearchPaths.map((path) => relative(dist, path)),
+  serviceWorker: {
+    path: "/service-worker.js",
+    scope: "/",
+    appBuildId: embedded.appBuildId,
+    dataReleaseId: embedded.dataReleaseId,
+    precacheSetSha256: embedded.precacheSetSha256,
+    precacheUrls: embedded.urls,
+    brotliBytes: brotliCompressSync(serviceWorker).length,
+  },
   assets,
 };
 writeFileSync(resolve(dist, "build-report.json"), `${JSON.stringify(report, null, 2)}\n`);

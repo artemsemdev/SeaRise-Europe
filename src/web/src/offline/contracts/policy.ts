@@ -264,6 +264,7 @@ export function validateOfflineTechnicalError(value: unknown): OfflineTechnicalE
 
 export const OFFLINE_WORKER_PROTOCOL = "searise-offline-worker-v1" as const;
 export type ClientToOfflineWorkerV1 =
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "inspect-identity"; messageToken: string; pair: AppReleasePairV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "acquire-lease" | "heartbeat-lease" | "release-lease"; messageToken: string; leaseId: string; pair: AppReleasePairV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "query-capability"; messageToken: string; requirements: InteractionRequirementsV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "prepare-update"; messageToken: string; currentPair: AppReleasePairV1; candidate: AppAuthorityV1 }>
@@ -271,6 +272,8 @@ export type ClientToOfflineWorkerV1 =
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "request-cleanup"; messageToken: string; pair: AppReleasePairV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "request-rollback"; messageToken: string; currentPair: AppReleasePairV1; targetPair: AppReleasePairV1; confirmationToken: string }>;
 export type OfflineWorkerToClientV1 =
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "worker-identity"; messageToken: string; pair: AppReleasePairV1; precacheSetSha256: Sha256Hex }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "activation-deferred"; messageToken: string; candidatePair: AppReleasePairV1; reason: "update-coordinator-not-installed" }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "lease-state"; messageToken: string; lease: ClientLeaseV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "capability"; messageToken: string; capability: RuntimeCapabilityV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "update-state"; messageToken: string | null; update: UpdateCapabilityV1 }>
@@ -283,6 +286,10 @@ export function validateClientToOfflineWorkerMessage(value: unknown): ClientToOf
   if (source.protocol !== OFFLINE_WORKER_PROTOCOL) fail("Offline worker protocol version is unsupported.");
   const messageToken = protocolId(source.messageToken, "messageToken");
   const type = source.type;
+  if (type === "inspect-identity") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "pair"], "identity message");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken, pair: validateAppReleasePair(record.pair) });
+  }
   if (type === "acquire-lease" || type === "heartbeat-lease" || type === "release-lease") {
     const record = exactRecord(value, ["protocol", "type", "messageToken", "leaseId", "pair"], `${type} message`);
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken, leaseId: protocolId(record.leaseId, "leaseId"), pair: validateAppReleasePair(record.pair) });
@@ -320,6 +327,15 @@ export function validateOfflineWorkerToClientMessage(value: unknown): OfflineWor
   const source = value as Record<string, unknown>;
   if (source.protocol !== OFFLINE_WORKER_PROTOCOL) fail("Offline worker protocol version is unsupported.");
   const type = source.type;
+  if (type === "worker-identity") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "pair", "precacheSetSha256"], "worker identity response");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), pair: validateAppReleasePair(record.pair), precacheSetSha256: sha256Hex(record.precacheSetSha256, "precacheSetSha256") });
+  }
+  if (type === "activation-deferred") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "candidatePair", "reason"], "activation deferred response");
+    if (record.reason !== "update-coordinator-not-installed") fail("Activation deferral reason is unsupported.");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), candidatePair: validateAppReleasePair(record.candidatePair), reason: record.reason });
+  }
   if (type === "lease-state") {
     const record = exactRecord(value, ["protocol", "type", "messageToken", "lease"], "lease-state response");
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), lease: validateClientLease(record.lease) });

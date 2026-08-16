@@ -7,8 +7,10 @@ const expectedCsp =
 test("binds Candidate-v7 read-only through one private loopback origin", async ({ page }) => {
   test.setTimeout(60_000);
   const forbiddenRequests: string[] = [];
+  const workerRequests: string[] = [];
   page.on("request", (request) => {
     const pathname = new URL(request.url()).pathname;
+    if (pathname === "/service-worker.js") workerRequests.push(pathname);
     if (isForbiddenApplicationApiPath(pathname)) {
       forbiddenRequests.push(pathname);
     }
@@ -21,6 +23,7 @@ test("binds Candidate-v7 read-only through one private loopback origin", async (
   );
   await expect(page.getByText(/Private engineering release · local only/i)).toBeVisible();
   await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  expect(await page.evaluate(() => navigator.serviceWorker.getRegistrations().then((items) => items.length))).toBe(0);
 
   const initial = await page.evaluate(async () => {
     const response = await fetch("/__local-binding/status");
@@ -225,4 +228,5 @@ test("binds Candidate-v7 read-only through one private loopback origin", async (
     unchanged: true,
   });
   expect(forbiddenRequests).toEqual([]);
+  expect(workerRequests).toEqual([]);
 });

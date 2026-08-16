@@ -182,6 +182,7 @@ export default defineConfig(({ mode }) => {
       __DATA_RELEASE_ID__: JSON.stringify(releaseId),
       __RELEASE_DISPOSITION__: JSON.stringify(releaseDisposition),
       __MANIFEST_URL__: JSON.stringify(manifestUrl),
+      __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V1__"),
     },
     server: {
       fs: {
@@ -200,6 +201,11 @@ export default defineConfig(({ mode }) => {
           index: resolve(import.meta.dirname, "index.html"),
           architecture: resolve(import.meta.dirname, "about/architecture/index.html"),
           scientificRuntime: resolve(import.meta.dirname, "src/scientific-runtime.ts"),
+          serviceWorker: resolve(import.meta.dirname, "src/offline/service-worker.ts"),
+        },
+        output: {
+          entryFileNames: (chunk) =>
+            chunk.name === "serviceWorker" ? "service-worker.js" : "assets/[name]-[hash].js",
         },
       },
     },
