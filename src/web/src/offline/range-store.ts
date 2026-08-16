@@ -92,10 +92,15 @@ function checkedIdentity(identity: RangeIdentityV1, expectedPair: AppReleasePair
   return validated;
 }
 function checkedCogIdentity(identity: RangeIdentityV1, expectedPair: AppReleasePairV1): RangeIdentityV1 {
-  const validated = checkedIdentity(identity, expectedPair);
-  if (validated.authority.role !== "projection-analysis-cog") {
+  const rawInput: unknown = identity;
+  const rawAuthority = typeof rawInput === "object" && rawInput !== null && "authority" in rawInput
+    ? rawInput.authority
+    : null;
+  if (typeof rawAuthority === "object" && rawAuthority !== null && "role" in rawAuthority
+    && rawAuthority.role === "projection-visual-pmtiles") {
     throw new RangeStoreUnsupportedError("PMTiles is visual, network-only context and cannot enter a range store.");
   }
+  const validated = checkedIdentity(identity, expectedPair);
   return validated;
 }
 function requestedInterval(identity: RangeIdentityV1, requested?: Readonly<{ start: number; endExclusive: number }>) {
