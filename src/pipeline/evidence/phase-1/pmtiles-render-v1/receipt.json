@@ -10,7 +10,7 @@
     "byteSize": 681871,
     "sha256": "3e68bcfdc4e891b05c77893d9a034795981bde72fe7056584678da8160e15b49",
     "manifestPath": "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json",
-    "manifestSha256": "9b39b8aee86d1e53cce1561898f37e4c6708d25798561c29d97562c268fd622c",
+    "manifestSha256": "81a185cf42c42c697c28fe22fd8f48a97ce4bfc14e20ae8cc7deeb8757f44d38",
     "approvedPhase0rReleaseId": "phase-0r-ar6-v1",
     "ownerGatePath": "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
     "ownerGateSha256": "f176b41d7cfe6a64ab1578e266f41838b2ffe4c915fb378d577468ba2104f638",
