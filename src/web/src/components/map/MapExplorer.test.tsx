@@ -6,12 +6,22 @@ import type { Coordinates, Selection } from "../../domain/release";
 import MapExplorer from "./MapExplorer";
 
 vi.mock("./MapSurface", () => ({
-  MapSurface: ({ layers, band, onCoordinate }: {
+  MapSurface: ({ layers, band, journeyTarget, journeyMotionSkipToken, interactionEnabled, onCoordinate }: {
     layers: { projection: { artifactId: string } };
     band: string;
+    journeyTarget?: Coordinates;
+    journeyMotionSkipToken?: number;
+    interactionEnabled?: boolean;
     onCoordinate: (coordinates: Coordinates) => void;
   }) => (
-    <div data-testid="map-adapter" data-artifact={layers.projection.artifactId} data-band={band}>
+    <div
+      data-testid="map-adapter"
+      data-artifact={layers.projection.artifactId}
+      data-band={band}
+      data-journey={journeyTarget ? `${journeyTarget.latitude}/${journeyTarget.longitude}` : "idle"}
+      data-motion-skip-token={journeyMotionSkipToken ?? 0}
+      data-interaction-enabled={interactionEnabled ? "true" : "false"}
+    >
       <button type="button" onClick={() => onCoordinate({ latitude: 51.5, longitude: -0.1 })}>
         Simulate common map selection
       </button>
@@ -33,7 +43,7 @@ async function context() {
 }
 
 describe("MapExplorer", () => {
-  it("keeps preview non-result and accepts overlay controls only through the common command", async () => {
+  it("keeps preview non-result while the result panel owns scenario and horizon selection", async () => {
     const release = await context();
     const command = vi.fn();
     const initial = Object.freeze({
@@ -48,24 +58,19 @@ describe("MapExplorer", () => {
     const { rerender } = render(<MapExplorer context={release} onSelection={command} />);
 
     expect(screen.getByRole("status")).toHaveTextContent(/default release preview.*not an accepted scientific result/i);
-    expect(screen.getByLabelText("Scenario")).toBeDisabled();
-    expect(screen.getByLabelText("Horizon")).toBeDisabled();
-    expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(/no result marker or result legend/i);
+    expect(screen.queryByLabelText("Scenario")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Horizon")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(/default non-result preview/i);
+    expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-interaction-enabled", "false");
 
     rerender(<MapExplorer context={release} selection={initial} onSelection={command} />);
+    expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-interaction-enabled", "true");
     expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(
       "Selected coordinate: 51.5000, -0.1000",
     );
-    fireEvent.change(screen.getByLabelText("Scenario"), { target: { value: "ssp5-85" } });
-    expect(command).toHaveBeenLastCalledWith(expect.objectContaining({ scenario: "ssp5-85", horizon: 2050 }));
     expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-artifact", "projection-ssp2-45-2050-pmtiles");
 
-    const higher = command.mock.calls.at(-1)![0] as Selection;
-    rerender(<MapExplorer context={release} selection={higher} onSelection={command} />);
-    fireEvent.change(screen.getByLabelText("Horizon"), { target: { value: "2100" } });
-    expect(command).toHaveBeenLastCalledWith(expect.objectContaining({ scenario: "ssp5-85", horizon: 2100 }));
-
-    const future = command.mock.calls.at(-1)![0] as Selection;
+    const future = Object.freeze({ ...initial, scenario: "ssp5-85" as const, horizon: 2100 as const });
     rerender(<MapExplorer context={release} selection={future} onSelection={command} />);
     fireEvent.click(screen.getByLabelText(/Upper · q0.833/));
 
@@ -77,6 +82,26 @@ describe("MapExplorer", () => {
     expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(
       "Accepted result visualization · ssp5-85 · 2100 · Upper · q0.833",
     );
+  });
+
+  it("passes a deterministic journey target to the map without presenting it as accepted", async () => {
+    const release = await context();
+    render(
+      <MapExplorer
+        context={release}
+        journeyActive
+        journeyTarget={{ latitude: 59.9139, longitude: 10.7522 }}
+        journeyMotionSkipToken={3}
+        onSelection={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("region", { name: /release-scoped source-grid visualization/i })).toHaveAttribute(
+      "data-journey-active",
+      "true",
+    );
+    expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-journey", "59.9139/10.7522");
+    expect(screen.getByTestId("map-adapter")).toHaveAttribute("data-motion-skip-token", "3");
+    expect(screen.getByLabelText("Map text alternative")).toHaveTextContent(/default non-result preview/i);
   });
 
   it("routes a map click through the immutable common coordinate selection", async () => {

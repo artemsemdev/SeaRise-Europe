@@ -44,8 +44,9 @@ import { releaseScopeStatus } from "./release-copy";
 import { isForbiddenApplicationApiPath } from "./test/application-api-boundary";
 
 vi.mock("./components/map/MapExplorer", () => ({
-  default: ({ selection, onSelection, context }: {
+  default: ({ selection, journeyMotionSkipToken, onSelection, context }: {
     selection?: Selection;
+    journeyMotionSkipToken?: number;
     onSelection: (selection: Selection) => void;
     context: ReleaseContext;
   }) => (
@@ -54,6 +55,7 @@ vi.mock("./components/map/MapExplorer", () => ({
       <output data-testid="map-accepted-selection">
         {selection ? `${selection.scenario}/${selection.horizon}/${selection.location.coordinates.latitude}` : "preview-only"}
       </output>
+      <output data-testid="map-motion-skip-token">{journeyMotionSkipToken ?? 0}</output>
       <button type="button" onClick={() => onSelection(Object.freeze({
         dataReleaseId: context.dataReleaseId,
         scenario: selection?.scenario ?? context.defaults.scenario,
@@ -418,7 +420,7 @@ function urlFor(
 
 async function waitForRuntime(records: RuntimeRecord[]): Promise<TestController> {
   await waitFor(() => expect(records.length).toBeGreaterThan(0));
-  await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: /select test map point/i })).toBeEnabled());
   return records.at(-1)!.controller;
 }
 
@@ -452,12 +454,14 @@ describe("production static application composition", () => {
     const runtime = runtimeFactory();
     render(<App runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
 
-    expect(screen.getByRole("heading", { level: 1, name: /explore regional sea-level projections across Europe/i })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: /take me there/i })).toBeVisible();
     expect(screen.getByText(/synthetic fixture · illustrative only/i)).toBeVisible();
-    expect(screen.getByRole("navigation", { name: /primary/i })).toBeVisible();
+    expect(screen.getByRole("button", { name: /methodology and sources/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /skip to content/i })).toHaveAttribute("href", "#main");
-    expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
+    expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
+    expect(document.querySelector(".flight-scene")).toBeInTheDocument();
+    expect(document.querySelector("[data-flight-phase='idle']")).toBeInTheDocument();
   });
 
   it("binds landing release disclosure to verified bootstrap disposition", () => {
@@ -516,6 +520,31 @@ describe("production static application composition", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("moves from idle through a truthful Flight transition before revealing the first result", async () => {
+    const runtime = runtimeFactory();
+    const user = userEvent.setup();
+    render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
+    const controller = await waitForRuntime(runtime.records);
+    expect(document.querySelector("[data-flight-phase='idle'] .flight-search")).toBeInTheDocument();
+
+    controller.deferNextSelection = true;
+    await user.click(await screen.findByRole("button", { name: /select test map point/i }));
+    expect(document.querySelector("[data-flight-phase='transition'] .flight-scene")).toBeInTheDocument();
+    expect(screen.getByText(/flying to the selected point/i)).toBeVisible();
+    expect(document.querySelector("[data-outcome]")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /skip motion/i }));
+    expect(document.querySelector("[data-flight-phase='transition']")).toBeInTheDocument();
+    expect(screen.getByTestId("map-motion-skip-token")).toHaveTextContent("1");
+    expect(screen.getByText(/camera motion skipped/i)).toBeVisible();
+    expect(document.querySelector("[data-outcome]")).toBeNull();
+
+    act(() => controller.resolveDeferred());
+    await waitFor(() => expect(document.querySelector("[data-flight-phase='result'] .flight-result")).toBeInTheDocument());
+    expect(document.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", "OutOfScope");
+    expect(screen.queryByText(/flying to the selected point/i)).not.toBeInTheDocument();
+  });
+
   it("keeps the accepted result on the map while one new command is pending, then swaps atomically", async () => {
     const runtime = runtimeFactory();
     const user = userEvent.setup();
@@ -523,17 +552,19 @@ describe("production static application composition", () => {
     render(<LandingPage release={ready()} retry={vi.fn()} runtimeFactory={runtime.factory} urlEnvironment={environment} searchWorkerFactory={searchFactory()} />);
     const controller = await waitForRuntime(runtime.records);
     await screen.findByText(/outside the coastal analysis area/i);
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     expect(await screen.findByTestId("map-accepted-selection")).toHaveTextContent("ssp2-45/2050/51.9");
 
     controller.deferNextSelection = true;
     await user.click(screen.getByLabelText(/Higher-emissions scenario/i));
+    expect(document.querySelector("[data-flight-phase='transition']")).toBeInTheDocument();
+    expect(screen.getByText(/flying to the selected point/i)).toBeVisible();
     expect(screen.getByText(/previous accepted result.*new selection is being checked/i)).toBeVisible();
     expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp2-45/2050/51.9");
     expect(controller.select).toHaveBeenCalledTimes(2);
 
     act(() => controller.resolveDeferred());
     await waitFor(() => expect(screen.getByTestId("map-accepted-selection")).toHaveTextContent("ssp5-85/2050/51.9"));
+    expect(document.querySelector("[data-flight-phase='result']")).toBeInTheDocument();
   });
 
   it("announces a terminal assessment failure without implying that evaluation is still running", async () => {
@@ -548,7 +579,6 @@ describe("production static application composition", () => {
       recoverable: true,
     });
 
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
 
     const status = document.querySelector(".selection-status");
@@ -569,7 +599,7 @@ describe("production static application composition", () => {
     const controller = await waitForRuntime(runtime.records);
     expect(await screen.findByText(/outside the coastal analysis area/i)).toBeVisible();
     expect(document.querySelector(".selection-status")).toHaveTextContent(
-      "The accepted projection is shown below.",
+      "The accepted projection is shown in the result panel.",
     );
     controller.failNextAssessment({
       kind: "technical-error",
@@ -584,7 +614,7 @@ describe("production static application composition", () => {
       /technical failure.*not a DataUnavailable scientific outcome/i,
     );
     expect(document.querySelector(".selection-status")).toHaveTextContent(
-      "The previous accepted projection remains shown below; the latest operation ended in a technical failure.",
+      "The previous accepted projection remains in the result panel; the latest operation ended in a technical failure.",
     );
     expect(document.querySelector(".selection-status")).not.toHaveTextContent(/being checked/i);
     expect(document.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", "OutOfScope");
@@ -610,12 +640,7 @@ describe("production static application composition", () => {
     expect(screen.getByText(/share link is ready in the browser address bar/i)).toBeVisible();
     expect(environment.url.searchParams.get("release")).toBe(releaseContext.dataReleaseId);
 
-    const search = screen.getByRole("combobox", { name: /find a city/i });
-    await user.type(search, "Fixture");
-    expect(await screen.findByRole("option", { name: /Fixturehafen/i })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
-    expect(search).toHaveValue("");
     expect(screen.queryByRole("listbox", { name: /settlement results/i })).not.toBeInTheDocument();
     expect(controller.select).toHaveBeenLastCalledWith(expect.objectContaining({
       location: { kind: "coordinate", coordinates: { latitude: 42, longitude: 7 } },
@@ -640,7 +665,7 @@ describe("production static application composition", () => {
     expect(controller.cancelSearch).toHaveBeenCalled();
     expect(controller.reset).toHaveBeenCalledOnce();
     expect(environment.url.searchParams.has("release")).toBe(false);
-    expect(screen.getByText(/choose a settlement or point/i)).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: /take me there/i })).toBeVisible();
   });
 
   it("deduplicates only duplicate StrictMode initial delivery and accepts the same later popstate", async () => {
@@ -726,7 +751,6 @@ describe("production static application composition", () => {
       message: "Stale release selection.",
       recoverable: false,
     }));
-    await user.click(screen.getByRole("button", { name: /open static visualization/i }));
     await user.click(await screen.findByRole("button", { name: /select test map point/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/selection command failed.*not a scientific outcome/i);
   });

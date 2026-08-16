@@ -17,12 +17,19 @@ import {
 import type { AssessmentResult } from "../domain/scientific-lookup";
 import type { ReleaseMethodology } from "../data/methodology-repository";
 import type { RefObject } from "react";
+import { ArrowCounterClockwise, BookOpenText, ShareNetwork } from "@phosphor-icons/react";
 import "./ProjectionPanel.css";
 
 const SCENARIO_LABELS: Readonly<Record<ScenarioId, string>> = Object.freeze({
   "ssp1-26": "Lower-emissions scenario (SSP1-2.6)",
   "ssp2-45": "Intermediate-emissions scenario (SSP2-4.5)",
   "ssp5-85": "Higher-emissions scenario (SSP5-8.5)",
+});
+
+const SCENARIO_SHORT_LABELS: Readonly<Record<ScenarioId, string>> = Object.freeze({
+  "ssp1-26": "SSP1-2.6",
+  "ssp2-45": "SSP2-4.5",
+  "ssp5-85": "SSP5-8.5",
 });
 
 const REQUIRED_DISCLAIMER =
@@ -41,6 +48,7 @@ export interface ProjectionPanelProps {
   readonly onShare: () => void;
   readonly onOpenMethodology: () => void;
   readonly methodologyTriggerRef?: RefObject<HTMLButtonElement | null>;
+  readonly showMethodologyAction?: boolean;
 }
 
 function assertNever(value: never): never {
@@ -175,10 +183,11 @@ function SelectionControls({
               type="radio"
               name="projection-scenario"
               value={scenario}
+              aria-label={`${SCENARIO_LABELS[scenario]}, exact ID ${scenario}`}
               checked={selection.scenario === scenario}
               onChange={() => changeScenario(scenario)}
             />
-            <span>{SCENARIO_LABELS[scenario]} <code>{scenario}</code></span>
+            <span>{SCENARIO_SHORT_LABELS[scenario]}</span>
           </label>
         ))}
       </fieldset>
@@ -253,29 +262,10 @@ function OutcomeContent({
             likely range (q0.167–q0.833) is <strong>{result.lowerMetres.toFixed(3)}–{result.upperMetres.toFixed(3)} m</strong>,
             relative to the <strong>{result.baseline}</strong>.
           </p>
-          <dl className="projection-panel__metadata">
-            <div><dt>Source-grid location</dt><dd>{result.source.latitude.toFixed(4)}°, {result.source.longitude.toFixed(4)}°</dd></div>
+          <dl className="projection-panel__primary-facts">
             <div><dt>Source-grid distance</dt><dd>{result.source.distanceKilometres.toFixed(3)} km</dd></div>
             <div><dt>Native resolution</dt><dd>{result.nativeResolutionDegrees}°</dd></div>
-            <div><dt>Methodology version</dt><dd><code>{result.methodologyVersion}</code></dd></div>
-            <div><dt>Data release</dt><dd><code>{result.dataReleaseId}</code></dd></div>
-            <div><dt>AR6 source release</dt><dd><code>{result.sourceRelease}</code></dd></div>
           </dl>
-          <section aria-labelledby="projection-source-title">
-            <h4 id="projection-source-title">Source and licence</h4>
-            <p>{methodology.source.attributionText}</p>
-            <p>
-              <a href={methodology.source.sourceUrl} rel="noreferrer">{methodology.source.title}</a>
-              {" · "}
-              <a href={methodology.source.licence.url} rel="noreferrer">
-                {methodology.source.licence.name} ({methodology.source.licence.spdxId})
-              </a>
-            </p>
-          </section>
-          <section aria-labelledby="projection-limitations-title">
-            <h4 id="projection-limitations-title">Limitations</h4>
-            <ul>{methodology.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
-          </section>
         </>
       );
       break;
@@ -328,11 +318,42 @@ function OutcomeContent({
         <p className="projection-panel__sr-only" role="status">Scientific outcome updated: {result.resultState}.</p>
       ) : null}
       {contextLabel ? <p className="projection-panel__context-label">{contextLabel}</p> : null}
+      <p className="projection-panel__outcome-badge">{result.resultState}</p>
       <div id="projection-outcome-title">{content}</div>
       {selectedLocation(selection)}
-      <p><strong>Release status:</strong> {dispositionCopy(methodology)}</p>
-      <p><strong>Map meaning:</strong> {mapMeaning(result)}</p>
-      <p className="projection-panel__disclaimer">{REQUIRED_DISCLAIMER}</p>
+      <details className="projection-panel__disclosure">
+        <summary>Limitations, method and release identity</summary>
+        <div className="projection-panel__disclosure-content">
+          {result.resultState === "ProjectionAvailable" ? (
+            <dl className="projection-panel__metadata">
+              <div><dt>Source-grid location</dt><dd>{result.source.latitude.toFixed(4)}°, {result.source.longitude.toFixed(4)}°</dd></div>
+              <div><dt>Source-grid distance</dt><dd>{result.source.distanceKilometres.toFixed(3)} km</dd></div>
+              <div><dt>Native resolution</dt><dd>{result.nativeResolutionDegrees}°</dd></div>
+              <div><dt>Methodology version</dt><dd><code>{result.methodologyVersion}</code></dd></div>
+              <div><dt>Data release</dt><dd><code>{result.dataReleaseId}</code></dd></div>
+              <div><dt>AR6 source release</dt><dd><code>{result.sourceRelease}</code></dd></div>
+            </dl>
+          ) : null}
+          <section aria-labelledby="projection-source-title">
+            <h4 id="projection-source-title">Source and licence</h4>
+            <p>{methodology.source.attributionText}</p>
+            <p>
+              <a href={methodology.source.sourceUrl} rel="noreferrer">{methodology.source.title}</a>
+              {" · "}
+              <a href={methodology.source.licence.url} rel="noreferrer">
+                {methodology.source.licence.name} ({methodology.source.licence.spdxId})
+              </a>
+            </p>
+          </section>
+          <section aria-labelledby="projection-limitations-title">
+            <h4 id="projection-limitations-title">Limitations</h4>
+            <ul>{methodology.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
+          </section>
+          <p><strong>Release status:</strong> {dispositionCopy(methodology)}</p>
+          <p><strong>Map meaning:</strong> {mapMeaning(result)}</p>
+          <p className="projection-panel__disclaimer">{REQUIRED_DISCLAIMER}</p>
+        </div>
+      </details>
     </article>
   );
 }
@@ -395,6 +416,7 @@ export function ProjectionPanel({
   onShare,
   onOpenMethodology,
   methodologyTriggerRef,
+  showMethodologyAction = true,
 }: ProjectionPanelProps): React.ReactNode {
   const accepted = visibleAcceptedProjection(state);
   const selection = currentSelection(state);
@@ -408,12 +430,15 @@ export function ProjectionPanel({
   const canReset = state.phase !== "booting" && state.phase !== "ready" && selection !== null;
 
   return (
-    <section className="projection-panel" aria-labelledby="projection-panel-title" data-phase={state.phase}>
+    <section className="projection-panel flight-result" aria-labelledby="projection-panel-title" data-phase={state.phase}>
       <header>
         <p className="projection-panel__eyebrow">Static browser projection</p>
         <h2 id="projection-panel-title">Regional relative sea-level projection</h2>
       </header>
       <PhaseMessage state={state} />
+      {accepted ? (
+        <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} />
+      ) : null}
       {selection ? (
         <SelectionControls
           selection={selection}
@@ -421,14 +446,26 @@ export function ProjectionPanel({
           onChange={onSelectionChange}
         />
       ) : null}
-      {accepted ? (
-        <AcceptedResult accepted={accepted} methodology={methodology} contextLabel={acceptedContext(state)} />
-      ) : null}
       <div className="projection-panel__actions" aria-label="Projection actions">
-        <button type="button" onClick={onRetry} disabled={!canRetry}>Retry exact selection</button>
-        <button type="button" onClick={onReset} disabled={!canReset}>Reset selection</button>
-        <button type="button" onClick={onShare} disabled={!stableShare}>Share accepted result</button>
-        <button ref={methodologyTriggerRef} type="button" onClick={onOpenMethodology} disabled={!methodologyUsable}>Methodology and sources</button>
+        <button type="button" onClick={onRetry} disabled={!canRetry}>
+          <ArrowCounterClockwise size={16} aria-hidden="true" /> Retry exact selection
+        </button>
+        <button
+          type="button"
+          aria-label="Reset selection and choose another place"
+          onClick={onReset}
+          disabled={!canReset}
+        >
+          <ArrowCounterClockwise size={16} aria-hidden="true" /> Another place
+        </button>
+        <button type="button" onClick={onShare} disabled={!stableShare}>
+          <ShareNetwork size={16} aria-hidden="true" /> Share accepted result
+        </button>
+        {showMethodologyAction ? (
+          <button ref={methodologyTriggerRef} type="button" onClick={onOpenMethodology} disabled={!methodologyUsable}>
+            <BookOpenText size={16} aria-hidden="true" /> Methodology and sources
+          </button>
+        ) : null}
       </div>
     </section>
   );

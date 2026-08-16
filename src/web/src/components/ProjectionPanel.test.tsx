@@ -237,27 +237,37 @@ describe("projection panel scientific outcomes", () => {
     ["DataUnavailable", /model data unavailable for this point/i],
     ["OutOfScope", /outside the coastal analysis area/i],
     ["UnsupportedGeography", /outside the supported Europe area/i],
-  ] as const)("renders only the authoritative %s meaning", (outcome, headline) => {
+  ] as const)("renders only the authoritative %s meaning", async (outcome, headline) => {
     const { container } = renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted(outcome) });
+    const user = userEvent.setup();
     expect(screen.getByRole("heading", { name: headline })).toBeVisible();
     expect(container.querySelectorAll("[data-outcome]")).toHaveLength(1);
     expect(container.querySelector("[data-outcome]")).toHaveAttribute("data-outcome", outcome);
+    await user.click(screen.getByText(/limitations, method and release identity/i));
     expect(screen.getByText(/map meaning:/i)).toBeVisible();
     expect(screen.getByText(/informational and educational use/i)).toHaveTextContent(
       "It does not determine flooding, inundation, terrain exposure, or property risk.",
     );
   });
 
-  it("shows the exact approved available metadata, attribution, licence, limitations, and exclusions", () => {
+  it("keeps primary values upfront and discloses complete evidence in native details", async () => {
     renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() });
+    const user = userEvent.setup();
     expect(screen.getByText(/selected settlement: geonames:2747891/i)).toBeVisible();
     expect(screen.getByText(/0\.247 m/)).toBeVisible();
     expect(screen.getByText(/0\.156–0\.351 m/)).toBeVisible();
     expect(screen.getByText(/q0\.167–q0\.833/)).toBeVisible();
     expect(screen.getByText(/1995-2014 mean/i)).toBeVisible();
+    const primaryFacts = document.querySelector(".projection-panel__primary-facts");
+    expect(primaryFacts).not.toBeNull();
+    expect(within(primaryFacts as HTMLElement).getByText("12.346 km")).toBeVisible();
+    expect(within(primaryFacts as HTMLElement).getByText("1°")).toBeVisible();
+    const disclosure = screen.getByText(/limitations, method and release identity/i).closest("summary");
+    expect(disclosure).not.toBeNull();
+    if (!disclosure) throw new Error("Method disclosure summary was not rendered.");
+    await user.click(disclosure);
+    expect(disclosure.closest("details")).toHaveAttribute("open");
     expect(screen.getByText("52.0000°, 4.0000°")).toBeVisible();
-    expect(screen.getByText("12.346 km")).toBeVisible();
-    expect(screen.getByText("1°")).toBeVisible();
     expect(screen.getByText("ar6-regional-projection-v1")).toBeVisible();
     expect(screen.getByText(RELEASE_ID)).toBeVisible();
     expect(screen.getByRole("link", { name: /ipcc ar6 regional sea level projections/i })).toHaveAttribute(
@@ -290,7 +300,7 @@ describe("projection panel scientific outcomes", () => {
     });
     rerender(<ProjectionPanel state={{ phase: "result", release, operationToken: 3, searchToken: 0, accepted: nodata }} methodology={methodology()} {...callbacks()} />);
     expect(screen.getByText(/at least one required source quantile/i)).toBeVisible();
-    expect(screen.getByText(/does not mean zero change/i)).toBeVisible();
+    expect(screen.getByText(/not a zero-change or no-risk result/i)).toBeVisible();
   });
 
   it("keeps scope outcomes useful without a no-hazard implication or application failure", () => {
@@ -358,8 +368,9 @@ describe("projection panel controls and fail-closed presentation", () => {
     ["synthetic-fixture", /synthetic fixture — demonstration only/i],
     ["private-engineering", /private engineering candidate — local validation only/i],
     ["public-promoted", /public promoted release — approved immutable release artifacts/i],
-  ] as const)("discloses the %s release disposition", (disposition, disclosure) => {
+  ] as const)("discloses the %s release disposition", async (disposition, disclosure) => {
     renderPanel({ phase: "result", release, operationToken: 2, searchToken: 0, accepted: accepted() }, methodology(disposition));
+    await userEvent.setup().click(screen.getByText(/limitations, method and release identity/i));
     expect(screen.getByText(disclosure)).toBeVisible();
   });
 

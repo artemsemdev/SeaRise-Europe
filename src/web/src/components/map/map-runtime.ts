@@ -24,7 +24,7 @@ const EMPTY_STYLE: StyleSpecification = {
   version: 8,
   name: "SeaRise release-only canvas",
   sources: {},
-  layers: [{ id: "searise-background", type: "background", paint: { "background-color": "#dbe9e7" } }],
+  layers: [{ id: "searise-background", type: "background", paint: { "background-color": "#0b3f4d" } }],
 };
 
 let sharedProtocol: Protocol | undefined;
@@ -151,6 +151,7 @@ export class MapController {
       maxZoom: 8,
       attributionControl: false,
       cooperativeGestures: true,
+      interactive: false,
     });
     this.#map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     this.#map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
@@ -259,6 +260,47 @@ export class MapController {
     } else {
       this.#marker.setLngLat([coordinates.longitude, coordinates.latitude]);
     }
+  }
+
+  travelTo(coordinates: Coordinates, animated: boolean): void {
+    if (this.#destroyed) return;
+    this.#map.easeTo({
+      center: [coordinates.longitude, coordinates.latitude],
+      zoom: Math.max(this.#map.getZoom(), 5),
+      duration: animated ? 900 : 0,
+      essential: false,
+    });
+  }
+
+  setInteractionEnabled(enabled: boolean): void {
+    if (this.#destroyed) return;
+    const handlers = [
+      this.#map.boxZoom,
+      this.#map.doubleClickZoom,
+      this.#map.dragPan,
+      this.#map.dragRotate,
+      this.#map.keyboard,
+      this.#map.scrollZoom,
+      this.#map.touchZoomRotate,
+    ];
+    for (const handler of handlers) {
+      if (enabled) handler.enable();
+      else handler.disable();
+    }
+    this.#map.getCanvas().tabIndex = enabled ? 0 : -1;
+    for (const control of this.#map.getContainer().querySelectorAll<HTMLButtonElement>(".maplibregl-ctrl button")) {
+      control.disabled = !enabled;
+      control.tabIndex = enabled ? 0 : -1;
+    }
+  }
+
+  finishTravel(coordinates: Coordinates): void {
+    if (this.#destroyed) return;
+    this.#map.stop();
+    this.#map.jumpTo({
+      center: [coordinates.longitude, coordinates.latitude],
+      zoom: Math.max(this.#map.getZoom(), 5),
+    });
   }
 
   async loadOptionalBasemap(): Promise<void> {

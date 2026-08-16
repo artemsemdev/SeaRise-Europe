@@ -5,7 +5,9 @@ import {
   useEffect,
   useRef,
   useState,
+  type RefObject,
 } from "react";
+import { AirplaneTilt } from "@phosphor-icons/react";
 import { useAssessmentRuntime } from "./application/use-assessment-runtime";
 import { useProjectionUrl } from "./application/use-projection-url";
 import type { BrowserRuntimeFactory } from "./application/browser-runtime";
@@ -32,7 +34,6 @@ import {
 } from "./domain/release";
 import type { SearchWorkerFactory } from "./search/client";
 import type { SettlementSearchRecord } from "./search/types";
-import { releaseScopeStatus } from "./release-copy";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 
 const ArchitecturePage = lazy(() => import("./routes/ArchitecturePage"));
@@ -55,6 +56,34 @@ function Header({ light = false }: { light?: boolean }) {
         <a href="https://github.com/artemsemdev/SeaRise-Europe">Source</a>
       </nav>
       <span className="release-pill">{releaseLabel()}</span>
+    </header>
+  );
+}
+
+function FlightHeader({
+  methodologyAvailable,
+  onOpenMethodology,
+  methodologyTriggerRef,
+}: {
+  readonly methodologyAvailable: boolean;
+  readonly onOpenMethodology: () => void;
+  readonly methodologyTriggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+  return (
+    <header className="flight-header">
+      <Brand />
+      <div className="flight-header__actions">
+        <span className="release-pill">{releaseLabel()}</span>
+        <button
+          ref={methodologyTriggerRef}
+          type="button"
+          aria-label="Methodology and sources"
+          disabled={!methodologyAvailable}
+          onClick={onOpenMethodology}
+        >
+          Methodology
+        </button>
+      </div>
     </header>
   );
 }
@@ -101,13 +130,42 @@ function projectionSelectionStatus(
     case "integrity-error":
     case "technical-error":
       return hasAcceptedProjection
-        ? "The previous accepted projection remains shown below; the latest operation ended in a technical failure."
+        ? "The previous accepted projection remains in the result panel; the latest operation ended in a technical failure."
         : "The selected operation ended in a technical failure. No scientific outcome was produced.";
     default:
       return hasAcceptedProjection
-        ? "The accepted projection is shown below."
-        : "The selected point is being checked below.";
+        ? "The accepted projection is shown in the result panel."
+        : "The selected point is being checked.";
   }
+}
+
+function projectionPanelVisible(state: ProjectionState | null, hasAcceptedProjection: boolean): boolean {
+  if (!state) return false;
+  if (hasAcceptedProjection) return true;
+  return state.phase === "result" || state.phase === "offline" || state.phase === "connection-required" ||
+    state.phase === "unsupported-browser" || state.phase === "integrity-error" ||
+    state.phase === "technical-error";
+}
+
+function projectionJourneySelection(state: ProjectionState | null): Selection | null {
+  if (!state) return null;
+  return state.phase === "evaluating" || state.phase === "updating"
+    ? state.operation.selection
+    : null;
+}
+
+function flightPhase(
+  state: ProjectionState | null,
+  journeyActive: boolean,
+  panelVisible: boolean,
+  externalFailure: boolean,
+): "idle" | "transition" | "result" | "failure" {
+  if (externalFailure) return "failure";
+  if (state && (state.phase === "offline" || state.phase === "connection-required" ||
+    state.phase === "unsupported-browser" || state.phase === "integrity-error" ||
+    state.phase === "technical-error")) return "failure";
+  if (journeyActive) return "transition";
+  return panelVisible ? "result" : "idle";
 }
 
 function settlementSelection(
@@ -146,6 +204,25 @@ interface NavigationIntent {
   readonly selection: Selection;
 }
 
+function useReducedMotionPreference(): boolean {
+  const query = "(prefers-reduced-motion: reduce)";
+  const [reduced, setReduced] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(query).matches
+      : false,
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia(query);
+    const update = (event: MediaQueryListEvent): void => setReduced(event.matches);
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  return reduced;
+}
+
 export interface LandingPageProps {
   readonly release: ReleaseBootstrapState;
   readonly retry: () => void;
@@ -163,13 +240,14 @@ function LandingPageSession({
 }: LandingPageProps) {
   const context = release.phase === "ready" ? release.context : null;
   const runtime = useAssessmentRuntime(context, runtimeFactory);
-  const [mapOpen, setMapOpen] = useState(false);
   const [methodologyOpen, setMethodologyOpen] = useState(false);
   const [clearSearchToken, setClearSearchToken] = useState(0);
   const [commandError, setCommandError] = useState<TechnicalError | null>(null);
   const [urlError, setUrlError] = useState<TechnicalError | null>(null);
   const [shareStatus, setShareStatus] = useState("");
   const [navigationIntent, setNavigationIntent] = useState<NavigationIntent | null>(null);
+  const [journeyMotionSkipToken, setJourneyMotionSkipToken] = useState(0);
+  const [skippedJourneyKey, setSkippedJourneyKey] = useState<string | null>(null);
   const navigationSerial = useRef(0);
   const handledNavigationSerial = useRef(0);
   const pendingInitialSelection = useRef<string | null>(null);
@@ -250,7 +328,17 @@ function LandingPageSession({
   }, [navigationIntent, scopeReady, submitSelection]);
 
   const accepted = runtime.projection ? visibleAcceptedProjection(runtime.projection) : null;
-  const scopeStatus = releaseScopeStatus(release);
+  const panelVisible = projectionPanelVisible(runtime.projection, accepted !== null);
+  const journeySelection = projectionJourneySelection(runtime.projection);
+  const externalFailure = commandError !== null || urlError !== null ||
+    runtime.methodology.phase === "technical-error";
+  const journeyActive = journeySelection !== null && !externalFailure;
+  const journeyKey = journeySelection && runtime.projection
+    ? `${runtime.projection.operationToken}:${selectionKey(journeySelection)}`
+    : null;
+  const reducedMotion = useReducedMotionPreference();
+  const journeyMotionComplete = reducedMotion || (journeyKey !== null && journeyKey === skippedJourneyKey);
+  const currentFlightPhase = flightPhase(runtime.projection, journeyActive, panelVisible, externalFailure);
   const verifiedMethodology = runtime.methodology.phase === "ready" && context &&
       runtime.methodology.dataReleaseId === context.dataReleaseId
     ? runtime.methodology.methodology
@@ -274,50 +362,101 @@ function LandingPageSession({
   };
 
   return (
-    <main id="main" className="landing">
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="graticule" aria-hidden="true" />
-        <div className="continent continent-one" aria-hidden="true" />
-        <div className="continent continent-two" aria-hidden="true" />
-        <div className="hero-content">
-          <p className="eyebrow">Regional projections · three scenarios · three horizons</p>
-          <h1 id="hero-title">
-            Explore regional sea-level projections <em>across Europe</em>.
-          </h1>
-          <p className="hero-copy">
-            Explore IPCC AR6 regional relative sea-level projections for European
-            settlements. Values are regional—not predictions of flooding or property risk.
-          </p>
-          <ReleaseStartup state={release} retry={retry} />
-          <SettlementSearch
-            release={scopeReady ? context : null}
-            clearToken={clearSearchToken}
-            workerFactory={searchWorkerFactory}
-            onSearchLifecycle={runtime.handleSearchLifecycle}
-            onSelect={(record) => {
-              if (!context || !scopeReady) return;
-              submitSelection(settlementSelection(context, runtime.projection, record));
-            }}
-          />
-          <p className="selection-status" aria-live="polite">
-            {projectionSelectionStatus(scopeReady, runtime.projection, accepted !== null)}
-          </p>
-        </div>
-        <aside className="scope-card" aria-label="Current data status">
-          <span className="scope-number">3 × 3</span>
-          <span>scenario and horizon combinations</span>
-          <span className="scope-rule" />
-          <strong>{scopeStatus.title}</strong>
-          <span>{scopeStatus.detail}</span>
-        </aside>
+    <main
+      id="main"
+      className={`landing flight-app${panelVisible ? " has-projection" : ""}${journeyActive ? " is-journey" : ""}`}
+      data-flight-phase={currentFlightPhase}
+    >
+      <FlightHeader
+        methodologyAvailable={verifiedMethodology !== null}
+        onOpenMethodology={() => setMethodologyOpen(true)}
+        methodologyTriggerRef={methodologyTriggerRef}
+      />
+
+      <div className="flight-map-layer flight-scene" aria-hidden={!context || !scopeReady}>
+        {context && scopeReady ? (
+          <Suspense fallback={<p className="map-module-loading" role="status">Loading map module…</p>}>
+            <MapExplorer
+              context={context}
+              selection={accepted?.selection}
+              journeyTarget={journeySelection?.location.coordinates}
+              journeyActive={journeyActive}
+              journeyMotionSkipToken={journeyMotionSkipToken}
+              onSelection={(selection) => {
+                runtime.cancelSearch();
+                setClearSearchToken((token) => token + 1);
+                submitSelection(selection);
+              }}
+            />
+          </Suspense>
+        ) : (
+          <div className="flight-map-fallback" aria-hidden="true" />
+        )}
+      </div>
+
+      <section
+        className="flight-command flight-search"
+        aria-labelledby="hero-title"
+        hidden={panelVisible || journeyActive}
+      >
+          <div className="flight-command__content">
+            <h1 id="hero-title">Take me <em>there</em>.</h1>
+            <p className="hero-copy">
+              Name a European settlement to check its nearest native IPCC AR6 source-grid
+              projection—privately, in this browser.
+            </p>
+            <ReleaseStartup state={release} retry={retry} />
+            <SettlementSearch
+              release={scopeReady ? context : null}
+              clearToken={clearSearchToken}
+              workerFactory={searchWorkerFactory}
+              onSearchLifecycle={runtime.handleSearchLifecycle}
+              onSelect={(record) => {
+                if (!context || !scopeReady) return;
+                submitSelection(settlementSelection(context, runtime.projection, record));
+              }}
+            />
+          </div>
       </section>
 
-      {commandError ? <TechnicalAlert error={commandError} prefix="Selection command failed" /> : null}
-      {urlError ? <TechnicalAlert error={urlError} prefix="Share or navigation failed" /> : null}
-      {runtime.methodology.phase === "technical-error" ? (
-        <TechnicalAlert error={runtime.methodology.error} prefix="Methodology verification failed" />
+      <p className="selection-status" aria-live="polite">
+        {projectionSelectionStatus(scopeReady, runtime.projection, accepted !== null)}
+      </p>
+
+      {journeyActive ? (
+        <div className="flight-progress" aria-live="polite">
+          <AirplaneTilt size={19} weight="fill" aria-hidden="true" />
+          <span role="status">
+            <strong>{journeyMotionComplete ? "Checking the selected point" : "Flying to the selected point"}</strong>
+            {reducedMotion
+              ? "Camera motion reduced. Checking its exact nearest native source-grid location in this browser…"
+              : journeyMotionComplete
+                ? "Camera motion skipped. Checking its exact nearest native source-grid location in this browser…"
+                : "Checking its exact nearest native source-grid location in this browser…"}
+          </span>
+          {!journeyMotionComplete ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!journeyKey) return;
+                setSkippedJourneyKey(journeyKey);
+                setJourneyMotionSkipToken((token) => token + 1);
+              }}
+            >
+              Skip motion
+            </button>
+          ) : null}
+        </div>
       ) : null}
-      <p className="share-status" role="status" aria-live="polite">{shareStatus}</p>
+
+      <div className="flight-alerts">
+        {commandError ? <TechnicalAlert error={commandError} prefix="Selection command failed" /> : null}
+        {urlError ? <TechnicalAlert error={urlError} prefix="Share or navigation failed" /> : null}
+        {runtime.methodology.phase === "technical-error" ? (
+          <TechnicalAlert error={runtime.methodology.error} prefix="Methodology verification failed" />
+        ) : null}
+        <p className="share-status" role="status" aria-live="polite">{shareStatus}</p>
+      </div>
 
       {runtime.projection ? (
         <ProjectionPanel
@@ -336,7 +475,7 @@ function LandingPageSession({
           onReset={reset}
           onShare={share}
           onOpenMethodology={() => setMethodologyOpen(true)}
-          methodologyTriggerRef={methodologyTriggerRef}
+          showMethodologyAction={false}
         />
       ) : null}
 
@@ -350,51 +489,6 @@ function LandingPageSession({
         />
       ) : null}
 
-      {context && scopeReady ? (
-        <section className="map-launcher" aria-label="Release visualization">
-          {!mapOpen ? (
-            <>
-              <p className="eyebrow dark">Optional visualization</p>
-              <h2>The map stays out of the initial application bundle.</h2>
-              <p>Open it when useful. Search, release validation, and textual information do not depend on it.</p>
-              <button type="button" onClick={() => setMapOpen(true)}>Open static visualization</button>
-            </>
-          ) : (
-            <Suspense fallback={<p className="map-module-loading" role="status">Loading map module…</p>}>
-              <MapExplorer
-                context={context}
-                selection={accepted?.selection}
-                onSelection={(selection) => {
-                  runtime.cancelSearch();
-                  setClearSearchToken((token) => token + 1);
-                  submitSelection(selection);
-                }}
-              />
-            </Suspense>
-          )}
-        </section>
-      ) : null}
-      <section className="principles" aria-labelledby="principles-title">
-        <p className="eyebrow dark">What this explorer reports</p>
-        <h2 id="principles-title">A source-bound regional projection, with its limits beside it.</h2>
-        <div className="principle-grid">
-          <article>
-            <span>01</span>
-            <h3>Exact source lookup</h3>
-            <p>The browser reads one nearest native AR6 grid location. It does not infer values from map colour.</p>
-          </article>
-          <article>
-            <span>02</span>
-            <h3>Private by design</h3>
-            <p>Settlement search and point selection stay in the browser; no application API receives them.</p>
-          </article>
-          <article>
-            <span>03</span>
-            <h3>Honest outcomes</h3>
-            <p>Unavailable data and unsupported geography remain explicit, separate outcomes.</p>
-          </article>
-        </div>
-      </section>
     </main>
   );
 }
@@ -418,13 +512,20 @@ export default function App({ runtimeFactory, urlEnvironment, searchWorkerFactor
   const [release, retryRelease] = useReleaseContext();
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${architecture ? " architecture-shell" : " flight-shell"}`}>
       <a className="skip-link" href="#main">Skip to content</a>
-      <Header light={architecture} />
       {architecture ? (
-        <Suspense fallback={<main id="main" className="route-loading">Loading architecture evidence…</main>}>
-          <ArchitecturePage />
-        </Suspense>
+        <>
+          <Header light />
+          <Suspense fallback={<main id="main" className="route-loading">Loading architecture evidence…</main>}>
+            <ArchitecturePage />
+          </Suspense>
+          <footer>
+            <span>SeaRise Europe</span>
+            <code>{runtimeConfig.dataReleaseId}</code>
+            <span>Informational and educational use only.</span>
+          </footer>
+        </>
       ) : (
         <LandingPage
           release={release}
@@ -434,11 +535,6 @@ export default function App({ runtimeFactory, urlEnvironment, searchWorkerFactor
           searchWorkerFactory={searchWorkerFactory}
         />
       )}
-      <footer>
-        <span>SeaRise Europe</span>
-        <code>{runtimeConfig.dataReleaseId}</code>
-        <span>Informational and educational use only.</span>
-      </footer>
     </div>
   );
 }
