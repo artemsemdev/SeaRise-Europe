@@ -1,8 +1,8 @@
 # Design Direction: The Flight Experience
 
-> **Status:** Active visual direction
+> **Status:** Historical visual direction retained for audit
 >
-> **Canonical interactive mock:** [SeaRise Flight](SeaRise-Flight.html)
+> **Historical interactive export:** [SeaRise Flight](SeaRise-Flight.html)
 >
 > **Behaviour authority:** [PRD](../PRD.md)
 >
@@ -10,10 +10,11 @@
 >
 > **Architecture authority:** [ADR-021](../../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
-The self-contained `SeaRise-Flight.html` export replaces the previous multi-page
-mock set. It is the visual and interaction reference for the static frontend,
-but it does not override the PRD, content guidelines, methodology, release
-contracts, accessibility requirements, or architecture fitness functions.
+The self-contained `SeaRise-Flight.html` export preserves the earlier visual
+direction. It is historical evidence, not application code, product copy, a
+scientific contract, a rollback baseline, or an implementation source. Its
+binary exposure and terrain-comparison behavior is superseded by ADR-024. The
+implemented static frontend and the authorities above define current behavior.
 
 ## 1. Creative north star
 

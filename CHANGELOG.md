@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Reclassified the superseded Flight mock and binary terrain-comparison methodology as explicit historical evidence, and added a fail-closed target-content scan so those legacy claims cannot re-enter the static application or built assets.
+
 ### Security
 
 - Pinned private overlay cleanup to an open directory identity so immediate

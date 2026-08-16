@@ -1,8 +1,8 @@
 # SeaRise Flight Mock — Scope Reconciliation Map
 
-> **Status:** Active implementation guide
+> **Status:** Historical visual evidence with an active reconciliation record
 >
-> **Canonical mock:** [SeaRise-Flight.html](SeaRise-Flight.html)
+> **Historical export:** [SeaRise-Flight.html](SeaRise-Flight.html)
 >
 > **Replaces:** the deleted `pages/` mock set and legacy preview images
 >
@@ -14,16 +14,17 @@
 
 ## Authority and intended use
 
-`SeaRise-Flight.html` is the canonical visual and interaction reference for the
-new static browser experience. It demonstrates the landing composition, local
+`SeaRise-Flight.html` is a preserved historical visual reference for the
+static browser experience. It demonstrates the landing composition, local
 settlement search, flight transition, scenario/horizon controls, release-scoped
 result, methodology disclosure, attribution, and technical/offline edge cases in
 one self-contained artifact.
 
-It remains a design mock. When its fixture values, timing, copy, state coverage,
-or implementation detail conflicts with the PRD, content guidelines, methodology,
-release contracts, accessibility requirements, or ADR-021, those authoritative
-documents win.
+It is not application code, product copy, a scientific contract, a rollback
+baseline, or an implementation source. Its binary exposure, terrain comparison,
+and modeled-water behavior are superseded by ADR-024. The implemented static
+application, PRD, content guidelines, methodology, release contracts,
+accessibility requirements, and accepted ADRs are authoritative.
 
 ## Mock inventory
 
@@ -111,7 +112,7 @@ The imported mock is intentionally self-contained so reviewers can open it
 without a build step. Its SHA-256 at import is:
 
 ```text
-e9f72148a9c9661b86d483043a0d661f8f7c4bb4938600ac1a41394320698aa7
+36c132bc3873d697e94084e45e7b6cee407be6ee6e8d81831f32e730792c164c
 ```
 
 If the HTML export changes, update this digest and review the reconciliation map
