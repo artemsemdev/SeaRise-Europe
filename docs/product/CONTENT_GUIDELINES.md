@@ -218,14 +218,14 @@ near-zero idle cost within current free allowances,” not “free forever.” U
 
 ## 9. Visual mock status
 
-The self-contained [SeaRise Flight mock](Mock/SeaRise-Flight.html) is the active
-visual and interaction direction. It replaces the legacy multi-page mock set.
-The mock uses synthetic illustrative values and remains subordinate to this
-guide, the PRD, methodology, release contracts, accessibility requirements, and
-ADR-021. Fixture counts, release IDs, artifact paths, timings, coordinates, and
-classifications must not be copied into production as constants. See
-[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for the implementation
-scope, required corrections, missing states, and GitHub issue links.
+The self-contained [SeaRise Flight mock](Mock/SeaRise-Flight.html) is preserved
+as historical visual evidence only. It is not application code, current product
+copy, a scientific contract, a rollback baseline, or an implementation source.
+The implemented static application and this guide are authoritative. The
+mock's synthetic values and superseded binary exposure behavior must not enter
+the target domain or production build. See
+[MOCK_REQUIREMENTS_MAP.md](Mock/MOCK_REQUIREMENTS_MAP.md) for its explicit
+historical boundary and reconciliation record.
 
 ## 10. Prohibited language
 

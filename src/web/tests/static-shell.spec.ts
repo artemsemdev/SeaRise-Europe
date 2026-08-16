@@ -30,7 +30,9 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
 
   await page.goto("/");
   await expectStaticDocumentSecurity(page);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Take me there");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(
+    "Explore regional sea-level projections across Europe",
+  );
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await expect(page.getByText(/Synthetic fixture · illustrative only/i)).toBeVisible();
@@ -411,7 +413,10 @@ test("local settlement worker is private, partial-ready, keyboard accessible, an
   await expect(input).toBeFocused();
 
   await input.fill("PrivateSearchTokenXYZ");
-  await expect(searchStatus).toContainText(/No matching settlement/i);
+  await expect(searchStatus).toContainText(/No matching places found in the loaded index/i);
+  await expect(page.locator(".search-shell .search-empty")).toContainText(
+    /Check the spelling or try a nearby city, town, or village/i,
+  );
   expect(network.join("\n")).not.toContain("PrivateSearchTokenXYZ");
   expect(network.filter((request) => request.includes("/search/")).length).toBe(2);
 

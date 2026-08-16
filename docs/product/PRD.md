@@ -25,9 +25,11 @@ without a production application server, database, tile server, or runtime
 geocoder. Scientific processing happens before publication; the browser reads
 versioned artifacts and performs bounded search and projection lookup locally.
 
-The target architecture is accepted but not yet implemented. The checked-in
-legacy runtime and synthetic raster are not evidence of a production-ready
-scientific release.
+The static target is implemented under `src/web` and is the only product
+baseline. Any legacy runtime code still present during Phase 2 removal is
+neither a baseline nor a rollback path. The committed synthetic fixture proves
+the application and release contracts, but it is not evidence of a
+production-ready scientific release.
 
 ## 2. Problem
 

@@ -33,6 +33,12 @@
       "reference": "src/web/src/data/browser-overlay-evidence.test.ts, src/web/src/data/manifest-repository.test.ts, and src/web/src/domain/url-state.test.ts",
       "environment": "macOS arm64; Node 20.20.1; AJV 8.20.0; Vitest 4.1.10; fast-check 4.9.0; committed synthetic fixture only"
     },
+    "local-2026-08-16-static-target-content": {
+      "kind": "repository-inspection",
+      "observedAt": "2026-08-16T10:35:19+02:00",
+      "reference": "docs/evidence/phase-2/issue-59-content-review.md, src/web/scripts/check-target-content.mjs, and docs/testing/static-target-content-contract.md",
+      "environment": "macOS arm64; Node 20.20.1; deterministic source and emitted-asset scanner with per-category mutation controls; no network, browser, Candidate-v7, TAR, or local-only input"
+    },
     "local-2026-08-16-static-scientific-lookup": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T06:19:05+02:00",
@@ -245,6 +251,20 @@
     }
   },
   "suites": [
+    {
+      "id": "static-target-content",
+      "layer": "static-analysis",
+      "owner": "frontend",
+      "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, and product-copy limits fail closed in production source, active documentation, and emitted static assets while retaining only explicitly allowlisted historical evidence.",
+      "sourcePaths": ["src/web/scripts/check-target-content.mjs", "docs/testing/static-target-content-contract.md", "docs/evidence/phase-2/issue-59-content-review.md"],
+      "changedPaths": ["src/web/**", "docs/product/**", "docs/methodology.md", "docs/testing/static-target-content-contract.md"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent mutation-sensitive static target content and historical-evidence boundary." },
+      "commands": { "focused": "node src/web/scripts/check-target-content.mjs", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-16-static-target-content", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "The scanner reads deterministic repository or build bytes and runs explicit mutation controls for every prohibited-claim category; it has no clock, network, browser, Candidate-v7, or local-only dependency." }
+    },
     {
       "id": "static-projection-panel",
       "layer": "component",

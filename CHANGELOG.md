@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Reclassified the superseded Flight mock and binary terrain-comparison methodology as explicit historical evidence, and added a fail-closed target-content scan so those legacy claims cannot re-enter the static application or built assets.
+- Reclassified the superseded Flight mock and binary terrain-comparison methodology as explicit historical evidence, and added a fail-closed target-content scan so legacy outcomes, risk or flooding certainty, relative horizons, forecast framing, and unsupported coverage, cost, or offline claims cannot re-enter the static application or built assets.
 
 ### Security
 
@@ -33,6 +33,15 @@ All notable changes to this project will be documented in this file.
   locked restore while that test runtime awaits Phase 2 removal.
 
 ### Fixed
+
+- Aligned the static landing copy with the approved product language and bound
+  its release disclosure to the verified synthetic, private-engineering, or
+  public-promoted disposition instead of hard-coding fixture status.
+
+- Aligned settlement no-match guidance with the approved product copy and
+  corrected active product documentation to identify the implemented static
+  target as the sole baseline and the superseded Flight mock as historical
+  evidence only.
 
 - Corrected the application live status after terminal projection failures so
   assistive technology no longer announces that a completed failed operation

@@ -40,6 +40,7 @@ import type {
 } from "./search/worker-protocol";
 import { fixtureReleaseContext } from "./test/release-fixture";
 import type { HorizonYear, ScenarioId } from "./contracts/generated/release-contract";
+import { releaseScopeStatus } from "./release-copy";
 import { isForbiddenApplicationApiPath } from "./test/application-api-boundary";
 
 vi.mock("./components/map/MapExplorer", () => ({
@@ -451,12 +452,38 @@ describe("production static application composition", () => {
     const runtime = runtimeFactory();
     render(<App runtimeFactory={runtime.factory} urlEnvironment={new TestUrlEnvironment()} searchWorkerFactory={searchFactory()} />);
 
-    expect(screen.getByRole("heading", { level: 1, name: /take me there/i })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: /explore regional sea-level projections across Europe/i })).toBeVisible();
     expect(screen.getByText(/synthetic fixture · illustrative only/i)).toBeVisible();
     expect(screen.getByRole("navigation", { name: /primary/i })).toBeVisible();
     expect(screen.getByRole("link", { name: /skip to content/i })).toHaveAttribute("href", "#main");
     expect(await screen.findByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
     await waitFor(() => expect(screen.getByRole("combobox", { name: /find a city/i })).toBeEnabled());
+  });
+
+  it("binds landing release disclosure to verified bootstrap disposition", () => {
+    expect(releaseScopeStatus({ phase: "loading", attempt: 0 })).toEqual({
+      title: "Release validation pending",
+      detail: "Scientific release status appears only after the pinned manifest is verified.",
+    });
+    expect(releaseScopeStatus(ready())).toEqual({
+      title: "Synthetic fixture",
+      detail: "Demonstration data only; no public scientific release is claimed.",
+    });
+    for (const [disposition, title, detail] of [
+      ["private-engineering", "Private engineering candidate", /local validation only/i],
+      ["public-promoted", "Public promoted release", /approved immutable release artifacts/i],
+    ] as const) {
+      const context = new ReleaseContext({
+        manifest: releaseContext.manifest,
+        manifestUrl: releaseContext.manifestUrl,
+        disposition,
+        artifacts: { ...releaseContext.artifacts },
+        datasets: { ...releaseContext.datasets },
+      });
+      const copy = releaseScopeStatus(ready(context));
+      expect(copy.title).toBe(title);
+      expect(copy.detail).toMatch(detail);
+    }
   });
 
   it("hands a search result to one deeply frozen selection command and never sends query text to a server", async () => {

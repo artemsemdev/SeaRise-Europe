@@ -84,7 +84,7 @@ function liveMessage(state: SettlementSearchState): string {
   const partial = state.readiness === "core-ready" ? " Coastal settlements are still loading." : "";
   return count
     ? `${count} ${count === 1 ? "settlement" : "settlements"} found.${partial}`
-    : `No matching settlement in the loaded index.${partial}`;
+    : `No matching places found in the loaded index. Check the spelling or try a nearby city, town, or village.${partial}`;
 }
 
 interface SettlementSearchSessionProps {
@@ -200,7 +200,7 @@ function SettlementSearchSession({
           value={query}
           disabled={!release}
           autoComplete="off"
-          placeholder="Try Málaga, Athens, or Border City"
+          placeholder="Try Rotterdam, Porto, or Galway"
           onFocus={() => {
             client?.start();
             if (query.trim()) setOpen(true);
@@ -256,7 +256,7 @@ function SettlementSearchSession({
             </div>
           ))}
           {!state.pending && !state.error && resultsAreCurrent && state.results.length === 0 ? (
-            <p className="search-empty">No matching settlement. Try another spelling.</p>
+            <p className="search-empty">No matching places found. Check the spelling or try a nearby city, town, or village.</p>
           ) : null}
           {state.error ? (
             <p className="search-empty error">Technical index failure. No scientific outcome was produced.</p>

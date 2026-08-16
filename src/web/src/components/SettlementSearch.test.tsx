@@ -124,6 +124,13 @@ afterEach(() => {
 });
 
 describe("settlement search combobox", () => {
+  it("uses the approved European-settlement prompt without synthetic control names", () => {
+    render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => new FakeWorker()} />);
+    const input = screen.getByRole("combobox", { name: /find a city/i });
+    expect(input).toHaveAttribute("placeholder", "Try Rotterdam, Porto, or Galway");
+    expect(input).not.toHaveAttribute("placeholder", expect.stringMatching(/Border City/i));
+  });
+
   it("emits immutable query lifecycle and only hands off a current frozen result", async () => {
     const worker = new FakeWorker();
     const lifecycle: SearchLifecycleEvent[] = [];
@@ -288,6 +295,19 @@ describe("settlement search combobox", () => {
     expect(await screen.findByText(/technical failure, not a no-match result/i)).toBeVisible();
     expect(screen.getByText(/no scientific outcome was produced/i)).toBeVisible();
     expect(screen.queryByText(/try another spelling/i)).not.toBeInTheDocument();
+  });
+
+  it("uses the approved settlement-only no-match guidance", async () => {
+    const worker = new FakeWorker();
+    const user = userEvent.setup();
+    render(<SettlementSearch release={context} onSelect={vi.fn()} workerFactory={() => worker} />);
+    await user.type(screen.getByRole("combobox", { name: /find a city/i }), "Unknown place");
+    expect(await screen.findByText(
+      "No matching places found. Check the spelling or try a nearby city, town, or village.",
+    )).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      /No matching places found in the loaded index.*try a nearby city, town, or village/i,
+    );
   });
 
   it("clears old results immediately so Enter and Explore cannot select a stale query", async () => {
