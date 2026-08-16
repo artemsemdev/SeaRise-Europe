@@ -58,7 +58,9 @@ All notable changes to this project will be documented in this file.
   bundle gates.
 
 - Added an exact browser-side AR6 projection lookup that verifies release-bound
-  support geometry, reads only COG byte ranges, selects the nearest native
+  support geometry, consumes the verified release source-grid identity, checks
+  COG `HEAD` and canonical range-chunk hashes, validates embedded
+  scenario/horizon/source/quantile metadata, selects the nearest native
   source-grid location within the inclusive 100 km limit, returns the three
   required quantiles, and preserves technical failures outside the four
   scientific outcomes. The committed synthetic release now carries the

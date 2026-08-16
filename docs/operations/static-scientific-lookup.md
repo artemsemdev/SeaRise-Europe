@@ -13,12 +13,20 @@ One immutable `ReleaseContext` supplies all runtime identities. The browser:
    decoding its CRS84 `MultiPolygon` rows;
 3. classifies support first and coastal scope second with boundary-inclusive
    point coverage;
-4. resolves the selected scenario/horizon analysis COG from that same release;
-5. requires byte-range responses, validates the 76 by 46 EPSG:4326 native grid,
-   and reads q0.167, q0.5, and q0.833 from one nearest native source pixel;
-6. applies the Haversine distance using the 6,371.0088 km mean Earth radius,
+4. verifies and decodes the release's `source-grid-identity` artifact instead
+   of deriving source IDs in browser code;
+5. verifies the small `cog-range-integrity` artifact and binds every COG to its
+   manifest path, byte size, whole-object SHA-256, and canonical 64 KiB chunk
+   SHA-256 identities;
+6. requires an exact `HEAD` identity followed only by `206` byte ranges,
+   expands each requested slice to complete verified chunks, and never accepts
+   an unverified range or a full-file `200` substitution;
+7. validates the COG's embedded scenario, horizon, source archive/member,
+   source release, method, baseline, units, scale, native resolution, and exact
+   q0.167/q0.5/q0.833 band descriptions before reading one nearest source pixel;
+8. applies the Haversine distance using the 6,371.0088 km mean Earth radius,
    lowest-location-ID tie break, and inclusive unrounded 100 km limit; and
-7. returns exactly `ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, or
+9. returns exactly `ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, or
    `UnsupportedGeography`.
 
 Manifest, integrity, transport, decode, range-support, coordinate-validation,
@@ -56,8 +64,9 @@ are:
   scenario/horizon combinations, 63 Python/TypeScript golden comparisons,
   native-grid edges, nodata, strict ranges, aborts, and malformed responses.
 
-The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 25 focused
-lookup tests. Its warm in-memory 100-lookup sample had p95 below the required
+The 2026-08-16 local run on macOS arm64 with Node 20.20.1 completed 29 focused
+lookup tests and 56 static-target unit/integration tests. Its warm in-memory
+100-lookup sample had p95 below the required
 100 ms gate. This is a synthetic-fixture engineering measurement, not a claim
 about public hosting latency or private production-sized bytes.
 
@@ -81,11 +90,13 @@ synthetic fixture until a separately authorized public release is promoted.
 
 ## Fail-closed triage
 
-- `RangeUnsupported`: the host returned a full response instead of `206`.
+- `RangeUnsupported`: `HEAD` or a range response omitted or contradicted the
+  exact size/range delivery contract, including a full response instead of
+  `206`.
 - `FetchFailed`: a required immutable artifact or byte range was unavailable.
-- `IntegrityFailed`: a complete boundary artifact did not match manifest bytes.
-- `DecodeFailed`: artifact structure, grid metadata, bands, nodata, or geometry
-  semantics violated the release contract.
+- `IntegrityFailed`: a complete artifact, range chunk, COG embedded identity,
+  boundary identity, or source-grid mapping did not match the pinned release.
+- `DecodeFailed`: otherwise verified artifact bytes could not be decoded.
 - `ReleaseIdentityMismatch`: selection, analysis, visual, and manifest
   identities did not describe one immutable release selection.
 - `Aborted`: the evaluation was cancelled or superseded; its result must be

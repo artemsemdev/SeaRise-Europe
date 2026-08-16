@@ -80,3 +80,58 @@ test("architecture direct navigation works from static output", async ({ page })
   await expect(page.getByText(/synthetic fixture/i).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /back to explorer/i })).toHaveAttribute("href", "/");
 });
+
+test("production-like release delivery exposes exact HEAD, CORS, and byte-range identity", async ({ page }) => {
+  await page.goto("/");
+  const artifactUrl =
+    "http://127.0.0.1:8091/releases/searise-europe-v1.0.0-20260810-c096aeab4e09/analysis/ssp2-45/2050.tif";
+  const observed = await page.evaluate(async (url) => {
+    const head = await fetch(url, { method: "HEAD", credentials: "omit", referrerPolicy: "no-referrer" });
+    const ranged = await fetch(url, {
+      headers: { Range: "bytes=16-47" },
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+    });
+    return {
+      head: {
+        status: head.status,
+        acceptRanges: head.headers.get("accept-ranges"),
+        contentLength: head.headers.get("content-length"),
+        etag: head.headers.get("etag"),
+      },
+      ranged: {
+        status: ranged.status,
+        acceptRanges: ranged.headers.get("accept-ranges"),
+        contentLength: ranged.headers.get("content-length"),
+        contentRange: ranged.headers.get("content-range"),
+        etag: ranged.headers.get("etag"),
+        bytes: Array.from(new Uint8Array(await ranged.arrayBuffer())),
+      },
+    };
+  }, artifactUrl);
+
+  expect(observed.head).toEqual({
+    status: 200,
+    acceptRanges: "bytes",
+    contentLength: "20320",
+    etag: '"sha256-d7998337ead737320cba98772284c7e7ee9372573f65e72f100071f38b90391f"',
+  });
+  expect(observed.ranged).toMatchObject({
+    status: 206,
+    acceptRanges: "bytes",
+    contentLength: "32",
+    contentRange: "bytes 16-47/20320",
+    etag: observed.head.etag,
+  });
+  expect(observed.ranged.bytes).toHaveLength(32);
+
+  const head = await page.request.head(artifactUrl, {
+    headers: { Origin: "http://127.0.0.1:4173" },
+  });
+  expect(head.headers()["access-control-allow-origin"]).toBe("http://127.0.0.1:4173");
+  expect(head.headers()["access-control-allow-methods"]).toBe("GET, HEAD");
+  expect(head.headers()["access-control-expose-headers"]).toBe(
+    "Accept-Ranges, Content-Length, Content-Range, ETag",
+  );
+  expect(head.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+});

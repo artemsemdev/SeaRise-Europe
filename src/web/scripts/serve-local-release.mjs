@@ -29,11 +29,13 @@ if (manifest.dataReleaseId !== expectedReleaseId) throw new Error("Local manifes
 const mediaTypes = {
   ".json": "application/json",
   ".jsonl": "application/x-ndjson",
+  ".gz": "application/gzip",
   ".parquet": "application/vnd.apache.parquet",
   ".pmtiles": "application/vnd.pmtiles",
   ".tif": "image/tiff; application=geotiff; profile=cloud-optimized",
   ".txt": "text/plain",
 };
+const artifactByPath = new Map(manifest.artifacts.map((artifact) => [artifact.path, artifact]));
 
 createServer((request, response) => {
   const prefix = `/releases/${expectedReleaseId}/`;
@@ -58,7 +60,13 @@ createServer((request, response) => {
   const headers = {
     "Accept-Ranges": "bytes",
     "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "GET, HEAD",
+    "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, ETag",
+    "Cache-Control": "public, max-age=31536000, immutable",
     "Content-Type": mediaTypes[extname(path)] ?? "application/octet-stream",
+    ...(artifactByPath.get(relativePath)?.sha256
+      ? { ETag: `"sha256-${artifactByPath.get(relativePath).sha256}"` }
+      : {}),
     "Vary": "Origin",
   };
   const match = /^bytes=(\d+)-(\d*)$/.exec(request.headers.range ?? "");
