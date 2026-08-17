@@ -231,8 +231,11 @@ export function loadHistoricalAllowlist({
   const path = existsSync(approvedPath) ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
   const document = JSON.parse(readFileSync(path, "utf8"));
-  const entries = validateHistoricalAllowlist(document, (repositoryPath) =>
-    readFileSync(resolve(root, repositoryPath), "utf8"), {
+  // A pull-request checkout is intentionally shallow.  Readiness still binds
+  // every allowlisted path to its declared Git-blob digest, but only the
+  // owner-approved authority may require the older audited commit object and
+  // its tree to be present locally.
+  const approvedGitResolvers = authority === "approved" ? {
     resolveTree: (commit) => execFileSync("git", ["rev-parse", `${commit}^{tree}`], {
       cwd: root,
       encoding: "utf8",
@@ -241,7 +244,9 @@ export function loadHistoricalAllowlist({
       cwd: root,
       encoding: "utf8",
     }).trim(),
-  });
+  } : {};
+  const entries = validateHistoricalAllowlist(document, (repositoryPath) =>
+    readFileSync(resolve(root, repositoryPath), "utf8"), approvedGitResolvers);
   if (authority === "approved") validateGatePolicyTrustRoots(root, document.auditedCommit);
   return entries;
 }
