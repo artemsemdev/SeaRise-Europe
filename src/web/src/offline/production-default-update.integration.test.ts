@@ -54,7 +54,21 @@ describe("production default update composition", () => {
     const candidateB = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-b", dataReleaseId: "next-browser-release-b" });
     let waitingPair = candidateA;
     let waitingPrecache = candidatePrecache;
-    const active = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: { contractVersion: 1, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId }, precacheSetSha256: currentPrecache }); } };
+    const currentPair = { contractVersion: 1 as const, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId };
+    const active = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) {
+      if (message.type === "acquire-lease" || message.type === "heartbeat-lease") {
+        ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "lease-state", messageToken: message.messageToken,
+          lease: { contractVersion: 1, leaseId: message.leaseId, pair: currentPair, expiresAtEpochMs: Date.now() + 120_000, state: "active" } });
+        return;
+      }
+      if (message.type === "release-lease") {
+        ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "lease-released", messageToken: message.messageToken,
+          pair: currentPair, leaseId: message.leaseId });
+        return;
+      }
+      ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken,
+        pair: currentPair, precacheSetSha256: currentPrecache });
+    } };
     const waiting = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: waitingPair, precacheSetSha256: waitingPrecache }); } };
     const registration = { active, waiting };
     Object.assign(globalThis, { caches, indexedDB: idb });
@@ -68,6 +82,7 @@ describe("production default update composition", () => {
     Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {
       register: vi.fn(async () => registration), ready: Promise.resolve(registration),
       getRegistration: vi.fn(async () => registration),
+      addEventListener: vi.fn(),
     } });
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
