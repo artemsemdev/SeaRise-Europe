@@ -3,7 +3,15 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -50,7 +58,28 @@ function deployment(expected) {
       sha256: createHash("sha256").update(bytes).digest("hex"),
     }],
   }));
-  return Object.freeze({ label: expected.label, root, identity, precacheSetSha256: expected.label.toLowerCase().repeat(64) });
+  const paths = [
+    "index.html",
+    "service-worker.js",
+    "assets/app-12345678.js",
+    `releases/${OFFLINE_LIFECYCLE_RELEASE_ID}/analysis/value.tif`,
+    `releases/${OFFLINE_LIFECYCLE_RELEASE_ID}/manifest.json`,
+  ];
+  const entries = paths.map((path) => {
+    const content = readFileSync(join(root, path));
+    return Object.freeze({
+      path,
+      byteSize: content.length,
+      sha256: createHash("sha256").update(content).digest("hex"),
+    });
+  });
+  return Object.freeze({
+    label: expected.label,
+    root,
+    identity,
+    precacheSetSha256: expected.label.toLowerCase().repeat(64),
+    seal: Object.freeze({ entries: Object.freeze(entries) }),
+  });
 }
 
 async function harness({ beforeCreate } = {}) {
@@ -161,5 +190,28 @@ describe("offline lifecycle server", () => {
     expect(response.status).toBe(400);
     expect(await (await request(`${origin}/__lifecycle/healthz`)).json())
       .toMatchObject({ deployment: "A", generation: 1 });
+  });
+
+  it("fails closed for shell and ranged-resource mutation after startup", async () => {
+    const { origin, deployments } = await harness();
+    const active = deployments.get("A");
+    writeFileSync(join(active.root, "index.html"), "mutated after startup");
+    expect((await request(`${origin}/`)).status).toBe(404);
+
+    const releasePath = join(active.root, "releases", OFFLINE_LIFECYCLE_RELEASE_ID);
+    writeFileSync(join(releasePath, "analysis/value.tif"), "RANGE-A");
+    const path = `/releases/${OFFLINE_LIFECYCLE_RELEASE_ID}/analysis/value.tif`;
+    expect((await request(`${origin}${path}`, { headers: { range: "bytes=1-4" } })).status).toBe(404);
+  });
+
+  it("rejects an intermediate directory symlink before ranged delivery", async () => {
+    const { origin, deployments } = await harness();
+    const releasePath = join(deployments.get("A").root, "releases", OFFLINE_LIFECYCLE_RELEASE_ID);
+    const analysis = join(releasePath, "analysis");
+    const moved = join(releasePath, "moved-analysis");
+    renameSync(analysis, moved);
+    symlinkSync(moved, analysis, "dir");
+    const path = `/releases/${OFFLINE_LIFECYCLE_RELEASE_ID}/analysis/value.tif`;
+    expect((await request(`${origin}${path}`, { headers: { range: "bytes=1-4" } })).status).toBe(404);
   });
 });

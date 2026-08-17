@@ -1,6 +1,16 @@
 import { Buffer } from "node:buffer";
-import { timingSafeEqual } from "node:crypto";
-import { createReadStream, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { createHash, timingSafeEqual } from "node:crypto";
+import {
+  closeSync,
+  constants,
+  createReadStream,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readSync,
+  realpathSync,
+} from "node:fs";
 import { createServer } from "node:http";
 import { extname, relative, resolve, sep } from "node:path";
 import { releaseDeliveryPolicy } from "./release-delivery-policy.mjs";
@@ -71,16 +81,49 @@ function canonicalPath(pathname) {
   return decoded.slice(1);
 }
 
-function regularFile(root, relativePath) {
+function sealedRegularFile(root, relativePath, sealEntries) {
   const target = resolve(root, relativePath);
   if (target === root || !target.startsWith(`${root}${sep}`)) throw new Error("Path escaped deployment root.");
-  const metadata = lstatSync(target);
-  if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Static target is not a regular file.");
+  const rootMetadata = lstatSync(root);
+  if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink()) throw new Error("Deployment root is not a real directory.");
+  let cursor = root;
+  const components = relativePath.split("/");
+  for (let index = 0; index < components.length; index += 1) {
+    cursor = resolve(cursor, components[index]);
+    const metadata = lstatSync(cursor);
+    if (metadata.isSymbolicLink()) throw new Error("Static target path contains a symlink.");
+    if (index < components.length - 1 && !metadata.isDirectory()) {
+      throw new Error("Static target path contains a non-directory component.");
+    }
+  }
   const realRoot = realpathSync(root);
   const realTarget = realpathSync(target);
   const child = relative(realRoot, realTarget);
   if (!child || child === ".." || child.startsWith(`..${sep}`)) throw new Error("Static target escaped deployment root.");
-  return Object.freeze({ target, size: metadata.size });
+  const sealed = sealEntries.get(relativePath);
+  if (!sealed) throw new Error("Static target is absent from the deployment seal.");
+  const descriptor = openSync(target, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const metadata = fstatSync(descriptor);
+    if (!metadata.isFile() || metadata.size !== sealed.byteSize) {
+      throw new Error("Static target size differs from the deployment seal.");
+    }
+    const digest = createHash("sha256");
+    const chunk = Buffer.allocUnsafe(64 * 1024);
+    for (let offset = 0; offset < metadata.size;) {
+      const length = readSync(descriptor, chunk, 0, Math.min(chunk.length, metadata.size - offset), offset);
+      if (length < 1) throw new Error("Static target ended before its sealed size.");
+      digest.update(chunk.subarray(0, length));
+      offset += length;
+    }
+    if (digest.digest("hex") !== sealed.sha256) {
+      throw new Error("Static target bytes differ from the deployment seal.");
+    }
+    return Object.freeze({ descriptor, size: metadata.size });
+  } catch (error) {
+    closeSync(descriptor);
+    throw error;
+  }
 }
 
 function parsedRange(value, size) {
@@ -129,6 +172,7 @@ function runtimeDeployment(record) {
   return Object.freeze({
     ...record,
     artifactByPath: new Map(manifest.artifacts.map((artifact) => [artifact.path, artifact])),
+    sealEntries: new Map(record.seal.entries.map((entry) => [entry.path, entry])),
   });
 }
 
@@ -201,6 +245,7 @@ export function createOfflineLifecycleServer({
     const selectedGeneration = generation;
     const deployment = configured.get(selectedLabel);
     let relativePath;
+    let descriptor = null;
     try {
       if (!request.method || !["GET", "HEAD"].includes(request.method)) {
         response.writeHead(405, { Allow: "GET, HEAD", "Cache-Control": "no-store" }).end();
@@ -208,15 +253,20 @@ export function createOfflineLifecycleServer({
         return;
       }
       relativePath = canonicalPath(url.pathname);
-      const file = regularFile(deployment.root, relativePath);
+      const file = sealedRegularFile(deployment.root, relativePath, deployment.sealEntries);
+      descriptor = file.descriptor;
       const headers = staticHeaders(relativePath, deployment, file.size);
       let range;
       try { range = parsedRange(request.headers.range, file.size); } catch {
+        closeSync(descriptor);
+        descriptor = null;
         response.writeHead(416, { ...headers, "Content-Range": `bytes */${file.size}` }).end();
         record({ deployment: selectedLabel, generation: selectedGeneration, method: request.method, path: url.pathname, status: 416 });
         return;
       }
       if (range && !("Accept-Ranges" in headers)) {
+        closeSync(descriptor);
+        descriptor = null;
         response.writeHead(416, { ...headers, "Content-Range": `bytes */${file.size}` }).end();
         record({ deployment: selectedLabel, generation: selectedGeneration, method: request.method, path: url.pathname, status: 416 });
         return;
@@ -231,9 +281,16 @@ export function createOfflineLifecycleServer({
         "X-Content-Type-Options": "nosniff",
       });
       record({ deployment: selectedLabel, generation: selectedGeneration, method: request.method, path: url.pathname, status });
-      if (request.method === "HEAD") response.end();
-      else createReadStream(file.target, { start, end }).pipe(response);
+      if (request.method === "HEAD") {
+        closeSync(descriptor);
+        descriptor = null;
+        response.end();
+      } else {
+        createReadStream(null, { fd: descriptor, autoClose: true, start, end }).pipe(response);
+        descriptor = null;
+      }
     } catch {
+      if (descriptor !== null) closeSync(descriptor);
       response.writeHead(404, { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }).end();
       record({ deployment: selectedLabel, generation: selectedGeneration, method: request.method ?? "", path: url.pathname, status: 404 });
     }
