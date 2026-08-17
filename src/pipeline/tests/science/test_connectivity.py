@@ -218,12 +218,53 @@ def _is_trusted_qa_callback_call(
     ):
         return False
     function = _enclosing_function(node, parents)
-    return (
-        function is not None
-        and function is _enclosing_function(assignment, parents)
-        and function.name == "dispatch"
-        and [argument.arg for argument in function.args.args] == ["self", "request"]
-    )
+    if (
+        function is None
+        or function is not _enclosing_function(assignment, parents)
+        or function.name != "dispatch"
+        or [argument.arg for argument in function.args.args] != ["self", "request"]
+        or function.args.posonlyargs
+        or function.args.vararg is not None
+        or function.args.kwonlyargs
+        or function.args.kwarg is not None
+        or function.args.defaults
+    ):
+        return False
+
+    validator_names = [
+        candidate
+        for candidate in ast.walk(function)
+        if isinstance(candidate, ast.Name) and candidate.id == "validator"
+    ]
+    stores_or_deletes = [
+        candidate
+        for candidate in validator_names
+        if isinstance(candidate.ctx, (ast.Store, ast.Del))
+    ]
+    validator_calls = [
+        candidate
+        for candidate in ast.walk(function)
+        if isinstance(candidate, ast.Call) and _is_name(candidate.func, "validator")
+    ]
+    if stores_or_deletes != [assignment.targets[0]] or validator_calls != [node]:
+        return False
+
+    for candidate in validator_names:
+        if candidate is assignment.targets[0] or candidate is node.func:
+            continue
+        parent = parents.get(id(candidate))
+        is_none_guard = (
+            isinstance(parent, ast.Compare)
+            and parent.left is candidate
+            and len(parent.ops) == 1
+            and isinstance(parent.ops[0], ast.Is)
+            and len(parent.comparators) == 1
+            and isinstance(parent.comparators[0], ast.Constant)
+            and parent.comparators[0].value is None
+        )
+        if not is_none_guard:
+            return False
+    return assignment.lineno < node.lineno
 
 
 def _retained_import_violations(source: str, package: str, path: str) -> set[str]:
@@ -802,6 +843,30 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_import_mechanisms() -
             "loader = registry.get(key)\nloader(request)",
             "science/mutation.py",
             "dynamic-import:computed-callable-alias:2",
+        ),
+        (
+            "class QaValidatorDispatcher:\n"
+            "    def dispatch(self, request):\n"
+            "        validator_id = self.validator_id_for(request.selector)\n"
+            "        validator = self._validators.get(validator_id)\n"
+            "        if validator is None:\n"
+            "            raise RuntimeError\n"
+            "        validator = eval\n"
+            "        return validator(request)\n",
+            "candidate_completeness/qa_dispatch.py",
+            "dynamic-import:computed-callable-alias:8",
+        ),
+        (
+            "class QaValidatorDispatcher:\n"
+            "    def dispatch(self, request):\n"
+            "        validator_id = self.validator_id_for(request.selector)\n"
+            "        validator = self._validators.get(validator_id)\n"
+            "        if validator is None:\n"
+            "            raise RuntimeError\n"
+            "        escaped = validator\n"
+            "        return validator(request)\n",
+            "candidate_completeness/qa_dispatch.py",
+            "dynamic-import:computed-callable-alias:8",
         ),
         (
             "getattr(acquirer, operation)(source, asset)",

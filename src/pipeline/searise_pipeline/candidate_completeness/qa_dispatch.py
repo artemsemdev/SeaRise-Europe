@@ -163,6 +163,16 @@ class QaValidatorDispatcher:
     committed matrix route and cannot add or replace callbacks.
     """
 
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in ("_matrix", "_routes", "_validators") and hasattr(self, name):
+            raise AttributeError(f"{name} is immutable after construction")
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if name in ("_matrix", "_routes", "_validators"):
+            raise AttributeError(f"{name} is immutable after construction")
+        object.__delattr__(self, name)
+
     def __init__(
         self,
         validators: Mapping[str, ArtifactValidator],
