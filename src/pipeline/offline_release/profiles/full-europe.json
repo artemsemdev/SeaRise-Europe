@@ -33,6 +33,7 @@
         "src/pipeline/science/ar6-lookup-validation.json",
         "src/pipeline/science/ar6-regional-release.json",
         "src/pipeline/science/ar6-regional-release.schema.json",
+        "src/pipeline/science/evidence/ar6-delivery-harness-relocation.json",
         "src/pipeline/science/evidence/ar6-lookup-goldens.json",
         "src/pipeline/searise_pipeline/offline_release/__init__.py",
         "src/pipeline/searise_pipeline/offline_release/cli.py",

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "amendmentId": "ar6-delivery-harness-relocation-v1",
+  "authority": "owner-directed-phase-2-static-runtime-removal",
+  "previousContractSha256": "be5f9a1b43a97819a0a06a4cfdeb388896205e8361d7aa3f70158ac3d7eec93f",
+  "currentContractSha256": "75cd7e4966af2067a96584ca15a7e11278b8e8a405f49bf2df84f7589a8938ee",
+  "changedContractMember": "deliveryMeasurement",
+  "previousDeliveryMeasurement": {
+    "harnessPath": "src/frontend/scripts/measure-ar6-release.mjs",
+    "harnessSha256": "3c0d8ba00d13fa2643e0ebf60c8e8f2f297da28d671b6f4ab52c2a3348bee509",
+    "packageLockPath": "src/frontend/package-lock.json",
+    "packageLockSha256": "0cf125d429ffb54cd52342bbcfac73f5fee1eebf53a7111a2329dd64d099b979",
+    "playwrightVersion": "1.62.1",
+    "geotiffVersion": "3.0.5",
+    "minimumColdLookups": 10,
+    "minimumWarmLookups": 100
+  },
+  "currentDeliveryMeasurement": {
+    "harnessPath": "src/web/scripts/measure-ar6-release.mjs",
+    "harnessSha256": "26edc7144166df526239728f41c27c7cf928c18d38496740ab119d31afe87bf9",
+    "packageLockPath": "package-lock.json",
+    "packageLockSha256": "88aaedbe42e82d3c917aed171d02a1c3d95d1758f3a0b710bb649012c418bf59",
+    "playwrightVersion": "1.62.1",
+    "geotiffVersion": "3.0.5",
+    "minimumColdLookups": 10,
+    "minimumWarmLookups": 100
+  },
+  "scientificFieldsChanged": false,
+  "historicalOwnerApprovalRewritten": false
+}

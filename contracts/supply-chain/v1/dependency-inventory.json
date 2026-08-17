@@ -138,7 +138,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "d4c8b746d987cf97229e2ce34ab6768781431d31d84451ba6cedd9de00d09bb0" }
+        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "6c78668aa117828347de64675824b54ac74d7000ec34430c7bf0f83b7b3b3b12" }
       ],
       "note": "The controlled release container uses a digest-pinned base and the release hash lock."
     },
