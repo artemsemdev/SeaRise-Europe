@@ -21,6 +21,7 @@ OUTPUTS = (
     "docker_frontend",
     "docker_api",
     "compose",
+    "repository_removal",
     "codeql_javascript",
     "codeql_csharp",
     "heavy",
@@ -167,6 +168,23 @@ COMPOSE = (
     "src/api/SeaRise.Api/appsettings*.json",
 )
 
+REPOSITORY_REMOVAL = (
+    "contracts/repository-removal/**",
+    "contracts/supply-chain/v2/static-target-profile.json",
+    "scripts/repository/**",
+    "tests/repository-removal/**",
+    "tests/test-inventory.json",
+    ".env.local.example",
+    "docker-compose.yml",
+    "scripts/compose-smoke.sh",
+    "src/api/.dockerignore",
+    "src/api/Dockerfile",
+    "src/frontend/.dockerignore",
+    "src/frontend/Dockerfile",
+    "tests/harness/test_changed_components.py",
+    "tests/harness/test_immutable_dependencies.py",
+)
+
 CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**", "tools/static-quality/**")
 
 CODEQL_CSHARP = ("src/api/**",)
@@ -209,6 +227,7 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
             _matches(path, API_IMAGE) and not _is_api_test(path) for path in paths
         ),
         "compose": any(_matches(path, COMPOSE) for path in paths),
+        "repository_removal": any(_matches(path, REPOSITORY_REMOVAL) for path in paths),
         "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
         "codeql_csharp": any(_matches(path, CODEQL_CSHARP) for path in paths),
     }

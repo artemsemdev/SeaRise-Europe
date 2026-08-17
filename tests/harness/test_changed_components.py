@@ -72,9 +72,11 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 producer["jobId"],
                 producer["nextJobId"],
             )
-            artifact_name = producer["artifactNameTemplate"].replace(
-                "{sourceRevision}", "${{ inputs.release_source_revision }}"
-            ).replace("{runId}", "${{ github.run_id }}")
+            artifact_name = (
+                producer["artifactNameTemplate"]
+                .replace("{sourceRevision}", "${{ inputs.release_source_revision }}")
+                .replace("{runId}", "${{ github.run_id }}")
+            )
 
             self.assertIn(f"name: {producer['jobName']}", job)
             self.assertIn(f"name: {artifact_name}", job)
@@ -135,6 +137,23 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 outputs = classify_paths([path])
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["heavy"])
+
+    def test_repository_removal_authorities_and_exact_targets_route_v2_gate(
+        self,
+    ) -> None:
+        paths = (
+            "contracts/repository-removal/v2/removal-plan.schema.json",
+            "scripts/repository/validate_removal_plan_v2.py",
+            "tests/repository-removal/test_validate_removal_plan_v2.py",
+            "contracts/supply-chain/v2/static-target-profile.json",
+            "docker-compose.yml",
+            "src/api/Dockerfile",
+            "src/frontend/Dockerfile",
+        )
+
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertTrue(classify_paths([path])["repository_removal"])
 
     def test_frontend_test_change_does_not_rebuild_image(self) -> None:
         outputs = classify_paths(
@@ -365,7 +384,30 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", validation)
         self.assertIn("run: npm run web:check", validation)
 
-    def test_release_evidence_pins_actions_and_checks_disk_before_download(self) -> None:
+    def test_repository_removal_job_enforces_committed_lifecycle_and_profile(
+        self,
+    ) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        job = _workflow_job(workflow, "repository-removal-v2", "ci-gate")
+        gate = workflow.split("  ci-gate:", maxsplit=1)[1]
+
+        self.assertIn("needs.changes.outputs.repository_removal == 'true'", job)
+        self.assertIn("contents: read\n      issues: read", job)
+        self.assertIn("fetch-depth: 0", job)
+        self.assertIn("persist-credentials: false", job)
+        self.assertIn("github.event.pull_request.head.sha || github.sha", job)
+        self.assertIn("test_validate_removal_plan_v2.py", job)
+        self.assertIn("validate_supply_chain_contract.py static-profile", job)
+        self.assertIn("github.event.pull_request.base.sha", job)
+        self.assertIn("--verify-owner-comment", job)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", job)
+        self.assertIn("- repository-removal-v2", gate)
+
+    def test_release_evidence_pins_actions_and_checks_disk_before_download(
+        self,
+    ) -> None:
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         ).read_text(encoding="utf-8")
@@ -710,9 +752,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(routes["frontend"])
         self.assertFalse(routes["api"])
 
-        script_routes = classify_paths(
-            ["scripts/science/promote_phase_0r_release.py"]
-        )
+        script_routes = classify_paths(["scripts/science/promote_phase_0r_release.py"])
         self.assertTrue(script_routes["pipeline"])
         self.assertTrue(script_routes["release"])
         self.assertTrue(script_routes["heavy"])
@@ -790,7 +830,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["infrastructure"])
         self.assertFalse(outputs["compose"])
 
-    def test_controlled_offline_build_is_manual_identity_bound_and_offline(self) -> None:
+    def test_controlled_offline_build_is_manual_identity_bound_and_offline(
+        self,
+    ) -> None:
         workflow = (
             Path(__file__).resolve().parents[2]
             / ".github/workflows/offline-release-controlled.yml"
