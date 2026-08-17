@@ -11,6 +11,12 @@ Repository deletion under ADR-025 is authorized by three immutable documents:
 It cannot use directory globs or active target paths and never permits an
 allowlisted term in active runtime.
 
+`canonical-design-reference` is reserved for the exact reviewed Flight mock.
+It preserves that file as the product's visual and interaction reference while
+making no scientific authorization claim for embedded prototype logic or copy.
+The referenced bytes must remain excluded from the static application and its
+built output; the rule is not a general documentation exemption.
+
 The schemas deliberately separate repository cleanup from external cleanup.
 Every inventory item must declare `externalMutationAuthorized: false`, and an
 owner decision cannot authorize Candidate-v7 publication or mutation of cloud
