@@ -41,11 +41,20 @@ candidate execution remains governed by the retained release graphs and locks.
 `contracts/supply-chain/v1` remains immutable Phase 1 historical evidence. Its
 NuGet and legacy runtime records describe that reviewed candidate boundary;
 they are not the current application dependency graph and must not be rewritten
-to resemble the Phase 2 target.
+to resemble the Phase 2 target. The v2 transition record binds the exact v1
+inventory bytes plus the reviewed Git commit and tree. Historical validation
+materializes only those Git blobs and runs the unchanged v1 validator there,
+so a Phase 2 workflow edit or later legacy deletion cannot be mistaken for v1
+evidence drift.
 
 Validate the active profile from the repository root:
 
 ```bash
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  historical-inventory \
+  --profile contracts/supply-chain/v2/static-target-profile.json \
+  --repository-root .
+
 PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
   static-profile \
   --document contracts/supply-chain/v2/static-target-profile.json \
@@ -61,4 +70,5 @@ completeness, publication, signing, or scientific approval claim.
 When an active dependency, workflow, recipe, lock, graph, receipt, schema, or
 SBOM changes, review that change and update its profile hash in the same pull
 request. Adding a new active input requires an explicit validator contract
-change; removing a required retained input fails closed.
+change; removing a required retained input fails closed. Current-tree discovery
+also rejects an unclassified npm manifest/lock or GitHub workflow.

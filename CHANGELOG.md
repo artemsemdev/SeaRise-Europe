@@ -12,7 +12,10 @@ All notable changes to this project will be documented in this file.
   CI/CodeQL/container legacy selectors owned by issues #70, #71, and #72.
   Normalized requirement parsing, exact contributor parity, semantic workflow
   checks, and tracked legacy-path absence prevent premature activation. Phase 1
-  v1 evidence remains unchanged as historical audit material.
+  v1 evidence remains unchanged as historical audit material and is now
+  validated from its SHA-256-bound Git commit/tree rather than from the mutable
+  Phase 2 checkout. Current npm manifests, locks, and workflows remain an exact
+  fail-closed v2 authority.
 
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two

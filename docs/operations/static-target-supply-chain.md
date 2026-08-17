@@ -7,6 +7,11 @@ SBOM change:
 
 ```bash
 PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  historical-inventory \
+  --profile contracts/supply-chain/v2/static-target-profile.json \
+  --repository-root .
+
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
   static-profile \
   --document contracts/supply-chain/v2/static-target-profile.json \
   --repository-root .
@@ -59,7 +64,10 @@ The active profile rejects all of these as requirements:
 Phase 1 evidence under `contracts/supply-chain/v1` is retained unchanged for
 audit history. Do not run its dependency-input inventory as the current-tree
 Phase 2 gate: it intentionally records the Phase 1 repository boundary.
-Algorithm tests and historical evidence validators remain useful, but a Phase 1
+The v2 profile binds its SHA-256 and the exact reviewed Git commit/tree. The
+`historical-inventory` command materializes those blobs in a temporary directory
+and runs the original v1 validator against them. Git history must therefore be
+available to this gate; CI checkout must not omit the recorded commit. A Phase 1
 record does not reactivate a deleted runtime.
 
 ## Updating authority
@@ -69,3 +77,16 @@ applicable, update the exact v2 hash, and run the focused supply-chain tests.
 The profile does not authorize publishing local Candidate-v7 bytes, changing
 external resources, or making production, signing, scientific-approval,
 vulnerability-completeness, or licence-completeness claims.
+
+For a new isolated npm toolchain such as `tools/static-quality`, use this order:
+
+1. Land this versioned transition before changing the current CI workflow.
+2. Rebase the toolchain branch onto it and retain all v2 files.
+3. Add the tool manifest and lock as a distinct v2 npm component and input map.
+4. Update the v2 SHA-256 for the final rebased `ci.yml` bytes in the same commit.
+5. Run `historical-inventory` first and `static-profile` second, then run the
+   tool installation and host-quality jobs.
+
+The discovery gate rejects the tool manifests until step 3, while the exact CI
+hash rejects the workflow change until step 4. Do not refresh v1 inventory or
+its build-plane SBOM to make either Phase 2 change pass.

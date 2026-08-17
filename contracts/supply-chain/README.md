@@ -8,7 +8,9 @@ repository and CI selectors are removed, it fails closed in
 
 `v1` defines the immutable historical evidence boundary for the Phase 1 release
 candidate. It does not alter `contracts/release/v1`; its NuGet and legacy
-runtime records are not the active Phase 2 dependency graph.
+runtime records are not the active Phase 2 dependency graph. The v2 transition
+profile binds the reviewed v1 inventory and Git tree; validate that historical
+tree instead of comparing v1 hashes with the mutable Phase 2 checkout.
 
 ## Evidence boundary
 
@@ -88,7 +90,7 @@ official Draft 7 schema. The vendored schemas are Apache-2.0 licensed.
 
 ## Dependency-defining input inventory
 
-`v1/dependency-inventory.json` binds the exact bytes of all 45 inputs discovered
+`v1/dependency-inventory.json` binds the exact bytes of all 49 inputs discovered
 at this reviewed revision. The inventory validation command below derives and
 reports the current validated count, avoiding a separate operational count.
 Coverage includes npm,
@@ -134,8 +136,9 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
   --document contracts/supply-chain/v1/fixtures/valid/dependency-exception.json \
   --as-of 2026-08-11T12:00:00Z
 
-PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py inventory \
-  --document contracts/supply-chain/v1/dependency-inventory.json \
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  historical-inventory \
+  --profile contracts/supply-chain/v2/static-target-profile.json \
   --repository-root .
 ```
 
