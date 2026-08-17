@@ -1,17 +1,17 @@
 // @vitest-environment node
 
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveStaticBuildRoot } from "./static-build-root.mjs";
+import { createOwnedLifecycleRoot, resolveStaticBuildRoot } from "./static-build-root.mjs";
 
 const roots = [];
 
 function temporaryRoot() {
-  const root = mkdtempSync(join(tmpdir(), "searise-build-root-test-"));
-  roots.push(root);
-  return root;
+  const owned = createOwnedLifecycleRoot();
+  roots.push(owned.root);
+  return owned;
 }
 
 afterEach(() => {
@@ -25,41 +25,69 @@ describe("static build output root", () => {
   });
 
   it("accepts only an explicit child of a real lifecycle root", () => {
-    const root = temporaryRoot();
-    const target = join(root, "deployment-a");
+    const owned = temporaryRoot();
+    const target = join(owned.root, "deployment-a");
     expect(resolveStaticBuildRoot({
       webRoot: "/workspace/web",
       environment: {
         SEARISE_LIFECYCLE_BUILD: "1",
-        SEARISE_LIFECYCLE_ROOT: root,
+        SEARISE_LIFECYCLE_ROOT: owned.root,
+        SEARISE_LIFECYCLE_ROOT_TOKEN: owned.token,
         SEARISE_WEB_DIST_ROOT: target,
       },
-    })).toBe(join(realpathSync(root), "deployment-a"));
+    })).toBe(target);
   });
 
   it.each([
-    ["missing mode", (root) => ({ SEARISE_LIFECYCLE_ROOT: root, SEARISE_WEB_DIST_ROOT: join(root, "a") })],
-    ["relative target", (root) => ({ SEARISE_LIFECYCLE_BUILD: "1", SEARISE_LIFECYCLE_ROOT: root, SEARISE_WEB_DIST_ROOT: "a" })],
-    ["root itself", (root) => ({ SEARISE_LIFECYCLE_BUILD: "1", SEARISE_LIFECYCLE_ROOT: root, SEARISE_WEB_DIST_ROOT: root })],
-    ["outside root", (root) => ({ SEARISE_LIFECYCLE_BUILD: "1", SEARISE_LIFECYCLE_ROOT: root, SEARISE_WEB_DIST_ROOT: resolve(root, "../escape") })],
+    ["missing mode", ({ root, token }) => ({ SEARISE_LIFECYCLE_ROOT: root, SEARISE_LIFECYCLE_ROOT_TOKEN: token, SEARISE_WEB_DIST_ROOT: join(root, "a") })],
+    ["relative target", ({ root, token }) => ({ SEARISE_LIFECYCLE_BUILD: "1", SEARISE_LIFECYCLE_ROOT: root, SEARISE_LIFECYCLE_ROOT_TOKEN: token, SEARISE_WEB_DIST_ROOT: "a" })],
+    ["root itself", ({ root, token }) => ({ SEARISE_LIFECYCLE_BUILD: "1", SEARISE_LIFECYCLE_ROOT: root, SEARISE_LIFECYCLE_ROOT_TOKEN: token, SEARISE_WEB_DIST_ROOT: root })],
+    ["outside root", ({ root, token }) => ({ SEARISE_LIFECYCLE_BUILD: "1", SEARISE_LIFECYCLE_ROOT: root, SEARISE_LIFECYCLE_ROOT_TOKEN: token, SEARISE_WEB_DIST_ROOT: resolve(root, "../escape") })],
   ])("rejects %s", (_name, environment) => {
-    const root = temporaryRoot();
-    expect(() => resolveStaticBuildRoot({ webRoot: "/workspace/web", environment: environment(root) }))
+    const owned = temporaryRoot();
+    expect(() => resolveStaticBuildRoot({ webRoot: "/workspace/web", environment: environment(owned) }))
       .toThrow();
   });
 
   it("rejects an existing symlink below the lifecycle root", () => {
-    const root = temporaryRoot();
+    const owned = temporaryRoot();
     const outside = temporaryRoot();
-    mkdirSync(join(root, "deployments"));
-    symlinkSync(outside, join(root, "deployments/link"));
+    mkdirSync(join(owned.root, "deployments"));
+    symlinkSync(outside.root, join(owned.root, "deployments/link"));
     expect(() => resolveStaticBuildRoot({
       webRoot: "/workspace/web",
       environment: {
         SEARISE_LIFECYCLE_BUILD: "1",
-        SEARISE_LIFECYCLE_ROOT: root,
-        SEARISE_WEB_DIST_ROOT: join(root, "deployments/link/a"),
+        SEARISE_LIFECYCLE_ROOT: owned.root,
+        SEARISE_LIFECYCLE_ROOT_TOKEN: owned.token,
+        SEARISE_WEB_DIST_ROOT: join(owned.root, "deployments/link/a"),
       },
     })).toThrow(/symbolic link/);
+  });
+
+  it("rejects a durable or aliased root even when the caller supplies a token", () => {
+    expect(() => resolveStaticBuildRoot({
+      webRoot: process.cwd(),
+      environment: {
+        SEARISE_LIFECYCLE_BUILD: "1",
+        SEARISE_LIFECYCLE_ROOT: process.cwd(),
+        SEARISE_LIFECYCLE_ROOT_TOKEN: "a".repeat(64),
+        SEARISE_WEB_DIST_ROOT: join(process.cwd(), "destructive-output"),
+      },
+    })).toThrow(/OS temporary|owner marker/);
+
+    const owned = temporaryRoot();
+    const alias = join(tmpdir(), `searise-offline-lifecycle-alias-${Date.now()}`);
+    roots.push(alias);
+    symlinkSync(owned.root, alias);
+    expect(() => resolveStaticBuildRoot({
+      webRoot: process.cwd(),
+      environment: {
+        SEARISE_LIFECYCLE_BUILD: "1",
+        SEARISE_LIFECYCLE_ROOT: alias,
+        SEARISE_LIFECYCLE_ROOT_TOKEN: owned.token,
+        SEARISE_WEB_DIST_ROOT: join(alias, "A"),
+      },
+    })).toThrow(/canonical owned OS temporary/);
   });
 });

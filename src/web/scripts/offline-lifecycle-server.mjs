@@ -148,7 +148,7 @@ export function createOfflineLifecycleServer({
   for (const [label, expected] of Object.entries(OFFLINE_LIFECYCLE_DEPLOYMENTS)) {
     const candidate = fixtures.deployments.get(label);
     if (!candidate) throw new Error(`Lifecycle deployment ${label} is unavailable.`);
-    configured.set(label, runtimeDeployment(validateDeployment(candidate.root, expected)));
+    configured.set(label, runtimeDeployment(validateDeployment(candidate.root, expected, candidate.seal)));
   }
   let active = "A";
   let generation = 1;
@@ -184,7 +184,7 @@ export function createOfflineLifecycleServer({
               !configured.has(input.deployment)) throw new Error("Unknown lifecycle deployment.");
           const expected = OFFLINE_LIFECYCLE_DEPLOYMENTS[input.deployment];
           const current = configured.get(input.deployment);
-          configured.set(input.deployment, runtimeDeployment(validateDeployment(current.root, expected)));
+          configured.set(input.deployment, runtimeDeployment(validateDeployment(current.root, expected, current.seal)));
           active = input.deployment;
           generation += 1;
           json(response, 200, { deployment: active, generation });

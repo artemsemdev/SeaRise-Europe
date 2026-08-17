@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { once } from "node:events";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -53,14 +53,18 @@ function deployment(expected) {
   return Object.freeze({ label: expected.label, root, identity, precacheSetSha256: expected.label.toLowerCase().repeat(64) });
 }
 
-async function harness() {
+async function harness({ beforeCreate } = {}) {
   const deployments = new Map(Object.values(OFFLINE_LIFECYCLE_DEPLOYMENTS).map((expected) => [expected.label, deployment(expected)]));
+  beforeCreate?.(deployments);
   const created = createOfflineLifecycleServer({
     fixtures: { deployments },
     controlToken: token,
     validateDeployment: (root, expected) => {
       const candidate = deployments.get(expected.label);
       if (candidate.root !== root) throw new Error("unexpected root");
+      if (readFileSync(join(root, "index.html"), "utf8") !== `<h1>${expected.label}</h1>`) {
+        throw new Error("deployment bytes differ from seal");
+      }
       return candidate;
     },
     maxLogEntries: 20,
@@ -69,7 +73,7 @@ async function harness() {
   created.server.listen(0, "127.0.0.1");
   await once(created.server, "listening");
   const address = created.server.address();
-  return { ...created, origin: `http://127.0.0.1:${address.port}` };
+  return { ...created, deployments, origin: `http://127.0.0.1:${address.port}` };
 }
 
 afterEach(async () => {
@@ -138,5 +142,24 @@ describe("offline lifecycle server", () => {
     });
     expect(response.status).toBe(400);
     expect(await (await request(`${origin}/__lifecycle/healthz`)).json()).toMatchObject({ deployment: "A", generation: 1 });
+  });
+
+  it("fails closed for byte mutation before startup and before a later switch", async () => {
+    await expect(harness({
+      beforeCreate(deployments) {
+        writeFileSync(join(deployments.get("A").root, "index.html"), "mutated before startup");
+      },
+    })).rejects.toThrow(/bytes differ/);
+
+    const { origin, deployments } = await harness();
+    writeFileSync(join(deployments.get("B").root, "index.html"), "mutated before switch");
+    const response = await request(`${origin}/__lifecycle/deployment`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [OFFLINE_LIFECYCLE_CONTROL_HEADER]: token },
+      body: JSON.stringify({ deployment: "B" }),
+    });
+    expect(response.status).toBe(400);
+    expect(await (await request(`${origin}/__lifecycle/healthz`)).json())
+      .toMatchObject({ deployment: "A", generation: 1 });
   });
 });

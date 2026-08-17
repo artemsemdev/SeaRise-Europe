@@ -1,10 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, lstatSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { createHash } from "node:crypto";
+import { lstatSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { validateApplicationBuildIdentity } from "./application-build-identity.mjs";
 import { assertSameBuildIdentity, validateBuildIdentity } from "./build-identity.mjs";
 import { extractEmbeddedPrecachePayload } from "./service-worker-precache.mjs";
+import { createOwnedLifecycleRoot, validateOwnedLifecycleRoot } from "./static-build-root.mjs";
 
 export const OFFLINE_LIFECYCLE_RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 export const OFFLINE_LIFECYCLE_DEPLOYMENTS = Object.freeze({
@@ -12,18 +13,6 @@ export const OFFLINE_LIFECYCLE_DEPLOYMENTS = Object.freeze({
   B: Object.freeze({ label: "B", appBuildId: "phase2-lifecycle-b" }),
   C: Object.freeze({ label: "C", appBuildId: "phase2-lifecycle-c" }),
 });
-
-function safeTemporaryRoot(value) {
-  if (typeof value !== "string" || !isAbsolute(value)) throw new Error("Lifecycle fixture root must be absolute.");
-  const temporary = realpathSync(tmpdir());
-  const root = realpathSync(value);
-  const child = relative(temporary, root);
-  if (!child || child === ".." || child.startsWith(`..${sep}`) || !basename(root).startsWith("searise-offline-lifecycle-")) {
-    throw new Error("Lifecycle fixture root is not an owned temporary directory.");
-  }
-  if (lstatSync(root).isSymbolicLink()) throw new Error("Lifecycle fixture root cannot be a symbolic link.");
-  return root;
-}
 
 function files(root, directory = root) {
   return readdirSync(directory).flatMap((name) => {
@@ -36,8 +25,7 @@ function files(root, directory = root) {
   });
 }
 
-export function validateOfflineLifecycleDeployment(root, expected) {
-  files(root);
+function inspectOfflineLifecycleDeployment(root, expected) {
   const identity = validateBuildIdentity(JSON.parse(readFileSync(join(root, "build-identity.json"), "utf8")));
   if (
     identity.appBuildId !== expected.appBuildId ||
@@ -72,6 +60,43 @@ export function validateOfflineLifecycleDeployment(root, expected) {
   });
 }
 
+function deploymentSeal(root, expected) {
+  const entries = files(root)
+    .map((path) => {
+      const bytes = readFileSync(path);
+      return Object.freeze({
+        path: relative(root, path).replaceAll("\\", "/"),
+        byteSize: bytes.length,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      });
+    })
+    .sort((left, right) => left.path.localeCompare(right.path));
+  return Object.freeze({
+    schemaVersion: "1.0.0",
+    sealKind: "offline-lifecycle-complete-file-inventory",
+    deployment: expected.label,
+    entries: Object.freeze(entries),
+    inventorySha256: createHash("sha256").update(`${JSON.stringify(entries)}\n`).digest("hex"),
+  });
+}
+
+export function sealOfflineLifecycleDeployment(root, expected) {
+  const inspected = inspectOfflineLifecycleDeployment(root, expected);
+  return Object.freeze({ ...inspected, seal: deploymentSeal(root, expected) });
+}
+
+export function validateOfflineLifecycleDeployment(root, expected, seal) {
+  if (!seal || typeof seal !== "object" || Array.isArray(seal)) {
+    throw new Error(`Lifecycle deployment ${expected.label} has no complete byte seal.`);
+  }
+  const inspected = inspectOfflineLifecycleDeployment(root, expected);
+  const actual = deploymentSeal(root, expected);
+  if (JSON.stringify(actual) !== JSON.stringify(seal)) {
+    throw new Error(`Lifecycle deployment ${expected.label} bytes differ from the complete file seal.`);
+  }
+  return Object.freeze({ ...inspected, seal: actual });
+}
+
 function cleanEnvironment(environment) {
   return Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("SEARISE_")));
 }
@@ -95,9 +120,10 @@ export function prepareOfflineLifecycleFixtures({
   webRoot = resolve(import.meta.dirname, ".."),
   environment = process.env,
   run = execute,
-  createRoot = () => mkdtempSync(join(tmpdir(), "searise-offline-lifecycle-")),
+  createRoot = createOwnedLifecycleRoot,
 } = {}) {
-  const lifecycleRoot = safeTemporaryRoot(createRoot());
+  const ownership = createRoot();
+  const lifecycleRoot = validateOwnedLifecycleRoot(ownership);
   const baseEnvironment = cleanEnvironment(environment);
   const deployments = new Map();
   try {
@@ -110,12 +136,13 @@ export function prepareOfflineLifecycleFixtures({
         SEARISE_RELEASE_DISPOSITION: "synthetic-fixture",
         SEARISE_LIFECYCLE_BUILD: "1",
         SEARISE_LIFECYCLE_ROOT: lifecycleRoot,
+        SEARISE_LIFECYCLE_ROOT_TOKEN: ownership.token,
         SEARISE_WEB_DIST_ROOT: outputRoot,
       };
       for (const [command, args, name] of buildCommands(webRoot, outputRoot)) {
         run({ command, args, cwd: webRoot, environment: buildEnvironment, label: `${expected.label} ${name}` });
       }
-      deployments.set(expected.label, validateOfflineLifecycleDeployment(outputRoot, expected));
+      deployments.set(expected.label, sealOfflineLifecycleDeployment(outputRoot, expected));
     }
     const digests = new Set([...deployments.values()].map(({ precacheSetSha256 }) => precacheSetSha256));
     if (digests.size !== deployments.size) throw new Error("Lifecycle deployments do not have distinct sealed precache identities.");
@@ -126,10 +153,12 @@ export function prepareOfflineLifecycleFixtures({
       cleanup() {
         if (removed) return;
         removed = true;
+        validateOwnedLifecycleRoot(ownership);
         rmSync(lifecycleRoot, { force: true, recursive: true });
       },
     });
   } catch (error) {
+    validateOwnedLifecycleRoot(ownership);
     rmSync(lifecycleRoot, { force: true, recursive: true });
     throw error;
   }

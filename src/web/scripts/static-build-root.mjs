@@ -1,9 +1,14 @@
-import { lstatSync, realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { randomBytes } from "node:crypto";
+import { lstatSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export const STATIC_BUILD_ROOT_ENV = "SEARISE_WEB_DIST_ROOT";
 export const LIFECYCLE_BUILD_ENV = "SEARISE_LIFECYCLE_BUILD";
 export const LIFECYCLE_ROOT_ENV = "SEARISE_LIFECYCLE_ROOT";
+export const LIFECYCLE_ROOT_TOKEN_ENV = "SEARISE_LIFECYCLE_ROOT_TOKEN";
+const ROOT_PREFIX = "searise-offline-lifecycle-";
+const OWNER_MARKER = ".searise-lifecycle-owner";
 
 function inside(root, target) {
   const child = relative(root, target);
@@ -26,6 +31,34 @@ function assertExistingPathHasNoSymlinks(root, target) {
   }
 }
 
+export function createOwnedLifecycleRoot() {
+  const temporary = realpathSync(tmpdir());
+  const root = mkdtempSync(join(temporary, ROOT_PREFIX));
+  const token = randomBytes(32).toString("hex");
+  writeFileSync(join(root, OWNER_MARKER), `${token}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+  return Object.freeze({ root, token });
+}
+
+export function validateOwnedLifecycleRoot({ root: value, token }) {
+  if (!value || !isAbsolute(value) || typeof token !== "string" || !/^[0-9a-f]{64}$/u.test(token)) {
+    throw new Error("Lifecycle root ownership is invalid.");
+  }
+  const temporary = realpathSync(tmpdir());
+  const lexical = resolve(value);
+  const root = realpathSync(lexical);
+  const metadata = lstatSync(lexical);
+  if (lexical !== root || !metadata.isDirectory() || metadata.isSymbolicLink() ||
+      dirname(root) !== temporary || !basename(root).startsWith(ROOT_PREFIX)) {
+    throw new Error("Lifecycle root must be a canonical owned OS temporary directory.");
+  }
+  const marker = join(root, OWNER_MARKER);
+  const markerMetadata = lstatSync(marker);
+  if (!markerMetadata.isFile() || markerMetadata.isSymbolicLink() || readFileSync(marker, "utf8") !== `${token}\n`) {
+    throw new Error("Lifecycle root owner marker is invalid.");
+  }
+  return root;
+}
+
 /**
  * Resolves the normal production output or a lifecycle-only temporary root.
  * Alternate roots require an explicit build mode and an existing, real
@@ -43,12 +76,15 @@ export function resolveStaticBuildRoot({ webRoot, environment = process.env }) {
   if (!lifecycleRootValue || !isAbsolute(lifecycleRootValue) || !isAbsolute(requested)) {
     throw new Error("Lifecycle build roots must be explicit absolute paths.");
   }
+  const lifecycleRoot = validateOwnedLifecycleRoot({
+    root: lifecycleRootValue,
+    token: environment[LIFECYCLE_ROOT_TOKEN_ENV],
+  });
   const lexicalRoot = resolve(lifecycleRootValue);
   const lexicalTarget = resolve(requested);
   if (!inside(lexicalRoot, lexicalTarget)) {
     throw new Error("Lifecycle build output must remain inside its temporary root.");
   }
-  const lifecycleRoot = realpathSync(lexicalRoot);
   const target = resolve(lifecycleRoot, relative(lexicalRoot, lexicalTarget));
   assertExistingPathHasNoSymlinks(lifecycleRoot, target);
   return target;
