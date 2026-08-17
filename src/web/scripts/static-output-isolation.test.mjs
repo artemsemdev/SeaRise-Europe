@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -44,8 +44,26 @@ function fixture() {
 
 describe("static output isolation", () => {
   it("accepts only the exact root, Vite, source-map, and release-manifest closure", () => {
-    const { options, paths } = fixture();
+    const { dist, options, paths } = fixture();
+    writeFileSync(resolve(dist, "assets/main-01234567.js"),
+      `export const scenarios = "/releases/${RELEASE}/config/scenarios.json";\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(validateStaticOutputIsolation({ ...options, paths }).allowedPaths).toContain("assets/main-01234567.js.map");
+  });
+
+  it("rejects a symlink even when it appears at an otherwise safe output path", () => {
+    const { dist, options, paths } = fixture();
+    const linked = resolve(dist, "linked.html");
+    symlinkSync(resolve(dist, "index.html"), linked);
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, linked] }))
+      .toThrow(/not a regular file: linked\.html/);
+  });
+
+  it("rejects a missing release-manifest-authorized file", () => {
+    const { dist, options, paths } = fixture();
+    const missing = resolve(dist, `releases/${RELEASE}/config/scenarios.json`);
+    unlinkSync(missing);
+    expect(() => validateStaticOutputIsolation({ ...options, paths: paths.filter((path) => path !== missing) }))
+      .toThrow(/missing allowlisted files: releases\/.+\/config\/scenarios\.json/);
   });
 
   it.each(["candidate-v7.tar", "unexpected-release.zip", "unknown-output.bin"])(
@@ -59,7 +77,7 @@ describe("static output isolation", () => {
     },
   );
 
-  it.each(["/assess", "/geocode", "/config"])("rejects an allowlisted built asset requesting %s", (endpoint) => {
+  it.each(["/assess", "/geocode", "/config", "https://runtime.invalid/config"])("rejects an allowlisted built asset requesting %s", (endpoint) => {
     const { dist, options, paths } = fixture();
     writeFileSync(resolve(dist, "assets/main-01234567.js"), `fetch(${JSON.stringify(endpoint)});\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(() => validateStaticOutputIsolation({ ...options, paths })).toThrow(/Forbidden runtime reference/);

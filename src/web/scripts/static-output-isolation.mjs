@@ -13,12 +13,20 @@ const SCANNED_EXTENSIONS = new Set([".html", ".js", ".css", ".map"]);
 const FORBIDDEN_RUNTIME_REFERENCES = Object.freeze([
   /candidate-v7/i,
   /local-data\/phase-1/i,
-  /["'`]\/[^"'`]*assess(?:[/?"'`]|$)/,
-  /["'`]\/[^"'`]*geocode(?:[/?"'`]|$)/,
-  /["'`]\/[^"'`]*config(?:[/?"'`]|$)/,
+  /["'`](?:(?:https?:)?\/\/[^/"'`]+)?\/(?:assess|geocode|config)(?:[/?#"'`]|$)/,
 ]);
+const RELATIVE_RUNTIME_ENDPOINT = /(["'`])((?:\.\/)?(?:assess|geocode|config)(?:[/?#][^"'`]*)?)\1/gu;
 
 function fail(message) { throw new Error(message); }
+
+function containsForbiddenRuntimeReference(text, allowedReleaseConfigPaths) {
+  if (FORBIDDEN_RUNTIME_REFERENCES.some((pattern) => pattern.test(text))) return true;
+  for (const match of text.matchAll(RELATIVE_RUNTIME_ENDPOINT)) {
+    const path = match[2].replace(/^\.\//u, "").replace(/\\+$/u, "");
+    if (!allowedReleaseConfigPaths.has(path)) return true;
+  }
+  return false;
+}
 
 function safeRelativePath(value, label) {
   if (typeof value !== "string" || !value || value.includes("\\") || value.startsWith("/")
@@ -98,6 +106,9 @@ export function validateStaticOutputIsolation({
     }
     expected.add(`${releasePrefix}/${safeRelativePath(artifact.path, `Release manifest artifact ${index}`)}`);
   }
+  const allowedReleaseConfigPaths = new Set(releaseManifest.artifacts
+    .map(({ path }) => path)
+    .filter((path) => typeof path === "string" && /^config\/[A-Za-z0-9._-]+\.json$/u.test(path)));
 
   const actual = paths.map((path) => {
     const relativePath = relative(dist, path).replaceAll("\\", "/");
@@ -115,7 +126,7 @@ export function validateStaticOutputIsolation({
 
   for (const path of actual.filter((path) => SCANNED_EXTENSIONS.has(extname(path)))) {
     const text = readFileSync(resolve(dist, path), "utf8");
-    if (FORBIDDEN_RUNTIME_REFERENCES.some((pattern) => pattern.test(text))) {
+    if (containsForbiddenRuntimeReference(text, allowedReleaseConfigPaths)) {
       fail(`Forbidden runtime reference in ${path}`);
     }
   }
