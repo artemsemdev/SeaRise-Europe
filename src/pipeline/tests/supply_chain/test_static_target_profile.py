@@ -86,6 +86,18 @@ def _refresh_hash(document: dict[str, Any], repository: Path, path: str) -> None
     _item(document, path)["sha256"] = hashlib.sha256((repository / path).read_bytes()).hexdigest()
 
 
+def _set_workflow_jobs_indent(value: str, width: int) -> str:
+    lines = value.splitlines(keepends=True)
+    jobs_index = next(index for index, line in enumerate(lines) if line.rstrip() == "jobs:")
+    for index in range(jobs_index + 1, len(lines)):
+        line = lines[index]
+        if line.strip() and not line.startswith(" "):
+            break
+        if line.startswith("  "):
+            lines[index] = " " * width + line[2:]
+    return "".join(lines)
+
+
 def _remove_workflow_job(value: str, selector: str) -> str:
     kind, separator, job_id = selector.partition(":")
     assert separator and kind == "workflow-job"
@@ -363,6 +375,34 @@ def test_historical_gate_rejects_any_retained_v1_subtree_drift(
         )
 
 
+def test_historical_gate_rejects_symlinked_retained_v1_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    retained = repository / "contracts/supply-chain/v1"
+    outside = tmp_path / "outside-v1"
+    shutil.copytree(retained, outside)
+    shutil.rmtree(retained)
+    retained.symlink_to(outside, target_is_directory=True)
+    original_git = historical_inventory._git
+    monkeypatch.setattr(
+        historical_inventory,
+        "_git",
+        lambda _repository, *arguments: original_git(ROOT, *arguments),
+    )
+
+    with pytest.raises(
+        SupplyChainContractError,
+        match="retained Phase 1 subtree must not use symlinks",
+    ):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
+
+
 def test_profile_rejects_repointed_historical_git_authority(tmp_path: Path) -> None:
     document = copy.deepcopy(_load())
     document["historicalEvidence"]["gitAuthority"]["commit"] = "f" * 40
@@ -571,6 +611,36 @@ def test_workflow_yaml_parser_finds_quoted_or_spaced_job_keys(
     workflow = repository / ".github/workflows/ci.yml"
     value = workflow.read_text(encoding="utf-8")
     workflow.write_text(value.replace("  api:", replacement, 1), encoding="utf-8")
+    document = copy.deepcopy(_load())
+    _refresh_hash(document, repository, ".github/workflows/ci.yml")
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert any(
+        selector["id"] == "ci-legacy-api"
+        for selector in validated["activation"]["pendingSelectors"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("indent", "quoted"),
+    [(1, False), (3, False), (4, False), (4, True)],
+)
+def test_workflow_yaml_parser_derives_jobs_child_indentation(
+    tmp_path: Path,
+    indent: int,
+    quoted: bool,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    workflow = repository / ".github/workflows/ci.yml"
+    value = _set_workflow_jobs_indent(workflow.read_text(encoding="utf-8"), indent)
+    if quoted:
+        value = value.replace(" " * indent + "api:", " " * indent + '"api" :', 1)
+    workflow.write_text(value, encoding="utf-8")
     document = copy.deepcopy(_load())
     _refresh_hash(document, repository, ".github/workflows/ci.yml")
 

@@ -31,8 +31,9 @@ of the API/frontend/blob-seed trees, PostGIS initialization scripts, root
 solution, API/frontend Dockerfiles, Compose file, and Compose smoke script.
 Absence uses `lstat`-style semantics, so a broken symlink still blocks
 activation. Workflow blockers are parsed as exact top-level job identities;
-quoted or colon-spaced keys remain visible, duplicate keys are rejected, and
-split environment-variable indirection cannot erase a job-removal obligation.
+the parser derives any consistent positive child indentation, quoted or
+colon-spaced keys remain visible, duplicate keys are rejected, and split
+environment-variable indirection cannot erase a job-removal obligation.
 
 The v2 contributor manifest is intentionally separate from the pre-removal
 `src/pipeline` development manifests. It retains the static build/data pipeline
@@ -49,6 +50,8 @@ retained v1 path and byte, materializes the archived schema, dependency inputs,
 and validator, verifies their bindings, then executes that archived validator.
 The mutable Phase 2 validator is not the historical authority, so a Phase 2
 workflow edit or later legacy deletion cannot be mistaken for v1 evidence drift.
+The retained v1 root and every traversed path component must resolve strictly
+beneath the repository without symlinks.
 
 Validate the active profile from the repository root:
 

@@ -708,13 +708,23 @@ def _yaml_mapping_entry(line: str, indent: int) -> tuple[str, str] | None:
 def _parse_workflow_jobs(value: str) -> frozenset[str]:
     jobs_seen = False
     in_jobs = False
+    job_indent: int | None = None
     job_ids: set[str] = set()
     for line in value.splitlines():
         indent = len(line) - len(line.lstrip(" "))
         if not line.strip() or line.lstrip().startswith("#"):
             continue
-        if indent != 0 and not (in_jobs and indent == 2):
+        if indent != 0 and not in_jobs:
             continue
+        if in_jobs and indent > 0:
+            if job_indent is None:
+                job_indent = indent
+            elif indent < job_indent:
+                raise SupplyChainContractError(
+                    "workflow jobs mapping uses inconsistent child indentation"
+                )
+            if indent > job_indent:
+                continue
         entry = _yaml_mapping_entry(line, indent)
         if entry is None:
             continue
@@ -727,10 +737,11 @@ def _parse_workflow_jobs(value: str) -> frozenset[str]:
                     )
                 jobs_seen = True
                 in_jobs = True
+                job_indent = None
             elif in_jobs:
                 in_jobs = False
             continue
-        if not in_jobs or indent != 2:
+        if not in_jobs or indent != job_indent:
             continue
         if remainder and not remainder.startswith("#"):
             raise SupplyChainContractError("workflow job must use a block mapping")

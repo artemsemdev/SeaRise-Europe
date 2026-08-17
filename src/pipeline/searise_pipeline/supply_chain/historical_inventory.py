@@ -51,18 +51,24 @@ def _retained_v1_files(
     repository_root: Path,
     subtree: PurePosixPath,
 ) -> dict[PurePosixPath, tuple[bytes, bool]]:
-    root = repository_root.joinpath(*subtree.parts)
+    resolved_repository_root = repository_root.resolve(strict=True)
+    root = _strict_repository_path(
+        resolved_repository_root,
+        subtree,
+        description="retained Phase 1 subtree",
+    )
     retained: dict[PurePosixPath, tuple[bytes, bool]] = {}
     try:
         candidates = tuple(root.rglob("*"))
     except OSError as exc:
         raise SupplyChainContractError("retained Phase 1 subtree cannot be read") from exc
     for candidate in candidates:
-        relative = PurePosixPath(candidate.relative_to(repository_root).as_posix())
-        if candidate.is_symlink():
-            raise SupplyChainContractError(
-                f"retained Phase 1 subtree must not use symlinks: {relative}"
-            )
+        relative = PurePosixPath(candidate.relative_to(resolved_repository_root).as_posix())
+        candidate = _strict_repository_path(
+            resolved_repository_root,
+            relative,
+            description="retained Phase 1 subtree",
+        )
         if candidate.is_dir():
             continue
         if not candidate.is_file():
@@ -74,6 +80,34 @@ def _retained_v1_files(
             bool(candidate.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)),
         )
     return retained
+
+
+def _strict_repository_path(
+    repository_root: Path,
+    logical: PurePosixPath,
+    *,
+    description: str,
+) -> Path:
+    """Resolve an existing path beneath the repository without following symlinks."""
+    try:
+        root = repository_root.resolve(strict=True)
+        if not root.is_dir():
+            raise SupplyChainContractError("repository root must be a directory")
+        current = root
+        for part in logical.parts:
+            current = current / part
+            mode = current.lstat().st_mode
+            if stat.S_ISLNK(mode):
+                raise SupplyChainContractError(
+                    f"{description} must not use symlinks: {logical}"
+                )
+        resolved = current.resolve(strict=True)
+        resolved.relative_to(root)
+    except SupplyChainContractError:
+        raise
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise SupplyChainContractError(f"{description} cannot be resolved safely") from exc
+    return resolved
 
 
 @contextmanager
@@ -92,7 +126,18 @@ def materialize_historical_dependency_authority(
     validator_authority = historical["validatorAuthority"]
     validator_path = _safe_path(validator_authority["path"])
     inventory_path = _safe_path(inventory_descriptor["path"])
-    inventory_bytes = (repository_root / inventory_path).read_bytes()
+    subtree = _safe_path(historical["path"])
+    _strict_repository_path(
+        repository_root,
+        subtree,
+        description="retained Phase 1 subtree",
+    )
+    inventory_location = _strict_repository_path(
+        repository_root,
+        inventory_path,
+        description="historical v1 inventory",
+    )
+    inventory_bytes = inventory_location.read_bytes()
     if hashlib.sha256(inventory_bytes).hexdigest() != inventory_descriptor["sha256"]:
         raise SupplyChainContractError("historical v1 inventory bytes changed")
     try:
@@ -104,7 +149,6 @@ def materialize_historical_dependency_authority(
         ]
     except (KeyError, TypeError, ValueError) as exc:
         raise SupplyChainContractError("historical v1 inventory structure is malformed") from exc
-    subtree = _safe_path(historical["path"])
     outside_inputs = {
         validator_path,
         *(path for path in inputs if subtree not in path.parents),

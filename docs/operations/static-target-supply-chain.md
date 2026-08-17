@@ -43,9 +43,10 @@ both exactly match the static contributor authority. Final activation also
 proves the API, frontend, blob-seed, solution, Compose, and Compose-smoke paths
 are absent, both PostGIS initialization scripts and the API/frontend Dockerfiles
 are absent, and no reviewed .NET/C# legacy workflow jobs remain. A constrained
-YAML mapping parser enforces exact top-level job identity, recognizes quoted and
-colon-spaced keys, and rejects duplicates; token formatting or split
-environment-variable values cannot erase the blocker.
+YAML mapping parser enforces exact top-level job identity, derives any
+consistent positive jobs-child indentation, recognizes quoted and colon-spaced
+keys, and rejects duplicates; token formatting or split environment-variable
+values cannot erase the blocker.
 
 Selector source files carry profile SHA-256 bindings. Path-presence selectors
 do not hash mutable legacy content: they use `lstat`-equivalent checks so files,
@@ -73,7 +74,9 @@ temporary directory. It verifies the validator SHA-256 and Git blob before
 executing that archived implementation; the mutable Phase 2 validator is never
 used as historical authority. Git history must therefore be available to this
 gate; CI checkout must not omit the recorded commit. A Phase 1 record does not
-reactivate a deleted runtime.
+reactivate a deleted runtime. The retained v1 root and every path component are
+resolved strictly beneath the repository before traversal or reads; symlinks at
+the root or below it fail closed.
 
 Current-tree discovery fails closed for alternative npm, pnpm, and Yarn locks;
 Pipenv, Poetry, uv, requirements, and pyproject Python authorities; and all four

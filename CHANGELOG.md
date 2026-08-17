@@ -18,7 +18,9 @@ All notable changes to this project will be documented in this file.
   mutable Phase 2 checkout. Current npm/pnpm/Yarn, workflow-job, local-action,
   container/Compose, Pipenv/Poetry/uv/requirements, native-tool, SBOM, and
   scoped-schema authorities remain exact and fail closed; workflow parsing
-  recognizes quoted or spaced keys and rejects duplicate job identities.
+  derives consistent jobs indentation, recognizes quoted or spaced keys, and
+  rejects duplicate job identities. Retained Phase 1 paths are resolved beneath
+  the repository without symlink traversal.
 
 - Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
   paths are ignored, untracked, absent from CI workflows, and absent from the
