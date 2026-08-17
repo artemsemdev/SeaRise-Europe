@@ -182,30 +182,38 @@ _ACTIVE_CONTRIBUTOR_INPUT_AUTHORITY = {
     )
 }
 _LEGACY_SELECTORS = {
-    "ci-legacy-api": (72, ".github/workflows/ci.yml", "src/api"),
+    "ci-legacy-api": (71, ".github/workflows/ci.yml", "src/api"),
     "ci-legacy-compose": (72, ".github/workflows/ci.yml", "compose-smoke"),
-    "ci-legacy-dotnet": (72, ".github/workflows/ci.yml", "actions/setup-dotnet@"),
-    "ci-legacy-frontend": (72, ".github/workflows/ci.yml", "src/frontend"),
-    "codeql-legacy-csharp": (72, ".github/workflows/codeql.yml", "csharp"),
+    "ci-legacy-dotnet": (71, ".github/workflows/ci.yml", "actions/setup-dotnet@"),
+    "ci-legacy-dotnet-command": (71, ".github/workflows/ci.yml", "dotnet "),
+    "ci-legacy-frontend": (70, ".github/workflows/ci.yml", "src/frontend"),
+    "codeql-legacy-csharp": (71, ".github/workflows/codeql.yml", "csharp"),
+    "codeql-legacy-dotnet": (71, ".github/workflows/codeql.yml", "dotnet "),
+    "legacy-api-tree": (71, "src/api", "path-exists"),
+    "legacy-blob-seed-tree": (72, "infra/blob-seed", "path-exists"),
+    "legacy-compose-file": (72, "docker-compose.yml", "path-exists"),
+    "legacy-compose-smoke": (72, "scripts/compose-smoke.sh", "path-exists"),
+    "legacy-frontend-tree": (70, "src/frontend", "path-exists"),
+    "legacy-solution-file": (71, "SeaRise Europe.sln", "path-exists"),
     "pipeline-pyproject-azure": (
         71,
         "src/pipeline/pyproject.toml",
-        "azure-storage-blob>=12.19,<13.0",
+        "azure-storage-blob",
     ),
     "pipeline-pyproject-postgis": (
         71,
         "src/pipeline/pyproject.toml",
-        "psycopg2-binary>=2.9,<3.0",
+        "psycopg2-binary",
     ),
     "pipeline-requirements-azure": (
         71,
         "src/pipeline/requirements-pipeline.txt",
-        "azure-storage-blob>=12.19,<13.0",
+        "azure-storage-blob",
     ),
     "pipeline-requirements-postgis": (
         71,
         "src/pipeline/requirements-pipeline.txt",
-        "psycopg2-binary>=2.9,<3.0",
+        "psycopg2-binary",
     ),
 }
 _FORBIDDEN_PREFIXES = (
@@ -324,28 +332,84 @@ def _safe_regular_file(repository_root: Path, value: str) -> Path:
 
 def _validate_static_contributor_manifest(repository_root: Path) -> None:
     manifest = repository_root / _STATIC_CONTRIBUTOR_REQUIREMENTS
-    names: list[str] = []
-    for line_number, raw in enumerate(manifest.read_text(encoding="utf-8").splitlines(), 1):
-        value = raw.split("#", 1)[0].strip()
-        if not value:
-            continue
-        match = _REQUIREMENT_NAME.match(value)
-        if match is None:
-            raise SupplyChainContractError(
-                f"invalid static contributor requirement at line {line_number}"
-            )
-        names.append(match.group(1).lower().replace("_", "-"))
+    requirements = _requirements_map(manifest.read_text(encoding="utf-8"), label="static")
+    names = list(requirements)
     forbidden = sorted(set(names) & _LEGACY_PYTHON_PACKAGES)
     if forbidden:
         raise SupplyChainContractError(
             f"legacy Python packages cannot enter the static target: {forbidden}"
         )
-    if len(names) != len(set(names)) or names != sorted(names):
-        raise SupplyChainContractError(
-            "static contributor requirements must be unique and sorted"
-        )
+    if names != sorted(names):
+        raise SupplyChainContractError("static contributor requirements must be sorted")
     if set(names) != set(_EXPECTED_CONTRIBUTOR_PACKAGES):
         raise SupplyChainContractError("static contributor package set drifted")
+
+
+def _canonical_requirement(value: str, *, label: str) -> tuple[str, str]:
+    match = _REQUIREMENT_NAME.match(value.strip())
+    if match is None:
+        raise SupplyChainContractError(f"invalid {label} requirement: {value}")
+    name = match.group(1).lower().replace("_", "-").replace(".", "-")
+    suffix = re.sub(r"\s+", "", value.strip()[match.end() :]).lower()
+    return name, f"{name}{suffix}"
+
+
+def _requirements_map(value: str, *, label: str) -> dict[str, str]:
+    requirements: dict[str, str] = {}
+    for line_number, raw in enumerate(value.splitlines(), 1):
+        value = raw.split("#", 1)[0].strip()
+        if not value:
+            continue
+        name, canonical = _canonical_requirement(value, label=f"{label} line {line_number}")
+        if name in requirements:
+            raise SupplyChainContractError(f"duplicate {label} requirement: {name}")
+        requirements[name] = canonical
+    return requirements
+
+
+def _pyproject_requirements(value: str) -> dict[str, str]:
+    def array(section: str, key: str) -> list[str]:
+        section_match = re.search(
+            rf"(?ms)^\[{re.escape(section)}\]\s*(.*?)(?=^\[|\Z)",
+            value,
+        )
+        if section_match is None:
+            raise SupplyChainContractError(f"pyproject section is missing: {section}")
+        array_match = re.search(
+            rf"(?ms)^\s*{re.escape(key)}\s*=\s*\[(.*?)^\s*\]",
+            section_match.group(1),
+        )
+        if array_match is None:
+            raise SupplyChainContractError(f"pyproject dependency array is missing: {key}")
+        return re.findall(r'^\s*"([^"]+)"\s*,?\s*$', array_match.group(1), re.MULTILINE)
+
+    requirements: dict[str, str] = {}
+    for raw in [*array("project", "dependencies"), *array("project.optional-dependencies", "dev")]:
+        name, canonical = _canonical_requirement(raw, label="pyproject")
+        if name in requirements:
+            raise SupplyChainContractError(f"duplicate pyproject requirement: {name}")
+        requirements[name] = canonical
+    return requirements
+
+
+def _validate_contributor_parity(repository_root: Path) -> None:
+    target = _requirements_map(
+        (repository_root / _STATIC_CONTRIBUTOR_REQUIREMENTS).read_text(encoding="utf-8"),
+        label="static",
+    )
+    pyproject = _pyproject_requirements(
+        (repository_root / "src/pipeline/pyproject.toml").read_text(encoding="utf-8")
+    )
+    requirements = _requirements_map(
+        (repository_root / "src/pipeline/requirements-pipeline.txt").read_text(
+            encoding="utf-8"
+        ),
+        label="pipeline",
+    )
+    if pyproject != target or requirements != target:
+        raise SupplyChainContractError(
+            "active contributor manifests must exactly match the static target authority"
+        )
 
 
 def _validate_static_npm_semantics(repository_root: Path) -> None:
@@ -441,11 +505,30 @@ def _expected_transition(
     issues: set[int] = set()
     python_pending = False
     contents: dict[str, str] = {}
+    python_requirements: dict[str, dict[str, str]] = {}
     for selector_id, (issue, path, selector) in sorted(_LEGACY_SELECTORS.items()):
-        if path not in contents:
-            contents[path] = _safe_regular_file(repository_root, path).read_text(encoding="utf-8")
-        if selector in contents[path]:
-            present.append({"id": selector_id, "path": path, "selector": selector})
+        present_selector = False
+        if selector == "path-exists":
+            present_selector = (repository_root / path).exists()
+        elif selector_id.startswith("pipeline-"):
+            if path not in python_requirements:
+                source = _safe_regular_file(repository_root, path).read_text(encoding="utf-8")
+                python_requirements[path] = (
+                    _pyproject_requirements(source)
+                    if path.endswith("pyproject.toml")
+                    else _requirements_map(source, label=path)
+                )
+            present_selector = selector in python_requirements[path]
+        else:
+            if path not in contents:
+                contents[path] = _safe_regular_file(repository_root, path).read_text(
+                    encoding="utf-8"
+                )
+            present_selector = selector.casefold() in contents[path].casefold()
+        if present_selector:
+            present.append(
+                {"id": selector_id, "issue": issue, "path": path, "selector": selector}
+            )
             issues.add(issue)
             python_pending = python_pending or selector_id.startswith("pipeline-")
     return present, sorted(issues), python_pending
@@ -544,5 +627,7 @@ def validate_static_target_profile(
             f"static supply-chain input set drifted; missing={missing}, extra={extra}"
         )
     _validate_static_contributor_manifest(repository_root)
+    if not python_pending:
+        _validate_contributor_parity(repository_root)
     _validate_active_sboms(repository_root)
     return document

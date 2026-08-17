@@ -14,12 +14,20 @@ validator rejects those paths even if a profile edit supplies a valid hash.
 This makes deletion of those runtime trees independent from the active
 supply-chain gate.
 
-The checked-in profile is honestly `pending-legacy-removal`: issue #71 still
-owns Azure/PostGIS contributor selectors and issue #72 still owns legacy CI and
-CodeQL selectors. Those exact selector authorities are hash-bound and listed in
-the activation record. The validator derives the selectors from repository
+The checked-in profile is honestly `pending-legacy-removal`: issue #70 owns the
+frontend/Next.js CI selector; issue #71 owns Azure/PostGIS, API/.NET, and CodeQL
+C# selectors; issue #72 owns the shared Compose/container selector. Those exact
+selector authorities are hash-bound and carry their issue ownership in the
+activation record. The validator derives the selectors from repository
 bytes; it rejects an `active` claim while any remain. Once the last selector is
 removed, only an `active` record with no blockers or pending selectors can pass.
+Python package names are parsed and normalized independently of PEP 508
+whitespace, punctuation, or case. Clearing #71 also requires both real
+contributor manifests to match the v2 static authority package-for-package and
+constraint-for-constraint. Active status additionally requires tracked absence
+of the API/frontend/blob-seed trees, root solution, Compose file, and Compose
+smoke script; workflow blockers are scanned semantically rather than trusted
+from the profile declaration.
 
 The v2 contributor manifest is intentionally separate from the pre-removal
 `src/pipeline` development manifests. It retains the static build/data pipeline

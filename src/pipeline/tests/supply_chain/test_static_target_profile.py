@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,105 @@ def _copy_active_authority(destination: Path) -> None:
             target = destination / item["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / item["path"], target)
+    for selector in _load()["activation"]["pendingSelectors"]:
+        if selector["selector"] != "path-exists":
+            continue
+        source = ROOT / selector["path"]
+        target = destination / selector["path"]
+        if source.is_dir():
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+
+def _refresh_hash(document: dict[str, Any], repository: Path, path: str) -> None:
+    _item(document, path)["sha256"] = hashlib.sha256((repository / path).read_bytes()).hexdigest()
+
+
+def _remove_issue_selectors(
+    document: dict[str, Any],
+    repository: Path,
+    issue: int,
+) -> None:
+    changed_files: set[str] = set()
+    for selector in list(document["activation"]["pendingSelectors"]):
+        if selector["issue"] != issue:
+            continue
+        target = repository / selector["path"]
+        if selector["selector"] == "path-exists":
+            if target.is_dir():
+                shutil.rmtree(target)
+            elif target.exists():
+                target.unlink()
+        elif not selector["id"].startswith("pipeline-"):
+            value = target.read_text(encoding="utf-8")
+            target.write_text(
+                value.replace(selector["selector"], "removed-legacy-token"),
+                encoding="utf-8",
+            )
+            changed_files.add(selector["path"])
+    document["activation"]["pendingSelectors"] = [
+        selector
+        for selector in document["activation"]["pendingSelectors"]
+        if selector["issue"] != issue
+    ]
+    document["activation"]["blockingIssues"] = sorted(
+        {selector["issue"] for selector in document["activation"]["pendingSelectors"]}
+    )
+    document["activation"]["status"] = (
+        "pending-legacy-removal"
+        if document["activation"]["pendingSelectors"]
+        else "active"
+    )
+    for path in changed_files:
+        _refresh_hash(document, repository, path)
+
+
+def _migrate_issue_71_python_authority(document: dict[str, Any], repository: Path) -> None:
+    target_path = (
+        repository
+        / "contracts/supply-chain/v2/python/static-target-contributor-requirements.txt"
+    )
+    target_lines = [
+        line.strip()
+        for line in target_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    dependencies = [line for line in target_lines if not line.lower().startswith("pytest")]
+    pytest_requirement = next(line for line in target_lines if line.lower().startswith("pytest"))
+    pyproject_path = repository / "src/pipeline/pyproject.toml"
+    pyproject = pyproject_path.read_text(encoding="utf-8")
+    dependency_block = "dependencies = [\n" + "".join(
+        f'    "{line}",\n' for line in dependencies
+    ) + "]"
+    dev_block = f'dev = [\n    "{pytest_requirement}",\n]'
+    pyproject = re.sub(
+        r"(?ms)^dependencies\s*=\s*\[.*?^\]",
+        dependency_block,
+        pyproject,
+        count=1,
+    )
+    pyproject = re.sub(r"(?ms)^dev\s*=\s*\[.*?^\]", dev_block, pyproject, count=1)
+    pyproject_path.write_text(pyproject, encoding="utf-8")
+    requirements_path = repository / "src/pipeline/requirements-pipeline.txt"
+    requirements_path.write_text("\n".join(target_lines) + "\n", encoding="utf-8")
+
+    pending = next(
+        component
+        for component in document["components"]
+        if component["id"] == "pending-legacy-python-authorities"
+    )
+    contributor = next(
+        component
+        for component in document["components"]
+        if component["id"] == "pipeline-python-contributor"
+    )
+    contributor["inputs"].extend(pending["inputs"])
+    contributor["inputs"].sort(key=lambda item: item["path"])
+    document["components"].remove(pending)
+    for path in ("src/pipeline/pyproject.toml", "src/pipeline/requirements-pipeline.txt"):
+        _refresh_hash(document, repository, path)
 
 
 def test_profile_schema_passes_draft_2020_12_metaschema() -> None:
@@ -75,7 +175,29 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     assert document["target"] == "static-browser"
     assert document["productionClaim"] is False
     assert document["activation"]["status"] == "pending-legacy-removal"
-    assert document["activation"]["blockingIssues"] == [71, 72]
+    assert document["activation"]["blockingIssues"] == [70, 71, 72]
+    assert {
+        selector["id"]: selector["issue"]
+        for selector in document["activation"]["pendingSelectors"]
+    } == {
+        "ci-legacy-api": 71,
+        "ci-legacy-compose": 72,
+        "ci-legacy-dotnet": 71,
+        "ci-legacy-dotnet-command": 71,
+        "ci-legacy-frontend": 70,
+        "codeql-legacy-csharp": 71,
+        "codeql-legacy-dotnet": 71,
+        "legacy-api-tree": 71,
+        "legacy-blob-seed-tree": 72,
+        "legacy-compose-file": 72,
+        "legacy-compose-smoke": 72,
+        "legacy-frontend-tree": 70,
+        "legacy-solution-file": 71,
+        "pipeline-pyproject-azure": 71,
+        "pipeline-pyproject-postgis": 71,
+        "pipeline-requirements-azure": 71,
+        "pipeline-requirements-postgis": 71,
+    }
     assert document["historicalEvidence"] == {
         "path": "contracts/supply-chain/v1",
         "status": "immutable-phase-1-history",
@@ -96,7 +218,7 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     )
 
 
-def test_profile_survives_a_tree_with_no_legacy_runtime(tmp_path: Path) -> None:
+def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     _copy_active_authority(repository)
 
@@ -104,10 +226,7 @@ def test_profile_survives_a_tree_with_no_legacy_runtime(tmp_path: Path) -> None:
 
     assert len(validated["components"]) == 13
     assert validated["activation"]["status"] == "pending-legacy-removal"
-    assert not (repository / "src/api").exists()
-    assert not (repository / "src/frontend").exists()
-    assert not (repository / "infra/blob-seed").exists()
-    assert not (repository / "docker-compose.yml").exists()
+    assert validated["activation"]["blockingIssues"] == [70, 71, 72]
 
 
 def test_profile_rejects_legacy_runtime_as_an_active_input(tmp_path: Path) -> None:
@@ -156,6 +275,99 @@ def test_profile_cannot_claim_active_while_legacy_selectors_remain(tmp_path: Pat
 
     with pytest.raises(SupplyChainContractError, match="activation does not match"):
         validate_static_target_profile(_write(tmp_path / "profile.json", document))
+
+
+def test_profile_detects_pep508_legacy_name_with_alternate_whitespace(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    pyproject_path = repository / "src/pipeline/pyproject.toml"
+    pyproject_path.write_text(
+        pyproject_path.read_text(encoding="utf-8").replace(
+            "azure-storage-blob>=12.19,<13.0",
+            "azure_storage_blob >= 12.19, < 13.0",
+        ),
+        encoding="utf-8",
+    )
+    document = copy.deepcopy(_load())
+    _refresh_hash(document, repository, "src/pipeline/pyproject.toml")
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert any(
+        selector["id"] == "pipeline-pyproject-azure"
+        for selector in validated["activation"]["pendingSelectors"]
+    )
+
+
+def test_profile_accepts_exact_partial_selector_shrink(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    document = copy.deepcopy(_load())
+    _remove_issue_selectors(document, repository, 70)
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert validated["activation"]["blockingIssues"] == [71, 72]
+    assert all(
+        selector["issue"] != 70
+        for selector in validated["activation"]["pendingSelectors"]
+    )
+
+
+def test_issue_71_migration_requires_exact_static_contributor_parity(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    document = copy.deepcopy(_load())
+    _migrate_issue_71_python_authority(document, repository)
+    _remove_issue_selectors(document, repository, 71)
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert validated["activation"]["blockingIssues"] == [70, 72]
+    assert all(
+        component["id"] != "pending-legacy-python-authorities"
+        for component in validated["components"]
+    )
+
+
+def test_profile_becomes_active_only_after_final_tracked_absence(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    document = copy.deepcopy(_load())
+    _migrate_issue_71_python_authority(document, repository)
+    for issue in (70, 71, 72):
+        _remove_issue_selectors(document, repository, issue)
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert validated["activation"] == {
+        "status": "active",
+        "blockingIssues": [],
+        "pendingSelectors": [],
+    }
+    assert not any(
+        (repository / path).exists()
+        for path in (
+            "src/api",
+            "src/frontend",
+            "infra/blob-seed",
+            "docker-compose.yml",
+            "scripts/compose-smoke.sh",
+            "SeaRise Europe.sln",
+        )
+    )
 
 
 @pytest.mark.parametrize("mutation", ["component", "role"])

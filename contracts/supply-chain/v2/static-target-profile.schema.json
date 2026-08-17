@@ -38,9 +38,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "path", "selector"],
+            "required": ["id", "issue", "path", "selector"],
             "properties": {
               "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+              "issue": { "type": "integer", "minimum": 1 },
               "path": { "type": "string", "minLength": 1 },
               "selector": { "type": "string", "minLength": 1 }
             }

@@ -26,9 +26,16 @@ release and settlement graphs used by deterministic builds.
 
 The current repository is not yet represented as static-only. The profile is
 `pending-legacy-removal` while hash-bound Python contributor manifests and
-CI/CodeQL workflows contain the exact selectors assigned to issues #71 and
-#72. Removing or changing a selector without updating the transition record
+CI/CodeQL workflows contain the exact selectors assigned to #70 (frontend),
+#71 (Python, API/.NET, and CodeQL C#), and #72 (shared Compose/container).
+Removing or changing a selector without updating the transition record
 fails closed; claiming `active` before all selectors disappear also fails.
+Package selectors are normalized from the actual requirement syntax, so valid
+PEP 508 whitespace or underscore variants cannot bypass the gate. After the
+Python blockers clear, `pyproject.toml` and `requirements-pipeline.txt` must
+both exactly match the static contributor authority. Final activation also
+proves the API, frontend, blob-seed, solution, Compose, and Compose-smoke paths
+are absent and that no .NET/C# legacy workflow semantics remain.
 
 ## Legacy boundary
 

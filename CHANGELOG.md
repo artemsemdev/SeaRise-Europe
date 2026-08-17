@@ -9,9 +9,10 @@ All notable changes to this project will be documented in this file.
 - Added a versioned static-browser supply-chain transition profile that locks
   the retained web npm, Python, settlement, scientific, build-plane, signing,
   and SBOM target authorities while honestly recording the Azure/PostGIS and
-  CI/CodeQL legacy selectors still pending issues #71 and #72. It cannot become
-  active until those selectors are removed; Phase 1 v1 evidence remains
-  unchanged as historical audit material.
+  CI/CodeQL/container legacy selectors owned by issues #70, #71, and #72.
+  Normalized requirement parsing, exact contributor parity, semantic workflow
+  checks, and tracked legacy-path absence prevent premature activation. Phase 1
+  v1 evidence remains unchanged as historical audit material.
 
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two

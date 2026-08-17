@@ -6,17 +6,25 @@
   "productionClaim": false,
   "activation": {
     "status": "pending-legacy-removal",
-    "blockingIssues": [71, 72],
+    "blockingIssues": [70, 71, 72],
     "pendingSelectors": [
-      { "id": "ci-legacy-api", "path": ".github/workflows/ci.yml", "selector": "src/api" },
-      { "id": "ci-legacy-compose", "path": ".github/workflows/ci.yml", "selector": "compose-smoke" },
-      { "id": "ci-legacy-dotnet", "path": ".github/workflows/ci.yml", "selector": "actions/setup-dotnet@" },
-      { "id": "ci-legacy-frontend", "path": ".github/workflows/ci.yml", "selector": "src/frontend" },
-      { "id": "codeql-legacy-csharp", "path": ".github/workflows/codeql.yml", "selector": "csharp" },
-      { "id": "pipeline-pyproject-azure", "path": "src/pipeline/pyproject.toml", "selector": "azure-storage-blob>=12.19,<13.0" },
-      { "id": "pipeline-pyproject-postgis", "path": "src/pipeline/pyproject.toml", "selector": "psycopg2-binary>=2.9,<3.0" },
-      { "id": "pipeline-requirements-azure", "path": "src/pipeline/requirements-pipeline.txt", "selector": "azure-storage-blob>=12.19,<13.0" },
-      { "id": "pipeline-requirements-postgis", "path": "src/pipeline/requirements-pipeline.txt", "selector": "psycopg2-binary>=2.9,<3.0" }
+      { "id": "ci-legacy-api", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "src/api" },
+      { "id": "ci-legacy-compose", "issue": 72, "path": ".github/workflows/ci.yml", "selector": "compose-smoke" },
+      { "id": "ci-legacy-dotnet", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "actions/setup-dotnet@" },
+      { "id": "ci-legacy-dotnet-command", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "dotnet " },
+      { "id": "ci-legacy-frontend", "issue": 70, "path": ".github/workflows/ci.yml", "selector": "src/frontend" },
+      { "id": "codeql-legacy-csharp", "issue": 71, "path": ".github/workflows/codeql.yml", "selector": "csharp" },
+      { "id": "codeql-legacy-dotnet", "issue": 71, "path": ".github/workflows/codeql.yml", "selector": "dotnet " },
+      { "id": "legacy-api-tree", "issue": 71, "path": "src/api", "selector": "path-exists" },
+      { "id": "legacy-blob-seed-tree", "issue": 72, "path": "infra/blob-seed", "selector": "path-exists" },
+      { "id": "legacy-compose-file", "issue": 72, "path": "docker-compose.yml", "selector": "path-exists" },
+      { "id": "legacy-compose-smoke", "issue": 72, "path": "scripts/compose-smoke.sh", "selector": "path-exists" },
+      { "id": "legacy-frontend-tree", "issue": 70, "path": "src/frontend", "selector": "path-exists" },
+      { "id": "legacy-solution-file", "issue": 71, "path": "SeaRise Europe.sln", "selector": "path-exists" },
+      { "id": "pipeline-pyproject-azure", "issue": 71, "path": "src/pipeline/pyproject.toml", "selector": "azure-storage-blob" },
+      { "id": "pipeline-pyproject-postgis", "issue": 71, "path": "src/pipeline/pyproject.toml", "selector": "psycopg2-binary" },
+      { "id": "pipeline-requirements-azure", "issue": 71, "path": "src/pipeline/requirements-pipeline.txt", "selector": "azure-storage-blob" },
+      { "id": "pipeline-requirements-postgis", "issue": 71, "path": "src/pipeline/requirements-pipeline.txt", "selector": "psycopg2-binary" }
     ]
   },
   "historicalEvidence": {
@@ -131,7 +139,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "fa45758bd5c05e2868dfbaa4c60bd075cd877032795b48df4be20ed4b0ff5906" }
+        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "7e401ce5fbd6229b3bf7f1d80f972f64f719bbe066b2886e331aa8733216d43e" }
       ]
     },
     {
