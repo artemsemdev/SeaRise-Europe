@@ -21,6 +21,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Relocated the permanent PMTiles browser and deterministic render evidence
+  harnesses into the static `src/web` workspace and bound them to the root npm
+  lockfile, without changing the approved scientific inputs or rendered PNG
+  bytes.
+
 - Bound the canonical frontend npm SBOM to the static `src/web` workspace in
   the root lockfile, including the Flight icon dependency and its exact
   registry integrity, instead of retaining the superseded Next.js lock as the
