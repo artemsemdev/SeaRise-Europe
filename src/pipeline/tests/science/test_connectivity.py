@@ -190,6 +190,76 @@ def _enclosing_function(
     return None
 
 
+def _name_bindings(
+    scope: ast.AST,
+    name: str,
+    parents: dict[int, ast.AST],
+) -> list[tuple[str, ast.AST]]:
+    """Inventory every syntax-level binding of ``name`` below one AST scope."""
+    bindings: list[tuple[str, ast.AST]] = []
+    for candidate in ast.walk(scope):
+        if (
+            isinstance(candidate, ast.Name)
+            and candidate.id == name
+            and isinstance(candidate.ctx, (ast.Store, ast.Del))
+        ):
+            bindings.append(("name", candidate))
+        elif isinstance(candidate, ast.arg) and candidate.arg == name:
+            bindings.append(("parameter", candidate))
+        elif isinstance(candidate, ast.alias):
+            parent = parents.get(id(candidate))
+            if isinstance(parent, ast.Import):
+                bound_name = candidate.asname or candidate.name.split(".", maxsplit=1)[0]
+            elif isinstance(parent, ast.ImportFrom):
+                bound_name = candidate.asname or candidate.name
+            else:
+                continue
+            if bound_name == name or candidate.name == "*":
+                bindings.append(("import", candidate))
+        elif (
+            isinstance(candidate, ast.ExceptHandler)
+            and candidate.name == name
+        ):
+            bindings.append(("exception", candidate))
+        elif (
+            isinstance(candidate, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and candidate.name == name
+        ):
+            bindings.append(("definition", candidate))
+        elif isinstance(candidate, (ast.Global, ast.Nonlocal)) and name in candidate.names:
+            bindings.append(("declaration", candidate))
+        elif (
+            type(candidate).__name__ in {"MatchAs", "MatchStar"}
+            and getattr(candidate, "name", None) == name
+        ):
+            bindings.append(("pattern", candidate))
+        elif (
+            type(candidate).__name__ == "MatchMapping"
+            and getattr(candidate, "rest", None) == name
+        ):
+            bindings.append(("pattern", candidate))
+        elif (
+            type(candidate).__name__ in {"TypeVar", "ParamSpec", "TypeVarTuple"}
+            and getattr(candidate, "name", None) == name
+        ):
+            bindings.append(("type-parameter", candidate))
+    return bindings
+
+
+def _qa_dispatch_shape(extra_statement: str = "") -> str:
+    extra = "".join(f"        {line}\n" for line in extra_statement.splitlines())
+    return (
+        "class QaValidatorDispatcher:\n"
+        "    def dispatch(self, request):\n"
+        "        validator_id = self.validator_id_for(request.selector)\n"
+        "        validator = self._validators.get(validator_id)\n"
+        "        if validator is None:\n"
+        "            raise RuntimeError\n"
+        f"{extra}"
+        "        return validator(request)\n"
+    )
+
+
 def _is_trusted_qa_callback_call(
     node: ast.Call,
     assignment: ast.AST,
@@ -236,17 +306,17 @@ def _is_trusted_qa_callback_call(
         for candidate in ast.walk(function)
         if isinstance(candidate, ast.Name) and candidate.id == "validator"
     ]
-    stores_or_deletes = [
-        candidate
-        for candidate in validator_names
-        if isinstance(candidate.ctx, (ast.Store, ast.Del))
-    ]
+    bindings = _name_bindings(function, "validator", parents)
     validator_calls = [
         candidate
         for candidate in ast.walk(function)
         if isinstance(candidate, ast.Call) and _is_name(candidate.func, "validator")
     ]
-    if stores_or_deletes != [assignment.targets[0]] or validator_calls != [node]:
+    if (
+        len(bindings) != 1
+        or bindings[0][1] is not assignment.targets[0]
+        or validator_calls != [node]
+    ):
         return False
 
     for candidate in validator_names:
@@ -915,6 +985,47 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_import_mechanisms() -
             violations.append(relative.as_posix())
 
     assert violations == []
+
+
+def test_exact_trusted_qa_dispatch_shape_remains_allowed() -> None:
+    assert not _retained_import_violations(
+        _qa_dispatch_shape(),
+        "searise_pipeline.candidate_completeness",
+        "candidate_completeness/qa_dispatch.py",
+    )
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        "from builtins import eval as validator",
+        "import builtins as validator",
+        "from builtins import *",
+        "try:\n    pass\nexcept Exception as validator:\n    pass",
+        "def validator():\n    pass",
+        "class validator:\n    pass",
+        "def shadow(validator):\n    pass",
+        *(
+            ["match request:\n    case validator:\n        pass"]
+            if hasattr(ast, "Match")
+            else []
+        ),
+        "global validator",
+        "def shadow():\n    nonlocal validator",
+    ],
+)
+def test_trusted_qa_dispatch_rejects_every_validator_binding_form(
+    binding: str,
+) -> None:
+    violations = _retained_import_violations(
+        _qa_dispatch_shape(binding),
+        "searise_pipeline.candidate_completeness",
+        "candidate_completeness/qa_dispatch.py",
+    )
+    assert any(
+        violation.startswith("dynamic-import:computed-callable-alias:")
+        for violation in violations
+    )
 
 
 def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:
