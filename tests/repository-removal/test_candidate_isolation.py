@@ -72,6 +72,14 @@ class CandidateIsolationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "appears in build path"):
                 check_candidate_isolation(root, Path("src/web/dist"))
 
+    def test_requires_completed_static_build(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._repository(root)
+
+            with self.assertRaisesRegex(ValueError, "static build root does not exist"):
+                check_candidate_isolation(root, Path("src/web/missing-dist"))
+
 
 if __name__ == "__main__":
     unittest.main()

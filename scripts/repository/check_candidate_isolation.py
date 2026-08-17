@@ -72,23 +72,24 @@ def check_candidate_isolation(repository_root: Path, build_root: Path) -> dict[s
         raise ValueError("build root must stay inside the repository") from exc
     if candidate_build_root.is_symlink():
         raise ValueError("build root must not be a symlink")
+    if not resolved_build_root.is_dir():
+        raise ValueError("static build root does not exist")
 
     build_entries = 0
-    if resolved_build_root.exists():
-        for directory, names, files in os.walk(resolved_build_root, followlinks=False):
-            for name in sorted([*names, *files]):
-                path = Path(directory) / name
-                relative = path.relative_to(resolved_build_root).as_posix()
-                build_entries += 1
-                if _contains_private_marker(relative):
-                    raise ValueError(f"private candidate marker appears in build path: {relative}")
-                if path.is_symlink():
-                    target = os.readlink(path)
-                    if _contains_private_marker(target):
-                        raise ValueError(
-                            "private candidate marker appears in build symlink: "
-                            f"{relative}"
-                        )
+    for directory, names, files in os.walk(resolved_build_root, followlinks=False):
+        for name in sorted([*names, *files]):
+            path = Path(directory) / name
+            relative = path.relative_to(resolved_build_root).as_posix()
+            build_entries += 1
+            if _contains_private_marker(relative):
+                raise ValueError(f"private candidate marker appears in build path: {relative}")
+            if path.is_symlink():
+                target = os.readlink(path)
+                if _contains_private_marker(target):
+                    raise ValueError(
+                        "private candidate marker appears in build symlink: "
+                        f"{relative}"
+                    )
 
     return {
         "trackedPaths": len(tracked),
