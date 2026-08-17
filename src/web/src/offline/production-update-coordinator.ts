@@ -28,6 +28,12 @@ function exactIntent(left: CloseAndReopenIntentV1, right: CloseAndReopenIntentV1
   return left.transitionId === right.transitionId && JSON.stringify(left) === JSON.stringify(right);
 }
 
+function sameCandidate(left: CloseAndReopenIntentV1, right: CloseAndReopenIntentV1): boolean {
+  return left.candidate.pair.appBuildId === right.candidate.pair.appBuildId &&
+    left.candidate.pair.dataReleaseId === right.candidate.pair.dataReleaseId &&
+    left.candidate.precacheSetSha256 === right.candidate.precacheSetSha256;
+}
+
 async function workerIdentity(worker: ServiceWorker): Promise<Readonly<{
   pair: AppReleasePairV1; precacheSetSha256: string;
 }>> {
@@ -74,6 +80,7 @@ export function createProductionUpdateCoordinator(
   });
   const retention = new ProductionRetentionCoordinator(lifecycle);
   const bootId = crypto.randomUUID();
+  let stableBootAuthority: AcceptedPairIdentityV1 | null = null;
   let discovered: Awaited<ReturnType<typeof workerIdentity>> | null = null;
   const readDurable = (): DurableIntent | null => {
     const value = localStorage.getItem(INTENT_KEY);
@@ -134,7 +141,27 @@ export function createProductionUpdateCoordinator(
     return identity;
   };
   const readControllerBoot = async (): Promise<ControllerBootProofV1> => {
-    const identity = accepted(router.current(), currentPrecacheSetSha256);
+    const observed = accepted(router.current(), currentPrecacheSetSha256);
+    if (stableBootAuthority && (
+      observed.pair.appBuildId !== stableBootAuthority.pair.appBuildId ||
+      observed.pair.dataReleaseId !== stableBootAuthority.pair.dataReleaseId
+    )) throw new Error("Accepted resource pair changed within one page boot.");
+    let identity = stableBootAuthority;
+    if (!identity) {
+      const stored = await lifecycle.read(observed.pair);
+      identity = stored.status === "found" && stored.record.state === "active" &&
+        stored.record.acceptedIdentity.precacheSetSha256 !== null &&
+        stored.record.acceptedIdentity.resourcePlanSha256 !== null &&
+        stored.record.acceptedIdentity.receiptSha256 !== null
+        ? Object.freeze({
+            contractVersion: 1 as const,
+            pair: stored.record.pair,
+            precacheSetSha256: stored.record.acceptedIdentity.precacheSetSha256,
+            resourcePlanSha256: stored.record.acceptedIdentity.resourcePlanSha256,
+            receiptSha256: stored.record.acceptedIdentity.receiptSha256,
+          })
+        : observed;
+    }
     const controller = navigator.serviceWorker.controller;
     if (!controller) throw new Error("The page has no controlling service worker authority.");
     const controlling = await workerIdentity(controller);
@@ -143,10 +170,12 @@ export function createProductionUpdateCoordinator(
         controlling.precacheSetSha256 !== identity.precacheSetSha256) {
       throw new Error("Controlling worker and admitted resource authority disagree.");
     }
+    const completed = await completeCurrentAuthority(identity);
+    stableBootAuthority ??= completed;
     return Object.freeze({
       contractVersion: 1,
       bootId,
-      controller: await completeCurrentAuthority(identity),
+      controller: completed,
     });
   };
   const ports: StaticUpdateCoordinatorPorts = {
@@ -164,8 +193,18 @@ export function createProductionUpdateCoordinator(
     },
     issueConfirmationToken: () => crypto.randomUUID(),
     recordPendingTransitionIntent: async (intent, permit) => withLock(permit, () => {
-      if (readDurable()) throw new Error("A durable update intent already exists.");
-      writeDurable(Object.freeze({ intent, state: "pending" }));
+      const validated = validateCloseAndReopenIntent(intent);
+      const current = readDurable();
+      if (current && (current.state === "pending" || current.state === "armed")) {
+        throw new Error("A nonterminal durable update intent already exists.");
+      }
+      if (current && exactIntent(current.intent, validated)) {
+        throw new Error("A terminal durable update intent cannot be replayed.");
+      }
+      if (current && sameCandidate(current.intent, validated)) {
+        throw new Error("A terminal update candidate cannot be replayed.");
+      }
+      writeDurable(Object.freeze({ intent: validated, state: "pending" }));
     }),
     armTransitionIntent: async (intent, permit) => withLock(permit, () => {
       const current = readDurable();
@@ -206,7 +245,8 @@ export function createProductionUpdateCoordinator(
   let reconciled = false;
   let reconciliationFailure = "";
   let provenBoot: ControllerBootProofV1 | null = null;
-  const reconcileFreshBoot = async (): Promise<void> => {
+  let reconciliationInFlight: Promise<void> | null = null;
+  const reconcileFreshBootOnce = async (): Promise<void> => {
     if (reconciled) {
       if (provenBoot && retention.state()?.state === "retryable-technical-failure") {
         await retention.reconcile(provenBoot.controller.pair);
@@ -260,6 +300,14 @@ export function createProductionUpdateCoordinator(
     provenBoot = boot;
     await retention.reconcile(boot.controller.pair);
     reconciled = true;
+  };
+  const reconcileFreshBoot = async (): Promise<void> => {
+    if (!reconciliationInFlight) {
+      reconciliationInFlight = reconcileFreshBootOnce().finally(() => {
+        reconciliationInFlight = null;
+      });
+    }
+    await reconciliationInFlight;
   };
   return Object.freeze({
     inspect: async (): Promise<UpdateCapabilityV1> => {

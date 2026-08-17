@@ -480,8 +480,8 @@ export class PairLifecycleStore {
     const pair = validateAppReleasePair(pairInput);
     const namespaces = cacheNamespaces(pair);
     const cacheNames = (await this.#cacheStorage.keys()).filter((name) =>
-      name === namespaces.shell || name === namespaces.release ||
-      name.startsWith(`${namespaces.shell}:staging:`) || name.startsWith(`${namespaces.release}:staging:`));
+      name === namespaces.shell || name.startsWith(`${namespaces.shell}:`) ||
+      name === namespaces.release || name.startsWith(`${namespaces.release}:staging:`));
     let cacheRequestCount = 0;
     for (const name of cacheNames) cacheRequestCount += (await (await this.#cacheStorage.open(name)).keys()).length;
 

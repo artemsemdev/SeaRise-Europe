@@ -45,6 +45,7 @@ function deployment(expected) {
   mkdirSync(join(releaseRoot, "analysis"), { recursive: true });
   writeFileSync(join(root, "index.html"), `<h1>${expected.label}</h1>`);
   writeFileSync(join(root, "service-worker.js"), `// ${expected.label}`);
+  writeFileSync(join(root, "assets/application-build-identity.js"), `export const build="${expected.label}";`);
   writeFileSync(join(root, "assets/app-12345678.js"), `export const deployment="${expected.label}";`);
   writeFileSync(join(releaseRoot, "analysis/value.tif"), bytes);
   writeFileSync(join(releaseRoot, "manifest.json"), JSON.stringify({
@@ -61,6 +62,7 @@ function deployment(expected) {
   const paths = [
     "index.html",
     "service-worker.js",
+    "assets/application-build-identity.js",
     "assets/app-12345678.js",
     `releases/${OFFLINE_LIFECYCLE_RELEASE_ID}/analysis/value.tif`,
     `releases/${OFFLINE_LIFECYCLE_RELEASE_ID}/manifest.json`,
@@ -143,6 +145,13 @@ describe("offline lifecycle server", () => {
 
   it("serves strict cache, worker, byte-range, and path boundaries", async () => {
     const { origin } = await harness();
+    const shell = await request(`${origin}/`);
+    expect(shell.headers.get("cache-control")).toBe("no-cache");
+    const probe = await request(`${origin}/lifecycle-probe.html`);
+    expect(probe.headers.get("cache-control")).toBe("no-store");
+    expect(await probe.text()).toContain("Lifecycle activation probe");
+    const embeddedIdentity = await request(`${origin}/assets/application-build-identity.js`);
+    expect(embeddedIdentity.headers.get("cache-control")).toBe("no-cache");
     const worker = await request(`${origin}/service-worker.js`);
     expect(worker.headers.get("cache-control")).toBe("no-store");
     expect(worker.headers.get("service-worker-allowed")).toBe("/");
@@ -160,6 +169,24 @@ describe("offline lifecycle server", () => {
     expect((await request(`${origin}/%255cetc/passwd`)).status).toBe(404);
     expect((await request(`${origin}/unknown/`)).status).toBe(404);
     expect((await request(`${origin}/`, { method: "POST" })).status).toBe(405);
+  });
+
+  it("simulates a reversible network outage without disabling authenticated controls", async () => {
+    const { origin } = await harness();
+    const control = (offline) => request(`${origin}/__lifecycle/network`, {
+      method: "POST",
+      headers: { "content-type": "application/json", [OFFLINE_LIFECYCLE_CONTROL_HEADER]: token },
+      body: JSON.stringify({ offline }),
+    });
+    expect(await (await control(true)).json()).toEqual({ networkOffline: true });
+    await expect(request(`${origin}/assets/app-12345678.js`)).rejects.toThrow();
+    const state = await (await request(`${origin}/__lifecycle/state`, {
+      headers: { [OFFLINE_LIFECYCLE_CONTROL_HEADER]: token },
+    })).json();
+    expect(state).toMatchObject({ networkOffline: true });
+    expect(state.requests.at(-1)).toMatchObject({ path: "/assets/app-12345678.js", status: 0 });
+    expect(await (await control(false)).json()).toEqual({ networkOffline: false });
+    expect((await request(`${origin}/assets/app-12345678.js`)).status).toBe(200);
   });
 
   it("rejects unknown deployment controls without changing authority", async () => {

@@ -71,6 +71,7 @@ npm run type-check
 npm test -- --run
 npm run build
 npx playwright test tests/client-lease-lifecycle.spec.ts --project=chromium
+npm run e2e:offline-lifecycle
 ```
 
 The focused Chromium test opens two same-origin tabs and verifies:
@@ -84,6 +85,25 @@ Unit coverage additionally proves cross-client spoof refusal, worker-minted
 renewal, malformed-source refusal, cleanup-fence refusal, unresponsive-client
 handling, census-set instability, strict protocol validation, and Candidate
 memory-only behavior.
+
+The offline lifecycle command builds three independently sealed synthetic
+deployments and runs the required A→B→C journey in Chromium.
+It verifies waiting-worker identity, explicit update preparation, natural
+activation only after all controlled tabs close, terminal-intent rollover,
+active/previous retention, removal of A's records and sealed shell caches, and
+an offline reload of the warmed C assessment. The activation probe uses the
+same-origin lifecycle health document so it cannot execute an old application
+shell under a newly activated worker. The harness never reads Candidate-v7 or
+any TAR and exposes no deployment endpoint to the application.
+
+Chromium is the Phase 2 required browser baseline for this lifecycle. WebKit
+also passed the same journey locally on 2026-08-17 and is retained as optional
+evidence. Playwright Firefox 153 kept the replacement worker waiting after all
+controlled pages closed or left scope, and a full persistent-profile restart
+discarded that waiting worker while retaining the old active worker. Firefox
+compatibility is therefore deferred; the project does not claim cross-engine
+update support. The natural-only contract remains unchanged: no `skipWaiting`
+or `clients.claim` is used.
 
 ## Failure handling
 
