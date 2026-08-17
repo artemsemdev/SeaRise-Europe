@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBrowserRuntime } from "../application/browser-runtime";
 import { runtimeConfig } from "../config";
 import { PairLifecycleStore } from "./pair-lifecycle-store";
+import { createProductionUpdateCoordinator } from "./production-update-coordinator";
+import type { VerifiedResourceRouter } from "./verified-resource-router";
 import { validateAppReleasePair } from "./contracts/keys";
 import { fixtureArtifactPath, fixtureBytes, fixtureReleaseContext, responseBody } from "../test/release-fixture";
 
@@ -43,7 +45,7 @@ afterEach(() => {
 });
 
 describe("production default update composition", () => {
-  it("refuses mixed and corrupt candidates before arming exact default-factory authority", async () => {
+  it("completes active authority and reconciles armed intents across fresh boots", async () => {
     const context = await fixtureReleaseContext();
     const idb = new IDBFactory();
     const caches = new MemoryCaches();
@@ -54,7 +56,12 @@ describe("production default update composition", () => {
     const candidateB = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-b", dataReleaseId: "next-browser-release-b" });
     let waitingPair = candidateA;
     let waitingPrecache = candidatePrecache;
-    const currentPair = { contractVersion: 1 as const, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId };
+    const currentPair = validateAppReleasePair({
+      contractVersion: 1, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId,
+    });
+    const retiredPair = validateAppReleasePair({
+      contractVersion: 1, appBuildId: "retired-browser-build", dataReleaseId: "retired-browser-release",
+    });
     const active = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) {
       if (message.type === "acquire-lease" || message.type === "heartbeat-lease") {
         ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "lease-state", messageToken: message.messageToken,
@@ -66,11 +73,17 @@ describe("production default update composition", () => {
           pair: currentPair, leaseId: message.leaseId });
         return;
       }
+      if (message.type === "request-client-census") {
+        ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "client-census",
+          messageToken: message.messageToken, targetPair: message.targetPair,
+          observations: [{ clientId: "retired-tab", state: "inactive" }] });
+        return;
+      }
       ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken,
         pair: currentPair, precacheSetSha256: currentPrecache });
     } };
     const waiting = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: waitingPair, precacheSetSha256: waitingPrecache }); } };
-    const registration = { active, waiting };
+    const registration: { active: typeof active; waiting: typeof waiting | null } = { active, waiting: null };
     Object.assign(globalThis, { caches, indexedDB: idb });
     Object.defineProperty(globalThis, "crypto", { configurable: true, value: {
       ...webcrypto,
@@ -79,11 +92,13 @@ describe("production default update composition", () => {
         webcrypto.subtle.digest(algorithm, Buffer.from(new Uint8Array(data as ArrayBuffer))) },
     } });
     Object.defineProperty(navigator, "locks", { configurable: true, value: locks });
-    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {
+    const serviceWorkerBoundary = {
       register: vi.fn(async () => registration), ready: Promise.resolve(registration),
       getRegistration: vi.fn(async () => registration),
       addEventListener: vi.fn(),
-    } });
+      controller: active,
+    };
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: serviceWorkerBoundary });
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
       const bytes = fixtureBytes(fixtureArtifactPath(url));
@@ -106,8 +121,19 @@ describe("production default update composition", () => {
       return response;
     });
 
+    const retiredLifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
+    await retiredLifecycle.stage(retiredPair);
+    await retiredLifecycle.completeBootstrap(retiredPair, "9".repeat(64));
+    await retiredLifecycle.completeCore(retiredPair, {
+      precacheSetSha256: "9".repeat(64),
+      resourcePlanSha256: "8".repeat(64),
+      receiptSha256: "7".repeat(64),
+    });
+    await retiredLifecycle.markCleanupPending(retiredPair);
+    retiredLifecycle.close();
+
     const runtime = await createBrowserRuntime(context);
-    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("update-available"));
+    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("current"));
     const methodology = context.artifact(context.manifest.contractArtifacts.methodology);
     await runtime.searchArtifactTransport(new URL(methodology.url), {
       signal: new AbortController().signal,
@@ -120,6 +146,23 @@ describe("production default update composition", () => {
       location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
     });
     if (interaction) await runtime.capability?.confirmInteractionAvailable(interaction);
+    const lifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
+    const currentLifecycle = await lifecycle.read(currentPair);
+    expect(currentLifecycle).toMatchObject({
+      status: "found",
+      record: { state: "active", acceptedIdentity: {
+        precacheSetSha256: currentPrecache,
+        resourcePlanSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        receiptSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      } },
+    });
+    await expect(runtime.resources.updateCoordinator?.inspectRetention?.()).resolves.toMatchObject({
+      state: "complete", activePair: currentPair, removedPairs: [retiredPair],
+    });
+    await expect(lifecycle.read(retiredPair)).resolves.toEqual({ status: "missing" });
+    registration.waiting = waiting;
+    await runtime.capability?.retry();
+    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("update-available"));
 
     // The UI advertised A, but the exact waiting worker changed to B before
     // action. The production coordinator must reject the mixed pair before
@@ -132,26 +175,49 @@ describe("production default update composition", () => {
     });
     expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
 
-    const lifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
-    await lifecycle.stage(candidateB);
-    await lifecycle.completeBootstrap(candidateB, "e".repeat(64));
-    await lifecycle.completeCore(candidateB, { precacheSetSha256: "e".repeat(64), resourcePlanSha256: "c".repeat(64), receiptSha256: "d".repeat(64) });
-    await runtime.capability?.retry();
-    await runtime.capability?.requestUpdateAction();
-    expect(runtime.capability?.getSnapshot()?.update).toMatchObject({
-      state: "failed", reason: expect.stringContaining("accepted resource authority disagree"),
-    });
-    expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
-
-    await lifecycle.stage(candidateA);
-    await lifecycle.completeBootstrap(candidateA, candidatePrecache);
-    await lifecycle.completeCore(candidateA, { precacheSetSha256: candidatePrecache, resourcePlanSha256: "f".repeat(64), receiptSha256: "1".repeat(64) });
     waitingPair = candidateA;
     waitingPrecache = candidatePrecache;
     await runtime.capability?.retry();
     await runtime.capability?.requestUpdateAction();
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("ready-to-activate"));
     expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"armed"');
+    const naturallyArmed = localStorage.getItem("searise:update-intent:v1");
+    if (!naturallyArmed) throw new Error("natural armed intent was unavailable");
     runtime.dispose();
+
+    const candidateRouter = { current: () => ({
+      contractVersion: 1 as const,
+      plan: { pair: candidateA, resourcePlanSha256: "f".repeat(64) },
+      gate: { receiptSha256: "1".repeat(64) },
+    }) } as unknown as VerifiedResourceRouter;
+    serviceWorkerBoundary.controller = waiting;
+    registration.waiting = null;
+    const successRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await successRuntime.inspect();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
+    await successRuntime.inspect();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
+
+    for (const corrupt of [
+      "{malformed",
+      JSON.stringify({ state: "armed" }),
+      JSON.stringify({ state: "forged", intent: JSON.parse(naturallyArmed).intent }),
+    ]) {
+      localStorage.setItem("searise:update-intent:v1", corrupt);
+      const corruptRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+      await expect(corruptRuntime.inspect()).resolves.toMatchObject({
+        state: "failed", reason: expect.stringContaining("malformed"),
+      });
+      expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
+    }
+
+    localStorage.setItem("searise:update-intent:v1", naturallyArmed);
+    serviceWorkerBoundary.controller = active;
+    const mismatchRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await expect(mismatchRuntime.inspect()).resolves.toMatchObject({
+      state: "failed", reason: expect.stringContaining("Controlling worker"),
+    });
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"tombstoned"');
+    expect(localStorage.getItem("searise:update-intent:v1")).not.toContain('"state":"consumed"');
   });
 });

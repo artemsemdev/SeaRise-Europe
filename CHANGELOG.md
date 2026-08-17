@@ -12,6 +12,15 @@ All notable changes to this project will be documented in this file.
   code for legacy runtime endpoint requests without accessing private Candidate
   files.
 
+- Added production browser retention after exact fresh-boot reconciliation.
+  The current worker now supplies the cleanup census under exact-pair Web
+  Locks; active, unknown, or unresponsive clients fail closed, while only
+  unleased `cleanup-pending` pairs older than the active and immediately
+  previous complete pair are removed. Partial deletion remains idempotently
+  retryable and is exposed as technical state, never as a scientific outcome.
+  Private Candidate sessions remain memory-only and do not create the
+  retention coordinator.
+
 - Bound every persistent browser lease to the service worker's authenticated
   `Client.id` instead of a caller-supplied tab identity. The worker now mints
   expiry, refuses cross-tab heartbeat and release attempts, challenges a stable
@@ -36,6 +45,12 @@ All notable changes to this project will be documented in this file.
   actual durable authority. Bounded abort-aware adapter deadlines fail closed
   as `adapter-stalled` if a port never acknowledges settlement. Git/deployment
   history, not browser storage, remains the application rollback authority.
+  Waiting workers now contribute only their build-sealed pair and precache
+  identity; runtime resource-plan and receipt authority is recorded only after
+  exact active-pair admission. A fresh boot reconciles an armed intent after
+  its actual controlling worker is challenged and matches admitted resources,
+  consumes an exact match once, tombstones a mismatch, and removes malformed
+  durable records without claiming activation.
 
 - Added a per-document production lease for the exact active app/release pair.
   Public static tabs acquire before the resource router becomes available,
