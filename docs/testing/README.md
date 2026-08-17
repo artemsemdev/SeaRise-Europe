@@ -49,6 +49,8 @@ or server-lifecycle types into target tests.
 
 Every suite declares:
 
+- lifecycle `status`, an approved `removalGate`, and concrete
+  `replacementEvidence` when retired;
 - owner and purpose;
 - exact source and changed-path patterns;
 - migration disposition and replacement gate;
@@ -56,11 +58,23 @@ Every suite declares:
 - measured or traceable estimated cost;
 - flake status and accountable owner.
 
-`baselineTests` locks every discovered current test file. The inventory check
-fails when a baseline path disappears. A retirement PR must keep the entry,
-set `status` to `retired`, cite the approved `removalGate`, and put the target
-test/PR/report in `replacementEvidence`. New tests must receive a baseline
-entry and suite ownership in the PR that introduces them.
+`baselineTests` locks every discovered current test file. An active suite must
+use `status: active` with null suite-level retirement metadata, and every one
+of its `sourcePaths` patterns must resolve. A retirement PR keeps both the
+suite and baseline history, changes them to `status: retired`, cites the
+approved `removalGate`, and records the target test, PR, or report in
+`replacementEvidence`. Retired source paths may be absent because deletion is
+the event they record; a retired baseline path must be absent. The validator
+rejects on-disk tests marked retired and active baseline tests owned by a
+retired suite.
+
+Only active suites own discovered tests or participate in changed-path
+routing. Selection, the credential-free fast filter, and command execution
+each reject retired suites independently, including direct `--run` use. The
+legacy Compose smoke test is discovered only while its script exists, so its
+approved removal cannot create a phantom unowned test. New tests must receive
+an active baseline entry and active suite ownership in the PR that introduces
+them.
 
 No `WIP`, skip, quarantine, or reduced assertion count is removal evidence.
 Coverage percentage is not replacement evidence. A replacement must cite the

@@ -343,6 +343,9 @@
   "suites": [
     {
       "id": "static-target-content",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "static-analysis",
       "owner": "frontend",
       "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, and product-copy limits fail closed in production source, active documentation, and emitted static assets while requiring an explicit scientific correction map on the active canonical Flight visual reference.",
@@ -357,6 +360,9 @@
     },
     {
       "id": "static-projection-panel",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "component",
       "owner": "frontend",
       "purpose": "Keep all eleven projection phases, exactly four ADR-024 outcomes, verified release metadata and disposition, technical failure taxonomy, semantic three-by-three controls, updating old/new separation, source attribution, map text equivalents, limitations, and required exclusions accessible and fail closed.",
@@ -371,6 +377,9 @@
     },
     {
       "id": "static-assessment-controller",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "frontend",
       "purpose": "Keep selection orchestration and its React runtime adapter atomic across rapid updates, cancellation, four scientific outcomes, verified methodology loading, technical delivery failures, exact retry, reset, release replacement, and disposal.",
@@ -385,6 +394,9 @@
     },
     {
       "id": "static-release-domain",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry including the explicit browser-only nodata control, exact range-only native-grid COG lookup including a real later-chunk tile, an atomic four-outcome projection state contract, separate technical failures, and release-scoped URL reload state.",
@@ -399,6 +411,9 @@
     },
     {
       "id": "static-projection-browser-ux",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "frontend",
       "purpose": "Prove the complete production-static projection journey: all four ADR-024 outcomes, exact values for all nine combinations, COG and PMTiles release identity, separate integrity and recoverable delivery failures, stale-completion rejection, atomic map/result/URL state, share/reload/popstate/reset, keyboard and dialog focus, reduced motion, responsive mobile operation, axe gates, and zero legacy application API roots.",
@@ -413,6 +428,9 @@
     },
     {
       "id": "static-web-shell",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "frontend",
       "purpose": "Verify the static React/Vite shell, direct routes, fixture disclosure, keyboard entry, accessibility smoke, exact document CSP and referrer policy, independently reconstructed recursive shell inventory, a warm full-offline reload with loaded search and one cached assessment, honest connection-required handling for an uncached COG, same-origin page-context later-chunk COG delivery and cold/cached lookup budgets, production-like delivery-header inspection, blocked unlisted origins, and zero legacy application API traffic without claiming public cross-origin enforcement.",
@@ -427,6 +445,9 @@
     },
     {
       "id": "static-offline-contracts",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
       "purpose": "Keep one immutable app/release build identity across Vite, browser runtime, service worker, build inspection, and explicit local Candidate mode; keep canonical scenario configuration, network-only visual-map capability, canonical namespaces, private-candidate exclusion, privacy, lifecycle, and worker messages fail closed.",
@@ -441,6 +462,9 @@
     },
     {
       "id": "static-whole-resource-cache",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "platform",
       "purpose": "Keep complete shell and small immutable release-resource persistence release-scoped, same-origin, integrity-verified, private-data-free, staged, rollback-safe where Cache Storage permits, and aggregate-only before service-worker integration.",
@@ -455,6 +479,9 @@
     },
     {
       "id": "static-authoritative-range-store",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep release-authorized COG range persistence bound to an immutable trusted identity catalog, exact, bounded, private-safe, corruption-detecting, pair-isolated, and transactionally consistent while PMTiles remains network-only and outside every range store.",
@@ -469,6 +496,9 @@
     },
     {
       "id": "static-release-resource-plan",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Bind the verified COG range-integrity index and every deterministic storage route to one exact app/release/artifact identity, while keeping PMTiles network-only, private/local releases memory-only, technical failures outside science, and personal state outside persistence.",
@@ -483,6 +513,9 @@
     },
     {
       "id": "static-coordinated-admission",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep cross-store resource admission logically atomic through an exact receipt published last, with operation-owned conditional cleanup, prior-result preservation, receipt-gated reads, private Candidate memory-only handling, PMTiles exclusion, and technical failures outside ADR-024 outcomes.",
@@ -497,6 +530,9 @@
     },
     {
       "id": "static-verified-resource-router",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep final browser delivery bound to runtime-verified request-specific app/release plans: production geography, methodology, settlement search, and COG reads use the router; whole resources are lazy; only exact COG chunks needed by the selected assessment read are admitted; public COG misses use no-store requests with exact immutable HEAD/206 response authority; private Candidate stores and delivery remain memory-only and private/no-store; and PMTiles remains network-only with zero resource-store persistence.",
@@ -511,6 +547,9 @@
     },
     {
       "id": "static-production-lifecycle-harness",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "security",
       "owner": "platform",
       "purpose": "Keep Issue #60 production lifecycle validation confined to canonical owned temporary roots and serve only complete byte-sealed A/B/C static deployments through authenticated atomic switches, with per-request mutation and symlink refusal.",
@@ -525,6 +564,9 @@
     },
     {
       "id": "static-offline-lifecycle-journey",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "platform",
       "purpose": "Prove the required Chromium production-static A-to-B-to-C natural worker activation, exact close-and-reopen intent consumption and safe terminal rollover, active/previous retention, exact A cleanup including sealed shell caches, warmed offline assessment reload, technical-state separation, and sanitized forbidden-request evidence.",
@@ -539,6 +581,9 @@
     },
     {
       "id": "static-range-cache-compatibility",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "platform",
       "purpose": "Measure real COG and PMTiles 206 persistence, whole-response range matching, IndexedDB byte retrieval, and exact partial-response synthesis across Chromium, Firefox, and WebKit before implementing the release-scoped production cache.",
@@ -553,6 +598,9 @@
     },
     {
       "id": "static-private-candidate-binding",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "frontend",
       "purpose": "Verify the explicit ignored Candidate-v7 through one read-only same-origin loopback adapter, a sealed temporary browser bundle, strict filesystem denial and content pinning, truthful private derivation evidence, actual COG-backed assessments for all nine combinations, all four ADR-024 outcomes, separate technical failures, zero legacy API traffic, and unchanged candidate/source-grid snapshots.",
@@ -567,6 +615,9 @@
     },
     {
       "id": "static-map-visualization",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "frontend",
       "purpose": "Verify lazy release-scoped MapLibre/PMTiles visualization, the exact nine visual identities, bounded ranges, controlled map selection, stale-render rejection, attribution, accessibility, restrictive-CSP compatibility, and graceful no-basemap operation without creating scientific results.",
@@ -581,6 +632,9 @@
     },
     {
       "id": "static-pmtiles-network-only",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Keep all nine visual-only PMTiles identities on the PMTiles-supported custom Source boundary with exact release URLs, manifest-bound byte size and strong ETag, bounded Range behavior, role-specific no-store requests and responses, bounded ephemeral decoded metadata only, no PMTiles persistence authority or structural browser-persistence trace, and no scientific interpretation.",
@@ -595,6 +649,9 @@
     },
     {
       "id": "static-settlement-search",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "frontend",
       "purpose": "Verify release-bound GeoNames shard construction and consumption, deterministic normalization and ranking, exact coordinates, private Worker-only queries, accessible keyboard search, partial readiness, integrity-first decode, atomic publication, production-browser performance evidence, and technical failure isolation.",
@@ -609,6 +666,9 @@
     },
     {
       "id": "quality-inventory-harness",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
       "purpose": "Prove every current test file is owned, routed, costed, and protected by an explicit migration gate.",
@@ -623,6 +683,9 @@
     },
     {
       "id": "frontend-api-contract",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Characterize the legacy methodology HTTP response shape until static config replaces it.",
@@ -637,6 +700,9 @@
     },
     {
       "id": "frontend-components",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "component",
       "owner": "frontend",
       "purpose": "Protect legacy five-state presentation, accessibility labels, search, and controls during static migration.",
@@ -651,6 +717,9 @@
     },
     {
       "id": "frontend-stores",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "frontend",
       "purpose": "Characterize legacy application, map, and UI state transitions before worker-owned state replaces them.",
@@ -665,6 +734,9 @@
     },
     {
       "id": "frontend-five-state-characterization",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Keep browser result-state precedence aligned with the shared cross-language fixture.",
@@ -679,6 +751,9 @@
     },
     {
       "id": "frontend-regional-fixture-parity",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Keep browser-oriented lookup bit-exact with the real-source regional fixture and independent golden vectors.",
@@ -693,6 +768,9 @@
     },
     {
       "id": "frontend-ar6-lookup-parity",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Keep the browser AR6 source-grid lookup bit-exact with independently read offline goldens and fail-closed edge semantics.",
@@ -707,6 +785,9 @@
     },
     {
       "id": "frontend-static-checks",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "static-analysis",
       "owner": "frontend",
       "purpose": "Enforce TypeScript, ESLint, content-language, and i18n boundaries.",
@@ -721,6 +802,9 @@
     },
     {
       "id": "frontend-public-contract-parity",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Require TypeScript and Python to accept, reject, and semantically derive the same versioned public contract fixtures.",
@@ -735,6 +819,9 @@
     },
     {
       "id": "frontend-search-evaluation-foundation",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Keep neutral search evaluation plus receipt-bound core/coastal browser shard serialization, merge semantics, bounded I/O, and incompatibility failures exact.",
@@ -749,6 +836,9 @@
     },
     {
       "id": "frontend-settlement-worker-performance",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "frontend",
       "purpose": "Keep exact settlement shard performance evidence receipt-bound, semantic-validated, provenance-explicit, and honest about its Node worker reference profile.",
@@ -763,6 +853,9 @@
     },
     {
       "id": "api-domain-legacy",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "science",
       "purpose": "Characterize legacy five-state domain precedence until browser parity is independently established.",
@@ -777,6 +870,9 @@
     },
     {
       "id": "api-shared-characterization",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "science",
       "purpose": "Compare the legacy C# determiner against the same fixture used by Python and TypeScript.",
@@ -791,6 +887,9 @@
     },
     {
       "id": "api-application-unit",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "platform",
       "purpose": "Protect legacy assessment orchestration and failure propagation during migration.",
@@ -805,6 +904,9 @@
     },
     {
       "id": "api-validation-unit",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "security",
       "purpose": "Protect request validation and TiTiler blob-path rejection while legacy endpoints remain.",
@@ -819,6 +921,9 @@
     },
     {
       "id": "api-http-integration",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "security",
       "purpose": "Characterize legacy HTTP contracts and security headers with in-process adapters.",
@@ -833,6 +938,9 @@
     },
     {
       "id": "api-postgis-integration",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "platform",
       "purpose": "Protect legacy PostGIS repositories and mutable layer/scenario persistence.",
@@ -847,6 +955,9 @@
     },
     {
       "id": "pipeline-source-contracts",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep source locks, acquisition integrity, retry, and publication-rights checks executable.",
@@ -861,6 +972,9 @@
     },
     {
       "id": "pipeline-science-contracts",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Enforce exact AR6, baseline, vertical-reference, uncertainty, DEM, geography, connectivity, and receipt contracts without heuristic fallback.",
@@ -875,6 +989,9 @@
     },
     {
       "id": "pipeline-settlement-public-contracts",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep versioned settlement records, GeoParquet envelopes, search-shard envelopes, and compatibility rejection executable.",
@@ -889,6 +1006,9 @@
     },
     {
       "id": "pipeline-geonames-place-parser",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep pinned GeoNames place/admin1 parsing lossless, lineage-exact, anomaly-explicit, and fail-closed outside its reviewed raw policy.",
@@ -903,6 +1023,9 @@
     },
     {
       "id": "pipeline-geonames-place-full-scan",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the reusable offline full-snapshot validator and reviewed local-only GeoNames count/anomaly report bound to the pinned parser and source identities.",
@@ -917,6 +1040,9 @@
     },
     {
       "id": "pipeline-geonames-alternate-normalization",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the exact GeoNames alternate/ISO parsers, source-level normalization policy, selected-name lineage, archive scan, and provider-anomaly evidence fail-closed.",
@@ -931,6 +1057,9 @@
     },
     {
       "id": "pipeline-settlement-spatial-toolchain",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
       "purpose": "Keep the Python 3.11 DuckDB Spatial wheel/lock parity, derived native-extension identities, checksum-first cache admission, and two-platform network-free load preflight fail-closed.",
@@ -945,6 +1074,9 @@
     },
     {
       "id": "pipeline-settlement-catalogue-domain",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep pure settlement inclusion, stable IDs, admin1 context, selected lineage, notices, rejections, and output ordering deterministic and fail-closed.",
@@ -959,6 +1091,9 @@
     },
     {
       "id": "pipeline-settlement-spatial-classification",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep descriptor-bound spatial assets, receipt-bound normalized-catalogue staging, support/coastal coverage, whole-meter metric shoreline distance, shard policy, immutable search projection, accepted-audit output, and outside-support rejection deterministic and fail-closed.",
@@ -973,6 +1108,9 @@
     },
     {
       "id": "pipeline-settlement-shoreline-contract",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the direct Natural Earth shoreline source identities, claim boundary, EPSG:3035 distance method, and whole-meter persistence contract closed and fail-closed.",
@@ -987,6 +1125,9 @@
     },
     {
       "id": "pipeline-settlement-shoreline-build",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the direct Natural Earth settlement shoreline, whole-feature selection, named controls, and checked artifact deterministic and fail-closed.",
@@ -1001,6 +1142,9 @@
     },
     {
       "id": "pipeline-release-gate-contract",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
       "purpose": "Keep release gate decisions fail-closed, authority-explicit, metric-bound, evidence-addressed, and deterministically renderable.",
@@ -1015,6 +1159,9 @@
     },
     {
       "id": "pipeline-candidate-completeness-contract",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Keep the Phase 1 pre-sign candidate bytes exact, immutable, manifest-last, rights-bound, and subject to a mandatory non-recursive supply-chain evidence gate.",
@@ -1029,6 +1176,9 @@
     },
     {
       "id": "pipeline-supply-chain-contract",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "security",
       "owner": "security",
       "purpose": "Keep signed-candidate evidence, exact local release-evidence handoffs, deterministic CycloneDX generation, reviewed Python graph authority, and dependency exceptions fail-closed.",
@@ -1043,6 +1193,9 @@
     },
     {
       "id": "pipeline-ar6-release-source-fixture",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Verify the checked-in AR6 regional release fixture is deterministic, hash-bound, tamper-evident, and consistent with the independent lookup goldens.",
@@ -1057,6 +1210,9 @@
     },
     {
       "id": "pipeline-ar6-release-cog",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Verify analysis COGs preserve exact AR6 integer-millimetre bands, deterministic bytes, grid metadata, and nodata semantics, including the browser-only 62N,44E control across all 27 bands.",
@@ -1071,6 +1227,9 @@
     },
     {
       "id": "pipeline-ar6-release-geoparquet",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Verify the analytical GeoParquet table preserves exact AR6 integer-millimetre values, source identities, deterministic bytes, and the declared valid-row set.",
@@ -1085,6 +1244,9 @@
     },
     {
       "id": "pipeline-reviewed-cog-range-access",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Bind all nine reviewed COG identities and the exact workflow producer, then persist candidate-bound loopback HTTP evidence for the 54-request map, raw latency, and malformed, ignored, truncated, substituted, or corrupt response rejection.",
@@ -1099,6 +1261,9 @@
     },
     {
       "id": "pipeline-boundary-geoparquet",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Verify checked-in engineering support and coastal boundaries retain exact input lineage, safe status, rights, canonical normalization, and deterministic GeoParquet bytes, while the separate browser-fixture writer pins and labels its isolated nodata control.",
@@ -1113,6 +1278,9 @@
     },
     {
       "id": "pipeline-boundary-pmtiles-structure",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Verify exact boundary GeoParquet source identity, safe metadata, Shapely identity, and canonical PMTiles v3 header, section, and count contracts.",
@@ -1127,6 +1295,9 @@
     },
     {
       "id": "pipeline-boundary-pmtiles-parity",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Verify decoded boundary IDs, properties, and geometry against an independent closed oracle and a derived MVT quantization error model.",
@@ -1141,6 +1312,9 @@
     },
     {
       "id": "pipeline-boundary-pmtiles-writer",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Verify the atomic boundary PMTiles writer binds every material vector option, metadata edit, gzip canonicalization step, and exact-pinned determinism gate.",
@@ -1155,6 +1329,9 @@
     },
     {
       "id": "pipeline-boundary-pmtiles-evidence",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, compare visual profiles, exercise z0/z3/z6 in Chromium and MapLibre, emit candidate-bound evidence, and fail closed on any drift.",
@@ -1169,6 +1346,9 @@
     },
     {
       "id": "static-pmtiles-render-evidence",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "science",
       "purpose": "Rebuild immutable z0/z3/z6 projection-PMTiles QA renders and prove quantile/value-bin coverage plus source-nodata transparency against approved Phase 0R bytes.",
@@ -1217,6 +1397,9 @@
     },
     {
       "id": "pipeline-ar6-release-pmtiles",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Verify visual PMTiles fail closed without the pinned toolchain and preserve canonical bytes and exact integer properties when the tools are available.",
@@ -1231,6 +1414,9 @@
     },
     {
       "id": "pipeline-ar6-release-delivery",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "science",
       "purpose": "Recompute Chromium delivery budgets from candidate-bound HTTP Range traces and reject detached paths, hashes, target values, or malformed measurements.",
@@ -1245,6 +1431,9 @@
     },
     {
       "id": "pipeline-ar6-release-recovery-gate",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "science",
       "purpose": "Enforce complete AR6 artifact evidence, engineering budgets, zero blockers, and separation between automated validation and owner release disposition.",
@@ -1259,6 +1448,9 @@
     },
     {
       "id": "pipeline-ar6-release-builder",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "integration",
       "owner": "data",
       "purpose": "Verify atomic AR6 release-candidate assembly, complete nine-layer artifact inventory, fail-closed staging, and reproducibility evidence.",
@@ -1273,6 +1465,9 @@
     },
     {
       "id": "pipeline-offline-release-builder",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "data",
       "purpose": "Enforce the typed Phase 1 build graph, strict plan identities, shared profiles, and closed failure taxonomy for the offline release builder.",
@@ -1287,6 +1482,9 @@
     },
     {
       "id": "pipeline-ar6-release-toolchain",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "contract",
       "owner": "platform",
       "purpose": "Verify the active release interpreter, runtime distributions, native geospatial libraries, and platform lock match the hash-bound release contract.",
@@ -1301,6 +1499,9 @@
     },
     {
       "id": "pipeline-regional-fixture",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Validate historical real-source fixture mechanics, exact nine-combination lineage, reproducible blocked attempts, and the explicit final scientific gate.",
@@ -1315,6 +1516,9 @@
     },
     {
       "id": "pipeline-legacy-transform",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "unit",
       "owner": "data",
       "purpose": "Characterize synthetic legacy download, transform, exposure, COG, validation, registration, and upload behavior.",
@@ -1329,6 +1533,9 @@
     },
     {
       "id": "pipeline-five-state-characterization",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Exercise result-state precedence and boundaries from the shared fixture and exhaustive tables.",
@@ -1343,6 +1550,9 @@
     },
     {
       "id": "pipeline-result-state-mutation-pilot",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "scientific",
       "owner": "science",
       "purpose": "Detect weak five-state boundaries with a bounded set of high-risk operator mutations.",
@@ -1357,6 +1567,9 @@
     },
     {
       "id": "pipeline-static-checks",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "static-analysis",
       "owner": "data",
       "purpose": "Enforce Python style, target-domain typing, and the audited source registry contract.",
@@ -1371,6 +1584,9 @@
     },
     {
       "id": "container-frontend-build",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "container",
       "owner": "platform",
       "purpose": "Prove the legacy Next.js container still builds during migration.",
@@ -1385,6 +1601,9 @@
     },
     {
       "id": "container-api-build",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "container",
       "owner": "platform",
       "purpose": "Prove the retiring API container still builds until decommission.",
@@ -1399,6 +1618,9 @@
     },
     {
       "id": "container-tiler-pull",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "container",
       "owner": "platform",
       "purpose": "Pin and prove availability of the retiring TiTiler runtime image.",
@@ -1413,6 +1635,9 @@
     },
     {
       "id": "compose-smoke",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "e2e",
       "owner": "platform",
       "purpose": "Characterize full legacy stack startup and service health before infrastructure removal.",
@@ -1427,6 +1652,9 @@
     },
     {
       "id": "codeql-javascript-typescript",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "security",
       "owner": "security",
       "purpose": "Scan frontend JavaScript/TypeScript data flows on PRs and the weekly schedule.",
@@ -1441,6 +1669,9 @@
     },
     {
       "id": "codeql-csharp",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
       "layer": "security",
       "owner": "security",
       "purpose": "Scan legacy C# data flows until API decommission and retain history for security review.",

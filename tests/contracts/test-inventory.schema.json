@@ -69,6 +69,9 @@
       "additionalProperties": false,
       "required": [
         "id",
+        "status",
+        "removalGate",
+        "replacementEvidence",
         "layer",
         "owner",
         "purpose",
@@ -83,6 +86,9 @@
       ],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]+$" },
+        "status": { "enum": ["active", "retired"] },
+        "removalGate": { "type": ["integer", "null"], "minimum": 1 },
+        "replacementEvidence": { "type": ["string", "null"], "minLength": 1 },
         "layer": {
           "enum": [
             "unit",
