@@ -86,12 +86,17 @@ function protocolId(value: unknown): string {
 }
 
 function validateWorkerRequest(value: unknown):
+  | Readonly<{ type: "discover-identity"; messageToken: string }>
   | Readonly<{ type: "inspect-identity"; messageToken: string; pair: AppReleasePairV1 }>
   | Readonly<{ type: "activate-update"; messageToken: string; candidatePair: AppReleasePairV1 }>
   | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const source = value as Record<string, unknown>;
   if (source.protocol !== OFFLINE_WORKER_PROTOCOL) return undefined;
+  if (source.type === "discover-identity") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken"], "identity discovery message");
+    return Object.freeze({ type: "discover-identity", messageToken: protocolId(record.messageToken) });
+  }
   if (source.type === "inspect-identity") {
     const record = exactRecord(value, ["protocol", "type", "messageToken", "pair"], "identity message");
     return Object.freeze({ type: "inspect-identity", messageToken: protocolId(record.messageToken), pair: validateAppReleasePair(record.pair) });
@@ -434,7 +439,8 @@ export function createServiceWorkerRuntime(
         return undefined;
       }
       if (!request) return undefined;
-      if (request.type === "inspect-identity" && exactPair(precache.pair, request.pair)) {
+      if (request.type === "discover-identity" ||
+          (request.type === "inspect-identity" && exactPair(precache.pair, request.pair))) {
         return Object.freeze({
           protocol: OFFLINE_WORKER_PROTOCOL,
           type: "worker-identity",

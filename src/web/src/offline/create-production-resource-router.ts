@@ -10,6 +10,8 @@ import { createRangeStore } from "./range-store";
 import { validateStorageBudget } from "./contracts/policy";
 import { MemoryWholeResourceCache, WholeResourceCache } from "./whole-resource-cache";
 import { VerifiedResourceRouter } from "./verified-resource-router";
+import { createProductionUpdateCoordinator } from "./production-update-coordinator";
+import type { BrowserResourceRouter } from "../application/browser-runtime";
 import { createClientLeaseController } from "./client-lease-controller";
 import { createWorkerClientAuthority } from "./worker-client-authority";
 
@@ -121,7 +123,7 @@ async function workerPrecacheAuthority(signal: AbortSignal): Promise<Readonly<{
 export async function createProductionResourceRouter(
   context: ReleaseContext,
   signal: AbortSignal,
-): Promise<VerifiedResourceRouter> {
+): Promise<BrowserResourceRouter> {
   if (!globalThis.crypto?.subtle || !globalThis.crypto.randomUUID) {
     throw technical("Web Crypto is required for verified release routing.");
   }
@@ -220,7 +222,7 @@ export async function createProductionResourceRouter(
       workerClientAuthority.attachObservation(() => clientLease!.observation());
       await clientLease.start();
     }
-    return new VerifiedResourceRouter({
+    const router = new VerifiedResourceRouter({
       releasePlan,
       wholeStore,
       rangeStore,
@@ -228,6 +230,14 @@ export async function createProductionResourceRouter(
       subtle,
       fetchRange: fetch.bind(globalThis),
       ...(localCandidate ? {} : { clientLease }),
+    });
+    if (localCandidate) return router;
+    return Object.freeze({
+      artifactTransport: router.artifactTransport,
+      cogRangeTransport: router.cogRangeTransport,
+      inspectCapability: router.inspectCapability.bind(router),
+      updateCoordinator: createProductionUpdateCoordinator(router, precacheSetSha256),
+      close: () => router.close(),
     });
   } catch (error) {
     await clientLease?.close().catch(() => undefined);
