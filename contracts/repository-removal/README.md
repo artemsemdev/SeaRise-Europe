@@ -82,8 +82,8 @@ python scripts/repository/validate_removal_approval.py --verify-owner-comment
 
 The gate needs authenticated, read-only GitHub API access to the public Issue
 #68 comment. An offline invocation, or an invocation without that flag, is not
-an approved removal chain and must block integration. Apply this exact command
-and a failing-without-the-flag integration test when refreshing this hardening
-branch after PR #421 and the PR #422 scope-review decoupling change merge into
-the integration branch. This focused branch does not edit either separate PR
-worktree.
+an approved removal chain and must block integration. The integrated PR #421
+gate probes for the exact `--verify-owner-comment` capability, invokes it for
+approved chains, and includes a regression proving that omission of the flag
+fails closed. The PR #422 scope-review decoupling is also present in the
+audited integration history.
