@@ -1,6 +1,6 @@
 import { brotliCompressSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import {
   applicationBuildIdentityFile,
@@ -15,6 +15,7 @@ import {
   extractEmbeddedPrecachePayload,
   rangeIntegrityBootstrapPath,
 } from "./service-worker-precache.mjs";
+import { validateStaticOutputIsolation } from "./static-output-isolation.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const dist = resolve(root, "dist");
@@ -27,11 +28,29 @@ const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; w
 function files(directory) {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
-    return statSync(path).isDirectory() ? files(path) : [path];
+    const metadata = lstatSync(path);
+    if (metadata.isSymbolicLink()) throw new Error(`Static build contains a symlink: ${relative(dist, path)}`);
+    if (metadata.isDirectory()) return files(path);
+    if (!metadata.isFile()) throw new Error(`Static build contains a non-file output: ${relative(dist, path)}`);
+    return [path];
   });
 }
 
 const paths = files(dist);
+const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
+const releaseManifest = JSON.parse(readFileSync(resolve(dist, "releases", releaseId, "manifest.json"), "utf8"));
+const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
+const embedded = extractEmbeddedPrecachePayload(serviceWorker);
+const outputIsolation = validateStaticOutputIsolation({
+  dist,
+  paths,
+  viteManifest,
+  releaseManifest,
+  releaseId,
+  buildIdentityFile,
+  applicationBuildIdentityFile,
+  shellManifestPaths: embedded.entries.map(({ path }) => path),
+});
 const required = [
   resolve(dist, "index.html"),
   resolve(dist, "about/architecture/index.html"),
@@ -75,12 +94,8 @@ for (const htmlPath of paths.filter((path) => extname(path) === ".html")) {
 }
 
 const scanned = paths.filter((path) => [".html", ".js", ".css", ".map"].includes(extname(path)));
-const forbidden = [/candidate-v7/i, /local-data\/phase-1/i, /["'`]\/[^"'`]*assess(?:[/?"'`]|$)/, /["'`]\/[^"'`]*geocode(?:[/?"'`]|$)/, /["'`]\/[^"'`]*config(?:[/?"'`]|$)/];
 for (const path of scanned) {
   const text = readFileSync(path, "utf8");
-  if (forbidden.some((pattern) => pattern.test(text))) {
-    throw new Error(`Forbidden runtime reference in ${relative(dist, path)}`);
-  }
   if (extname(path) === ".js" && /\b(?:new\s+)?Function\s*\(|Error compiling schema, function code/.test(text)) {
     throw new Error(`CSP-incompatible runtime code generation in ${relative(dist, path)}`);
   }
@@ -98,7 +113,6 @@ const assets = paths
   })
   .sort((left, right) => left.path.localeCompare(right.path));
 
-const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
 const serviceWorkerEntry = viteManifest["src/offline/service-worker.ts"];
 if (
   !serviceWorkerEntry ||
@@ -107,12 +121,9 @@ if (
   (serviceWorkerEntry.dynamicImports?.length ?? 0) !== 0 ||
   paths.includes(resolve(dist, "service-worker.js.map"))
 ) throw new Error("Service worker must be one self-contained root entry without a stale source map");
-const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
 if (/skipWaiting\s*\(|clients\s*\.\s*claim\s*\(/u.test(serviceWorker)) {
   throw new Error("Worker shell cannot force activation or claim existing clients");
 }
-const embedded = extractEmbeddedPrecachePayload(serviceWorker);
-
 const expectedPrecacheFiles = new Set();
 function collectPrecache(key) {
   const entry = viteManifest[key];
@@ -268,6 +279,7 @@ if (initialJavascript > 250 * 1024) {
 
 const report = {
   ...buildIdentity,
+  outputIsolation,
   staticRoutes: ["/", "/about/architecture/"],
   bundleIsolation: {
     initialFiles: [...initialFiles].sort(),

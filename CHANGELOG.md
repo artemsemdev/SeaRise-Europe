@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a fail-closed static-output inventory gate derived from the exact Vite,
+  embedded shell-precache, and release manifests. Production builds now reject
+  every unlisted file, including TAR/archive contamination, and scan emitted
+  code for legacy runtime endpoint requests without accessing private Candidate
+  files.
+
 - Added production browser retention after exact fresh-boot reconciliation.
   The current worker now supplies the cleanup census under exact-pair Web
   Locks; active, unknown, or unresponsive clients fail closed, while only
