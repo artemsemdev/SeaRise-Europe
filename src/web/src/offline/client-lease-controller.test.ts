@@ -6,6 +6,7 @@ import {
   ClientLeaseUnavailableError,
   createClientLeaseController,
   type ClientLeaseLifecyclePort,
+  type ClientLeaseIdentityV1,
   type ClientLeaseStorePort,
   type RepeatingTimerPort,
 } from "./client-lease-controller";
@@ -21,20 +22,33 @@ class LeaseStore implements ClientLeaseStorePort {
   readonly acquired: ClientLeaseV1[] = [];
   readonly released: ClientLeaseV1[] = [];
   readonly activated: ClientLeaseV1[] = [];
+  now: () => number = () => 1_000;
 
-  async activateClientLease(lease: ClientLeaseV1): Promise<void> {
+  lease(identity: ClientLeaseIdentityV1): ClientLeaseV1 {
+    return {
+      contractVersion: 1, leaseId: identity.leaseId, pair: identity.pair,
+      expiresAtEpochMs: this.now() + 120_000, state: "active",
+    };
+  }
+
+  async activateClientLease(identity: ClientLeaseIdentityV1): Promise<ClientLeaseV1> {
+    const lease = this.lease(identity);
     this.activated.push(lease);
     this.active.set(lease.leaseId, lease);
+    return lease;
   }
 
-  async acquireLease(lease: ClientLeaseV1): Promise<void> {
+  async acquireLease(identity: ClientLeaseIdentityV1): Promise<ClientLeaseV1> {
+    const lease = this.lease(identity);
     this.acquired.push(lease);
     this.active.set(lease.leaseId, lease);
+    return lease;
   }
 
-  async releaseLease(lease: ClientLeaseV1): Promise<void> {
+  async releaseLease(identity: ClientLeaseIdentityV1): Promise<void> {
+    const lease = this.active.get(identity.leaseId) ?? this.lease(identity);
     this.released.push(lease);
-    this.active.delete(lease.leaseId);
+    this.active.delete(identity.leaseId);
   }
 
 }
@@ -78,6 +92,7 @@ describe("production client lease controller", () => {
     const store = new LeaseStore();
     const timer = new Timer();
     let now = 1_000;
+    store.now = () => now;
     const controller = createClientLeaseController({
       pair: pair(), store, timer, lifecycle: new Lifecycle(),
       now: () => now, randomUUID: () => "11111111-1111-4111-8111-111111111111",
@@ -139,9 +154,9 @@ describe("production client lease controller", () => {
     const store = new LeaseStore();
     const activation = deferred();
     const original = store.activateClientLease.bind(store);
-    vi.spyOn(store, "activateClientLease").mockImplementation(async (lease) => {
+    vi.spyOn(store, "activateClientLease").mockImplementation(async (identity) => {
       await activation.promise;
-      await original(lease);
+      return original(identity);
     });
     const controller = createClientLeaseController({
       pair: pair(), store, timer: new Timer(), lifecycle: new Lifecycle(),
@@ -166,10 +181,12 @@ describe("production client lease controller", () => {
     const pending = deferred();
     const started = deferred();
     const acquire = vi.spyOn(store, "acquireLease");
-    acquire.mockImplementationOnce(async (lease) => {
+    acquire.mockImplementationOnce(async (identity) => {
       started.resolve();
       await pending.promise;
+      const lease = store.lease(identity);
       store.active.set(lease.leaseId, lease);
+      return lease;
     });
     const controller = createClientLeaseController({
       pair: pair(), store, timer, lifecycle: new Lifecycle(),
