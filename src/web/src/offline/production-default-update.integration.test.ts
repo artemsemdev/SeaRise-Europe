@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBrowserRuntime } from "../application/browser-runtime";
 import { runtimeConfig } from "../config";
 import { PairLifecycleStore } from "./pair-lifecycle-store";
+import { createProductionUpdateCoordinator } from "./production-update-coordinator";
+import type { VerifiedResourceRouter } from "./verified-resource-router";
 import { validateAppReleasePair } from "./contracts/keys";
 import { fixtureArtifactPath, fixtureBytes, fixtureReleaseContext, responseBody } from "../test/release-fixture";
 
@@ -81,11 +83,13 @@ describe("production default update composition", () => {
         webcrypto.subtle.digest(algorithm, Buffer.from(new Uint8Array(data as ArrayBuffer))) },
     } });
     Object.defineProperty(navigator, "locks", { configurable: true, value: locks });
-    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {
+    const serviceWorkerBoundary = {
       register: vi.fn(async () => registration), ready: Promise.resolve(registration),
       getRegistration: vi.fn(async () => registration),
       addEventListener: vi.fn(),
-    } });
+      controller: active,
+    };
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: serviceWorkerBoundary });
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init: RequestInit = {}) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
       const bytes = fixtureBytes(fixtureArtifactPath(url));
@@ -153,46 +157,43 @@ describe("production default update composition", () => {
     await runtime.capability?.requestUpdateAction();
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("ready-to-activate"));
     expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"armed"');
+    const naturallyArmed = localStorage.getItem("searise:update-intent:v1");
+    if (!naturallyArmed) throw new Error("natural armed intent was unavailable");
     runtime.dispose();
 
-    const mismatchRuntime = await createBrowserRuntime(context);
-    await mismatchRuntime.searchArtifactTransport(new URL(methodology.url), {
-      signal: new AbortController().signal, headers: { Accept: methodology.mediaType },
-    });
-    await mismatchRuntime.controller.select({
-      dataReleaseId: context.dataReleaseId, scenario: "ssp2-45", horizon: 2050,
-      location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
-    });
-    await mismatchRuntime.capability?.retry();
-    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"tombstoned"');
-    expect(mismatchRuntime.capability?.getSnapshot()?.update).toMatchObject({
-      state: "failed", reason: expect.stringContaining("does not match the exact fresh-boot controller"),
-    });
-    mismatchRuntime.dispose();
+    const candidateRouter = { current: () => ({
+      contractVersion: 1 as const,
+      plan: { pair: candidateA, resourcePlanSha256: "f".repeat(64) },
+      gate: { receiptSha256: "1".repeat(64) },
+    }) } as unknown as VerifiedResourceRouter;
+    serviceWorkerBoundary.controller = waiting;
+    registration.waiting = null;
+    const successRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await successRuntime.inspect();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
+    await successRuntime.inspect();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
 
-    if (currentLifecycle.status !== "found") throw new Error("current lifecycle was unavailable");
-    const activeIdentity = currentLifecycle.record.acceptedIdentity;
-    const sourceBootId = "previous-boot";
-    const transitionId = `${sourceBootId}.freshbootinstance1.g1`;
-    localStorage.setItem("searise:update-intent:v1", JSON.stringify({ state: "armed", intent: {
-      contractVersion: 1, transitionId, confirmationGeneration: 1, sourceBootId,
-      sourceController: { contractVersion: 1, pair: candidateA, precacheSetSha256: candidatePrecache,
-        resourcePlanSha256: "e".repeat(64), receiptSha256: "f".repeat(64) },
-      candidate: { contractVersion: 1, pair: currentPair, precacheSetSha256: activeIdentity.precacheSetSha256 },
-      message: "Update ready. Close all SeaRise tabs and reopen to use it.",
-    } }));
-    const successRuntime = await createBrowserRuntime(context);
-    await successRuntime.searchArtifactTransport(new URL(methodology.url), {
-      signal: new AbortController().signal, headers: { Accept: methodology.mediaType },
+    for (const corrupt of [
+      "{malformed",
+      JSON.stringify({ state: "armed" }),
+      JSON.stringify({ state: "forged", intent: JSON.parse(naturallyArmed).intent }),
+    ]) {
+      localStorage.setItem("searise:update-intent:v1", corrupt);
+      const corruptRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+      await expect(corruptRuntime.inspect()).resolves.toMatchObject({
+        state: "failed", reason: expect.stringContaining("malformed"),
+      });
+      expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
+    }
+
+    localStorage.setItem("searise:update-intent:v1", naturallyArmed);
+    serviceWorkerBoundary.controller = active;
+    const mismatchRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await expect(mismatchRuntime.inspect()).resolves.toMatchObject({
+      state: "failed", reason: expect.stringContaining("Controlling worker"),
     });
-    await successRuntime.controller.select({
-      dataReleaseId: context.dataReleaseId, scenario: "ssp2-45", horizon: 2050,
-      location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
-    });
-    await successRuntime.capability?.retry();
-    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
-    await successRuntime.capability?.retry();
-    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
-    successRuntime.dispose();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"tombstoned"');
+    expect(localStorage.getItem("searise:update-intent:v1")).not.toContain('"state":"consumed"');
   });
 });

@@ -6,6 +6,7 @@ import { PairLifecycleStore } from "./pair-lifecycle-store";
 import { StaticUpdateCapabilityCoordinator } from "./static-update-capability";
 import {
   StaticHostUpdateCoordinator,
+  validateCloseAndReopenIntent,
   type AcceptedPairIdentityV1,
   type CloseAndReopenIntentV1,
   type ControllerBootProofV1,
@@ -17,6 +18,7 @@ import type { VerifiedResourceRouter } from "./verified-resource-router";
 const INTENT_KEY = "searise:update-intent:v1";
 
 type DurableIntent = Readonly<{ intent: CloseAndReopenIntentV1; state: "pending" | "armed" | "consumed" | "tombstoned" }>;
+const DURABLE_STATES = new Set<DurableIntent["state"]>(["pending", "armed", "consumed", "tombstoned"]);
 
 function exactIntent(left: CloseAndReopenIntentV1, right: CloseAndReopenIntentV1): boolean {
   return left.transitionId === right.transitionId && JSON.stringify(left) === JSON.stringify(right);
@@ -62,7 +64,18 @@ export function createProductionUpdateCoordinator(
   let discovered: Awaited<ReturnType<typeof workerIdentity>> | null = null;
   const readDurable = (): DurableIntent | null => {
     const value = localStorage.getItem(INTENT_KEY);
-    return value ? JSON.parse(value) as DurableIntent : null;
+    if (!value) return null;
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("Durable update intent is invalid.");
+    const record = parsed as Record<string, unknown>;
+    if (Object.keys(record).length !== 2 || !("intent" in record) ||
+        typeof record.state !== "string" || !DURABLE_STATES.has(record.state as DurableIntent["state"])) {
+      throw new TypeError("Durable update intent shape or state is invalid.");
+    }
+    return Object.freeze({
+      intent: validateCloseAndReopenIntent(record.intent as CloseAndReopenIntentV1),
+      state: record.state as DurableIntent["state"],
+    });
   };
   const writeDurable = (value: DurableIntent): void => localStorage.setItem(INTENT_KEY, JSON.stringify(value));
   const guard = (permit: DurablePortPermitV1): void => {
@@ -75,11 +88,9 @@ export function createProductionUpdateCoordinator(
       return operation();
     });
   };
-  const readBoot = async (): Promise<ControllerBootProofV1> => Object.freeze({
-    contractVersion: 1, bootId, controller: await completeCurrentAuthority(),
-  });
-  const completeCurrentAuthority = async (): Promise<AcceptedPairIdentityV1> => {
-    const identity = accepted(router.current(), currentPrecacheSetSha256);
+  const completeCurrentAuthority = async (
+    identity: AcceptedPairIdentityV1,
+  ): Promise<AcceptedPairIdentityV1> => {
     let stored = await lifecycle.read(identity.pair);
     if (stored.status === "missing") {
       await lifecycle.stage(identity.pair);
@@ -109,8 +120,24 @@ export function createProductionUpdateCoordinator(
     }
     return identity;
   };
+  const readControllerBoot = async (): Promise<ControllerBootProofV1> => {
+    const identity = accepted(router.current(), currentPrecacheSetSha256);
+    const controller = navigator.serviceWorker.controller;
+    if (!controller) throw new Error("The page has no controlling service worker authority.");
+    const controlling = await workerIdentity(controller);
+    if (controlling.pair.appBuildId !== identity.pair.appBuildId ||
+        controlling.pair.dataReleaseId !== identity.pair.dataReleaseId ||
+        controlling.precacheSetSha256 !== identity.precacheSetSha256) {
+      throw new Error("Controlling worker and admitted resource authority disagree.");
+    }
+    return Object.freeze({
+      contractVersion: 1,
+      bootId,
+      controller: await completeCurrentAuthority(identity),
+    });
+  };
   const ports: StaticUpdateCoordinatorPorts = {
-    readControllerBoot: readBoot,
+    readControllerBoot: readControllerBoot,
     inspectWaitingCandidate: async (pair) => {
       const registration = await navigator.serviceWorker.getRegistration("/");
       if (!registration?.waiting) return Object.freeze({ status: "incomplete", reason: "No waiting static worker is installed." });
@@ -167,9 +194,34 @@ export function createProductionUpdateCoordinator(
   let reconciliationFailure = "";
   const reconcileFreshBoot = async (): Promise<void> => {
     if (reconciled || !router.current()) return;
-    const boot = await readBoot();
+    let durable: DurableIntent | null;
+    try {
+      durable = readDurable();
+    } catch {
+      await navigator.locks.request(INTENT_KEY, { mode: "exclusive" }, () => {
+        localStorage.removeItem(INTENT_KEY);
+      });
+      reconciliationFailure = "Durable update intent was malformed and has been removed.";
+      reconciled = true;
+      return;
+    }
+    let boot: ControllerBootProofV1;
+    try {
+      boot = await readControllerBoot();
+    } catch (error) {
+      if (durable?.state === "armed") {
+        await navigator.locks.request(INTENT_KEY, { mode: "exclusive" }, () => {
+          const current = readDurable();
+          if (current?.state === "armed" && exactIntent(current.intent, durable.intent)) {
+            writeDurable(Object.freeze({ intent: durable.intent, state: "tombstoned" }));
+          }
+        });
+      }
+      reconciliationFailure = error instanceof Error ? error.message : "Fresh-boot controller proof failed.";
+      reconciled = true;
+      return;
+    }
     if (!coordinator.state()) await coordinator.initialize();
-    const durable = readDurable();
     if (durable?.state === "armed") {
       const exact = boot.controller.pair.appBuildId === durable.intent.candidate.pair.appBuildId &&
         boot.controller.pair.dataReleaseId === durable.intent.candidate.pair.dataReleaseId &&
