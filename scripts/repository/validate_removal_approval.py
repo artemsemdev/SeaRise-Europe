@@ -344,9 +344,8 @@ def _requirements_dependency_count(source: bytes, package: str) -> int:
     selected = _selector_package_name(package)
     count = 0
     dependency_directive = re.compile(
-        r"^(?:-r(?:\s|=|$)|--requirement(?:\s|=|$)|"
-        r"-c(?:\s|=|$)|--constraint(?:\s|=|$)|"
-        r"-e(?:\s|=|$)|--editable(?:\s|=|$))"
+        r"^(?:-r|-c|-e|--requirement(?:\s|=|$)|"
+        r"--constraint(?:\s|=|$)|--editable(?:\s|=|$))"
     )
     trailing_hashes = re.compile(
         r"(?:\s+--hash=[A-Za-z0-9]+:[A-Fa-f0-9]+)+\s*$"

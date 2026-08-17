@@ -931,8 +931,12 @@ class RemovalApprovalTests(unittest.TestCase):
     def test_requirements_dependency_rejects_hidden_or_invalid_dependencies(self) -> None:
         sources = (
             b"-r shared-requirements.txt\n",
+            b"-rshared-requirements.txt\n",
+            b"-c constraints.txt\n",
+            b"-cconstraints.txt\n",
             b"--constraint constraints.txt\n",
             b"-e git+https://example.invalid/project.git#egg=project\n",
+            b"-egit+https://example.invalid/project.git#egg=project\n",
             b"not a requirement !!!\n",
             b"azure-storage-blob \\\n",
         )
@@ -948,6 +952,20 @@ class RemovalApprovalTests(unittest.TestCase):
                 b"azure-storage-blob\nAzure_Storage.Blob\n",
             ),
             2,
+        )
+
+    def test_requirements_dependency_keeps_configuration_options_non_declarative(
+        self,
+    ) -> None:
+        source = b'''--require-hashes
+-fhttps://example.invalid/wheels
+-i https://example.invalid/simple
+azure-storage-blob==12.0.0
+'''
+
+        self.assertEqual(
+            _selector_count("requirements-dependency", "azure-storage-blob", source),
+            1,
         )
 
     def test_rejects_unlinked_replacement_and_retirement_evidence(self) -> None:
