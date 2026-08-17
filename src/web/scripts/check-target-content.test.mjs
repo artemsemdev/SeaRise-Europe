@@ -1,13 +1,37 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   activeAuthoritativeDocument,
   ownerCommentVerificationArguments,
+  readScanFile,
   scanContent,
   validateHistoricalAllowlist,
 } from "./check-target-content.mjs";
+
+describe("built content containment", () => {
+  it("reads an external build root but rejects a symlink escape", () => {
+    const builtRoot = mkdtempSync(resolve(tmpdir(), "target-content-built-"));
+    const outsideRoot = mkdtempSync(resolve(tmpdir(), "target-content-outside-"));
+    try {
+      const builtFile = resolve(builtRoot, "index.html");
+      writeFileSync(builtFile, "static build");
+      expect(readScanFile(builtFile, builtRoot)).toBe("static build");
+
+      const outsideFile = resolve(outsideRoot, "outside.js");
+      writeFileSync(outsideFile, "external payload");
+      const linkedFile = resolve(builtRoot, "linked.js");
+      symlinkSync(outsideFile, linkedFile);
+      expect(() => readScanFile(linkedFile, builtRoot)).toThrow(/must not use symlinks/);
+    } finally {
+      rmSync(builtRoot, { recursive: true, force: true });
+      rmSync(outsideRoot, { recursive: true, force: true });
+    }
+  });
+});
 
 function blob(content) {
   const bytes = Buffer.from(content);

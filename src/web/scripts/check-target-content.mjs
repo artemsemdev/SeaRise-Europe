@@ -157,6 +157,10 @@ function readRegularFile(path, encoding = null, root = repositoryRoot) {
   return readFileSync(current, encoding ?? undefined);
 }
 
+export function readScanFile(path, scanRoot) {
+  return readRegularFile(path, "utf8", scanRoot);
+}
+
 function gitBlobSha(content) {
   const bytes = Buffer.from(content);
   return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
@@ -423,14 +427,16 @@ function main() {
   const builtIndex = process.argv.indexOf("--built");
   const builtRoot = builtIndex < 0 ? null : process.argv[builtIndex + 1];
   if (builtIndex >= 0 && !builtRoot) throw new Error("--built requires a directory");
-  const files = builtRoot
-    ? filesBelow(resolve(webRoot, builtRoot), builtExtensions)
+  const resolvedBuiltRoot = builtRoot ? resolve(webRoot, builtRoot) : null;
+  const scanRoot = resolvedBuiltRoot ?? repositoryRoot;
+  const files = resolvedBuiltRoot
+    ? filesBelow(resolvedBuiltRoot, builtExtensions)
     : repositorySources();
   const allowedHistoricalPaths = builtRoot ? new Map() : loadHistoricalAllowlist();
   const violations = [];
   for (const path of files) {
     const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
-    const content = activeAuthoritativeDocument(readRegularFile(path, "utf8"), path);
+    const content = activeAuthoritativeDocument(readScanFile(path, scanRoot), path);
     const contentViolations = [...scanContent(content)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")

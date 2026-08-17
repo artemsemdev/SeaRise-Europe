@@ -324,6 +324,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Allowed content validation to scan lifecycle builds staged outside the Git
+  checkout while retaining strict containment and symlink rejection within the
+  selected build root.
 - Kept mobile Flight capability/update alerts below the optional basemap control
   and made the browser technical-failure journey wait for its exact query-free
   release COG `HEAD` interception before injecting the transient failure.
