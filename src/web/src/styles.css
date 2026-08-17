@@ -555,14 +555,17 @@ code { font-family: "Geist Mono Variable", ui-monospace, monospace; font-size: 0
 footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; padding: 1.5rem clamp(1.25rem, 3vw, 3rem); background: #04161b; color: rgb(255 255 255 / 68%); font-size: 0.72rem; }
 
 @media (max-width: 760px) {
-  .flight-header { align-items: flex-start; flex-direction: column; gap: 0.45rem; }
-  .flight-header__actions {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.45rem;
-    margin-left: 0;
+  .flight-header { display: block; }
+  .flight-header__actions { display: contents; }
+  .flight-header__actions > .release-pill {
+    position: absolute;
+    top: 4.25rem;
+    left: 1.125rem;
+    max-width: 10rem;
+    text-align: left;
   }
-  .release-pill { max-width: 10rem; text-align: left; }
+  .flight-header__actions > .release-pill:not(.flight-capability-pill) { top: 7.65rem; }
+  .flight-header__actions > button { position: absolute; top: 1rem; right: 1.125rem; }
   .flight-command { place-items: center; padding: 0 1.5rem; }
   .flight-command__content { width: min(36rem, 100%); }
   .flight-command h1 { font-size: 2.375rem; letter-spacing: -0.03em; }
