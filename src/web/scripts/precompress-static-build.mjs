@@ -4,6 +4,7 @@ import { lstatSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
 
 const dist = resolve(import.meta.dirname, "../dist");
+const releaseRoot = resolve(dist, "releases");
 const compressible = new Set([".css", ".html", ".js", ".json", ".svg", ".xml"]);
 let count = 0;
 
@@ -13,6 +14,7 @@ function visit(directory) {
     const metadata = lstatSync(path);
     if (metadata.isSymbolicLink()) throw new Error(`refusing to precompress symlink ${relative(dist, path)}`);
     if (metadata.isDirectory()) {
+      if (path === releaseRoot) continue;
       visit(path);
       continue;
     }

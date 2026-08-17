@@ -5,9 +5,9 @@
   "evidence": {
     "local-2026-08-17-generic-static-lighthouse": {
       "kind": "local-measurement",
-      "observedAt": "2026-08-17T11:55:05+02:00",
+      "observedAt": "2026-08-17T12:16:37+02:00",
       "reference": "docs/operations/generic-static-host-validation.md, src/web/scripts/validate-generic-static-host.mjs, and src/web/scripts/run-lighthouse-gate.mjs",
-      "environment": "macOS arm64; Node 20.20.1; Lighthouse 12.8.2; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; simulated mobile profile; scores performance 90, accessibility 100, best practices 96, SEO 100; static routes, build/release identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
+      "environment": "macOS arm64; Node 20.20.1; Lighthouse 12.8.2; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; three fresh simulated-mobile Chromium audits each produced raw scores performance 0.90, accessibility 1.00, best practices 0.96, SEO 1.00, with the same medians; exact manifest-only release inventory, static routes, build/release/config identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
     },
     "local-2026-08-17-offline-lifecycle-journey": {
       "kind": "local-measurement",
@@ -463,8 +463,8 @@
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent generic static-host portability, static-route, zero-dynamic-endpoint, and Chromium Lighthouse quality gate." },
       "commands": { "focused": "npm run web:build && npm run web:validate:static-host && npm run web:validate:lighthouse", "full": "npm run web:check && npm run web:validate:static-host && npm run web:validate:lighthouse && npm run web:e2e" },
       "execution": { "tier": "release", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 30, "class": "slow", "evidenceRef": "local-2026-08-17-generic-static-lighthouse", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Pinned Node, Lighthouse, Playwright Chromium, sirv-cli, committed synthetic fixture, precompressed bytes, simulated mobile profile, and loopback origin remove external service, data, and network dependencies. The gate preserves simulated mobile CPU/network behavior and fails below 90." }
+      "cost": { "estimatedSeconds": 65, "class": "slow", "evidenceRef": "local-2026-08-17-generic-static-lighthouse", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A single simulated-mobile audit varied from 0.88 to 0.90 before the initial Flight fonts were preloaded. The owned gate now preserves three fresh raw reports, evaluates the raw median, and additionally rejects every individual category below 0.90. The post-fix three-run evidence was 0.90/1.00/0.96/1.00 in every run; no external service, data, or network is involved." }
     },
     {
       "id": "static-offline-contracts",

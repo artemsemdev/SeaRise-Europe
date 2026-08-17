@@ -102,6 +102,10 @@ for (const entry of ["index.html", "about/architecture/index.html"]) {
   if (!/<style data-static-initial-css>/u.test(html) || /<link rel="stylesheet"/u.test(html)) {
     throw new Error(`${entry} does not embed its initial render-blocking stylesheet`);
   }
+  const fontPreloads = [...html.matchAll(/<link rel="preload" href="(\/assets\/(?:instrument-sans-latin-wght-normal|instrument-serif-latin-400-normal)-[A-Za-z0-9_-]+\.woff2)" as="font" type="font\/woff2" crossorigin>/gu)];
+  if (fontPreloads.length !== 2 || fontPreloads.some(([, path]) => !paths.includes(resolve(dist, `.${path}`)))) {
+    throw new Error(`${entry} does not preload both initial Latin Flight fonts`);
+  }
 }
 
 const workerPaths = paths.filter((path) => /search\.worker-[^/]+\.js$/.test(path));

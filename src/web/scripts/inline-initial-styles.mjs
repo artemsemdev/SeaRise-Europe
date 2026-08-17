@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 
 const dist = resolve(import.meta.dirname, "../dist");
 const documents = ["index.html", "about/architecture/index.html"];
+const initialFontPatterns = [
+  /\/assets\/instrument-sans-latin-wght-normal-[A-Za-z0-9_-]+\.woff2/u,
+  /\/assets\/instrument-serif-latin-400-normal-[A-Za-z0-9_-]+\.woff2/u,
+];
 let expectedHref;
 
 for (const document of documents) {
@@ -16,7 +20,14 @@ for (const document of documents) {
   expectedHref = href;
   const css = readFileSync(resolve(dist, href.slice(1)), "utf8");
   if (/<\/style/iu.test(css)) throw new Error("initial CSS cannot be safely embedded in HTML");
-  writeFileSync(path, html.replace(links[0][0], `<style data-static-initial-css>${css}</style>`));
+  const initialFonts = initialFontPatterns.map((pattern) => css.match(pattern)?.[0]);
+  if (initialFonts.some((font) => !font) || new Set(initialFonts).size !== initialFontPatterns.length) {
+    throw new Error("initial CSS does not contain the exact Latin Flight fonts");
+  }
+  const preloads = initialFonts
+    .map((font) => `<link rel="preload" href="${font}" as="font" type="font/woff2" crossorigin>`)
+    .join("");
+  writeFileSync(path, html.replace(links[0][0], `${preloads}<style data-static-initial-css>${css}</style>`));
 }
 
 console.log(`inlined ${expectedHref} in ${documents.length} static routes`);

@@ -146,6 +146,9 @@ export function validateStaticOutputIsolation({
     if (expected.has(path)) continue;
     const suffix = path.endsWith(".br") ? ".br" : path.endsWith(".gz") ? ".gz" : null;
     if (!suffix) continue;
+    if (path.startsWith(`${releasePrefix}/`)) {
+      fail(`Static release contains a non-manifest precompressed sidecar: ${path}`);
+    }
     const base = path.slice(0, -suffix.length);
     if (!expected.has(base) || !PRECOMPRESSED_BASE_EXTENSIONS.has(extname(base)) || base.endsWith(".map")) {
       fail(`Static output contains an unauthorized precompressed sidecar: ${path}`);

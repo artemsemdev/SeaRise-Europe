@@ -10,8 +10,10 @@ All notable changes to this project will be documented in this file.
   production build now emits deterministic Brotli/gzip sidecars, validates
   both static routes, build/release identity, assets, static 404 behavior, and
   zero dynamic legacy endpoint handling, and requires at least 90 in all four
-  Lighthouse mobile categories. Initial CSS is embedded and scientific runtime
-  loading is deferred past the initial render to satisfy the performance gate.
+  Lighthouse mobile categories across three isolated audits. Initial CSS is
+  embedded, the two initial Flight fonts are preloaded, scientific runtime
+  loading is deferred past the initial render, and generated delivery sidecars
+  cannot expand the exact manifest-authorized release inventory.
 
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
