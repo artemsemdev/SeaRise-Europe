@@ -182,17 +182,20 @@ _ACTIVE_CONTRIBUTOR_INPUT_AUTHORITY = {
     )
 }
 _LEGACY_SELECTORS = {
-    "ci-legacy-api": (71, ".github/workflows/ci.yml", "src/api"),
-    "ci-legacy-compose": (72, ".github/workflows/ci.yml", "compose-smoke"),
-    "ci-legacy-dotnet": (71, ".github/workflows/ci.yml", "actions/setup-dotnet@"),
-    "ci-legacy-dotnet-command": (71, ".github/workflows/ci.yml", "dotnet "),
-    "ci-legacy-frontend": (70, ".github/workflows/ci.yml", "src/frontend"),
-    "codeql-legacy-csharp": (71, ".github/workflows/codeql.yml", "csharp"),
-    "codeql-legacy-dotnet": (71, ".github/workflows/codeql.yml", "dotnet "),
+    "ci-legacy-api": (71, ".github/workflows/ci.yml", "tokens:src api"),
+    "ci-legacy-compose": (72, ".github/workflows/ci.yml", "tokens:compose smoke"),
+    "ci-legacy-compose-command": (72, ".github/workflows/ci.yml", "tokens:docker compose"),
+    "ci-legacy-dotnet": (71, ".github/workflows/ci.yml", "tokens:setup dotnet"),
+    "ci-legacy-dotnet-command": (71, ".github/workflows/ci.yml", "token:dotnet"),
+    "ci-legacy-frontend": (70, ".github/workflows/ci.yml", "tokens:src frontend"),
+    "codeql-legacy-csharp": (71, ".github/workflows/codeql.yml", "token:csharp"),
+    "codeql-legacy-dotnet": (71, ".github/workflows/codeql.yml", "token:dotnet"),
     "legacy-api-tree": (71, "src/api", "path-exists"),
     "legacy-blob-seed-tree": (72, "infra/blob-seed", "path-exists"),
     "legacy-compose-file": (72, "docker-compose.yml", "path-exists"),
     "legacy-compose-smoke": (72, "scripts/compose-smoke.sh", "path-exists"),
+    "legacy-db-geography": (71, "infra/db/init-geography.sql", "path-exists"),
+    "legacy-db-init": (71, "infra/db/init.sql", "path-exists"),
     "legacy-frontend-tree": (70, "src/frontend", "path-exists"),
     "legacy-solution-file": (71, "SeaRise Europe.sln", "path-exists"),
     "pipeline-pyproject-azure": (
@@ -498,6 +501,29 @@ def _validate_active_sboms(repository_root: Path) -> None:
         )
 
 
+def _path_lexists(path: Path) -> bool:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _workflow_selector_present(value: str, selector: str) -> bool:
+    kind, separator, expression = selector.partition(":")
+    if not separator or kind not in {"token", "tokens"}:
+        raise SupplyChainContractError(f"invalid workflow selector: {selector}")
+    expected = tuple(expression.split())
+    if not expected or (kind == "token" and len(expected) != 1):
+        raise SupplyChainContractError(f"invalid workflow selector: {selector}")
+    tokens = tuple(re.findall(r"[a-z0-9]+", value.casefold()))
+    width = len(expected)
+    return any(
+        tokens[index : index + width] == expected
+        for index in range(len(tokens) - width + 1)
+    )
+
+
 def _expected_transition(
     repository_root: Path,
 ) -> tuple[list[dict[str, str]], list[int], bool]:
@@ -509,7 +535,7 @@ def _expected_transition(
     for selector_id, (issue, path, selector) in sorted(_LEGACY_SELECTORS.items()):
         present_selector = False
         if selector == "path-exists":
-            present_selector = (repository_root / path).exists()
+            present_selector = _path_lexists(repository_root / path)
         elif selector_id.startswith("pipeline-"):
             if path not in python_requirements:
                 source = _safe_regular_file(repository_root, path).read_text(encoding="utf-8")
@@ -524,7 +550,7 @@ def _expected_transition(
                 contents[path] = _safe_regular_file(repository_root, path).read_text(
                     encoding="utf-8"
                 )
-            present_selector = selector.casefold() in contents[path].casefold()
+            present_selector = _workflow_selector_present(contents[path], selector)
         if present_selector:
             present.append(
                 {"id": selector_id, "issue": issue, "path": path, "selector": selector}

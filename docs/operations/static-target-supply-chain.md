@@ -26,7 +26,7 @@ release and settlement graphs used by deterministic builds.
 
 The current repository is not yet represented as static-only. The profile is
 `pending-legacy-removal` while hash-bound Python contributor manifests and
-CI/CodeQL workflows contain the exact selectors assigned to #70 (frontend),
+CI/CodeQL workflows contain the exact token selectors assigned to #70 (frontend),
 #71 (Python, API/.NET, and CodeQL C#), and #72 (shared Compose/container).
 Removing or changing a selector without updating the transition record
 fails closed; claiming `active` before all selectors disappear also fails.
@@ -35,7 +35,16 @@ PEP 508 whitespace or underscore variants cannot bypass the gate. After the
 Python blockers clear, `pyproject.toml` and `requirements-pipeline.txt` must
 both exactly match the static contributor authority. Final activation also
 proves the API, frontend, blob-seed, solution, Compose, and Compose-smoke paths
-are absent and that no .NET/C# legacy workflow semantics remain.
+are absent, both PostGIS initialization scripts are absent, and no reviewed
+.NET/C# legacy workflow tokens remain. Token sequences are case-insensitive and
+separator/whitespace aware, so tab/newline formatting and environment-variable
+values do not erase the blocker. This is a conservative scan of workflow bytes,
+not a complete GitHub Actions interpreter.
+
+Selector source files carry profile SHA-256 bindings. Path-presence selectors
+do not hash mutable legacy content: they use `lstat`-equivalent checks so files,
+directories, and broken symlinks all block final activation. The repository
+removal approval contract separately binds the audited Git commit and tree.
 
 ## Legacy boundary
 

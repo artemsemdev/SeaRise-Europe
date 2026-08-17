@@ -82,8 +82,15 @@ def _remove_issue_selectors(
                 target.unlink()
         elif not selector["id"].startswith("pipeline-"):
             value = target.read_text(encoding="utf-8")
+            _kind, _separator, expression = selector["selector"].partition(":")
+            words = expression.split()
+            pattern = (
+                r"(?i)(?<![a-z0-9])"
+                + r"[^a-z0-9]+".join(map(re.escape, words))
+                + r"(?![a-z0-9])"
+            )
             target.write_text(
-                value.replace(selector["selector"], "removed-legacy-token"),
+                re.sub(pattern, "removed-legacy-token", value),
                 encoding="utf-8",
             )
             changed_files.add(selector["path"])
@@ -182,6 +189,7 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     } == {
         "ci-legacy-api": 71,
         "ci-legacy-compose": 72,
+        "ci-legacy-compose-command": 72,
         "ci-legacy-dotnet": 71,
         "ci-legacy-dotnet-command": 71,
         "ci-legacy-frontend": 70,
@@ -191,6 +199,8 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
         "legacy-blob-seed-tree": 72,
         "legacy-compose-file": 72,
         "legacy-compose-smoke": 72,
+        "legacy-db-geography": 71,
+        "legacy-db-init": 71,
         "legacy-frontend-tree": 70,
         "legacy-solution-file": 71,
         "pipeline-pyproject-azure": 71,
@@ -302,6 +312,60 @@ def test_profile_detects_pep508_legacy_name_with_alternate_whitespace(tmp_path: 
     )
 
 
+@pytest.mark.parametrize(
+    ("path", "selector_id", "needle", "replacement", "injected"),
+    [
+        (
+            ".github/workflows/ci.yml",
+            "ci-legacy-api",
+            "src/api",
+            "${LEGACY_API_PATH}",
+            'LEGACY_API_PATH: "src\t/\n  api"',
+        ),
+        (
+            ".github/workflows/codeql.yml",
+            "codeql-legacy-csharp",
+            "csharp",
+            "${LEGACY_LANGUAGE}",
+            'LEGACY_LANGUAGE: "csharp"',
+        ),
+        (
+            ".github/workflows/ci.yml",
+            "ci-legacy-compose-command",
+            "docker compose",
+            "${CONTAINER_CLI}",
+            'CONTAINER_CLI: "docker\n  compose"',
+        ),
+    ],
+)
+def test_workflow_scanner_resists_whitespace_and_env_indirection(
+    tmp_path: Path,
+    path: str,
+    selector_id: str,
+    needle: str,
+    replacement: str,
+    injected: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    workflow = repository / path
+    value = workflow.read_text(encoding="utf-8")
+    assert needle in value
+    workflow.write_text(value.replace(needle, replacement) + f"\n{injected}\n", encoding="utf-8")
+    document = copy.deepcopy(_load())
+    _refresh_hash(document, repository, path)
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert any(
+        selector["id"] == selector_id
+        for selector in validated["activation"]["pendingSelectors"]
+    )
+
+
 def test_profile_accepts_exact_partial_selector_shrink(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     _copy_active_authority(repository)
@@ -366,8 +430,28 @@ def test_profile_becomes_active_only_after_final_tracked_absence(tmp_path: Path)
             "docker-compose.yml",
             "scripts/compose-smoke.sh",
             "SeaRise Europe.sln",
+            "infra/db/init.sql",
+            "infra/db/init-geography.sql",
         )
     )
+
+
+def test_broken_symlink_cannot_satisfy_active_absence(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    document = copy.deepcopy(_load())
+    _migrate_issue_71_python_authority(document, repository)
+    for issue in (70, 71, 72):
+        _remove_issue_selectors(document, repository, issue)
+    geography = repository / "infra/db/init-geography.sql"
+    geography.parent.mkdir(parents=True, exist_ok=True)
+    geography.symlink_to("missing-init-geography.sql")
+
+    with pytest.raises(SupplyChainContractError, match="activation does not match"):
+        validate_static_target_profile(
+            _write(tmp_path / "profile.json", document),
+            repository_root=repository,
+        )
 
 
 @pytest.mark.parametrize("mutation", ["component", "role"])

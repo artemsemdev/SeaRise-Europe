@@ -17,17 +17,21 @@ supply-chain gate.
 The checked-in profile is honestly `pending-legacy-removal`: issue #70 owns the
 frontend/Next.js CI selector; issue #71 owns Azure/PostGIS, API/.NET, and CodeQL
 C# selectors; issue #72 owns the shared Compose/container selector. Those exact
-selector authorities are hash-bound and carry their issue ownership in the
-activation record. The validator derives the selectors from repository
+workflow and Python selector source files are hash-bound; path-presence
+selectors carry issue ownership but intentionally bind existence rather than
+mutable legacy content. The validator derives both kinds from repository
 bytes; it rejects an `active` claim while any remain. Once the last selector is
 removed, only an `active` record with no blockers or pending selectors can pass.
 Python package names are parsed and normalized independently of PEP 508
 whitespace, punctuation, or case. Clearing #71 also requires both real
 contributor manifests to match the v2 static authority package-for-package and
 constraint-for-constraint. Active status additionally requires tracked absence
-of the API/frontend/blob-seed trees, root solution, Compose file, and Compose
-smoke script; workflow blockers are scanned semantically rather than trusted
-from the profile declaration.
+of the API/frontend/blob-seed trees, PostGIS initialization scripts, root
+solution, Compose file, and Compose smoke script. Absence uses `lstat`-style
+semantics, so a broken symlink still blocks activation. Workflow blockers use a
+conservative case-insensitive token-sequence scan over the reviewed workflow
+bytes, including values declared for environment indirection; this is not a
+claim to interpret every possible GitHub Actions expression.
 
 The v2 contributor manifest is intentionally separate from the pre-removal
 `src/pipeline` development manifests. It retains the static build/data pipeline
