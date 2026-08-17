@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Callable, Literal, Mapping, NoReturn
 
 from jsonschema import Draft202012Validator
@@ -155,7 +156,22 @@ def with_terminal_validators(
 
 
 class QaValidatorDispatcher:
-    """Resolve every matrix route to exactly one callable validator."""
+    """Resolve a validated, immutable build-time registry to QA callbacks.
+
+    The registry is internal build authority, not a runtime plugin surface. Production
+    construction is closed by ``production_validators.py``; requests can select only a
+    committed matrix route and cannot add or replace callbacks.
+    """
+
+    def __setattr__(self, name: str, value: object) -> None:
+        if name in ("_matrix", "_routes", "_validators") and hasattr(self, name):
+            raise AttributeError(f"{name} is immutable after construction")
+        object.__setattr__(self, name, value)
+
+    def __delattr__(self, name: str) -> None:
+        if name in ("_matrix", "_routes", "_validators"):
+            raise AttributeError(f"{name} is immutable after construction")
+        object.__delattr__(self, name)
 
     def __init__(
         self,
@@ -176,10 +192,10 @@ class QaValidatorDispatcher:
         noncallable = sorted(key for key, value in validators.items() if not callable(value))
         if noncallable:
             _fail("qa-validator-registry", f"validators are not callable: {noncallable}")
-        self._validators = dict(validators)
-        self._routes: dict[ArtifactSelector, str] = {
-            route.selector: str(route.validator_id) for route in self._matrix.routes
-        }
+        self._validators: Mapping[str, ArtifactValidator] = MappingProxyType(dict(validators))
+        self._routes: Mapping[ArtifactSelector, str] = MappingProxyType(
+            {route.selector: str(route.validator_id) for route in self._matrix.routes}
+        )
 
     @property
     def validator_ids(self) -> tuple[str, ...]:
@@ -197,10 +213,13 @@ class QaValidatorDispatcher:
         return validator_id
 
     def dispatch(self, request: QaValidationRequest) -> QaValidationOutcome:
-        """Run the selected validator and require an explicit, well-formed outcome."""
+        """Run one trusted build callback and require an explicit, well-formed outcome."""
         validator_id = self.validator_id_for(request.selector)
+        validator = self._validators.get(validator_id)
+        if validator is None:
+            _fail("qa-validator-route", f"validator implementation is missing: {validator_id}")
         try:
-            outcome = self._validators[validator_id](request)
+            outcome = validator(request)
         except CandidateContractError:
             raise
         except Exception as exc:

@@ -36,6 +36,42 @@ RELEASE_V2_SCHEMA_ROOT = REPOSITORY_ROOT / "contracts/release/v2"
 SETTLEMENT_SCHEMA = REPOSITORY_ROOT / "contracts/settlements/v4/search-artifact.schema.json"
 INVENTORY = REPOSITORY_ROOT / "contracts/candidate-completeness/v2/required-artifacts.json"
 
+PRODUCTION_VALIDATOR_IDS = frozenset(
+    {
+        "candidate.byte-gate.checksums",
+        "candidate.qa-report-json",
+        "candidate.qa-report-markdown",
+        "release.analysis-cog",
+        "release.boundary-geoparquet.coastal",
+        "release.boundary-geoparquet.support",
+        "release.boundary-pmtiles.coastal",
+        "release.boundary-pmtiles.support",
+        "release.build-receipt",
+        "release.projection-geoparquet",
+        "release.projection-pmtiles",
+        "release.public-contract.architecture-evidence",
+        "release.public-contract.methodology",
+        "release.public-contract.quality-summary",
+        "release.public-contract.scenario-config",
+        "release.public-contract.source-receipt",
+        "release.rights",
+        "release.stac.catalog",
+        "release.stac.collection",
+        "release.stac.item",
+        "settlements.browser-search-receipt",
+        "settlements.browser-search-shard",
+        "settlements.geoparquet",
+    }
+)
+PRODUCTION_VALIDATOR_MODULES = frozenset(
+    {
+        "searise_pipeline.candidate_completeness.production_binary_validators",
+        "searise_pipeline.candidate_completeness.production_validators",
+        "searise_pipeline.candidate_completeness.qa_dispatch",
+        "searise_pipeline.candidate_completeness.search_shard_validator",
+    }
+)
+
 _PUBLIC_SCHEMAS = {
     "release.public-contract.architecture-evidence": (
         RELEASE_V1_SCHEMA_ROOT,
@@ -498,7 +534,7 @@ def production_json_validator_registry(
 def production_validator_dispatcher(
     authorities: ProductionQaAuthorities,
 ) -> QaValidatorDispatcher:
-    """Construct the closed 54-artifact production dispatcher."""
+    """Construct the closed 54-artifact dispatcher from committed validators only."""
     validators = production_json_validator_registry(
         provenance=authorities.provenance,
         projection_source=authorities.binary.projection.source,
@@ -513,4 +549,14 @@ def production_validator_dispatcher(
         brotli_sha256=authorities.brotli_sha256,
         work_directory=authorities.work_directory,
     )
-    return QaValidatorDispatcher(with_terminal_validators(validators))
+    closed = with_terminal_validators(validators)
+    if set(closed) != PRODUCTION_VALIDATOR_IDS:
+        _fail("qa-validator-registry", "production validator identities differ")
+    untrusted = sorted(
+        validator_id
+        for validator_id, validator in closed.items()
+        if getattr(validator, "__module__", None) not in PRODUCTION_VALIDATOR_MODULES
+    )
+    if untrusted:
+        _fail("qa-validator-registry", f"production validators are untrusted: {untrusted}")
+    return QaValidatorDispatcher(closed)

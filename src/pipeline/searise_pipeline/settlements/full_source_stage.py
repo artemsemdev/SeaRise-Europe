@@ -441,11 +441,16 @@ def _stage_rows(
             alternate = by_path["alternateNamesV2.txt"]
             _consume_member(archive, infos[alternate.path], alternate, consume_alternate)
 
-    actions = {"places": places, "admin1": admin1, "alternate_names": alternate_names}
-    if len(source_order) != len(actions) or set(source_order) != set(actions):
+    expected_sources = {"places", "admin1", "alternate_names"}
+    if len(source_order) != len(expected_sources) or set(source_order) != expected_sources:
         raise FullSourceStageError("staging source order is incomplete or duplicated")
     for name in source_order:
-        actions[name]()
+        if name == "places":
+            places()
+        elif name == "admin1":
+            admin1()
+        else:
+            alternate_names()
         for sink in sinks.values():
             sink.flush()
 

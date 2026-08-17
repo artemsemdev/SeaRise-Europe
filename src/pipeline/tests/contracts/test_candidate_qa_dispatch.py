@@ -78,6 +78,40 @@ def test_unknown_selector_fails_before_any_validator_runs() -> None:
     assert caught.value.code == "qa-validator-route"
 
 
+def test_dispatcher_copies_and_freezes_the_validated_registry() -> None:
+    registry = _registry()
+    dispatcher = QaValidatorDispatcher(registry)
+    validator_id = dispatcher.validator_id_for(_request().selector)
+    registry.pop(validator_id)
+
+    assert dispatcher.dispatch(_request()).status == "pass"
+
+    with pytest.raises(TypeError):
+        dispatcher._validators[validator_id] = _pass  # type: ignore[index]
+
+
+@pytest.mark.parametrize("attribute", ["_validators", "_routes", "_matrix"])
+def test_dispatcher_authority_cannot_be_rebound_or_deleted(attribute: str) -> None:
+    injected_called = False
+
+    def injected(_: QaValidationRequest) -> QaValidationOutcome:
+        nonlocal injected_called
+        injected_called = True
+        return _pass(_request())
+
+    dispatcher = QaValidatorDispatcher(_registry())
+    selected = dispatcher.validator_id_for(_request().selector)
+    replacement = {selected: injected}
+
+    with pytest.raises(AttributeError, match="immutable after construction"):
+        setattr(dispatcher, attribute, replacement)
+    with pytest.raises(AttributeError, match="immutable after construction"):
+        delattr(dispatcher, attribute)
+
+    assert dispatcher.dispatch(_request()).status == "pass"
+    assert not injected_called
+
+
 @pytest.mark.parametrize(
     "outcome",
     [

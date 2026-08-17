@@ -21,7 +21,10 @@ FIXTURE = ROOT / "src/pipeline/tests/settlements/fixtures/spatial/fixture-manife
 
 @pytest.fixture
 def environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
-    authority._note_cleanup(SimpleNamespace(), RuntimeError("cleanup"))
+    cleanup_error = RuntimeError("primary")
+    authority._note_cleanup(cleanup_error, RuntimeError("cleanup"))
+    if hasattr(cleanup_error, "add_note"):
+        assert cleanup_error.__notes__ == ["spatial cleanup failed closed: cleanup"]
     repository = tmp_path / "repository"
     cache = tmp_path / "cache"
     work = tmp_path / "work"
