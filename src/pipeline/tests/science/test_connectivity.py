@@ -36,59 +36,72 @@ CONTRACT_DIR = Path(__file__).parents[2] / "science"
 REPO_ROOT = Path(__file__).parents[4]
 REVIEW_PATH = CONTRACT_DIR / "scope-connectivity-review.json"
 PACKAGE_ROOT = REPO_ROOT / "src" / "pipeline" / "searise_pipeline"
+LEGACY_DOMAIN = "searise_pipeline.domain"
 
 
-def _imported_modules(source: str, package: str) -> set[str]:
+def _constant_string(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Constant) and type(node.value) is str:
+        return node.value
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _constant_string(node.left)
+        right = _constant_string(node.right)
+        if left is not None and right is not None:
+            return left + right
+    return None
+
+
+def _is_legacy_domain(value: str) -> bool:
+    return value == LEGACY_DOMAIN or value.startswith(f"{LEGACY_DOMAIN}.")
+
+
+def _legacy_domain_references(source: str, package: str) -> set[str]:
     tree = ast.parse(source)
-    modules: set[str] = set()
-    importlib_aliases = {"importlib"}
-    import_module_aliases: set[str] = set()
+    references: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            importlib_aliases.update(
-                alias.asname or alias.name
-                for alias in node.names
-                if alias.name == "importlib"
+            references.update(
+                alias.name for alias in node.names if _is_legacy_domain(alias.name)
             )
-        elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
-            import_module_aliases.update(
-                alias.asname or alias.name
-                for alias in node.names
-                if alias.name == "import_module"
-            )
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            modules.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
             relative_name = "." * node.level + (node.module or "")
             base = importlib.util.resolve_name(relative_name, package)
-            modules.add(base)
-            modules.update(f"{base}.{alias.name}" for alias in node.names)
-        elif isinstance(node, ast.Call):
-            direct_import = isinstance(node.func, ast.Name) and (
-                node.func.id == "__import__" or node.func.id in import_module_aliases
+            candidates = {base, *(f"{base}.{alias.name}" for alias in node.names)}
+            references.update(value for value in candidates if _is_legacy_domain(value))
+
+        constant = _constant_string(node)
+        if constant is not None and _is_legacy_domain(constant):
+            references.add(constant)
+
+        if isinstance(node, ast.Call):
+            positional = [_constant_string(argument) for argument in node.args]
+            keyword = {
+                item.arg: _constant_string(item.value)
+                for item in node.keywords
+                if item.arg is not None
+            }
+            relative_targets = [
+                value
+                for value in positional
+                if value is not None and value.startswith(".")
+            ]
+            package_values = [
+                value
+                for value in [*positional[1:], keyword.get("package")]
+                if value is not None
+                and (
+                    value == "searise_pipeline"
+                    or value.startswith("searise_pipeline.")
+                )
+            ]
+            references.update(
+                resolved
+                for target in relative_targets
+                for package_value in package_values
+                if _is_legacy_domain(
+                    resolved := importlib.util.resolve_name(target, package_value)
+                )
             )
-            module_import = (
-                isinstance(node.func, ast.Attribute)
-                and node.func.attr == "import_module"
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id in importlib_aliases
-            )
-            if not direct_import and not module_import:
-                continue
-            if not node.args or not (
-                isinstance(node.args[0], ast.Constant)
-                and type(node.args[0].value) is str
-            ):
-                raise ValueError("Dynamic import target must be a string literal")
-            target = node.args[0].value
-            modules.add(
-                importlib.util.resolve_name(target, package)
-                if target.startswith(".")
-                else target
-            )
-    return modules
+    return references
 
 
 def _module_package(path: Path) -> str:
@@ -367,45 +380,57 @@ def test_retained_pipeline_cannot_import_legacy_domain() -> None:
             'load("searise_pipeline.domain.result_state")',
             "searise_pipeline.science",
         ),
+        (
+            'import builtins as b\nb.__import__("searise_pipeline.domain")',
+            "searise_pipeline.science",
+        ),
+        (
+            "from builtins import __import__ as load\n"
+            'load("searise_pipeline.domain")',
+            "searise_pipeline.science",
+        ),
+        (
+            "import importlib\nload = importlib.import_module\n"
+            'load("searise_pipeline.domain")',
+            "searise_pipeline.science",
+        ),
+        (
+            'load(".domain", "searise_pipeline")',
+            "searise_pipeline.science",
+        ),
+        (
+            'load(".domain", package="searise_pipeline")',
+            "searise_pipeline.science",
+        ),
+        (
+            'load("searise_pipeline." + "domain")',
+            "searise_pipeline.science",
+        ),
     )
     for source, package in mutations:
-        assert any(
-            module == "searise_pipeline.domain"
-            or module.startswith("searise_pipeline.domain.")
-            for module in _imported_modules(source, package)
+        assert _legacy_domain_references(source, package)
+
+    assert (
+        _legacy_domain_references(
+            'import importlib\nimportlib.import_module("duckdb")',
+            "searise_pipeline.settlements",
         )
+        == set()
+    )
 
     violations = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         relative = path.relative_to(PACKAGE_ROOT)
         if relative.parts[0] == "domain":
             continue
-        imported = _imported_modules(
+        references = _legacy_domain_references(
             path.read_text(encoding="utf-8"),
             _module_package(path),
         )
-        if any(
-            module == "searise_pipeline.domain"
-            or module.startswith("searise_pipeline.domain.")
-            for module in imported
-        ):
+        if references:
             violations.append(relative.as_posix())
 
     assert violations == []
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "__import__(module_name)",
-        "import importlib\nimportlib.import_module(module_name)",
-        "import importlib as loader\nloader.import_module(module_name)",
-        "from importlib import import_module as load\nload(module_name)",
-    ],
-)
-def test_legacy_domain_gate_rejects_nonliteral_dynamic_imports(source: str) -> None:
-    with pytest.raises(ValueError, match="Dynamic import target must be a string literal"):
-        _imported_modules(source, "searise_pipeline.science")
 
 
 def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:
