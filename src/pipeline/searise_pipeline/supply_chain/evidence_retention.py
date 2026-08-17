@@ -461,7 +461,8 @@ def retain_release_evidence(
             cryptographic_receipt,
             public_readback_receipt,
             output_root,
-            repository_root=historical_root,
+            repository_root=repository_root,
+            repository_authority_root=historical_root,
             dependency_inventory=historical_inventory,
         )
 
@@ -474,6 +475,7 @@ def _retain_release_evidence(
     output_root: Path,
     *,
     repository_root: Path,
+    repository_authority_root: Path,
     dependency_inventory: Path,
 ) -> ReleaseEvidenceRetention:
     budget = _ReadBudget(_MAX_TOTAL_READ_BYTES)
@@ -534,7 +536,7 @@ def _retain_release_evidence(
             pair = _validate_candidate_evidence_pair(
                 candidate_copy,
                 evidence_copy,
-                repository_root=repository_root,
+                repository_root=repository_authority_root,
                 trusted_invocation_uri=trusted_invocation,
                 allow_production_envelope=True,
                 dependency_inventory=dependency_inventory,

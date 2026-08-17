@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -119,6 +120,14 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path, Path, Path]:
     return candidate, evidence, crypto, public, output_parent / "supply-chain"
 
 
+def _full_history_repository(destination: Path) -> Path:
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", str(ROOT), str(destination)],
+        check=True,
+    )
+    return destination
+
+
 def test_retains_complete_schema_valid_local_handoff(tmp_path: Path) -> None:
     candidate, evidence, crypto, public, output = _inputs(tmp_path)
     result = retention.retain_release_evidence(
@@ -174,6 +183,83 @@ def test_retains_complete_schema_valid_local_handoff(tmp_path: Path) -> None:
         assert (output / item["path"]).stat().st_mode & 0o777 == 0o400
     assert output.stat().st_mode & 0o777 == 0o700
     assert retention.validate_release_evidence_retention(output) == result
+
+
+def test_public_retention_rejects_output_nested_under_current_checkout(
+    tmp_path: Path,
+) -> None:
+    candidate, evidence, crypto, public, _output = _inputs(tmp_path / "inputs")
+    repository = _full_history_repository(tmp_path / "repository")
+    release_id = json.loads((candidate / "manifest.json").read_text())["dataReleaseId"]
+    output = repository / "retained" / release_id / "supply-chain"
+    output.parent.mkdir(parents=True, mode=0o700)
+    output.parent.chmod(0o700)
+
+    with pytest.raises(SupplyChainContractError, match="outside candidate and repository"):
+        retention.retain_release_evidence(
+            candidate,
+            evidence,
+            crypto,
+            public,
+            output,
+            repository_root=repository,
+        )
+
+    assert not output.exists()
+
+
+def test_public_retention_uses_historical_inputs_after_current_legacy_deletion(
+    tmp_path: Path,
+) -> None:
+    candidate, evidence, crypto, public, output = _inputs(tmp_path / "inputs")
+    repository = _full_history_repository(tmp_path / "repository")
+    legacy_input = repository / "src/api/Directory.Build.props"
+    legacy_input.unlink()
+
+    result = retention.retain_release_evidence(
+        candidate,
+        evidence,
+        crypto,
+        public,
+        output,
+        repository_root=repository,
+    )
+
+    assert result.output_root == output
+    assert not legacy_input.exists()
+
+
+@pytest.mark.parametrize(
+    ("logical", "message"),
+    [
+        ("contracts/supply-chain/v1/identity-policy.json", "contracts tree does not match"),
+        (
+            "contracts/supply-chain/v2/historical/v1-contracts.py",
+            "validator binding changed",
+        ),
+    ],
+)
+def test_public_retention_rejects_historical_authority_mutation(
+    tmp_path: Path,
+    logical: str,
+    message: str,
+) -> None:
+    candidate, evidence, crypto, public, output = _inputs(tmp_path / "inputs")
+    repository = _full_history_repository(tmp_path / "repository")
+    target = repository / logical
+    target.write_bytes(target.read_bytes() + b"\n")
+
+    with pytest.raises(SupplyChainContractError, match=message):
+        retention.retain_release_evidence(
+            candidate,
+            evidence,
+            crypto,
+            public,
+            output,
+            repository_root=repository,
+        )
+
+    assert not output.exists()
 
 
 def test_refuses_overwrite_and_retains_first_committed_tree(tmp_path: Path) -> None:

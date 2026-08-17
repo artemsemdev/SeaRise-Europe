@@ -337,6 +337,10 @@ All notable changes to this project will be documented in this file.
   restoring legacy files into the checkout. Protected finalization now checks
   out full history before invoking that authority.
 
+- Kept the caller's current checkout as the release-retention output isolation
+  boundary while using the materialized Phase 1 tree only for historical
+  inventory and SBOM validation.
+
 - Allowed content validation to scan lifecycle builds staged outside the Git
   checkout while retaining strict containment and symlink rejection within the
   selected build root.
