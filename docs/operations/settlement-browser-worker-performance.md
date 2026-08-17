@@ -1,5 +1,13 @@
 # Settlement browser-worker performance evidence
 
+> **Retirement notice:** The production static target now owns the accepted
+> local browser path in `src/web/scripts/measure-local-candidate-search.mjs`
+> and `src/web/scripts/search-performance-evidence.mjs`; use the
+> [static settlement-search runbook](static-settlement-search.md) for new
+> measurements. The legacy runners documented below remain only until issue
+> #70 removes `src/frontend`, so their tests can be retired with explicit
+> replacement evidence rather than silently deleted.
+
 ## Accepted Chromium reference path
 
 `src/frontend/scripts/measure-production-browser-worker.mjs` builds the real
