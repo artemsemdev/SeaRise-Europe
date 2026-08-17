@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added versioned repository-removal inventory, evidence-receipt, and owner-
+  decision schemas. The approval chain is bound to one audited commit and two
+  SHA-256 digests, requires replacement evidence for every Phase 2 deletion,
+  and cannot authorize Candidate-v7 publication or external-resource mutation.
+
 - Added a production-like Chromium browser journey that rotates sealed
   static deployments from A to B to C without forced activation, proves the
   close-and-reopen update contract, retains only the active and immediately

@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v1/inventory.schema.json",
+  "title": "SeaRise Europe repository-removal inventory v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "inventoryId",
+    "repository",
+    "auditedCommit",
+    "auditedTree",
+    "createdAt",
+    "governingIssues",
+    "candidatePolicy",
+    "externalResourcePolicy",
+    "recoveryPolicy",
+    "items"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "inventoryId": { "type": "string", "pattern": "^repository-removal-v1-[a-z0-9-]+$" },
+    "repository": { "const": "artemsemdev/SeaRise-Europe" },
+    "auditedCommit": { "$ref": "#/$defs/gitCommit" },
+    "auditedTree": { "$ref": "#/$defs/gitCommit" },
+    "createdAt": { "$ref": "#/$defs/timestamp" },
+    "governingIssues": {
+      "type": "array",
+      "prefixItems": [
+        { "const": 68 },
+        { "const": 70 },
+        { "const": 71 },
+        { "const": 72 }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "candidatePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateV7LocalOnly", "bytesInspected", "publicationAuthorized"],
+      "properties": {
+        "candidateV7LocalOnly": { "const": true },
+        "bytesInspected": { "const": false },
+        "publicationAuthorized": { "const": false }
+      }
+    },
+    "externalResourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mutationAuthorized", "deferredToSeparateApproval"],
+      "properties": {
+        "mutationAuthorized": { "const": false },
+        "deferredToSeparateApproval": { "const": true }
+      }
+    },
+    "recoveryPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceRecoveryCommit", "productRollback"],
+      "properties": {
+        "sourceRecoveryCommit": { "$ref": "#/$defs/gitCommit" },
+        "productRollback": { "const": "previous-verified-static-pair" }
+      }
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "gitCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[]).+$"
+    },
+    "locator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "selector", "gitBlobSha"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "selector": { "type": ["string", "null"], "minLength": 1 },
+        "gitBlobSha": { "$ref": "#/$defs/gitCommit" }
+      }
+    },
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reference", "invariant"],
+      "properties": {
+        "kind": {
+          "enum": ["test-suite", "contract", "document", "pull-request", "issue", "scan"]
+        },
+        "reference": { "type": "string", "minLength": 1 },
+        "invariant": { "type": "string", "minLength": 1 }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "locators",
+        "disposition",
+        "reason",
+        "ownerIssue",
+        "removalGate",
+        "replacementEvidence",
+        "targetOwnerPaths",
+        "deferOwner",
+        "historicalAllowlistEntry",
+        "externalMutationAuthorized"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "kind": {
+          "enum": [
+            "runtime-source",
+            "test",
+            "dependency",
+            "environment-variable",
+            "ci-job",
+            "script",
+            "container-image",
+            "infrastructure",
+            "operational-documentation",
+            "contract-fixture-evidence",
+            "runtime-endpoint",
+            "ci-route",
+            "container-service",
+            "container-volume",
+            "external-resource-reference"
+          ]
+        },
+        "locators": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/locator" }
+        },
+        "disposition": {
+          "enum": [
+            "delete-phase-2",
+            "retain-build-science",
+            "retain-historical-evidence",
+            "defer"
+          ]
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "ownerIssue": { "type": ["integer", "null"], "enum": [70, 71, 72, null] },
+        "removalGate": { "type": ["string", "null"], "minLength": 1 },
+        "replacementEvidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceReference" }
+        },
+        "targetOwnerPaths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/repositoryPath" }
+        },
+        "deferOwner": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["owner", "followUpIssue"],
+              "properties": {
+                "owner": { "type": "string", "minLength": 1 },
+                "followUpIssue": { "type": "integer", "minimum": 1 }
+              }
+            }
+          ]
+        },
+        "historicalAllowlistEntry": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "externalMutationAuthorized": { "const": false }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "disposition": { "const": "delete-phase-2" } } },
+          "then": {
+            "properties": {
+              "ownerIssue": { "enum": [70, 71, 72] },
+              "removalGate": { "type": "string", "minLength": 1 },
+              "replacementEvidence": { "minItems": 1 },
+              "targetOwnerPaths": { "minItems": 1 },
+              "deferOwner": { "type": "null" },
+              "historicalAllowlistEntry": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "retain-build-science" } } },
+          "then": {
+            "properties": {
+              "ownerIssue": { "type": "null" },
+              "removalGate": { "type": "null" },
+              "targetOwnerPaths": { "minItems": 1 },
+              "deferOwner": { "type": "null" },
+              "historicalAllowlistEntry": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "retain-historical-evidence" } } },
+          "then": {
+            "properties": {
+              "ownerIssue": { "type": "null" },
+              "removalGate": { "type": "null" },
+              "replacementEvidence": { "maxItems": 0 },
+              "targetOwnerPaths": { "maxItems": 0 },
+              "deferOwner": { "type": "null" },
+              "historicalAllowlistEntry": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "defer" } } },
+          "then": {
+            "properties": {
+              "ownerIssue": { "type": "null" },
+              "removalGate": { "type": "null" },
+              "replacementEvidence": { "maxItems": 0 },
+              "targetOwnerPaths": { "maxItems": 0 },
+              "deferOwner": { "type": "object" },
+              "historicalAllowlistEntry": { "type": "null" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

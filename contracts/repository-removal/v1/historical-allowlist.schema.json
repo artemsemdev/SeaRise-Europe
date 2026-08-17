@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v1/historical-allowlist.schema.json",
+  "title": "SeaRise Europe repository-removal historical allowlist v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "auditedCommit", "auditedTree", "entries"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "auditedCommit": { "$ref": "#/$defs/gitCommit" },
+    "auditedTree": { "$ref": "#/$defs/gitCommit" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "gitCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[]).+$",
+      "not": { "pattern": "^(?:src/web/|src/pipeline/searise_pipeline/)" }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "gitBlobSha", "rule", "reason", "activeRuntimeAllowed"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "gitBlobSha": { "$ref": "#/$defs/gitCommit" },
+        "rule": {
+          "enum": [
+            "historical-adr-term",
+            "historical-changelog-term",
+            "historical-five-state-evidence",
+            "immutable-v1-supply-chain-evidence"
+          ]
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "activeRuntimeAllowed": { "const": false }
+      }
+    }
+  }
+}
