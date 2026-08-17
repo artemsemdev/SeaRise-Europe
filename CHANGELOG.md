@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a fail-closed static-output inventory gate derived from the exact Vite,
+  embedded shell-precache, and release manifests. Production builds now reject
+  every unlisted file, including TAR/archive contamination, and scan emitted
+  code for legacy runtime endpoint requests without accessing private Candidate
+  files.
+
 - Bound every persistent browser lease to the service worker's authenticated
   `Client.id` instead of a caller-supplied tab identity. The worker now mints
   expiry, refuses cross-tab heartbeat and release attempts, challenges a stable
