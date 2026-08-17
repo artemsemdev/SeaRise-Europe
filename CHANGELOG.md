@@ -39,8 +39,8 @@ All notable changes to this project will be documented in this file.
   the retained web npm, Python, settlement, scientific, build-plane, signing,
   and SBOM target authorities while honestly recording the Azure/PostGIS and
   CI/CodeQL/container legacy selectors owned by issues #70, #71, and #72.
-  Normalized requirement parsing, exact contributor parity, semantic workflow
-  checks, and tracked legacy-path absence prevent premature activation. Phase 1
+  Format-aware PEP 508 dependency parsing, exact contributor parity, semantic
+  workflow checks, and tracked legacy-path absence prevent premature activation. Phase 1
   v1 evidence remains unchanged as historical audit material and is now
   validated as a complete 48-file subtree by recomputing its Git tree and
   executing a v2-vendored, SHA-256- and Git-blob-bound historical validator
@@ -62,6 +62,12 @@ All notable changes to this project will be documented in this file.
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,
   and cannot authorize Candidate-v7 publication or external-resource mutation.
+  Canonical #70/#71/#72 scope, issue-owned semantic test retirement, exact
+  replacement-suite/target-path check coverage, structured committed command
+  outputs, and live Issue #68 owner-comment verification now fail closed.
+  Per-issue allowed/required replacement suites, inventoried command identity,
+  and glob-aware suite-source ownership prevent consistently relabelled or
+  unrelated evidence from authorizing deletion.
 
 - Added a production-like Chromium browser journey that rotates sealed
   static deployments from A to B to C without forced activation, proves the

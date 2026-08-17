@@ -11,11 +11,18 @@ from pathlib import Path
 from typing import Any
 
 from scripts.repository.validate_removal_approval import (
+    DEFAULT_CENSUS,
+    DEFAULT_CENSUS_SCHEMA,
+    DEFAULT_CHECK_OUTPUT_SCHEMA,
     DEFAULT_DECISION_SCHEMA,
     DEFAULT_EVIDENCE_SCHEMA,
     DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA,
     DEFAULT_INVENTORY_SCHEMA,
     DEFAULT_VALIDATOR,
+    RemovalApprovalError,
+    _canonical_census,
+    _selector_count,
+    _tracked_blobs,
     expected_approval_text,
     validate_removal_approval,
 )
@@ -27,6 +34,11 @@ HISTORICAL_ALLOWLIST_PATH = Path(
     "contracts/repository-removal/v1/historical-allowlist.json"
 )
 INVENTORY_SCHEMA_PATH = Path("contracts/repository-removal/v1/inventory.schema.json")
+CENSUS_PATH = Path("contracts/repository-removal/v1/census.json")
+CENSUS_SCHEMA_PATH = Path("contracts/repository-removal/v1/census.schema.json")
+CHECK_OUTPUT_SCHEMA_PATH = Path(
+    "contracts/repository-removal/v1/check-output.schema.json"
+)
 EVIDENCE_SCHEMA_PATH = Path(
     "contracts/repository-removal/v1/evidence-receipt.schema.json"
 )
@@ -39,7 +51,7 @@ HISTORICAL_ALLOWLIST_SCHEMA_PATH = Path(
 VALIDATOR_PATH = Path("scripts/repository/validate_removal_approval.py")
 TEST_INVENTORY_PATH = Path("tests/test-inventory.json")
 REPLACEMENT_MATRIX_PATH = Path(
-    "docs/testing/legacy-frontend-removal-inventory.md"
+    "docs/testing/legacy-runtime-removal-matrix.md"
 )
 
 
@@ -60,15 +72,90 @@ class ApprovalRepository:
         self._write(Path("legacy/runtime.txt"), b"legacy\n")
         self._write(Path("historical/evidence.md"), b"historical evidence\n")
         self._write(Path("target/runtime.test.ts"), b"target\n")
+        self._write(Path(".github/workflows/ci.yml"), b"jobs:\n  frontend:\n    runs-on: ubuntu-latest\n")
+        self._write(Path("scripts/ci/routes.py"), b"FRONTEND = ('src/frontend/**',)\n")
         for destination, source in (
             (INVENTORY_SCHEMA_PATH, DEFAULT_INVENTORY_SCHEMA),
+            (CENSUS_SCHEMA_PATH, DEFAULT_CENSUS_SCHEMA),
+            (CHECK_OUTPUT_SCHEMA_PATH, DEFAULT_CHECK_OUTPUT_SCHEMA),
             (EVIDENCE_SCHEMA_PATH, DEFAULT_EVIDENCE_SCHEMA),
             (DECISION_SCHEMA_PATH, DEFAULT_DECISION_SCHEMA),
             (HISTORICAL_ALLOWLIST_SCHEMA_PATH, DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA),
             (VALIDATOR_PATH, DEFAULT_VALIDATOR),
         ):
             self._write(destination, source.read_bytes())
-        self._write(TEST_INVENTORY_PATH, b"test inventory\n")
+        self._write(
+            CENSUS_PATH,
+            _json_bytes(
+                {
+                    "schemaVersion": "1.0.0",
+                    "censusId": "phase-2-legacy-runtime-v1",
+                    "issues": [
+                        {
+                            "ownerIssue": 70,
+                            "allowedReplacementSuiteIds": ["target-suite"],
+                            "requiredReplacementSuiteIds": ["target-suite"],
+                            "roots": [],
+                            "paths": ["legacy/runtime.txt"],
+                            "selectors": [],
+                        },
+                        {
+                            "ownerIssue": 71,
+                            "allowedReplacementSuiteIds": [],
+                            "requiredReplacementSuiteIds": [],
+                            "roots": [],
+                            "paths": [],
+                            "selectors": [],
+                        },
+                        {
+                            "ownerIssue": 72,
+                            "allowedReplacementSuiteIds": [],
+                            "requiredReplacementSuiteIds": [],
+                            "roots": [],
+                            "paths": [],
+                            "selectors": [],
+                        },
+                    ],
+                }
+            ),
+        )
+        self._write(
+            TEST_INVENTORY_PATH,
+            _json_bytes(
+                {
+                    "suites": [
+                        {
+                            "id": "legacy-suite",
+                            "status": "active",
+                            "replacementGate": {"issue": 70},
+                        },
+                        {
+                            "id": "target-suite",
+                            "status": "active",
+                            "sourcePaths": ["target/**/*.test.ts"],
+                            "commands": {
+                                "focused": "npm run web:check",
+                                "full": "npm run web:check && npm run web:e2e",
+                            },
+                            "replacementGate": {"issue": None},
+                        },
+                        {
+                            "id": "other-issue-suite",
+                            "status": "active",
+                            "sourcePaths": ["target/**/*.test.ts"],
+                            "commands": {
+                                "focused": "npm run web:check",
+                                "full": "npm run web:check && npm run web:e2e",
+                            },
+                            "replacementGate": {"issue": None},
+                        },
+                    ],
+                    "baselineTests": [
+                        {"path": "legacy/runtime.txt", "suite": "legacy-suite"}
+                    ],
+                }
+            ),
+        )
         self._write(REPLACEMENT_MATRIX_PATH, b"replacement matrix\n")
         self._git("add", ".")
         self._git("commit", "-q", "-m", "test: add audited tree")
@@ -137,10 +224,13 @@ class ApprovalRepository:
                     "replacementEvidence": [
                         {
                             "kind": "test-suite",
-                            "reference": "target/runtime.test.ts",
+                            "reference": "target-suite",
                             "invariant": "The static target owns runtime behavior.",
                         }
                     ],
+                    "replacementSuiteIds": ["target-suite"],
+                    "replacementCheckIds": ["static-target"],
+                    "retirementSuiteIds": ["legacy-suite"],
                     "targetOwnerPaths": ["target/runtime.test.ts"],
                     "deferOwner": None,
                     "historicalAllowlistEntry": None,
@@ -161,6 +251,9 @@ class ApprovalRepository:
                     "ownerIssue": None,
                     "removalGate": None,
                     "replacementEvidence": [],
+                    "replacementSuiteIds": [],
+                    "replacementCheckIds": [],
+                    "retirementSuiteIds": [],
                     "targetOwnerPaths": [],
                     "deferOwner": None,
                     "historicalAllowlistEntry": "historical-evidence",
@@ -181,6 +274,9 @@ class ApprovalRepository:
                     "ownerIssue": None,
                     "removalGate": None,
                     "replacementEvidence": [],
+                    "replacementSuiteIds": [],
+                    "replacementCheckIds": [],
+                    "retirementSuiteIds": [],
                     "targetOwnerPaths": ["target/runtime.test.ts"],
                     "deferOwner": None,
                     "historicalAllowlistEntry": None,
@@ -195,6 +291,8 @@ class ApprovalRepository:
         inventory: dict[str, Any] | None = None,
         include_decision: bool = True,
         evidence_mutation: dict[str, Any] | None = None,
+        check_mutation: dict[str, Any] | None = None,
+        check_output_mutation: dict[str, Any] | None = None,
         contract_hash_mutation: dict[str, str] | None = None,
         decision_mutation: dict[str, Any] | None = None,
         historical_entries: list[dict[str, Any]] | None = None,
@@ -230,6 +328,13 @@ class ApprovalRepository:
             "inventorySchemaSha256": self._git(
                 "show", f"HEAD:{INVENTORY_SCHEMA_PATH}"
             ),
+            "censusSha256": self._git("show", f"HEAD:{CENSUS_PATH}"),
+            "censusSchemaSha256": self._git(
+                "show", f"HEAD:{CENSUS_SCHEMA_PATH}"
+            ),
+            "checkOutputSchemaSha256": self._git(
+                "show", f"HEAD:{CHECK_OUTPUT_SCHEMA_PATH}"
+            ),
             "evidenceReceiptSchemaSha256": self._git(
                 "show", f"HEAD:{EVIDENCE_SCHEMA_PATH}"
             ),
@@ -246,6 +351,34 @@ class ApprovalRepository:
                 "show", f"HEAD:{REPLACEMENT_MATRIX_PATH}"
             ),
         }
+        check_output: dict[str, Any] = {
+            "schemaVersion": "1.0.0",
+            "auditedCommit": self.audited_commit,
+            "checkId": "static-target",
+            "command": "npm run web:check",
+            "result": "passed",
+        }
+        if check_output_mutation:
+            check_output.update(check_output_mutation)
+        check_output_bytes = _json_bytes(check_output)
+        output_path = Path(
+            "tests/evidence/repository-removal/v1/static-target.json"
+        )
+        check: dict[str, Any] = {
+            "id": "static-target",
+            "command": "npm run web:check",
+            "result": "passed",
+            "outputPath": str(output_path),
+            "outputSha256": _sha256(check_output_bytes),
+            "coveredReplacementSuiteIds": ["target-suite"],
+            "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+            "evidencePaths": [
+                "target/runtime.test.ts",
+                str(output_path),
+            ],
+        }
+        if check_mutation:
+            check.update(check_mutation)
         evidence: dict[str, Any] = {
             "schemaVersion": "1.0.0",
             "receiptId": "repository-removal-evidence-v1-test",
@@ -269,15 +402,7 @@ class ApprovalRepository:
                 "uploaded": False,
             },
             "externalResourceMutation": False,
-            "checks": [
-                {
-                    "id": "static-target",
-                    "command": "npm run web:check",
-                    "result": "passed",
-                    "outputSha256": "1" * 64,
-                    "evidencePaths": ["target/runtime.test.ts"],
-                }
-            ],
+            "checks": [check],
         }
         if contract_hash_mutation:
             evidence["contractHashes"].update(contract_hash_mutation)
@@ -288,10 +413,12 @@ class ApprovalRepository:
         self._write(INVENTORY_PATH, inventory_bytes)
         self._write(EVIDENCE_PATH, evidence_bytes)
         self._write(HISTORICAL_ALLOWLIST_PATH, historical_allowlist_bytes)
+        self._write(output_path, check_output_bytes)
         paths = [
             str(INVENTORY_PATH),
             str(EVIDENCE_PATH),
             str(HISTORICAL_ALLOWLIST_PATH),
+            str(output_path),
         ]
         if include_decision:
             decision: dict[str, Any] = {
@@ -325,6 +452,7 @@ class ApprovalRepository:
                         ).encode("utf-8")
                     ),
                 },
+                "liveVerificationRequired": True,
                 "authorizedIssues": [70, 71, 72],
                 "candidatePublicationAuthorized": False,
                 "externalResourceMutationAuthorized": False,
@@ -338,9 +466,75 @@ class ApprovalRepository:
 
 
 class RemovalApprovalTests(unittest.TestCase):
+    def test_repository_census_resolves_every_canonical_locator(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        census = json.loads(DEFAULT_CENSUS.read_text(encoding="utf-8"))
+
+        owners, errors = _canonical_census(
+            census,
+            repository_root=root,
+            audited_commit=commit,
+            tracked=_tracked_blobs(root, commit),
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            {issue: sum(owner == issue for owner in owners.values()) for issue in (70, 71, 72)},
+            {70: 109, 71: 107, 72: 13},
+        )
+        test_inventory = json.loads(
+            (root / "tests/test-inventory.json").read_text(encoding="utf-8")
+        )
+        active_suites = {
+            suite["id"]
+            for suite in test_inventory["suites"]
+            if suite.get("status") == "active"
+        }
+        for issue in census["issues"]:
+            allowed = set(issue["allowedReplacementSuiteIds"])
+            required = set(issue["requiredReplacementSuiteIds"])
+            self.assertLessEqual(required, allowed)
+            self.assertLessEqual(allowed, active_suites)
+        issue71 = next(issue for issue in census["issues"] if issue["ownerIssue"] == 71)
+        self.assertIn(
+            "pipeline-science-contracts",
+            issue71["requiredReplacementSuiteIds"],
+        )
+
     def _validate(
-        self, repository: ApprovalRepository, *, allow_unapproved: bool = False
+        self,
+        repository: ApprovalRepository,
+        *,
+        allow_unapproved: bool = False,
+        live_comment_mutation: dict[str, Any] | None = None,
+        verify_owner_comment: bool = True,
     ) -> list[str]:
+        def owner_comment(comment_id: int) -> dict[str, Any]:
+            decision = json.loads(
+                repository._git("show", f"HEAD:{DECISION_PATH}")
+            )
+            comment = {
+                "id": comment_id,
+                "html_url": decision["approvalSource"]["commentUrl"],
+                "issue_url": (
+                    "https://api.github.com/repos/artemsemdev/"
+                    "SeaRise-Europe/issues/68"
+                ),
+                "body": decision["approvalText"],
+                "author_association": "OWNER",
+                "user": {"login": "artemsemdev"},
+            }
+            if live_comment_mutation:
+                comment.update(live_comment_mutation)
+            return comment
+
         return validate_removal_approval(
             repository_root=repository.root,
             inventory_path=INVENTORY_PATH,
@@ -351,11 +545,22 @@ class RemovalApprovalTests(unittest.TestCase):
             evidence_schema_path=EVIDENCE_SCHEMA_PATH,
             decision_schema_path=DECISION_SCHEMA_PATH,
             historical_allowlist_schema_path=HISTORICAL_ALLOWLIST_SCHEMA_PATH,
+            census_path=CENSUS_PATH,
+            census_schema_path=CENSUS_SCHEMA_PATH,
+            check_output_schema_path=CHECK_OUTPUT_SCHEMA_PATH,
             validator_path=VALIDATOR_PATH,
             test_inventory_path=TEST_INVENTORY_PATH,
             replacement_matrix_path=REPLACEMENT_MATRIX_PATH,
             allow_unapproved=allow_unapproved,
+            verify_owner_comment=verify_owner_comment and not allow_unapproved,
+            owner_comment_fetcher=owner_comment,
         )
+
+    @staticmethod
+    def _commit_census(repository: ApprovalRepository, census: dict[str, Any]) -> None:
+        repository._write(CENSUS_PATH, _json_bytes(census))
+        repository._git("add", str(CENSUS_PATH))
+        repository._git("commit", "-q", "-m", "test: update census")
 
     def test_accepts_exact_committed_approval_chain(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -441,8 +646,14 @@ class RemovalApprovalTests(unittest.TestCase):
                 "id": "static-target",
                 "command": "npm run web:test",
                 "result": "passed",
+                "outputPath": "tests/evidence/repository-removal/v1/static-target.json",
                 "outputSha256": "2" * 64,
-                "evidencePaths": ["target/runtime.test.ts"],
+                "coveredReplacementSuiteIds": ["target-suite"],
+                "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+                "evidencePaths": [
+                    "target/runtime.test.ts",
+                    "tests/evidence/repository-removal/v1/static-target.json",
+                ],
             }
             repository.commit_chain(
                 evidence_mutation={
@@ -513,8 +724,17 @@ class RemovalApprovalTests(unittest.TestCase):
                             "id": "unsafe-check",
                             "command": "gh secret delete TOKEN",
                             "result": "passed",
+                            "outputPath": (
+                                "tests/evidence/repository-removal/v1/unsafe-check.json"
+                            ),
                             "outputSha256": "2" * 64,
-                            "evidencePaths": ["evidence/not-committed.txt"],
+                            "coveredReplacementSuiteIds": ["target-suite"],
+                            "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+                            "evidencePaths": [
+                                "missing/evidence.ts",
+                                "target/runtime.test.ts",
+                                "tests/evidence/repository-removal/v1/unsafe-check.json",
+                            ],
                         }
                     ]
                 }
@@ -527,7 +747,7 @@ class RemovalApprovalTests(unittest.TestCase):
         )
         self.assertIn(
             "unsafe-check: evidencePaths not tracked at audited commit: "
-            "['evidence/not-committed.txt']",
+            "['missing/evidence.ts']",
             errors,
         )
 
@@ -571,6 +791,434 @@ class RemovalApprovalTests(unittest.TestCase):
         self.assertIn(
             "owner decision approvalText is not the exact required approval",
             errors,
+        )
+
+    def test_rejects_non_exhaustive_canonical_census_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            census = json.loads((repository.root / CENSUS_PATH).read_text())
+            census["issues"][0]["paths"].insert(0, "historical/evidence.md")
+            self._commit_census(repository, census)
+            repository.commit_chain()
+
+            errors = self._validate(repository)
+
+        self.assertTrue(
+            any("delete inventory does not exhaust canonical census" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_missing_and_duplicate_canonical_selectors(self) -> None:
+        for duplicate in (False, True):
+            with self.subTest(duplicate=duplicate), tempfile.TemporaryDirectory() as directory:
+                repository = ApprovalRepository(Path(directory))
+                selector_value = "frontend" if duplicate else "missing"
+                if duplicate:
+                    repository._write(
+                        Path(".github/workflows/ci.yml"),
+                        b"jobs:\n  frontend:\n    runs-on: ubuntu-latest\n  frontend:\n    runs-on: ubuntu-latest\n",
+                    )
+                    repository._git("add", ".github/workflows/ci.yml")
+                    repository._git("commit", "-q", "-m", "test: duplicate selector")
+                    repository.audited_commit = repository._git(
+                        "rev-parse", "HEAD"
+                    ).decode().strip()
+                    repository.audited_tree = repository._git(
+                        "rev-parse", "HEAD^{tree}"
+                    ).decode().strip()
+                census = json.loads((repository.root / CENSUS_PATH).read_text())
+                census["issues"][0]["selectors"] = [
+                    {
+                        "path": ".github/workflows/ci.yml",
+                        "kind": "workflow-job",
+                        "value": selector_value,
+                    }
+                ]
+                self._commit_census(repository, census)
+                inventory = repository.inventory()
+                workflow_blob = repository._git(
+                    "rev-parse",
+                    f"{repository.audited_commit}:.github/workflows/ci.yml",
+                ).decode().strip()
+                inventory["items"][0]["locators"].insert(
+                    0,
+                    {
+                        "path": ".github/workflows/ci.yml",
+                        "selector": f"workflow-job:{selector_value}",
+                        "gitBlobSha": workflow_blob,
+                    },
+                )
+                repository.commit_chain(inventory=inventory)
+
+                errors = self._validate(repository)
+
+            self.assertTrue(
+                any("canonical selector must exist exactly once" in error for error in errors),
+                errors,
+            )
+
+    def test_setuptools_mapping_selectors_are_structural_and_independent(self) -> None:
+        source = b'''[tool.setuptools]\npackages = ["pipeline", "searise_pipeline"]\n\n[tool.setuptools.package-dir]\npipeline = "."\nsearise_pipeline = "searise_pipeline"\n'''
+
+        self.assertEqual(_selector_count("setuptools-package", "pipeline", source), 1)
+        self.assertEqual(
+            _selector_count("setuptools-package-dir", "pipeline", source),
+            1,
+        )
+        self.assertEqual(
+            _selector_count("setuptools-package", "missing", source),
+            0,
+        )
+
+    def test_pyproject_dependency_ignores_metadata_and_unrelated_toml(self) -> None:
+        source = b'''[project]\nname = "demo"\ndescription = "azure-storage-blob"\ndependencies = []\n\n[tool.demo]\npackage = "azure-storage-blob"\n'''
+
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "azure-storage-blob", source),
+            0,
+        )
+
+    def test_pyproject_dependency_parses_main_and_optional_pep508_entries(self) -> None:
+        source = b'''[project]\nname = "demo"\ndependencies = ["Azure_Storage.Blob[crypto]>=12; python_version >= '3.11'"]\n\n[project.optional-dependencies]\ndatabase = ["Psycopg2_Binary>=2.9"]\n'''
+
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "azure-storage-blob", source),
+            1,
+        )
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "psycopg2-binary", source),
+            1,
+        )
+
+    def test_pyproject_dependency_rejects_malformed_or_ambiguous_input(self) -> None:
+        malformed_toml = b'[project]\ndependencies = ["azure-storage-blob"\n'
+        malformed_requirement = b'''[project]\ndependencies = ["not a requirement !!!"]\n'''
+
+        for source in (malformed_toml, malformed_requirement):
+            with self.subTest(source=source), self.assertRaises(RemovalApprovalError):
+                _selector_count("pyproject-dependency", "azure-storage-blob", source)
+
+        duplicate = b'''[project]\ndependencies = ["azure-storage-blob"]\n\n[project.optional-dependencies]\ndev = ["Azure_Storage.Blob"]\n'''
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "azure-storage-blob", duplicate),
+            2,
+        )
+
+    def test_requirements_dependency_ignores_comments_options_and_urls(self) -> None:
+        source = b'''# azure-storage-blob\n--find-links https://example.invalid/azure-storage-blob\n--index-url https://azure-storage-blob.example.invalid/simple\n--extra-index-url=https://example.invalid/psycopg2-binary\n--require-hashes\n'''
+
+        self.assertEqual(
+            _selector_count("requirements-dependency", "azure-storage-blob", source),
+            0,
+        )
+        self.assertEqual(
+            _selector_count("requirements-dependency", "psycopg2-binary", source),
+            0,
+        )
+
+    def test_requirements_dependency_parses_markers_hashes_and_canonical_names(self) -> None:
+        source = b'''Azure_Storage.Blob[crypto]>=12; python_version >= "3.11"  # retained\nPsycopg2.Binary==2.9.10 \\\n    --hash=sha256:0123456789abcdef \\\n    --hash=sha256:abcdef0123456789\n'''
+
+        self.assertEqual(
+            _selector_count("requirements-dependency", "azure-storage-blob", source),
+            1,
+        )
+        self.assertEqual(
+            _selector_count("requirements-dependency", "psycopg2-binary", source),
+            1,
+        )
+
+    def test_requirements_dependency_rejects_hidden_or_invalid_dependencies(self) -> None:
+        sources = (
+            b"-r shared-requirements.txt\n",
+            b"-rshared-requirements.txt\n",
+            b"-c constraints.txt\n",
+            b"-cconstraints.txt\n",
+            b"--constraint constraints.txt\n",
+            b"-e git+https://example.invalid/project.git#egg=project\n",
+            b"-egit+https://example.invalid/project.git#egg=project\n",
+            b"not a requirement !!!\n",
+            b"azure-storage-blob \\\n",
+        )
+
+        for source in sources:
+            with self.subTest(source=source), self.assertRaises(RemovalApprovalError):
+                _selector_count("requirements-dependency", "azure-storage-blob", source)
+
+        self.assertEqual(
+            _selector_count(
+                "requirements-dependency",
+                "azure-storage-blob",
+                b"azure-storage-blob\nAzure_Storage.Blob\n",
+            ),
+            2,
+        )
+
+    def test_requirements_dependency_rejects_all_declaration_option_prefixes(
+        self,
+    ) -> None:
+        for option in ("requirement", "constraint", "editable"):
+            for length in range(1, len(option) + 1):
+                prefix = option[:length]
+                for separator in (" ", "="):
+                    source = f"--{prefix}{separator}hidden.txt\n".encode()
+                    with self.subTest(source=source), self.assertRaises(
+                        RemovalApprovalError
+                    ):
+                        _selector_count(
+                            "requirements-dependency", "azure-storage-blob", source
+                        )
+
+    def test_requirements_dependency_keeps_configuration_options_non_declarative(
+        self,
+    ) -> None:
+        source = b'''--require-hashes
+--extra-index-url https://example.invalid/extra
+--only-binary=:all:
+--prefer-binary
+-fhttps://example.invalid/wheels
+-i https://example.invalid/simple
+azure-storage-blob==12.0.0
+'''
+
+        self.assertEqual(
+            _selector_count("requirements-dependency", "azure-storage-blob", source),
+            1,
+        )
+
+    def test_rejects_unlinked_replacement_and_retirement_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            delete_item = inventory["items"][0]
+            delete_item["replacementSuiteIds"] = ["unknown-suite"]
+            delete_item["replacementCheckIds"] = ["unknown-check"]
+            delete_item["retirementSuiteIds"] = []
+            repository.commit_chain(inventory=inventory)
+
+            errors = self._validate(repository)
+
+        self.assertTrue(any("replacementSuiteIds not in test inventory" in e for e in errors))
+        self.assertTrue(any("replacementCheckIds not in evidence receipt" in e for e in errors))
+        self.assertTrue(any("deleted baseline tests lack retirement mapping" in e for e in errors))
+        self.assertTrue(any("semantic retirement suite census drifted" in e for e in errors))
+
+    def test_requires_census_mandated_replacement_suites_per_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            census = json.loads((repository.root / CENSUS_PATH).read_text())
+            census["issues"][0]["allowedReplacementSuiteIds"] = [
+                "mandatory-absence-scan",
+                "target-suite",
+            ]
+            census["issues"][0]["requiredReplacementSuiteIds"] = [
+                "mandatory-absence-scan"
+            ]
+            self._commit_census(repository, census)
+            repository.commit_chain()
+
+            errors = self._validate(repository)
+
+        self.assertTrue(
+            any(
+                "deletion inventory lacks mandatory replacement suites for "
+                "ownerIssue #70" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_unverifiable_retained_command_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                evidence_mutation={
+                    "checks": [
+                        {
+                            "id": "static-target",
+                            "command": "npm run web:check",
+                            "result": "passed",
+                            "outputPath": (
+                                "tests/evidence/repository-removal/v1/static-target.json"
+                            ),
+                            "outputSha256": "0" * 64,
+                            "coveredReplacementSuiteIds": ["target-suite"],
+                            "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+                            "evidencePaths": [
+                                "target/runtime.test.ts",
+                                "tests/evidence/repository-removal/v1/static-target.json",
+                            ],
+                        }
+                    ]
+                }
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: outputSha256 does not match retained command output: "
+            "tests/evidence/repository-removal/v1/static-target.json",
+            errors,
+        )
+
+    def test_rejects_arbitrary_tracked_file_as_check_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                check_mutation={
+                    "outputPath": "historical/evidence.md",
+                    "outputSha256": _sha256(b"historical evidence\n"),
+                    "evidencePaths": [
+                        "historical/evidence.md",
+                        "target/runtime.test.ts",
+                    ],
+                }
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: outputPath must be the canonical check namespace: "
+            "tests/evidence/repository-removal/v1/static-target.json",
+            errors,
+        )
+
+    def test_rejects_structured_check_output_binding_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                check_output_mutation={"command": "npm run web:test"}
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: committed check output does not exactly bind "
+            "auditedCommit/checkId/command/result",
+            errors,
+        )
+
+    def test_rejects_retirement_suite_owned_by_another_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            inventory["items"][0]["ownerIssue"] = 71
+            repository.commit_chain(inventory=inventory)
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "delete-runtime: retirementSuiteIds must have replacementGate.issue "
+            "equal to ownerIssue: ['legacy-suite']",
+            errors,
+        )
+
+    def test_rejects_semantically_unbound_check_suite_and_target_path(self) -> None:
+        mutations = (
+            {"coveredReplacementSuiteIds": ["legacy-suite"]},
+            {"coveredTargetOwnerPaths": ["historical/evidence.md"]},
+        )
+        expected = (
+            (
+                "delete-runtime: replacement checks do not exactly cover "
+                "replacementSuiteIds"
+            ),
+            "delete-runtime: replacement checks do not exactly cover targetOwnerPaths",
+        )
+        for mutation, expected_error in zip(mutations, expected):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                repository = ApprovalRepository(Path(directory))
+                repository.commit_chain(check_mutation=mutation)
+
+                errors = self._validate(repository)
+
+            self.assertIn(expected_error, errors)
+
+    def test_rejects_consistently_relabelled_unrelated_replacement_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            delete_item = inventory["items"][0]
+            delete_item["replacementSuiteIds"] = ["other-issue-suite"]
+            delete_item["replacementEvidence"][0]["reference"] = "other-issue-suite"
+            repository.commit_chain(
+                inventory=inventory,
+                check_mutation={
+                    "coveredReplacementSuiteIds": ["other-issue-suite"]
+                },
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "delete-runtime: replacementSuiteIds are not allowed for ownerIssue "
+            "#70: ['other-issue-suite']",
+            errors,
+        )
+
+    def test_rejects_consistently_bound_true_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                check_mutation={"command": "true"},
+                check_output_mutation={"command": "true"},
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: command must exactly match target-suite "
+            "commands.focused or commands.full",
+            errors,
+        )
+
+    def test_rejects_consistently_bound_unrelated_workflow_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            inventory["items"][0]["targetOwnerPaths"] = [
+                ".github/workflows/ci.yml"
+            ]
+            output_path = "tests/evidence/repository-removal/v1/static-target.json"
+            repository.commit_chain(
+                inventory=inventory,
+                check_mutation={
+                    "coveredTargetOwnerPaths": [".github/workflows/ci.yml"],
+                    "evidencePaths": [".github/workflows/ci.yml", output_path],
+                },
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: covered suite target-suite has no matching "
+            "coveredTargetOwnerPath",
+            errors,
+        )
+        self.assertIn(
+            "static-target: coveredTargetOwnerPaths do not match covered suite "
+            "sourcePaths: ['.github/workflows/ci.yml']",
+            errors,
+        )
+
+    def test_requires_live_owner_comment_and_rejects_live_identity_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain()
+
+            offline_errors = self._validate(repository, verify_owner_comment=False)
+            live_errors = self._validate(
+                repository,
+                live_comment_mutation={"author_association": "CONTRIBUTOR"},
+            )
+
+        self.assertIn(
+            "live GitHub owner comment verification is required for approval",
+            offline_errors,
+        )
+        self.assertIn(
+            "live GitHub owner comment does not exactly match the recorded owner approval",
+            live_errors,
         )
 
 

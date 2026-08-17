@@ -22,6 +22,7 @@ function approvalRepository() {
   mkdirSync(resolve(root, "docs/evidence"), { recursive: true });
   writeFileSync(resolve(root, "docs/evidence/history.md"), "Historical evidence.\n");
   mkdirSync(resolve(root, "src/web/scripts"), { recursive: true });
+  writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// synthetic approval launcher\n");
   writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "// synthetic gate policy\n");
   writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.test.mjs"), "// synthetic gate tests\n");
   mkdirSync(resolve(root, "contracts/supply-chain/v2"), { recursive: true });
@@ -159,13 +160,20 @@ describe("static repository dependency gates", () => {
     expect(scanDependencyRecords(unlisted, { mode: "repository-final" }).violations).toHaveLength(1);
   });
 
-  it("classifies only exact removal-policy allowlist documents as gate definitions", () => {
-    const exact = [{ path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json", text: "NuGet" }];
+  it("classifies only exact removal-policy documents as gate definitions", () => {
+    const exact = [
+      { path: "contracts/repository-removal/v1/census.json", text: "SeaRise Europe.sln" },
+      { path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json", text: "NuGet" },
+    ];
     const unlisted = [{ path: "contracts/repository-removal/v1/unreviewed.json", text: "NuGet" }];
     expect(scanDependencyRecords(exact, { mode: "repository-final" }).violations).toHaveLength(0);
     expect(scanDependencyRecords(unlisted, { mode: "repository-final" }).violations).toHaveLength(1);
     expect(scanDependencyRecords([{
       path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json",
+      text: "AZURE_MAPS_KEY=mutation",
+    }], { mode: "repository-final" }).violations).toHaveLength(1);
+    expect(scanDependencyRecords([{
+      path: "contracts/repository-removal/v1/census.json",
       text: "AZURE_MAPS_KEY=mutation",
     }], { mode: "repository-final" }).violations).toHaveLength(1);
   });
@@ -260,13 +268,25 @@ describe("static repository dependency gates", () => {
       approvalValidator: () => { throw new Error("invalid owner/hash chain"); },
       supplyChainValidator: skipSupplyChain,
     })).toThrow(/invalid owner\/hash chain/);
+    expect(() => validateStaticRepository({
+      mode: "repository-readiness",
+      root,
+      approvalValidator: () => { throw new Error("invalid owner/hash chain"); },
+      supplyChainValidator: skipSupplyChain,
+    })).toThrow(/invalid owner\/hash chain/);
     let approvals = 0;
     const approve = () => { approvals += 1; };
+    const approvedReadiness = validateStaticRepository({
+      mode: "repository-readiness", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    });
+    expect(approvedReadiness.findings.some(({ path, rule }) =>
+      path === "src/frontend/token-free" && rule === "must-delete-path")).toBe(true);
+    expect(approvals).toBe(1);
     expect(() => validateStaticRepository({
       mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
     }))
       .toThrow(/must-delete-path/);
-    expect(approvals).toBe(1);
+    expect(approvals).toBe(2);
 
     git(root, "rm", "-q", "src/frontend/token-free");
     git(root, "-c", "user.name=Artem", "-c", "user.email=6793222+artemsemdev@users.noreply.github.com",
@@ -275,14 +295,44 @@ describe("static repository dependency gates", () => {
       mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
     }).violations)
       .toHaveLength(0);
-    expect(approvals).toBe(2);
+    expect(approvals).toBe(3);
     expect(readFileSync(resolve(root, "docs/evidence/history.md"), "utf8")).toBe("Historical evidence.\n");
+
+    writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// changed approval launcher\n");
+    expect(() => validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    }))
+      .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
+    writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// synthetic approval launcher\n");
 
     writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "createServer(app)\n");
     expect(() => validateStaticRepository({
       mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
     }))
       .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
+  });
+
+  it("fails closed on final authority and blob mutations during readiness", () => {
+    const { root, contract } = approvalRepository();
+    const approvedPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.json");
+    const skipSupplyChain = () => {};
+    const approve = () => {};
+
+    const authorityMutation = { ...contract, authority: "preapproval-current-blobs" };
+    writeFileSync(approvedPath, `${JSON.stringify(authorityMutation)}\n`);
+    expect(() => validateStaticRepository({
+      mode: "repository-readiness", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    })).toThrow(/not a v1 document/);
+
+    const blobMutation = {
+      ...contract,
+      entries: contract.entries.map((entry) => ({ ...entry })),
+    };
+    blobMutation.entries[0].gitBlobSha = "0".repeat(40);
+    writeFileSync(approvedPath, `${JSON.stringify(blobMutation)}\n`);
+    expect(() => validateStaticRepository({
+      mode: "repository-readiness", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    })).toThrow(/blob mismatch/);
   });
 
   it("binds every current v2 profile component, input byte hash, and Git mode", () => {

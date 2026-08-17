@@ -112,6 +112,9 @@
         "ownerIssue",
         "removalGate",
         "replacementEvidence",
+        "replacementSuiteIds",
+        "replacementCheckIds",
+        "retirementSuiteIds",
         "targetOwnerPaths",
         "deferOwner",
         "historicalAllowlistEntry",
@@ -159,6 +162,21 @@
           "type": "array",
           "items": { "$ref": "#/$defs/evidenceReference" }
         },
+        "replacementSuiteIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+        },
+        "replacementCheckIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+        },
+        "retirementSuiteIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+        },
         "targetOwnerPaths": {
           "type": "array",
           "uniqueItems": true,
@@ -192,6 +210,8 @@
               "ownerIssue": { "enum": [70, 71, 72] },
               "removalGate": { "type": "string", "minLength": 1 },
               "replacementEvidence": { "minItems": 1 },
+              "replacementSuiteIds": { "minItems": 1 },
+              "replacementCheckIds": { "minItems": 1 },
               "targetOwnerPaths": { "minItems": 1 },
               "deferOwner": { "type": "null" },
               "historicalAllowlistEntry": { "type": "null" }
@@ -204,6 +224,9 @@
             "properties": {
               "ownerIssue": { "type": "null" },
               "removalGate": { "type": "null" },
+              "replacementSuiteIds": { "maxItems": 0 },
+              "replacementCheckIds": { "maxItems": 0 },
+              "retirementSuiteIds": { "maxItems": 0 },
               "targetOwnerPaths": { "minItems": 1 },
               "deferOwner": { "type": "null" },
               "historicalAllowlistEntry": { "type": "null" }
@@ -217,6 +240,9 @@
               "ownerIssue": { "type": "null" },
               "removalGate": { "type": "null" },
               "replacementEvidence": { "maxItems": 0 },
+              "replacementSuiteIds": { "maxItems": 0 },
+              "replacementCheckIds": { "maxItems": 0 },
+              "retirementSuiteIds": { "maxItems": 0 },
               "targetOwnerPaths": { "maxItems": 0 },
               "deferOwner": { "type": "null" },
               "historicalAllowlistEntry": { "type": "string" }
@@ -230,6 +256,9 @@
               "ownerIssue": { "type": "null" },
               "removalGate": { "type": "null" },
               "replacementEvidence": { "maxItems": 0 },
+              "replacementSuiteIds": { "maxItems": 0 },
+              "replacementCheckIds": { "maxItems": 0 },
+              "retirementSuiteIds": { "maxItems": 0 },
               "targetOwnerPaths": { "maxItems": 0 },
               "deferOwner": { "type": "object" },
               "historicalAllowlistEntry": { "type": "null" }

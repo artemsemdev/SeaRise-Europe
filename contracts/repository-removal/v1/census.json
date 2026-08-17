@@ -1,0 +1,149 @@
+{
+  "schemaVersion": "1.0.0",
+  "censusId": "phase-2-legacy-runtime-v1",
+  "issues": [
+    {
+      "ownerIssue": 70,
+      "allowedReplacementSuiteIds": [
+        "static-assessment-controller",
+        "static-projection-browser-ux",
+        "static-projection-panel",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "requiredReplacementSuiteIds": [
+        "static-projection-browser-ux",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "roots": [
+        {
+          "path": "src/frontend",
+          "excludePaths": [
+            "src/frontend/.dockerignore",
+            "src/frontend/Dockerfile"
+          ]
+        }
+      ],
+      "paths": [],
+      "selectors": [
+        { "path": ".github/workflows/ci.yml", "kind": "workflow-job", "value": "frontend" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "FRONTEND" }
+      ]
+    },
+    {
+      "ownerIssue": 71,
+      "allowedReplacementSuiteIds": [
+        "pipeline-ar6-release-builder",
+        "pipeline-regional-fixture",
+        "pipeline-reviewed-cog-range-access",
+        "pipeline-science-contracts",
+        "pipeline-supply-chain-contract",
+        "static-assessment-controller",
+        "static-map-visualization",
+        "static-pmtiles-network-only",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content"
+      ],
+      "requiredReplacementSuiteIds": [
+        "pipeline-ar6-release-builder",
+        "pipeline-reviewed-cog-range-access",
+        "pipeline-science-contracts",
+        "static-assessment-controller",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content"
+      ],
+      "roots": [
+        { "path": "infra/blob-seed", "excludePaths": [] },
+        { "path": "infra/db", "excludePaths": [] },
+        {
+          "path": "src/api",
+          "excludePaths": [
+            "src/api/.dockerignore",
+            "src/api/Dockerfile"
+          ]
+        },
+        { "path": "src/pipeline/searise_pipeline/domain", "excludePaths": [] }
+      ],
+      "paths": [
+        ".env.pipeline.example",
+        "SeaRise Europe.sln",
+        "scripts/tests/run_mutation_pilot.py",
+        "src/pipeline/__init__.py",
+        "src/pipeline/cogify.py",
+        "src/pipeline/compute_exposure.py",
+        "src/pipeline/config.py",
+        "src/pipeline/download.py",
+        "src/pipeline/preprocess.py",
+        "src/pipeline/register.py",
+        "src/pipeline/run_pipeline.py",
+        "src/pipeline/tests/builders/result_state.py",
+        "src/pipeline/tests/tdd/test_result_state_characterization.py",
+        "src/pipeline/tests/test_cogify.py",
+        "src/pipeline/tests/test_compute_exposure.py",
+        "src/pipeline/tests/test_config.py",
+        "src/pipeline/tests/test_download.py",
+        "src/pipeline/tests/test_preprocess.py",
+        "src/pipeline/tests/test_register.py",
+        "src/pipeline/tests/test_upload.py",
+        "src/pipeline/tests/test_validate.py",
+        "src/pipeline/upload.py",
+        "src/pipeline/validate.py"
+      ],
+      "selectors": [
+        { "path": ".github/workflows/ci.yml", "kind": "workflow-job", "value": "api" },
+        { "path": ".github/workflows/ci.yml", "kind": "workflow-job", "value": "infrastructure" },
+        { "path": ".github/workflows/codeql.yml", "kind": "workflow-job", "value": "analyze-csharp" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "API" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "CODEQL_CSHARP" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "INFRASTRUCTURE" },
+        { "path": "src/pipeline/pyproject.toml", "kind": "pyproject-dependency", "value": "azure-storage-blob" },
+        { "path": "src/pipeline/pyproject.toml", "kind": "pyproject-dependency", "value": "psycopg2-binary" },
+        { "path": "src/pipeline/pyproject.toml", "kind": "setuptools-package", "value": "pipeline" },
+        { "path": "src/pipeline/pyproject.toml", "kind": "setuptools-package-dir", "value": "pipeline" },
+        { "path": "src/pipeline/requirements-pipeline.txt", "kind": "requirements-dependency", "value": "azure-storage-blob" },
+        { "path": "src/pipeline/requirements-pipeline.txt", "kind": "requirements-dependency", "value": "psycopg2-binary" }
+      ]
+    },
+    {
+      "ownerIssue": 72,
+      "allowedReplacementSuiteIds": [
+        "static-generic-host-lighthouse",
+        "static-offline-lifecycle-journey",
+        "static-pmtiles-network-only",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "requiredReplacementSuiteIds": [
+        "static-generic-host-lighthouse",
+        "static-offline-lifecycle-journey",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "roots": [],
+      "paths": [
+        ".env.local.example",
+        "docker-compose.yml",
+        "scripts/compose-smoke.sh",
+        "src/api/.dockerignore",
+        "src/api/Dockerfile",
+        "src/frontend/.dockerignore",
+        "src/frontend/Dockerfile"
+      ],
+      "selectors": [
+        { "path": ".github/workflows/ci.yml", "kind": "workflow-job", "value": "compose-smoke" },
+        { "path": ".github/workflows/ci.yml", "kind": "workflow-job", "value": "docker-api" },
+        { "path": ".github/workflows/ci.yml", "kind": "workflow-job", "value": "docker-frontend" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "API_IMAGE" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "COMPOSE" },
+        { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "FRONTEND_IMAGE" }
+      ]
+    }
+  ]
+}
