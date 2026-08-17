@@ -41,15 +41,107 @@ DYNAMIC_IMPORT_PRIMITIVES = frozenset({"__import__", "import_module"})
 DUCKDB_IMPORT_PATH = "settlements/spatial_toolchain.py"
 
 
-def _constant_string(node: ast.AST) -> str | None:
+def _constant_string(
+    node: ast.AST, constants: dict[str, str] | None = None
+) -> str | None:
     if isinstance(node, ast.Constant) and type(node.value) is str:
         return node.value
+    if isinstance(node, ast.Name) and constants is not None:
+        return constants.get(node.id)
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        left = _constant_string(node.left)
-        right = _constant_string(node.right)
+        left = _constant_string(node.left, constants)
+        right = _constant_string(node.right, constants)
         if left is not None and right is not None:
             return left + right
+    if isinstance(node, ast.FormattedValue):
+        return _constant_string(node.value, constants)
+    if isinstance(node, ast.JoinedStr):
+        values = [_constant_string(value, constants) for value in node.values]
+        if all(value is not None for value in values):
+            return "".join(value for value in values if value is not None)
     return None
+
+
+class _ConstantStringResolver(ast.NodeVisitor):
+    def __init__(self) -> None:
+        self.values: dict[int, str] = {}
+        self._scopes: list[dict[str, str]] = [{}]
+
+    def visit(self, node: ast.AST) -> None:  # type: ignore[override]
+        value = _constant_string(node, self._scopes[-1])
+        if value is not None:
+            self.values[id(node)] = value
+        super().visit(node)
+
+    def _bind(self, target: ast.AST, value: str | None) -> None:
+        names = [
+            item.id
+            for item in ast.walk(target)
+            if isinstance(item, ast.Name) and isinstance(item.ctx, ast.Store)
+        ]
+        for name in names:
+            if value is not None and isinstance(target, ast.Name):
+                self._scopes[-1][name] = value
+            else:
+                self._scopes[-1].pop(name, None)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        self.visit(node.value)
+        value = _constant_string(node.value, self._scopes[-1])
+        for target in node.targets:
+            self.visit(target)
+            self._bind(target, value)
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        self.visit(node.annotation)
+        if node.value is not None:
+            self.visit(node.value)
+        self.visit(node.target)
+        self._bind(
+            node.target,
+            _constant_string(node.value, self._scopes[-1])
+            if node.value is not None
+            else None,
+        )
+
+    def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        self.visit(node.value)
+        self.visit(node.target)
+        self._bind(node.target, _constant_string(node.value, self._scopes[-1]))
+
+    def _visit_function(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for default in [*node.args.defaults, *node.args.kw_defaults]:
+            if default is not None:
+                self.visit(default)
+        self._scopes[-1].pop(node.name, None)
+        self._scopes.append(dict(self._scopes[-1]))
+        arguments = [
+            *node.args.posonlyargs,
+            *node.args.args,
+            *node.args.kwonlyargs,
+        ]
+        if node.args.vararg is not None:
+            arguments.append(node.args.vararg)
+        if node.args.kwarg is not None:
+            arguments.append(node.args.kwarg)
+        for argument in arguments:
+            self._scopes[-1].pop(argument.arg, None)
+        for statement in node.body:
+            self.visit(statement)
+        self._scopes.pop()
+
+    visit_FunctionDef = _visit_function
+    visit_AsyncFunctionDef = _visit_function
+
+
+def _resolved_constant_strings(tree: ast.AST) -> dict[int, str]:
+    resolver = _ConstantStringResolver()
+    resolver.visit(tree)
+    return resolver.values
 
 
 def _is_legacy_domain(value: str) -> bool:
@@ -71,13 +163,67 @@ def _is_allowlisted_duckdb_import(node: ast.Call, path: str) -> bool:
     )
 
 
+def _has_immutable_stdlib_importlib_binding(tree: ast.Module) -> bool:
+    exact_imports = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.Import)
+        and len(node.names) == 1
+        and node.names[0].name == "importlib"
+        and node.names[0].asname is None
+    ]
+    if len(exact_imports) != 1:
+        return False
+    exact_import = exact_imports[0]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                bound_name = alias.asname or alias.name.split(".")[0]
+                if bound_name == "importlib" and node is not exact_import:
+                    return False
+        elif isinstance(node, ast.ImportFrom):
+            if any(
+                alias.name == "*" or (alias.asname or alias.name) == "importlib"
+                for alias in node.names
+            ):
+                return False
+        elif (
+            isinstance(node, ast.Name)
+            and node.id == "importlib"
+            and isinstance(node.ctx, (ast.Store, ast.Del))
+        ):
+            return False
+        elif isinstance(node, ast.arg) and node.arg == "importlib":
+            return False
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if node.name == "importlib":
+                return False
+        elif isinstance(node, ast.ExceptHandler) and node.name == "importlib":
+            return False
+        elif (
+            type(node).__name__ in {"MatchAs", "MatchStar"}
+            and getattr(node, "name", None) == "importlib"
+        ):
+            return False
+    return True
+
+
 def _retained_import_violations(source: str, package: str, path: str) -> set[str]:
     tree = ast.parse(source)
     violations: set[str] = set()
-    allowlisted_dynamic_references = {
-        id(node.func)
+    resolved_constants = _resolved_constant_strings(tree)
+    duckdb_calls = [
+        node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and _is_allowlisted_duckdb_import(node, path)
+    ]
+    immutable_importlib = _has_immutable_stdlib_importlib_binding(tree)
+    if duckdb_calls and not immutable_importlib:
+        violations.add("dynamic-import:untrusted-importlib-binding")
+    allowlisted_dynamic_references = {
+        id(node.func)
+        for node in duckdb_calls
+        if immutable_importlib
     }
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -108,7 +254,7 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
         ):
             violations.add(f"dynamic-import:{node.attr}:{node.lineno}")
 
-        constant = _constant_string(node)
+        constant = resolved_constants.get(id(node))
         if constant is not None:
             if _is_legacy_domain(constant):
                 violations.add(constant)
@@ -501,6 +647,18 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
             'import importlib\nprimitive = "import_" + "module"\n'
             "importlib.__dict__[primitive](module_name)"
         ),
+        (
+            'import importlib\nprefix = "import_"\nsuffix = "module"\n'
+            "getattr(importlib, prefix + suffix)(module_name)"
+        ),
+        (
+            'import importlib\nprefix = "import_"\nsuffix = "module"\n'
+            'getattr(importlib, f"{prefix}{suffix}")(module_name)'
+        ),
+        (
+            'import importlib\nprefix = "import_"\nsuffix = "module"\n'
+            "importlib.__dict__[prefix + suffix](module_name)"
+        ),
     )
     for source in computed_callable_mutations:
         assert any(
@@ -509,6 +667,29 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
                 source,
                 "searise_pipeline.science",
                 "science/mutation.py",
+            )
+        )
+
+    untrusted_importlib_mutations = (
+        (
+            'import importlib\nimportlib = loader\nimportlib.import_module("duckdb")'
+        ),
+        (
+            "import importlib\n"
+            "def load(importlib):\n"
+            '    return importlib.import_module("duckdb")'
+        ),
+        (
+            "import importlib\nfrom proxy import *\n"
+            'importlib.import_module("duckdb")'
+        ),
+    )
+    for source in untrusted_importlib_mutations:
+        assert "dynamic-import:untrusted-importlib-binding" in (
+            _retained_import_violations(
+                source,
+                "searise_pipeline.settlements",
+                DUCKDB_IMPORT_PATH,
             )
         )
 
