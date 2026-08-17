@@ -77,6 +77,23 @@ describe("static output isolation", () => {
     },
   );
 
+  it.each([
+    "candidate-v7.tar",
+    "analysis/Candidate_v7.bin",
+    "local-data/phase-1/private.bin",
+    "archives/release.tar.gz",
+    "archives/release.tgz",
+    "archives/release.zip",
+  ])("rejects manifest-authorized private Candidate or archive output %s", (name) => {
+    const { dist, options, paths } = fixture();
+    const injected = resolve(dist, `releases/${RELEASE}/${name}`);
+    mkdirSync(resolve(injected, ".."), { recursive: true });
+    writeFileSync(injected, "PRIVATE SENTINEL");
+    options.releaseManifest.artifacts.push({ path: name });
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
+      .toThrow(/names a private Candidate or archive output/);
+  });
+
   it.each(["/assess", "/geocode", "/config", "https://runtime.invalid/config"])("rejects an allowlisted built asset requesting %s", (endpoint) => {
     const { dist, options, paths } = fixture();
     writeFileSync(resolve(dist, "assets/main-01234567.js"), `fetch(${JSON.stringify(endpoint)});\n//# sourceMappingURL=main-01234567.js.map\n`);

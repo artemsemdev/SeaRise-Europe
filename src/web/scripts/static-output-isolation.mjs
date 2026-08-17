@@ -10,6 +10,11 @@ const ROOT_OUTPUTS = Object.freeze([
   "build-report.json",
 ]);
 const SCANNED_EXTENSIONS = new Set([".html", ".js", ".css", ".map"]);
+const FORBIDDEN_STATIC_OUTPUT_PATHS = Object.freeze([
+  /(?:^|\/)candidate(?:[-_.]?v?\d+)?(?:[/.\-_]|$)/i,
+  /(?:^|\/)local-data(?:\/|$)/i,
+  /\.(?:7z|rar|tar|tar\.bz2|tar\.gz|tar\.xz|tgz|zip)$/i,
+]);
 const FORBIDDEN_RUNTIME_REFERENCES = Object.freeze([
   /candidate-v7/i,
   /local-data\/phase-1/i,
@@ -38,6 +43,14 @@ function safeRelativePath(value, label) {
     fail(`${label} is not a canonical relative output path`);
   }
   return value;
+}
+
+function safePublicReleaseArtifactPath(value, label) {
+  const path = safeRelativePath(value, label);
+  if (FORBIDDEN_STATIC_OUTPUT_PATHS.some((pattern) => pattern.test(path))) {
+    fail(`${label} names a private Candidate or archive output`);
+  }
+  return path;
 }
 
 function addViteEntryOutputs(expected, entry, label) {
@@ -108,7 +121,7 @@ export function validateStaticOutputIsolation({
     if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
       fail(`Release manifest artifact ${index} is not an object`);
     }
-    expected.add(`${releasePrefix}/${safeRelativePath(artifact.path, `Release manifest artifact ${index}`)}`);
+    expected.add(`${releasePrefix}/${safePublicReleaseArtifactPath(artifact.path, `Release manifest artifact ${index}`)}`);
   }
   const allowedReleaseConfigPaths = new Set(releaseManifest.artifacts
     .map(({ path }) => path)
