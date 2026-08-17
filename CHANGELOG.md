@@ -179,6 +179,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Corrected the test-retirement inventory so executable legacy frontend
+  Python tests cannot escape discovery, removal-bound suites point to explicit
+  stronger static-target evidence, and PostGIS/blob-seed changes route through
+  active legacy characterization gates before repository deletion.
+
 - Routed production geography, methodology, settlement-index, and exact COG
   reads through the verified resource router. Search shard bytes are verified
   and admitted on the main thread before transfer to the Web Worker, persistent
