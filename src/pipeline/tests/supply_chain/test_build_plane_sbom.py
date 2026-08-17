@@ -89,15 +89,19 @@ def _inventory() -> dict[str, Any]:
 
 
 def _copy_authority(destination: Path) -> Path:
-    document = _inventory()
-    for component in document["components"]:
-        for item in component["inputs"]:
-            target = destination / item["path"]
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(REPOSITORY_ROOT / item["path"], target)
-    inventory = destination / INVENTORY_LOGICAL
-    inventory.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(INVENTORY, inventory)
+    with materialize_historical_dependency_authority(
+        PROFILE,
+        repository_root=REPOSITORY_ROOT,
+    ) as (historical_root, historical_inventory):
+        document = json.loads(historical_inventory.read_bytes())
+        for component in document["components"]:
+            for item in component["inputs"]:
+                target = destination / item["path"]
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(historical_root / item["path"], target)
+        inventory = destination / INVENTORY_LOGICAL
+        inventory.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(historical_inventory, inventory)
     return inventory
 
 
@@ -431,7 +435,11 @@ def test_mutable_or_inconsistent_dockerfile_base_fails_closed(tmp_path: Path) ->
         generate_build_plane_sbom(inventory, repository_root=repository)
 
 
-def test_noncanonical_or_semantically_changed_artifact_fails_closed(tmp_path: Path) -> None:
+def test_noncanonical_or_semantically_changed_artifact_fails_closed(
+    tmp_path: Path,
+    historical_authority: tuple[Path, Path],
+) -> None:
+    historical_root, historical_inventory = historical_authority
     document = json.loads(ARTIFACT.read_bytes())
     noncanonical = tmp_path / "pretty.cdx.json"
     noncanonical.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
@@ -453,23 +461,27 @@ def test_noncanonical_or_semantically_changed_artifact_fails_closed(tmp_path: Pa
     with pytest.raises(SupplyChainContractError, match="differs from"):
         validate_build_plane_sbom(
             changed,
-            INVENTORY,
-            repository_root=REPOSITORY_ROOT,
+            historical_inventory,
+            repository_root=historical_root,
         )
 
 
-def test_publication_is_immutable(tmp_path: Path) -> None:
+def test_publication_is_immutable(
+    tmp_path: Path,
+    historical_authority: tuple[Path, Path],
+) -> None:
+    historical_root, historical_inventory = historical_authority
     output = tmp_path / "build-plane.cdx.json"
     document = publish_build_plane_sbom(
         output,
-        INVENTORY,
-        repository_root=REPOSITORY_ROOT,
+        historical_inventory,
+        repository_root=historical_root,
     )
 
     assert output.read_bytes() == ARTIFACT.read_bytes() == canonical_sbom_bytes(document)
     with pytest.raises(SupplyChainContractError, match="already exists"):
         publish_build_plane_sbom(
             output,
-            INVENTORY,
-            repository_root=REPOSITORY_ROOT,
+            historical_inventory,
+            repository_root=historical_root,
         )
