@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v2/application-receipt.schema.json",
+  "title": "SeaRise Europe repository-removal v2 application receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "receiptId", "preapprovalCommit", "decisionCommit", "appliedCommit", "appliedTree", "preapprovalSha256", "removalPlanSha256", "ownerDecisionSha256", "plannedStateSha256", "safety"],
+  "properties": {
+    "$schema": { "const": "./application-receipt.schema.json" },
+    "schemaVersion": { "const": "2.0.0" },
+    "receiptId": { "const": "phase-2-issue-72-removal-v2-application" },
+    "preapprovalCommit": { "$ref": "#/$defs/gitSha" },
+    "decisionCommit": { "$ref": "#/$defs/gitSha" },
+    "appliedCommit": { "$ref": "#/$defs/gitSha" },
+    "appliedTree": { "$ref": "#/$defs/gitSha" },
+    "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+    "removalPlanSha256": { "$ref": "#/$defs/sha256" },
+    "ownerDecisionSha256": { "$ref": "#/$defs/sha256" },
+    "plannedStateSha256": { "$ref": "#/$defs/sha256" },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateV7BytesUsed", "tarBytesUsed", "publicationAuthorized", "externalResourceMutationAuthorized"],
+      "properties": {
+        "candidateV7BytesUsed": { "const": false },
+        "tarBytesUsed": { "const": false },
+        "publicationAuthorized": { "const": false },
+        "externalResourceMutationAuthorized": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

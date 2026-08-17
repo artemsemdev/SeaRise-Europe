@@ -35,6 +35,7 @@ CONTRACT_DIRECTORY = "contracts/repository-removal/v2"
 PLAN_PATH = f"{CONTRACT_DIRECTORY}/removal-plan.json"
 PREAPPROVAL_PATH = f"{CONTRACT_DIRECTORY}/preapproval.json"
 DECISION_PATH = f"{CONTRACT_DIRECTORY}/owner-decision.json"
+RECEIPT_PATH = f"{CONTRACT_DIRECTORY}/application-receipt.json"
 EXPECTED_TRUST_ROOTS = {
     "v1Census": "contracts/repository-removal/v1/census.json",
     "v1CensusSchema": "contracts/repository-removal/v1/census.schema.json",
@@ -50,6 +51,7 @@ EXPECTED_TRUST_ROOTS = {
     "v1OwnerDecisionSchema": "contracts/repository-removal/v1/owner-decision.schema.json",
     "v1Validator": "scripts/repository/validate_removal_approval.py",
     "v2OwnerDecisionSchema": f"{CONTRACT_DIRECTORY}/owner-decision.schema.json",
+    "v2ApplicationReceiptSchema": f"{CONTRACT_DIRECTORY}/application-receipt.schema.json",
     "v2PlanSchema": f"{CONTRACT_DIRECTORY}/removal-plan.schema.json",
     "v2PreapprovalSchema": f"{CONTRACT_DIRECTORY}/preapproval.schema.json",
     "v2Validator": "scripts/repository/validate_removal_plan_v2.py",
@@ -877,6 +879,7 @@ def _assert_checkout_matches_commit(root: Path, commit: str, paths: set[str]) ->
 
 def validate_framework(root: Path) -> None:
     for relative_path in (
+        "contracts/repository-removal/v2/application-receipt.schema.json",
         "contracts/repository-removal/v2/removal-plan.schema.json",
         "contracts/repository-removal/v2/preapproval.schema.json",
         "contracts/repository-removal/v2/owner-decision.schema.json",
@@ -889,11 +892,28 @@ def validate_framework(root: Path) -> None:
 
 
 def validate_preapproval_commit(
-    root: Path, preapproval_commit: str, *, checkout_commit: str | None = None
+    root: Path,
+    base_commit: str,
+    preapproval_commit: str,
+    *,
+    checkout_commit: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], bytes, bytes, set[str]]:
+    _assert_commit(root, base_commit)
     _assert_commit(root, preapproval_commit)
+    if _base_commit_from_preapproval(root, preapproval_commit) != base_commit:
+        raise PlanError("plan auditedCommit does not equal repository base B")
+    _assert_ancestor(root, base_commit, preapproval_commit)
+    _assert_exact_changed_paths(
+        root,
+        base_commit,
+        preapproval_commit,
+        {PLAN_PATH, PREAPPROVAL_PATH},
+        "B-to-P",
+    )
     if _optional_tree_entry(root, preapproval_commit, DECISION_PATH) is not None:
         raise PlanError("owner decision must be absent at preapproval commit P")
+    if _optional_tree_entry(root, preapproval_commit, RECEIPT_PATH) is not None:
+        raise PlanError("application receipt must be absent at preapproval commit P")
     _, _, plan_bytes = _regular_blob(root, preapproval_commit, PLAN_PATH)
     _, _, preapproval_bytes = _regular_blob(root, preapproval_commit, PREAPPROVAL_PATH)
     plan = _json_load_bytes(plan_bytes, "removal plan")
@@ -912,6 +932,8 @@ def validate_preapproval_commit(
         _json_load_bytes(preapproval_schema_bytes, "preapproval schema"),
         "preapproval",
     )
+    if plan["auditedCommit"] != base_commit:
+        raise PlanError("plan auditedCommit does not equal repository base B")
     if preapproval["trustRoots"] != EXPECTED_TRUST_ROOTS:
         raise PlanError(
             "preapproval trustRoots do not equal the exact required mapping"
@@ -919,6 +941,10 @@ def validate_preapproval_commit(
     if set(preapproval["trustRootSha256"]) != set(EXPECTED_TRUST_ROOTS):
         raise PlanError("preapproval trustRootSha256 names are not exact")
     for name, path in EXPECTED_TRUST_ROOTS.items():
+        if _tree_entry(root, base_commit, path) != _tree_entry(
+            root, preapproval_commit, path
+        ):
+            raise PlanError(f"trust root changed across B-to-P: {name}")
         _, _, content = _regular_blob(root, preapproval_commit, path)
         if _sha256(content) != preapproval["trustRootSha256"][name]:
             raise PlanError(f"preapproval trust root hash mismatch: {name}")
@@ -928,6 +954,22 @@ def validate_preapproval_commit(
         raise PlanError("preapproval audited tree does not match plan")
     if preapproval["removalPlanSha256"] != _sha256(plan_bytes):
         raise PlanError("preapproval removal plan hash mismatch")
+    protected = {
+        PLAN_PATH,
+        PREAPPROVAL_PATH,
+        DECISION_PATH,
+        RECEIPT_PATH,
+        *EXPECTED_TRUST_ROOTS.values(),
+    }
+    planned_paths = {entry["path"] for entry in plan["entries"]}
+    overlap = sorted(planned_paths & protected)
+    if overlap:
+        raise PlanError(f"planned paths overlap lifecycle authority: {overlap}")
+    for path in sorted(planned_paths):
+        if _optional_tree_entry(root, base_commit, path) != _optional_tree_entry(
+            root, preapproval_commit, path
+        ):
+            raise PlanError(f"planned source changed across B-to-P: {path}")
     materialize_plan(root, plan)
     authority_paths = {PLAN_PATH, PREAPPROVAL_PATH, *EXPECTED_TRUST_ROOTS.values()}
     if checkout_commit is not None:
@@ -950,6 +992,15 @@ def expected_owner_approval_text(
     return template.replace("<PREAPPROVAL_COMMIT>", preapproval_commit).replace(
         "<PREAPPROVAL_SHA256>", preapproval_sha256
     )
+
+
+def _base_commit_from_preapproval(root: Path, preapproval_commit: str) -> str:
+    _, _, plan_bytes = _regular_blob(root, preapproval_commit, PLAN_PATH)
+    plan = _json_load_bytes(plan_bytes, "removal plan")
+    base_commit = plan.get("auditedCommit")
+    if not isinstance(base_commit, str):
+        raise PlanError("removal plan does not identify repository base B")
+    return base_commit
 
 
 def _verify_owner_comment(decision: dict[str, Any], expected_text: str) -> None:
@@ -1005,9 +1056,19 @@ def validate_decision_commit(
     _assert_exact_changed_paths(
         root, preapproval_commit, decision_commit, {DECISION_PATH}, "P-to-D"
     )
+    if (
+        _derive_unique_addition_commit(
+            root, preapproval_commit, decision_commit, DECISION_PATH, "owner decision"
+        )
+        != decision_commit
+    ):
+        raise PlanError("D is not the unique owner-decision addition commit")
     plan, preapproval, plan_bytes, preapproval_bytes, authority_paths = (
         validate_preapproval_commit(
-            root, preapproval_commit, checkout_commit=checkout_commit or decision_commit
+            root,
+            _base_commit_from_preapproval(root, preapproval_commit),
+            preapproval_commit,
+            checkout_commit=checkout_commit or decision_commit,
         )
     )
     _assert_authorities_unchanged(
@@ -1045,6 +1106,63 @@ def validate_decision_commit(
     return plan, decision, authority_paths
 
 
+def _validate_applied_tree(
+    root: Path, plan: dict[str, Any], applied_commit: str
+) -> None:
+    materialized = materialize_plan(root, plan)
+    entries = {entry["path"]: entry for entry in plan["entries"]}
+    for path, expected_bytes in materialized.items():
+        observed = _optional_tree_entry(root, applied_commit, path)
+        if expected_bytes is None:
+            if observed is not None:
+                raise PlanError(f"planned absent path still has a Git entry: {path}")
+            continue
+        if observed is None:
+            raise PlanError(f"planned present path is absent: {path}")
+        mode, object_type, object_id = observed
+        expected = entries[path]["after"]
+        if object_type != "blob" or mode != expected["mode"]:
+            raise PlanError(f"planned present path has wrong type or mode: {path}")
+        content = _git(root, "cat-file", "blob", object_id)
+        if (
+            object_id != expected["gitBlobSha"]
+            or _sha256(content) != expected["sha256"]
+            or content != expected_bytes
+        ):
+            raise PlanError(f"applied bytes do not match exact plan: {path}")
+
+
+def _planned_state_sha256(root: Path, plan: dict[str, Any], commit: str) -> str:
+    state: list[dict[str, str]] = []
+    for path in sorted(entry["path"] for entry in plan["entries"]):
+        observed = _optional_tree_entry(root, commit, path)
+        if observed is None:
+            state.append({"path": path, "state": "absent"})
+        else:
+            mode, object_type, object_id = observed
+            state.append(
+                {
+                    "path": path,
+                    "state": "present",
+                    "mode": mode,
+                    "type": object_type,
+                    "objectId": object_id,
+                }
+            )
+    payload = json.dumps(state, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return _sha256(payload)
+
+
+def _assert_planned_state_unchanged(
+    root: Path, plan: dict[str, Any], applied_commit: str, later_commit: str
+) -> None:
+    for path in sorted(entry["path"] for entry in plan["entries"]):
+        if _optional_tree_entry(root, applied_commit, path) != _optional_tree_entry(
+            root, later_commit, path
+        ):
+            raise PlanError(f"planned post-state changed after A: {path}")
+
+
 def validate_applied_commit(
     root: Path,
     preapproval_commit: str,
@@ -1069,34 +1187,185 @@ def validate_applied_commit(
         root, applied_commit, DECISION_PATH
     ):
         raise PlanError("owner decision changed after D")
-    materialized = materialize_plan(root, plan)
     _assert_exact_changed_paths(
         root,
         decision_commit,
         applied_commit,
-        set(materialized),
+        {entry["path"] for entry in plan["entries"]},
         "D-to-A",
     )
-    entries = {entry["path"]: entry for entry in plan["entries"]}
-    for path, expected_bytes in materialized.items():
-        observed = _optional_tree_entry(root, applied_commit, path)
-        if expected_bytes is None:
-            if observed is not None:
-                raise PlanError(f"planned absent path still has a Git entry: {path}")
+    _validate_applied_tree(root, plan, applied_commit)
+    if (
+        _derive_applied_commit(root, decision_commit, applied_commit, plan)
+        != applied_commit
+    ):
+        raise PlanError("A is not the earliest exact applied commit")
+
+
+def _commits_between(root: Path, start: str, head: str) -> list[str]:
+    return [
+        line
+        for line in _git(root, "rev-list", "--reverse", f"{start}..{head}")
+        .decode("ascii")
+        .splitlines()
+        if line
+    ]
+
+
+def _parents(root: Path, commit: str) -> list[str]:
+    fields = _git(root, "rev-list", "--parents", "-n", "1", commit).decode().split()
+    return fields[1:]
+
+
+def _derive_unique_addition_commit(
+    root: Path, start: str, head: str, path: str, label: str
+) -> str:
+    candidates: list[str] = []
+    for commit in _commits_between(root, start, head):
+        if _optional_tree_entry(root, commit, path) is None:
             continue
-        if observed is None:
-            raise PlanError(f"planned present path is absent: {path}")
-        mode, object_type, object_id = observed
-        expected = entries[path]["after"]
-        if object_type != "blob" or mode != expected["mode"]:
-            raise PlanError(f"planned present path has wrong type or mode: {path}")
-        content = _git(root, "cat-file", "blob", object_id)
-        if (
-            object_id != expected["gitBlobSha"]
-            or _sha256(content) != expected["sha256"]
-            or content != expected_bytes
+        parents = _parents(root, commit)
+        if parents and all(
+            _optional_tree_entry(root, parent, path) is None for parent in parents
         ):
-            raise PlanError(f"applied bytes do not match exact plan: {path}")
+            candidates.append(commit)
+    if len(candidates) != 1:
+        raise PlanError(f"{label} addition commit is not unique: {candidates}")
+    return candidates[0]
+
+
+def _is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
+    process = subprocess.run(
+        [
+            "git",
+            "--no-replace-objects",
+            "merge-base",
+            "--is-ancestor",
+            ancestor,
+            descendant,
+        ],
+        cwd=root,
+        capture_output=True,
+        env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1", "GIT_NO_LAZY_FETCH": "1"},
+        check=False,
+    )
+    return process.returncode == 0
+
+
+def _derive_applied_commit(
+    root: Path, decision_commit: str, head: str, plan: dict[str, Any]
+) -> str | None:
+    expected_paths = {entry["path"] for entry in plan["entries"]}
+    candidates: list[str] = []
+    for commit in _commits_between(root, decision_commit, head):
+        if _changed_paths(root, decision_commit, commit) != expected_paths:
+            continue
+        try:
+            _validate_applied_tree(root, plan, commit)
+        except PlanError:
+            continue
+        candidates.append(commit)
+    earliest = [
+        candidate
+        for candidate in candidates
+        if not any(
+            other != candidate and _is_ancestor(root, other, candidate)
+            for other in candidates
+        )
+    ]
+    if not candidates:
+        return None
+    if len(earliest) != 1:
+        raise PlanError(f"applied commit A is not unique: {earliest}")
+    return earliest[0]
+
+
+def validate_application_receipt(
+    root: Path,
+    receipt_commit: str,
+    head_commit: str,
+    *,
+    verify_owner_comment: bool,
+) -> None:
+    _assert_commit(root, receipt_commit)
+    _assert_commit(root, head_commit)
+    _, _, receipt_bytes = _regular_blob(root, receipt_commit, RECEIPT_PATH)
+    receipt = _json_load_bytes(receipt_bytes, "application receipt")
+    preapproval_commit = receipt["preapprovalCommit"]
+    decision_commit = receipt["decisionCommit"]
+    applied_commit = receipt["appliedCommit"]
+    _assert_ancestor(root, preapproval_commit, decision_commit)
+    _assert_ancestor(root, decision_commit, applied_commit)
+    _assert_ancestor(root, applied_commit, receipt_commit)
+    _assert_ancestor(root, receipt_commit, head_commit)
+    plan, _, plan_bytes, preapproval_bytes, authority_paths = (
+        validate_preapproval_commit(
+            root,
+            _base_commit_from_preapproval(root, preapproval_commit),
+            preapproval_commit,
+            checkout_commit=head_commit,
+        )
+    )
+    _, _, receipt_schema_bytes = _regular_blob(
+        root,
+        preapproval_commit,
+        EXPECTED_TRUST_ROOTS["v2ApplicationReceiptSchema"],
+    )
+    _schema_validate_document(
+        receipt,
+        _json_load_bytes(receipt_schema_bytes, "application receipt schema"),
+        "application receipt",
+    )
+    validate_applied_commit(
+        root,
+        preapproval_commit,
+        decision_commit,
+        applied_commit,
+        verify_owner_comment=verify_owner_comment,
+    )
+    if _optional_tree_entry(root, applied_commit, RECEIPT_PATH) is not None:
+        raise PlanError("application receipt must be absent at A")
+    if (
+        _derive_unique_addition_commit(
+            root, applied_commit, receipt_commit, RECEIPT_PATH, "application receipt"
+        )
+        != receipt_commit
+    ):
+        raise PlanError("R is not the unique application-receipt addition commit")
+    _assert_exact_changed_paths(
+        root, applied_commit, receipt_commit, {RECEIPT_PATH}, "A-to-R"
+    )
+    _, _, decision_bytes = _regular_blob(root, decision_commit, DECISION_PATH)
+    expected = {
+        "preapprovalCommit": preapproval_commit,
+        "decisionCommit": decision_commit,
+        "appliedCommit": applied_commit,
+        "appliedTree": _git(root, "rev-parse", f"{applied_commit}^{{tree}}")
+        .decode()
+        .strip(),
+        "preapprovalSha256": _sha256(preapproval_bytes),
+        "removalPlanSha256": _sha256(plan_bytes),
+        "ownerDecisionSha256": _sha256(decision_bytes),
+        "plannedStateSha256": _planned_state_sha256(root, plan, applied_commit),
+    }
+    for field, value in expected.items():
+        if receipt[field] != value:
+            raise PlanError(f"application receipt {field} does not match P/D/A history")
+    _assert_authorities_unchanged(
+        root, preapproval_commit, receipt_commit, authority_paths
+    )
+    _assert_authorities_unchanged(
+        root, preapproval_commit, head_commit, authority_paths
+    )
+    if _tree_entry(root, decision_commit, DECISION_PATH) != _tree_entry(
+        root, head_commit, DECISION_PATH
+    ):
+        raise PlanError("owner decision changed after D")
+    if _tree_entry(root, receipt_commit, RECEIPT_PATH) != _tree_entry(
+        root, head_commit, RECEIPT_PATH
+    ):
+        raise PlanError("application receipt changed after R")
+    _assert_planned_state_unchanged(root, plan, applied_commit, head_commit)
 
 
 def validate_ci_state(
@@ -1108,16 +1377,21 @@ def validate_ci_state(
 ) -> None:
     states = {
         path: _optional_tree_entry(root, applied_commit, path) is not None
-        for path in (PLAN_PATH, PREAPPROVAL_PATH, DECISION_PATH)
+        for path in (PLAN_PATH, PREAPPROVAL_PATH, DECISION_PATH, RECEIPT_PATH)
     }
     if not any(states.values()):
         validate_framework(root)
         return
     if not states[PLAN_PATH] or not states[PREAPPROVAL_PATH]:
         raise PlanError("repository-removal v2 artifacts are in a partial state")
+    if states[RECEIPT_PATH] and not states[DECISION_PATH]:
+        raise PlanError("application receipt exists without owner decision")
     if not states[DECISION_PATH]:
         validate_preapproval_commit(
-            root, applied_commit, checkout_commit=applied_commit
+            root,
+            execution_base,
+            applied_commit,
+            checkout_commit=applied_commit,
         )
         return
     _, _, decision_bytes = _regular_blob(root, applied_commit, DECISION_PATH)
@@ -1125,22 +1399,54 @@ def validate_ci_state(
     preapproval_commit = decision.get("preapprovalCommit")
     if not isinstance(preapproval_commit, str):
         raise PlanError("owner decision does not identify preapproval commit P")
-    if _optional_tree_entry(root, execution_base, DECISION_PATH) is None:
-        validate_decision_commit(
+    if states[RECEIPT_PATH]:
+        _, _, receipt_bytes = _regular_blob(root, applied_commit, RECEIPT_PATH)
+        receipt = _json_load_bytes(receipt_bytes, "application receipt")
+        named_applied = receipt.get("appliedCommit")
+        if not isinstance(named_applied, str):
+            raise PlanError("application receipt does not identify applied commit A")
+        receipt_commit = _derive_unique_addition_commit(
+            root, named_applied, applied_commit, RECEIPT_PATH, "application receipt"
+        )
+        validate_application_receipt(
             root,
-            preapproval_commit,
+            receipt_commit,
             applied_commit,
             verify_owner_comment=verify_owner_comment,
-            checkout_commit=applied_commit,
         )
-    else:
-        validate_applied_commit(
-            root,
-            preapproval_commit,
-            execution_base,
-            applied_commit,
-            verify_owner_comment=verify_owner_comment,
-        )
+        return
+    decision_commit = _derive_unique_addition_commit(
+        root, preapproval_commit, applied_commit, DECISION_PATH, "owner decision"
+    )
+    plan, _, authority_paths = validate_decision_commit(
+        root,
+        preapproval_commit,
+        decision_commit,
+        verify_owner_comment=verify_owner_comment,
+        checkout_commit=applied_commit,
+    )
+    derived_applied = _derive_applied_commit(
+        root, decision_commit, applied_commit, plan
+    )
+    if derived_applied is None:
+        _assert_planned_state_unchanged(root, plan, decision_commit, applied_commit)
+        return
+    validate_applied_commit(
+        root,
+        preapproval_commit,
+        decision_commit,
+        derived_applied,
+        verify_owner_comment=verify_owner_comment,
+    )
+    _assert_ancestor(root, derived_applied, applied_commit)
+    _assert_authorities_unchanged(
+        root, preapproval_commit, applied_commit, authority_paths
+    )
+    if _tree_entry(root, decision_commit, DECISION_PATH) != _tree_entry(
+        root, applied_commit, DECISION_PATH
+    ):
+        raise PlanError("owner decision changed after D")
+    _assert_planned_state_unchanged(root, plan, derived_applied, applied_commit)
 
 
 def _add_commit_argument(parser: argparse.ArgumentParser, name: str) -> None:
@@ -1155,6 +1461,7 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("framework")
     preapproval = subparsers.add_parser("preapproval")
+    _add_commit_argument(preapproval, "--base-commit")
     _add_commit_argument(preapproval, "--preapproval-commit")
     decision = subparsers.add_parser("decision")
     _add_commit_argument(decision, "--preapproval-commit")
@@ -1165,6 +1472,10 @@ def main() -> int:
     _add_commit_argument(applied, "--decision-commit")
     _add_commit_argument(applied, "--applied-commit")
     applied.add_argument("--verify-owner-comment", action="store_true")
+    post = subparsers.add_parser("post-application")
+    _add_commit_argument(post, "--receipt-commit")
+    _add_commit_argument(post, "--head-commit")
+    post.add_argument("--verify-owner-comment", action="store_true")
     ci = subparsers.add_parser("ci")
     _add_commit_argument(ci, "--execution-base")
     _add_commit_argument(ci, "--applied-commit")
@@ -1180,6 +1491,7 @@ def main() -> int:
         elif arguments.command == "preapproval":
             validate_preapproval_commit(
                 root,
+                arguments.base_commit,
                 arguments.preapproval_commit,
                 checkout_commit=arguments.preapproval_commit,
             )
@@ -1196,6 +1508,13 @@ def main() -> int:
                 arguments.preapproval_commit,
                 arguments.decision_commit,
                 arguments.applied_commit,
+                verify_owner_comment=arguments.verify_owner_comment,
+            )
+        elif arguments.command == "post-application":
+            validate_application_receipt(
+                root,
+                arguments.receipt_commit,
+                arguments.head_commit,
                 verify_owner_comment=arguments.verify_owner_comment,
             )
         elif arguments.command == "ci":

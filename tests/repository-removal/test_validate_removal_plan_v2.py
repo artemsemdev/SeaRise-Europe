@@ -14,13 +14,17 @@ from scripts.repository.validate_removal_plan_v2 import (
     EXPECTED_TRUST_ROOTS,
     PLAN_PATH,
     PREAPPROVAL_PATH,
+    RECEIPT_PATH,
     PlanError,
     _json_load_bytes,
+    _planned_state_sha256,
     _schema_validate_document,
     _sha256,
     _static_profile_activation,
     materialize_plan,
+    validate_application_receipt,
     validate_applied_commit,
+    validate_ci_state,
     validate_decision_commit,
     validate_framework,
     validate_preapproval_commit,
@@ -56,6 +60,10 @@ def _blob(repo: Path, commit: str, path: str) -> str:
     return _run(repo, "rev-parse", f"{commit}:{path}")
 
 
+def _base(repo: Path, preapproval: str) -> str:
+    return _run(repo, "rev-parse", f"{preapproval}~1")
+
+
 def _lifecycle(tmp_path: Path) -> tuple[Path, str, str, str]:
     repo = tmp_path / "repository"
     repo.mkdir()
@@ -66,6 +74,7 @@ def _lifecycle(tmp_path: Path) -> tuple[Path, str, str, str]:
     for relative_path in sorted(set(EXPECTED_TRUST_ROOTS.values())):
         _write(repo, relative_path, (ROOT / relative_path).read_bytes())
     _write(repo, "retire.txt", b"legacy runtime\n")
+    _write(repo, "unrelated-base.txt", b"must survive preapproval\n")
     base = _commit(repo, "base")
     tree = _run(repo, "rev-parse", f"{base}^{{tree}}")
 
@@ -154,14 +163,63 @@ def _lifecycle(tmp_path: Path) -> tuple[Path, str, str, str]:
     return repo, preapproval_commit, decision_commit, applied_commit
 
 
+def _add_receipt(repo: Path, preapproval: str, decision: str, applied: str) -> str:
+    plan_bytes = subprocess.run(
+        ["git", "show", f"{preapproval}:{PLAN_PATH}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    ).stdout
+    preapproval_bytes = subprocess.run(
+        ["git", "show", f"{preapproval}:{PREAPPROVAL_PATH}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    ).stdout
+    decision_bytes = subprocess.run(
+        ["git", "show", f"{decision}:{DECISION_PATH}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    ).stdout
+    plan = _json_load_bytes(plan_bytes, "plan")
+    receipt = {
+        "$schema": "./application-receipt.schema.json",
+        "schemaVersion": "2.0.0",
+        "receiptId": "phase-2-issue-72-removal-v2-application",
+        "preapprovalCommit": preapproval,
+        "decisionCommit": decision,
+        "appliedCommit": applied,
+        "appliedTree": _run(repo, "rev-parse", f"{applied}^{{tree}}"),
+        "preapprovalSha256": _sha256(preapproval_bytes),
+        "removalPlanSha256": _sha256(plan_bytes),
+        "ownerDecisionSha256": _sha256(decision_bytes),
+        "plannedStateSha256": _planned_state_sha256(repo, plan, applied),
+        "safety": {
+            "candidateV7BytesUsed": False,
+            "tarBytesUsed": False,
+            "publicationAuthorized": False,
+            "externalResourceMutationAuthorized": False,
+        },
+    }
+    _write(repo, RECEIPT_PATH, (json.dumps(receipt, indent=2) + "\n").encode())
+    return _commit(repo, "application receipt")
+
+
 def test_framework_contains_schemas_but_no_concrete_authority() -> None:
     validate_framework(ROOT)
     assert (V2 / "removal-plan.schema.json").is_file()
     assert (V2 / "preapproval.schema.json").is_file()
     assert (V2 / "owner-decision.schema.json").is_file()
+    assert (V2 / "application-receipt.schema.json").is_file()
+    assert (
+        EXPECTED_TRUST_ROOTS["v2ApplicationReceiptSchema"]
+        == "contracts/repository-removal/v2/application-receipt.schema.json"
+    )
     assert not (V2 / "removal-plan.json").exists()
     assert not (V2 / "preapproval.json").exists()
     assert not (V2 / "owner-decision.json").exists()
+    assert not (V2 / "application-receipt.json").exists()
 
 
 @pytest.mark.parametrize(
@@ -183,7 +241,9 @@ def test_real_git_preapproval_decision_applied_lifecycle(
     repo, preapproval, decision, applied = _lifecycle(tmp_path)
     monkeypatch.setattr(validator, "_verify_owner_comment", lambda *_: None)
 
-    validate_preapproval_commit(repo, preapproval, checkout_commit=applied)
+    validate_preapproval_commit(
+        repo, _base(repo, preapproval), preapproval, checkout_commit=applied
+    )
     validate_decision_commit(
         repo,
         preapproval,
@@ -198,6 +258,67 @@ def test_real_git_preapproval_decision_applied_lifecycle(
         applied,
         verify_owner_comment=True,
     )
+
+
+def test_ci_derives_immediate_and_aggregate_applied_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, preapproval, _, applied = _lifecycle(tmp_path)
+    base = _base(repo, preapproval)
+    monkeypatch.setattr(validator, "_verify_owner_comment", lambda *_: None)
+
+    validate_ci_state(repo, base, applied, verify_owner_comment=True)
+    _write(repo, "unrelated.txt", b"later integration work\n")
+    aggregate_head = _commit(repo, "unrelated integration work")
+    validate_ci_state(repo, base, aggregate_head, verify_owner_comment=True)
+    validate_ci_state(repo, aggregate_head, aggregate_head, verify_owner_comment=True)
+
+
+def test_ci_preapproval_state_binds_exact_execution_base(tmp_path: Path) -> None:
+    repo, preapproval, _, _ = _lifecycle(tmp_path)
+    base = _base(repo, preapproval)
+    _run(repo, "reset", "--hard", preapproval)
+    validate_ci_state(repo, base, preapproval, verify_owner_comment=False)
+    with pytest.raises(PlanError, match="plan auditedCommit does not equal"):
+        validate_ci_state(repo, preapproval, preapproval, verify_owner_comment=False)
+
+
+def test_application_receipt_and_future_unrelated_pr_remain_valid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, preapproval, decision, applied = _lifecycle(tmp_path)
+    monkeypatch.setattr(validator, "_verify_owner_comment", lambda *_: None)
+    receipt = _add_receipt(repo, preapproval, decision, applied)
+
+    validate_application_receipt(repo, receipt, receipt, verify_owner_comment=True)
+    validate_ci_state(repo, applied, receipt, verify_owner_comment=True)
+    _write(repo, "future.txt", b"unrelated future PR\n")
+    future_head = _commit(repo, "future unrelated work")
+    validate_application_receipt(repo, receipt, future_head, verify_owner_comment=True)
+    validate_ci_state(repo, receipt, future_head, verify_owner_comment=True)
+
+
+def test_post_receipt_rejects_planned_state_or_receipt_tampering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, preapproval, decision, applied = _lifecycle(tmp_path)
+    monkeypatch.setattr(validator, "_verify_owner_comment", lambda *_: None)
+    receipt = _add_receipt(repo, preapproval, decision, applied)
+    _write(repo, "retire.txt", b"resurrected\n")
+    tampered_state = _commit(repo, "tamper planned post-state")
+    with pytest.raises(PlanError, match="planned post-state changed"):
+        validate_application_receipt(
+            repo, receipt, tampered_state, verify_owner_comment=True
+        )
+
+    _run(repo, "reset", "--hard", receipt)
+    path = repo / RECEIPT_PATH
+    path.write_bytes(path.read_bytes() + b"\n")
+    tampered_receipt = _commit(repo, "tamper receipt")
+    with pytest.raises(PlanError, match="application receipt changed"):
+        validate_application_receipt(
+            repo, receipt, tampered_receipt, verify_owner_comment=True
+        )
 
 
 def test_preapproval_and_execution_base_cannot_be_conflated(
@@ -216,6 +337,95 @@ def test_preapproval_and_execution_base_cannot_be_conflated(
             applied,
             verify_owner_comment=True,
         )
+
+
+@pytest.mark.parametrize(
+    ("target", "action"),
+    [
+        ("retire.txt", "delete"),
+        ("retire.txt", "mutate"),
+        ("unrelated-base.txt", "delete"),
+    ],
+)
+def test_b_to_p_rejects_planned_or_unrelated_early_deletion(
+    tmp_path: Path, target: str, action: str
+) -> None:
+    repo, preapproval, _, _ = _lifecycle(tmp_path)
+    base = _base(repo, preapproval)
+    plan_bytes = subprocess.run(
+        ["git", "show", f"{preapproval}:{PLAN_PATH}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    ).stdout
+    preapproval_bytes = subprocess.run(
+        ["git", "show", f"{preapproval}:{PREAPPROVAL_PATH}"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    ).stdout
+    _run(repo, "reset", "--hard", base)
+    _write(repo, PLAN_PATH, plan_bytes)
+    _write(repo, PREAPPROVAL_PATH, preapproval_bytes)
+    if action == "delete":
+        (repo / target).unlink()
+    else:
+        _write(repo, target, b"mutated before approval\n")
+    malicious = _commit(repo, f"{action} {target} before approval")
+    with pytest.raises(PlanError, match="B-to-P changed-path set differs"):
+        validate_preapproval_commit(repo, base, malicious)
+
+
+def test_b_to_p_rejects_nonancestor_and_annotated_tag_objects(tmp_path: Path) -> None:
+    repo, preapproval, _, _ = _lifecycle(tmp_path)
+    base = _base(repo, preapproval)
+    unrelated = _run(
+        repo,
+        "commit-tree",
+        _run(repo, "rev-parse", f"{base}^{{tree}}"),
+        "-m",
+        "unrelated base",
+    )
+    plan = _json_load_bytes(
+        subprocess.run(
+            ["git", "show", f"{preapproval}:{PLAN_PATH}"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        ).stdout,
+        "plan",
+    )
+    preapproval_document = _json_load_bytes(
+        subprocess.run(
+            ["git", "show", f"{preapproval}:{PREAPPROVAL_PATH}"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+        ).stdout,
+        "preapproval",
+    )
+    unrelated_tree = _run(repo, "rev-parse", f"{unrelated}^{{tree}}")
+    plan["auditedCommit"] = unrelated
+    plan["auditedTree"] = unrelated_tree
+    plan_bytes = (json.dumps(plan, indent=2) + "\n").encode()
+    preapproval_document["auditedCommit"] = unrelated
+    preapproval_document["auditedTree"] = unrelated_tree
+    preapproval_document["removalPlanSha256"] = _sha256(plan_bytes)
+    _run(repo, "reset", "--hard", base)
+    _write(repo, PLAN_PATH, plan_bytes)
+    _write(
+        repo,
+        PREAPPROVAL_PATH,
+        (json.dumps(preapproval_document, indent=2) + "\n").encode(),
+    )
+    nonancestor_preapproval = _commit(repo, "nonancestor preapproval")
+    with pytest.raises(PlanError, match="required Git ancestry is absent"):
+        validate_preapproval_commit(repo, unrelated, nonancestor_preapproval)
+
+    _run(repo, "tag", "-a", "annotated-base", base, "-m", "annotated base")
+    tag_object = _run(repo, "rev-parse", "refs/tags/annotated-base")
+    with pytest.raises(PlanError, match="exact 40-character object id"):
+        validate_preapproval_commit(repo, tag_object, preapproval)
 
 
 def test_applied_diff_rejects_extra_path(
@@ -293,7 +503,9 @@ def test_exact_trust_root_mapping_rejects_missing_name(tmp_path: Path) -> None:
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     corrupt = _commit(repo, "remove required trust root")
     with pytest.raises(PlanError, match="exact required mapping"):
-        validate_preapproval_commit(repo, corrupt, checkout_commit=corrupt)
+        validate_preapproval_commit(
+            repo, _base(repo, preapproval), corrupt, checkout_commit=corrupt
+        )
 
 
 def test_decision_symlink_is_not_a_signed_json_blob(tmp_path: Path) -> None:
@@ -327,7 +539,7 @@ def test_git_replace_ref_cannot_change_committed_preapproval(tmp_path: Path) -> 
     repo, preapproval, _, _ = _lifecycle(tmp_path)
     base = _run(repo, "rev-parse", f"{preapproval}~1")
     _run(repo, "replace", preapproval, base)
-    validate_preapproval_commit(repo, preapproval)
+    validate_preapproval_commit(repo, base, preapproval)
 
 
 def test_plan_rejects_protected_v1_and_path_ancestry_collisions(
@@ -401,7 +613,7 @@ def _activation_operation(workflow: bytes) -> dict:
         ],
         "componentId": "github-actions",
         "inputPath": ".github/workflows/ci.yml",
-        "fromSha256": "6129f323d1c6bc52837936e89a437cae42213fa8f76bd9e3d5ee3d2756757d18",
+        "fromSha256": "6ce17942de5f0535c249a4b799fa58acda87e3d0c831b6b2d8c2f7a2eb256af0",
         "toSha256": hashlib.sha256(workflow).hexdigest(),
     }
 
@@ -464,7 +676,9 @@ def test_candidate_and_tar_paths_are_never_read(
         return original(path)
 
     monkeypatch.setattr(Path, "read_bytes", guarded_read)
-    validate_preapproval_commit(repo, preapproval, checkout_commit=preapproval)
+    validate_preapproval_commit(
+        repo, _base(repo, preapproval), preapproval, checkout_commit=preapproval
+    )
     lowered = " ".join(EXPECTED_TRUST_ROOTS.values()).lower()
     assert "candidate" not in lowered
     assert ".tar" not in lowered
