@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v2/static-target-profile.schema.json",
+  "title": "SeaRise active static-target supply-chain profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "profileId",
+    "target",
+    "productionClaim",
+    "historicalEvidence",
+    "excludedLegacyRequirements",
+    "components"
+  ],
+  "properties": {
+    "$schema": { "const": "./static-target-profile.schema.json" },
+    "schemaVersion": { "const": "2.0.0" },
+    "profileId": { "const": "static-browser-supply-chain-v2" },
+    "target": { "const": "static-browser" },
+    "productionClaim": { "const": false },
+    "historicalEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "status"],
+      "properties": {
+        "path": { "const": "contracts/supply-chain/v1" },
+        "status": { "const": "immutable-phase-1-history" }
+      }
+    },
+    "excludedLegacyRequirements": {
+      "const": [
+        "api-nuget",
+        "azurite-blob-seed",
+        "legacy-compose-runtime",
+        "legacy-runtime-images",
+        "nextjs-frontend-runtime"
+      ]
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ecosystem", "releaseUse", "coverage", "inputs"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "ecosystem": {
+            "enum": [
+              "container",
+              "cyclonedx",
+              "github-actions",
+              "native",
+              "npm",
+              "python",
+              "standard-schema"
+            ]
+          },
+          "releaseUse": { "enum": ["candidate", "development"] },
+          "coverage": { "enum": ["locked", "range-constrained"] },
+          "inputs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "role", "sha256"],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+                },
+                "role": {
+                  "enum": [
+                    "lock",
+                    "manifest",
+                    "receipt",
+                    "recipe",
+                    "sbom",
+                    "schema",
+                    "workflow"
+                  ]
+                },
+                "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

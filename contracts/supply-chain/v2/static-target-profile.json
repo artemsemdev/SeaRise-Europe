@@ -1,0 +1,153 @@
+{
+  "$schema": "./static-target-profile.schema.json",
+  "schemaVersion": "2.0.0",
+  "profileId": "static-browser-supply-chain-v2",
+  "target": "static-browser",
+  "productionClaim": false,
+  "historicalEvidence": {
+    "path": "contracts/supply-chain/v1",
+    "status": "immutable-phase-1-history"
+  },
+  "excludedLegacyRequirements": [
+    "api-nuget",
+    "azurite-blob-seed",
+    "legacy-compose-runtime",
+    "legacy-runtime-images",
+    "nextjs-frontend-runtime"
+  ],
+  "components": [
+    {
+      "id": "active-sboms",
+      "ecosystem": "cyclonedx",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/sboms/python-release-linux-x86-64-cp311.cdx.json", "role": "sbom", "sha256": "1174aa758bb9d741d4562a7978723f40bd1934b4513da91ca1c9233aa4571367" },
+        { "path": "contracts/supply-chain/v1/sboms/python-release-macos-arm64-cp311.cdx.json", "role": "sbom", "sha256": "2541143e0548bf2777ce17087959d8001a925acd4b21d8c578f349371e8be26d" },
+        { "path": "contracts/supply-chain/v1/sboms/python-settlement-spatial-linux-x86-64-cp311.cdx.json", "role": "sbom", "sha256": "aa13bda14f941bf3a383326b268d48074fbe35608360a5bb5cd98541d03f075c" },
+        { "path": "contracts/supply-chain/v1/sboms/python-settlement-spatial-macos-arm64-cp311.cdx.json", "role": "sbom", "sha256": "1680760db11f137fa6e56cdf0fb3f88e38b215be517078aaeca7613eb301738e" },
+        { "path": "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json", "role": "sbom", "sha256": "51b6eb4a97f52d9ee78b28efde7dca5ce78a9b65954f5c7257957b4deb4db255" }
+      ]
+    },
+    {
+      "id": "github-actions",
+      "ecosystem": "github-actions",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "2abbb4dec68b380582dcff8fdfff77c97e6130a79f8b60d2f3d1a67d0ff6e70e" },
+        { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
+        { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
+        { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },
+        { "path": ".github/workflows/phase-1-release-sign.yml", "role": "workflow", "sha256": "cbe085418568888a089124c94f456e995e51badbe205546f4c637ebd9103de2f" }
+      ]
+    },
+    {
+      "id": "native-build-plane",
+      "ecosystem": "native",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/tools/cosign-linux-amd64.json", "role": "lock", "sha256": "dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9" },
+        { "path": "src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64", "role": "recipe", "sha256": "8d5fb782ea81bc19c9c8d71e31aae19a01bc448f401fd10114f633bd2a6c2dc5" },
+        { "path": "src/pipeline/toolchain/build_macos_tippecanoe.sh", "role": "recipe", "sha256": "143cfd23ca2f051c60cc1221122236d4cb4305a554ca6fe44d66bec164432bc9" },
+        { "path": "src/pipeline/toolchain/duckdb-spatial-extensions.json", "role": "lock", "sha256": "77c7ea3422e67be2f8d23f0dcef2d5d36236f01b8856f76289ed1e0532359ca6" },
+        { "path": "src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json", "role": "receipt", "sha256": "7935c9cce2ffa7c07ce64fdae11554555756d4ec5beb5fe089a227ad23400074" },
+        { "path": "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json", "role": "receipt", "sha256": "f6c05ca78c5b02a7db921b5b5246396b9da8a2e8c7ab358b08a1b1c714eaa51a" }
+      ]
+    },
+    {
+      "id": "pipeline-container",
+      "ecosystem": "container",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "6c78668aa117828347de64675824b54ac74d7000ec34430c7bf0f83b7b3b3b12" }
+      ]
+    },
+    {
+      "id": "pipeline-geoid-evaluator",
+      "ecosystem": "python",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "src/pipeline/science/geoid-evaluator-requirements.txt", "role": "lock", "sha256": "6ee06b8167c30dd83a31251e1dfe800168a5d35e4aa55294d0f5b15e9bd10821" }
+      ]
+    },
+    {
+      "id": "pipeline-python-contributor",
+      "ecosystem": "python",
+      "releaseUse": "development",
+      "coverage": "range-constrained",
+      "inputs": [
+        { "path": "contracts/supply-chain/v2/python/static-target-contributor-requirements.txt", "role": "manifest", "sha256": "254042728ce4307e9db80c2599d0b30c409f1afd88eddfa0388e2e61b705d9f4" }
+      ]
+    },
+    {
+      "id": "pipeline-python-release",
+      "ecosystem": "python",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/python-graphs/release-runtime.json", "role": "manifest", "sha256": "86fc6d1a7446d338b607cff07c3403f46a38941b524337786fd6dc5c59a0150e" },
+        { "path": "src/pipeline/requirements-phase1-final-macos-x86_64.lock", "role": "lock", "sha256": "2988c24e76853ba8f87c3cc756325d5114386389b1548a0a034939473a7b80f0" },
+        { "path": "src/pipeline/requirements-release-macos-arm64.lock", "role": "lock", "sha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75" },
+        { "path": "src/pipeline/requirements-release.lock", "role": "lock", "sha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f" }
+      ]
+    },
+    {
+      "id": "provenance-signing-contracts",
+      "ecosystem": "standard-schema",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/release/v2/browser-derivation-provenance.schema.json", "role": "schema", "sha256": "4049555a77ec3fb410ceb6f114fa30cf10a052844d2bc765f873990cb1276b01" },
+        { "path": "contracts/supply-chain/v1/build-types/offline-release-real-source-v1.json", "role": "manifest", "sha256": "1b08ca61980ec1e0c0fa8615756f6a3fbce2929b899d5d814306cec12c53fbd9" },
+        { "path": "contracts/supply-chain/v1/build-types/offline-release-v1.json", "role": "manifest", "sha256": "5dcb87dafca4289b9fff69f73d6b18ab828129cc3770463bef3074b291e55f71" },
+        { "path": "contracts/supply-chain/v1/cosign-tool-lock.schema.json", "role": "schema", "sha256": "9ef5afb2bb8d4a9279e8c925c4392879c20915a2f858bcc6143e763d5a51cb42" },
+        { "path": "contracts/supply-chain/v1/cryptographic-verification-receipt.schema.json", "role": "schema", "sha256": "98cd5f4fa87a6da9ce443aa41f6f392b29ab9a7f8172708407065d0d89f1584d" },
+        { "path": "contracts/supply-chain/v1/evidence-envelope.schema.json", "role": "schema", "sha256": "b5f0a2ea6a031cba1c3ead2fb6adc694c961a3f504bb1a56210faaff43a930de" },
+        { "path": "contracts/supply-chain/v1/identity-policy.json", "role": "manifest", "sha256": "3dee2a4dd5e400ae060fb7c68f654ea6270c03e2740690417128b9fa9878738c" },
+        { "path": "contracts/supply-chain/v1/identity-policy.schema.json", "role": "schema", "sha256": "90c12d828c9fc6a4346fa6f44bb67f885c479a2bb0a4149735ed7dded9fad5f9" },
+        { "path": "contracts/supply-chain/v1/public-readback-verification-receipt.schema.json", "role": "schema", "sha256": "cefbdc1fc0a50c6d13f656a1322701747420d8b8662fd08614f4143addda6cce" },
+        { "path": "contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json", "role": "schema", "sha256": "f0e2f420cc53cc445a1f560e4c82779c565d67b01f10b952cff169eab1ead9d5" },
+        { "path": "contracts/supply-chain/v1/release-evidence-retention-receipt.schema.json", "role": "schema", "sha256": "0a9777bcfd6c8e486f466ab6c428cc26b4fd065c8d3159962b610da1749638de" }
+      ]
+    },
+    {
+      "id": "settlement-spatial-python",
+      "ecosystem": "python",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json", "role": "manifest", "sha256": "64d00b72ce9226e639f506e359242beff4fbbeb45feaa22569ec1c180d0fff80" },
+        { "path": "src/pipeline/requirements-settlements-spatial-linux-x86_64.lock", "role": "lock", "sha256": "52b9b9081a9f84cac3c3067ca2f68622b4515f2ef8929183f0ae57c6df3db497" },
+        { "path": "src/pipeline/requirements-settlements-spatial-macos-arm64.lock", "role": "lock", "sha256": "1c992360d57158a51053536ca8d70d6d718b7caa96f60af1b5615a0c8535e33e" }
+      ]
+    },
+    {
+      "id": "static-web-npm",
+      "ecosystem": "npm",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "package-lock.json", "role": "lock", "sha256": "ad0642e4e6c9112f1b2044e2deeb5ddf959f570ea8f59bf09cfe0a9bdd8b444a" },
+        { "path": "package.json", "role": "manifest", "sha256": "f4cba9e4f6c411982be028223a0d32ac8adf088d3458f65b7f6cd72530aac80d" },
+        { "path": "src/web/package.json", "role": "manifest", "sha256": "26ff3cd02009837e05413413baebdf8f6fe610262117c5a912aacd9f6808b869" }
+      ]
+    },
+    {
+      "id": "vendored-cyclonedx-schemas",
+      "ecosystem": "standard-schema",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v1/vendor/bom-1.7.schema.json", "role": "schema", "sha256": "5532388d3cfd200e5261bd27da58e8882b27930497d61f905ca5d992ee69bdc2" },
+        { "path": "contracts/supply-chain/v1/vendor/cryptography-defs.schema.json", "role": "schema", "sha256": "78e4b1df3150c38893234a12c7048f2709fc170559a5a3db222128165f5e096c" },
+        { "path": "contracts/supply-chain/v1/vendor/jsf-0.82.schema.json", "role": "schema", "sha256": "a8a19aefb25c8b868326e44fe40d1923d5b5c72c1975f31dd1e4d11b08732105" },
+        { "path": "contracts/supply-chain/v1/vendor/manifest.json", "role": "lock", "sha256": "74759373034cf21298cbd7dd77041740287513bfcd51bd55ff776612d4db3d66" },
+        { "path": "contracts/supply-chain/v1/vendor/spdx.schema.json", "role": "schema", "sha256": "9688c076891e4147cfe978d5fa3196c740b1ff79b25b146d94178a3db6066180" }
+      ]
+    }
+  ]
+}

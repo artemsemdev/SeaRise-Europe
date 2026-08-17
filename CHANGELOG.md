@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a versioned active static-browser supply-chain profile that locks the
+  retained web npm, Python, settlement, scientific, build-plane, signing, and
+  SBOM authorities while rejecting NuGet, Next.js, Azurite/blob-seed, Compose,
+  and legacy runtime images as Phase 2 requirements. Phase 1 v1 evidence remains
+  unchanged as historical audit material.
+
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,

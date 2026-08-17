@@ -1,8 +1,12 @@
 # Supply-chain contracts
 
-`v1` defines the immutable evidence boundary for a Phase 1 release candidate.
-It does not alter `contracts/release/v1`, and incompatible changes require a new
-versioned directory.
+`v2` is the active static-browser supply-chain profile. It retains the web npm,
+Python, settlement, scientific, build-plane, signing, provenance, and SBOM
+authorities needed by the static target without requiring any legacy runtime.
+
+`v1` defines the immutable historical evidence boundary for the Phase 1 release
+candidate. It does not alter `contracts/release/v1`; its NuGet and legacy
+runtime records are not the active Phase 2 dependency graph.
 
 ## Evidence boundary
 

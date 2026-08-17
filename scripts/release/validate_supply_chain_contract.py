@@ -27,6 +27,7 @@ from searise_pipeline.supply_chain import (
     validate_npm_sbom,
     validate_nuget_sbom,
     validate_python_sbom,
+    validate_static_target_profile,
     verify_candidate_evidence_cryptographically,
     write_candidate_artifact_authority,
 )
@@ -110,6 +111,9 @@ def _parser() -> argparse.ArgumentParser:
     inventory = commands.add_parser("inventory")
     inventory.add_argument("--document", type=Path, required=True)
     inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
+    static_profile = commands.add_parser("static-profile")
+    static_profile.add_argument("--document", type=Path, required=True)
+    static_profile.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_sbom = commands.add_parser("npm-sbom")
     npm_sbom.add_argument("--lock", type=Path, required=True)
     npm_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
@@ -278,6 +282,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             input_count = sum(len(component["inputs"]) for component in document["components"])  # fmt: skip
             print(f"validated {input_count} dependency-defining inputs")
+        elif args.command == "static-profile":
+            document = validate_static_target_profile(
+                args.document,
+                repository_root=args.repository_root.resolve(),
+            )
+            input_count = sum(len(component["inputs"]) for component in document["components"])
+            print(f"validated {input_count} active static-target supply-chain inputs")
         elif args.command == "npm-sbom":
             document = publish_npm_sbom(
                 args.output,

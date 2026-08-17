@@ -39,6 +39,7 @@ from .sbom import (
 from .sigstore_verifier import (
     verify_candidate_evidence_cryptographically,
 )
+from .static_profile import validate_static_target_profile
 
 __all__ = [
     "CandidateEvidenceSummary",
@@ -73,6 +74,7 @@ __all__ = [
     "validate_nuget_sbom",
     "validate_python_lock_graph",
     "validate_python_sbom",
+    "validate_static_target_profile",
     "verify_candidate_evidence_cryptographically",
     "verify_public_signed_subjects",
     "write_new_sbom",
