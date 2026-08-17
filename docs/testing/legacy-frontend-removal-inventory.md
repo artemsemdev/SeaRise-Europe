@@ -32,6 +32,27 @@ The C# DTOs in `src/api/SeaRise.Api/Dtos/AssessResponse.cs`,
 shapes but are not target contracts. They are owned by issue #71; this
 inventory does not authorize their deletion or modify their tests.
 
+## Issue #68 retirement-readiness classification
+
+The following suites remain `active` while their files exist. They are no
+longer classified as permanent because their owners are inside directories
+scheduled for removal. The eventual #70 or #71 deletion PR must mark each
+suite and baseline path `retired` and cite the target suites below as concrete
+replacement evidence.
+
+| Active legacy suite | Disposition and removal issue | Equivalent-or-stronger target evidence |
+|---|---|---|
+| `frontend-five-state-characterization` | Delete after #70 gate | `static-release-domain`, `static-projection-panel`, and `static-projection-browser-ux` prove exactly four ADR-024 outcomes, technical-failure separation, all nine combinations, and production-static behavior. The shared five-state fixture remains historical evidence only. |
+| `frontend-regional-fixture-parity` | Delete after #70 gate | `static-release-domain` and `pipeline-regional-fixture` retain the independent regional vectors, exact target lookup, source locks, and pipeline evidence. |
+| `frontend-ar6-lookup-parity` | Delete after #70 gate | `static-release-domain` and `pipeline-reviewed-cog-range-access` cover exact quantiles, integer millimetres, nodata, nearest native-grid tie-breaks, and the inclusive 100 km limit. |
+| `frontend-static-checks` | Rewrite against the #70 public/static target | `static-target-content` plus the `src/web` lint, type-check, generated-contract, content, and production-build gates replace every legacy-only authoring command. |
+| `frontend-public-contract-parity` | Rewrite against the #70 public/static target | `static-release-domain`, `static-target-content`, and generated `src/web` release-contract checks validate the retained release, STAC, manifest, and gate-report fixtures. |
+| `api-shared-characterization` | Retain as characterization until #71 | `static-release-domain`, `static-projection-panel`, `static-projection-browser-ux`, and `pipeline-science-contracts` replace the C# execution path while the shared five-state fixture remains historical-only evidence. |
+
+These mappings are readiness evidence, not retirement metadata. Active suite
+and baseline rows keep null retirement evidence until the same PR actually
+deletes their on-disk files.
+
 ## Store and domain test mapping
 
 | Legacy evidence | Equivalent-or-stronger target evidence | State |
