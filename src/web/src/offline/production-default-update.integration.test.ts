@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 describe("production default update composition", () => {
-  it("refuses mixed and corrupt candidates before arming exact default-factory authority", async () => {
+  it("completes active authority and reconciles armed intents across fresh boots", async () => {
     const context = await fixtureReleaseContext();
     const idb = new IDBFactory();
     const caches = new MemoryCaches();
@@ -54,7 +54,9 @@ describe("production default update composition", () => {
     const candidateB = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-b", dataReleaseId: "next-browser-release-b" });
     let waitingPair = candidateA;
     let waitingPrecache = candidatePrecache;
-    const currentPair = { contractVersion: 1 as const, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId };
+    const currentPair = validateAppReleasePair({
+      contractVersion: 1, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId,
+    });
     const active = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) {
       if (message.type === "acquire-lease" || message.type === "heartbeat-lease") {
         ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "lease-state", messageToken: message.messageToken,
@@ -70,7 +72,7 @@ describe("production default update composition", () => {
         pair: currentPair, precacheSetSha256: currentPrecache });
     } };
     const waiting = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: waitingPair, precacheSetSha256: waitingPrecache }); } };
-    const registration = { active, waiting };
+    const registration: { active: typeof active; waiting: typeof waiting | null } = { active, waiting: null };
     Object.assign(globalThis, { caches, indexedDB: idb });
     Object.defineProperty(globalThis, "crypto", { configurable: true, value: {
       ...webcrypto,
@@ -107,7 +109,7 @@ describe("production default update composition", () => {
     });
 
     const runtime = await createBrowserRuntime(context);
-    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("update-available"));
+    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("current"));
     const methodology = context.artifact(context.manifest.contractArtifacts.methodology);
     await runtime.searchArtifactTransport(new URL(methodology.url), {
       signal: new AbortController().signal,
@@ -120,6 +122,19 @@ describe("production default update composition", () => {
       location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
     });
     if (interaction) await runtime.capability?.confirmInteractionAvailable(interaction);
+    const lifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
+    const currentLifecycle = await lifecycle.read(currentPair);
+    expect(currentLifecycle).toMatchObject({
+      status: "found",
+      record: { state: "active", acceptedIdentity: {
+        precacheSetSha256: currentPrecache,
+        resourcePlanSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+        receiptSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      } },
+    });
+    registration.waiting = waiting;
+    await runtime.capability?.retry();
+    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("update-available"));
 
     // The UI advertised A, but the exact waiting worker changed to B before
     // action. The production coordinator must reject the mixed pair before
@@ -132,20 +147,6 @@ describe("production default update composition", () => {
     });
     expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
 
-    const lifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
-    await lifecycle.stage(candidateB);
-    await lifecycle.completeBootstrap(candidateB, "e".repeat(64));
-    await lifecycle.completeCore(candidateB, { precacheSetSha256: "e".repeat(64), resourcePlanSha256: "c".repeat(64), receiptSha256: "d".repeat(64) });
-    await runtime.capability?.retry();
-    await runtime.capability?.requestUpdateAction();
-    expect(runtime.capability?.getSnapshot()?.update).toMatchObject({
-      state: "failed", reason: expect.stringContaining("accepted resource authority disagree"),
-    });
-    expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
-
-    await lifecycle.stage(candidateA);
-    await lifecycle.completeBootstrap(candidateA, candidatePrecache);
-    await lifecycle.completeCore(candidateA, { precacheSetSha256: candidatePrecache, resourcePlanSha256: "f".repeat(64), receiptSha256: "1".repeat(64) });
     waitingPair = candidateA;
     waitingPrecache = candidatePrecache;
     await runtime.capability?.retry();
@@ -153,5 +154,45 @@ describe("production default update composition", () => {
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("ready-to-activate"));
     expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"armed"');
     runtime.dispose();
+
+    const mismatchRuntime = await createBrowserRuntime(context);
+    await mismatchRuntime.searchArtifactTransport(new URL(methodology.url), {
+      signal: new AbortController().signal, headers: { Accept: methodology.mediaType },
+    });
+    await mismatchRuntime.controller.select({
+      dataReleaseId: context.dataReleaseId, scenario: "ssp2-45", horizon: 2050,
+      location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
+    });
+    await mismatchRuntime.capability?.retry();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"tombstoned"');
+    expect(mismatchRuntime.capability?.getSnapshot()?.update).toMatchObject({
+      state: "failed", reason: expect.stringContaining("does not match the exact fresh-boot controller"),
+    });
+    mismatchRuntime.dispose();
+
+    if (currentLifecycle.status !== "found") throw new Error("current lifecycle was unavailable");
+    const activeIdentity = currentLifecycle.record.acceptedIdentity;
+    const sourceBootId = "previous-boot";
+    const transitionId = `${sourceBootId}.freshbootinstance1.g1`;
+    localStorage.setItem("searise:update-intent:v1", JSON.stringify({ state: "armed", intent: {
+      contractVersion: 1, transitionId, confirmationGeneration: 1, sourceBootId,
+      sourceController: { contractVersion: 1, pair: candidateA, precacheSetSha256: candidatePrecache,
+        resourcePlanSha256: "e".repeat(64), receiptSha256: "f".repeat(64) },
+      candidate: { contractVersion: 1, pair: currentPair, precacheSetSha256: activeIdentity.precacheSetSha256 },
+      message: "Update ready. Close all SeaRise tabs and reopen to use it.",
+    } }));
+    const successRuntime = await createBrowserRuntime(context);
+    await successRuntime.searchArtifactTransport(new URL(methodology.url), {
+      signal: new AbortController().signal, headers: { Accept: methodology.mediaType },
+    });
+    await successRuntime.controller.select({
+      dataReleaseId: context.dataReleaseId, scenario: "ssp2-45", horizon: 2050,
+      location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
+    });
+    await successRuntime.capability?.retry();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
+    await successRuntime.capability?.retry();
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
+    successRuntime.dispose();
   });
 });

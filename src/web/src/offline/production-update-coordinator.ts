@@ -1,4 +1,5 @@
 import type { BrowserUpdateCoordinator } from "../application/browser-runtime";
+import type { RuntimeCapabilityV2, UpdateCapabilityV1 } from "./contracts/policy";
 import { OFFLINE_WORKER_PROTOCOL, validateOfflineWorkerToClientMessage } from "./contracts/policy";
 import type { AppReleasePairV1 } from "./contracts/keys";
 import { PairLifecycleStore } from "./pair-lifecycle-store";
@@ -75,8 +76,39 @@ export function createProductionUpdateCoordinator(
     });
   };
   const readBoot = async (): Promise<ControllerBootProofV1> => Object.freeze({
-    contractVersion: 1, bootId, controller: accepted(router.current(), currentPrecacheSetSha256),
+    contractVersion: 1, bootId, controller: await completeCurrentAuthority(),
   });
+  const completeCurrentAuthority = async (): Promise<AcceptedPairIdentityV1> => {
+    const identity = accepted(router.current(), currentPrecacheSetSha256);
+    let stored = await lifecycle.read(identity.pair);
+    if (stored.status === "missing") {
+      await lifecycle.stage(identity.pair);
+      await lifecycle.completeBootstrap(identity.pair, identity.precacheSetSha256);
+      await lifecycle.completeCore(identity.pair, {
+        precacheSetSha256: identity.precacheSetSha256,
+        resourcePlanSha256: identity.resourcePlanSha256,
+        receiptSha256: identity.receiptSha256,
+      });
+      await lifecycle.activate(identity.pair);
+    } else if (stored.status === "found" && stored.record.state === "bootstrap-complete") {
+      await lifecycle.completeCore(identity.pair, {
+        precacheSetSha256: identity.precacheSetSha256,
+        resourcePlanSha256: identity.resourcePlanSha256,
+        receiptSha256: identity.receiptSha256,
+      });
+      await lifecycle.activate(identity.pair);
+    } else if (stored.status === "found" && stored.record.state === "core-complete") {
+      await lifecycle.activate(identity.pair);
+    }
+    stored = await lifecycle.read(identity.pair);
+    if (stored.status !== "found" || stored.record.state !== "active" ||
+        stored.record.acceptedIdentity.precacheSetSha256 !== identity.precacheSetSha256 ||
+        stored.record.acceptedIdentity.resourcePlanSha256 !== identity.resourcePlanSha256 ||
+        stored.record.acceptedIdentity.receiptSha256 !== identity.receiptSha256) {
+      throw new Error("Active pair lifecycle does not match exact admitted resource authority.");
+    }
+    return identity;
+  };
   const ports: StaticUpdateCoordinatorPorts = {
     readControllerBoot: readBoot,
     inspectWaitingCandidate: async (pair) => {
@@ -86,19 +118,9 @@ export function createProductionUpdateCoordinator(
       if (discovered.pair.appBuildId !== pair.appBuildId || discovered.pair.dataReleaseId !== pair.dataReleaseId) {
         return Object.freeze({ status: "mixed", reason: "Waiting worker pair does not match the requested candidate." });
       }
-      const stored = await lifecycle.read(pair);
-      if (stored.status !== "found" || !["core-complete", "active", "previous"].includes(stored.record.state)) {
-        return Object.freeze({ status: "incomplete", reason: "Waiting candidate has no complete accepted resource authority." });
-      }
-      const identity = stored.record.acceptedIdentity;
-      if (!identity.precacheSetSha256 || !identity.resourcePlanSha256 || !identity.receiptSha256 ||
-          identity.precacheSetSha256 !== discovered.precacheSetSha256) {
-        return Object.freeze({ status: "corrupt", reason: "Waiting worker and accepted resource authority disagree." });
-      }
-      return Object.freeze({ status: "sealed", candidate: Object.freeze({ contractVersion: 1, pair,
-        precacheSetSha256: identity.precacheSetSha256,
-        resourcePlanSha256: identity.resourcePlanSha256,
-        receiptSha256: identity.receiptSha256 }) });
+      return Object.freeze({ status: "sealed", candidate: Object.freeze({
+        contractVersion: 1, pair, precacheSetSha256: discovered.precacheSetSha256,
+      }) });
     },
     issueConfirmationToken: () => crypto.randomUUID(),
     recordPendingTransitionIntent: async (intent, permit) => withLock(permit, () => {
@@ -126,18 +148,54 @@ export function createProductionUpdateCoordinator(
       if (!current) return "missing" as const;
       if (current.state === "consumed") return "already-consumed" as const;
       if (current.state !== "armed" || !exactIntent(current.intent, intent) ||
-          boot.controller.pair.appBuildId !== intent.candidate.pair.appBuildId) return "not-armed" as const;
+          boot.controller.pair.appBuildId !== intent.candidate.pair.appBuildId ||
+          boot.controller.pair.dataReleaseId !== intent.candidate.pair.dataReleaseId ||
+          boot.controller.precacheSetSha256 !== intent.candidate.precacheSetSha256) return "not-armed" as const;
       writeDurable(Object.freeze({ intent, state: "consumed" })); return "consumed" as const;
     }),
   };
   const coordinator = new StaticHostUpdateCoordinator(ports);
-  void coordinator.initialize().catch(() => undefined);
-  return new StaticUpdateCapabilityCoordinator(coordinator, {
+  const adapter = new StaticUpdateCapabilityCoordinator(coordinator, {
     candidate: async () => {
       const registration = await navigator.serviceWorker.getRegistration("/");
       if (!registration?.waiting) return null;
       discovered = await workerIdentity(registration.waiting);
       return discovered.pair;
+    },
+  });
+  let reconciled = false;
+  let reconciliationFailure = "";
+  const reconcileFreshBoot = async (): Promise<void> => {
+    if (reconciled || !router.current()) return;
+    const boot = await readBoot();
+    if (!coordinator.state()) await coordinator.initialize();
+    const durable = readDurable();
+    if (durable?.state === "armed") {
+      const exact = boot.controller.pair.appBuildId === durable.intent.candidate.pair.appBuildId &&
+        boot.controller.pair.dataReleaseId === durable.intent.candidate.pair.dataReleaseId &&
+        boot.controller.precacheSetSha256 === durable.intent.candidate.precacheSetSha256;
+      if (exact) await coordinator.verifyNextBoot(durable.intent);
+      else {
+        await navigator.locks.request(INTENT_KEY, { mode: "exclusive" }, () => {
+          const current = readDurable();
+          if (current?.state === "armed" && exactIntent(current.intent, durable.intent)) {
+            writeDurable(Object.freeze({ intent: durable.intent, state: "tombstoned" }));
+          }
+        });
+        reconciliationFailure = "Armed update intent does not match the exact fresh-boot controller authority.";
+      }
+    }
+    reconciled = true;
+  };
+  return Object.freeze({
+    inspect: async (): Promise<UpdateCapabilityV1> => {
+      await reconcileFreshBoot();
+      if (reconciliationFailure) return Object.freeze({ state: "failed", reason: reconciliationFailure });
+      return adapter.inspect();
+    },
+    requestAction: async (capability: RuntimeCapabilityV2): Promise<void> => {
+      await reconcileFreshBoot();
+      return adapter.requestAction(capability);
     },
   });
 }
