@@ -68,6 +68,14 @@
       "activeRuntimeAllowed": false
     },
     {
+      "id": "v1-nuget-fixture-project",
+      "path": "contracts/supply-chain/v1/fixtures/nuget/Fixture.App.xml",
+      "gitBlobSha": "b5567fda118251dc6e5880cb4f1954dc79122742",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 synthetic NuGet project fixture as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
       "id": "v1-unverified-evidence-envelope-schema",
       "path": "contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json",
       "gitBlobSha": "544e370ff8f8e357554eb0e084494b3b544fc71e",

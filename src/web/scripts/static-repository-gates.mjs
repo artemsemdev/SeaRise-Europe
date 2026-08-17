@@ -17,46 +17,61 @@ const EXECUTABLE_NAMES = new Set([
 const EXECUTABLE_EXTENSIONS = new Set([
   ".cs", ".csproj", ".fsproj", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx",
   ".json", ".py", ".sh", ".sql", ".toml", ".props", ".targets", ".yml", ".yaml",
+  ".html", ".css", ".svg", ".xml", ".tf", ".tfvars", ".env", ".conf", ".config",
 ]);
 const ARCHIVE_EXTENSIONS = /\.(?:7z|rar|tar|tar\.bz2|tar\.gz|tar\.xz|tgz|zip)$/iu;
 
 export const forbiddenDependencyRules = Object.freeze([
   Object.freeze({ id: "nextjs-runtime", pattern: /(?:["'](?:next|eslint-config-next)["']|\bnext\/(?:server|headers|navigation|router|image)\b|\bnext (?:build|dev|start)\b|\b\.next\/)/giu }),
-  Object.freeze({ id: "dotnet-csharp-nuget", pattern: /(?:\bdotnet\s+(?:build|run|test|restore|publish|format)\b|\bMicrosoft\.AspNetCore\b|\bNuGet\b|<TargetFramework>|\.csproj\b|\.sln\b)/giu }),
-  Object.freeze({ id: "postgres-postgis-npgsql", pattern: /(?:\bPostgreSQL\b|\bPostGIS\b|\bNpgsql\b|postgres(?:ql)?:\/\/|\bpostgis\/postgis:|\bpostgres:\d)/giu }),
+  Object.freeze({ id: "dotnet-csharp-nuget", pattern: /(?:\bdotnet\s+(?:build|run|test|restore|publish|format)\b|\bMicrosoft\.AspNetCore\b|\bASP\.NET\b|\bNuGet\b|<TargetFramework>|\.csproj\b|\.sln\b|(?:^|\/)global\.json\b)/gimu }),
+  Object.freeze({ id: "postgres-postgis-npgsql", pattern: /(?:\bPostgreSQL\b|\bPostGIS\b|\bNpgsql\b|postgres(?:ql)?:\/\/|\bpostgis\/postgis:|\bpostgres:(?:\d|latest)\b|\b(?:POSTGRES_[A-Z_]+|PGHOST|PGPORT|PGDATABASE|PGUSER|PGPASSWORD)\b)/giu }),
   Object.freeze({ id: "titiler-runtime", pattern: /(?:\bTiTiler\b|\btitiler(?:\.|-)|developmentseed\/titiler)/giu }),
   Object.freeze({ id: "azurite-runtime", pattern: /(?:\bAzurite\b|mcr\.microsoft\.com\/azure-storage\/azurite|UseDevelopmentStorage=true)/giu }),
-  Object.freeze({ id: "azure-runtime-geocoder", pattern: /(?:\bAzure Maps\b.{0,80}\bgeocod|atlas\.microsoft\.com\/(?:search|geocode)|maps\.azure\.com.{0,120}(?:search|geocode))/giu }),
+  Object.freeze({ id: "azure-runtime-geocoder", pattern: /(?:\bAzure Maps\b.{0,80}\bgeocod|atlas\.microsoft\.com\/(?:search|geocode|sdk)|maps\.azure\.com.{0,120}(?:search|geocode)|\bAZURE_MAPS_[A-Z_]+\b|azure-maps-control|subscription-key.{0,80}(?:atlas|maps\.azure))/giu }),
   Object.freeze({ id: "legacy-compose-runtime", pattern: /^\s{0,8}(?:api|frontend|db|postgres|postgis|titiler|azurite):\s*$/gimu }),
-  Object.freeze({ id: "node-production-server", pattern: /(?:\bvite preview\b|\bnext start\b|\bnode\s+(?:\.\/)?(?:server|app|index)\.(?:js|mjs|cjs)\b|\bcreateServer\s*\()/giu }),
+  Object.freeze({ id: "node-production-server", pattern: /(?:\bvite preview\b|\bnext start\b|\bnode\s+(?:\.\/)?(?:server|app|index)\.(?:js|mjs|cjs)\b|\bcreateServer\s*\(|["'](?:express|fastify|http-server|serve)["']\s*:|\bnpx\s+(?:http-server|serve)\b|\bfastify\s+start\b)/giu }),
 ]);
 
 const pendingRemovalPaths = Object.freeze([
   /^SeaRise(?: Europe)?\.sln$/u,
   /^src\/(?:api|frontend)\//u,
   /^infra\/(?:db|blob-seed)\//u,
-  /^docker-compose\.ya?ml$/u,
+  /^(?:docker-compose|compose)\.ya?ml$/u,
   /^\.env\.(?:local|pipeline)\.example$/u,
-  /^\.github\/workflows\/(?:ci|codeql)\.yml$/u,
-  /^scripts\/(?:compose-smoke\.sh|ci\/changed_components\.py)$/u,
+  /^scripts\/compose-smoke\.sh$/u,
   /^src\/pipeline\/(?:__init__|cogify|compute_exposure|config|download|preprocess|register|run_pipeline|upload|validate)\.py$/u,
 ]);
 const legacyPipelineAdapters = /^src\/pipeline\/(?:__init__|cogify|compute_exposure|config|download|preprocess|register|run_pipeline|upload|validate)\.py$/u;
-const retainedNodeToolPaths = new Set([
-  "src/web/scripts/measure-ar6-release.mjs",
-  "src/web/scripts/measure-local-candidate-search.mjs",
-  "src/web/scripts/run-local-candidate-e2e.mjs",
-  "src/web/scripts/verify-boundary-pmtiles-browser.mjs",
+const mustDeletePrefixes = Object.freeze(["src/api/", "src/frontend/", "infra/db/", "infra/blob-seed/"]);
+const exactRetainedRulePurpose = new Map([
+  ["src/web/package.json", new Set(["node-production-server"])],
+  ["src/web/vite.config.ts", new Set(["node-production-server"])],
+  ["src/web/tests/static-shell.spec.ts", new Set(["node-production-server"])],
+  ["src/web/scripts/measure-ar6-release.mjs", new Set(["node-production-server"])],
+  ["src/web/scripts/measure-local-candidate-search.mjs", new Set(["node-production-server"])],
+  ["src/web/scripts/offline-lifecycle-server.mjs", new Set(["node-production-server"])],
+  ["src/web/scripts/run-local-candidate-e2e.mjs", new Set(["node-production-server"])],
+  ["src/web/scripts/serve-committed-release.mjs", new Set(["node-production-server"])],
+  ["src/web/scripts/serve-range-cache-spike.mjs", new Set(["node-production-server"])],
+  ["src/web/scripts/verify-boundary-pmtiles-browser.mjs", new Set(["node-production-server"])],
+  ["tests/evidence/mutation-pilot-result-state.json", new Set(["dotnet-csharp-nuget"])],
+  ["tests/evidence/tdd-slices.json", new Set(["dotnet-csharp-nuget"])],
+  ["tests/harness/test_immutable_dependencies.py", new Set(["postgres-postgis-npgsql"])],
+  ["tests/test-inventory.json", new Set(["dotnet-csharp-nuget", "postgres-postgis-npgsql", "titiler-runtime"])],
 ]);
-const retainedTestEvidencePaths = new Set([
-  "tests/evidence/mutation-pilot-result-state.json",
-  "tests/evidence/tdd-slices.json",
-  "tests/harness/test_immutable_dependencies.py",
-  "tests/test-inventory.json",
+const allPolicyRuleIds = new Set(forbiddenDependencyRules.map(({ id }) => id));
+const gatePolicyRulePurpose = new Map([
+  ["src/web/scripts/static-repository-gates.mjs", allPolicyRuleIds],
+  ["src/web/scripts/static-repository-gates.test.mjs", allPolicyRuleIds],
+  ["contracts/repository-removal/v1/historical-allowlist.preapproval.json", new Set(["dotnet-csharp-nuget"])],
+  ["contracts/repository-removal/v1/historical-allowlist.json", new Set(["dotnet-csharp-nuget"])],
 ]);
 
 function isPendingRemoval(path, ruleId) {
   return pendingRemovalPaths.some((pattern) => pattern.test(path))
+    || ((path === ".github/workflows/ci.yml" || path === ".github/workflows/codeql.yml")
+      && ruleId !== "must-delete-path")
+    || (path === "scripts/ci/changed_components.py" && ruleId === "dotnet-csharp-nuget")
     || (ruleId === "dotnet-csharp-nuget" && (
       path.startsWith("src/pipeline/searise_pipeline/supply_chain/")
       || path.startsWith("src/pipeline/tests/supply_chain/")
@@ -68,22 +83,11 @@ function retainedClass(path, ruleId, historicalEntries) {
   if (historicalEntries.get(path)?.rule === "immutable-v1-supply-chain-evidence") {
     return "immutable-v1-supply-chain-evidence";
   }
-  if (path === "src/web/scripts/static-repository-gates.mjs"
-      || path === "src/web/scripts/static-repository-gates.test.mjs"
-      || path === "contracts/repository-removal/v1/historical-allowlist.preapproval.json"
-      || path === "contracts/repository-removal/v1/historical-allowlist.json") {
+  if (gatePolicyRulePurpose.get(path)?.has(ruleId)) {
     return "gate-policy-definition";
   }
-  if (retainedTestEvidencePaths.has(path)) {
-    return "retained-test-evidence";
-  }
-  if (ruleId === "node-production-server" && (
-    path === "src/web/package.json" || path === "src/web/vite.config.ts"
-    || path === "src/web/tests/static-shell.spec.ts"
-    || /^src\/web\/scripts\/(?:serve-|offline-lifecycle-server|static-build-root)/u.test(path)
-    || retainedNodeToolPaths.has(path)
-  )) {
-    return "retained-test-tooling";
+  if (exactRetainedRulePurpose.get(path)?.has(ruleId)) {
+    return path.startsWith("tests/") ? "retained-test-evidence" : "retained-test-tooling";
   }
   return null;
 }
@@ -110,10 +114,27 @@ function scanText(path, text) {
   return findings;
 }
 
-function isExecutableText(path) {
+function pathPresenceFindings(paths) {
+  return paths.flatMap((path) => {
+    const mustDelete = mustDeletePrefixes.some((prefix) => path.startsWith(prefix))
+      || pendingRemovalPaths.some((pattern) => pattern.test(path));
+    const privatePath = /(?:^|\/)(?:candidate[-_.]?v?\d+|local-data)(?:[/._-]|$)/iu.test(path)
+      || ARCHIVE_EXTENSIONS.test(path);
+    if (!mustDelete && !privatePath) return [];
+    return [Object.freeze({
+      path,
+      rule: privatePath ? "private-or-archive-path" : "must-delete-path",
+      line: 1,
+      text: privatePath ? "private/archive repository path" : "approved Phase 2 must-delete path",
+    })];
+  });
+}
+
+export function isRepositoryScanPath(path) {
   const name = path.split("/").at(-1);
   return EXECUTABLE_NAMES.has(name) || EXECUTABLE_EXTENSIONS.has(extname(path))
-    || name?.startsWith("Dockerfile") || /^\.env(?:\.|$)/u.test(name ?? "");
+    || name?.startsWith("Dockerfile") || /^\.env(?:\.|$)/u.test(name ?? "")
+    || (typeof name === "string" && !name.includes("."));
 }
 
 function trackedPaths(root) {
@@ -134,15 +155,21 @@ function filesBelow(root) {
   return files;
 }
 
-export function scanDependencyRecords(records, { mode, historicalEntries = new Map() }) {
+export function scanDependencyRecords(records, {
+  mode,
+  historicalEntries = new Map(),
+  paths = records.map(({ path }) => path),
+}) {
   if (!["target", "built", "repository-readiness", "repository-final"].includes(mode)) {
     throw new Error(`Unknown static repository gate mode: ${mode}`);
   }
-  const findings = records.flatMap(({ path, text }) => scanText(path, text).map((finding) => {
-    const classification = isPendingRemoval(path, finding.rule)
+  const rawFindings = [...pathPresenceFindings(paths), ...records.flatMap(({ path, text }) => scanText(path, text))];
+  const findings = rawFindings.map((finding) => {
+    const { path } = finding;
+    const classification = finding.rule === "private-or-archive-path" ? null : isPendingRemoval(path, finding.rule)
       ? "pending-removal" : retainedClass(path, finding.rule, historicalEntries);
     return Object.freeze({ ...finding, classification });
-  }));
+  });
   const violations = findings.filter(({ classification }) => {
     if (mode === "built") return true;
     if (mode === "target") {
@@ -155,7 +182,8 @@ export function scanDependencyRecords(records, { mode, historicalEntries = new M
 }
 
 function readRecords(paths, root) {
-  return paths.filter((path) => isExecutableText(path) && !ARCHIVE_EXTENSIONS.test(path)).map((path) => {
+  return paths.filter((path) => isRepositoryScanPath(path) && !ARCHIVE_EXTENSIONS.test(path)
+    && !/(?:^|\/)(?:candidate[-_.]?v?\d+|local-data)(?:[/._-]|$)/iu.test(path)).map((path) => {
     const absolute = resolve(root, path);
     const bytes = readFileSync(absolute);
     if (bytes.includes(0)) return null;
@@ -163,31 +191,80 @@ function readRecords(paths, root) {
   }).filter(Boolean);
 }
 
+function inspectableOutput(bytes) {
+  if (!bytes.includes(0)) return bytes.toString("utf8");
+  const strings = [];
+  let current = "";
+  for (const byte of bytes) {
+    if (byte >= 0x20 && byte <= 0x7e) current += String.fromCharCode(byte);
+    else {
+      if (current.length >= 4) strings.push(current);
+      current = "";
+    }
+  }
+  if (current.length >= 4) strings.push(current);
+  for (const [characterOffset, zeroOffset] of [[0, 1], [1, 0]]) {
+    current = "";
+    for (let index = 0; index + 1 < bytes.length; index += 2) {
+      const character = bytes[index + characterOffset];
+      const zero = bytes[index + zeroOffset];
+      if (zero === 0 && character >= 0x20 && character <= 0x7e) current += String.fromCharCode(character);
+      else {
+        if (current.length >= 4) strings.push(current);
+        current = "";
+      }
+    }
+    if (current.length >= 4) strings.push(current);
+  }
+  return strings.join("\n");
+}
+
 export function isTargetScanPath(path) {
   return path.startsWith("src/web/") || path === "package.json" || path === "package-lock.json";
 }
 
-export function validateStaticRepository({ mode, builtRoot = null, root = repositoryRoot } = {}) {
+export function validateStaticRepository({
+  mode,
+  builtRoot = null,
+  root = repositoryRoot,
+  approvalValidator,
+} = {}) {
   let records;
   if (mode === "built") {
     if (!builtRoot || !existsSync(builtRoot)) throw new Error("Built-output dependency scan requires an existing directory");
-    records = filesBelow(builtRoot).filter((path) => !ARCHIVE_EXTENSIONS.test(path)).map((path) => {
+    const absolutePaths = filesBelow(builtRoot);
+    const paths = absolutePaths.map((path) => relative(builtRoot, path).replaceAll("\\", "/"));
+    records = absolutePaths.filter((path) => {
+      const logical = relative(builtRoot, path).replaceAll("\\", "/");
+      return !ARCHIVE_EXTENSIONS.test(logical)
+        && !/(?:^|\/)(?:candidate[-_.]?v?\d+|local-data)(?:[/._-]|$)/iu.test(logical);
+    }).map((path) => {
       const bytes = readFileSync(path);
-      return bytes.includes(0) ? null : { path: relative(builtRoot, path).replaceAll("\\", "/"), text: bytes.toString("utf8") };
-    }).filter(Boolean);
+      return { path: relative(builtRoot, path).replaceAll("\\", "/"), text: inspectableOutput(bytes) };
+    });
+    const result = scanDependencyRecords(records, { mode, historicalEntries: new Map(), paths });
+    if (result.violations.length) {
+      const details = result.violations.map(({ path, line, rule, text }) => `${path}:${line}: ${rule} (${text})`);
+      throw new Error(`Forbidden static dependency references found:\n${details.join("\n")}`);
+    }
+    return result;
   } else {
     const paths = trackedPaths(root).filter((path) => mode !== "target" || isTargetScanPath(path));
     records = readRecords(paths, root);
+    const historicalEntries = mode.startsWith("repository-")
+      ? loadHistoricalAllowlist({
+        authority: mode === "repository-final" ? "approved" : "readiness",
+        root,
+        ...(approvalValidator ? { validateApproval: approvalValidator } : {}),
+      })
+      : new Map();
+    const result = scanDependencyRecords(records, { mode, historicalEntries, paths });
+    if (result.violations.length) {
+      const details = result.violations.map(({ path, line, rule, text }) => `${path}:${line}: ${rule} (${text})`);
+      throw new Error(`Forbidden static dependency references found:\n${details.join("\n")}`);
+    }
+    return result;
   }
-  const result = scanDependencyRecords(records, {
-    mode,
-    historicalEntries: mode.startsWith("repository-") ? loadHistoricalAllowlist() : new Map(),
-  });
-  if (result.violations.length) {
-    const details = result.violations.map(({ path, line, rule, text }) => `${path}:${line}: ${rule} (${text})`);
-    throw new Error(`Forbidden static dependency references found:\n${details.join("\n")}`);
-  }
-  return result;
 }
 
 function main() {

@@ -55,25 +55,28 @@ production build.
 
 ## Historical evidence allowlist
 
-Historical terminology is never exempted by directory. Before owner approval,
-the scanner reads
-`contracts/repository-removal/v1/historical-allowlist.preapproval.json`; after
-approval it automatically prefers `historical-allowlist.json`. Each entry must
-bind one exact repository path to its Git blob SHA and one constrained rule.
-The scanner recalculates the blob ID from committed bytes and rejects changed,
-duplicated, active-runtime, or rule/path-mismatched entries.
+Historical terminology is never exempted by directory. Readiness may read
+`contracts/repository-removal/v1/historical-allowlist.preapproval.json`, but
+final mode refuses preapproval authority. Final mode requires the committed
+`historical-allowlist.json` and a successful offline validation of the complete
+inventory, evidence-receipt, owner-decision, comment-identity, audited-object,
+and hash chain. Each allowlist entry binds one exact repository path to its
+current and audited Git blob SHA and one constrained rule. The scanner rejects
+schema-shape, ID, commit/tree, duplicate, active-authority, and rule/path drift.
 
 The preapproval document is evidence classification only. It does not approve
 deletion, publication, or an inventory disposition. The final repository-
 removal validator remains the authority for the owner-approved hash chain.
 Neither document can allow historical terminology in `src/web` or the active
-pipeline. The separately marked historical section of `docs/methodology.md`
-continues to use its narrow in-file boundary.
+pipeline. Rules name explicit allowed claim IDs; they never suppress certainty,
+property-risk, inundation, or other product claims. The separately marked
+historical section of `docs/methodology.md` continues to use its narrow in-file
+boundary.
 
 ADR-024 remains active authoritative policy, never historical evidence. Its
 two obsolete outcome identifiers are accepted only inside the exact sentence
-that says they do not appear in an ADR-024 release. The allowlist validator also
-understands the schema's exact `canonical-design-reference` rule for
+that says they do not appear in an ADR-024 release. The loader is prepared for
+the schema's forthcoming exact `canonical-design-reference` rule for
 `docs/product/Mock/SeaRise-Flight.html`; that rule preserves design authority
 but cannot place the mock in built output.
 
@@ -86,19 +89,27 @@ three scopes:
   TiTiler, Azurite, runtime Azure geocoding, legacy Compose services, and a Node
   production server;
 - emitted output applies the same rules without any tooling exception;
-- repository readiness scans every tracked executable/configuration file and
-  classifies exact pending-removal roots separately from retained test/build
-  tooling, deterministic pipeline code, build-plane containers, and immutable
-  v1 supply-chain evidence.
+- repository readiness scans tracked source, HTML/CSS/SVG/XML, JSON, workflow,
+  environment, Terraform, Docker/Compose, and extensionless configuration
+  paths. Presence under a must-delete root fails final mode even when a survivor
+  contains no legacy token. Shared workflows and retained local server tools
+  use exact path/rule-purpose selectors rather than directory or filename
+  wildcards.
 
 Readiness classification is not removal approval. `--repository-final` changes
 every remaining pending-removal reference into a failure and also rejects any
-unclassified reference. It is the Phase 2 final clean-repository gate.
+unclassified reference. It is the Phase 2 final clean-repository gate. Printed
+occurrence counts are diagnostics only; they are not an inventory-completeness
+claim.
 
 Static-output isolation independently rejects both unversioned and `/v1/`
 forms of `/assess`, `/geocode`, and `/config`. Only exact
 `/releases/<dataReleaseId>/config/*.json` references named by the loaded release
-manifest are allowed.
+manifest are allowed. Candidate/local-data/archive paths and the canonical
+Flight path are rejected through every Vite, shell, release-manifest, and
+actual-output authorization channel before bytes are read. Every authorized
+output is then inspected as text or extracted ASCII/UTF-16 strings; exact
+Flight bytes are rejected even under a renamed manifest-authorized path.
 
 ## Commands
 

@@ -1,4 +1,5 @@
-import { mkdtempSync, mkdirSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { Buffer } from "node:buffer";
+import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -42,6 +43,26 @@ function fixture() {
   return { dist, options, paths: Object.keys(files).map((path) => resolve(dist, path)) };
 }
 
+function addArchitectureEvidence(fixtureValue, mutation = {}) {
+  const { dist, options, paths } = fixtureValue;
+  const path = `releases/${RELEASE}/evidence/architecture.json`;
+  const absolute = resolve(dist, path);
+  mkdirSync(resolve(absolute, ".."), { recursive: true });
+  writeFileSync(absolute, JSON.stringify({
+    runtime: {
+      applicationApiCalls: 0,
+      prohibitedRoutes: ["/assess", "/geocode", "/config"],
+    },
+    ...mutation,
+  }));
+  options.releaseManifest.artifacts.push({
+    artifactId: "architecture-evidence",
+    path: "evidence/architecture.json",
+    role: "architecture-evidence",
+  });
+  paths.push(absolute);
+}
+
 describe("static output isolation", () => {
   it("accepts only the exact root, Vite, source-map, and release-manifest closure", () => {
     const { dist, options, paths } = fixture();
@@ -66,16 +87,25 @@ describe("static output isolation", () => {
       .toThrow(/missing allowlisted files: releases\/.+\/config\/scenarios\.json/);
   });
 
-  it.each(["candidate-v7.tar", "unexpected-release.zip", "unknown-output.bin"])(
-    "rejects unlisted output %s without reading any private Candidate",
+  it.each(["candidate-v7.tar", "unexpected-release.zip", "local-data/private.bin"])(
+    "rejects forbidden actual output path %s before reading bytes",
     (name) => {
       const { dist, options, paths } = fixture();
       const injected = resolve(dist, name);
+      mkdirSync(resolve(injected, ".."), { recursive: true });
       writeFileSync(injected, "synthetic mutation only");
       expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
-        .toThrow(`Static output contains unlisted files: ${name}`);
+        .toThrow(/names a private Candidate, archive, or canonical design-reference output/);
     },
   );
+
+  it("rejects an ordinary unlisted output", () => {
+    const { dist, options, paths } = fixture();
+    const injected = resolve(dist, "unknown-output.bin");
+    writeFileSync(injected, "synthetic mutation only");
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
+      .toThrow("Static output contains unlisted files: unknown-output.bin");
+  });
 
   it("rejects the canonical Flight mock from built output", () => {
     const { dist, options, paths } = fixture();
@@ -83,8 +113,38 @@ describe("static output isolation", () => {
     mkdirSync(resolve(injected, ".."), { recursive: true });
     writeFileSync(injected, "synthetic design-reference mutation only");
     expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
-      .toThrow(/Static output contains unlisted files: docs\/product\/Mock\/SeaRise-Flight\.html/);
+      .toThrow(/canonical design-reference output/);
   });
+
+  it("rejects exact canonical Flight bytes under a renamed authorized path", () => {
+    const { dist, options, paths } = fixture();
+    const renamed = resolve(dist, `releases/${RELEASE}/design.bin`);
+    writeFileSync(renamed, readFileSync(resolve(process.cwd(), "../../docs/product/Mock/SeaRise-Flight.html")));
+    options.releaseManifest.artifacts.push({ path: "design.bin" });
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, renamed] }))
+      .toThrow(/Canonical Flight mock bytes are forbidden/);
+  });
+
+  it.each([
+    ["Vite", () => ({ file: "candidate-v7.js" })],
+    ["shell", null],
+  ])("rejects a forbidden %s authorization channel", (_channel, viteEntry) => {
+    const { options, paths } = fixture();
+    if (viteEntry) options.viteManifest["mutation.ts"] = viteEntry();
+    else options.shellManifestPaths.push("/local-data/private.js");
+    expect(() => validateStaticOutputIsolation({ ...options, paths }))
+      .toThrow(/names a private Candidate, archive, or canonical design-reference output/);
+  });
+
+  it.each(["buildIdentityFile", "applicationBuildIdentityFile"])(
+    "rejects a forbidden %s authorization channel",
+    (field) => {
+      const { options, paths } = fixture();
+      options[field] = "candidate-v7.json";
+      expect(() => validateStaticOutputIsolation({ ...options, paths }))
+        .toThrow(/names a private Candidate, archive, or canonical design-reference output/);
+    },
+  );
 
   it.each([
     "candidate-v7.tar",
@@ -100,7 +160,7 @@ describe("static output isolation", () => {
     writeFileSync(injected, "PRIVATE SENTINEL");
     options.releaseManifest.artifacts.push({ path: name });
     expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
-      .toThrow(/names a private Candidate or archive output/);
+      .toThrow(/names a private Candidate, archive, or canonical design-reference output/);
   });
 
   it.each([
@@ -127,5 +187,43 @@ describe("static output isolation", () => {
     writeFileSync(resolve(dist, "assets/main-01234567.js"),
       `export const unbound = ${JSON.stringify(reference)};\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(() => validateStaticOutputIsolation({ ...options, paths })).toThrow(/Forbidden runtime reference/);
+  });
+
+  it("scans manifest-authorized JSON for dynamic endpoints", () => {
+    const { dist, options, paths } = fixture();
+    writeFileSync(resolve(dist, `releases/${RELEASE}/config/scenarios.json`), '{"endpoint":"/v1/assess"}');
+    expect(() => validateStaticOutputIsolation({ ...options, paths })).toThrow(/Forbidden runtime reference/);
+  });
+
+  it("accepts only the exact architecture-evidence zero-call prohibition", () => {
+    const value = fixture();
+    addArchitectureEvidence(value);
+    expect(validateStaticOutputIsolation({ ...value.options, paths: value.paths }).allowedPaths)
+      .toContain(`releases/${RELEASE}/evidence/architecture.json`);
+  });
+
+  it("rejects endpoint mutations outside the exact architecture prohibition field", () => {
+    const value = fixture();
+    addArchitectureEvidence(value, { mutationEndpoint: "/v1/assess" });
+    expect(() => validateStaticOutputIsolation({ ...value.options, paths: value.paths }))
+      .toThrow(/Forbidden runtime reference/);
+  });
+
+  it("extracts dynamic endpoints from manifest-authorized binary bytes", () => {
+    const { dist, options, paths } = fixture();
+    const binary = resolve(dist, `releases/${RELEASE}/data.bin`);
+    writeFileSync(binary, Buffer.from([0, ...Buffer.from("/v1/geocode"), 0]));
+    options.releaseManifest.artifacts.push({ path: "data.bin" });
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, binary] }))
+      .toThrow(/Forbidden runtime reference/);
+  });
+
+  it("extracts UTF-16 dynamic endpoints from manifest-authorized binary bytes", () => {
+    const { dist, options, paths } = fixture();
+    const binary = resolve(dist, `releases/${RELEASE}/utf16.bin`);
+    writeFileSync(binary, Buffer.from(`\0${[..."/v1/config"].join("\0")}\0`, "binary"));
+    options.releaseManifest.artifacts.push({ path: "utf16.bin" });
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, binary] }))
+      .toThrow(/Forbidden runtime reference/);
   });
 });

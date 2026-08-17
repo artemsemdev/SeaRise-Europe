@@ -33,7 +33,10 @@ function fixture(overrides = {}) {
 describe("historical terminology allowlist", () => {
   it("accepts an exact path/blob/rule entry", () => {
     const { content, document } = fixture();
-    expect(validateHistoricalAllowlist(document, () => content).has("docs/evidence/historical.md")).toBe(true);
+    const entry = validateHistoricalAllowlist(document, () => content).get("docs/evidence/historical.md");
+    expect(entry.allowedClaims.has("binary-exposure-product")).toBe(true);
+    expect(entry.allowedClaims.has("property-risk-product")).toBe(false);
+    expect(entry.allowedClaims.has("future-flood-certainty")).toBe(false);
   });
 
   it("rejects a changed blob", () => {
@@ -46,10 +49,30 @@ describe("historical terminology allowlist", () => {
     { path: "docs/evidence/nested/historical.md", rule: "historical-adr-term" },
     { path: "src/web/src/App.tsx", rule: "historical-five-state-evidence" },
     { path: "docs/evidence/historical.md", activeRuntimeAllowed: true },
+    { path: "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md", rule: "historical-adr-term" },
   ])("rejects invalid rule or active-target scope %#", (overrides) => {
     const { content, document } = fixture(overrides);
     document.entries[0].gitBlobSha = blob(content);
     expect(() => validateHistoricalAllowlist(document, () => content)).toThrow(/invalid entry/);
+  });
+
+  it("rejects duplicate IDs and audited-tree drift", () => {
+    const { content, document } = fixture();
+    document.entries.push({ ...document.entries[0], path: "docs/evidence/second.md" });
+    expect(() => validateHistoricalAllowlist(document, () => content)).toThrow(/repeats id/);
+    document.entries.pop();
+    expect(() => validateHistoricalAllowlist(document, () => content, { resolveTree: () => "c".repeat(40) }))
+      .toThrow(/audited tree/);
+  });
+
+  it("rejects extra schema fields and audited-blob drift", () => {
+    const { content, document } = fixture();
+    document.unreviewed = true;
+    expect(() => validateHistoricalAllowlist(document, () => content)).toThrow(/not a v1 document/);
+    delete document.unreviewed;
+    expect(() => validateHistoricalAllowlist(document, () => content, {
+      resolveBlob: () => "d".repeat(40),
+    })).toThrow(/audited blob mismatch/);
   });
 
   it("accepts only the exact canonical Flight design-reference path", () => {

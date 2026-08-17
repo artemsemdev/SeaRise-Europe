@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,14 +23,6 @@ const canonicalFlightMockPath = resolve(
 const canonicalFlightRequirementsPath = resolve(
   repositoryRoot,
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
-);
-const approvedHistoricalAllowlistPath = resolve(
-  repositoryRoot,
-  "contracts/repository-removal/v1/historical-allowlist.json",
-);
-const preapprovalHistoricalAllowlistPath = resolve(
-  repositoryRoot,
-  "contracts/repository-removal/v1/historical-allowlist.preapproval.json",
 );
 const canonicalFlightContractMarkers = Object.freeze([
   "ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.",
@@ -64,6 +57,31 @@ const historicalRules = Object.freeze({
   "immutable-v1-supply-chain-evidence": /^contracts\/supply-chain\/v1\//u,
   "canonical-design-reference": /^docs\/product\/Mock\/SeaRise-Flight\.html$/u,
 });
+const historicalRuleClaims = Object.freeze({
+  "historical-adr-term": new Set([
+    "legacy-outcome-modeled-exposure",
+    "legacy-outcome-no-modeled-exposure",
+  ]),
+  "historical-changelog-term": new Set([
+    "legacy-outcome-modeled-exposure",
+    "legacy-outcome-no-modeled-exposure",
+  ]),
+  "historical-five-state-evidence": new Set([
+    "legacy-outcome-modeled-exposure",
+    "legacy-outcome-no-modeled-exposure",
+    "legacy-copy-modeled-exposure",
+    "legacy-copy-no-modeled-exposure",
+    "binary-exposure-product",
+    "terrain-comparison-product",
+  ]),
+  "immutable-v1-supply-chain-evidence": new Set(),
+  "canonical-design-reference": new Set(),
+});
+const activeAuthorityPaths = new Set([
+  "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+  "docs/methodology.md",
+  "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
+]);
 
 export const prohibitedTargetClaims = Object.freeze([
   Object.freeze({ id: "legacy-outcome-modeled-exposure", pattern: /\bModeledExposureDetected\b/giu }),
@@ -112,35 +130,101 @@ function gitBlobSha(content) {
   return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
 }
 
-export function validateHistoricalAllowlist(document, readPath) {
-  if (!document || document.schemaVersion !== "1.0.0" || !Array.isArray(document.entries)) {
+function hasExactKeys(value, expected) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
+}
+
+export function validateHistoricalAllowlist(document, readPath, {
+  resolveTree = null,
+  resolveBlob = null,
+} = {}) {
+  if (!document || document.schemaVersion !== "1.0.0" || !Array.isArray(document.entries)
+      || document.entries.length === 0
+      || !/^[a-f0-9]{40}$/u.test(document.auditedCommit ?? "")
+      || !/^[a-f0-9]{40}$/u.test(document.auditedTree ?? "")
+      || !hasExactKeys(document, ["schemaVersion", "auditedCommit", "auditedTree", "entries"])) {
     throw new Error("Historical terminology allowlist is not a v1 document");
   }
+  if (resolveTree && resolveTree(document.auditedCommit) !== document.auditedTree) {
+    throw new Error("Historical terminology allowlist audited tree does not match its commit");
+  }
   const entries = new Map();
+  const ids = new Set();
   for (const entry of document.entries) {
     const rule = historicalRules[entry?.rule];
-    if (!entry || typeof entry.path !== "string" || !rule || !rule.test(entry.path)
+    if (!entry || !hasExactKeys(entry, [
+      "id", "path", "gitBlobSha", "rule", "reason", "activeRuntimeAllowed",
+    ]) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(entry.id ?? "")
+        || typeof entry.path !== "string" || !rule || !rule.test(entry.path)
+        || !/^[a-f0-9]{40}$/u.test(entry.gitBlobSha ?? "")
+        || typeof entry.reason !== "string" || entry.reason.length === 0
         || entry.activeRuntimeAllowed !== false || entry.path.startsWith("src/web/")
-        || entry.path.startsWith("src/pipeline/searise_pipeline/")) {
+        || entry.path.startsWith("src/pipeline/searise_pipeline/")
+        || activeAuthorityPaths.has(entry.path)) {
       throw new Error(`Historical terminology allowlist has an invalid entry: ${entry?.id ?? "unknown"}`);
     }
+    if (ids.has(entry.id)) throw new Error(`Historical terminology allowlist repeats id ${entry.id}`);
     if (entries.has(entry.path)) throw new Error(`Historical terminology allowlist repeats ${entry.path}`);
+    ids.add(entry.id);
     const content = readPath(entry.path);
     if (gitBlobSha(content) !== entry.gitBlobSha) {
       throw new Error(`Historical terminology allowlist blob mismatch: ${entry.path}`);
     }
-    entries.set(entry.path, Object.freeze({ rule: entry.rule, gitBlobSha: entry.gitBlobSha }));
+    if (resolveBlob && resolveBlob(document.auditedCommit, entry.path) !== entry.gitBlobSha) {
+      throw new Error(`Historical terminology allowlist audited blob mismatch: ${entry.path}`);
+    }
+    entries.set(entry.path, Object.freeze({
+      rule: entry.rule,
+      gitBlobSha: entry.gitBlobSha,
+      allowedClaims: historicalRuleClaims[entry.rule],
+    }));
   }
   return entries;
 }
 
-export function loadHistoricalAllowlist() {
-  const path = existsSync(approvedHistoricalAllowlistPath)
-    ? approvedHistoricalAllowlistPath : preapprovalHistoricalAllowlistPath;
+function approvedRemovalChain(root) {
+  const validator = resolve(root, "scripts/repository/validate_removal_approval.py");
+  if (!existsSync(validator)) throw new Error("Approved repository-removal validator is missing");
+  try {
+    execFileSync("python3", [validator, "--repository-root", root], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+  } catch (error) {
+    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
+    throw new Error(`Repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
+  }
+}
+
+export function loadHistoricalAllowlist({
+  authority = "readiness",
+  root = repositoryRoot,
+  validateApproval = approvedRemovalChain,
+} = {}) {
+  const approvedPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.json");
+  const preapprovalPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.preapproval.json");
+  if (authority === "approved") {
+    if (!existsSync(approvedPath)) throw new Error("Approved historical allowlist is missing");
+    validateApproval(root);
+  } else if (authority !== "readiness") {
+    throw new Error(`Unknown historical allowlist authority: ${authority}`);
+  }
+  const path = existsSync(approvedPath) ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
   const document = JSON.parse(readFileSync(path, "utf8"));
   return validateHistoricalAllowlist(document, (repositoryPath) =>
-    readFileSync(resolve(repositoryRoot, repositoryPath), "utf8"));
+    readFileSync(resolve(root, repositoryPath), "utf8"), {
+    resolveTree: (commit) => execFileSync("git", ["rev-parse", `${commit}^{tree}`], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim(),
+    resolveBlob: (commit, repositoryPath) => execFileSync("git", ["rev-parse", `${commit}:${repositoryPath}`], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim(),
+  });
 }
 
 function activeMethodology(content, path) {
@@ -262,15 +346,16 @@ function main() {
   const allowedHistoricalPaths = builtRoot ? new Map() : loadHistoricalAllowlist();
   const violations = [];
   for (const path of files) {
+    const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
     const content = activeAuthoritativeDocument(readFileSync(path, "utf8"), path);
     const contentViolations = [...scanContent(content)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")
-      || path.startsWith(`${resolve(webRoot, "src")}${sep}`);
+      || path.startsWith(`${resolve(webRoot, "src")}${sep}`)
+      || allowedHistoricalPaths.has(repositoryPath);
     if (isProductCopy) contentViolations.push(...scanProductCopy(content));
     for (const violation of contentViolations) {
-      const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
-      if (allowedHistoricalPaths.has(repositoryPath)) continue;
+      if (allowedHistoricalPaths.get(repositoryPath)?.allowedClaims.has(violation.claim)) continue;
       violations.push(`${relative(repositoryRoot, path)}:${violation.line}: ${violation.claim} (${violation.text})`);
     }
   }
