@@ -15,7 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .contracts import SupplyChainContractError, validate_dependency_inventory
-from .static_profile import validate_static_target_profile
+from .static_profile import _HISTORICAL_EVIDENCE, load_static_target_profile_contract
 
 
 def _git(repository_root: Path, *arguments: str) -> bytes:
@@ -53,8 +53,10 @@ def materialize_historical_dependency_authority(
     repository_root: Path,
 ) -> Iterator[tuple[Path, Path]]:
     """Yield the v1 authority exactly as recorded by the v2 transition profile."""
-    profile = validate_static_target_profile(profile_path, repository_root=repository_root)
+    profile = load_static_target_profile_contract(profile_path, repository_root=repository_root)
     historical = profile["historicalEvidence"]
+    if historical != _HISTORICAL_EVIDENCE:
+        raise SupplyChainContractError("historical Phase 1 authority drifted")
     inventory_descriptor = historical["dependencyInventory"]
     git_authority = historical["gitAuthority"]
     inventory_path = _safe_path(inventory_descriptor["path"])

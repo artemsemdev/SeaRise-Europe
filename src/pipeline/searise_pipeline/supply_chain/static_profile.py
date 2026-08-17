@@ -606,12 +606,12 @@ def _expected_transition(
     return present, sorted(issues), python_pending
 
 
-def validate_static_target_profile(
+def load_static_target_profile_contract(
     profile_path: Path,
     *,
     repository_root: Path = REPOSITORY_ROOT,
 ) -> dict[str, Any]:
-    """Validate exact target inputs, transition blockers, and reusable SBOM graphs."""
+    """Validate the v2 profile schema without asserting current-tree authority."""
     document = _load_strict_json(profile_path, label="static supply-chain profile")
     schema_path = _safe_regular_file(repository_root, _SCHEMA_PATH)
     schema = _load_strict_json(schema_path, label="static supply-chain schema")
@@ -624,6 +624,19 @@ def validate_static_target_profile(
         error = errors[0]
         location = ".".join(str(part) for part in error.absolute_path) or "$"
         raise SupplyChainContractError(f"static supply-chain profile {location}: {error.message}")
+    return document
+
+
+def validate_static_target_profile(
+    profile_path: Path,
+    *,
+    repository_root: Path = REPOSITORY_ROOT,
+) -> dict[str, Any]:
+    """Validate exact target inputs, transition blockers, and reusable SBOM graphs."""
+    document = load_static_target_profile_contract(
+        profile_path,
+        repository_root=repository_root,
+    )
 
     if document["excludedLegacyRequirements"] != _EXPECTED_EXCLUSIONS:
         raise SupplyChainContractError("static supply-chain legacy exclusions drifted")
