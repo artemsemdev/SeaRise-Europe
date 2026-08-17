@@ -51,7 +51,12 @@ def _run(
         if not selected:
             raise click.ClickException("No acquisition targets were selected")
         for source, asset in selected:
-            _, receipt = getattr(acquirer, operation)(source, asset)
+            if operation == "fetch":
+                _, receipt = acquirer.fetch(source, asset)
+            elif operation == "verify":
+                _, receipt = acquirer.verify(source, asset)
+            else:
+                raise click.ClickException(f"Unsupported acquisition operation: {operation}")
             click.echo(receipt.to_json().rstrip())
     except (RegistryError, AcquisitionError) as exc:
         if isinstance(exc, AcquisitionError):

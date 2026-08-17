@@ -38,7 +38,6 @@ REVIEW_PATH = CONTRACT_DIR / "scope-connectivity-review.json"
 PACKAGE_ROOT = REPO_ROOT / "src" / "pipeline" / "searise_pipeline"
 LEGACY_DOMAIN = "searise_pipeline.domain"
 DYNAMIC_IMPORT_PRIMITIVES = frozenset({"__import__", "import_module"})
-DUCKDB_IMPORT_PATH = "settlements/spatial_toolchain.py"
 
 
 def _constant_string(node: ast.AST) -> str | None:
@@ -56,116 +55,8 @@ def _is_legacy_domain(value: str) -> bool:
     return value == LEGACY_DOMAIN or value.startswith(f"{LEGACY_DOMAIN}.")
 
 
-def _is_allowlisted_duckdb_import(node: ast.Call, path: str) -> bool:
-    return (
-        path == DUCKDB_IMPORT_PATH
-        and isinstance(node.func, ast.Attribute)
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id == "importlib"
-        and node.func.attr == "import_module"
-        and len(node.args) == 1
-        and isinstance(node.args[0], ast.Constant)
-        and type(node.args[0].value) is str
-        and node.args[0].value == "duckdb"
-        and not node.keywords
-    )
-
-
-def _has_immutable_stdlib_importlib_binding(tree: ast.Module) -> bool:
-    exact_imports = [
-        node
-        for node in tree.body
-        if isinstance(node, ast.Import)
-        and len(node.names) == 1
-        and node.names[0].name == "importlib"
-        and node.names[0].asname is None
-    ]
-    if len(exact_imports) != 1:
-        return False
-    exact_import = exact_imports[0]
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                bound_name = alias.asname or alias.name.split(".")[0]
-                if bound_name == "importlib" and node is not exact_import:
-                    return False
-        elif isinstance(node, ast.ImportFrom):
-            if any(
-                alias.name == "*" or (alias.asname or alias.name) == "importlib"
-                for alias in node.names
-            ):
-                return False
-        elif (
-            isinstance(node, ast.Name)
-            and node.id == "importlib"
-            and isinstance(node.ctx, (ast.Store, ast.Del))
-        ):
-            return False
-        elif isinstance(node, ast.arg) and node.arg == "importlib":
-            return False
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            if node.name == "importlib":
-                return False
-        elif isinstance(node, ast.ExceptHandler) and node.name == "importlib":
-            return False
-        elif (
-            type(node).__name__ in {"MatchAs", "MatchStar"}
-            and getattr(node, "name", None) == "importlib"
-        ):
-            return False
-    return True
-
-
 def _is_name(node: ast.AST, name: str) -> bool:
     return isinstance(node, ast.Name) and node.id == name
-
-
-def _is_safe_computed_call(node: ast.Call, path: str) -> bool:
-    if path == "candidate_completeness/qa_dispatch.py":
-        return (
-            isinstance(node.func, ast.Subscript)
-            and isinstance(node.func.value, ast.Attribute)
-            and _is_name(node.func.value.value, "self")
-            and node.func.value.attr == "_validators"
-            and _is_name(node.func.slice, "validator_id")
-            and len(node.args) == 1
-            and _is_name(node.args[0], "request")
-            and not node.keywords
-        )
-    if path == "settlements/full_source_stage.py":
-        return (
-            isinstance(node.func, ast.Subscript)
-            and _is_name(node.func.value, "actions")
-            and _is_name(node.func.slice, "name")
-            and not node.args
-            and not node.keywords
-        )
-    if path == "settlements/spatial_asset_authority.py":
-        return (
-            isinstance(node.func, ast.Call)
-            and _is_name(node.func.func, "getattr")
-            and len(node.func.args) == 3
-            and _is_name(node.func.args[0], "error")
-            and _constant_string(node.func.args[1]) == "add_note"
-            and isinstance(node.func.args[2], ast.Lambda)
-            and not node.func.keywords
-            and len(node.args) == 1
-            and not node.keywords
-        )
-    if path == "sources/cli.py":
-        return (
-            isinstance(node.func, ast.Call)
-            and _is_name(node.func.func, "getattr")
-            and len(node.func.args) == 2
-            and _is_name(node.func.args[0], "acquirer")
-            and _is_name(node.func.args[1], "operation")
-            and not node.func.keywords
-            and len(node.args) == 2
-            and _is_name(node.args[0], "source")
-            and _is_name(node.args[1], "asset")
-            and not node.keywords
-        )
-    return False
 
 
 def _is_safe_getattr(
@@ -223,13 +114,7 @@ def _is_safe_getattr(
             and isinstance(parent, ast.GeneratorExp)
             and parent.elt is node
         )
-    return path == "sources/cli.py" and isinstance(parent, ast.Call) and (
-        parent.func is node
-        and _is_safe_computed_call(parent, path)
-        and len(node.args) == 2
-        and _is_name(node.args[0], "acquirer")
-        and _is_name(node.args[1], "operation")
-    )
+    return False
 
 
 def _is_safe_locals_call(node: ast.Call, parent: ast.AST | None) -> bool:
@@ -279,19 +164,6 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
         for node in ast.walk(tree)
         for child in ast.iter_child_nodes(node)
     }
-    duckdb_calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and _is_allowlisted_duckdb_import(node, path)
-    ]
-    immutable_importlib = _has_immutable_stdlib_importlib_binding(tree)
-    if duckdb_calls and not immutable_importlib:
-        violations.add("dynamic-import:untrusted-importlib-binding")
-    allowlisted_dynamic_references = {
-        id(node.func)
-        for node in duckdb_calls
-        if immutable_importlib
-    }
     for node in ast.walk(tree):
         parent = parents.get(id(node))
         if isinstance(node, ast.Import):
@@ -312,13 +184,11 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
         if (
             isinstance(node, ast.Name)
             and node.id in DYNAMIC_IMPORT_PRIMITIVES
-            and id(node) not in allowlisted_dynamic_references
         ):
             violations.add(f"dynamic-import:{node.id}:{node.lineno}")
         elif (
             isinstance(node, ast.Attribute)
             and node.attr in DYNAMIC_IMPORT_PRIMITIVES
-            and id(node) not in allowlisted_dynamic_references
         ):
             violations.add(f"dynamic-import:{node.attr}:{node.lineno}")
 
@@ -330,9 +200,7 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
                 violations.add(f"dynamic-import-literal:{constant}:{node.lineno}")
 
         if isinstance(node, ast.Call):
-            if isinstance(node.func, (ast.Call, ast.Subscript)) and not (
-                _is_safe_computed_call(node, path)
-            ):
+            if isinstance(node.func, (ast.Call, ast.Subscript)):
                 violations.add(f"dynamic-import:computed-callable:{node.lineno}")
             if isinstance(node.func, ast.Name):
                 if node.func.id == "getattr" and not _is_safe_getattr(
@@ -367,6 +235,18 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
             and _constant_string(node.slice) == "importlib"
         ):
             violations.add(f"dynamic-import:importlib-mapping-rebind:{node.lineno}")
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr == "importlib"
+            and isinstance(node.ctx, (ast.Store, ast.Del))
+        ):
+            violations.add(f"dynamic-import:importlib-attribute-rebind:{node.lineno}")
+        if (
+            isinstance(node, ast.Name)
+            and node.id == "importlib"
+            and isinstance(node.ctx, (ast.Store, ast.Del))
+        ):
+            violations.add(f"dynamic-import:importlib-name-rebind:{node.lineno}")
 
         if isinstance(node, ast.Call):
             positional = [_constant_string(argument) for argument in node.args]
@@ -706,13 +586,10 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
     for source, package in mutations:
         assert _retained_import_violations(source, package, "science/mutation.py")
 
-    assert (
-        _retained_import_violations(
-            'import importlib\nimportlib.import_module("duckdb")',
-            "searise_pipeline.settlements",
-            DUCKDB_IMPORT_PATH,
-        )
-        == set()
+    assert _retained_import_violations(
+        'import importlib\nimportlib.import_module("duckdb")',
+        "searise_pipeline.settlements",
+        "settlements/spatial_toolchain.py",
     )
     rejected_duckdb_mutations = (
         'import importlib\nimportlib.import_module("sqlite")',
@@ -724,7 +601,7 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
         assert _retained_import_violations(
             source,
             "searise_pipeline.settlements",
-            DUCKDB_IMPORT_PATH,
+            "settlements/spatial_toolchain.py",
         )
     assert _retained_import_violations(
         'import importlib\nimportlib.import_module("duckdb")',
@@ -795,7 +672,7 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
         assert _retained_import_violations(
             source,
             "searise_pipeline.settlements",
-            DUCKDB_IMPORT_PATH,
+            "settlements/spatial_toolchain.py",
         )
 
     structural_policy_mutations = (
@@ -825,7 +702,51 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
         assert expected in _retained_import_violations(
             source,
             "searise_pipeline.settlements",
-            DUCKDB_IMPORT_PATH,
+            "settlements/spatial_toolchain.py",
+        )
+
+    executable_shape_mutations = (
+        (
+            "registry[key](request)",
+            "candidate_completeness/qa_dispatch.py",
+            "dynamic-import:computed-callable:1",
+        ),
+        (
+            "actions[name]()",
+            "settlements/full_source_stage.py",
+            "dynamic-import:computed-callable:1",
+        ),
+        (
+            "getattr(acquirer, operation)(source, asset)",
+            "sources/cli.py",
+            "dynamic-import:computed-callable:1",
+        ),
+        (
+            "loader = getattr(value, field)\nloader(request)",
+            "candidate_completeness/byte_gate.py",
+            "dynamic-import:reflection:getattr:1",
+        ),
+        (
+            "payload = geometry.__dict__\nloader = payload[field]\nloader(request)",
+            "settlements/spatial_classification.py",
+            "dynamic-import:reflection:__dict__:1",
+        ),
+        (
+            "holder.importlib = proxy",
+            "science/mutation.py",
+            "dynamic-import:importlib-attribute-rebind:1",
+        ),
+        (
+            "del holder.importlib",
+            "science/mutation.py",
+            "dynamic-import:importlib-attribute-rebind:1",
+        ),
+    )
+    for source, path, expected in executable_shape_mutations:
+        assert expected in _retained_import_violations(
+            source,
+            "searise_pipeline.science",
+            path,
         )
 
     violations = []

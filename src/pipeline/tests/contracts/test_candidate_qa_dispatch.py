@@ -78,6 +78,17 @@ def test_unknown_selector_fails_before_any_validator_runs() -> None:
     assert caught.value.code == "qa-validator-route"
 
 
+def test_dispatcher_fails_closed_if_a_bound_implementation_disappears() -> None:
+    dispatcher = QaValidatorDispatcher(_registry())
+    validator_id = dispatcher.validator_id_for(_request().selector)
+    dispatcher._validators.pop(validator_id)
+
+    with pytest.raises(CandidateContractError) as caught:
+        dispatcher.dispatch(_request())
+
+    assert caught.value.code == "qa-validator-route"
+
+
 @pytest.mark.parametrize(
     "outcome",
     [

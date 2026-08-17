@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -236,6 +237,17 @@ def test_default_live_verifier_requires_python_311_before_duckdb_import(
     monkeypatch.setattr(spatial_toolchain.sys, "version_info", (3, 10, 9))
 
     with pytest.raises(SpatialToolchainError, match="requires Python 3.11"):
+        verify_spatial_toolchain(cache_root, manifest, platform_key="linux-x86_64")
+
+
+def test_default_live_verifier_reports_a_missing_duckdb_dependency(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest, cache_root = _prepared_cache(tmp_path)
+    monkeypatch.setattr(spatial_toolchain.sys, "version_info", (3, 11, 0))
+    monkeypatch.setitem(sys.modules, "duckdb", None)
+
+    with pytest.raises(ModuleNotFoundError):
         verify_spatial_toolchain(cache_root, manifest, platform_key="linux-x86_64")
 
 

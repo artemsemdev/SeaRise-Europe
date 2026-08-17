@@ -199,8 +199,11 @@ class QaValidatorDispatcher:
     def dispatch(self, request: QaValidationRequest) -> QaValidationOutcome:
         """Run the selected validator and require an explicit, well-formed outcome."""
         validator_id = self.validator_id_for(request.selector)
+        validator = self._validators.get(validator_id)
+        if validator is None:
+            _fail("qa-validator-route", f"validator implementation is missing: {validator_id}")
         try:
-            outcome = self._validators[validator_id](request)
+            outcome = validator(request)
         except CandidateContractError:
             raise
         except Exception as exc:
