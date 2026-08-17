@@ -17,7 +17,7 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
   --repository-root .
 ```
 
-The current readiness record validates 54 exact inputs. It also regenerates and compares the
+The current readiness record validates 57 exact inputs. It also regenerates and compares the
 static `src/web` npm SBOM and the Linux/macOS release and settlement Python
 SBOMs against their locked graphs. Input paths must be repository-relative,
 regular, non-symlinked files with exact SHA-256 values.
@@ -25,6 +25,13 @@ regular, non-symlinked files with exact SHA-256 values.
 The v2 npm artifact uses the explicit `static-web-npm-lock-only` scope and is
 derived from a root lock with exactly one `src/web`
 workspace. Next.js packages and `src/frontend` workspace metadata fail closed.
+The separate `static-quality-npm` component binds only its isolated package and
+lock, while the `github-actions` component binds the dedicated generic-host and
+Lighthouse workflow. The transitional v1 compatibility exception is exact to
+those three paths; sibling workflows or alternative lock aliases remain
+discoverable and fail closed. Historical transition validation verifies each
+file's v2 profile SHA-256 before comparing its `100644` mode authority, so the
+compatibility exception cannot admit mutable bytes or executable-bit drift.
 The v2 contributor manifest likewise omits and rejects the legacy
 `psycopg2-binary` and `azure-storage-blob` adapters while retaining the exact
 release and settlement graphs used by deterministic builds.

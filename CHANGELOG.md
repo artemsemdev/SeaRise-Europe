@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added clean-clone generic static-host and Chromium Lighthouse gates. The
+  production build now emits deterministic Brotli/gzip sidecars, validates
+  both static routes, build/release identity, assets, static 404 behavior, and
+  zero dynamic legacy endpoint handling, and requires at least 90 in all four
+  Lighthouse mobile categories across three isolated audits. Initial CSS is
+  embedded, the two initial Flight fonts are preloaded, scientific runtime
+  and release bootstrap loading are deferred past the initial render, and
+  generated delivery sidecars cannot expand the exact manifest-authorized
+  release inventory. Lighthouse
+  and generic-host dependencies use a separate audited quality-tool lock so
+  immutable Phase 1 npm and PMTiles evidence remains unchanged.
+
 - Added a versioned static-browser supply-chain transition profile that locks
   the retained web npm, Python, settlement, scientific, build-plane, signing,
   and SBOM target authorities while honestly recording the Azure/PostGIS and

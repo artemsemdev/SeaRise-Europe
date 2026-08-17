@@ -39,7 +39,7 @@ function fakeDeployment(output, expected) {
   const precacheSetSha256 = digest(expected.label.toLowerCase());
   mkdirSync(join(output, "assets"), { recursive: true });
   mkdirSync(join(output, "releases", OFFLINE_LIFECYCLE_RELEASE_ID, "config"), { recursive: true });
-  writeFileSync(join(output, "index.html"), `<head><script src="/assets/application-build-identity.js"></script></head><body><h1>${expected.label}</h1></body>`);
+  writeFileSync(join(output, "index.html"), `<head><script defer src="/assets/application-build-identity.js"></script></head><body><h1>${expected.label}</h1></body>`);
   writeFileSync(join(output, "build-identity.json"), JSON.stringify(identity));
   writeFileSync(join(output, "assets/application-build-identity.js"), serializeApplicationBuildIdentity(identity));
   writeFileSync(join(output, "releases", OFFLINE_LIFECYCLE_RELEASE_ID, "manifest.json"), JSON.stringify({

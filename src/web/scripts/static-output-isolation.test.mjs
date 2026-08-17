@@ -66,6 +66,14 @@ describe("static output isolation", () => {
       .toThrow(/missing allowlisted files: releases\/.+\/config\/scenarios\.json/);
   });
 
+  it("rejects a generated sidecar inside the exact manifest-authorized release", () => {
+    const { dist, options, paths } = fixture();
+    const injected = resolve(dist, `releases/${RELEASE}/config/scenarios.json.br`);
+    writeFileSync(injected, "synthetic compressed mutation");
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
+      .toThrow(/non-manifest precompressed sidecar/);
+  });
+
   it.each(["candidate-v7.tar", "unexpected-release.zip", "unknown-output.bin"])(
     "rejects unlisted output %s without reading any private Candidate",
     (name) => {

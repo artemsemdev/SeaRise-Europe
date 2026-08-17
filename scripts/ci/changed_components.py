@@ -46,6 +46,7 @@ WEB = (
     "package.json",
     "package-lock.json",
     "src/web/**",
+    "tools/static-quality/**",
     "contracts/release/v1/**",
     "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
     "src/pipeline/evidence/ar6-regional-release/**",
@@ -159,7 +160,7 @@ COMPOSE = (
     "src/api/SeaRise.Api/appsettings*.json",
 )
 
-CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**")
+CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**", "tools/static-quality/**")
 
 CODEQL_CSHARP = ("src/api/**",)
 

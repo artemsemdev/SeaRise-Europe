@@ -23,7 +23,7 @@ import {
 import { ProjectionPanel } from "./components/ProjectionPanel";
 import { SettlementSearch } from "./components/SettlementSearch";
 import { releaseLabel, runtimeConfig } from "./config";
-import { technicalErrorFrom } from "./data/manifest-repository";
+import { technicalErrorFrom } from "./data/technical-error";
 import {
   selectionKey,
   visibleAcceptedProjection,

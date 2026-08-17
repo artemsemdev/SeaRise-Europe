@@ -280,6 +280,14 @@ Use a production-like browser and a documented hardware/network profile.
 Store machine-readable results with the candidate release and expose the
 current summary on `/about/architecture`.
 
+The clean-clone implementation of this gate is documented in
+`docs/operations/generic-static-host-validation.md`. It uses a pinned generic
+static-file server, precompressed production output, Lighthouse 13.4.1's
+simulated mobile profile, and Playwright Chromium. The quality tools use their
+own audited lock and do not alter immutable Phase 1 npm evidence. All four
+category scores
+must be at least 90; Firefox and WebKit are outside this Phase 2 gate.
+
 ## 6. CI stages
 
 1. **Fast checks:** format, lint, type check, unit, property, schema, and small

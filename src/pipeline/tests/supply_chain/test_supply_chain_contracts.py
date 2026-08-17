@@ -495,6 +495,32 @@ def test_dependency_discovery_rejects_new_unclassified_input(tmp_path: Path) -> 
         validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
 
 
+def test_v1_dependency_discovery_excludes_only_exact_static_quality_authority(
+    tmp_path: Path,
+) -> None:
+    quality = tmp_path / "tools" / "static-quality"
+    quality.mkdir(parents=True)
+    (quality / "package.json").write_text('{"private": true}\n', encoding="utf-8")
+    (quality / "package-lock.json").write_text(
+        '{"lockfileVersion": 3, "packages": {}}\n', encoding="utf-8"
+    )
+    (quality / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    workflow = tmp_path / ".github/workflows/static-quality.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("jobs: {}\n", encoding="utf-8")
+    sibling_workflow = tmp_path / ".github/workflows/static-quality-extra.yml"
+    sibling_workflow.write_text("jobs: {}\n", encoding="utf-8")
+    similarly_named = tmp_path / "other" / "static-quality" / "package.json"
+    similarly_named.parent.mkdir(parents=True)
+    similarly_named.write_text('{"private": true}\n', encoding="utf-8")
+
+    assert discover_dependency_inputs(tmp_path) == (
+        ".github/workflows/static-quality-extra.yml",
+        "other/static-quality/package.json",
+        "tools/static-quality/pnpm-lock.yaml",
+    )
+
+
 def test_dependency_discovery_includes_local_composite_actions(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     _copy_dependency_inputs(repository)

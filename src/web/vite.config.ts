@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 import { applicationBuildIdentityPlugin } from "./scripts/application-build-identity.mjs";
 import { buildIdentityFile, resolveBuildIdentity } from "./scripts/build-identity.mjs";
 import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
+import { inlineInitialStyles } from "./scripts/static-delivery-assets.mjs";
 import { resolveStaticBuildRoot } from "./scripts/static-build-root.mjs";
 
 const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
@@ -89,6 +90,12 @@ export default defineConfig(({ mode }) => {
           mkdirSync(destination, { recursive: true });
           cpSync(fixturePayloadRoot, destination, { recursive: true });
           cpSync(fixtureOverlayRoot, destination, { recursive: true });
+        },
+      },
+      {
+        name: "static-delivery-assets",
+        closeBundle() {
+          inlineInitialStyles(buildRoot);
         },
       },
       {

@@ -36,6 +36,7 @@ _HISTORICAL_EVIDENCE = {
         ".github/workflows/offline-release-controlled.yml": "100644",
         ".github/workflows/phase-0r-owner-promotion.yml": "100644",
         ".github/workflows/phase-1-release-sign.yml": "100644",
+        ".github/workflows/static-quality.yml": "100644",
         "contracts/supply-chain/v2/historical/v1-contracts.py": "100644",
         "docker-compose.yml": "100644",
         "infra/blob-seed/Dockerfile": "100644",
@@ -73,6 +74,8 @@ _HISTORICAL_EVIDENCE = {
         "src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json": "100644",
         "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json": "100644",
         "src/web/package.json": "100644",
+        "tools/static-quality/package-lock.json": "100644",
+        "tools/static-quality/package.json": "100644",
     },
     "validatorAuthority": {
         "path": _HISTORICAL_VALIDATOR_PATH,
@@ -92,6 +95,7 @@ _BASE_COMPONENTS = {
     "profile-contract": ("standard-schema", "candidate", "locked"),
     "provenance-signing-contracts": ("standard-schema", "candidate", "locked"),
     "settlement-spatial-python": ("python", "candidate", "locked"),
+    "static-quality-npm": ("npm", "development", "locked"),
     "static-web-npm": ("npm", "candidate", "locked"),
     "vendored-cyclonedx-schemas": ("standard-schema", "candidate", "locked"),
 }
@@ -122,6 +126,7 @@ _BASE_INPUT_AUTHORITY = {
         ".github/workflows/offline-release-controlled.yml",
         ".github/workflows/phase-0r-owner-promotion.yml",
         ".github/workflows/phase-1-release-sign.yml",
+        ".github/workflows/static-quality.yml",
     ),
     **_authority(
         "provenance-signing-contracts",
@@ -180,6 +185,8 @@ _BASE_INPUT_AUTHORITY = {
     ),
     **_authority("profile-contract", "schema", _SCHEMA_PATH),
     **_authority("profile-contract", "manifest", _HISTORICAL_VALIDATOR_PATH),
+    **_authority("static-quality-npm", "lock", "tools/static-quality/package-lock.json"),
+    **_authority("static-quality-npm", "manifest", "tools/static-quality/package.json"),
     **_authority("static-web-npm", "lock", "package-lock.json"),
     **_authority("static-web-npm", "manifest", "package.json", "src/web/package.json"),
     **_authority(
