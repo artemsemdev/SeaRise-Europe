@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-17",
   "evidence": {
+    "local-2026-08-17-generic-static-lighthouse": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T11:55:05+02:00",
+      "reference": "docs/operations/generic-static-host-validation.md, src/web/scripts/validate-generic-static-host.mjs, and src/web/scripts/run-lighthouse-gate.mjs",
+      "environment": "macOS arm64; Node 20.20.1; Lighthouse 12.8.2; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; simulated mobile profile; scores performance 90, accessibility 100, best practices 96, SEO 100; static routes, build/release identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
+    },
     "local-2026-08-17-offline-lifecycle-journey": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T09:42:00+02:00",
@@ -442,6 +448,23 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 20, "class": "fast", "evidenceRef": "local-2026-08-16-static-shell", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Production build inspection independently reconstructs the recursive Vite, lazy map, Worker, WASM, CSS, and font closure. A Chromium journey warms the committed synthetic fixture, removes the network, reloads the full Flight app, repeats search and one accepted assessment, and observes connection-required for an uncached horizon. Same-origin CSP, later-fourth-chunk SHA verification, and explicit 2,500 ms cold/100 ms cached-p95 budgets remain covered. APIRequestContext inspects CORS headers but does not prove public browser enforcement." }
+    },
+    {
+      "id": "static-generic-host-lighthouse",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "integration",
+      "owner": "platform",
+      "purpose": "Prove the production output works on a pinned generic static-file server, exposes only the two intended document routes and immutable build/release assets, returns static 404 responses for unknown and legacy application endpoints, and meets the >=90 Lighthouse mobile performance, accessibility, best-practices, and SEO budgets in Chromium.",
+      "sourcePaths": ["src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "src/web/scripts/validate-generic-static-host.mjs", "src/web/scripts/run-lighthouse-gate.mjs", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
+      "changedPaths": ["src/web/**", "package.json", "package-lock.json", ".github/workflows/ci.yml"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent generic static-host portability, static-route, zero-dynamic-endpoint, and Chromium Lighthouse quality gate." },
+      "commands": { "focused": "npm run web:build && npm run web:validate:static-host && npm run web:validate:lighthouse", "full": "npm run web:check && npm run web:validate:static-host && npm run web:validate:lighthouse && npm run web:e2e" },
+      "execution": { "tier": "release", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 30, "class": "slow", "evidenceRef": "local-2026-08-17-generic-static-lighthouse", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Pinned Node, Lighthouse, Playwright Chromium, sirv-cli, committed synthetic fixture, precompressed bytes, simulated mobile profile, and loopback origin remove external service, data, and network dependencies. The gate preserves simulated mobile CPU/network behavior and fails below 90." }
     },
     {
       "id": "static-offline-contracts",
@@ -1726,6 +1749,7 @@
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/application-build-identity.test.mjs", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/build-identity.test.mjs", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/generic-static-host.test.mjs", "suite": "static-generic-host-lighthouse", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/offline-lifecycle-fixtures.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/offline-lifecycle-server.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/static-build-root.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },

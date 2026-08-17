@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added clean-clone generic static-host and Chromium Lighthouse gates. The
+  production build now emits deterministic Brotli/gzip sidecars, validates
+  both static routes, build/release identity, assets, static 404 behavior, and
+  zero dynamic legacy endpoint handling, and requires at least 90 in all four
+  Lighthouse mobile categories. Initial CSS is embedded and scientific runtime
+  loading is deferred past the initial render to satisfy the performance gate.
+
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,

@@ -130,6 +130,21 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Validate generic static hosting
+        run: npm run web:validate:static-host
+
+      - name: Enforce Lighthouse mobile quality budgets
+        run: npm run web:validate:lighthouse
+
+      - name: Retain Lighthouse evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: phase2-lighthouse-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: src/web/test-results/lighthouse/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Browser smoke and accessibility
         run: npm run web:e2e
 

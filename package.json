@@ -15,6 +15,8 @@
     "web:type-check": "npm run type-check --workspace @searise/web",
     "web:test": "npm run test --workspace @searise/web",
     "web:build": "npm run build --workspace @searise/web",
+    "web:validate:static-host": "npm run validate:static-host --workspace @searise/web",
+    "web:validate:lighthouse": "npm run validate:lighthouse --workspace @searise/web",
     "web:serve": "npm run serve --workspace @searise/web",
     "web:serve:offline-lifecycle": "npm run serve:offline-lifecycle --workspace @searise/web",
     "web:e2e:offline-lifecycle": "npm run e2e:offline-lifecycle --workspace @searise/web",
