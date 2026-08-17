@@ -21,6 +21,7 @@ import {
 
 export const OFFLINE_LIFECYCLE_CONTROL_HEADER = "x-searise-lifecycle-token";
 const CONTROL_PREFIX = "/__lifecycle/";
+const ACTIVATION_PROBE_PATH = "/lifecycle-probe.html";
 const MAX_CONTROL_BODY = 1024;
 const MAX_LOG_ENTRIES = 2_000;
 const CONTENT_TYPES = Object.freeze({
@@ -157,11 +158,12 @@ function staticHeaders(path, deployment, size) {
       ...(policy.etag ? { ETag: policy.etag } : {}),
     };
   }
-  const noStore = path === "index.html" || path === "service-worker.js" ||
-    path === "build-identity.json" || path === "build-report.json" ||
-    path === "assets/application-build-identity.js";
+  const noStore = path === "service-worker.js" ||
+    path === "build-identity.json" || path === "build-report.json";
+  const revalidate = path === "index.html" || path === "assets/application-build-identity.js";
   return {
-    "Cache-Control": noStore ? "no-store" : immutableAsset(path) ? "public, max-age=31536000, immutable" : "no-cache",
+    "Cache-Control": noStore ? "no-store" : revalidate ? "no-cache" :
+      immutableAsset(path) ? "public, max-age=31536000, immutable" : "no-cache",
     "Content-Type": CONTENT_TYPES[extname(path)] ?? "application/octet-stream",
     ...(path === "service-worker.js" ? { "Service-Worker-Allowed": "/" } : {}),
   };
@@ -196,6 +198,7 @@ export function createOfflineLifecycleServer({
   }
   let active = "A";
   let generation = 1;
+  let networkOffline = false;
   const requests = [];
   const record = (entry) => {
     requests.push(Object.freeze(entry));
@@ -214,7 +217,24 @@ export function createOfflineLifecycleServer({
         return;
       }
       if (url.pathname === `${CONTROL_PREFIX}state` && request.method === "GET") {
-        json(response, 200, { deployment: active, generation, requests });
+        json(response, 200, { deployment: active, generation, networkOffline, requests });
+        return;
+      }
+      if (url.pathname === `${CONTROL_PREFIX}network` && request.method === "POST") {
+        try {
+          if (request.headers["content-type"] !== "application/json") {
+            throw new Error("Lifecycle controls require application/json.");
+          }
+          const input = await body(request);
+          if (!input || typeof input !== "object" || Array.isArray(input) ||
+              Object.keys(input).length !== 1 || typeof input.offline !== "boolean") {
+            throw new Error("Lifecycle network state is invalid.");
+          }
+          networkOffline = input.offline;
+          json(response, 200, { networkOffline });
+        } catch (error) {
+          json(response, 400, { error: error instanceof Error ? error.message : "Invalid control request." });
+        }
         return;
       }
       if (url.pathname === `${CONTROL_PREFIX}deployment` && request.method === "POST") {
@@ -243,6 +263,21 @@ export function createOfflineLifecycleServer({
 
     const selectedLabel = active;
     const selectedGeneration = generation;
+    if (networkOffline) {
+      record({ deployment: selectedLabel, generation: selectedGeneration, method: request.method ?? "", path: url.pathname, status: 0 });
+      request.socket.destroy();
+      return;
+    }
+    if (url.pathname === ACTIVATION_PROBE_PATH && request.method === "GET") {
+      const probe = "<!doctype html><title>Lifecycle activation probe</title>\n";
+      response.writeHead(200, {
+        "Cache-Control": "no-store",
+        "Content-Length": String(Buffer.byteLength(probe)),
+        "Content-Type": "text/html; charset=utf-8",
+      }).end(probe);
+      record({ deployment: selectedLabel, generation: selectedGeneration, method: "GET", path: url.pathname, status: 200 });
+      return;
+    }
     const deployment = configured.get(selectedLabel);
     let relativePath;
     let descriptor = null;
