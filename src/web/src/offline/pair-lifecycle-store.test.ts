@@ -85,6 +85,11 @@ class TestPairLocks implements PairCleanupLockPort {
   }
 }
 
+class TestClientCensus {
+  observations: readonly Readonly<{ clientId: string; state: "inactive" | "active" | "unknown" | "unresponsive" }>[] = [];
+  async observe(): Promise<typeof this.observations> { return this.observations; }
+}
+
 function openDatabase(factory: IDBFactory, name: string, version?: number): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const opened = version === undefined ? factory.open(name) : factory.open(name, version);
@@ -219,13 +224,15 @@ describe("versioned exact-pair lifecycle store", () => {
   let factory: IDBFactory;
   let caches: MemoryCaches;
   let locks: TestPairLocks;
+  let census: TestClientCensus;
   let store: PairLifecycleStore;
 
   beforeEach(() => {
     factory = new IDBFactory();
     caches = new MemoryCaches();
     locks = new TestPairLocks();
-    store = new PairLifecycleStore({ indexedDB: factory, cacheStorage: caches, locks, now: () => 1_000 });
+    census = new TestClientCensus();
+    store = new PairLifecycleStore({ indexedDB: factory, cacheStorage: caches, locks, clientCensus: census, now: () => 1_000 });
   });
 
   it("binds bootstrap and core completion to the exact composite SHA-256 identity", async () => {
@@ -291,14 +298,16 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(store.inventory()).resolves.toMatchObject({ corruptRecordCount: 1, records: [] });
     await expect(store.markCorrupt(target)).resolves.toMatchObject({ state: "corrupt", lastFailure: "corrupt-record" });
     await store.markCleanupPending(target);
-    await expect(store.removeExactPair(target, [{ clientId: "client-safe", state: "inactive" }]))
+    census.observations = [{ clientId: "client-safe", state: "inactive" }];
+    await expect(store.removeExactPair(target))
       .resolves.toMatchObject({ state: "removed" });
   });
 
   it("enumerates only exact pair Cache Storage, range, receipt, and lease records", async () => {
     const target = pair();
     const namespaces = cacheNamespaces(target);
-    caches.seed(namespaces.shell, "https://static.example/index.html");
+    const sealedShell = `${namespaces.shell}:${A}`;
+    caches.seed(sealedShell, "https://static.example/index.html");
     caches.seed(namespaces.release, "https://static.example/releases/release-a/manifest.json");
     caches.seed(`${namespaces.release}:staging:operation-1`, "https://static.example/staged");
     caches.seed(cacheNamespaces(pair("build-z", "release-z")).release, "https://static.example/other");
@@ -308,7 +317,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(store.storageInventory(target)).resolves.toEqual({
       contractVersion: 1,
       pair: target,
-      cacheNames: [namespaces.release, `${namespaces.release}:staging:operation-1`, namespaces.shell].sort(),
+      cacheNames: [namespaces.release, `${namespaces.release}:staging:operation-1`, sealedShell].sort(),
       cacheRequestCount: 3,
       rangeRecordCount: 1,
       rangeBytes: 4,
@@ -325,11 +334,25 @@ describe("versioned exact-pair lifecycle store", () => {
       const target = pair();
       await store.stage(target);
       await store.markCleanupPending(target);
-      await expect(store.removeExactPair(target, [{ clientId: "client-1", state }]))
+      census.observations = [{ clientId: "client-1", state }];
+      await expect(store.removeExactPair(target))
         .rejects.toMatchObject({ code: "CleanupBlocked" });
       await expect(store.read(target)).resolves.toMatchObject({ status: "found", record: { state: "cleanup-pending" } });
     },
   );
+
+  it("requires a service-worker census and maps census failures to fail-closed cleanup", async () => {
+    const target = pair();
+    const withoutCensus = new PairLifecycleStore({ indexedDB: factory, cacheStorage: caches, locks, now: () => 1_000 });
+    await withoutCensus.stage(target);
+    await withoutCensus.markCleanupPending(target);
+    await expect(withoutCensus.removeExactPair(target)).rejects.toMatchObject({ code: "StorageFailed" });
+
+    census.observe = async () => { throw new Error("matchAll failed"); };
+    await store.stage(pair("build-b", "release-b"));
+    await store.markCleanupPending(pair("build-b", "release-b"));
+    await expect(store.removeExactPair(pair("build-b", "release-b"))).rejects.toMatchObject({ code: "CleanupBlocked" });
+  });
 
   it("blocks cleanup for a target-pair unexpired stored lease or protected range authority", async () => {
     const target = pair();
@@ -342,7 +365,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(store.removeExactPair(target)).rejects.toMatchObject({ code: "CleanupBlocked" });
 
     const protectedFactory = new IDBFactory();
-    const protectedStore = new PairLifecycleStore({ indexedDB: protectedFactory, cacheStorage: caches, locks, now: () => 3_000 });
+    const protectedStore = new PairLifecycleStore({ indexedDB: protectedFactory, cacheStorage: caches, locks, clientCensus: census, now: () => 3_000 });
     await protectedStore.stage(target);
     await protectedStore.markCleanupPending(target);
     await seedRangeDatabase(protectedFactory, target, { leaseExpiresAt: 900, protectedAs: "previous" });
@@ -368,7 +391,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await makeComplete(store, target);
     await store.markCleanupPending(target);
     const namespaces = cacheNamespaces(target);
-    caches.seed(namespaces.shell, "https://static.example/index.html");
+    caches.seed(`${namespaces.shell}:${A}`, "https://static.example/index.html");
     await seedRangeDatabase(factory, target, { leaseExpiresAt: 900 });
     await seedReceiptDatabase(factory, target);
 
@@ -382,7 +405,8 @@ describe("versioned exact-pair lifecycle store", () => {
       await continueGate;
     };
 
-    const cleanup = store.removeExactPair(target, [{ clientId: "initially-inactive", state: "inactive" }]);
+    census.observations = [{ clientId: "initially-inactive", state: "inactive" }];
+    const cleanup = store.removeExactPair(target);
     await reachedLock;
     await putLease(factory, target, "late-live-client", 2_000);
     continueCleanup();
@@ -390,7 +414,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(cleanup).rejects.toMatchObject({ code: "CleanupBlocked" });
     await expect(store.read(target)).resolves.toMatchObject({ status: "found", record: { state: "cleanup-pending" } });
     await expect(store.storageInventory(target)).resolves.toMatchObject({
-      cacheNames: [namespaces.shell], rangeRecordCount: 1, receiptRecordCount: 1, leaseRecordCount: 2,
+      cacheNames: [`${namespaces.shell}:${A}`], rangeRecordCount: 1, receiptRecordCount: 1, leaseRecordCount: 2,
     });
   });
 
@@ -399,7 +423,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await makeComplete(store, target);
     await store.markCleanupPending(target);
     const namespaces = cacheNamespaces(target);
-    caches.seed(namespaces.shell, "https://static.example/index.html");
+    caches.seed(`${namespaces.shell}:${A}`, "https://static.example/index.html");
     await seedRangeDatabase(factory, target, { leaseExpiresAt: 900 });
     await seedReceiptDatabase(factory, target);
 
@@ -413,7 +437,8 @@ describe("versioned exact-pair lifecycle store", () => {
       await continueGate;
     };
 
-    const cleanup = store.removeExactPair(target, [{ clientId: "closed-client", state: "inactive" }]);
+    census.observations = [{ clientId: "closed-client", state: "inactive" }];
+    const cleanup = store.removeExactPair(target);
     await reachedDeletion;
     const signal = new AbortController().signal;
     const racingAdmission = locks.request(
@@ -447,7 +472,8 @@ describe("versioned exact-pair lifecycle store", () => {
       events.push(`idb:${this.name}`);
       return originalDelete.call(this, key);
     });
-    const result = await store.removeExactPair(target, [{ clientId: "closed-client", state: "inactive" }]);
+    census.observations = [{ clientId: "closed-client", state: "inactive" }];
+    const result = await store.removeExactPair(target);
 
     expect(result).toMatchObject({
       state: "removed",

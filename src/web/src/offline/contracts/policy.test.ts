@@ -20,6 +20,8 @@ import {
   validateRuntimeCapability,
   validateRuntimeCapabilityV2,
   validateStorageBudget,
+  validateWorkerLeaseChallenge,
+  validateWorkerLeaseChallengeResponse,
 } from "./policy";
 
 const A = "a".repeat(64);
@@ -213,6 +215,31 @@ describe("offline worker, lease, and technical protocol v1", () => {
     expect(validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "worker-identity", messageToken: "identity-1", pair: pair(), precacheSetSha256: A }).type).toBe("worker-identity");
     expect(validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activation-deferred", messageToken: "activate-1", candidatePair: pair(), reason: "update-coordinator-not-installed" }).type).toBe("activation-deferred");
     expect(() => validateOfflineWorkerToClientMessage({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activation-deferred", messageToken: "activate-1", candidatePair: pair(), reason: "later", query: "private-sentinel" })).toThrow(/additional/);
+  });
+
+  it("validates source-bound lease release, census, and port-only challenge messages", () => {
+    expect(validateClientToOfflineWorkerMessage({
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "request-client-census",
+      messageToken: "census-one", targetPair: pair(),
+    }).type).toBe("request-client-census");
+    expect(validateOfflineWorkerToClientMessage({
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-released",
+      messageToken: "release-one", pair: pair(), leaseId: "lease-one",
+    }).type).toBe("lease-released");
+    expect(validateOfflineWorkerToClientMessage({
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "client-census", messageToken: "census-one",
+      targetPair: pair(), observations: [{ clientId: "source-one", state: "unresponsive" }],
+    }).type).toBe("client-census");
+    const challenge = { protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-challenge", messageToken: "challenge-one", targetPair: pair() };
+    expect(validateWorkerLeaseChallenge(challenge).targetPair).toEqual(pair());
+    expect(validateWorkerLeaseChallengeResponse({
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-challenge-response",
+      messageToken: "challenge-one", state: "active", pair: pair(), leaseId: "lease-one",
+    }).state).toBe("active");
+    expect(() => validateWorkerLeaseChallengeResponse({
+      protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-challenge-response",
+      messageToken: "challenge-one", state: "inactive", leaseId: "smuggled",
+    })).toThrow(/additional/);
   });
 
   it("versions subject-bound capability messages without changing the v1 wire", () => {

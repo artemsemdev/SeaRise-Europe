@@ -88,6 +88,9 @@ export interface PairLifecycleStoreDependencies {
   readonly indexedDB: IDBFactory;
   readonly cacheStorage: LifecycleCacheStorage;
   readonly locks?: PairCleanupLockPort;
+  readonly clientCensus?: Readonly<{
+    observe(pair: AppReleasePairV1, signal: AbortSignal): Promise<readonly ClientLeaseObservationV1[]>;
+  }>;
   readonly now?: () => number;
 }
 
@@ -249,6 +252,7 @@ export class PairLifecycleStore {
   readonly #idb: IDBFactory;
   readonly #cacheStorage: LifecycleCacheStorage;
   readonly #locks: PairCleanupLockPort | undefined;
+  readonly #clientCensus: PairLifecycleStoreDependencies["clientCensus"];
   readonly #now: () => number;
   #database: Promise<IDBDatabase> | null = null;
 
@@ -256,6 +260,7 @@ export class PairLifecycleStore {
     this.#idb = dependencies.indexedDB;
     this.#cacheStorage = dependencies.cacheStorage;
     this.#locks = dependencies.locks;
+    this.#clientCensus = dependencies.clientCensus;
     this.#now = dependencies.now ?? Date.now;
   }
 
@@ -475,8 +480,8 @@ export class PairLifecycleStore {
     const pair = validateAppReleasePair(pairInput);
     const namespaces = cacheNamespaces(pair);
     const cacheNames = (await this.#cacheStorage.keys()).filter((name) =>
-      name === namespaces.shell || name === namespaces.release ||
-      name.startsWith(`${namespaces.shell}:staging:`) || name.startsWith(`${namespaces.release}:staging:`));
+      name === namespaces.shell || name.startsWith(`${namespaces.shell}:`) ||
+      name === namespaces.release || name.startsWith(`${namespaces.release}:staging:`));
     let cacheRequestCount = 0;
     for (const name of cacheNames) cacheRequestCount += (await (await this.#cacheStorage.open(name)).keys()).length;
 
@@ -630,13 +635,11 @@ export class PairLifecycleStore {
 
   async removeExactPair(
     pairInput: AppReleasePairV1,
-    observationsInput: readonly ClientLeaseObservationV1[] = [],
   ): Promise<RemovedPairV1> {
     const pair = validateAppReleasePair(pairInput);
-    const observations = observationsInput.map(validateObservation);
-    if (!this.#locks) {
+    if (!this.#locks || !this.#clientCensus) {
       throw new PairLifecycleStoreError(
-        "StorageFailed", "A cross-context exact-pair admission lock is required for cleanup.",
+        "StorageFailed", "A cross-context lock and service-worker client census are required for cleanup.",
       );
     }
     const signal = new AbortController().signal;
@@ -644,6 +647,14 @@ export class PairLifecycleStore {
     try {
       return await this.#locks.request(pairAdmissionLockName(pair), { mode: "exclusive", signal }, async () => {
         operationStarted = true;
+        let observations: readonly ClientLeaseObservationV1[];
+        try {
+          observations = (await this.#clientCensus!.observe(pair, signal)).map(validateObservation);
+        } catch (error) {
+          throw new PairLifecycleStoreError(
+            "CleanupBlocked", "The service-worker client census failed closed.", error,
+          );
+        }
         return this.#removeExactPairLocked(pair, observations);
       });
     } catch (error) {

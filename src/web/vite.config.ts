@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 import { applicationBuildIdentityPlugin } from "./scripts/application-build-identity.mjs";
 import { buildIdentityFile, resolveBuildIdentity } from "./scripts/build-identity.mjs";
 import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
+import { resolveStaticBuildRoot } from "./scripts/static-build-root.mjs";
 
 const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
@@ -47,6 +48,7 @@ export default defineConfig(({ mode }) => {
   const buildIdentity = resolveBuildIdentity({ mode, repositoryRoot });
   const releaseId = buildIdentity.dataReleaseId;
   const releaseDisposition = buildIdentity.releaseDisposition;
+  const buildRoot = resolveStaticBuildRoot({ webRoot: import.meta.dirname });
 
   return {
     plugins: [
@@ -82,7 +84,7 @@ export default defineConfig(({ mode }) => {
         name: "committed-release-fixture",
         closeBundle() {
           if (releaseDisposition !== "synthetic-fixture" || releaseId !== fixtureReleaseId) return;
-          const destination = resolve(import.meta.dirname, "dist/releases", releaseId);
+          const destination = resolve(buildRoot, "releases", releaseId);
           rmSync(destination, { force: true, recursive: true });
           mkdirSync(destination, { recursive: true });
           cpSync(fixturePayloadRoot, destination, { recursive: true });
@@ -198,6 +200,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      emptyOutDir: true,
+      outDir: buildRoot,
       target: "es2022",
       sourcemap: true,
       manifest: "vite-manifest.json",

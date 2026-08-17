@@ -146,7 +146,7 @@ def _run_browser_harness(
     candidate: Path,
     node_path: Path,
     browser_harness_path: Path,
-    frontend_directory: Path,
+    node_workspace_directory: Path,
 ) -> Mapping[str, Any]:
     for label, path in (
         ("Node executable", node_path),
@@ -154,7 +154,7 @@ def _run_browser_harness(
     ):
         if not path.is_file() or path.is_symlink():
             raise ScienceContractError(f"Boundary {label} is absent or unsafe")
-    if not frontend_directory.is_dir() or frontend_directory.is_symlink():
+    if not node_workspace_directory.is_dir() or node_workspace_directory.is_symlink():
         raise ScienceContractError("Boundary browser environment is absent or unsafe")
     try:
         subprocess.run(
@@ -164,7 +164,7 @@ def _run_browser_harness(
                 str(candidate),
                 str(output),
             ],
-            cwd=frontend_directory,
+            cwd=node_workspace_directory,
             check=True,
             capture_output=True,
             text=True,
@@ -228,7 +228,7 @@ def build_boundary_evidence_package(
     tools: BoundaryVectorToolPaths,
     node_path: Path,
     browser_harness_path: Path,
-    frontend_directory: Path,
+    node_workspace_directory: Path,
 ) -> Path:
     """Build both boundaries twice and atomically publish their evidence package."""
     if _HEX40.fullmatch(source_revision) is None:
@@ -320,7 +320,7 @@ def build_boundary_evidence_package(
             candidate=candidate,
             node_path=node_path,
             browser_harness_path=browser_harness_path,
-            frontend_directory=frontend_directory,
+            node_workspace_directory=node_workspace_directory,
         )
 
         output_records = [

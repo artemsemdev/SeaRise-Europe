@@ -124,11 +124,17 @@ jobs:
       - name: Validate static target
         run: npm run web:check
 
+      - name: Validate deterministic PMTiles render evidence
+        run: npm run evidence:pmtiles-render --workspace @searise/web
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Browser smoke and accessibility
         run: npm run web:e2e
+
+      - name: Offline update and retention lifecycle
+        run: npm run web:e2e:offline-lifecycle
 
       - name: Retain successful browser evidence
         if: success()
@@ -196,9 +202,6 @@ jobs:
 
       - name: Unit tests
         run: npm test
-
-      - name: Validate deterministic PMTiles render evidence
-        run: npm run evidence:pmtiles-render
 
   api:
     name: API (format, build, test)
@@ -562,13 +565,12 @@ jobs:
         with:
           node-version: 20.20.1
           cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install locked boundary browser environment
-        working-directory: src/frontend
         run: |
           npm ci
-          ./node_modules/.bin/playwright install chromium
+          npx playwright install chromium
 
       - name: Build and inspect exact boundary candidates twice
         env:
@@ -586,8 +588,8 @@ jobs:
             --pmtiles-distribution-platform darwin-arm64 \
             --build-run-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-darwin-arm64" \
             --node "$(command -v node)" \
-            --browser-harness src/frontend/scripts/verify-boundary-pmtiles-browser.mjs \
-            --frontend-directory src/frontend \
+            --browser-harness src/web/scripts/verify-boundary-pmtiles-browser.mjs \
+            --node-workspace-directory . \
             --output "${RUNNER_TEMP}/boundary-pmtiles-evidence"
 
       - name: Validate boundary evidence package
@@ -979,21 +981,18 @@ jobs:
         with:
           node-version: 20.20.1
           cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install locked browser measurement environment
-        working-directory: src/frontend
         run: npm ci
 
       - name: Install package-lock-owned Playwright Chromium
-        working-directory: src/frontend
         run: ./node_modules/.bin/playwright install chromium
 
       - name: Measure trusted browser delivery
-        working-directory: src/frontend
         run: |
           rm -f -- /tmp/browser-trace-macos-arm64.json
-          node scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 /tmp/browser-trace-macos-arm64.json
+          node src/web/scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 /tmp/browser-trace-macos-arm64.json
           test -s /tmp/browser-trace-macos-arm64.json
 
       - name: Validate browser delivery evidence
@@ -1004,7 +1003,7 @@ jobs:
           python scripts/science/validate_ar6_delivery_trace.py \
             --candidate /tmp/phase-0r-ar6-v1 \
             --trace /tmp/browser-trace-macos-arm64.json \
-            --harness src/frontend/scripts/measure-ar6-release.mjs \
+            --harness src/web/scripts/measure-ar6-release.mjs \
             --release-contract src/pipeline/science/ar6-regional-release.json \
             --build-timing /tmp/build-timing-macos-arm64.json \
             --output /tmp/delivery-report-macos-arm64.json

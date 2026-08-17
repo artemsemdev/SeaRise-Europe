@@ -401,15 +401,41 @@ export type ClientToOfflineWorkerV1 =
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "prepare-update"; messageToken: string; currentPair: AppReleasePairV1; candidate: AppAuthorityV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "activate-update"; messageToken: string; candidatePair: AppReleasePairV1; confirmationToken: string }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "request-cleanup"; messageToken: string; pair: AppReleasePairV1 }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "request-client-census"; messageToken: string; targetPair: AppReleasePairV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "request-rollback"; messageToken: string; currentPair: AppReleasePairV1; targetPair: AppReleasePairV1; confirmationToken: string }>;
 export type OfflineWorkerToClientV1 =
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "worker-identity"; messageToken: string; pair: AppReleasePairV1; precacheSetSha256: Sha256Hex }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "activation-deferred"; messageToken: string; candidatePair: AppReleasePairV1; reason: "update-coordinator-not-installed" }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "lease-state"; messageToken: string; lease: ClientLeaseV1 }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "lease-released"; messageToken: string; pair: AppReleasePairV1; leaseId: string }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "lease-refused"; messageToken: string; reason: LeaseRefusalReasonV1 }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "client-census"; messageToken: string; targetPair: AppReleasePairV1; observations: readonly WorkerClientObservationV1[] }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "census-refused"; messageToken: string; reason: CensusRefusalReasonV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "capability"; messageToken: string; capability: RuntimeCapabilityV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "update-state"; messageToken: string | null; update: UpdateCapabilityV1 }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "cleanup-result"; messageToken: string; pair: AppReleasePairV1; deletedPairs: readonly AppReleasePairV1[]; freedBytes: number }>
   | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "technical-error"; messageToken: string | null; error: OfflineTechnicalErrorV1 }>;
+
+export type LeaseRefusalReasonV1 =
+  | "source-unavailable" | "pair-mismatch" | "cleanup-pending"
+  | "lease-mismatch" | "storage-failed";
+export type CensusRefusalReasonV1 =
+  | "source-unavailable" | "requester-unleased" | "client-enumeration-failed"
+  | "client-set-changed" | "client-unresponsive" | "client-unknown";
+export interface WorkerClientObservationV1 {
+  readonly clientId: string;
+  readonly state: "inactive" | "active" | "unknown" | "unresponsive";
+}
+const WORKER_CLIENT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+export type WorkerLeaseChallengeV1 = Readonly<{
+  protocol: typeof OFFLINE_WORKER_PROTOCOL;
+  type: "lease-challenge";
+  messageToken: string;
+  targetPair: AppReleasePairV1;
+}>;
+export type WorkerLeaseChallengeResponseV1 =
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "lease-challenge-response"; messageToken: string; state: "inactive" }>
+  | Readonly<{ protocol: typeof OFFLINE_WORKER_PROTOCOL; type: "lease-challenge-response"; messageToken: string; state: "active"; pair: AppReleasePairV1; leaseId: string }>;
 export type ClientToOfflineWorkerV2 = Readonly<{
   protocol: typeof OFFLINE_WORKER_PROTOCOL_V2;
   type: "query-capability";
@@ -453,6 +479,10 @@ export function validateClientToOfflineWorkerMessage(value: unknown): ClientToOf
     const record = exactRecord(value, ["protocol", "type", "messageToken", "pair"], "cleanup message");
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken, pair: validateAppReleasePair(record.pair) });
   }
+  if (type === "request-client-census") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "targetPair"], "client census message");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken, targetPair: validateAppReleasePair(record.targetPair) });
+  }
   if (type === "request-rollback") {
     const record = exactRecord(value, ["protocol", "type", "messageToken", "currentPair", "targetPair", "confirmationToken"], "rollback message");
     const rollback = validateRollbackRequest({ contractVersion: 1, currentPair: record.currentPair, targetPair: record.targetPair, confirmationToken: record.confirmationToken });
@@ -480,6 +510,37 @@ export function validateOfflineWorkerToClientMessage(value: unknown): OfflineWor
     const record = exactRecord(value, ["protocol", "type", "messageToken", "lease"], "lease-state response");
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), lease: validateClientLease(record.lease) });
   }
+  if (type === "lease-released") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "pair", "leaseId"], "lease release response");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), pair: validateAppReleasePair(record.pair), leaseId: protocolId(record.leaseId, "leaseId") });
+  }
+  if (type === "lease-refused") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "reason"], "lease refusal response");
+    const reasons = new Set<unknown>(["source-unavailable", "pair-mismatch", "cleanup-pending", "lease-mismatch", "storage-failed"]);
+    if (!reasons.has(record.reason)) fail("Lease refusal reason is unsupported.");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), reason: record.reason as LeaseRefusalReasonV1 });
+  }
+  if (type === "client-census") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "targetPair", "observations"], "client census response");
+    if (!Array.isArray(record.observations)) fail("Client census observations must be an array.");
+    const observations = record.observations.map((item) => {
+      const observation = exactRecord(item, ["clientId", "state"], "client census observation");
+      const state = observation.state;
+      if (typeof observation.clientId !== "string" || !WORKER_CLIENT_ID.test(observation.clientId) ||
+          !new Set<unknown>(["inactive", "active", "unknown", "unresponsive"]).has(state)) {
+        fail("Client census observation is invalid.");
+      }
+      return Object.freeze({ clientId: observation.clientId, state: state as WorkerClientObservationV1["state"] });
+    });
+    if (new Set(observations.map(({ clientId }) => clientId)).size !== observations.length) fail("Client census observations contain duplicate clients.");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), targetPair: validateAppReleasePair(record.targetPair), observations: Object.freeze(observations) });
+  }
+  if (type === "census-refused") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "reason"], "client census refusal");
+    const reasons = new Set<unknown>(["source-unavailable", "requester-unleased", "client-enumeration-failed", "client-set-changed", "client-unresponsive", "client-unknown"]);
+    if (!reasons.has(record.reason)) fail("Client census refusal reason is unsupported.");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), reason: record.reason as CensusRefusalReasonV1 });
+  }
   if (type === "capability") {
     const record = exactRecord(value, ["protocol", "type", "messageToken", "capability"], "capability response");
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: protocolId(record.messageToken, "messageToken"), capability: validateRuntimeCapability(record.capability) });
@@ -501,6 +562,25 @@ export function validateOfflineWorkerToClientMessage(value: unknown): OfflineWor
     return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type, messageToken: nullableId(record.messageToken), error: validateOfflineTechnicalError(record.error) });
   }
   return fail("worker response type is unsupported.");
+}
+
+export function validateWorkerLeaseChallenge(value: unknown): WorkerLeaseChallengeV1 {
+  const record = exactRecord(value, ["protocol", "type", "messageToken", "targetPair"], "lease challenge");
+  if (record.protocol !== OFFLINE_WORKER_PROTOCOL || record.type !== "lease-challenge") fail("Lease challenge protocol is unsupported.");
+  return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-challenge", messageToken: protocolId(record.messageToken, "messageToken"), targetPair: validateAppReleasePair(record.targetPair) });
+}
+
+export function validateWorkerLeaseChallengeResponse(value: unknown): WorkerLeaseChallengeResponseV1 {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("Lease challenge response must be an object.");
+  const state = (value as Record<string, unknown>).state;
+  if (state === "inactive") {
+    const record = exactRecord(value, ["protocol", "type", "messageToken", "state"], "inactive lease challenge response");
+    if (record.protocol !== OFFLINE_WORKER_PROTOCOL || record.type !== "lease-challenge-response") fail("Lease challenge response protocol is unsupported.");
+    return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-challenge-response", messageToken: protocolId(record.messageToken, "messageToken"), state });
+  }
+  const record = exactRecord(value, ["protocol", "type", "messageToken", "state", "pair", "leaseId"], "active lease challenge response");
+  if (record.protocol !== OFFLINE_WORKER_PROTOCOL || record.type !== "lease-challenge-response" || state !== "active") fail("Lease challenge response protocol is unsupported.");
+  return Object.freeze({ protocol: OFFLINE_WORKER_PROTOCOL, type: "lease-challenge-response", messageToken: protocolId(record.messageToken, "messageToken"), state, pair: validateAppReleasePair(record.pair), leaseId: protocolId(record.leaseId, "leaseId") });
 }
 
 export function validateClientToOfflineWorkerV2Message(value: unknown): ClientToOfflineWorkerV2 {

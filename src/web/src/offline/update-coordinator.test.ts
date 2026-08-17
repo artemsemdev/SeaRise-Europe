@@ -30,6 +30,14 @@ function accepted(value: AppReleasePairV1, suffix = ""): AcceptedPairIdentityV1 
   });
 }
 
+function sealed(value: AcceptedPairIdentityV1) {
+  return Object.freeze({
+    contractVersion: 1 as const,
+    pair: value.pair,
+    precacheSetSha256: value.precacheSetSha256,
+  });
+}
+
 const active = accepted(pair("build-1", "release-1"));
 const candidate = accepted(pair("build-2", "release-2"));
 const anotherCandidate = accepted(pair("build-3", "release-3"), "d");
@@ -154,7 +162,7 @@ describe("conservative static-host update coordinator", () => {
     expect(state).toMatchObject({
       phase: "waiting-candidate-verified",
       boot: boot(),
-      candidate,
+      candidate: sealed(candidate),
       confirmationToken: "g1.provider-1",
       currentUsable: true,
     });
@@ -170,7 +178,7 @@ describe("conservative static-host update coordinator", () => {
       boot: boot(),
       message: UPDATE_READY_MESSAGE,
       currentUsable: true,
-      intent: { sourceController: active, candidate },
+      intent: { sourceController: active, candidate: sealed(candidate) },
     });
     expect(confirmed.boot.controller).toEqual(active);
     expect(test.recorded).toHaveLength(1);
@@ -299,7 +307,7 @@ describe("conservative static-host update coordinator", () => {
     expect(stale).toMatchObject({ phase: "preparing", currentUsable: true });
     expect(test.ports.recordPendingTransitionIntent).not.toHaveBeenCalled();
     release?.();
-    await expect(newer).resolves.toMatchObject({ phase: "waiting-candidate-verified", candidate: anotherCandidate });
+    await expect(newer).resolves.toMatchObject({ phase: "waiting-candidate-verified", candidate: sealed(anotherCandidate) });
   });
 
   it("binds provider collisions to coordinator generations and rejects the older token", async () => {

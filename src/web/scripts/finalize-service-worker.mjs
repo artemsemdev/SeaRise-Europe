@@ -7,9 +7,10 @@ import {
   deriveShellPrecacheEntries,
   precachePlaceholder,
 } from "./service-worker-precache.mjs";
+import { resolveStaticBuildRoot } from "./static-build-root.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const dist = resolve(root, "dist");
+const dist = resolveStaticBuildRoot({ webRoot: root });
 const workerPath = resolve(dist, "service-worker.js");
 const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
 const workerEntry = viteManifest["src/offline/service-worker.ts"];

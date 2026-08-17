@@ -1,7 +1,7 @@
 import { cacheNamespaces, validateAppReleasePair, type AppReleasePairV1 } from "./contracts/keys";
 
 export const OFFLINE_RANGE_DATABASE = "searise-offline:v1" as const;
-export const OFFLINE_RANGE_DATABASE_VERSION = 3 as const;
+export const OFFLINE_RANGE_DATABASE_VERSION = 4 as const;
 export const OFFLINE_RANGE_STORES = {
   meta: "range-meta",
   ranges: "ranges",
@@ -19,6 +19,7 @@ interface StoredCleanupFenceV1 {
 interface StoredLeaseAuthority {
   readonly pairKey?: unknown;
   readonly expiresAtEpochMs?: unknown;
+  readonly sourceClientId?: unknown;
 }
 
 export interface PairCleanupLockPort {
@@ -87,6 +88,11 @@ export function openOfflineRangeDatabase(indexedDB: IDBFactory): Promise<IDBData
         leases.createIndex("by-pair", "pairKey");
         leases.createIndex("by-expiry", ["expiresAtEpochMs", "pairKey", "leaseId"], { unique: true });
       }
+      const leases = open.transaction!.objectStore(OFFLINE_RANGE_STORES.leases);
+      if (!leases.indexNames.contains("by-pair-source")) {
+        leases.createIndex("by-pair-source", ["pairKey", "sourceClientId"], { unique: true });
+      }
+      if (!leases.indexNames.contains("by-source")) leases.createIndex("by-source", "sourceClientId");
       if (!database.objectStoreNames.contains(OFFLINE_RANGE_STORES.cleanupFences)) {
         database.createObjectStore(OFFLINE_RANGE_STORES.cleanupFences, { keyPath: "pairKey" });
       }
@@ -166,7 +172,11 @@ export async function beginPairCleanupFence(
     const unsafeLease = leases.some((lease) => {
       if (typeof lease.pairKey !== "string") return true;
       if (lease.pairKey !== key) return false;
-      return !Number.isSafeInteger(lease.expiresAtEpochMs) || Number(lease.expiresAtEpochMs) > observedAt;
+      if (!Number.isSafeInteger(lease.expiresAtEpochMs)) return true;
+      if (Number(lease.expiresAtEpochMs) <= observedAt) return false;
+      // Every live target lease blocks the durable commit. Missing or malformed
+      // source binding is therefore conservative legacy/corrupt evidence too.
+      return true;
     });
     if (unsafeLease) {
       throw new PairCleanupFenceError(

@@ -5,9 +5,14 @@ export const CLIENT_LEASE_TTL_MS = 120_000;
 export const CLIENT_LEASE_HEARTBEAT_MS = 30_000;
 
 export interface ClientLeaseStorePort {
-  activateClientLease(lease: ClientLeaseV1): Promise<void>;
-  acquireLease(lease: ClientLeaseV1): Promise<void>;
-  releaseLease(lease: ClientLeaseV1): Promise<void>;
+  activateClientLease(identity: ClientLeaseIdentityV1): Promise<ClientLeaseV1>;
+  acquireLease(identity: ClientLeaseIdentityV1): Promise<ClientLeaseV1>;
+  releaseLease(identity: ClientLeaseIdentityV1): Promise<void>;
+}
+
+export interface ClientLeaseIdentityV1 {
+  readonly pair: AppReleasePairV1;
+  readonly leaseId: string;
 }
 
 export interface RepeatingTimerPort {
@@ -37,6 +42,7 @@ export interface ClientLeaseController {
   close(): Promise<void>;
   settled(): Promise<void>;
   assertActive(): void;
+  observation(): Readonly<{ state: "inactive" } | { state: "active"; pair: AppReleasePairV1; leaseId: string }>;
 }
 
 export class ClientLeaseUnavailableError extends Error {
@@ -82,6 +88,7 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
       close: async () => undefined,
       settled: async () => undefined,
       assertActive: () => undefined,
+      observation: () => Object.freeze({ state: "inactive" as const }),
     });
   }
 
@@ -133,8 +140,13 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
           failClosed(new ClientLeaseUnavailableError("The persistent client lease expired before renewal."));
           return;
         }
-        const next = exactLease(pair, current.leaseId, timestamp);
-        await options.store.acquireLease(next);
+        const next = validateClientLease(await options.store.acquireLease({ pair, leaseId: current.leaseId }));
+        const acceptedAt = now();
+        if (next.leaseId !== current.leaseId || next.pair.appBuildId !== pair.appBuildId ||
+            next.pair.dataReleaseId !== pair.dataReleaseId || next.expiresAtEpochMs <= acceptedAt ||
+            next.expiresAtEpochMs > acceptedAt + CLIENT_LEASE_TTL_MS) {
+          throw new ClientLeaseUnavailableError("The worker returned an invalid lease renewal.");
+        }
         if (state === "active" && generation === expectedGeneration) lease = next;
       } catch (error) {
         if (state === "active" && generation === expectedGeneration) failClosed(error);
@@ -147,11 +159,18 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
     if (state === "starting" && startPromise) return startPromise;
     if (state !== "new") throw new ClientLeaseUnavailableError("A stopped client lease controller cannot be restarted.");
     state = "starting";
-    const nextLease = exactLease(pair, `client-${randomUUID()}`, now());
+    const timestamp = now();
+    const leaseId = exactLease(pair, `client-${randomUUID()}`, timestamp).leaseId;
     startPromise = (async () => {
       try {
-        await options.store.activateClientLease(nextLease);
-        lease = nextLease;
+        const activated = validateClientLease(await options.store.activateClientLease({ pair, leaseId }));
+        const acceptedAt = now();
+        if (activated.leaseId !== leaseId || activated.pair.appBuildId !== pair.appBuildId ||
+            activated.pair.dataReleaseId !== pair.dataReleaseId || activated.expiresAtEpochMs <= acceptedAt ||
+            activated.expiresAtEpochMs > acceptedAt + CLIENT_LEASE_TTL_MS) {
+          throw new ClientLeaseUnavailableError("The worker returned an invalid initial lease.");
+        }
+        lease = activated;
         if (closeRequested) return;
         state = "active";
         lifecycle.addPageHideListener(pageHide);
@@ -184,7 +203,7 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
       const current = lease;
       await enqueue(async () => {
         try {
-          if (current) await options.store.releaseLease(current);
+          if (current) await options.store.releaseLease({ pair, leaseId: current.leaseId });
         } finally {
           lease = undefined;
           state = "closed";
@@ -217,6 +236,17 @@ export function createClientLeaseController(options: ClientLeaseControllerOption
         failClosed(new ClientLeaseUnavailableError("The persistent client lease expired."));
       }
       throw new ClientLeaseUnavailableError();
+    },
+    observation: () => {
+      try {
+        if (state === "active" && lease) {
+          const timestamp = now();
+          if (Number.isSafeInteger(timestamp) && timestamp < lease.expiresAtEpochMs) {
+            return Object.freeze({ state: "active" as const, pair, leaseId: lease.leaseId });
+          }
+        }
+      } catch { /* Fail closed below. */ }
+      return Object.freeze({ state: "inactive" as const });
     },
   });
 }

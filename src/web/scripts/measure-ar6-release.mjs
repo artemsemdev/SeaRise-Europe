@@ -18,7 +18,7 @@ const manifest = JSON.parse(readFileSync(join(candidate, "manifest.json"), "utf8
 const buildEvidence = JSON.parse(readFileSync(join(candidate, "build-evidence.json"), "utf8"));
 const packageLock = readFileSync(resolve("package-lock.json"));
 const packageLockDocument = JSON.parse(packageLock.toString("utf8"));
-const goldensPath = resolve("../pipeline/science/evidence/ar6-lookup-goldens.json");
+const goldensPath = resolve("src/pipeline/science/evidence/ar6-lookup-goldens.json");
 const goldensBytes = readFileSync(goldensPath);
 const goldens = JSON.parse(goldensBytes.toString("utf8"));
 if (buildEvidence.lookupGoldenEvidence.sha256 !== sha256(goldensBytes)) {
@@ -160,17 +160,17 @@ const browser = await chromium.launch({ headless: true, args: ["--enable-precise
 async function oneLookup(page, sample, reuse) {
   return page.evaluate(
     async ({ origin, sample, sourceColumn, cogRow, expectedLocationId, expectedValuesMillimetres, reuse }) => {
-      const started = performance.now();
-      const heapBeforeBytes = performance.memory?.usedJSHeapSize ?? -1;
+      const started = globalThis.performance.now();
+      const heapBeforeBytes = globalThis.performance.memory?.usedJSHeapSize ?? -1;
       let peakHeapBytes = heapBeforeBytes;
       const sampleHeap = () => {
-        peakHeapBytes = Math.max(peakHeapBytes, performance.memory?.usedJSHeapSize ?? -1);
+        peakHeapBytes = Math.max(peakHeapBytes, globalThis.performance.memory?.usedJSHeapSize ?? -1);
       };
       const cache = globalThis.__seariseCache ?? {};
       let sourceGrid = cache.sourceGrid;
       let image = cache.image;
       if (!reuse || !sourceGrid) {
-        sourceGrid = await (await fetch(`${origin}/source-grid.json.gz?sample=${sample}`)).json();
+        sourceGrid = await (await globalThis.fetch(`${origin}/source-grid.json.gz?sample=${sample}`)).json();
         sampleHeap();
       }
       if (!reuse || !image) {
@@ -194,9 +194,9 @@ async function oneLookup(page, sample, reuse) {
         throw new Error("COG quantiles differ from the independent golden");
       }
       return {
-        durationMilliseconds: performance.now() - started,
+        durationMilliseconds: globalThis.performance.now() - started,
         heapBeforeBytes,
-        heapAfterBytes: performance.memory?.usedJSHeapSize ?? -1,
+        heapAfterBytes: globalThis.performance.memory?.usedJSHeapSize ?? -1,
         peakHeapBytes,
         locationId: actualLocationId,
         valuesMillimetres,
@@ -256,7 +256,7 @@ const artifactByteSizes = Object.fromEntries(
 );
 const trace = {
   schemaVersion: 1,
-  harness: "src/frontend/scripts/measure-ar6-release.mjs",
+  harness: "src/web/scripts/measure-ar6-release.mjs",
   candidate: {
     releaseId: manifest.releaseId,
     manifestSha256: sha256(readFileSync(join(candidate, "manifest.json"))),

@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a production-like Chromium browser journey that rotates sealed
+  static deployments from A to B to C without forced activation, proves the
+  close-and-reopen update contract, retains only the active and immediately
+  previous generations, and reloads a warmed assessment offline. Terminal
+  update intents now roll forward only to a distinct verified candidate, and
+  exact-pair cleanup includes precache-addressed service-worker shell caches.
+  WebKit passed the same local journey as optional evidence; Firefox natural
+  waiting-worker activation remains explicitly deferred and is not a support
+  claim or required CI gate.
+
+- Added a fail-closed static-output inventory gate derived from the exact Vite,
+  embedded shell-precache, and release manifests. Production builds now reject
+  every unlisted file, including TAR/archive contamination, and scan emitted
+  code for legacy runtime endpoint requests without accessing private Candidate
+  files.
+
+- Added production browser retention after exact fresh-boot reconciliation.
+  The current worker now supplies the cleanup census under exact-pair Web
+  Locks; active, unknown, or unresponsive clients fail closed, while only
+  unleased `cleanup-pending` pairs older than the active and immediately
+  previous complete pair are removed. Partial deletion remains idempotently
+  retryable and is exposed as technical state, never as a scientific outcome.
+  Private Candidate sessions remain memory-only and do not create the
+  retention coordinator.
+
+- Bound every persistent browser lease to the service worker's authenticated
+  `Client.id` instead of a caller-supplied tab identity. The worker now mints
+  expiry, refuses cross-tab heartbeat and release attempts, challenges a stable
+  two-pass window-client census before pair cleanup, and keeps the durable
+  cleanup fence as the final race-prevention authority. Private Candidate
+  sessions still create no worker authority, lease, census listener, timer, or
+  persistent record.
+
 - Added a conservative static-host update coordinator that verifies a sealed
   waiting candidate and records an explicit one-shot close-and-reopen intent
   without activating a worker, reloading, or changing current authority. A
@@ -22,6 +55,12 @@ All notable changes to this project will be documented in this file.
   actual durable authority. Bounded abort-aware adapter deadlines fail closed
   as `adapter-stalled` if a port never acknowledges settlement. Git/deployment
   history, not browser storage, remains the application rollback authority.
+  Waiting workers now contribute only their build-sealed pair and precache
+  identity; runtime resource-plan and receipt authority is recorded only after
+  exact active-pair admission. A fresh boot reconciles an armed intent after
+  its actual controlling worker is challenged and matches admitted resources,
+  consumes an exact match once, tombstones a mismatch, and removes malformed
+  durable records without claiming activation.
 
 - Added a per-document production lease for the exact active app/release pair.
   Public static tabs acquire before the resource router becomes available,
@@ -32,6 +71,18 @@ All notable changes to this project will be documented in this file.
   initial acquisition.
   Private Candidate sessions remain memory-only and create no lease, timer,
   lifecycle listener, or persistent storage activity.
+
+- Added a canonical Flight offline chip driven by exact accepted release
+  inventory, plus visible connection, storage, and safe-update notices in the
+  existing alert slot with explicit retry/activation actions. Visual PMTiles
+  remain network-only, online completion does not add header chrome, and
+  generic browser connectivity never authorizes an offline claim. Exact
+  interaction generations prevent one location's cached assessment from
+  authorizing another location with the same scenario and horizon. Static-host
+  coordinator state and actions now flow through the production browser
+  runtime, while pending and failed actions are fenced to the exact capability
+  subject and candidate identity. The canonical chip uses the mock's mint
+  translucent treatment and status dot.
 
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,
@@ -98,6 +149,15 @@ All notable changes to this project will be documented in this file.
 - Added a release-scoped complete-resource cache adapter with byte verification
   before admission and after readback, staged promotion, corruption quarantine,
   private-data exclusion, and aggregate-only availability evidence.
+- Added target-owned production settlement-search browser evidence with exact
+  manifest/receipt/shard/query bindings, private request allowlisting, retained
+  responsiveness and latency distributions, explicit browser budgets,
+  hash-bound nonclaim validation, and durable no-overwrite report publication.
+
+- Added the static target's production settlement-search shard builder. It
+  consumes the exact Python-validated projection authority, emits deterministic
+  v4 code-point-trie Brotli shards and a release/source/hash-bound receipt, and
+  publishes without overwrite through fail-closed atomic file promotion.
 
 - Added production-static browser journey evidence for all four ADR-024
   outcomes and all nine scenario/horizon projections, including exact COG
@@ -155,6 +215,17 @@ All notable changes to this project will be documented in this file.
   network-only, visual-only, and `no-store` until a separate promotion contract
   supplies authoritative interval digests; the original browser observations
   remain unchanged.
+- Relocated the reusable AR6 Chromium delivery measurement harness into the
+  static `src/web` workspace and rebound its exact release contract to the
+  root npm lockfile without changing lookup values or engineering budgets.
+  The committed offline source fixture is deterministically rebound to that
+  contract with its previous identities recorded and no verified-archive or
+  scientific-release capability granted to the migration.
+
+- Relocated the permanent PMTiles browser and deterministic render evidence
+  harnesses into the static `src/web` workspace and bound them to the root npm
+  lockfile, without changing the approved scientific inputs or rendered PNG
+  bytes.
 
 - Made test-suite retirement an explicit, fail-closed inventory lifecycle:
   active suites alone own, route, and execute tests, while retired suite and
@@ -190,6 +261,10 @@ All notable changes to this project will be documented in this file.
   locked restore while that test runtime awaits Phase 2 removal.
 
 ### Fixed
+
+- Kept mobile Flight capability/update alerts below the optional basemap control
+  and made the browser technical-failure journey wait for its exact query-free
+  release COG `HEAD` interception before injecting the transient failure.
 
 - Bound one-shot coordinated-admission proofs and accepted receipt gates to
   their exact issuing and consuming storage profiles. Cross-profile

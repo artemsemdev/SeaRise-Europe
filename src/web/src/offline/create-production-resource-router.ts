@@ -10,7 +10,10 @@ import { createRangeStore } from "./range-store";
 import { validateStorageBudget } from "./contracts/policy";
 import { MemoryWholeResourceCache, WholeResourceCache } from "./whole-resource-cache";
 import { VerifiedResourceRouter } from "./verified-resource-router";
+import { createProductionUpdateCoordinator } from "./production-update-coordinator";
+import type { BrowserResourceRouter } from "../application/browser-runtime";
 import { createClientLeaseController } from "./client-lease-controller";
+import { createWorkerClientAuthority } from "./worker-client-authority";
 
 const RANGE_BUDGET_BYTES = 96 * 1024 * 1024;
 const WHOLE_BUDGET_BYTES = 64 * 1024 * 1024;
@@ -61,7 +64,10 @@ async function privateSessionAuthority(subtle: SubtleCrypto): Promise<string> {
   return hexadecimal(await subtle.digest("SHA-256", payload));
 }
 
-async function workerPrecacheAuthority(signal: AbortSignal): Promise<string> {
+async function workerPrecacheAuthority(signal: AbortSignal): Promise<Readonly<{
+  precacheSetSha256: string;
+  worker: ServiceWorker;
+}>> {
   if (signal.aborted) throw technical("Build identity verification was cancelled.", true);
   if (!("serviceWorker" in navigator)) {
     throw technical("A verified service worker is required for persistent release routing.");
@@ -111,13 +117,13 @@ async function workerPrecacheAuthority(signal: AbortSignal): Promise<string> {
   ) {
     throw technical("The application and verified service worker identities disagree.");
   }
-  return message.precacheSetSha256;
+  return Object.freeze({ precacheSetSha256: message.precacheSetSha256, worker });
 }
 
 export async function createProductionResourceRouter(
   context: ReleaseContext,
   signal: AbortSignal,
-): Promise<VerifiedResourceRouter> {
+): Promise<BrowserResourceRouter> {
   if (!globalThis.crypto?.subtle || !globalThis.crypto.randomUUID) {
     throw technical("Web Crypto is required for verified release routing.");
   }
@@ -126,9 +132,8 @@ export async function createProductionResourceRouter(
   if (!localCandidate && (!("caches" in globalThis) || !("indexedDB" in globalThis) || !("locks" in navigator))) {
     throw technical("Persistent release routing requires Cache Storage, IndexedDB, and Web Locks.");
   }
-  const precacheSetSha256 = localCandidate
-    ? await privateSessionAuthority(subtle)
-    : await workerPrecacheAuthority(signal);
+  const workerAuthority = localCandidate ? null : await workerPrecacheAuthority(signal);
+  const precacheSetSha256 = workerAuthority?.precacheSetSha256 ?? await privateSessionAuthority(subtle);
   const appAuthority = validateAppAuthority({
     contractVersion: 1,
     appBuildId: runtimeConfig.appBuildId,
@@ -204,14 +209,21 @@ export async function createProductionResourceRouter(
     localCandidate,
   });
   let clientLease: ReturnType<typeof createClientLeaseController> | undefined;
+  let workerClientAuthority: ReturnType<typeof createWorkerClientAuthority> | undefined;
   try {
-    clientLease = createClientLeaseController({
-      pair: validateAppReleasePair(releasePlan.pair),
-      store: rangeStore,
-      persistence: releasePlan.persistence.mode,
-    });
-    await clientLease.start();
-    return new VerifiedResourceRouter({
+    if (workerAuthority) {
+      workerClientAuthority = createWorkerClientAuthority(
+        workerAuthority.worker,
+        navigator.serviceWorker,
+      );
+      clientLease = createClientLeaseController({
+        pair: validateAppReleasePair(releasePlan.pair),
+        store: workerClientAuthority,
+      });
+      workerClientAuthority.attachObservation(() => clientLease!.observation());
+      await clientLease.start();
+    }
+    const router = new VerifiedResourceRouter({
       releasePlan,
       wholeStore,
       rangeStore,
@@ -219,6 +231,17 @@ export async function createProductionResourceRouter(
       subtle,
       fetchRange: fetch.bind(globalThis),
       ...(localCandidate ? {} : { clientLease }),
+    });
+    if (localCandidate) return router;
+    return Object.freeze({
+      artifactTransport: router.artifactTransport,
+      cogRangeTransport: router.cogRangeTransport,
+      inspectCapability: router.inspectCapability.bind(router),
+      updateCoordinator: createProductionUpdateCoordinator(router, precacheSetSha256, {
+        locks: browserAdmissionLockPort(navigator.locks),
+        clientCensus: workerClientAuthority,
+      }),
+      close: () => router.close(),
     });
   } catch (error) {
     await clientLease?.close().catch(() => undefined);
