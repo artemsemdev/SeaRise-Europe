@@ -48,6 +48,14 @@ An application build contains or resolves one explicit `dataReleaseId`. It
 must not consume “latest” during a session. Each release is stored under
 `/releases/{dataReleaseId}/...`; objects in that prefix are append-only.
 
+Before deployment, `scripts/inspect-build.mjs` reconstructs the complete output
+allowlist from fixed document roots, the exact Vite manifest, the embedded
+shell-precache manifest, referenced source maps, and the selected release
+manifest. Every output must be a regular file on that list; unknown archives,
+private Candidate material, and emitted code that requests `/assess`,
+`/geocode`, or `/config` fail the build. This validation uses only committed
+fixture output and never discovers or scans Candidate-v7.
+
 R2 must support `GET`, `HEAD`, and byte-range requests with the CORS and exposed
 headers in ADR-021. Large artifacts use one public canonical URL so browser,
 STAC, manifest, and smoke tests all address the same object.
