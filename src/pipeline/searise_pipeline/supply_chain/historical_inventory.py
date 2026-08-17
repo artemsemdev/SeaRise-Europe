@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import stat
+import subprocess
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, cast
 
 from .contracts import SupplyChainContractError
 from .static_profile import _HISTORICAL_EVIDENCE, load_static_target_profile_contract
@@ -110,6 +112,163 @@ def _git_object_oid(kind: str, content: bytes) -> str:
 
 def _git_file_mode(path: Path) -> str:
     return "100755" if path.stat().st_mode & 0o111 else "100644"
+
+
+def _git(
+    repository_root: Path,
+    *arguments: str,
+    input_bytes: bytes | None = None,
+) -> bytes:
+    environment = os.environ.copy()
+    environment["GIT_NO_LAZY_FETCH"] = "1"
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    try:
+        return subprocess.run(
+            ["git", "--no-replace-objects", *arguments],
+            cwd=repository_root,
+            env=environment,
+            input=input_bytes,
+            check=True,
+            capture_output=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise SupplyChainContractError(
+            "historical Phase 1 Git authority object is unavailable"
+        ) from exc
+
+
+def _git_blobs_at(
+    repository_root: Path,
+    commit: str,
+    logical_paths: set[PurePosixPath],
+) -> dict[PurePosixPath, tuple[str, bytes]]:
+    raw_tree = _git(repository_root, "ls-tree", "-r", "-z", commit, "--")
+    entries: dict[str, tuple[str, str, str]] = {}
+    try:
+        for raw_entry in (value for value in raw_tree.split(b"\0") if value):
+            metadata, raw_path = raw_entry.split(b"\t", 1)
+            mode, kind, oid = metadata.decode("ascii").split(" ")
+            path = raw_path.decode("utf-8")
+            if path in entries:
+                raise ValueError("duplicate Git path")
+            entries[path] = (mode, kind, oid)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise SupplyChainContractError(
+            "historical Phase 1 Git tree metadata is malformed"
+        ) from exc
+
+    selected: list[tuple[PurePosixPath, str, str]] = []
+    for logical in sorted(logical_paths, key=lambda item: item.as_posix()):
+        tree_entry = entries.get(logical.as_posix())
+        if tree_entry is None:
+            raise SupplyChainContractError(
+                f"historical Phase 1 Git path is missing or ambiguous: {logical}"
+            )
+        mode, kind, oid = tree_entry
+        if kind != "blob":
+            raise SupplyChainContractError(
+                f"historical v1 dependency input must be a Git blob: {logical}"
+            )
+        selected.append((logical, mode, oid))
+
+    batch = _git(
+        repository_root,
+        "cat-file",
+        "--batch",
+        input_bytes=("\n".join(oid for _path, _mode, oid in selected) + "\n").encode(),
+    )
+    offset = 0
+    result: dict[PurePosixPath, tuple[str, bytes]] = {}
+    try:
+        for logical, mode, expected_oid in selected:
+            line_end = batch.index(b"\n", offset)
+            oid, kind, raw_size = batch[offset:line_end].decode("ascii").split(" ")
+            size = int(raw_size)
+            content_start = line_end + 1
+            content_end = content_start + size
+            content = batch[content_start:content_end]
+            if batch[content_end : content_end + 1] != b"\n":
+                raise ValueError("missing batch separator")
+            offset = content_end + 1
+            if oid != expected_oid or kind != "blob" or _git_object_oid(kind, content) != oid:
+                raise ValueError("Git object identity mismatch")
+            result[logical] = (mode, content)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise SupplyChainContractError(
+            "historical Phase 1 Git blob batch is missing or malformed"
+        ) from exc
+    if offset != len(batch):
+        raise SupplyChainContractError("historical Phase 1 Git blob batch has extra output")
+    return result
+
+
+def _git_entry_at(
+    repository_root: Path,
+    commit: str,
+    logical: PurePosixPath,
+) -> tuple[str, str, bytes]:
+    output = _git(repository_root, "ls-tree", "-z", commit, "--", logical.as_posix())
+    entries = [entry for entry in output.split(b"\0") if entry]
+    if len(entries) != 1:
+        raise SupplyChainContractError(
+            f"historical Phase 1 Git path is missing or ambiguous: {logical}"
+        )
+    try:
+        metadata, raw_path = entries[0].split(b"\t", 1)
+        mode, kind, oid = metadata.decode("ascii").split(" ")
+        path = raw_path.decode("utf-8")
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise SupplyChainContractError(
+            f"historical Phase 1 Git path metadata is malformed: {logical}"
+        ) from exc
+    if path != logical.as_posix():
+        raise SupplyChainContractError(
+            f"historical Phase 1 Git path does not match exactly: {logical}"
+        )
+    content = _git(repository_root, "cat-file", kind, oid)
+    if _git_object_oid(kind, content) != oid:
+        raise SupplyChainContractError(
+            f"historical Phase 1 Git object identity does not match: {logical}"
+        )
+    return mode, kind, content
+
+
+def _historical_git_authority(
+    repository_root: Path,
+    git_authority: dict[str, str],
+    subtree: PurePosixPath,
+) -> str:
+    shallow = _git(repository_root, "rev-parse", "--is-shallow-repository").strip()
+    if shallow != b"false":
+        raise SupplyChainContractError(
+            "historical Phase 1 validation requires a full Git history"
+        )
+    commit = git_authority["commit"]
+    if _git(repository_root, "cat-file", "-t", commit).strip() != b"commit":
+        raise SupplyChainContractError(
+            "historical Phase 1 Git authority is not a commit"
+        )
+    _git(
+        repository_root,
+        "rev-list",
+        "--objects",
+        "--missing=error",
+        "--quiet",
+        commit,
+    )
+    tree = _git(repository_root, "rev-parse", f"{commit}^{{tree}}").decode().strip()
+    if tree != git_authority["tree"]:
+        raise SupplyChainContractError("historical Phase 1 Git tree does not match")
+    mode, kind, content = _git_entry_at(repository_root, commit, subtree)
+    if mode != "040000" or kind != "tree":
+        raise SupplyChainContractError(
+            "historical Phase 1 contracts path is not a Git tree"
+        )
+    if _git_object_oid(kind, content) != git_authority["phase1ContractsTree"]:
+        raise SupplyChainContractError(
+            "historical Phase 1 Git contracts tree does not match"
+        )
+    return commit
 
 
 def _retained_tree_oid(
@@ -222,6 +381,11 @@ def materialize_historical_dependency_authority(
         raise SupplyChainContractError(
             f"historical v1 mode authority is incomplete: missing={missing}, extra={extra}"
         )
+    historical_commit = _historical_git_authority(
+        repository_root,
+        git_authority,
+        subtree,
+    )
     retained_v1 = _retained_v1_files(repository_root, subtree)
     if _retained_tree_oid(retained_v1, subtree) != git_authority["phase1ContractsTree"]:
         raise SupplyChainContractError("historical Phase 1 contracts tree does not match")
@@ -272,24 +436,20 @@ def materialize_historical_dependency_authority(
         root = Path(temporary).resolve()
         for logical, (content, executable) in retained_v1.items():
             _copy_materialized_file(root, logical, content, executable)
+        historical_blobs = _git_blobs_at(
+            repository_root,
+            historical_commit,
+            outside_inputs,
+        )
         for logical, expected_sha256 in input_descriptors:
             if logical == subtree or subtree in logical.parents:
                 continue
-            source = _strict_repository_path(
-                repository_root,
-                logical,
-                description="historical v1 dependency input",
-            )
-            if not source.is_file():
-                raise SupplyChainContractError(
-                    f"historical v1 dependency input must be a regular file: {logical}"
-                )
+            mode, content = historical_blobs[logical]
             expected_mode = mode_authority[logical.as_posix()]
-            if _git_file_mode(source) != expected_mode:
+            if mode != expected_mode:
                 raise SupplyChainContractError(
                     f"historical v1 dependency input mode changed: {logical}"
                 )
-            content = source.read_bytes()
             if hashlib.sha256(content).hexdigest() != expected_sha256:
                 raise SupplyChainContractError(
                     f"dependency input SHA-256 mismatch: {logical}"
@@ -314,7 +474,7 @@ def validate_historical_dependency_inventory(
         profile_path,
         repository_root=repository_root,
     ) as (historical_root, inventory_path):
-        authority = _HISTORICAL_EVIDENCE["validatorAuthority"]
+        authority = cast(dict[str, str], _HISTORICAL_EVIDENCE["validatorAuthority"])
         validator_path = historical_root / _HISTORICAL_VALIDATOR_RUNTIME_PATH
         validator_bytes = validator_path.read_bytes()
         if hashlib.sha256(validator_bytes).hexdigest() != authority["sha256"]:

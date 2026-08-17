@@ -355,4 +355,12 @@ def test_identity_policy_is_descriptor_safe(
 
         monkeypatch.setattr(pair_validation.os, "read", swap)
     with pytest.raises(SupplyChainContractError, match="identity policy.*(symlinks|changed)"):
-        _validate(candidate, evidence, repository)
+        pair_validation._validate_candidate_evidence_pair(
+            candidate,
+            evidence,
+            repository_root=repository,
+            trusted_invocation_uri=INVOCATION,
+            allow_production_envelope=False,
+            dependency_inventory=ROOT
+            / "contracts/supply-chain/v1/dependency-inventory.json",
+        )

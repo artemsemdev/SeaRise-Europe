@@ -79,16 +79,20 @@ blob. The `historical-inventory` command recomputes the subtree tree and
 validator blob from checkout bytes, verifies every inventory input, then
 materializes the retained schema, inputs, and vendored validator in a temporary
 directory. It executes only that historical implementation; the mutable Phase 2
-validator is never used as historical authority. The gate works in a clean
-shallow checkout without Git history or a network fetch. A Phase 1 record does
-not reactivate a deleted runtime. The retained v1 root and every path component are
-resolved strictly beneath the repository before traversal or reads; symlinks at
-the root or below it fail closed.
+validator is never used as historical authority. Outside-v1 Phase 1 inputs are
+read from the exact `gitAuthority.commit` object, never from current paths, and
+are created only inside the temporary materialization root. Run this gate from a
+full-history checkout (`fetch-depth: 0` in CI); shallow, partial, missing-object,
+path, tree, mode, and hash drift fail closed without a lazy network fetch. A
+Phase 1 record does not reactivate a deleted runtime. The retained v1 root and
+every path component are resolved strictly beneath the repository before
+traversal or reads; symlinks at the root or below it fail closed.
 
 The historical mode authority contains exactly every inventory input outside
 `contracts/supply-chain/v1` plus the vendored validator snapshot. Validation
-compares each current executable bit with its reviewed Git mode (`100644` or
-`100755`) before copying bytes, so either direction of mode drift fails closed.
+compares each historical Git entry with its reviewed mode (`100644` or `100755`)
+before isolated materialization. The vendored validator and three transitional
+v2 inputs remain checked against their current reviewed bytes and modes.
 
 Current-tree discovery fails closed for alternative npm, pnpm, and Yarn locks;
 Pipenv, Poetry, uv, requirements, and pyproject Python authorities; and all four

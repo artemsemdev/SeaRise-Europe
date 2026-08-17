@@ -113,6 +113,20 @@ def _invoke(
     repository: Path = ROOT,
     run_id: str = RUN_ID,
 ) -> object:
+    if repository != ROOT:
+        assert production_evidence._FINALIZATION_LOCK.acquire(blocking=False)
+        try:
+            return production_evidence._finalize_production_evidence(
+                candidate,
+                repository_root=repository,
+                repository_authority_root=repository,
+                controlled_build_run_id=run_id,
+                manifest_bundle=manifest_bundle.absolute(),
+                provenance_bundle=provenance_bundle.absolute(),
+                output_root=output.absolute(),
+            )
+        finally:
+            production_evidence._FINALIZATION_LOCK.release()
     return finalize_production_evidence(
         candidate,
         repository_root=repository,
@@ -161,10 +175,15 @@ def _repository_authority(root: Path) -> Path:
         production_evidence._SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
         for logical in production_evidence._SBOM_PATHS
     )
-    for logical in paths:
-        target = root.joinpath(*logical.parts)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(ROOT.joinpath(*logical.parts), target)
+    profile = ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    with production_evidence.materialize_historical_dependency_authority(
+        profile,
+        repository_root=ROOT,
+    ) as (historical_root, _historical_inventory):
+        for logical in paths:
+            target = root.joinpath(*logical.parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(historical_root.joinpath(*logical.parts), target)
     return root
 
 
@@ -632,9 +651,14 @@ def test_all_ten_sboms_are_checked_against_merged_authorities(
     candidate, manifest_bundle, provenance_bundle = _inputs(tmp_path)
     validated = []
     original = production_evidence._validate_sbom_authority
-    def record(logical: str, path: Path, root: Path) -> dict[str, object]:
+    def record(
+        logical: str,
+        path: Path,
+        root: Path,
+        dependency_inventory: Path,
+    ) -> dict[str, object]:
         validated.append(logical)
-        return original(logical, path, root)
+        return original(logical, path, root, dependency_inventory)
     monkeypatch.setattr(production_evidence, "_validate_sbom_authority", record)
     _invoke(candidate, manifest_bundle, provenance_bundle, tmp_path / "evidence")
     assert tuple(validated) == production_evidence._SBOM_PATHS * 2
