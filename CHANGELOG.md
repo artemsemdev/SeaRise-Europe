@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
   loading is deferred past the initial render, and generated delivery sidecars
   cannot expand the exact manifest-authorized release inventory.
 
+- Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
+  paths are ignored, untracked, absent from CI workflows, and absent from the
+  static output inventory without reading Candidate-v7 or TAR bytes.
+
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,
@@ -187,6 +191,11 @@ All notable changes to this project will be documented in this file.
   cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
 
 ### Changed
+
+- Corrected the test-retirement inventory so executable legacy frontend
+  Python tests cannot escape discovery, removal-bound suites point to explicit
+  stronger static-target evidence, and PostGIS/blob-seed changes route through
+  active legacy characterization gates before repository deletion.
 
 - Routed production geography, methodology, settlement-index, and exact COG
   reads through the verified resource router. Search shard bytes are verified

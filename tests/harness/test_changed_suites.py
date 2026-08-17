@@ -82,6 +82,15 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
             "pipeline-supply-chain-contract", {suite["id"] for suite in suites}
         )
 
+    def test_legacy_infrastructure_routes_deletion_owners(self) -> None:
+        database_suites = select_suites(self.inventory, ["infra/db/init.sql"])
+        blob_seed_suites = select_suites(self.inventory, ["infra/blob-seed/seed.py"])
+
+        self.assertIn(
+            "api-postgis-integration", {suite["id"] for suite in database_suites}
+        )
+        self.assertIn("compose-smoke", {suite["id"] for suite in blob_seed_suites})
+
     def test_every_current_suite_has_explicit_active_lifecycle(self) -> None:
         self.assertTrue(self.inventory["suites"])
         for suite in self.inventory["suites"]:
@@ -222,6 +231,7 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
             for relative in (
                 "src/pipeline/tests",
                 "src/frontend/src",
+                "src/frontend/scripts",
                 "src/web/src",
                 "src/web/scripts",
                 "src/web/tests",
@@ -235,6 +245,30 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
                 self.assertNotIn("scripts/compose-smoke.sh", _discover_test_files())
                 (root / "scripts/compose-smoke.sh").write_text("#!/bin/sh\n")
                 self.assertIn("scripts/compose-smoke.sh", _discover_test_files())
+
+    def test_frontend_python_test_is_discovered(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                "src/pipeline/tests",
+                "src/frontend/src",
+                "src/frontend/scripts",
+                "src/web/src",
+                "src/web/scripts",
+                "src/web/tests",
+                "tests/harness",
+                "src/api/SeaRise.Api.Tests",
+                "scripts",
+            ):
+                (root / relative).mkdir(parents=True, exist_ok=True)
+
+            test_path = root / "src/frontend/scripts/test-browser-shard-fs.py"
+            test_path.write_text("def test_fixture(): pass\n")
+            with patch("scripts.tests.validate_test_inventory.ROOT", root):
+                self.assertIn(
+                    "src/frontend/scripts/test-browser-shard-fs.py",
+                    _discover_test_files(),
+                )
 
 
 if __name__ == "__main__":
