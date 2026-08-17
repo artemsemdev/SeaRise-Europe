@@ -35,6 +35,58 @@ npm run generate:search-fixture --workspace @searise/web
 npm run check:search-fixture --workspace @searise/web
 ```
 
+### Production shard build
+
+The static target owns the production builder in
+`src/web/scripts/search-shard-builder.mjs`; it does not call or import the
+legacy Next.js runtime. First produce the projection-authority JSON with
+`scripts/release/validate_settlement_search_projection.py`. That Python
+authority is the replay proof for the exact spatial database, spatial receipt,
+projection bytes, record count, source identities, release ID, and three
+geometry identities. Then build into a new, owner-controlled directory:
+
+```bash
+mkdir -m 700 /absolute/output/search
+npm run build:search-shards --workspace @searise/web -- \
+  --projection /absolute/input/settlement-search-projection.ndjson \
+  --projection-authority /absolute/input/settlement-search-projection-authority.json \
+  --spatial-database /absolute/input/spatial.duckdb \
+  --spatial-receipt /absolute/input/spatial-receipt.json \
+  --validation-work-dir /absolute/private/replay-work \
+  --data-release-id searise-europe-v1.2.3-YYYYMMDD-0123456789ab \
+  --output-dir /absolute/output/search
+```
+
+The production CLI reruns the Python validator and requires its stdout to equal
+the supplied authority byte-for-byte; a self-consistent but unvalidated
+authority is insufficient. The builder also rechecks the canonical bounded
+projection and the authority's self-hash before producing either shard. It
+emits the exact v4 code-point trie format accepted by the production Worker
+decoder, with canonical numeric GeoNames order and the pinned runtime/ranking
+identity. Quality-11 Brotli bytes are deterministic only under the pinned Node
+runtime recorded in the artifact.
+
+Publication refuses existing names, symlink directories, path escape, and
+non-owner-controlled output. Each file is staged and synced, then promoted by
+an exclusive hard link; the receipt is the final completeness marker. A failed
+promotion removes only inodes owned by that invocation, so a retry starts from
+an empty public set. Validate the exact set without overwriting it:
+
+```bash
+npm run validate:search-shards --workspace @searise/web -- \
+  --projection /absolute/input/settlement-search-projection.ndjson \
+  --projection-authority /absolute/input/settlement-search-projection-authority.json \
+  --spatial-database /absolute/input/spatial.duckdb \
+  --spatial-receipt /absolute/input/spatial-receipt.json \
+  --validation-work-dir /absolute/private/replay-work \
+  --data-release-id searise-europe-v1.2.3-YYYYMMDD-0123456789ab \
+  --output-dir /absolute/output/search
+```
+
+Candidate-v7 may be supplied only through the documented ignored, read-only
+local path. Neither this command nor CI discovers, copies, uploads, or publishes
+Candidate-v7 or its TAR.
+
 The generator covers canonical and alternate spellings, diacritics,
 transliteration, duplicate names with country/admin context, inland and coastal
 places, zero population, and a transcontinental boundary case. It writes four
@@ -108,6 +160,7 @@ Run the deterministic target gates from the repository root:
 
 ```bash
 npm ci
+npm run test:search-shard-builder --workspace @searise/web
 npm run web:check
 npm run web:e2e
 npm audit --audit-level=high
