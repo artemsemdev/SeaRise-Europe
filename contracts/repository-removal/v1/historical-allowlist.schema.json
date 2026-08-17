@@ -37,7 +37,8 @@
             "historical-adr-term",
             "historical-changelog-term",
             "historical-five-state-evidence",
-            "immutable-v1-supply-chain-evidence"
+            "immutable-v1-supply-chain-evidence",
+            "canonical-design-reference"
           ]
         },
         "reason": { "type": "string", "minLength": 1 },
