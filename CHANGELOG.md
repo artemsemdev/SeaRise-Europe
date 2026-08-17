@@ -334,7 +334,8 @@ All notable changes to this project will be documented in this file.
   materializing outside-v1 inputs from their exact reviewed Git commit instead
   of requiring legacy paths in the current tree. Full-history, commit, tree,
   path, blob, mode, and hash checks now fail closed without lazy fetching or
-  restoring legacy files into the checkout.
+  restoring legacy files into the checkout. Protected finalization now checks
+  out full history before invoking that authority.
 
 - Allowed content validation to scan lifecycle builds staged outside the Git
   checkout while retaining strict containment and symlink rejection within the

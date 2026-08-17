@@ -10,6 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[4]
 WORKFLOW = ROOT / ".github/workflows/phase-1-release-sign.yml"
+WORKFLOWS = ROOT / ".github/workflows"
 POLICY = ROOT / "contracts/supply-chain/v1/identity-policy.json"
 OPERATIONS = ROOT / "docs/operations/phase-1-protected-signing.md"
 
@@ -18,6 +19,12 @@ SETUP_PYTHON = "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
 DOWNLOAD = "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093"
 UPLOAD = "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"
 COSIGN_LOCK_SHA256 = "dbc14b1ecc49d3fbbfb907504e50c2c18d398e1c5aa55df1f1002d709c7b70e9"
+HISTORICAL_CONSUMER_MARKERS = (
+    "scripts/release/finalize_production_evidence.py",
+    "scripts/release/retain_release_evidence.py",
+    "candidate-evidence-pair",
+    "cryptographic-verification",
+)
 
 
 def _jobs(text: str) -> dict[str, str]:
@@ -87,6 +94,7 @@ def _assert_protected_policy(text: str) -> None:
     assert "needs:\n      - intake\n      - sign" in finalize
     assert "id-token" not in finalize
     assert finalize.count("scripts/release/finalize_production_evidence.py") == 1
+    assert finalize.count("fetch-depth: 0") == 1
     for flag in (
         "--candidate-root",
         "--repository-root",
@@ -138,6 +146,48 @@ def _assert_protected_policy(text: str) -> None:
 
 def test_workflow_enforces_four_plane_least_privilege_and_exact_evidence() -> None:
     _assert_protected_policy(WORKFLOW.read_text(encoding="utf-8"))
+
+
+def test_every_workflow_consumer_has_full_historical_git_authority() -> None:
+    wired_consumers: list[tuple[str, str, str]] = []
+    workflows = sorted({*WORKFLOWS.glob("*.yml"), *WORKFLOWS.glob("*.yaml")})
+    for workflow in workflows:
+        text = workflow.read_text(encoding="utf-8")
+        jobs = text.partition("\njobs:\n")[2]
+        starts = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))
+        for index, match in enumerate(starts):
+            end = starts[index + 1].start() if index + 1 < len(starts) else len(jobs)
+            body = jobs[match.start() : end]
+            for marker in HISTORICAL_CONSUMER_MARKERS:
+                marker_index = body.find(marker)
+                if marker_index < 0:
+                    continue
+                checkout_index = body.find(CHECKOUT)
+                assert 0 <= checkout_index < marker_index
+                checkout_before_consumer = body[checkout_index:marker_index]
+                assert re.search(
+                    r"^\s+fetch-depth:\s*0\s*$",
+                    checkout_before_consumer,
+                    re.MULTILINE,
+                )
+                wired_consumers.append((workflow.name, match.group(1), marker))
+
+    assert wired_consumers == [
+        (
+            "phase-1-release-sign.yml",
+            "finalize",
+            "scripts/release/finalize_production_evidence.py",
+        )
+    ]
+
+
+def test_protected_finalizer_rejects_shallow_checkout_wiring() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    finalize = _jobs(text)["finalize"]
+    mutated = text.replace(finalize, finalize.replace("fetch-depth: 0", "fetch-depth: 1"), 1)
+
+    with pytest.raises(AssertionError):
+        _assert_protected_policy(mutated)
 
 
 @pytest.mark.parametrize("job_name", ["intake", "sign", "finalize", "verify"])
