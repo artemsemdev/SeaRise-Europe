@@ -324,6 +324,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             changes.index("Validate manual workflow request"),
             changes.index("uses: actions/checkout"),
         )
+
         self.assertIn("inputs.release_evidence == true", evidence)
         self.assertIn("github.ref_name == 'master'", evidence)
         self.assertIn("needs: changes", evidence)
@@ -350,6 +351,19 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             macos_evidence.index("uses: actions/checkout"),
         )
         self.assertNotIn("inputs.release_source_revision || github.sha", workflow)
+
+    def test_static_web_can_verify_the_owner_approval_chain(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        web = _workflow_job(workflow, "web", "frontend")
+
+        self.assertIn("permissions:\n      contents: read\n      issues: read", web)
+        self.assertIn("fetch-depth: 0", web)
+        validation = web.split("- name: Validate static target", maxsplit=1)[1]
+        validation = validation.split("\n      - name:", maxsplit=1)[0]
+        self.assertIn("GH_TOKEN: ${{ github.token }}", validation)
+        self.assertIn("run: npm run web:check", validation)
 
     def test_release_evidence_pins_actions_and_checks_disk_before_download(self) -> None:
         workflow = (
