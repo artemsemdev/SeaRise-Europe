@@ -38,6 +38,13 @@ _IGNORED_DEPENDENCY_PARTS = frozenset(
         "target",
     }
 )
+_V1_NON_CANDIDATE_DEPENDENCY_PATHS = frozenset(
+    {
+        PurePosixPath(".github/workflows/static-quality.yml"),
+        PurePosixPath("tools/static-quality/package-lock.json"),
+        PurePosixPath("tools/static-quality/package.json"),
+    }
+)
 _COMPOSE_FILES = frozenset(
     {"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"}
 )
@@ -250,6 +257,10 @@ def _is_opentofu_input(path: PurePosixPath) -> bool:
 
 
 def _is_dependency_input(path: PurePosixPath) -> bool:
+    # The immutable v1 inventory discovers the Phase 1 repository boundary.
+    # Later versioned profiles own and validate their dependency inputs.
+    if path.parts[:3] == ("contracts", "supply-chain", "v2"):
+        return False
     name = path.name
     workflow = (
         len(path.parts) >= 3
@@ -298,9 +309,16 @@ def discover_dependency_inputs(repository_root: Path = REPOSITORY_ROOT) -> tuple
         if any(part in _IGNORED_DEPENDENCY_PARTS for part in relative.parts):
             continue
         logical_path = PurePosixPath(relative.as_posix())
+        if _is_v1_non_candidate_dependency(logical_path):
+            continue
         if candidate.is_file() and _is_dependency_input(logical_path):
             discovered.append(logical_path.as_posix())
     return tuple(sorted(discovered))
+
+
+def _is_v1_non_candidate_dependency(path: PurePosixPath) -> bool:
+    """Exclude only exact v2-authorized files from the immutable v1 candidate graph."""
+    return path in _V1_NON_CANDIDATE_DEPENDENCY_PATHS
 
 
 def _component_for_input(path: PurePosixPath) -> str:

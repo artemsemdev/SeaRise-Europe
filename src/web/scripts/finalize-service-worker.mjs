@@ -7,6 +7,7 @@ import {
   deriveShellPrecacheEntries,
   precachePlaceholder,
 } from "./service-worker-precache.mjs";
+import { precompressStaticBuild } from "./static-delivery-assets.mjs";
 import { resolveStaticBuildRoot } from "./static-build-root.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -43,4 +44,5 @@ worker = worker.replace(
 worker = worker.replace(/\n?\/\/# sourceMappingURL=service-worker\.js\.map\s*$/u, "");
 writeFileSync(workerPath, worker);
 rmSync(`${workerPath}.map`, { force: true });
+precompressStaticBuild(dist);
 console.log(`embedded ${entries.length} byte-verified shell resources in service-worker.js`);

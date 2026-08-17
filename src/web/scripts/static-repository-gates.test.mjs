@@ -8,6 +8,7 @@ import {
   isRepositoryScanPath,
   isTargetScanPath,
   scanDependencyRecords,
+  validateStaticSupplyChainProfile,
   validateStaticRepository,
 } from "./static-repository-gates.mjs";
 
@@ -23,6 +24,8 @@ function approvalRepository() {
   mkdirSync(resolve(root, "src/web/scripts"), { recursive: true });
   writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "// synthetic gate policy\n");
   writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.test.mjs"), "// synthetic gate tests\n");
+  mkdirSync(resolve(root, "contracts/supply-chain/v2"), { recursive: true });
+  writeFileSync(resolve(root, "contracts/supply-chain/v2/static-target-profile.json"), "{}\n");
   mkdirSync(resolve(root, "src/frontend"), { recursive: true });
   writeFileSync(resolve(root, "src/frontend/token-free"), "survivor\n");
   git(root, "add", ".");
@@ -230,10 +233,15 @@ describe("static repository dependency gates", () => {
 
   it("discovers token-free survivors and requires approved final authority end to end", () => {
     const { root, contract } = approvalRepository();
-    const readiness = validateStaticRepository({ mode: "repository-readiness", root });
+    const skipSupplyChain = () => {};
+    const readiness = validateStaticRepository({
+      mode: "repository-readiness", root, supplyChainValidator: skipSupplyChain,
+    });
     expect(readiness.findings.some(({ path, rule }) =>
       path === "src/frontend/token-free" && rule === "must-delete-path")).toBe(true);
-    expect(() => validateStaticRepository({ mode: "repository-final", root, approvalValidator: () => {} }))
+    expect(() => validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: () => {}, supplyChainValidator: skipSupplyChain,
+    }))
       .toThrow(/Approved historical allowlist is missing/);
 
     writeFileSync(resolve(root, "contracts/repository-removal/v1/historical-allowlist.json"),
@@ -245,23 +253,46 @@ describe("static repository dependency gates", () => {
       mode: "repository-final",
       root,
       approvalValidator: () => { throw new Error("invalid owner/hash chain"); },
+      supplyChainValidator: skipSupplyChain,
     })).toThrow(/invalid owner\/hash chain/);
     let approvals = 0;
     const approve = () => { approvals += 1; };
-    expect(() => validateStaticRepository({ mode: "repository-final", root, approvalValidator: approve }))
+    expect(() => validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    }))
       .toThrow(/must-delete-path/);
     expect(approvals).toBe(1);
 
     git(root, "rm", "-q", "src/frontend/token-free");
     git(root, "-c", "user.name=Artem", "-c", "user.email=6793222+artemsemdev@users.noreply.github.com",
       "commit", "-qm", "test: remove survivor");
-    expect(validateStaticRepository({ mode: "repository-final", root, approvalValidator: approve }).violations)
+    expect(validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    }).violations)
       .toHaveLength(0);
     expect(approvals).toBe(2);
     expect(readFileSync(resolve(root, "docs/evidence/history.md"), "utf8")).toBe("Historical evidence.\n");
 
     writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "createServer(app)\n");
-    expect(() => validateStaticRepository({ mode: "repository-final", root, approvalValidator: approve }))
+    expect(() => validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    }))
       .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
+  });
+
+  it("binds the current v2 profile counts and exact static-quality workflow/tooling inputs", () => {
+    const root = resolve(process.cwd(), "../..");
+    const profile = JSON.parse(readFileSync(resolve(root, "contracts/supply-chain/v2/static-target-profile.json"), "utf8"));
+    const readPath = (path) => readFileSync(resolve(root, path));
+    expect(validateStaticSupplyChainProfile(profile, readPath)).toEqual({ componentCount: 14, inputCount: 57 });
+
+    const countMutation = JSON.parse(JSON.stringify(profile));
+    countMutation.components.at(-1).inputs.pop();
+    expect(() => validateStaticSupplyChainProfile(countMutation, readPath)).toThrow(/count drift/);
+
+    const workflowMutation = JSON.parse(JSON.stringify(profile));
+    workflowMutation.components.find(({ id }) => id === "github-actions")
+      .inputs.find(({ path }) => path === ".github/workflows/static-quality.yml").sha256 = "0".repeat(64);
+    expect(() => validateStaticSupplyChainProfile(workflowMutation, readPath)).toThrow(/input hash drift/);
   });
 });

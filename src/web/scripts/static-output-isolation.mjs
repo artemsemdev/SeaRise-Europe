@@ -17,6 +17,7 @@ const webRoot = moduleUrl.protocol === "file:"
 const repositoryRoot = resolve(webRoot, "../..");
 const canonicalFlightPath = resolve(repositoryRoot, "docs/product/Mock/SeaRise-Flight.html");
 const canonicalFlightRequirementsPath = resolve(repositoryRoot, "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md");
+const PRECOMPRESSED_BASE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".svg", ".xml"]);
 const FORBIDDEN_STATIC_OUTPUT_PATHS = Object.freeze([
   /(?:^|\/)candidate(?:[-_.]?v?\d+)?(?:[/.\-_]|$)/i,
   /(?:^|\/)local-data(?:\/|$)/i,
@@ -213,6 +214,23 @@ export function validateStaticOutputIsolation({
     return safePath;
   });
   if (new Set(actual).size !== actual.length) fail("Static output contains duplicate paths");
+
+  for (const path of actual) {
+    // Manifest-authorized release objects may themselves use .br as their
+    // canonical media encoding; they are verified by release identity rather
+    // than treated as derived delivery sidecars.
+    if (expected.has(path)) continue;
+    const suffix = path.endsWith(".br") ? ".br" : path.endsWith(".gz") ? ".gz" : null;
+    if (!suffix) continue;
+    if (path.startsWith(`${releasePrefix}/`)) {
+      fail(`Static release contains a non-manifest precompressed sidecar: ${path}`);
+    }
+    const base = path.slice(0, -suffix.length);
+    if (!expected.has(base) || !PRECOMPRESSED_BASE_EXTENSIONS.has(extname(base)) || base.endsWith(".map")) {
+      fail(`Static output contains an unauthorized precompressed sidecar: ${path}`);
+    }
+    expected.add(path);
+  }
 
   const missing = [...expected].filter((path) => path !== "build-report.json" && !actual.includes(path)).sort();
   if (missing.length) fail(`Static output is missing allowlisted files: ${missing.join(", ")}`);

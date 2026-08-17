@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,6 +61,32 @@ const exactRetainedRulePurpose = new Map([
     ["postgres-postgis-npgsql", new Set(["postgis"])],
     ["titiler-runtime", new Set(["titiler", "developmentseed/titiler"])],
   ])],
+  ["contracts/supply-chain/v2/historical/v1-contracts.py", new Map([
+    ["dotnet-csharp-nuget", new Set(["nuget", ".csproj"])],
+  ])],
+  ["contracts/supply-chain/v2/static-target-profile.json", new Map([
+    ["dotnet-csharp-nuget", new Set(["nuget", ".csproj", ".sln"])],
+    ["postgres-postgis-npgsql", new Set(["postgis"])],
+    ["azurite-runtime", new Set(["azurite"])],
+  ])],
+  ["contracts/supply-chain/v2/static-target-profile.schema.json", new Map([
+    ["dotnet-csharp-nuget", new Set(["nuget"])],
+    ["azurite-runtime", new Set(["azurite"])],
+  ])],
+  ["src/pipeline/searise_pipeline/supply_chain/static_profile.py", new Map([
+    ["nextjs-runtime", new Set(["\"next\""])],
+    ["dotnet-csharp-nuget", new Set(["nuget", ".csproj", ".sln"])],
+    ["postgres-postgis-npgsql", new Set(["postgis"])],
+    ["azurite-runtime", new Set(["azurite"])],
+  ])],
+  ["src/pipeline/tests/supply_chain/test_static_target_profile.py", new Map([
+    ["nextjs-runtime", new Set(["\"next\""])],
+    ["dotnet-csharp-nuget", new Set([".sln"])],
+    ["postgres-postgis-npgsql", new Set(["postgis"])],
+  ])],
+  ["tests/harness/test_changed_suites.py", new Map([
+    ["postgres-postgis-npgsql", new Set(["postgis"])],
+  ])],
 ]);
 const allPolicyRuleIds = new Set(forbiddenDependencyRules.map(({ id }) => id));
 const gatePolicyRulePurpose = new Map([
@@ -89,6 +116,8 @@ function retainedClass(path, ruleId, findingText, historicalEntries) {
     return "gate-policy-definition";
   }
   if (exactRetainedRulePurpose.get(path)?.get(ruleId)?.has(findingText.toLocaleLowerCase("en-US"))) {
+    if (path.startsWith("contracts/supply-chain/v2/")
+        || path.includes("/supply_chain/static_profile.py")) return "retained-build-science";
     return path.startsWith("tests/") ? "retained-test-evidence" : "retained-test-tooling";
   }
   return null;
@@ -189,8 +218,9 @@ export function scanDependencyRecords(records, {
   const rawFindings = [...pathPresenceFindings(paths), ...records.flatMap(({ path, text }) => scanText(path, text))];
   const findings = rawFindings.map((finding) => {
     const { path } = finding;
-    const classification = finding.rule === "private-or-archive-path" ? null : isPendingRemoval(path, finding.rule)
-      ? "pending-removal" : retainedClass(path, finding.rule, finding.text, historicalEntries);
+    const retained = retainedClass(path, finding.rule, finding.text, historicalEntries);
+    const classification = finding.rule === "private-or-archive-path" ? null : retained
+      ?? (isPendingRemoval(path, finding.rule) ? "pending-removal" : null);
     return Object.freeze({ ...finding, classification });
   });
   const violations = findings.filter(({ classification }) => {
@@ -246,11 +276,44 @@ export function isTargetScanPath(path) {
   return path.startsWith("src/web/") || path === "package.json" || path === "package-lock.json";
 }
 
+export function validateStaticSupplyChainProfile(document, readPath) {
+  if (!document || document.schemaVersion !== "2.0.0"
+      || document.profileId !== "static-browser-supply-chain-v2"
+      || !Array.isArray(document.components)) {
+    throw new Error("Static-target supply-chain profile is not the required v2 authority");
+  }
+  const componentCount = document.components.length;
+  const inputCount = document.components.reduce((count, component) =>
+    count + (Array.isArray(component?.inputs) ? component.inputs.length : 0), 0);
+  if (componentCount !== 14 || inputCount !== 57) {
+    throw new Error(`Static-target supply-chain profile count drift: ${componentCount} components / ${inputCount} inputs`);
+  }
+  const byId = new Map(document.components.map((component) => [component.id, component]));
+  if (byId.size !== componentCount) throw new Error("Static-target supply-chain component IDs are not unique");
+  const required = new Map([
+    [".github/workflows/static-quality.yml", ["github-actions", "workflow"]],
+    ["tools/static-quality/package-lock.json", ["static-quality-npm", "lock"]],
+    ["tools/static-quality/package.json", ["static-quality-npm", "manifest"]],
+  ]);
+  const qualityInputs = byId.get("static-quality-npm")?.inputs ?? [];
+  if (qualityInputs.length !== 2) throw new Error("Static-quality tooling authority must contain exactly two inputs");
+  for (const [path, [componentId, role]] of required) {
+    const input = byId.get(componentId)?.inputs?.find((candidate) => candidate.path === path);
+    if (!input || input.role !== role || !/^[a-f0-9]{64}$/u.test(input.sha256 ?? "")) {
+      throw new Error(`Static-target supply-chain authority is missing exact ${componentId} input: ${path}`);
+    }
+    const actual = createHash("sha256").update(readPath(path)).digest("hex");
+    if (actual !== input.sha256) throw new Error(`Static-target supply-chain input hash drift: ${path}`);
+  }
+  return Object.freeze({ componentCount, inputCount });
+}
+
 export function validateStaticRepository({
   mode,
   builtRoot = null,
   root = repositoryRoot,
   approvalValidator,
+  supplyChainValidator = validateStaticSupplyChainProfile,
 } = {}) {
   let records;
   if (mode === "built") {
@@ -272,6 +335,9 @@ export function validateStaticRepository({
     }
     return result;
   } else {
+    const profilePath = resolve(root, "contracts/supply-chain/v2/static-target-profile.json");
+    if (!existsSync(profilePath)) throw new Error("Static-target supply-chain v2 profile is missing");
+    supplyChainValidator(JSON.parse(readFileSync(profilePath, "utf8")), (path) => readFileSync(resolve(root, path)));
     const paths = trackedPaths(root).filter((path) => mode !== "target" || isTargetScanPath(path));
     records = readRecords(paths, root);
     const historicalEntries = mode.startsWith("repository-")

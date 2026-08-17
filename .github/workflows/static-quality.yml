@@ -1,0 +1,79 @@
+name: Static quality
+
+on:
+  pull_request:
+    branches:
+      - master
+      - "integration/**"
+    paths:
+      - ".github/workflows/static-quality.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "contracts/release/v1/fixtures/release/**"
+      - "contracts/release/v2/fixtures/browser-release/**"
+      - "src/web/**"
+      - "tools/static-quality/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/static-quality.yml"
+      - "package.json"
+      - "package-lock.json"
+      - "contracts/release/v1/fixtures/release/**"
+      - "contracts/release/v2/fixtures/browser-release/**"
+      - "src/web/**"
+      - "tools/static-quality/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-quality-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  static-quality:
+    name: Generic host and Lighthouse
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20.20.1
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Build production static application
+        run: |
+          npm ci
+          npm run web:build
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+          cache-dependency-path: tools/static-quality/package-lock.json
+
+      - name: Install locked static-quality tools and Chromium
+        run: |
+          npm ci --prefix tools/static-quality
+          npm run install:chromium:ci --prefix tools/static-quality
+
+      - name: Validate generic static hosting
+        run: node tools/static-quality/validate-generic-static-host.mjs
+
+      - name: Enforce Lighthouse budgets
+        run: node tools/static-quality/run-lighthouse-gate.mjs
+
+      - name: Upload Lighthouse evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: static-quality-lighthouse
+          path: src/web/test-results/lighthouse
+          if-no-files-found: error
+          retention-days: 14

@@ -6,17 +6,16 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { technicalErrorFrom } from "../data/manifest-repository";
+import { technicalErrorFrom } from "../data/technical-error";
 import type { ReleaseMethodology } from "../data/methodology-repository";
 import type { ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import type { ProjectionState } from "../domain/projection-state";
 import type { ReleaseContext, Selection, TechnicalError } from "../domain/release";
 import type { RuntimeCapabilityV2 } from "../offline/contracts/policy";
-import {
-  createBrowserRuntime,
-  type BrowserRuntimeFactory,
-  type BrowserRuntimeScope,
+import type {
+  BrowserRuntimeFactory,
+  BrowserRuntimeScope,
 } from "./browser-runtime";
 import type { RuntimeCapabilityInteractionV1 } from "./runtime-capability";
 
@@ -56,6 +55,11 @@ interface MethodologyRecord {
 const EMPTY_SUBSCRIBE = (): (() => void) => () => undefined;
 const NULL_SNAPSHOT = (): null => null;
 
+const defaultBrowserRuntimeFactory: BrowserRuntimeFactory = async (context, signal) => {
+  const { createBrowserRuntime } = await import("./browser-runtime");
+  return createBrowserRuntime(context, signal);
+};
+
 function unavailable(): Error {
   return new Error("The immutable release browser runtime is not ready.");
 }
@@ -83,7 +87,7 @@ function methodologyIdentityError(
  */
 export function useAssessmentRuntime(
   context: ReleaseContext | null,
-  factory: BrowserRuntimeFactory = createBrowserRuntime,
+  factory: BrowserRuntimeFactory = defaultBrowserRuntimeFactory,
 ): AssessmentRuntimeView {
   const [runtime, setRuntime] = useState<BrowserRuntimeScope | null>(null);
   const [methodologyRecord, setMethodologyRecord] = useState<MethodologyRecord | null>(null);

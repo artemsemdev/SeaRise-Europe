@@ -39,7 +39,7 @@ function temporaryDist() {
   mkdirSync(join(dist, "assets"));
   writeFileSync(join(dist, "index.html"), [
     "<html><head>",
-    `  <script src="/${applicationBuildIdentityFile}"></script>`,
+    `  <script defer src="/${applicationBuildIdentityFile}"></script>`,
     "  <script type=\"module\" src=\"/assets/index.js\"></script>",
     "</head></html>",
   ].join("\n"));

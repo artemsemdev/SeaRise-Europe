@@ -96,7 +96,11 @@ three scopes:
   use exact path/rule/matched-text purpose selectors rather than directory or
   filename wildcards. A package-level structural check separately rejects
   production HTTP-server dependencies, including a dependency whose name is
-  also used by a retained test script.
+  also used by a retained test script. Before scanning dependency terms, target,
+  readiness, and final modes also require the current v2 transition profile's
+  exact 14 components and 57 inputs. The dedicated static-quality workflow,
+  package manifest, and lock must occupy their exact components and roles and
+  match the SHA-256 values recorded by that profile.
 
 Readiness classification is not removal approval. `--repository-final` changes
 every remaining pending-removal reference into a failure and also rejects any

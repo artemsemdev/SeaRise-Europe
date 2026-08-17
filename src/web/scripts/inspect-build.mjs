@@ -1,4 +1,4 @@
-import { brotliCompressSync } from "node:zlib";
+import { brotliCompressSync, constants, gzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
@@ -40,6 +40,25 @@ function files(directory) {
 const paths = files(dist);
 const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
 const releaseManifest = JSON.parse(readFileSync(resolve(dist, "releases", releaseId, "manifest.json"), "utf8"));
+const canonicalCompressedReleaseObjects = new Set(releaseManifest.artifacts
+  .filter(({ path }) => path.endsWith(".br") || path.endsWith(".gz"))
+  .map(({ path }) => resolve(dist, "releases", releaseId, path)));
+for (const path of paths.filter((candidate) => candidate.endsWith(".br") || candidate.endsWith(".gz"))) {
+  if (canonicalCompressedReleaseObjects.has(path)) continue;
+  const suffix = path.endsWith(".br") ? ".br" : ".gz";
+  const source = readFileSync(path.slice(0, -suffix.length));
+  const expected = suffix === ".br"
+    ? brotliCompressSync(source, {
+        params: {
+          [constants.BROTLI_PARAM_QUALITY]: 11,
+          [constants.BROTLI_PARAM_MODE]: constants.BROTLI_MODE_TEXT,
+        },
+      })
+    : gzipSync(source, { level: 9, mtime: 0 });
+  if (!readFileSync(path).equals(expected)) {
+    throw new Error(`Precompressed sidecar is not byte-deterministic: ${relative(dist, path)}`);
+  }
+}
 const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
 const embedded = extractEmbeddedPrecachePayload(serviceWorker);
 const outputIsolation = validateStaticOutputIsolation({
@@ -79,6 +98,13 @@ for (const entry of ["index.html", "about/architecture/index.html"]) {
   }
   if (!/<meta\s+name="referrer"\s+content="no-referrer"\s*\/?\s*>/i.test(html)) {
     throw new Error(`${entry} does not enforce the no-referrer document policy`);
+  }
+  if (!/<style data-static-initial-css>/u.test(html) || /<link rel="stylesheet"/u.test(html)) {
+    throw new Error(`${entry} does not embed its initial render-blocking stylesheet`);
+  }
+  const fontPreloads = [...html.matchAll(/<link rel="preload" href="(\/assets\/(?:instrument-sans-latin-wght-normal|instrument-serif-latin-400-normal)-[A-Za-z0-9_-]+\.woff2)" as="font" type="font\/woff2" crossorigin>/gu)];
+  if (fontPreloads.length !== 2 || fontPreloads.some(([, path]) => !paths.includes(resolve(dist, `.${path}`)))) {
+    throw new Error(`${entry} does not preload both initial Latin Flight fonts`);
   }
 }
 
@@ -232,6 +258,16 @@ function collectInitial(entry) {
   for (const imported of entry.imports ?? []) collectInitial(viteManifest[imported]);
 }
 collectInitial(mainEntry);
+const browserRuntimeEntry = viteManifest["src/application/browser-runtime.ts"];
+const cogRuntimeEntry = Object.values(viteManifest).find((entry) => entry.name === "cog-analysis-reader");
+if (
+  !browserRuntimeEntry?.isDynamicEntry ||
+  initialFiles.has(browserRuntimeEntry.file) ||
+  !cogRuntimeEntry ||
+  initialFiles.has(cogRuntimeEntry.file)
+) {
+  throw new Error("Scientific COG/runtime code must remain outside the initial application graph");
+}
 const dynamicFiles = Object.values(viteManifest)
   .filter((entry) => entry.isDynamicEntry)
   .map((entry) => entry.file);

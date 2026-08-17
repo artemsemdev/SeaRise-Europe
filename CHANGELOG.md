@@ -15,7 +15,44 @@ All notable changes to this project will be documented in this file.
   alternate Compose names, JSON/binary build mutations, all authorization
   channels, current canonical Flight bytes, and owner-approved final authority
   now fail closed with match-purpose exceptions only. The two self-describing
-  gate-policy files are additionally bound to their owner-approved Git blobs.
+  gate-policy files are additionally bound to their owner-approved Git blobs;
+  repository modes bind the current 14-component, 57-input v2 profile and its
+  exact static-quality workflow, manifest, and lock.
+
+- Added clean-clone generic static-host and Chromium Lighthouse gates. The
+  production build now emits deterministic Brotli/gzip sidecars, validates
+  both static routes, build/release identity, assets, static 404 behavior, and
+  zero dynamic legacy endpoint handling, and requires at least 90 in all four
+  Lighthouse mobile categories across three isolated audits. Initial CSS is
+  embedded, the two initial Flight fonts are preloaded, scientific runtime
+  and release bootstrap loading are deferred past the initial render, and
+  generated delivery sidecars cannot expand the exact manifest-authorized
+  release inventory. Lighthouse
+  and generic-host dependencies use a separate audited quality-tool lock so
+  immutable Phase 1 npm and PMTiles evidence remains unchanged.
+
+- Added a versioned static-browser supply-chain transition profile that locks
+  the retained web npm, Python, settlement, scientific, build-plane, signing,
+  and SBOM target authorities while honestly recording the Azure/PostGIS and
+  CI/CodeQL/container legacy selectors owned by issues #70, #71, and #72.
+  Normalized requirement parsing, exact contributor parity, semantic workflow
+  checks, and tracked legacy-path absence prevent premature activation. Phase 1
+  v1 evidence remains unchanged as historical audit material and is now
+  validated as a complete 48-file subtree by recomputing its Git tree and
+  executing a v2-vendored, SHA-256- and Git-blob-bound historical validator
+  rather than code from the mutable Phase 2 checkout. The gate verifies and
+  materializes current-tree inputs without requiring Git history or a network
+  fetch, and binds every outside-v1 input plus the vendored validator to its
+  reviewed Git executable mode. Current npm/pnpm/Yarn, workflow-job, local-action,
+  container/Compose, Pipenv/Poetry/uv/requirements, native-tool, SBOM, and
+  scoped-schema authorities remain exact and fail closed; workflow parsing
+  derives consistent jobs indentation, recognizes quoted or spaced keys, and
+  rejects duplicate job identities. Retained Phase 1 paths are resolved beneath
+  the repository without symlink traversal.
+
+- Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
+  paths are ignored, untracked, absent from CI workflows, and absent from the
+  static output inventory without reading Candidate-v7 or TAR bytes.
 
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
@@ -189,6 +226,11 @@ All notable changes to this project will be documented in this file.
   cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
 
 ### Changed
+
+- Corrected the test-retirement inventory so executable legacy frontend
+  Python tests cannot escape discovery, removal-bound suites point to explicit
+  stronger static-target evidence, and PostGIS/blob-seed changes route through
+  active legacy characterization gates before repository deletion.
 
 - Routed production geography, methodology, settlement-index, and exact COG
   reads through the verified resource router. Search shard bytes are verified
