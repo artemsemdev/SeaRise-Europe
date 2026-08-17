@@ -52,8 +52,8 @@
         { "path": "package-lock.json", "role": "lock", "sha256": "88aaedbe42e82d3c917aed171d02a1c3d95d1758f3a0b710bb649012c418bf59" },
         { "path": "package.json", "role": "manifest", "sha256": "340a13f00e5be4cd6d1a5397f380ba75388611ed9d191f220fdaf43185da3d4d" },
         { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "c5d8af53b1029f9bfb75424ccad83b3da4ad096d175f4ba05789e847d5548cdd" },
-        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "91ca18bef0831f02279da61e775b7c8bb426cf368595e7dc7de9c3bd251de2ab" },
-        { "path": "src/web/package.json", "role": "manifest", "sha256": "9eb165ded9360379cc45e7ebd90742415db0738493a88d942a11c4965d9f985e" }
+        { "path": "src/frontend/package.json", "role": "manifest", "sha256": "7cea772154dfd3ce7739b6f14f3d0b8f0bda4957e61781959e9fe14a8efad702" },
+        { "path": "src/web/package.json", "role": "manifest", "sha256": "149f086f558a12c290fd7a0ab012fa8664255a863b2e843045b76089613afd74" }
       ],
       "note": "The static web workspace uses the root npm lockfileVersion 3 with exact registry URLs and SHA-512 integrity; the legacy frontend remains separately locked during the migration."
     },
@@ -63,7 +63,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "73a8f1c96889731a88c34030fdd6979f84a06f956ee98f7cf151a306537d057d" },
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "94cdaf0d606b123ab4995751ba495351c86d4e58cd322134c8e8ed9bf527982d" },
         { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },
@@ -138,7 +138,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "d4c8b746d987cf97229e2ce34ab6768781431d31d84451ba6cedd9de00d09bb0" }
+        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "6c78668aa117828347de64675824b54ac74d7000ec34430c7bf0f83b7b3b3b12" }
       ],
       "note": "The controlled release container uses a digest-pinned base and the release hash lock."
     },

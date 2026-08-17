@@ -28,6 +28,7 @@
 !src/pipeline/science/ar6-regional-release.json
 !src/pipeline/science/ar6-regional-release.schema.json
 !src/pipeline/science/evidence/
+!src/pipeline/science/evidence/ar6-delivery-harness-relocation.json
 !src/pipeline/science/evidence/ar6-lookup-goldens.json
 !src/pipeline/searise_pipeline/
 !src/pipeline/searise_pipeline/**
