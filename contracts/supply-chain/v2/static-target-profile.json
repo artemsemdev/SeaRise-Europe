@@ -4,6 +4,21 @@
   "profileId": "static-browser-supply-chain-v2",
   "target": "static-browser",
   "productionClaim": false,
+  "activation": {
+    "status": "pending-legacy-removal",
+    "blockingIssues": [71, 72],
+    "pendingSelectors": [
+      { "id": "ci-legacy-api", "path": ".github/workflows/ci.yml", "selector": "src/api" },
+      { "id": "ci-legacy-compose", "path": ".github/workflows/ci.yml", "selector": "compose-smoke" },
+      { "id": "ci-legacy-dotnet", "path": ".github/workflows/ci.yml", "selector": "actions/setup-dotnet@" },
+      { "id": "ci-legacy-frontend", "path": ".github/workflows/ci.yml", "selector": "src/frontend" },
+      { "id": "codeql-legacy-csharp", "path": ".github/workflows/codeql.yml", "selector": "csharp" },
+      { "id": "pipeline-pyproject-azure", "path": "src/pipeline/pyproject.toml", "selector": "azure-storage-blob>=12.19,<13.0" },
+      { "id": "pipeline-pyproject-postgis", "path": "src/pipeline/pyproject.toml", "selector": "psycopg2-binary>=2.9,<3.0" },
+      { "id": "pipeline-requirements-azure", "path": "src/pipeline/requirements-pipeline.txt", "selector": "azure-storage-blob>=12.19,<13.0" },
+      { "id": "pipeline-requirements-postgis", "path": "src/pipeline/requirements-pipeline.txt", "selector": "psycopg2-binary>=2.9,<3.0" }
+    ]
+  },
   "historicalEvidence": {
     "path": "contracts/supply-chain/v1",
     "status": "immutable-phase-1-history"
@@ -26,7 +41,7 @@
         { "path": "contracts/supply-chain/v1/sboms/python-release-macos-arm64-cp311.cdx.json", "role": "sbom", "sha256": "2541143e0548bf2777ce17087959d8001a925acd4b21d8c578f349371e8be26d" },
         { "path": "contracts/supply-chain/v1/sboms/python-settlement-spatial-linux-x86-64-cp311.cdx.json", "role": "sbom", "sha256": "aa13bda14f941bf3a383326b268d48074fbe35608360a5bb5cd98541d03f075c" },
         { "path": "contracts/supply-chain/v1/sboms/python-settlement-spatial-macos-arm64-cp311.cdx.json", "role": "sbom", "sha256": "1680760db11f137fa6e56cdf0fb3f88e38b215be517078aaeca7613eb301738e" },
-        { "path": "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json", "role": "sbom", "sha256": "51b6eb4a97f52d9ee78b28efde7dca5ce78a9b65954f5c7257957b4deb4db255" }
+        { "path": "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json", "role": "sbom", "sha256": "6a6dcc4d80ca158a1b6c9e5002354755382b67b7768ff92520c45c2812d52aaf" }
       ]
     },
     {
@@ -57,12 +72,27 @@
       ]
     },
     {
+      "id": "pending-legacy-python-authorities",
+      "ecosystem": "python",
+      "releaseUse": "development",
+      "coverage": "range-constrained",
+      "inputs": [
+        { "path": "src/pipeline/pyproject.toml", "role": "manifest", "sha256": "a9d6419156973ca4e99818ac203ace843a35cd8dde995117c99adef3f3258b6c" },
+        { "path": "src/pipeline/requirements-pipeline.txt", "role": "manifest", "sha256": "3b707e10408dee29f3842a089317c9700df14ec2dadf141decce94b165e04bb4" }
+      ]
+    },
+    {
       "id": "pipeline-container",
       "ecosystem": "container",
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "6c78668aa117828347de64675824b54ac74d7000ec34430c7bf0f83b7b3b3b12" }
+        { "path": "src/pipeline/offline_release/Dockerfile", "role": "recipe", "sha256": "6c78668aa117828347de64675824b54ac74d7000ec34430c7bf0f83b7b3b3b12" },
+        { "path": "src/pipeline/offline_release/Dockerfile.dockerignore", "role": "recipe", "sha256": "1366013820ded2ce10862511b90c6cf77a4e0170bab364db300c837bf69c7c9d" },
+        { "path": "src/pipeline/offline_release/profiles/fixture.json", "role": "manifest", "sha256": "3bf6b75a5d8fb71657c47869c2ff4346eca31634f433beb03bf24623044b61fd" },
+        { "path": "src/pipeline/offline_release/profiles/full-europe.json", "role": "manifest", "sha256": "586f1003d5c686d4d0060868ccd416e1b569cbf0cfc01dd72c75f938112d2380" },
+        { "path": "src/pipeline/offline_release/profiles/profile.schema.json", "role": "schema", "sha256": "e066e7fea1ba357f611a55d60e009a191b0c052d839d35f0a597551fda6c6dc6" },
+        { "path": "src/pipeline/offline_release/profiles/regional.json", "role": "manifest", "sha256": "4fe2cd50e568a040547fb39a90e46dfe5f385638100d6b48fbe523ccece1c538" }
       ]
     },
     {
@@ -93,6 +123,15 @@
         { "path": "src/pipeline/requirements-phase1-final-macos-x86_64.lock", "role": "lock", "sha256": "2988c24e76853ba8f87c3cc756325d5114386389b1548a0a034939473a7b80f0" },
         { "path": "src/pipeline/requirements-release-macos-arm64.lock", "role": "lock", "sha256": "87880ce239f89f7b44e1165794dced3825d4fd9c3a6d413337d9f96530d50b75" },
         { "path": "src/pipeline/requirements-release.lock", "role": "lock", "sha256": "2bf2b9d60eb1bfc7b492db1df81be1da901df212ca4dec92d585ebca35c71d6f" }
+      ]
+    },
+    {
+      "id": "profile-contract",
+      "ecosystem": "standard-schema",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "fa45758bd5c05e2868dfbaa4c60bd075cd877032795b48df4be20ed4b0ff5906" }
       ]
     },
     {

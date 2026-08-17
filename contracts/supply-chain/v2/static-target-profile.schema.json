@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/supply-chain/v2/static-target-profile.schema.json",
-  "title": "SeaRise active static-target supply-chain profile",
+  "title": "SeaRise static-target supply-chain transition profile",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,6 +10,7 @@
     "profileId",
     "target",
     "productionClaim",
+    "activation",
     "historicalEvidence",
     "excludedLegacyRequirements",
     "components"
@@ -20,6 +21,50 @@
     "profileId": { "const": "static-browser-supply-chain-v2" },
     "target": { "const": "static-browser" },
     "productionClaim": { "const": false },
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockingIssues", "pendingSelectors"],
+      "properties": {
+        "status": { "enum": ["pending-legacy-removal", "active"] },
+        "blockingIssues": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "pendingSelectors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "path", "selector"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+              "path": { "type": "string", "minLength": 1 },
+              "selector": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "active" } } },
+          "then": {
+            "properties": {
+              "blockingIssues": { "maxItems": 0 },
+              "pendingSelectors": { "maxItems": 0 }
+            }
+          },
+          "else": {
+            "properties": {
+              "blockingIssues": { "minItems": 1 },
+              "pendingSelectors": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
     "historicalEvidence": {
       "type": "object",
       "additionalProperties": false,

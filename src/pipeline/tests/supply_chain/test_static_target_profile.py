@@ -1,4 +1,4 @@
-"""Fail-closed tests for the active static-browser supply-chain profile."""
+"""Fail-closed tests for the static-browser supply-chain transition profile."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from jsonschema import Draft202012Validator
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     discover_dependency_inputs,
+    generate_npm_sbom,
     validate_static_target_profile,
 )
 
@@ -53,6 +54,16 @@ def test_profile_schema_passes_draft_2020_12_metaschema() -> None:
     Draft202012Validator.check_schema(_load(SCHEMA))
 
 
+def test_npm_sbom_rejects_unreviewed_scope() -> None:
+    with pytest.raises(SupplyChainContractError, match="unsupported npm SBOM scope"):
+        generate_npm_sbom(
+            ROOT / "package-lock.json",
+            repository_root=ROOT,
+            logical_path="package-lock.json",
+            scope="unreviewed-runtime",
+        )
+
+
 def test_checked_in_profile_validates_only_the_static_target() -> None:
     document = validate_static_target_profile(PROFILE, repository_root=ROOT)
     paths = {
@@ -63,6 +74,8 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
 
     assert document["target"] == "static-browser"
     assert document["productionClaim"] is False
+    assert document["activation"]["status"] == "pending-legacy-removal"
+    assert document["activation"]["blockingIssues"] == [71, 72]
     assert document["historicalEvidence"] == {
         "path": "contracts/supply-chain/v1",
         "status": "immutable-phase-1-history",
@@ -70,8 +83,8 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
     assert "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json" in paths
     assert "contracts/supply-chain/v1/sboms/frontend-npm.cdx.json" not in paths
-    assert "src/pipeline/pyproject.toml" not in paths
-    assert "src/pipeline/requirements-pipeline.txt" not in paths
+    assert "src/pipeline/pyproject.toml" in paths
+    assert "src/pipeline/requirements-pipeline.txt" in paths
     assert (
         "contracts/supply-chain/v2/python/static-target-contributor-requirements.txt"
         not in discover_dependency_inputs()
@@ -89,7 +102,8 @@ def test_profile_survives_a_tree_with_no_legacy_runtime(tmp_path: Path) -> None:
 
     validated = validate_static_target_profile(PROFILE, repository_root=repository)
 
-    assert len(validated["components"]) == 11
+    assert len(validated["components"]) == 13
+    assert validated["activation"]["status"] == "pending-legacy-removal"
     assert not (repository / "src/api").exists()
     assert not (repository / "src/frontend").exists()
     assert not (repository / "infra/blob-seed").exists()
@@ -132,6 +146,39 @@ def test_profile_rejects_changed_authority_bytes(tmp_path: Path) -> None:
         validate_static_target_profile(_write(tmp_path / "profile.json", document))
 
 
+def test_profile_cannot_claim_active_while_legacy_selectors_remain(tmp_path: Path) -> None:
+    document = copy.deepcopy(_load())
+    document["activation"] = {
+        "status": "active",
+        "blockingIssues": [],
+        "pendingSelectors": [],
+    }
+
+    with pytest.raises(SupplyChainContractError, match="activation does not match"):
+        validate_static_target_profile(_write(tmp_path / "profile.json", document))
+
+
+@pytest.mark.parametrize("mutation", ["component", "role"])
+def test_profile_rejects_input_owner_or_role_drift(tmp_path: Path, mutation: str) -> None:
+    document = copy.deepcopy(_load())
+    source = next(item for item in document["components"] if item["id"] == "static-web-npm")
+    item = next(item for item in source["inputs"] if item["path"] == "src/web/package.json")
+    if mutation == "role":
+        item["role"] = "lock"
+    else:
+        source["inputs"].remove(item)
+        target = next(
+            component
+            for component in document["components"]
+            if component["id"] == "pipeline-python-contributor"
+        )
+        target["inputs"].append(item)
+        target["inputs"].sort(key=lambda candidate: candidate["path"])
+
+    with pytest.raises(SupplyChainContractError, match="owner or role drifted"):
+        validate_static_target_profile(_write(tmp_path / "profile.json", document))
+
+
 def test_profile_rejects_duplicate_json_keys(tmp_path: Path) -> None:
     duplicate = PROFILE.read_text(encoding="utf-8").replace(
         '  "schemaVersion": "2.0.0",',
@@ -155,6 +202,46 @@ def test_profile_rejects_symlinked_authority(tmp_path: Path) -> None:
 
     with pytest.raises(SupplyChainContractError, match="must not use symlinks: package.json"):
         validate_static_target_profile(PROFILE, repository_root=repository)
+
+
+def test_profile_loads_its_bound_schema_from_repository_root(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    (repository / "contracts/supply-chain/v2/static-target-profile.schema.json").unlink()
+
+    with pytest.raises(SupplyChainContractError, match="outside or missing"):
+        validate_static_target_profile(PROFILE, repository_root=repository)
+
+
+def test_profile_rejects_repository_schema_hash_drift(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    schema_path = repository / "contracts/supply-chain/v2/static-target-profile.schema.json"
+    schema = json.loads(schema_path.read_bytes())
+    schema["description"] = "Unreviewed but structurally valid schema mutation."
+    schema_path.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch.*profile.schema"):
+        validate_static_target_profile(PROFILE, repository_root=repository)
+
+
+def test_profile_rejects_web_manifest_lock_drift(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    manifest_path = repository / "src/web/package.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["dependencies"]["react"] = "0.0.0"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    document = copy.deepcopy(_load())
+    _item(document, "src/web/package.json")["sha256"] = hashlib.sha256(
+        manifest_path.read_bytes()
+    ).hexdigest()
+
+    with pytest.raises(SupplyChainContractError, match="differs from its exact lock workspace"):
+        validate_static_target_profile(
+            _write(tmp_path / "profile.json", document),
+            repository_root=repository,
+        )
 
 
 @pytest.mark.parametrize("legacy_package", ["azure-storage-blob", "psycopg2-binary"])

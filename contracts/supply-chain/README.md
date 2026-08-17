@@ -1,8 +1,10 @@
 # Supply-chain contracts
 
-`v2` is the active static-browser supply-chain profile. It retains the web npm,
-Python, settlement, scientific, build-plane, signing, provenance, and SBOM
-authorities needed by the static target without requiring any legacy runtime.
+`v2` is the static-browser supply-chain transition profile. Its target graph
+retains the web npm, Python, settlement, scientific, build-plane, signing,
+provenance, and SBOM authorities needed after migration. Until the recorded
+repository and CI selectors are removed, it fails closed in
+`pending-legacy-removal` rather than claiming the current checkout is static-only.
 
 `v1` defines the immutable historical evidence boundary for the Phase 1 release
 candidate. It does not alter `contracts/release/v1`; its NuGet and legacy

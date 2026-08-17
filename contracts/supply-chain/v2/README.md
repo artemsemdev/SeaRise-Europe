@@ -1,18 +1,25 @@
-# Active static-target supply-chain profile
+# Static-target supply-chain transition profile
 
-Version 2 is the active supply-chain boundary for the Phase 2 static browser
-application. It locks the exact inputs for the `src/web` npm workspace, Python
+Version 2 defines the target supply-chain boundary for the Phase 2 static
+browser application. It locks the exact inputs for the `src/web` npm workspace, Python
 release/contributor/settlement graphs, retained native and container build
 plane, signing tool, vendored CycloneDX schemas, and five reusable static-target
 SBOMs. The npm SBOM is published under `v2/sboms` from the root lock whose sole
 workspace is `src/web`; active validation rejects Next.js components and any
 `src/frontend` workspace property.
 
-The profile deliberately has no active requirement for NuGet, `src/api`,
+The target graph deliberately has no requirement for NuGet, `src/api`,
 `src/frontend`, Azurite/blob-seed, Compose, or any legacy runtime image. The
 validator rejects those paths even if a profile edit supplies a valid hash.
 This makes deletion of those runtime trees independent from the active
 supply-chain gate.
+
+The checked-in profile is honestly `pending-legacy-removal`: issue #71 still
+owns Azure/PostGIS contributor selectors and issue #72 still owns legacy CI and
+CodeQL selectors. Those exact selector authorities are hash-bound and listed in
+the activation record. The validator derives the selectors from repository
+bytes; it rejects an `active` claim while any remain. Once the last selector is
+removed, only an `active` record with no blockers or pending selectors can pass.
 
 The v2 contributor manifest is intentionally separate from the pre-removal
 `src/pipeline` development manifests. It retains the static build/data pipeline
@@ -33,9 +40,10 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
   --repository-root .
 ```
 
-Validation is fail-closed over the exact sorted component set, required path
-set, safe regular-file ancestry, SHA-256 bindings, static npm SBOM, and four
-target-specific Python SBOMs. It makes no production, vulnerability, licence
+Validation is fail-closed over the exact path-to-component-to-role map, bound
+repository-local schema, safe regular-file ancestry, SHA-256 bindings, build
+profiles and Docker context, static npm SBOM, exact `src/web` manifest/lock
+parity, and four target-specific Python SBOMs. It makes no production, vulnerability, licence
 completeness, publication, signing, or scientific approval claim.
 
 When an active dependency, workflow, recipe, lock, graph, receipt, schema, or
