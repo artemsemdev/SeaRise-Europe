@@ -9,8 +9,9 @@ repository and CI selectors are removed, it fails closed in
 `v1` defines the immutable historical evidence boundary for the Phase 1 release
 candidate. It does not alter `contracts/release/v1`; its NuGet and legacy
 runtime records are not the active Phase 2 dependency graph. The v2 transition
-profile binds the reviewed v1 inventory and Git tree; validate that historical
-tree instead of comparing v1 hashes with the mutable Phase 2 checkout.
+profile binds the complete 48-file v1 subtree, reviewed inventory, Git tree,
+and validator semantics; validate that historical authority instead of
+comparing selected v1 hashes with the mutable Phase 2 checkout.
 
 ## Evidence boundary
 

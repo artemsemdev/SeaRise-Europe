@@ -13,9 +13,10 @@ All notable changes to this project will be documented in this file.
   Normalized requirement parsing, exact contributor parity, semantic workflow
   checks, and tracked legacy-path absence prevent premature activation. Phase 1
   v1 evidence remains unchanged as historical audit material and is now
-  validated from its SHA-256-bound Git commit/tree rather than from the mutable
-  Phase 2 checkout. Current npm manifests, locks, and workflows remain an exact
-  fail-closed v2 authority.
+  validated as a complete 48-file subtree from its SHA-256-bound Git commit/tree
+  with bound validator semantics rather than from the mutable Phase 2 checkout.
+  Current npm, workflow-job, local-action, container, Python, native-tool, SBOM,
+  and scoped-schema authorities remain exact and fail closed.
 
 - Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
   paths are ignored, untracked, absent from CI workflows, and absent from the

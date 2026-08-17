@@ -15,9 +15,10 @@ This makes deletion of those runtime trees independent from the active
 supply-chain gate.
 
 The checked-in profile is honestly `pending-legacy-removal`: issue #70 owns the
-frontend/Next.js CI selector; issue #71 owns Azure/PostGIS, API/.NET, and CodeQL
-C# selectors; issue #72 owns the shared Compose/container selector. Those exact
-workflow and Python selector source files are hash-bound; path-presence
+frontend/Next.js CI selector; issue #71 owns Azure/PostGIS, API/.NET, CodeQL C#,
+and blob-seed removal; issue #72 owns Compose and the legacy API/frontend
+Dockerfiles. Exact workflow jobs and Python selector source files are hash-bound;
+path-presence
 selectors carry issue ownership but intentionally bind existence rather than
 mutable legacy content. The validator derives both kinds from repository
 bytes; it rejects an `active` claim while any remain. Once the last selector is
@@ -27,11 +28,10 @@ whitespace, punctuation, or case. Clearing #71 also requires both real
 contributor manifests to match the v2 static authority package-for-package and
 constraint-for-constraint. Active status additionally requires tracked absence
 of the API/frontend/blob-seed trees, PostGIS initialization scripts, root
-solution, Compose file, and Compose smoke script. Absence uses `lstat`-style
-semantics, so a broken symlink still blocks activation. Workflow blockers use a
-conservative case-insensitive token-sequence scan over the reviewed workflow
-bytes, including values declared for environment indirection; this is not a
-claim to interpret every possible GitHub Actions expression.
+solution, API/frontend Dockerfiles, Compose file, and Compose smoke script.
+Absence uses `lstat`-style semantics, so a broken symlink still blocks
+activation. Workflow blockers are exact top-level job identities, so whitespace
+or split environment-variable indirection cannot erase a job-removal obligation.
 
 The v2 contributor manifest is intentionally separate from the pre-removal
 `src/pipeline` development manifests. It retains the static build/data pipeline
@@ -41,9 +41,10 @@ candidate execution remains governed by the retained release graphs and locks.
 `contracts/supply-chain/v1` remains immutable Phase 1 historical evidence. Its
 NuGet and legacy runtime records describe that reviewed candidate boundary;
 they are not the current application dependency graph and must not be rewritten
-to resemble the Phase 2 target. The v2 transition record binds the exact v1
-inventory bytes plus the reviewed Git commit and tree. Historical validation
-materializes only those Git blobs and runs the unchanged v1 validator there,
+to resemble the Phase 2 target. The v2 transition record binds the complete
+48-file v1 subtree tree, exact inventory bytes, reviewed Git commit/tree, and
+validator semantics. Historical validation compares every retained v1 path and
+byte, materializes the archived schema and dependency inputs, and validates them,
 so a Phase 2 workflow edit or later legacy deletion cannot be mistaken for v1
 evidence drift.
 
@@ -71,4 +72,6 @@ When an active dependency, workflow, recipe, lock, graph, receipt, schema, or
 SBOM changes, review that change and update its profile hash in the same pull
 request. Adding a new active input requires an explicit validator contract
 change; removing a required retained input fails closed. Current-tree discovery
-also rejects an unclassified npm manifest/lock or GitHub workflow.
+also rejects unclassified npm manifests/locks, workflows, local actions, Docker
+recipes, Python manifests/locks, native tool authority, build profiles, v2 SBOMs,
+and scoped schemas.

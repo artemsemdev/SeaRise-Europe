@@ -31,8 +31,9 @@ release and settlement graphs used by deterministic builds.
 
 The current repository is not yet represented as static-only. The profile is
 `pending-legacy-removal` while hash-bound Python contributor manifests and
-CI/CodeQL workflows contain the exact token selectors assigned to #70 (frontend),
-#71 (Python, API/.NET, and CodeQL C#), and #72 (shared Compose/container).
+CI/CodeQL workflows contain the exact job selectors assigned to #70 (frontend),
+#71 (Python, API/.NET, CodeQL C#, and blob-seed), and #72 (Compose plus the
+legacy API/frontend Dockerfiles).
 Removing or changing a selector without updating the transition record
 fails closed; claiming `active` before all selectors disappear also fails.
 Package selectors are normalized from the actual requirement syntax, so valid
@@ -40,11 +41,10 @@ PEP 508 whitespace or underscore variants cannot bypass the gate. After the
 Python blockers clear, `pyproject.toml` and `requirements-pipeline.txt` must
 both exactly match the static contributor authority. Final activation also
 proves the API, frontend, blob-seed, solution, Compose, and Compose-smoke paths
-are absent, both PostGIS initialization scripts are absent, and no reviewed
-.NET/C# legacy workflow tokens remain. Token sequences are case-insensitive and
-separator/whitespace aware, so tab/newline formatting and environment-variable
-values do not erase the blocker. This is a conservative scan of workflow bytes,
-not a complete GitHub Actions interpreter.
+are absent, both PostGIS initialization scripts and the API/frontend Dockerfiles
+are absent, and no reviewed .NET/C# legacy workflow jobs remain. Exact top-level
+job identity, rather than token adjacency, prevents split environment-variable
+values from erasing the blocker.
 
 Selector source files carry profile SHA-256 bindings. Path-presence selectors
 do not hash mutable legacy content: they use `lstat`-equivalent checks so files,
@@ -64,9 +64,10 @@ The active profile rejects all of these as requirements:
 Phase 1 evidence under `contracts/supply-chain/v1` is retained unchanged for
 audit history. Do not run its dependency-input inventory as the current-tree
 Phase 2 gate: it intentionally records the Phase 1 repository boundary.
-The v2 profile binds its SHA-256 and the exact reviewed Git commit/tree. The
-`historical-inventory` command materializes those blobs in a temporary directory
-and runs the original v1 validator against them. Git history must therefore be
+The v2 profile binds its SHA-256, complete 48-file subtree tree, exact reviewed
+Git commit/tree, and validator semantics. The `historical-inventory` command
+first compares every retained v1 path and byte, then materializes the archived
+schema and dependency inputs in a temporary directory and validates them. Git history must therefore be
 available to this gate; CI checkout must not omit the recorded commit. A Phase 1
 record does not reactivate a deleted runtime.
 
