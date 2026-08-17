@@ -83,9 +83,10 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["frontend"])
         self.assertFalse(outputs["docker_frontend"])
 
-    def test_pmtiles_render_authorities_route_frontend_evidence_check(self) -> None:
+    def test_pmtiles_render_authorities_route_static_web_evidence_check(self) -> None:
         paths = [
             "src/pipeline/evidence/phase-1/pmtiles-render-v1/receipt.json",
+            "src/pipeline/evidence/phase-1/pmtiles-render-v1/z3-4-2-median_mm.png",
             "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
             "src/pipeline/fixtures/ar6-regional-release/source-fixture.json.gz",
         ]
@@ -93,9 +94,41 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         for path in paths:
             with self.subTest(path=path):
                 outputs = classify_paths([path])
-                self.assertTrue(outputs["frontend"])
+                self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["pipeline"])
+                self.assertFalse(outputs["frontend"])
                 self.assertFalse(outputs["docker_frontend"])
+
+    def test_static_pmtiles_release_dependencies_route_macos_toolchain(self) -> None:
+        paths = [
+            "package.json",
+            "package-lock.json",
+            "src/web/package.json",
+            "src/web/scripts/verify-boundary-pmtiles-browser.mjs",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["web"])
+                self.assertTrue(outputs["release"])
+                self.assertFalse(outputs["frontend"])
+                self.assertFalse(outputs["docker_frontend"])
+                self.assertFalse(outputs["api"])
+                self.assertFalse(outputs["compose"])
+
+    def test_unrelated_static_and_pipeline_paths_skip_release_toolchain(self) -> None:
+        paths = [
+            "src/web/src/App.tsx",
+            "src/web/scripts/render-pmtiles-evidence.mjs",
+            "src/pipeline/evidence/phase-1/other-evidence/receipt.json",
+            "src/pipeline/evidence/unrelated/receipt.json",
+        ]
+
+        for path in paths:
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertFalse(outputs["release"])
 
     def test_pipeline_change_does_not_route_runtime_stack(self) -> None:
         outputs = classify_paths(["src/pipeline/searise_pipeline/science/ar6.py"])
@@ -413,10 +446,10 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertLess(validate, upload)
         self.assertIn("node-version: 20", macos)
         self.assertIn(
-            "cache-dependency-path: src/frontend/package-lock.json",
+            "cache-dependency-path: package-lock.json",
             macos,
         )
-        self.assertIn("working-directory: src/frontend", macos)
+        self.assertNotIn("working-directory: src/frontend", macos)
         self.assertIn("run: npm ci", macos)
         self.assertIn(
             "run: ./node_modules/.bin/playwright install chromium",
@@ -424,7 +457,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertNotIn("npx playwright", macos)
         command = (
-            "node scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 "
+            "node src/web/scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 "
             "/tmp/browser-trace-macos-arm64.json"
         )
         self.assertIn(command, macos)
@@ -436,7 +469,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("--candidate /tmp/phase-0r-ar6-v1", macos)
         self.assertIn("--trace /tmp/browser-trace-macos-arm64.json", macos)
         self.assertIn(
-            "--harness src/frontend/scripts/measure-ar6-release.mjs",
+            "--harness src/web/scripts/measure-ar6-release.mjs",
             macos,
         )
         self.assertIn(

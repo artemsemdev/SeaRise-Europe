@@ -35,6 +35,61 @@ npm run generate:search-fixture --workspace @searise/web
 npm run check:search-fixture --workspace @searise/web
 ```
 
+### Production shard build
+
+The static target owns the production builder in
+`src/web/scripts/search-shard-builder.mjs`; it does not call or import the
+legacy Next.js runtime. First produce the projection-authority JSON with
+`scripts/release/validate_settlement_search_projection.py`. That Python
+authority is the replay proof for the exact spatial database, spatial receipt,
+projection bytes, record count, source identities, release ID, and three
+geometry identities. Then build into a new, owner-controlled directory:
+
+```bash
+mkdir -m 700 /absolute/output/search
+npm run build:search-shards --workspace @searise/web -- \
+  --projection /absolute/input/settlement-search-projection.ndjson \
+  --projection-authority /absolute/input/settlement-search-projection-authority.json \
+  --spatial-database /absolute/input/spatial.duckdb \
+  --spatial-receipt /absolute/input/spatial-receipt.json \
+  --validation-work-dir /absolute/private/replay-work \
+  --data-release-id searise-europe-v1.2.3-YYYYMMDD-0123456789ab \
+  --output-dir /absolute/output/search
+```
+
+The production CLI reruns the Python validator and requires its stdout to equal
+the supplied authority byte-for-byte; a self-consistent but unvalidated
+authority is insufficient. The builder also rechecks the canonical bounded
+projection and the authority's self-hash before producing either shard. It
+emits the exact v4 code-point trie format accepted by the production Worker
+decoder, with canonical numeric GeoNames order and the pinned runtime/ranking
+identity. Before build or validation, the CLI compares every byte-affecting
+`process.versions` identity recorded in the artifact (Node, Brotli, zlib, ICU,
+and Unicode) and fails closed on any mismatch. Quality-11 Brotli bytes are
+deterministic only under that exact pinned Node binary profile; matching the
+Node version string alone is insufficient.
+
+Publication refuses existing names, symlink directories, path escape, and
+non-owner-controlled output. Each file is staged and synced, then promoted by
+an exclusive hard link; the receipt is the final completeness marker. A failed
+promotion removes only inodes owned by that invocation, so a retry starts from
+an empty public set. Validate the exact set without overwriting it:
+
+```bash
+npm run validate:search-shards --workspace @searise/web -- \
+  --projection /absolute/input/settlement-search-projection.ndjson \
+  --projection-authority /absolute/input/settlement-search-projection-authority.json \
+  --spatial-database /absolute/input/spatial.duckdb \
+  --spatial-receipt /absolute/input/spatial-receipt.json \
+  --validation-work-dir /absolute/private/replay-work \
+  --data-release-id searise-europe-v1.2.3-YYYYMMDD-0123456789ab \
+  --output-dir /absolute/output/search
+```
+
+Candidate-v7 may be supplied only through the documented ignored, read-only
+local path. Neither this command nor CI discovers, copies, uploads, or publishes
+Candidate-v7 or its TAR.
+
 The generator covers canonical and alternate spellings, diacritics,
 transliteration, duplicate names with country/admin context, inland and coastal
 places, zero population, and a transcontinental boundary case. It writes four
@@ -108,6 +163,7 @@ Run the deterministic target gates from the repository root:
 
 ```bash
 npm ci
+npm run test:search-shard-builder --workspace @searise/web
 npm run web:check
 npm run web:e2e
 npm audit --audit-level=high
@@ -141,31 +197,56 @@ the static build, committed, sent to CI, or uploaded anywhere.
 ### Read-only Candidate-v7 measurement
 
 The static target includes a local-only measurement command. It reads an
-explicit candidate root in place, verifies each compressed shard against the
-candidate manifest, serves the production Worker bundle and those source files
-from a cross-origin-isolated loopback origin, and writes its raw report with
-exclusive creation. Keep that report under `/tmp` or another ignored private
-directory outside every Git worktree, the Candidate tree, and the deployable
+explicit candidate root in place and requires the manifest, the
+`settlements-search-shard-set-receipt` artifact, and both compressed shards to
+agree on release, provenance, path, size, encoding, format, and SHA-256. The
+query set must be canonical JSON with a final newline, declare the same
+provenance as the candidate, use `production-candidate` corpus scale for a
+real-source candidate, contain one to 100 unique stable IDs, and keep each
+nonempty query within 256 Unicode code points.
+
+The harness serves the production Worker bundle and the read-only source files
+from a cross-origin-isolated loopback origin. Keep its report in an existing
+owner-controlled private directory under `/tmp`, or another ignored private
+directory, outside every Git worktree, the Candidate tree, and the deployable
 `dist` tree. The command resolves canonical paths and rejects those locations
 before it reads or opens the report path:
 
 ```bash
 cd src/web
 npm run build
+mkdir -m 700 /tmp/searise-search-evidence
 npm run measure:local-candidate-search -- \
   --candidate-root /absolute/ignored/candidate-v7 \
   --query-set /absolute/ignored/performance-queries.json \
-  --output /tmp/static-search-candidate-v7-measurement.json \
+  --output /tmp/searise-search-evidence/candidate-v7-measurement.json \
   --samples 5
 ```
 
 The command uses Pixel 7 emulation and a 512 MiB Worker V8 old-space limit. It
-records Chromium version, initialization and query distributions,
+records Chromium version, retained cold-initialization and warmed-query
+observations, the maximum main-thread 10 ms timer gap during each cold start,
 `performance.measureUserAgentSpecificMemory()` when available, and dedicated
-Worker `Runtime.getHeapUsage` telemetry. The conservative numeric observation
-adds V8 used heap, embedder heap, and backing storage, then takes the maximum
-with the user-agent-specific observations. This is not device RSS and Pixel
-emulation is not physical mobile hardware.
+Worker `Runtime.getHeapUsage` telemetry. Initialization passes only below
+1,000 ms p95 and query performance passes only below 50 ms p95. Every browser
+request must be an allowlisted same-origin `GET` without a query string; the
+report retains only method and path, while raw settlement queries remain in
+page/Worker session memory and never enter a URL, request body, report, log,
+cache key, or persistent browser storage.
+
+The canonical report binds the candidate manifest, shard receipt, both shard
+authorities, canonical query-set bytes, and result-count identity. Its content
+identity is recomputed and its distributions, thresholds, request gate, and
+false production/publication/scientific/owner/mobile-device claims are
+self-validated before and after publication. Publication writes and syncs a
+private stage, makes it read-only, promotes it with an exclusive hard link,
+syncs the parent directory, and never overwrites an existing report. Failure
+rollback removes only the invocation's own inode.
+
+The conservative numeric memory observation adds V8 used heap, embedder heap,
+and backing storage, then takes the maximum with the user-agent-specific
+observations. This is not device RSS and Pixel emulation is not physical mobile
+hardware.
 
 The 2026-08-16 read-only run observed 38,512,542-byte and 46,221,779-byte
 decoded shards. The 64 MiB decoded ceiling therefore leaves 20,887,085 bytes

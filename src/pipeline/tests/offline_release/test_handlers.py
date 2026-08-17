@@ -181,3 +181,20 @@ def test_projection_bundle_adapter_rejects_unapproved_owner_gate(
 
     with pytest.raises(ScienceContractError, match="owner-approved"):
         validate_reviewed_projection_bundle(BUNDLE, repository_root=REPO_ROOT)
+
+
+def test_projection_bundle_adapter_rejects_delivery_amendment_science_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_read = projection_bundle_module._read_json
+
+    def read_with_drift(path: Path):
+        document = original_read(path)
+        if path.name == "ar6-delivery-harness-relocation.json":
+            document["previousDeliveryMeasurement"]["minimumColdLookups"] = 11
+        return document
+
+    monkeypatch.setattr(projection_bundle_module, "_read_json", read_with_drift)
+
+    with pytest.raises(ScienceContractError, match="changes approved science"):
+        validate_reviewed_projection_bundle(BUNDLE, repository_root=REPO_ROOT)

@@ -87,6 +87,18 @@
       "reference": "docs/operations/static-settlement-search.md and src/web/tests/static-shell.spec.ts",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; Chromium desktop/mobile; committed synthetic fixture; production-scale memory not measured"
     },
+    "local-2026-08-17-static-search-shard-builder": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T02:45:00+02:00",
+      "reference": "src/web/scripts/search-shard-builder.test.mjs and docs/operations/static-settlement-search.md",
+      "environment": "macOS arm64 host; official Node 20.20.1 darwin-x64 binary under Rosetta with Brotli 1.1.0, zlib 1.3.1-e00f703, ICU 78.2, and Unicode 17.0; Vitest 4.1.10; six generated bounded synthetic-projection cases; no Candidate-v7, TAR, legacy runtime, or external storage"
+    },
+    "local-2026-08-17-static-search-performance-evidence": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T03:24:30+02:00",
+      "reference": "src/web/scripts/search-performance-evidence.test.mjs and docs/operations/static-settlement-search.md",
+      "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; six deterministic synthetic evidence and filesystem-fault cases; no Candidate-v7, TAR, network, legacy runtime, or external storage"
+    },
     "local-2026-08-16-private-candidate-binding": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T06:50:24+02:00",
@@ -545,15 +557,15 @@
       "id": "static-settlement-search",
       "layer": "e2e",
       "owner": "frontend",
-      "purpose": "Verify release-bound GeoNames shards, deterministic normalization and ranking, exact coordinates, private Worker-only queries, accessible keyboard search, partial readiness, integrity-first decode, and technical failure isolation.",
-      "sourcePaths": ["src/web/src/search/**", "src/web/src/components/SettlementSearch.test.tsx", "src/web/src/local-candidate-harness.test.ts", "src/web/src/local-measurement-paths.test.ts", "src/web/tests/static-shell.spec.ts", "contracts/release/v1/fixtures/release/*/search/*.br"],
+      "purpose": "Verify release-bound GeoNames shard construction and consumption, deterministic normalization and ranking, exact coordinates, private Worker-only queries, accessible keyboard search, partial readiness, integrity-first decode, atomic publication, production-browser performance evidence, and technical failure isolation.",
+      "sourcePaths": ["src/web/scripts/build-settlement-search-shards.mjs", "src/web/scripts/search-shard-builder.mjs", "src/web/scripts/search-shard-builder.test.mjs", "src/web/scripts/search-performance-evidence.mjs", "src/web/scripts/search-performance-evidence.test.mjs", "src/web/src/search/**", "src/web/src/components/SettlementSearch.test.tsx", "src/web/src/local-candidate-harness.test.ts", "src/web/src/local-measurement-paths.test.ts", "src/web/tests/static-shell.spec.ts", "contracts/release/v1/fixtures/release/*/search/*.br"],
       "changedPaths": ["package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/supply-chain/v1/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static settlement-search, privacy, accessibility, integrity, and no-runtime-geocoder contract." },
-      "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
+      "commands": { "focused": "npm run test:search-shard-builder --workspace @searise/web && npm run test:search-performance-evidence --workspace @searise/web", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-16-static-settlement-search", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Deterministic Vitest and desktop/mobile Chromium cases passed against exact committed fixture bytes; production-corpus performance remains a separate local-only gate." }
+      "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-17-static-search-performance-evidence", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Six deterministic builder cases and six target-owned performance-evidence cases passed, including runtime identities, a fixed shard golden, strict input/report mutations, short writes, no-overwrite publication, and identity-safe rollback; production Candidate measurement remains explicit, read-only, and local-only." }
     },
     {
       "id": "quality-inventory-harness",
@@ -688,8 +700,8 @@
       "purpose": "Keep neutral search evaluation plus receipt-bound core/coastal browser shard serialization, merge semantics, bounded I/O, and incompatibility failures exact.",
       "sourcePaths": ["src/frontend/src/search/evaluation/*.test.ts", "src/frontend/src/search/shards/*.test.ts", "src/frontend/src/search/worker/*.test.ts", "src/frontend/scripts/test-browser-shard-fs.py"],
       "changedPaths": ["contracts/search-evaluation/**", "docs/operations/settlement-search-projection.md", "src/frontend/scripts/browser-shard-fs.py", "src/frontend/scripts/build-settlement-search-shards.ts", "src/frontend/scripts/test-browser-shard-fs.py", "src/frontend/src/search/evaluation/**", "src/frontend/src/search/shards/**", "src/frontend/src/search/worker/**", "src/frontend/.nvmrc", "src/frontend/package.json", "src/frontend/package-lock.json"],
-      "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent neutral search-evaluation boundary; replacement must preserve exact synthetic outcomes and fail-closed serialization controls." },
+      "disposition": "delete-after-gate",
+      "replacementGate": { "issue": 70, "evidenceRequired": "Retire after the target-owned v4 builder/decoder, static Worker, ranking, receipt, deterministic golden, atomic publication, privacy, keyboard, and browser evidence in the static-settlement-search suite remain green in the same removal PR." },
       "commands": { "focused": "cd src/frontend && npm test -- src/search", "full": "cd src/frontend && npm test" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 1, "class": "fast", "evidenceRef": "local-2026-08-11-search-evaluation-foundation", "scope": "focused-suite" },
@@ -702,8 +714,8 @@
       "purpose": "Keep exact settlement shard performance evidence receipt-bound, semantic-validated, provenance-explicit, and honest about its Node worker reference profile.",
       "sourcePaths": ["src/frontend/src/search/performance/*.test.ts"],
       "changedPaths": ["docs/operations/settlement-browser-worker-performance.md", "src/frontend/scripts/measure-settlement-browser-worker.ts", "src/frontend/src/search/performance/**"],
-      "disposition": "keep-permanently",
-      "replacementGate": { "issue": null, "evidenceRequired": "Permanent production-input measurement foundation; a browser runner may supplement but must not weaken exact receipt, byte, provenance, or nonclaim validation." },
+      "disposition": "delete-after-gate",
+      "replacementGate": { "issue": 70, "evidenceRequired": "Retire after src/web/scripts/search-performance-evidence.test.mjs and the production static Worker journey retain exact manifest/receipt/shard/query bindings, canonical self-validation, false claims, browser request privacy, latency/responsiveness evidence, and durable report publication." },
       "commands": { "focused": "cd src/frontend && npm test -- src/search/performance/browser-worker-evidence.test.ts", "full": "cd src/frontend && npm test" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "frontend", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 5, "class": "fast", "evidenceRef": "local-2026-08-12-settlement-worker-performance", "scope": "focused-suite" },
@@ -1106,8 +1118,8 @@
       "layer": "contract",
       "owner": "data",
       "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, compare visual profiles, exercise z0/z3/z6 in Chromium and MapLibre, emit candidate-bound evidence, and fail closed on any drift.",
-      "sourcePaths": ["src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
-      "changedPaths": [".github/workflows/ci.yml", "scripts/release/build_boundary_pmtiles_evidence.py", "src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "sourcePaths": ["src/web/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "changedPaths": [".github/workflows/ci.yml", "package-lock.json", "scripts/release/build_boundary_pmtiles_evidence.py", "src/web/package.json", "src/web/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-pinned dual-build, profile-selection, z0/z3/z6 browser render, receipt, checksum, structure, and decoded-parity evidence gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
@@ -1116,18 +1128,19 @@
       "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fast orchestration mutation tests are unconditional; the controlled job downloads hash-pinned public assets and package-lock-owned Chromium and requires the exact macOS ARM64 release runner." }
     },
     {
-      "id": "frontend-pmtiles-render-evidence",
+      "id": "static-pmtiles-render-evidence",
       "layer": "integration",
       "owner": "science",
       "purpose": "Rebuild immutable z0/z3/z6 projection-PMTiles QA renders and prove quantile/value-bin coverage plus source-nodata transparency against approved Phase 0R bytes.",
       "sourcePaths": [
-        "src/frontend/scripts/render-pmtiles-evidence.mjs",
+        "src/web/scripts/render-pmtiles-evidence.mjs",
         "src/pipeline/evidence/phase-1/pmtiles-render-v1/**"
       ],
       "changedPaths": [
         "contracts/release/v1/fixtures/release/**/layers/**/*.pmtiles",
-        "src/frontend/scripts/render-pmtiles-evidence.mjs",
-        "src/frontend/package-lock.json",
+        "src/web/scripts/render-pmtiles-evidence.mjs",
+        "src/web/package.json",
+        "package-lock.json",
         "src/pipeline/evidence/ar6-regional-release/**",
         "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
         "src/pipeline/fixtures/ar6-regional-release/**"
@@ -1138,13 +1151,13 @@
         "evidenceRequired": "Permanent approved-artifact binding, deterministic z0/z3/z6 RGBA/PNG identity, representative value-bin, and transparent source-nodata gate."
       },
       "commands": {
-        "focused": "cd src/frontend && npm run evidence:pmtiles-render",
-        "full": "cd src/frontend && npm run evidence:pmtiles-render && npm test"
+        "focused": "npm run evidence:pmtiles-render --workspace @searise/web",
+        "full": "npm run evidence:pmtiles-render --workspace @searise/web && npm run test --workspace @searise/web"
       },
       "execution": {
         "tier": "fast",
         "ciWorkflow": "ci.yml",
-        "ciJob": "frontend",
+        "ciJob": "web",
         "requiresDocker": false,
         "requiresCredentials": false
       },
@@ -1182,7 +1195,7 @@
       "owner": "science",
       "purpose": "Recompute Chromium delivery budgets from candidate-bound HTTP Range traces and reject detached paths, hashes, target values, or malformed measurements.",
       "sourcePaths": ["src/pipeline/tests/release/test_delivery.py"],
-      "changedPaths": ["scripts/science/validate_ar6_delivery_trace.py", "src/frontend/scripts/measure-ar6-release.mjs", "src/frontend/package-lock.json", "src/pipeline/science/ar6-regional-release*.json", "src/pipeline/searise_pipeline/release/delivery.py", "src/pipeline/tests/release/test_delivery.py"],
+      "changedPaths": ["package-lock.json", "scripts/science/validate_ar6_delivery_trace.py", "src/web/scripts/measure-ar6-release.mjs", "src/pipeline/science/ar6-regional-release*.json", "src/pipeline/searise_pipeline/release/delivery.py", "src/pipeline/tests/release/test_delivery.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-candidate browser delivery, toolchain, Range-request, cache, heap, latency, and budget gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_delivery.py -q", "full": "python -m pytest src/pipeline/tests -q" },
@@ -1453,6 +1466,7 @@
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/render-token.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/SettlementSearch.test.tsx", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/search-shard-builder.test.mjs", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/cog-analysis-reader.golden.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/geography-classifier.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/map-layer-resolver.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1485,6 +1499,7 @@
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-candidate-harness.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/local-measurement-paths.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/search-performance-evidence.test.mjs", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/search/runtime.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/search/search.worker.test.ts", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/pmtiles-network-source.test.ts", "suite": "static-pmtiles-network-only", "status": "active", "removalGate": null, "replacementEvidence": null },

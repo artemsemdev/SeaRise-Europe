@@ -139,6 +139,15 @@ All notable changes to this project will be documented in this file.
 - Added a release-scoped complete-resource cache adapter with byte verification
   before admission and after readback, staged promotion, corruption quarantine,
   private-data exclusion, and aggregate-only availability evidence.
+- Added target-owned production settlement-search browser evidence with exact
+  manifest/receipt/shard/query bindings, private request allowlisting, retained
+  responsiveness and latency distributions, explicit browser budgets,
+  hash-bound nonclaim validation, and durable no-overwrite report publication.
+
+- Added the static target's production settlement-search shard builder. It
+  consumes the exact Python-validated projection authority, emits deterministic
+  v4 code-point-trie Brotli shards and a release/source/hash-bound receipt, and
+  publishes without overwrite through fail-closed atomic file promotion.
 
 - Added production-static browser journey evidence for all four ADR-024
   outcomes and all nine scenario/horizon projections, including exact COG
@@ -196,6 +205,17 @@ All notable changes to this project will be documented in this file.
   network-only, visual-only, and `no-store` until a separate promotion contract
   supplies authoritative interval digests; the original browser observations
   remain unchanged.
+- Relocated the reusable AR6 Chromium delivery measurement harness into the
+  static `src/web` workspace and rebound its exact release contract to the
+  root npm lockfile without changing lookup values or engineering budgets.
+  The committed offline source fixture is deterministically rebound to that
+  contract with its previous identities recorded and no verified-archive or
+  scientific-release capability granted to the migration.
+
+- Relocated the permanent PMTiles browser and deterministic render evidence
+  harnesses into the static `src/web` workspace and bound them to the root npm
+  lockfile, without changing the approved scientific inputs or rendered PNG
+  bytes.
 
 - Bound the canonical frontend npm SBOM to the static `src/web` workspace in
   the root lockfile, including the Flight icon dependency and its exact
