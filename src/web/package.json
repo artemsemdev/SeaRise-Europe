@@ -23,6 +23,7 @@
     "dev": "vite",
     "serve:local-release": "node scripts/serve-local-release.mjs",
     "serve:committed-release": "node scripts/serve-committed-release.mjs",
+    "serve:offline-lifecycle": "node scripts/serve-offline-lifecycle.mjs",
     "e2e:local-candidate": "node scripts/run-local-candidate-e2e.mjs",
     "evidence:pmtiles-render": "node scripts/render-pmtiles-evidence.mjs --check",
     "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-target-content.mjs && npm run check:contracts && npm run check:search-fixture && npm run check:scientific-fixture",

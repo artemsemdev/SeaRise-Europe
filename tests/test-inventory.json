@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-17",
   "evidence": {
+    "local-2026-08-17-production-lifecycle-harness": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T05:45:30+02:00",
+      "reference": "src/web/scripts/static-build-root.test.mjs, src/web/scripts/offline-lifecycle-fixtures.test.mjs, and src/web/scripts/offline-lifecycle-server.test.mjs",
+      "environment": "macOS arm64; Node 20.20.1; Vite 8.2.1; Vitest 4.1.10; 18 deterministic lifecycle cases passed, including canonical owned temporary roots, complete deployment seals, authenticated atomic A/B/C switching, post-start shell and ranged-resource mutation refusal, and intermediate-symlink refusal; committed synthetic fixture only; no Candidate-v7, TAR, external storage, or legacy runtime"
+    },
     "local-2026-08-17-static-client-census": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T02:11:00+02:00",
@@ -496,6 +502,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 4, "class": "fast", "evidenceRef": "local-2026-08-16-verified-resource-router", "scope": "focused-suite" },
       "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Committed fixture bytes, fresh fake IndexedDB, deterministic WebCrypto, explicit cancellation, and injected strict network/cache ports make every authority and failure path repeatable without external state." }
+    },
+    {
+      "id": "static-production-lifecycle-harness",
+      "layer": "security",
+      "owner": "platform",
+      "purpose": "Keep Issue #60 production lifecycle validation confined to canonical owned temporary roots and serve only complete byte-sealed A/B/C static deployments through authenticated atomic switches, with per-request mutation and symlink refusal.",
+      "sourcePaths": ["src/web/scripts/static-build-root.mjs", "src/web/scripts/static-build-root.d.mts", "src/web/scripts/static-build-root.test.mjs", "src/web/scripts/offline-lifecycle-fixtures.mjs", "src/web/scripts/offline-lifecycle-fixtures.test.mjs", "src/web/scripts/offline-lifecycle-server.mjs", "src/web/scripts/offline-lifecycle-server.test.mjs", "src/web/scripts/serve-offline-lifecycle.mjs"],
+      "changedPaths": ["src/web/scripts/static-build-root*", "src/web/scripts/offline-lifecycle-*", "src/web/scripts/serve-offline-lifecycle.mjs", "src/web/vite.config.ts", "src/web/package.json", "package.json"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent Issue #60 owned-root, complete-seal, per-request byte authority, symlink refusal, authenticated switch, and cleanup gate." },
+      "commands": { "focused": "npm run test --workspace @searise/web -- scripts/static-build-root.test.mjs scripts/offline-lifecycle-fixtures.test.mjs scripts/offline-lifecycle-server.test.mjs", "full": "npm run web:check" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-17-production-lifecycle-harness", "scope": "focused-suite" },
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "All filesystem bytes, build identities, seals, mutations, and symlink controls are deterministic; the HTTP cases require only an ephemeral loopback bind, which restricted local sandboxes may deny while pinned CI and normal hosts pass." }
     },
     {
       "id": "static-range-cache-compatibility",
@@ -1455,6 +1475,9 @@
     { "path": "src/web/src/App.test.tsx", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/application-build-identity.test.mjs", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/build-identity.test.mjs", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/offline-lifecycle-fixtures.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/offline-lifecycle-server.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/static-build-root.test.mjs", "suite": "static-production-lifecycle-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/static-output-isolation.test.mjs", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/assessment-controller.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/runtime-capability.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
