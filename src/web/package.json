@@ -15,6 +15,7 @@
     "generate:search-fixture": "node scripts/generate-search-fixture.mjs",
     "check:search-fixture": "node scripts/generate-search-fixture.mjs --check",
     "test:search-shard-builder": "vitest run scripts/search-shard-builder.test.mjs",
+    "test:search-performance-evidence": "vitest run scripts/search-performance-evidence.test.mjs",
     "build:search-shards": "node scripts/build-settlement-search-shards.mjs build",
     "validate:search-shards": "node scripts/build-settlement-search-shards.mjs validate",
     "measure:local-candidate-search": "node scripts/measure-local-candidate-search.mjs",
