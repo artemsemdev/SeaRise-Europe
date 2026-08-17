@@ -16,8 +16,10 @@ All notable changes to this project will be documented in this file.
   channels, current canonical Flight bytes, and owner-approved final authority
   now fail closed with match-purpose exceptions only. The two self-describing
   gate-policy files are additionally bound to their owner-approved Git blobs;
-  repository modes bind the current 14-component, 57-input v2 profile and its
-  exact static-quality workflow, manifest, and lock.
+  repository modes bind all exact bytes and Git modes in the current
+  14-component, 57-input v2 profile. Repository and build traversal rejects
+  symlinks before reading them, while preapproval binds current historical
+  blobs without claiming the final post-gate audited commit prematurely.
 
 - Added clean-clone generic static-host and Chromium Lighthouse gates. The
   production build now emits deterministic Brotli/gzip sidecars, validates

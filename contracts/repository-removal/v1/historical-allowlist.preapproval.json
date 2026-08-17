@@ -1,7 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "auditedCommit": "9ff436f45c458320f2e45c4b6fd0668c842735f4",
-  "auditedTree": "59bf80b950b70f0973001ee933134c8a1da3fab3",
+  "authority": "preapproval-current-blobs",
   "entries": [
     {
       "id": "adr-021-static-cutover-history",

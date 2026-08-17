@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadHistoricalAllowlist } from "./check-target-content.mjs";
@@ -21,6 +21,83 @@ const EXECUTABLE_EXTENSIONS = new Set([
   ".html", ".css", ".svg", ".xml", ".tf", ".tfvars", ".env", ".conf", ".config",
 ]);
 const ARCHIVE_EXTENSIONS = /\.(?:7z|rar|tar|tar\.bz2|tar\.gz|tar\.xz|tgz|zip)$/iu;
+
+const staticSupplyChainComponents = new Map([
+  ["active-sboms", ["cyclonedx", "candidate", "locked"]],
+  ["github-actions", ["github-actions", "candidate", "locked"]],
+  ["native-build-plane", ["native", "candidate", "locked"]],
+  ["pending-legacy-python-authorities", ["python", "development", "range-constrained"]],
+  ["pipeline-container", ["container", "candidate", "locked"]],
+  ["pipeline-geoid-evaluator", ["python", "candidate", "locked"]],
+  ["pipeline-python-contributor", ["python", "development", "range-constrained"]],
+  ["pipeline-python-release", ["python", "candidate", "locked"]],
+  ["profile-contract", ["standard-schema", "candidate", "locked"]],
+  ["provenance-signing-contracts", ["standard-schema", "candidate", "locked"]],
+  ["settlement-spatial-python", ["python", "candidate", "locked"]],
+  ["static-quality-npm", ["npm", "development", "locked"]],
+  ["static-web-npm", ["npm", "candidate", "locked"]],
+  ["vendored-cyclonedx-schemas", ["standard-schema", "candidate", "locked"]],
+]);
+
+const staticSupplyChainInputs = new Map([
+  ["contracts/supply-chain/v1/sboms/python-release-linux-x86-64-cp311.cdx.json", ["active-sboms", "sbom", "100644"]],
+  ["contracts/supply-chain/v1/sboms/python-release-macos-arm64-cp311.cdx.json", ["active-sboms", "sbom", "100644"]],
+  ["contracts/supply-chain/v1/sboms/python-settlement-spatial-linux-x86-64-cp311.cdx.json", ["active-sboms", "sbom", "100644"]],
+  ["contracts/supply-chain/v1/sboms/python-settlement-spatial-macos-arm64-cp311.cdx.json", ["active-sboms", "sbom", "100644"]],
+  ["contracts/supply-chain/v2/sboms/static-web-npm.cdx.json", ["active-sboms", "sbom", "100644"]],
+  [".github/workflows/ci.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/codeql.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/offline-release-controlled.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/phase-0r-owner-promotion.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/phase-1-release-sign.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/static-quality.yml", ["github-actions", "workflow", "100644"]],
+  ["contracts/supply-chain/v1/tools/cosign-linux-amd64.json", ["native-build-plane", "lock", "100644"]],
+  ["src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64", ["native-build-plane", "recipe", "100644"]],
+  ["src/pipeline/toolchain/build_macos_tippecanoe.sh", ["native-build-plane", "recipe", "100755"]],
+  ["src/pipeline/toolchain/duckdb-spatial-extensions.json", ["native-build-plane", "lock", "100644"]],
+  ["src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json", ["native-build-plane", "receipt", "100644"]],
+  ["src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json", ["native-build-plane", "receipt", "100644"]],
+  ["src/pipeline/pyproject.toml", ["pending-legacy-python-authorities", "manifest", "100644"]],
+  ["src/pipeline/requirements-pipeline.txt", ["pending-legacy-python-authorities", "manifest", "100644"]],
+  ["src/pipeline/offline_release/Dockerfile", ["pipeline-container", "recipe", "100644"]],
+  ["src/pipeline/offline_release/Dockerfile.dockerignore", ["pipeline-container", "recipe", "100644"]],
+  ["src/pipeline/offline_release/profiles/fixture.json", ["pipeline-container", "manifest", "100644"]],
+  ["src/pipeline/offline_release/profiles/full-europe.json", ["pipeline-container", "manifest", "100644"]],
+  ["src/pipeline/offline_release/profiles/profile.schema.json", ["pipeline-container", "schema", "100644"]],
+  ["src/pipeline/offline_release/profiles/regional.json", ["pipeline-container", "manifest", "100644"]],
+  ["src/pipeline/science/geoid-evaluator-requirements.txt", ["pipeline-geoid-evaluator", "lock", "100644"]],
+  ["contracts/supply-chain/v2/python/static-target-contributor-requirements.txt", ["pipeline-python-contributor", "manifest", "100644"]],
+  ["contracts/supply-chain/v1/python-graphs/release-runtime.json", ["pipeline-python-release", "manifest", "100644"]],
+  ["src/pipeline/requirements-phase1-final-macos-x86_64.lock", ["pipeline-python-release", "lock", "100644"]],
+  ["src/pipeline/requirements-release-macos-arm64.lock", ["pipeline-python-release", "lock", "100644"]],
+  ["src/pipeline/requirements-release.lock", ["pipeline-python-release", "lock", "100644"]],
+  ["contracts/supply-chain/v2/historical/v1-contracts.py", ["profile-contract", "manifest", "100644"]],
+  ["contracts/supply-chain/v2/static-target-profile.schema.json", ["profile-contract", "schema", "100644"]],
+  ["contracts/release/v2/browser-derivation-provenance.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/build-types/offline-release-real-source-v1.json", ["provenance-signing-contracts", "manifest", "100644"]],
+  ["contracts/supply-chain/v1/build-types/offline-release-v1.json", ["provenance-signing-contracts", "manifest", "100644"]],
+  ["contracts/supply-chain/v1/cosign-tool-lock.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/cryptographic-verification-receipt.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/evidence-envelope.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/identity-policy.json", ["provenance-signing-contracts", "manifest", "100644"]],
+  ["contracts/supply-chain/v1/identity-policy.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/public-readback-verification-receipt.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/release-evidence-retention-receipt.schema.json", ["provenance-signing-contracts", "schema", "100644"]],
+  ["contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json", ["settlement-spatial-python", "manifest", "100644"]],
+  ["src/pipeline/requirements-settlements-spatial-linux-x86_64.lock", ["settlement-spatial-python", "lock", "100644"]],
+  ["src/pipeline/requirements-settlements-spatial-macos-arm64.lock", ["settlement-spatial-python", "lock", "100644"]],
+  ["tools/static-quality/package-lock.json", ["static-quality-npm", "lock", "100644"]],
+  ["tools/static-quality/package.json", ["static-quality-npm", "manifest", "100644"]],
+  ["package-lock.json", ["static-web-npm", "lock", "100644"]],
+  ["package.json", ["static-web-npm", "manifest", "100644"]],
+  ["src/web/package.json", ["static-web-npm", "manifest", "100644"]],
+  ["contracts/supply-chain/v1/vendor/bom-1.7.schema.json", ["vendored-cyclonedx-schemas", "schema", "100644"]],
+  ["contracts/supply-chain/v1/vendor/cryptography-defs.schema.json", ["vendored-cyclonedx-schemas", "schema", "100644"]],
+  ["contracts/supply-chain/v1/vendor/jsf-0.82.schema.json", ["vendored-cyclonedx-schemas", "schema", "100644"]],
+  ["contracts/supply-chain/v1/vendor/manifest.json", ["vendored-cyclonedx-schemas", "lock", "100644"]],
+  ["contracts/supply-chain/v1/vendor/spdx.schema.json", ["vendored-cyclonedx-schemas", "schema", "100644"]],
+]);
 
 export const forbiddenDependencyRules = Object.freeze([
   Object.freeze({ id: "nextjs-runtime", pattern: /(?:["'](?:next|eslint-config-next)["']|\bnext\/(?:server|headers|navigation|router|image)\b|\bnext (?:build|dev|start)\b|\b\.next\/)/giu }),
@@ -195,16 +272,54 @@ function trackedPaths(root) {
 }
 
 function filesBelow(root) {
+  const rootStatus = lstatSync(root);
+  if (rootStatus.isSymbolicLink()) throw new Error(`Built-output root must not be a symlink: ${root}`);
+  if (!rootStatus.isDirectory()) throw new Error(`Built-output root must be a directory: ${root}`);
   const files = [];
   const visit = (path) => {
     for (const name of readdirSync(path).sort()) {
       const child = resolve(path, name);
-      if (statSync(child).isDirectory()) visit(child);
-      else files.push(child);
+      const status = lstatSync(child);
+      if (status.isSymbolicLink()) throw new Error(`Built output must not contain symlinks: ${child}`);
+      if (status.isDirectory()) visit(child);
+      else if (status.isFile()) files.push(child);
+      else throw new Error(`Built output must contain only regular files and directories: ${child}`);
     }
   };
   visit(root);
   return files;
+}
+
+function safeRepositoryFile(root, logicalPath) {
+  if (!logicalPath || logicalPath.startsWith("/") || logicalPath.includes("\\")
+      || logicalPath.split("/").some((part) => part === "" || part === "." || part === "..")) {
+    throw new Error(`Unsafe repository path: ${logicalPath}`);
+  }
+  const rootStatus = lstatSync(root);
+  if (rootStatus.isSymbolicLink() || !rootStatus.isDirectory()) {
+    throw new Error(`Repository root must be a regular directory: ${root}`);
+  }
+  let current = root;
+  for (const part of logicalPath.split("/")) {
+    current = resolve(current, part);
+    const status = lstatSync(current);
+    if (status.isSymbolicLink()) throw new Error(`Repository path must not use symlinks: ${logicalPath}`);
+  }
+  const status = lstatSync(current);
+  if (!status.isFile()) throw new Error(`Repository path must be a regular file: ${logicalPath}`);
+  return current;
+}
+
+function trackedMode(root, logicalPath) {
+  const output = execFileSync("git", ["ls-files", "--stage", "--", logicalPath], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  const lines = output.split("\n").filter(Boolean);
+  if (lines.length !== 1 || !lines[0].endsWith(`\t${logicalPath}`)) {
+    throw new Error(`Static-target supply-chain input is not uniquely tracked: ${logicalPath}`);
+  }
+  return lines[0].split(" ", 1)[0];
 }
 
 export function scanDependencyRecords(records, {
@@ -237,7 +352,7 @@ export function scanDependencyRecords(records, {
 function readRecords(paths, root) {
   return paths.filter((path) => isRepositoryScanPath(path) && !ARCHIVE_EXTENSIONS.test(path)
     && !/(?:^|\/)(?:candidate[-_.]?v?\d+|local-data)(?:[/._-]|$)/iu.test(path)).map((path) => {
-    const absolute = resolve(root, path);
+    const absolute = safeRepositoryFile(root, path);
     const bytes = readFileSync(absolute);
     if (bytes.includes(0)) return null;
     return Object.freeze({ path, text: bytes.toString("utf8") });
@@ -276,9 +391,10 @@ export function isTargetScanPath(path) {
   return path.startsWith("src/web/") || path === "package.json" || path === "package-lock.json";
 }
 
-export function validateStaticSupplyChainProfile(document, readPath) {
+export function validateStaticSupplyChainProfile(document, readPath, readMode) {
   if (!document || document.schemaVersion !== "2.0.0"
       || document.profileId !== "static-browser-supply-chain-v2"
+      || document.$schema !== "./static-target-profile.schema.json"
       || !Array.isArray(document.components)) {
     throw new Error("Static-target supply-chain profile is not the required v2 authority");
   }
@@ -288,22 +404,45 @@ export function validateStaticSupplyChainProfile(document, readPath) {
   if (componentCount !== 14 || inputCount !== 57) {
     throw new Error(`Static-target supply-chain profile count drift: ${componentCount} components / ${inputCount} inputs`);
   }
-  const byId = new Map(document.components.map((component) => [component.id, component]));
-  if (byId.size !== componentCount) throw new Error("Static-target supply-chain component IDs are not unique");
-  const required = new Map([
-    [".github/workflows/static-quality.yml", ["github-actions", "workflow"]],
-    ["tools/static-quality/package-lock.json", ["static-quality-npm", "lock"]],
-    ["tools/static-quality/package.json", ["static-quality-npm", "manifest"]],
-  ]);
-  const qualityInputs = byId.get("static-quality-npm")?.inputs ?? [];
-  if (qualityInputs.length !== 2) throw new Error("Static-quality tooling authority must contain exactly two inputs");
-  for (const [path, [componentId, role]] of required) {
-    const input = byId.get(componentId)?.inputs?.find((candidate) => candidate.path === path);
-    if (!input || input.role !== role || !/^[a-f0-9]{64}$/u.test(input.sha256 ?? "")) {
-      throw new Error(`Static-target supply-chain authority is missing exact ${componentId} input: ${path}`);
+  if (typeof readMode !== "function") throw new Error("Static-target supply-chain mode authority is required");
+  const componentIds = document.components.map(({ id }) => id);
+  if (componentIds.join("\0") !== [...staticSupplyChainComponents.keys()].join("\0")) {
+    throw new Error("Static-target supply-chain component set or order drifted");
+  }
+  const recorded = new Set();
+  for (const component of document.components) {
+    const expectedComponent = staticSupplyChainComponents.get(component.id);
+    if (!expectedComponent || [component.ecosystem, component.releaseUse, component.coverage].join("\0")
+        !== expectedComponent.join("\0")) {
+      throw new Error(`Static-target supply-chain component contract drift: ${component.id}`);
     }
-    const actual = createHash("sha256").update(readPath(path)).digest("hex");
-    if (actual !== input.sha256) throw new Error(`Static-target supply-chain input hash drift: ${path}`);
+    const paths = component.inputs?.map(({ path }) => path) ?? [];
+    if (paths.join("\0") !== [...paths].sort().join("\0") || new Set(paths).size !== paths.length) {
+      throw new Error(`Static-target supply-chain inputs must be unique and sorted: ${component.id}`);
+    }
+    for (const input of component.inputs ?? []) {
+      const expected = staticSupplyChainInputs.get(input.path);
+      if (!expected || expected[0] !== component.id || expected[1] !== input.role
+          || !/^[a-f0-9]{64}$/u.test(input.sha256 ?? "") || recorded.has(input.path)) {
+        throw new Error(`Static-target supply-chain input set, owner, or role drift: ${input.path}`);
+      }
+      const bytes = readPath(input.path);
+      const actual = createHash("sha256").update(bytes).digest("hex");
+      if (actual !== input.sha256) throw new Error(`Static-target supply-chain input hash drift: ${input.path}`);
+      const mode = readMode(input.path);
+      if (mode !== expected[2]) throw new Error(`Static-target supply-chain input mode drift: ${input.path}`);
+      recorded.add(input.path);
+    }
+  }
+  const missing = [...staticSupplyChainInputs.keys()].filter((path) => !recorded.has(path));
+  if (missing.length || recorded.size !== staticSupplyChainInputs.size) {
+    throw new Error(`Static-target supply-chain input set drifted; missing=${JSON.stringify(missing)}`);
+  }
+  const schemaPath = document.$schema.replace(/^\.\//u, "contracts/supply-chain/v2/");
+  const schemaInput = document.components.find(({ id }) => id === "profile-contract")?.inputs
+    ?.find(({ path }) => path === schemaPath);
+  if (!schemaInput || schemaInput.role !== "schema") {
+    throw new Error("Static-target supply-chain profile is not bound to its declared schema");
   }
   return Object.freeze({ componentCount, inputCount });
 }
@@ -317,7 +456,7 @@ export function validateStaticRepository({
 } = {}) {
   let records;
   if (mode === "built") {
-    if (!builtRoot || !existsSync(builtRoot)) throw new Error("Built-output dependency scan requires an existing directory");
+    if (!builtRoot) throw new Error("Built-output dependency scan requires an existing directory");
     const absolutePaths = filesBelow(builtRoot);
     const paths = absolutePaths.map((path) => relative(builtRoot, path).replaceAll("\\", "/"));
     records = absolutePaths.filter((path) => {
@@ -335,9 +474,11 @@ export function validateStaticRepository({
     }
     return result;
   } else {
-    const profilePath = resolve(root, "contracts/supply-chain/v2/static-target-profile.json");
-    if (!existsSync(profilePath)) throw new Error("Static-target supply-chain v2 profile is missing");
-    supplyChainValidator(JSON.parse(readFileSync(profilePath, "utf8")), (path) => readFileSync(resolve(root, path)));
+    const profileLogicalPath = "contracts/supply-chain/v2/static-target-profile.json";
+    const profileBytes = readFileSync(safeRepositoryFile(root, profileLogicalPath));
+    supplyChainValidator(JSON.parse(profileBytes.toString("utf8")),
+      (path) => readFileSync(safeRepositoryFile(root, path)),
+      (path) => trackedMode(root, path));
     const paths = trackedPaths(root).filter((path) => mode !== "target" || isTargetScanPath(path));
     records = readRecords(paths, root);
     const historicalEntries = mode.startsWith("repository-")

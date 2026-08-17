@@ -39,6 +39,18 @@ describe("historical terminology allowlist", () => {
     expect(entry.allowedClaims.has("future-flood-certainty")).toBe(false);
   });
 
+  it("uses current blob bindings without claiming a stale audit anchor during readiness", () => {
+    const { content, document } = fixture();
+    delete document.auditedCommit;
+    delete document.auditedTree;
+    document.authority = "preapproval-current-blobs";
+    expect(validateHistoricalAllowlist(document, () => content, { authority: "readiness" })
+      .has("docs/evidence/historical.md")).toBe(true);
+    document.auditedCommit = "a".repeat(40);
+    expect(() => validateHistoricalAllowlist(document, () => content, { authority: "readiness" }))
+      .toThrow(/not a v1 document/);
+  });
+
   it("rejects a changed blob", () => {
     const { document } = fixture();
     expect(() => validateHistoricalAllowlist(document, () => "mutated"))

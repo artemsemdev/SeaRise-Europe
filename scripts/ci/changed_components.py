@@ -43,11 +43,18 @@ FRONTEND = (
 
 WEB = (
     ".nvmrc",
+    ".github/workflows/**",
     "package.json",
     "package-lock.json",
+    "contracts/repository-removal/v1/historical-allowlist*.json",
     "src/web/**",
     "tools/static-quality/**",
     "contracts/release/v1/**",
+    "contracts/supply-chain/v2/**",
+    "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+    "docs/methodology.md",
+    "docs/product/Mock/SeaRise-Flight.html",
+    "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
     "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
     "src/pipeline/evidence/ar6-regional-release/**",
     "src/pipeline/fixtures/ar6-regional-release/**",

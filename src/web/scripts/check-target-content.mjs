@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -116,17 +116,45 @@ export const prohibitedProductCopy = Object.freeze([
 ]);
 
 function filesBelow(root, extensions) {
-  if (!existsSync(root)) throw new Error(`Content scan root does not exist: ${root}`);
+  const rootStatus = lstatSync(root);
+  if (rootStatus.isSymbolicLink()) throw new Error(`Content-scan root must not be a symlink: ${root}`);
+  if (!rootStatus.isDirectory()) throw new Error(`Content-scan root must be a directory: ${root}`);
   const files = [];
   const visit = (path) => {
     for (const name of readdirSync(path).sort()) {
       const child = resolve(path, name);
-      if (statSync(child).isDirectory()) visit(child);
+      const status = lstatSync(child);
+      if (status.isSymbolicLink()) throw new Error(`Content scan must not traverse symlinks: ${child}`);
+      if (status.isDirectory()) visit(child);
+      else if (!status.isFile()) throw new Error(`Content scan accepts only regular files: ${child}`);
       else if (extensions.has(extname(child))) files.push(child);
     }
   };
   visit(root);
   return files;
+}
+
+function readRegularFile(path, encoding = null, root = repositoryRoot) {
+  const repositoryRelative = relative(root, path);
+  if (repositoryRelative.startsWith(`..${sep}`) || repositoryRelative === "..") {
+    throw new Error(`Content scan input must stay inside the repository: ${path}`);
+  }
+  let current = root;
+  const rootStatus = lstatSync(current);
+  if (rootStatus.isSymbolicLink() || !rootStatus.isDirectory()) {
+    throw new Error(`Content-scan repository root must be a regular directory: ${root}`);
+  }
+  for (const part of repositoryRelative.split(sep).filter(Boolean)) {
+    current = resolve(current, part);
+    const status = lstatSync(current);
+    if (status.isSymbolicLink()) {
+      throw new Error(`Content scan input must not use symlinks: ${path}`);
+    }
+  }
+  if (!lstatSync(current).isFile()) {
+    throw new Error(`Content scan input must be a regular file: ${path}`);
+  }
+  return readFileSync(current, encoding ?? undefined);
 }
 
 function gitBlobSha(content) {
@@ -140,17 +168,23 @@ function hasExactKeys(value, expected) {
 }
 
 export function validateHistoricalAllowlist(document, readPath, {
+  authority = "approved",
   resolveTree = null,
   resolveBlob = null,
 } = {}) {
+  const approved = authority === "approved";
+  const readiness = authority === "readiness";
+  const anchorValid = approved
+    ? /^[a-f0-9]{40}$/u.test(document?.auditedCommit ?? "")
+      && /^[a-f0-9]{40}$/u.test(document?.auditedTree ?? "")
+      && hasExactKeys(document, ["schemaVersion", "auditedCommit", "auditedTree", "entries"])
+    : readiness && document?.authority === "preapproval-current-blobs"
+      && hasExactKeys(document, ["schemaVersion", "authority", "entries"]);
   if (!document || document.schemaVersion !== "1.0.0" || !Array.isArray(document.entries)
-      || document.entries.length === 0
-      || !/^[a-f0-9]{40}$/u.test(document.auditedCommit ?? "")
-      || !/^[a-f0-9]{40}$/u.test(document.auditedTree ?? "")
-      || !hasExactKeys(document, ["schemaVersion", "auditedCommit", "auditedTree", "entries"])) {
+      || document.entries.length === 0 || !anchorValid) {
     throw new Error("Historical terminology allowlist is not a v1 document");
   }
-  if (resolveTree && resolveTree(document.auditedCommit) !== document.auditedTree) {
+  if (approved && resolveTree && resolveTree(document.auditedCommit) !== document.auditedTree) {
     throw new Error("Historical terminology allowlist audited tree does not match its commit");
   }
   const entries = new Map();
@@ -175,7 +209,7 @@ export function validateHistoricalAllowlist(document, readPath, {
     if (gitBlobSha(content) !== entry.gitBlobSha) {
       throw new Error(`Historical terminology allowlist blob mismatch: ${entry.path}`);
     }
-    if (resolveBlob && resolveBlob(document.auditedCommit, entry.path) !== entry.gitBlobSha) {
+    if (approved && resolveBlob && resolveBlob(document.auditedCommit, entry.path) !== entry.gitBlobSha) {
       throw new Error(`Historical terminology allowlist audited blob mismatch: ${entry.path}`);
     }
     entries.set(entry.path, Object.freeze({
@@ -204,7 +238,7 @@ function approvedRemovalChain(root) {
 
 function validateGatePolicyTrustRoots(root, auditedCommit) {
   for (const path of gatePolicyTrustPaths) {
-    const currentBlob = gitBlobSha(readFileSync(resolve(root, path)));
+    const currentBlob = gitBlobSha(readRegularFile(resolve(root, path), null, root));
     const auditedBlob = execFileSync("git", ["rev-parse", `${auditedCommit}:${path}`], {
       cwd: root,
       encoding: "utf8",
@@ -230,7 +264,7 @@ export function loadHistoricalAllowlist({
   }
   const path = existsSync(approvedPath) ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
-  const document = JSON.parse(readFileSync(path, "utf8"));
+  const document = JSON.parse(readRegularFile(path, "utf8", root));
   // A pull-request checkout is intentionally shallow.  Readiness still binds
   // every allowlisted path to its declared Git-blob digest, but only the
   // owner-approved authority may require the older audited commit object and
@@ -246,7 +280,7 @@ export function loadHistoricalAllowlist({
     }).trim(),
   } : {};
   const entries = validateHistoricalAllowlist(document, (repositoryPath) =>
-    readFileSync(resolve(root, repositoryPath), "utf8"), approvedGitResolvers);
+    readRegularFile(resolve(root, repositoryPath), "utf8", root), { authority, ...approvedGitResolvers });
   if (authority === "approved") validateGatePolicyTrustRoots(root, document.auditedCommit);
   return entries;
 }
@@ -267,7 +301,7 @@ export function activeAuthoritativeDocument(content, path) {
 }
 
 function verifyCanonicalFlightContract() {
-  const content = readFileSync(canonicalFlightMockPath, "utf8");
+  const content = readRegularFile(canonicalFlightMockPath, "utf8");
   const doctype = content.indexOf("<!DOCTYPE html>");
   if (doctype < 0) throw new Error("Canonical Flight mock is missing its document boundary");
   const annotation = content.slice(0, doctype);
@@ -279,7 +313,7 @@ function verifyCanonicalFlightContract() {
       throw new Error(`Canonical Flight mock is missing its authority marker: ${marker}`);
     }
   }
-  const requirements = readFileSync(canonicalFlightRequirementsPath, "utf8");
+  const requirements = readRegularFile(canonicalFlightRequirementsPath, "utf8");
   for (const marker of canonicalFlightRequirementsMarkers) {
     if (!requirements.includes(marker)) {
       throw new Error(`Canonical Flight requirements are missing their authority marker: ${marker}`);
@@ -371,7 +405,7 @@ function main() {
   const violations = [];
   for (const path of files) {
     const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
-    const content = activeAuthoritativeDocument(readFileSync(path, "utf8"), path);
+    const content = activeAuthoritativeDocument(readRegularFile(path, "utf8"), path);
     const contentViolations = [...scanContent(content)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")
@@ -385,6 +419,17 @@ function main() {
   }
   if (violations.length > 0) {
     throw new Error(`Prohibited target-domain claims found:\n${violations.join("\n")}`);
+  }
+  const repositoryGate = resolve(webRoot, "scripts/static-repository-gates.mjs");
+  const gateOptions = builtRoot
+    ? [["--built", builtRoot]]
+    : [["--target"], ["--repository-readiness"]];
+  for (const options of gateOptions) {
+    execFileSync(process.execPath, [repositoryGate, ...options], {
+      cwd: webRoot,
+      encoding: "utf8",
+      stdio: "inherit",
+    });
   }
   const scope = builtRoot ? `built assets in ${builtRoot}` : "static target source and active documentation";
   console.log(`Target content contract passed for ${files.length} files (${scope}).`);

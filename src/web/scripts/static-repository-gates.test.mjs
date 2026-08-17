@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -48,8 +48,13 @@ function approvalRepository() {
     }],
   };
   mkdirSync(resolve(root, "contracts/repository-removal/v1"), { recursive: true });
+  const preapproval = {
+    schemaVersion: "1.0.0",
+    authority: "preapproval-current-blobs",
+    entries: contract.entries,
+  };
   writeFileSync(resolve(root, "contracts/repository-removal/v1/historical-allowlist.preapproval.json"),
-    `${JSON.stringify(contract)}\n`);
+    `${JSON.stringify(preapproval)}\n`);
   git(root, "add", ".");
   git(root, "-c", "user.name=Artem", "-c", "user.email=6793222+artemsemdev@users.noreply.github.com",
     "commit", "-qm", "test: add readiness authority");
@@ -280,19 +285,58 @@ describe("static repository dependency gates", () => {
       .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
   });
 
-  it("binds the current v2 profile counts and exact static-quality workflow/tooling inputs", () => {
+  it("binds every current v2 profile component, input byte hash, and Git mode", () => {
     const root = resolve(process.cwd(), "../..");
     const profile = JSON.parse(readFileSync(resolve(root, "contracts/supply-chain/v2/static-target-profile.json"), "utf8"));
     const readPath = (path) => readFileSync(resolve(root, path));
-    expect(validateStaticSupplyChainProfile(profile, readPath)).toEqual({ componentCount: 14, inputCount: 57 });
+    const readMode = (path) => git(root, "ls-files", "--stage", "--", path).split(" ", 1)[0];
+    expect(validateStaticSupplyChainProfile(profile, readPath, readMode))
+      .toEqual({ componentCount: 14, inputCount: 57 });
 
     const countMutation = JSON.parse(JSON.stringify(profile));
     countMutation.components.at(-1).inputs.pop();
-    expect(() => validateStaticSupplyChainProfile(countMutation, readPath)).toThrow(/count drift/);
+    expect(() => validateStaticSupplyChainProfile(countMutation, readPath, readMode)).toThrow(/count drift/);
 
-    const workflowMutation = JSON.parse(JSON.stringify(profile));
-    workflowMutation.components.find(({ id }) => id === "github-actions")
-      .inputs.find(({ path }) => path === ".github/workflows/static-quality.yml").sha256 = "0".repeat(64);
-    expect(() => validateStaticSupplyChainProfile(workflowMutation, readPath)).toThrow(/input hash drift/);
+    const arbitraryHashMutation = JSON.parse(JSON.stringify(profile));
+    arbitraryHashMutation.components.find(({ id }) => id === "active-sboms").inputs[0].sha256 = "0".repeat(64);
+    expect(() => validateStaticSupplyChainProfile(arbitraryHashMutation, readPath, readMode))
+      .toThrow(/input hash drift/);
+
+    expect(() => validateStaticSupplyChainProfile(profile, readPath, (path) =>
+      path === "src/pipeline/toolchain/build_macos_tippecanoe.sh" ? "100644" : readMode(path)))
+      .toThrow(/input mode drift/);
+
+    const replacedInput = JSON.parse(JSON.stringify(profile));
+    replacedInput.components[0].inputs[0] = {
+      ...replacedInput.components[0].inputs[0], path: "docs/unclassified.json",
+    };
+    replacedInput.components[0].inputs.sort((left, right) => left.path.localeCompare(right.path));
+    expect(() => validateStaticSupplyChainProfile(replacedInput, readPath, readMode))
+      .toThrow(/input set, owner, or role drift/);
+
+    const schemaMutation = JSON.parse(JSON.stringify(profile));
+    schemaMutation.$schema = "./unbound.schema.json";
+    expect(() => validateStaticSupplyChainProfile(schemaMutation, readPath, readMode))
+      .toThrow(/required v2 authority/);
+  });
+
+  it("rejects a built-output symlink before reading its target", () => {
+    const dist = mkdtempSync(resolve(tmpdir(), "repository-built-symlink-"));
+    writeFileSync(resolve(dist, "outside.txt"), "postgres:latest\n");
+    symlinkSync(resolve(dist, "outside.txt"), resolve(dist, "linked.txt"));
+    expect(() => validateStaticRepository({ mode: "built", builtRoot: dist }))
+      .toThrow(/must not contain symlinks/);
+  });
+
+  it("rejects a tracked repository symlink before reading its target", () => {
+    const { root } = approvalRepository();
+    writeFileSync(resolve(root, "payload.txt"), "postgres:latest\n");
+    symlinkSync("../../payload.txt", resolve(root, "src/web/linked.ts"));
+    git(root, "add", ".");
+    git(root, "-c", "user.name=Artem", "-c", "user.email=6793222+artemsemdev@users.noreply.github.com",
+      "commit", "-qm", "test: add repository symlink");
+    expect(() => validateStaticRepository({
+      mode: "repository-readiness", root, supplyChainValidator: () => {},
+    })).toThrow(/must not use symlinks/);
   });
 });

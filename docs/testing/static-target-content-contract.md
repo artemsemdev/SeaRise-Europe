@@ -60,9 +60,11 @@ Historical terminology is never exempted by directory. Readiness may read
 final mode refuses preapproval authority. Final mode requires the committed
 `historical-allowlist.json` and a successful offline validation of the complete
 inventory, evidence-receipt, owner-decision, comment-identity, audited-object,
-and hash chain. Each allowlist entry binds one exact repository path to its
-current and audited Git blob SHA and one constrained rule. The scanner rejects
-schema-shape, ID, commit/tree, duplicate, active-authority, and rule/path drift.
+and hash chain. Preapproval binds each exact repository path to its current Git
+blob only and deliberately carries no commit/tree audit claim. Final approval
+binds that path to both the current and audited Git blob SHA plus one constrained
+rule. The scanner rejects schema-shape, ID, commit/tree, duplicate,
+active-authority, and rule/path drift.
 
 The preapproval document is evidence classification only. It does not approve
 deletion, publication, or an inventory disposition. The final repository-
@@ -98,9 +100,11 @@ three scopes:
   production HTTP-server dependencies, including a dependency whose name is
   also used by a retained test script. Before scanning dependency terms, target,
   readiness, and final modes also require the current v2 transition profile's
-  exact 14 components and 57 inputs. The dedicated static-quality workflow,
-  package manifest, and lock must occupy their exact components and roles and
-  match the SHA-256 values recorded by that profile.
+  exact 14 components and 57 inputs. Every input must occupy its exact
+  component and role, match its recorded SHA-256 before its tracked Git mode is
+  checked, and use the bound profile schema; extra, missing, reordered,
+  symlinked, or mode-mutated authority fails closed. Repository and built-output
+  traversal uses non-following metadata checks before every read.
 
 Readiness classification is not removal approval. `--repository-final` changes
 every remaining pending-removal reference into a failure and also rejects any
