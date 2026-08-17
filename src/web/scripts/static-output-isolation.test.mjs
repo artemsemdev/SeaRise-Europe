@@ -46,7 +46,7 @@ describe("static output isolation", () => {
   it("accepts only the exact root, Vite, source-map, and release-manifest closure", () => {
     const { dist, options, paths } = fixture();
     writeFileSync(resolve(dist, "assets/main-01234567.js"),
-      `export const scenarios = "/releases/${RELEASE}/config/scenarios.json";\n//# sourceMappingURL=main-01234567.js.map\n`);
+      `export const scenarios = ["/releases/${RELEASE}/config/scenarios.json", "https://fixture.searise.invalid/releases/${RELEASE}/config/scenarios.json"];\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(validateStaticOutputIsolation({ ...options, paths }).allowedPaths).toContain("assets/main-01234567.js.map");
   });
 
@@ -80,6 +80,17 @@ describe("static output isolation", () => {
   it.each(["/assess", "/geocode", "/config", "https://runtime.invalid/config"])("rejects an allowlisted built asset requesting %s", (endpoint) => {
     const { dist, options, paths } = fixture();
     writeFileSync(resolve(dist, "assets/main-01234567.js"), `fetch(${JSON.stringify(endpoint)});\n//# sourceMappingURL=main-01234567.js.map\n`);
+    expect(() => validateStaticOutputIsolation({ ...options, paths })).toThrow(/Forbidden runtime reference/);
+  });
+
+  it.each([
+    `/releases/${RELEASE}/config/UNLISTED.json`,
+    "/releases/searise-europe-v9.9.9-20990101-ffffffffffff/config/scenarios.json",
+    `https://fixture.searise.invalid/releases/${RELEASE}/config/UNLISTED.json`,
+  ])("rejects unbound release config reference %s", (reference) => {
+    const { dist, options, paths } = fixture();
+    writeFileSync(resolve(dist, "assets/main-01234567.js"),
+      `export const unbound = ${JSON.stringify(reference)};\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(() => validateStaticOutputIsolation({ ...options, paths })).toThrow(/Forbidden runtime reference/);
   });
 });
