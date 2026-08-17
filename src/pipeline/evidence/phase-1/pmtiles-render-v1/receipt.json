@@ -38,8 +38,8 @@
   },
   "renderer": {
     "id": "projection-pmtiles-software-raster-v1",
-    "scriptPath": "src/frontend/scripts/render-pmtiles-evidence.mjs",
-    "scriptSha256": "5656374059dcc60f66053e79594ba4232f06824010df2dad3b1e8576880f64fc",
+    "scriptPath": "src/web/scripts/render-pmtiles-evidence.mjs",
+    "scriptSha256": "cb7212812acbb57a2eb47ff622dc7285c5468723cbabdc46ac823d128b728225",
     "width": 512,
     "height": 512,
     "sampling": "pixel-centre-even-odd",
@@ -104,12 +104,12 @@
         ]
       }
     ],
-    "packageLockPath": "src/frontend/package-lock.json",
-    "packageLockSha256": "c5d8af53b1029f9bfb75424ccad83b3da4ad096d175f4ba05789e847d5548cdd",
+    "packageLockPath": "package-lock.json",
+    "packageLockSha256": "88aaedbe42e82d3c917aed171d02a1c3d95d1758f3a0b710bb649012c418bf59",
     "packages": {
-      "@mapbox/vector-tile": "2.0.4",
+      "@mapbox/vector-tile": "2.0.5",
       "fflate": "0.8.3",
-      "pbf": "4.0.1",
+      "pbf": "4.0.2",
       "pmtiles": "4.5.0"
     }
   },

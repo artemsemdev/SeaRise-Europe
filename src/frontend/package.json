@@ -14,7 +14,6 @@
     "lint:i18n": "node --import tsx scripts/lint-i18n-externalization.ts",
     "contracts:generate": "node scripts/generate-public-contract-types.mjs",
     "contracts:check": "node scripts/generate-public-contract-types.mjs --check",
-    "evidence:pmtiles-render": "node scripts/render-pmtiles-evidence.mjs --check",
     "measure:settlement-browser": "node scripts/measure-production-browser-worker.mjs",
     "type-check": "npm run contracts:check && tsc --noEmit",
     "test": "vitest run",

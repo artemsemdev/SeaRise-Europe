@@ -940,8 +940,8 @@
       "layer": "contract",
       "owner": "data",
       "purpose": "Build both support and coastal boundary artifacts twice with the exact release environment, compare visual profiles, exercise z0/z3/z6 in Chromium and MapLibre, emit candidate-bound evidence, and fail closed on any drift.",
-      "sourcePaths": ["src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
-      "changedPaths": [".github/workflows/ci.yml", "scripts/release/build_boundary_pmtiles_evidence.py", "src/frontend/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "sourcePaths": ["src/web/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/tests/release/test_boundary_evidence.py"],
+      "changedPaths": [".github/workflows/ci.yml", "package-lock.json", "scripts/release/build_boundary_pmtiles_evidence.py", "src/web/package.json", "src/web/scripts/verify-boundary-pmtiles-browser.mjs", "src/pipeline/searise_pipeline/release/boundary_evidence.py", "src/pipeline/tests/release/test_boundary_evidence.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-pinned dual-build, profile-selection, z0/z3/z6 browser render, receipt, checksum, structure, and decoded-parity evidence gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_boundary_evidence.py -q", "full": "python -m pytest src/pipeline/tests -q" },
@@ -950,18 +950,19 @@
       "flakiness": { "status": "environment-sensitive", "owner": "data", "issue": null, "expiresAt": null, "evidence": "Fast orchestration mutation tests are unconditional; the controlled job downloads hash-pinned public assets and package-lock-owned Chromium and requires the exact macOS ARM64 release runner." }
     },
     {
-      "id": "frontend-pmtiles-render-evidence",
+      "id": "static-pmtiles-render-evidence",
       "layer": "integration",
       "owner": "science",
       "purpose": "Rebuild immutable z0/z3/z6 projection-PMTiles QA renders and prove quantile/value-bin coverage plus source-nodata transparency against approved Phase 0R bytes.",
       "sourcePaths": [
-        "src/frontend/scripts/render-pmtiles-evidence.mjs",
+        "src/web/scripts/render-pmtiles-evidence.mjs",
         "src/pipeline/evidence/phase-1/pmtiles-render-v1/**"
       ],
       "changedPaths": [
         "contracts/release/v1/fixtures/release/**/layers/**/*.pmtiles",
-        "src/frontend/scripts/render-pmtiles-evidence.mjs",
-        "src/frontend/package-lock.json",
+        "src/web/scripts/render-pmtiles-evidence.mjs",
+        "src/web/package.json",
+        "package-lock.json",
         "src/pipeline/evidence/ar6-regional-release/**",
         "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
         "src/pipeline/fixtures/ar6-regional-release/**"
@@ -972,13 +973,13 @@
         "evidenceRequired": "Permanent approved-artifact binding, deterministic z0/z3/z6 RGBA/PNG identity, representative value-bin, and transparent source-nodata gate."
       },
       "commands": {
-        "focused": "cd src/frontend && npm run evidence:pmtiles-render",
-        "full": "cd src/frontend && npm run evidence:pmtiles-render && npm test"
+        "focused": "npm run evidence:pmtiles-render --workspace @searise/web",
+        "full": "npm run evidence:pmtiles-render --workspace @searise/web && npm run test --workspace @searise/web"
       },
       "execution": {
         "tier": "fast",
         "ciWorkflow": "ci.yml",
-        "ciJob": "frontend",
+        "ciJob": "web",
         "requiresDocker": false,
         "requiresCredentials": false
       },
