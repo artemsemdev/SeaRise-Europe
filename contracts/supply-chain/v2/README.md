@@ -30,8 +30,9 @@ constraint-for-constraint. Active status additionally requires tracked absence
 of the API/frontend/blob-seed trees, PostGIS initialization scripts, root
 solution, API/frontend Dockerfiles, Compose file, and Compose smoke script.
 Absence uses `lstat`-style semantics, so a broken symlink still blocks
-activation. Workflow blockers are exact top-level job identities, so whitespace
-or split environment-variable indirection cannot erase a job-removal obligation.
+activation. Workflow blockers are parsed as exact top-level job identities;
+quoted or colon-spaced keys remain visible, duplicate keys are rejected, and
+split environment-variable indirection cannot erase a job-removal obligation.
 
 The v2 contributor manifest is intentionally separate from the pre-removal
 `src/pipeline` development manifests. It retains the static build/data pipeline
@@ -43,10 +44,11 @@ NuGet and legacy runtime records describe that reviewed candidate boundary;
 they are not the current application dependency graph and must not be rewritten
 to resemble the Phase 2 target. The v2 transition record binds the complete
 48-file v1 subtree tree, exact inventory bytes, reviewed Git commit/tree, and
-validator semantics. Historical validation compares every retained v1 path and
-byte, materializes the archived schema and dependency inputs, and validates them,
-so a Phase 2 workflow edit or later legacy deletion cannot be mistaken for v1
-evidence drift.
+the exact historical validator Git blob. Historical validation compares every
+retained v1 path and byte, materializes the archived schema, dependency inputs,
+and validator, verifies their bindings, then executes that archived validator.
+The mutable Phase 2 validator is not the historical authority, so a Phase 2
+workflow edit or later legacy deletion cannot be mistaken for v1 evidence drift.
 
 Validate the active profile from the repository root:
 
@@ -72,6 +74,7 @@ When an active dependency, workflow, recipe, lock, graph, receipt, schema, or
 SBOM changes, review that change and update its profile hash in the same pull
 request. Adding a new active input requires an explicit validator contract
 change; removing a required retained input fails closed. Current-tree discovery
-also rejects unclassified npm manifests/locks, workflows, local actions, Docker
-recipes, Python manifests/locks, native tool authority, build profiles, v2 SBOMs,
-and scoped schemas.
+also rejects unclassified npm manifests and npm, pnpm, or Yarn locks; workflows;
+local actions; Docker recipes; Pipenv, Poetry, uv, requirements, and pyproject
+Python authorities; every Compose filename alias; native tool authority; build
+profiles; v2 SBOMs; and scoped schemas.

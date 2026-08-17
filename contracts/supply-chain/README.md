@@ -10,8 +10,9 @@ repository and CI selectors are removed, it fails closed in
 candidate. It does not alter `contracts/release/v1`; its NuGet and legacy
 runtime records are not the active Phase 2 dependency graph. The v2 transition
 profile binds the complete 48-file v1 subtree, reviewed inventory, Git tree,
-and validator semantics; validate that historical authority instead of
-comparing selected v1 hashes with the mutable Phase 2 checkout.
+and exact historical validator Git blob. Historical validation materializes
+and executes that archived validator instead of trusting validator code from
+the mutable Phase 2 checkout.
 
 ## Evidence boundary
 
