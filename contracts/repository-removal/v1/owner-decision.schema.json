@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v1/owner-decision.schema.json",
+  "title": "SeaRise Europe repository-removal owner decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "decisionId",
+    "decision",
+    "approvedBy",
+    "approvedAt",
+    "auditedCommit",
+    "inventorySha256",
+    "evidenceReceiptSha256",
+    "approvalText",
+    "approvalSource",
+    "authorizedIssues",
+    "candidatePublicationAuthorized",
+    "externalResourceMutationAuthorized"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "decisionId": { "type": "string", "pattern": "^repository-removal-owner-decision-v1-[a-z0-9-]+$" },
+    "decision": { "const": "approved" },
+    "approvedBy": { "const": "project-owner" },
+    "approvedAt": { "type": "string", "format": "date-time" },
+    "auditedCommit": { "$ref": "#/$defs/gitCommit" },
+    "inventorySha256": { "$ref": "#/$defs/sha256" },
+    "evidenceReceiptSha256": { "$ref": "#/$defs/sha256" },
+    "approvalText": { "type": "string", "minLength": 1 },
+    "approvalSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "commentId", "commentUrl", "author", "authorAssociation", "bodySha256"],
+      "properties": {
+        "issue": { "const": 68 },
+        "commentId": { "type": "integer", "minimum": 1 },
+        "commentUrl": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/artemsemdev/SeaRise-Europe/issues/68#issuecomment-[0-9]+$" },
+        "author": { "type": "string", "minLength": 1 },
+        "authorAssociation": { "const": "OWNER" },
+        "bodySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "authorizedIssues": {
+      "type": "array",
+      "prefixItems": [{ "const": 70 }, { "const": 71 }, { "const": 72 }],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "candidatePublicationAuthorized": { "const": false },
+    "externalResourceMutationAuthorized": { "const": false }
+  },
+  "$defs": {
+    "gitCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
