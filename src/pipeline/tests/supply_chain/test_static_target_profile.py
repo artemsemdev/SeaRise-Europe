@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -69,7 +70,12 @@ def _copy_active_authority(destination: Path) -> None:
 
 
 def _copy_historical_authority(destination: Path) -> None:
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", "--no-checkout", str(ROOT), str(destination)],
+        check=True,
+    )
     for path in (
+        ".github/workflows/ci.yml",
         ".github/workflows/static-quality.yml",
         "contracts/supply-chain/v2/static-target-profile.json",
         "contracts/supply-chain/v2/static-target-profile.schema.json",
@@ -81,19 +87,75 @@ def _copy_historical_authority(destination: Path) -> None:
         target = destination / path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / path, target)
-    shutil.copytree(
-        ROOT / "contracts/supply-chain/v1",
-        destination / "contracts/supply-chain/v1",
-    )
-    inventory = _load(ROOT / "contracts/supply-chain/v1/dependency-inventory.json")
-    for component in inventory["components"]:
+
+    retained = destination / "contracts/supply-chain/v1"
+    retained.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(ROOT / "contracts/supply-chain/v1", retained)
+
+    inventory = _load()["historicalEvidence"]["dependencyInventory"]["path"]
+    inventory_document = json.loads((ROOT / inventory).read_bytes())
+    for component in inventory_document["components"]:
         for item in component["inputs"]:
-            source = ROOT / item["path"]
             target = destination / item["path"]
             if target.exists():
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, target)
+            shutil.copy2(ROOT / item["path"], target)
+
+
+def _commit(repository: Path, message: str) -> str:
+    subprocess.run(["git", "add", "-A"], cwd=repository, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=SeaRise Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            message,
+        ],
+        cwd=repository,
+        check=True,
+    )
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _bind_git_authority(
+    document: dict[str, Any],
+    repository: Path,
+    commit: str,
+) -> dict[str, Any]:
+    authority = copy.deepcopy(document["historicalEvidence"])
+    authority["gitAuthority"].update(
+        {
+            "commit": commit,
+            "tree": subprocess.run(
+                ["git", "rev-parse", f"{commit}^{{tree}}"],
+                cwd=repository,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+            "phase1ContractsTree": subprocess.run(
+                ["git", "rev-parse", f"{commit}:contracts/supply-chain/v1"],
+                cwd=repository,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        }
+    )
+    document["historicalEvidence"] = authority
+    return authority
 
 
 def _refresh_hash(document: dict[str, Any], repository: Path, path: str) -> None:
@@ -323,17 +385,117 @@ def test_historical_v1_inventory_validates_against_its_git_tree() -> None:
     assert document["inventoryKind"] == "dependency-defining-inputs"
 
 
-def test_historical_gate_validates_without_git_history(tmp_path: Path) -> None:
-    repository = tmp_path / "shallow-clean-checkout"
+def test_historical_gate_materializes_deleted_current_input_from_git(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
     _copy_historical_authority(repository)
+    (repository / "src/api/Directory.Build.props").unlink()
 
-    assert not (repository / ".git").exists()
     document = validate_historical_dependency_inventory(
         repository / "contracts/supply-chain/v2/static-target-profile.json",
         repository_root=repository,
     )
 
     assert document["inventoryKind"] == "dependency-defining-inputs"
+    assert not (repository / "src/api/Directory.Build.props").exists()
+
+
+def test_historical_gate_ignores_mutable_current_ci_workflow(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    workflow = repository / ".github/workflows/ci.yml"
+    workflow.write_text("name: untrusted-current-worktree\n", encoding="utf-8")
+
+    document = validate_historical_dependency_inventory(
+        repository / "contracts/supply-chain/v2/static-target-profile.json",
+        repository_root=repository,
+    )
+
+    assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+def test_historical_gate_ignores_git_replace_refs(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    authority_commit = _load(profile_path)["historicalEvidence"]["gitAuthority"]["commit"]
+    target = repository / "src/api/Directory.Build.props"
+    target.write_bytes(target.read_bytes() + b"\nuntrusted replacement\n")
+    replacement_commit = _commit(repository, "test: create untrusted replacement")
+    subprocess.run(
+        ["git", "replace", authority_commit, replacement_commit],
+        cwd=repository,
+        check=True,
+    )
+
+    document = validate_historical_dependency_inventory(
+        profile_path,
+        repository_root=repository,
+    )
+
+    assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+def test_historical_gate_rejects_missing_git_history(tmp_path: Path) -> None:
+    repository = tmp_path / "clean-checkout-without-history"
+    _copy_historical_authority(repository)
+    shutil.rmtree(repository / ".git")
+
+    assert not (repository / ".git").exists()
+    with pytest.raises(SupplyChainContractError, match="Git authority object is unavailable"):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
+
+
+def test_historical_gate_rejects_shallow_history(tmp_path: Path) -> None:
+    repository = tmp_path / "shallow-checkout"
+    _copy_historical_authority(repository)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    (repository / ".git/shallow").write_text(f"{head}\n", encoding="ascii")
+
+    with pytest.raises(SupplyChainContractError, match="requires a full Git history"):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
+
+
+def test_historical_gate_rejects_missing_authority_commit(tmp_path: Path) -> None:
+    repository = tmp_path / "unrelated-repository"
+    _copy_historical_authority(repository)
+    shutil.rmtree(repository / ".git")
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=SeaRise Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "test: unrelated history",
+        ],
+        cwd=repository,
+        check=True,
+    )
+
+    with pytest.raises(SupplyChainContractError, match="Git authority object is unavailable"):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
 
 
 def test_historical_gate_ignores_mutable_current_validator(
@@ -364,37 +526,45 @@ def test_historical_gate_rejects_vendored_validator_mutation(tmp_path: Path) -> 
         )
 
 
-@pytest.mark.parametrize(
-    ("path", "mode", "message"),
-    [
-        (
-            "src/pipeline/toolchain/build_macos_tippecanoe.sh",
-            0o644,
-            "dependency input mode changed",
-        ),
-        (".github/workflows/ci.yml", 0o755, "dependency input mode changed"),
-        (
-            "contracts/supply-chain/v2/historical/v1-contracts.py",
-            0o755,
-            "validator snapshot mode changed",
-        ),
-    ],
-)
-def test_historical_gate_rejects_mode_drift_in_both_directions(
+def test_historical_gate_rejects_vendored_validator_mode_drift(
     tmp_path: Path,
-    path: str,
-    mode: int,
-    message: str,
 ) -> None:
     repository = tmp_path / "repository"
     _copy_historical_authority(repository)
-    (repository / path).chmod(mode)
+    (repository / "contracts/supply-chain/v2/historical/v1-contracts.py").chmod(0o755)
 
-    with pytest.raises(SupplyChainContractError, match=message):
+    with pytest.raises(SupplyChainContractError, match="validator snapshot mode changed"):
         validate_historical_dependency_inventory(
             repository / "contracts/supply-chain/v2/static-target-profile.json",
             repository_root=repository,
         )
+
+
+@pytest.mark.parametrize("operation", ["delete", "mutate"])
+def test_historical_gate_rejects_git_path_or_hash_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    target = repository / "src/api/Directory.Build.props"
+    if operation == "delete":
+        target.unlink()
+        message = "Git path is missing or ambiguous"
+    else:
+        target.write_bytes(target.read_bytes() + b"\n")
+        message = "dependency input SHA-256 mismatch"
+    commit = _commit(repository, f"test: {operation} historical input")
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    document = _load(profile_path)
+    authority = _bind_git_authority(document, repository, commit)
+    _write(profile_path, document)
+    monkeypatch.setattr(historical_inventory, "_HISTORICAL_EVIDENCE", authority)
+    monkeypatch.setattr(static_profile, "_HISTORICAL_EVIDENCE", authority)
+
+    with pytest.raises(SupplyChainContractError, match=message):
+        validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
 
 def test_historical_gate_rejects_incomplete_mode_authority(
@@ -470,7 +640,7 @@ def test_historical_gate_recomputes_vendored_validator_git_blob(
         validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
 
-def test_historical_gate_recomputes_retained_v1_tree(
+def test_historical_gate_rejects_git_subtree_binding_drift(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -487,7 +657,7 @@ def test_historical_gate_recomputes_retained_v1_tree(
 
     with pytest.raises(
         SupplyChainContractError,
-        match="historical Phase 1 contracts tree does not match",
+        match="historical Phase 1 Git contracts tree does not match",
     ):
         validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
