@@ -163,6 +163,10 @@ describe("static repository dependency gates", () => {
   it("classifies only exact removal-policy documents as gate definitions", () => {
     const exact = [
       { path: "contracts/repository-removal/v1/census.json", text: "SeaRise Europe.sln" },
+      {
+        path: "contracts/repository-removal/v1/inventory.json",
+        text: "SeaRise Europe.sln and PostGIS",
+      },
       { path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json", text: "NuGet" },
     ];
     const unlisted = [{ path: "contracts/repository-removal/v1/unreviewed.json", text: "NuGet" }];
@@ -174,6 +178,10 @@ describe("static repository dependency gates", () => {
     }], { mode: "repository-final" }).violations).toHaveLength(1);
     expect(scanDependencyRecords([{
       path: "contracts/repository-removal/v1/census.json",
+      text: "AZURE_MAPS_KEY=mutation",
+    }], { mode: "repository-final" }).violations).toHaveLength(1);
+    expect(scanDependencyRecords([{
+      path: "contracts/repository-removal/v1/inventory.json",
       text: "AZURE_MAPS_KEY=mutation",
     }], { mode: "repository-final" }).violations).toHaveLength(1);
   });

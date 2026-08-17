@@ -170,6 +170,10 @@ const gatePolicyRulePurpose = new Map([
   ["src/web/scripts/static-repository-gates.mjs", allPolicyRuleIds],
   ["src/web/scripts/static-repository-gates.test.mjs", allPolicyRuleIds],
   ["contracts/repository-removal/v1/census.json", new Set(["dotnet-csharp-nuget"])],
+  ["contracts/repository-removal/v1/inventory.json", new Set([
+    "dotnet-csharp-nuget",
+    "postgres-postgis-npgsql",
+  ])],
   ["contracts/repository-removal/v1/historical-allowlist.preapproval.json", new Set(["dotnet-csharp-nuget"])],
   ["contracts/repository-removal/v1/historical-allowlist.json", new Set(["dotnet-csharp-nuget"])],
 ]);
