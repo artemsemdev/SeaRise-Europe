@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import gzip
+import hashlib
+import io
 import json
 from pathlib import Path
 
@@ -11,6 +14,7 @@ import pytest
 from searise_pipeline.release import (
     load_release_contract,
     load_source_fixture,
+    rebind_source_fixture_contract,
     write_source_fixture,
 )
 from searise_pipeline.release.model import assert_source_integrity
@@ -27,9 +31,7 @@ def contract() -> dict[str, object]:
 
 
 def fixture_source():
-    receipt = json.loads(
-        (FIXTURE_DIR / "source-fixture-receipt.json").read_text(encoding="utf-8")
-    )
+    receipt = json.loads((FIXTURE_DIR / "source-fixture-receipt.json").read_text(encoding="utf-8"))
     return load_source_fixture(
         FIXTURE_DIR / "source-fixture.json.gz",
         receipt=receipt,
@@ -129,3 +131,66 @@ def test_fixture_writer_rejects_mutated_source_before_creating_output(
         write_source_fixture(source, output)
 
     assert not output.exists()
+
+
+def test_contract_rebind_preserves_science_and_removes_archive_capability(
+    tmp_path: Path,
+) -> None:
+    current_path = FIXTURE_DIR / "source-fixture.json.gz"
+    current_receipt = json.loads(
+        (FIXTURE_DIR / "source-fixture-receipt.json").read_text(encoding="utf-8")
+    )
+    original_document = json.loads(gzip.decompress(current_path.read_bytes()))
+    previous_contract_sha256 = "1" * 64
+    original_document["releaseContractSha256"] = previous_contract_sha256
+    previous_payload = (
+        json.dumps(original_document, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode("utf-8")
+    previous_buffer = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=previous_buffer, mtime=0) as stream:
+        stream.write(previous_payload)
+    previous_path = tmp_path / "previous-source-fixture.json.gz"
+    previous_path.write_bytes(previous_buffer.getvalue())
+    previous_receipt = dict(current_receipt)
+    previous_receipt.update(
+        {
+            "byteSize": previous_path.stat().st_size,
+            "sha256": hashlib.sha256(previous_path.read_bytes()).hexdigest(),
+            "releaseContractSha256": previous_contract_sha256,
+        }
+    )
+    rebound_bytes, rebound_receipt = rebind_source_fixture_contract(
+        previous_path,
+        receipt=previous_receipt,
+        release_contract=contract(),
+        expected_previous_contract_sha256=previous_contract_sha256,
+    )
+    rebound_path = tmp_path / "source-fixture.json.gz"
+    rebound_path.write_bytes(rebound_bytes)
+    rebound_document = json.loads(gzip.decompress(rebound_bytes))
+
+    assert {
+        key: value for key, value in original_document.items() if key != "releaseContractSha256"
+    } == {key: value for key, value in rebound_document.items() if key != "releaseContractSha256"}
+    assert rebound_receipt["sourceArchiveVerifiedForThisWrite"] is False
+    assert rebound_receipt["scientificReleaseEligible"] is False
+    assert rebound_receipt["contractRebind"]["scientificValuesChanged"] is False
+    restored = load_source_fixture(
+        rebound_path,
+        receipt=rebound_receipt,
+        release_contract=contract(),
+    )
+    assert restored.source_mode == "offline-real-source-fixture"
+    assert restored.archive_and_members_verified_this_build is False
+
+
+def test_contract_rebind_rejects_unauthorized_previous_contract() -> None:
+    receipt = json.loads((FIXTURE_DIR / "source-fixture-receipt.json").read_text(encoding="utf-8"))
+    with pytest.raises(ScienceContractError, match="authorized previous contract"):
+        rebind_source_fixture_contract(
+            FIXTURE_DIR / "source-fixture.json.gz",
+            receipt=receipt,
+            release_contract=contract(),
+            expected_previous_contract_sha256="0" * 64,
+        )

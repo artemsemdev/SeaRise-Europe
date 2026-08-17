@@ -83,6 +83,26 @@ must never be copied into a real-source candidate or interpreted as support,
 coastal, hazard, flooding, inundation, terrain exposure, flood probability, or
 property-risk evidence.
 
+### Offline fixture contract rebind
+
+Moving a delivery harness changes the whole release-contract digest even when
+the source grid and projection values do not change. The one-time migration is
+performed from the repository root with:
+
+```bash
+PYTHONPATH=src/pipeline python scripts/science/rebind_ar6_release_fixture.py
+```
+
+The script accepts only the pinned previous contract digest, verifies the
+previous fixture receipt plus archive and member identities, changes only the
+embedded contract digest, and revalidates every array against the current
+contract. The new receipt records both previous digests, declares
+`scientificValuesChanged: false`, and deliberately sets
+`sourceArchiveVerifiedForThisWrite` and `scientificReleaseEligible` to false.
+Rerunning the command is idempotent: it validates the already rebound fixture
+and performs no write. This migration never reads Candidate-v7 or the private
+Phase 1 TAR.
+
 ## Clean-clone verification
 
 From the repository root with the pinned Node and npm versions:
