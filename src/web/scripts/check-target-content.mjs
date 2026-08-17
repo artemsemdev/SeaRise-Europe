@@ -286,20 +286,23 @@ export function loadHistoricalAllowlist({
 } = {}) {
   const approvedPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.json");
   const preapprovalPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.preapproval.json");
-  if (authority === "approved") {
-    if (!existsSync(approvedPath)) throw new Error("Approved historical allowlist is missing");
-    validateApproval(root);
-  } else if (authority !== "readiness") {
+  if (authority !== "approved" && authority !== "readiness") {
     throw new Error(`Unknown historical allowlist authority: ${authority}`);
   }
-  const path = existsSync(approvedPath) ? approvedPath : preapprovalPath;
+  const approvedExists = existsSync(approvedPath);
+  if (authority === "approved" && !approvedExists) {
+    throw new Error("Approved historical allowlist is missing");
+  }
+  const effectiveAuthority = approvedExists ? "approved" : authority;
+  if (effectiveAuthority === "approved") validateApproval(root);
+  const path = approvedExists ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
   const document = JSON.parse(readRegularFile(path, "utf8", root));
   // A pull-request checkout is intentionally shallow.  Readiness still binds
   // every allowlisted path to its declared Git-blob digest, but only the
   // owner-approved authority may require the older audited commit object and
   // its tree to be present locally.
-  const approvedGitResolvers = authority === "approved" ? {
+  const approvedGitResolvers = effectiveAuthority === "approved" ? {
     resolveTree: (commit) => execFileSync("git", ["rev-parse", `${commit}^{tree}`], {
       cwd: root,
       encoding: "utf8",
@@ -310,8 +313,11 @@ export function loadHistoricalAllowlist({
     }).trim(),
   } : {};
   const entries = validateHistoricalAllowlist(document, (repositoryPath) =>
-    readRegularFile(resolve(root, repositoryPath), "utf8", root), { authority, ...approvedGitResolvers });
-  if (authority === "approved") validateGatePolicyTrustRoots(root, document.auditedCommit);
+    readRegularFile(resolve(root, repositoryPath), "utf8", root), {
+      authority: effectiveAuthority,
+      ...approvedGitResolvers,
+    });
+  if (effectiveAuthority === "approved") validateGatePolicyTrustRoots(root, document.auditedCommit);
   return entries;
 }
 
