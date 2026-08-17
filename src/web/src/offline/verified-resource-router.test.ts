@@ -642,6 +642,75 @@ describe("verified resource router", () => {
     expect(test.caches.entryCount()).toBe(beforeCaches);
   });
 
+  it("derives exact interaction requirements and never treats network-only PMTiles as offline data", async () => {
+    const test = await harness();
+    const search = test.router.interactionRequirements({ kind: "search", shards: ["core", "coastal"] });
+    expect(search.requirements).toHaveLength(2);
+    expect(search.requirements.every((requirement) => requirement.kind === "whole")).toBe(true);
+
+    const map = await test.router.inspectCapability({
+      kind: "map", scenario: "ssp2-45", horizon: 2050,
+    });
+    expect(map).toMatchObject({
+      subject: { kind: "map", scenario: "ssp2-45", horizon: 2050 },
+      data: {
+        state: "connection-required",
+        missing: [{ kind: "network-only", identity: "projection-ssp2-45-2050-pmtiles" }],
+      },
+    });
+    expect((await test.router.inspectCapability(
+      { kind: "map", scenario: "ssp2-45", horizon: 2050 },
+      { authoritativeNetworkUsable: true },
+    )).data.state).toBe("online-complete");
+  });
+
+  it("requires exact accepted inventory before claiming the current assessment is available offline", async () => {
+    const test = await harness();
+    const subject = { kind: "assessment", scenario: "ssp1-26", horizon: 2030 } as const;
+    const before = await test.router.inspectCapability(subject);
+    expect(before.data).toMatchObject({ state: "connection-required", retryable: true });
+    expect(before.data.state === "connection-required" && new Set(before.data.missing.map(({ kind }) => kind)))
+      .toEqual(new Set(["whole", "range"]));
+    expect((await test.router.inspectCapability(subject, {
+      authoritativeNetworkUsable: true,
+    })).data.state).toBe("online-complete");
+
+    for (const route of test.plan.routes) {
+      if (route.kind !== "complete-resource" || route.authority.authorityKind !== "release-artifact" ||
+          !["support-boundary", "coastal-boundary"].includes(route.authority.role)) continue;
+      await test.router.artifactTransport(new URL(route.authority.canonicalUrl), {
+        signal: new AbortController().signal,
+        headers: Object.freeze({ Accept: route.authority.mediaType }),
+      });
+    }
+    await readFirstCog(test);
+    const after = await test.router.inspectCapability(subject);
+    expect(after.data).toMatchObject({ state: "available-offline" });
+    if (after.data.state !== "available-offline") throw new Error("assessment was not available offline");
+    expect(after.data.resourceCount).toBeGreaterThanOrEqual(5);
+    expect(after.data.byteCount).toBeGreaterThan(0);
+  });
+
+  it("surfaces storage degradation without replacing scientific state", async () => {
+    const test = await harness();
+    const capability = await test.router.inspectCapability(
+      { kind: "core" },
+      { storageDegraded: "evicted", authoritativeNetworkUsable: true },
+    );
+    expect(capability.data).toEqual({
+      state: "degraded-storage",
+      pair: test.plan.pair,
+      reason: "evicted",
+      networkUsable: true,
+    });
+    expect(JSON.stringify(capability)).not.toMatch(/resultState|DataUnavailable/u);
+
+    const candidate = await harness({ localCandidate: true });
+    expect((await candidate.router.inspectCapability(
+      { kind: "core" }, { authoritativeNetworkUsable: true },
+    )).data).toMatchObject({ state: "degraded-storage", reason: "persistence-denied" });
+  });
+
   it("routes an explicit local Candidate through memory-only stores with no Cache Storage or IndexedDB requirement", async () => {
     const test = await harness({ localCandidate: true });
     expect(test.plan.persistence.mode).toBe("memory-only");

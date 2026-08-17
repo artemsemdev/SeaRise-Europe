@@ -14,11 +14,27 @@ import {
 } from "./admission-receipt";
 import {
   assertVerifiedReleaseResourcePlan,
+  type ReleaseResourceRouteV1,
   type VerifiedReleaseResourcePlanV1,
 } from "./release-resource-plan";
 import type { RangeIdentityV1, WholeResourceAuthorityV1 } from "./contracts/v1";
+import {
+  OFFLINE_CAPABILITY_CONTRACT_VERSION_V2,
+  validateInteractionRequirementsV2,
+  validateRuntimeCapabilityV2,
+  type InteractionRequirementsV2,
+  type InteractionSubjectV1,
+  type MissingRequirementV2,
+  type OfflineRequirementV2,
+  type RuntimeCapabilityV2,
+  type UpdateCapabilityV1,
+} from "./contracts/policy";
 import type { RangeStore, VerifiedRangeWrite } from "./range-store";
-import { WholeResourceCacheError, type WholeResourceStore } from "./whole-resource-cache";
+import {
+  WholeResourceCacheError,
+  type WholeResourceReadResult,
+  type WholeResourceStore,
+} from "./whole-resource-cache";
 
 export interface AcceptedResourceSnapshotV1 {
   readonly contractVersion: 1;
@@ -34,6 +50,18 @@ export interface VerifiedResourceRouterOptionsV1 {
   readonly subtle: SubtleCrypto;
   readonly fetchRange: typeof fetch;
   readonly clientLease?: Readonly<{ close(): Promise<void>; assertActive(): void }>;
+}
+
+export interface RuntimeCapabilityInspectionV1 {
+  /**
+   * Evidence that the exact current interaction completed against its
+   * authoritative network resources. Generic connectivity signals such as
+   * navigator.onLine are deliberately insufficient.
+   */
+  readonly authoritativeNetworkUsable?: boolean;
+  readonly storageDegraded?: "quota" | "evicted" | "persistence-denied";
+  readonly update?: UpdateCapabilityV1;
+  readonly signal?: AbortSignal;
 }
 
 function technical(
@@ -74,6 +102,18 @@ function concatenate(parts: readonly ArrayBuffer[]): ArrayBuffer {
   return output.buffer;
 }
 
+function wholeIdentity(authority: WholeResourceAuthorityV1): string {
+  switch (authority.authorityKind) {
+    case "release-artifact": return authority.artifactId;
+    case "app-asset": return authority.resourceId;
+    case "release-manifest": return "release-manifest";
+  }
+}
+
+function rangeIdentity(identity: RangeIdentityV1): string {
+  return `${identity.authority.artifactId}.${identity.interval.start}-${identity.interval.endExclusive}`;
+}
+
 export class VerifiedResourceRouter {
   readonly #releasePlan: VerifiedReleaseResourcePlanV1;
   readonly #wholeStore: WholeResourceStore;
@@ -89,6 +129,10 @@ export class VerifiedResourceRouter {
   readonly #wholeByUrl: ReadonlyMap<string, WholeResourceAuthorityV1>;
   readonly #rangesByArtifact: ReadonlyMap<string, readonly RangeIdentityV1[]>;
   #active: AcceptedResourceSnapshotV1 | undefined;
+  #activeResources: Readonly<{
+    whole: readonly WholeResourceAuthorityV1[];
+    ranges: readonly RangeIdentityV1[];
+  }> | undefined;
   #admissionTail: Promise<void> = Promise.resolve();
   readonly #pendingOperations = new Set<Promise<unknown>>();
   #closed = false;
@@ -231,6 +275,158 @@ export class VerifiedResourceRouter {
     this.#pendingOperations.add(pending);
     void pending.finally(() => this.#pendingOperations.delete(pending)).catch(() => undefined);
     return pending;
+  }
+
+  interactionRequirements(subject: InteractionSubjectV1): InteractionRequirementsV2 {
+    const routes = this.#routesForSubject(subject);
+    return validateInteractionRequirementsV2({
+      contractVersion: OFFLINE_CAPABILITY_CONTRACT_VERSION_V2,
+      pair: this.#releasePlan.pair,
+      subject,
+      requirements: routes.flatMap((route): readonly OfflineRequirementV2[] => {
+        switch (route.kind) {
+          case "complete-resource": return [{ kind: "whole" as const, authority: route.authority }];
+          case "analysis-cog-ranges": return route.ranges.map((identity) => ({ kind: "range" as const, identity }));
+          case "network-only": return route.reason === "visual-pmtiles"
+            ? [{ kind: "network-only" as const, identity: route.identity.artifactId, reason: route.reason }]
+            : [];
+        }
+      }),
+    });
+  }
+
+  async inspectCapability(
+    subject: InteractionSubjectV1,
+    options: RuntimeCapabilityInspectionV1 = {},
+  ): Promise<RuntimeCapabilityV2> {
+    const requirements = this.interactionRequirements(subject);
+    const update = options.update ?? Object.freeze({ state: "current" as const });
+    const signal = options.signal ?? new AbortController().signal;
+    abortIfNeeded(signal);
+
+    const degradedReason = options.storageDegraded ?? (
+      this.#releasePlan.persistence.mode === "memory-only" ? "persistence-denied" : undefined
+    );
+    if (degradedReason) {
+      return validateRuntimeCapabilityV2({
+        contractVersion: OFFLINE_CAPABILITY_CONTRACT_VERSION_V2,
+        subject: requirements.subject,
+        data: {
+          state: "degraded-storage",
+          pair: requirements.pair,
+          reason: degradedReason,
+          networkUsable: options.authoritativeNetworkUsable === true,
+        },
+        update,
+      });
+    }
+
+    const requiredWhole = requirements.requirements.flatMap((requirement) =>
+      requirement.kind === "whole" ? [requirement.authority] : []);
+    const requiredRanges = requirements.requirements.flatMap((requirement) =>
+      requirement.kind === "range" ? [requirement.identity] : []);
+    const networkOnly = requirements.requirements.flatMap((requirement) =>
+      requirement.kind === "network-only" ? [requirement] : []);
+    const missing: MissingRequirementV2[] = networkOnly.map((requirement) => Object.freeze({
+      kind: "network-only" as const,
+      identity: requirement.identity,
+    }));
+    let resourceCount = 0;
+    let byteCount = 0;
+
+    for (const authority of requiredWhole) {
+      abortIfNeeded(signal);
+      let result: WholeResourceReadResult | null = null;
+      if (this.#active?.gate) {
+        try {
+          result = await this.#wholeStore.readAccepted(authority, this.#active.gate);
+        } catch {
+          // The active gate may belong to a different exact interaction.
+        }
+      }
+      if (!result || result.state !== "hit") {
+        const plan = await this.#admissionPlan([authority], []);
+        const gate = await this.#receiptStore.accepted(plan);
+        if (gate) result = await this.#wholeStore.readAccepted(authority, gate);
+      }
+      if (result?.state === "hit") {
+        resourceCount += 1;
+        byteCount += result.byteLength;
+      } else {
+        missing.push(Object.freeze({ kind: "whole", identity: wholeIdentity(authority) }));
+      }
+    }
+    const activeGate = this.#active?.gate ?? null;
+    for (const identity of requiredRanges) {
+      abortIfNeeded(signal);
+      let bytes: ArrayBuffer | null = null;
+      if (activeGate) {
+        try {
+          bytes = await this.#rangeStore.readAccepted(identity, activeGate);
+        } catch {
+          // A valid gate for another exact subject is not evidence for this
+          // range. Treat it as missing instead of widening authority.
+        }
+      }
+      if (bytes) {
+        resourceCount += 1;
+        byteCount += bytes.byteLength;
+      } else {
+        missing.push(Object.freeze({ kind: "range", identity: rangeIdentity(identity) }));
+      }
+    }
+
+    const data = missing.length === 0
+      ? { state: "available-offline" as const, pair: requirements.pair, resourceCount, byteCount }
+      : options.authoritativeNetworkUsable === true
+        ? { state: "online-complete" as const, pair: requirements.pair }
+        : {
+            state: "connection-required" as const,
+            pair: requirements.pair,
+            missing: Object.freeze(missing),
+            retryable: true as const,
+          };
+    return validateRuntimeCapabilityV2({
+      contractVersion: OFFLINE_CAPABILITY_CONTRACT_VERSION_V2,
+      subject: requirements.subject,
+      data,
+      update,
+    });
+  }
+
+  #routesForSubject(subject: InteractionSubjectV1): readonly ReleaseResourceRouteV1[] {
+    if (subject.kind === "core") {
+      return this.#releasePlan.routes.filter((route) => route.kind === "complete-resource" &&
+        route.authority.authorityKind === "release-artifact" &&
+        ["methodology", "source-attribution", "support-boundary", "coastal-boundary"]
+          .includes(route.authority.role));
+    }
+    if (subject.kind === "search") {
+      const paths = new Set(subject.shards.map((shard) => `search/europe-${shard}.codepoint-trie.json.br`));
+      return this.#releasePlan.routes.filter((route) => route.kind === "complete-resource" &&
+        route.authority.authorityKind === "release-artifact" && paths.has(route.authority.path));
+    }
+    const artifactId = `projection-${subject.scenario}-${subject.horizon}-${subject.kind === "map" ? "pmtiles" : "cog"}`;
+    if (subject.kind === "map") {
+      return this.#releasePlan.routes.filter((route) =>
+        route.kind === "network-only" && route.identity.artifactId === artifactId);
+    }
+    const activeRangeIds = new Set((this.#activeResources?.ranges ?? [])
+      .filter((identity) => identity.authority.artifactId === artifactId)
+      .map(rangeIdentity));
+    const hasCurrentRanges = activeRangeIds.size > 0;
+    return this.#releasePlan.routes.flatMap((route): readonly ReleaseResourceRouteV1[] => {
+      if (route.kind === "complete-resource" && route.authority.authorityKind === "release-artifact" &&
+          ["support-boundary", "coastal-boundary", "source-grid-identity", "range-integrity-index"]
+            .includes(route.authority.role)) return [route];
+      if (route.kind !== "analysis-cog-ranges" || route.identity.artifactId !== artifactId) return [];
+      return [{
+        ...route,
+        ranges: hasCurrentRanges
+          ? Object.freeze(route.ranges.filter((identity) => activeRangeIds.has(rangeIdentity(identity))))
+          : route.ranges,
+      }];
+    });
   }
 
   async #admissionPlan(
@@ -404,6 +600,7 @@ export class VerifiedResourceRouter {
       if (!gate) return null;
       const snapshot = Object.freeze({ contractVersion: 1 as const, plan, gate });
       this.#active = snapshot;
+      this.#activeResources = Object.freeze({ whole: this.#assessmentSupport, ranges: Object.freeze([]) });
       return snapshot;
     });
   }
@@ -429,6 +626,7 @@ export class VerifiedResourceRouter {
       if (wholeComplete) {
         const snapshot = Object.freeze({ contractVersion: 1 as const, plan, gate: previous });
         this.#active = snapshot;
+        this.#activeResources = Object.freeze({ whole: requiredWhole, ranges: requiredRanges });
         return snapshot;
       }
     }
@@ -454,6 +652,7 @@ export class VerifiedResourceRouter {
     });
     const snapshot = Object.freeze({ contractVersion: 1 as const, plan, gate: result.gate });
     this.#active = snapshot;
+    this.#activeResources = Object.freeze({ whole: requiredWhole, ranges: requiredRanges });
     return snapshot;
   }
 

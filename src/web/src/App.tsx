@@ -16,6 +16,10 @@ import type {
   ProjectionUrlEvent,
 } from "./application/projection-url-controller";
 import { MethodologyDialog } from "./components/MethodologyDialog";
+import {
+  FlightCapabilityAlerts,
+  FlightCapabilityPill,
+} from "./components/FlightCapabilityStatus";
 import { ProjectionPanel } from "./components/ProjectionPanel";
 import { SettlementSearch } from "./components/SettlementSearch";
 import { releaseLabel, runtimeConfig } from "./config";
@@ -34,6 +38,7 @@ import {
 } from "./domain/release";
 import type { SearchWorkerFactory } from "./search/client";
 import type { SettlementSearchRecord } from "./search/types";
+import type { RuntimeCapabilityV2 } from "./offline/contracts/policy";
 import { canRetryRelease, useReleaseContext, type ReleaseBootstrapState } from "./use-release-context";
 import flightOverviewUrl from "./assets/flight-overview.svg?url";
 
@@ -62,10 +67,12 @@ function Header({ light = false }: { light?: boolean }) {
 }
 
 function FlightHeader({
+  capability,
   methodologyAvailable,
   onOpenMethodology,
   methodologyTriggerRef,
 }: {
+  readonly capability: RuntimeCapabilityV2 | null;
   readonly methodologyAvailable: boolean;
   readonly onOpenMethodology: () => void;
   readonly methodologyTriggerRef: RefObject<HTMLButtonElement | null>;
@@ -74,6 +81,7 @@ function FlightHeader({
     <header className="flight-header">
       <Brand />
       <div className="flight-header__actions">
+        <FlightCapabilityPill capability={capability} />
         <span className="release-pill">{releaseLabel()}</span>
         <button
           ref={methodologyTriggerRef}
@@ -440,6 +448,7 @@ function LandingPageSession({
       data-flight-phase={currentFlightPhase}
     >
       <FlightHeader
+        capability={runtime.capability}
         methodologyAvailable={verifiedMethodology !== null}
         onOpenMethodology={() => setMethodologyOpen(true)}
         methodologyTriggerRef={methodologyTriggerRef}
@@ -532,6 +541,11 @@ function LandingPageSession({
       ) : null}
 
       <div className="flight-alerts">
+        <FlightCapabilityAlerts
+          capability={runtime.capability}
+          onRetry={runtime.retryCapability}
+          onUpdateAction={runtime.requestUpdateAction}
+        />
         {commandError ? (
           <TechnicalAlert error={commandError} prefix="Selection command failed" focusRef={commandFailureRef} />
         ) : null}

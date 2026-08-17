@@ -12,6 +12,16 @@ import type { ReleaseContext, Selection } from "../domain/release";
 import { AssessmentController } from "./assessment-controller";
 import { createProductionResourceRouter } from "../offline/create-production-resource-router";
 import type { CogRangeTransport } from "../data/cog-analysis-reader";
+import type {
+  InteractionSubjectV1,
+  RuntimeCapabilityV2,
+  UpdateCapabilityV1,
+} from "../offline/contracts/policy";
+import type { RuntimeCapabilityInspectionV1 } from "../offline/verified-resource-router";
+import {
+  RuntimeCapabilityController,
+  type RuntimeCapabilityPort,
+} from "./runtime-capability";
 
 export interface AssessmentControllerPort {
   readonly getSnapshot: () => ProjectionState;
@@ -33,6 +43,7 @@ export interface BrowserRuntimeScope {
   readonly controller: AssessmentControllerPort;
   readonly methodology: MethodologyLoader;
   readonly searchArtifactTransport?: ArtifactTransport;
+  readonly capability?: RuntimeCapabilityPort;
   readonly dispose?: () => void;
 }
 
@@ -50,7 +61,18 @@ export interface ProductionBrowserRuntime extends BrowserRuntimeScope {
 export interface BrowserResourceRouter {
   readonly artifactTransport: ArtifactTransport;
   readonly cogRangeTransport: CogRangeTransport;
+  readonly inspectCapability?: (
+    subject: InteractionSubjectV1,
+    options?: RuntimeCapabilityInspectionV1,
+  ) => Promise<RuntimeCapabilityV2>;
+  readonly updateCoordinator?: BrowserUpdateCoordinator;
   close(): void;
+}
+
+/** Production bridge from the static-host coordinator into capability UI. */
+export interface BrowserUpdateCoordinator {
+  readonly inspect: () => UpdateCapabilityV1 | Promise<UpdateCapabilityV1>;
+  readonly requestAction: (capability: RuntimeCapabilityV2) => Promise<void>;
 }
 
 export type BrowserRuntimeFactory = (
@@ -80,7 +102,7 @@ export async function createBrowserRuntime(
   signal: AbortSignal = new AbortController().signal,
   options: BrowserRuntimeOptions = {},
 ): Promise<ProductionBrowserRuntime> {
-  const resources = options.resourceRouter ?? await (
+  const resources: BrowserResourceRouter = options.resourceRouter ?? await (
     options.createResourceRouter ?? createProductionResourceRouter
   )(context, signal);
   const geography = new StaticGeographyClassifier({
@@ -102,6 +124,19 @@ export async function createBrowserRuntime(
   const methodology = new MethodologyRepository({
     transport: resources.artifactTransport,
   });
+  const capability = resources.inspectCapability
+    ? new RuntimeCapabilityController({
+        inspect: async (subject, inspection) => resources.inspectCapability!(subject, {
+          ...inspection,
+          ...(resources.updateCoordinator
+            ? { update: await resources.updateCoordinator.inspect() }
+            : {}),
+        }),
+        ...(resources.updateCoordinator ? {
+          updateAction: { requestAction: resources.updateCoordinator.requestAction },
+        } : {}),
+      })
+    : undefined;
 
   return Object.freeze({
     context,
@@ -110,10 +145,12 @@ export async function createBrowserRuntime(
     assessment,
     controller,
     methodology,
+    ...(capability ? { capability } : {}),
     resources,
     searchArtifactTransport: resources.artifactTransport,
     dispose: () => {
       controller.dispose();
+      capability?.dispose();
       resources.close();
     },
   });

@@ -41,6 +41,18 @@ All notable changes to this project will be documented in this file.
   Private Candidate sessions remain memory-only and create no lease, timer,
   lifecycle listener, or persistent storage activity.
 
+- Added a canonical Flight offline chip driven by exact accepted release
+  inventory, plus visible connection, storage, and safe-update notices in the
+  existing alert slot with explicit retry/activation actions. Visual PMTiles
+  remain network-only, online completion does not add header chrome, and
+  generic browser connectivity never authorizes an offline claim. Exact
+  interaction generations prevent one location's cached assessment from
+  authorizing another location with the same scenario and horizon. Static-host
+  coordinator state and actions now flow through the production browser
+  runtime, while pending and failed actions are fenced to the exact capability
+  subject and candidate identity. The canonical chip uses the mock's mint
+  translucent treatment and status dot.
+
 - Added a recursively generated, independently inspected production Flight
   shell precache covering the Vite main graph, lazy map modules and styles,
   settlement-search Worker, Brotli WASM decoder, fonts, and dynamic scientific

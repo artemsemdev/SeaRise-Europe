@@ -195,6 +195,30 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   expect(forbiddenRequests).toEqual([]);
 });
 
+test("375px Flight renders the runtime offline state in the canonical header", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium");
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(page.locator(".projection-panel")).toHaveAttribute("data-phase", "result");
+  const offlinePill = page.locator(
+    ".flight-header [data-capability-state='available-offline']",
+  );
+  await expect(offlinePill).toHaveText("Available offline for this assessment");
+  await expect(offlinePill.locator(".flight-capability-pill__dot")).toBeVisible();
+  await expect(offlinePill).toHaveCSS("background-color", "rgba(134, 214, 192, 0.22)");
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const pillBox = await offlinePill.boundingBox();
+  expect(pillBox).not.toBeNull();
+  if (!pillBox) throw new Error("375px Flight capability geometry was unavailable.");
+  expect(pillBox.x).toBeGreaterThanOrEqual(0);
+  expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(375);
+});
+
 test("document CSP blocks an unlisted network origin before a request leaves the page", async ({ page }) => {
   const blockedOriginRequests: string[] = [];
   page.on("request", (request) => {

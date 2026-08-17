@@ -311,6 +311,16 @@ describe("service worker shell runtime", () => {
     const { runtime } = harness();
     const pair = { contractVersion: 1, appBuildId: "build-a", dataReleaseId: release };
     expect(runtime.message({ protocol: OFFLINE_WORKER_PROTOCOL, type: "inspect-identity", messageToken: "inspect-1", pair })).toMatchObject({ type: "worker-identity", pair, precacheSetSha256: embedded.precacheSetSha256 });
+    expect(runtime.message({
+      protocol: OFFLINE_WORKER_PROTOCOL,
+      type: "discover-identity",
+      messageToken: "discover-1",
+    })).toMatchObject({
+      type: "worker-identity",
+      messageToken: "discover-1",
+      pair,
+      precacheSetSha256: embedded.precacheSetSha256,
+    });
     expect(runtime.message({ protocol: OFFLINE_WORKER_PROTOCOL, type: "activate-update", messageToken: "activate-1", candidatePair: pair, confirmationToken: "confirm-1" })).toMatchObject({ type: "activation-deferred", candidatePair: pair });
   });
 
