@@ -54,10 +54,12 @@ to resemble the Phase 2 target. The v2 transition record binds the complete
 48-file v1 subtree tree, exact inventory bytes, reviewed Git provenance, and a
 v2-vendored copy of the exact historical validator Git blob. Historical
 validation recomputes the retained subtree Git tree and validator blob from
-checkout bytes, verifies every inventory input, materializes them in isolation,
-then executes only the vendored validator. It requires no Git history or network
-fetch. The mutable Phase 2 validator is not the historical authority, so a
-Phase 2 workflow edit cannot be mistaken for v1 evidence drift.
+checkout bytes, loads every outside-v1 inventory input from the exact reviewed
+Git commit, materializes them in isolation, then executes only the vendored
+validator. It requires a full local Git history and disables lazy object fetch;
+missing commit, tree, path, blob, mode, or hash authority fails closed. The
+mutable Phase 2 validator is not the historical authority, so a Phase 2 workflow
+edit or removal cannot be mistaken for v1 evidence drift.
 An exact mode manifest binds every inventory input outside the retained v1 tree
 and the vendored validator to Git mode `100644` or `100755`; missing, extra, or
 changed executable bits fail before materialization.
