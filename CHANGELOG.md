@@ -33,8 +33,9 @@ All notable changes to this project will be documented in this file.
   Waiting workers now contribute only their build-sealed pair and precache
   identity; runtime resource-plan and receipt authority is recorded only after
   exact active-pair admission. A fresh boot reconciles an armed intent after
-  its controller and admitted resources are proven, consumes an exact match
-  once, and tombstones a mismatch without claiming activation.
+  its actual controlling worker is challenged and matches admitted resources,
+  consumes an exact match once, tombstones a mismatch, and removes malformed
+  durable records without claiming activation.
 
 - Added a per-document production lease for the exact active app/release pair.
   Public static tabs acquire before the resource router becomes available,

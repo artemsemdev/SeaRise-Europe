@@ -61,7 +61,10 @@ can expose only its build-sealed exact pair and precache hash; it cannot claim a
 runtime admission receipt. The active pair reaches `core-complete`/`active`
 only from the exact resource-plan and receipt returned by verified runtime
 admission. On a fresh boot, an armed intent is consumed once only after that
-exact controller/resource authority exists; a mismatch is tombstoned. The
+exact resource authority matches a direct identity challenge to
+`navigator.serviceWorker.controller`; `registration.active` is not accepted as
+controller proof. A mismatch is tombstoned, while malformed or unknown durable
+records are removed with an explicit failed state. The
 durable transition port uses cross-tab Web Locks and exact conditional local
 storage records. Missing or mixed evidence fails closed. It never reloads the
 page, activates a worker, or invents a lifecycle receipt.

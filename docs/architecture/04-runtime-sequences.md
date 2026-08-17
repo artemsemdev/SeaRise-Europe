@@ -271,11 +271,13 @@ Rollback deploys the previous complete pair; immutable artifacts are never
 overwritten.
 
 The static-host update coordinator is a pure user-intent state machine over
-injected ports. Its waiting-candidate identity binds the exact app/release pair
-to the accepted shell precache hash, resource-plan hash, and core
-admission-receipt hash. Inspection can report only `sealed`, `incomplete`,
-`corrupt`, `mixed`, or `stale`; only a sealed waiting candidate can produce a
-confirmation token.
+injected ports. A waiting worker can prove only its build-sealed exact
+app/release pair and shell precache hash; it cannot claim a runtime resource
+plan or admission receipt before it controls a page. Inspection can report
+only `sealed`, `incomplete`, `corrupt`, `mixed`, or `stale`; only a sealed
+waiting install identity can produce a confirmation token. Runtime
+resource-plan and receipt authority is recorded later, from exact active-pair
+admission after natural activation.
 
 Starting newer preparation synchronously enters `preparing` and revokes the
 prior pending confirmation before the first asynchronous port call. The
@@ -325,15 +327,19 @@ the adapter never settles, state becomes fail-closed `adapter-stalled`; later
 mutations return immediately with that technical state instead of waiting or
 claiming a durable outcome.
 
-On the subsequent fresh boot, activation is recognized only when the page
-proves a different boot identity controlled by the exact confirmed
-app/release/precache/core identity and atomically consumes the matching
-one-shot intent. Same-page, mismatched-controller, stale-intent, missing-intent,
-pending-intent, and replay attempts fail closed while the actually controlling
-pair remains usable. A changed controller proof reported to the original
-coordinator is still the same page, not a fresh boot, and cannot finalize
-activation. Async completion from a cancelled generation cannot overwrite a
-newer operation.
+On the subsequent fresh boot, activation is recognized only after exact active
+resources are admitted and the page challenges
+`navigator.serviceWorker.controller` directly. The controller-reported pair
+and precache must match the router's current pair and the newly recorded
+resource-plan/receipt authority before the matching one-shot intent is consumed.
+`registration.active` and a cached precache value are not controller proof.
+Malformed JSON, unknown durable states, wrong shapes, same-page,
+mismatched-controller, stale-intent, missing-intent, pending-intent, and replay
+attempts fail closed; malformed records are removed and controller mismatches
+are tombstoned under the update Web Lock. A changed controller proof reported
+to the original coordinator is still the same page, not a fresh boot, and
+cannot finalize activation. Async completion from a cancelled generation
+cannot overwrite a newer operation.
 Candidate evidence failures remain distinct from technical controller,
 inspection-port, token-provider, and intent-store failures. All are technical
 update states, never scientific outcomes.
