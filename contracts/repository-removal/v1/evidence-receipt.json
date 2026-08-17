@@ -1,0 +1,223 @@
+{
+  "auditedCommit": "c151d76c59736d41dbe29f64bb2da1520f80a861",
+  "auditedTree": "43375cc00fd54e875e26c145412f82b428125b9f",
+  "browserDisposition": {
+    "firefox": "deferred",
+    "required": "chromium",
+    "threeBrowserSupportClaim": false,
+    "webkit": "optional-historical-evidence"
+  },
+  "candidateIsolation": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "uploaded": false
+  },
+  "checks": [
+    {
+      "command": "python -m pytest src/pipeline/tests/release/test_builder.py src/pipeline/tests/release/test_evidence.py src/pipeline/tests/release/test_reproducibility.py -q",
+      "coveredReplacementSuiteIds": [
+        "pipeline-ar6-release-builder"
+      ],
+      "coveredTargetOwnerPaths": [
+        "src/pipeline/tests/release/test_builder.py"
+      ],
+      "evidencePaths": [
+        "src/pipeline/tests/release/test_builder.py",
+        "tests/evidence/repository-removal/v1/pipeline-ar6-release-builder.json"
+      ],
+      "id": "pipeline-ar6-release-builder",
+      "outputPath": "tests/evidence/repository-removal/v1/pipeline-ar6-release-builder.json",
+      "outputSha256": "f956d5534168ab955f84d9d65096016b0286239f773c4c152c0db0f55a2f4a4b",
+      "result": "passed"
+    },
+    {
+      "command": "python -m pytest src/pipeline/tests/offline_release/test_cog_range.py src/pipeline/tests/offline_release/test_cog_range_evidence.py -q",
+      "coveredReplacementSuiteIds": [
+        "pipeline-reviewed-cog-range-access"
+      ],
+      "coveredTargetOwnerPaths": [
+        "src/pipeline/tests/offline_release/test_cog_range.py"
+      ],
+      "evidencePaths": [
+        "src/pipeline/tests/offline_release/test_cog_range.py",
+        "tests/evidence/repository-removal/v1/pipeline-reviewed-cog-range-access.json"
+      ],
+      "id": "pipeline-reviewed-cog-range-access",
+      "outputPath": "tests/evidence/repository-removal/v1/pipeline-reviewed-cog-range-access.json",
+      "outputSha256": "9af27117759442de5cb5ddb533436298328d9a165d0289c6873e73b0f86e204d",
+      "result": "passed"
+    },
+    {
+      "command": "python -m pytest src/pipeline/tests/science -q",
+      "coveredReplacementSuiteIds": [
+        "pipeline-science-contracts"
+      ],
+      "coveredTargetOwnerPaths": [
+        "src/pipeline/tests/science/test_ar6.py"
+      ],
+      "evidencePaths": [
+        "src/pipeline/tests/science/test_ar6.py",
+        "tests/evidence/repository-removal/v1/pipeline-science-contracts.json"
+      ],
+      "id": "pipeline-science-contracts",
+      "outputPath": "tests/evidence/repository-removal/v1/pipeline-science-contracts.json",
+      "outputSha256": "b834cf5c317234638a6938855146c21b43efbf9e49b7b8e85088d44fb4a19300",
+      "result": "passed"
+    },
+    {
+      "command": "npm test --workspace @searise/web -- --run src/application/assessment-controller.test.ts src/application/use-assessment-runtime.test.tsx",
+      "coveredReplacementSuiteIds": [
+        "static-assessment-controller"
+      ],
+      "coveredTargetOwnerPaths": [
+        "src/web/src/application/assessment-controller.test.ts"
+      ],
+      "evidencePaths": [
+        "src/web/src/application/assessment-controller.test.ts",
+        "tests/evidence/repository-removal/v1/static-assessment-controller.json"
+      ],
+      "id": "static-assessment-controller",
+      "outputPath": "tests/evidence/repository-removal/v1/static-assessment-controller.json",
+      "outputSha256": "87b88b1e712cb162237b3eb9b7e9a1273a8f866666ef498340db1d8d73eaf7e2",
+      "result": "passed"
+    },
+    {
+      "command": "npm run web:build && npm ci --prefix tools/static-quality && node tools/static-quality/validate-generic-static-host.mjs && node tools/static-quality/run-lighthouse-gate.mjs",
+      "coveredReplacementSuiteIds": [
+        "static-generic-host-lighthouse"
+      ],
+      "coveredTargetOwnerPaths": [
+        ".github/workflows/static-quality.yml"
+      ],
+      "evidencePaths": [
+        ".github/workflows/static-quality.yml",
+        "tests/evidence/repository-removal/v1/static-generic-host-lighthouse.json"
+      ],
+      "id": "static-generic-host-lighthouse",
+      "outputPath": "tests/evidence/repository-removal/v1/static-generic-host-lighthouse.json",
+      "outputSha256": "b738a83f2c750675da8110fc7d36114d3dd3358c5a7445350103e53e58cb9569",
+      "result": "passed"
+    },
+    {
+      "command": "npm run e2e:offline-lifecycle --workspace @searise/web",
+      "coveredReplacementSuiteIds": [
+        "static-offline-lifecycle-journey"
+      ],
+      "coveredTargetOwnerPaths": [
+        "docs/evidence/phase-2/issue-60-offline-lifecycle.md"
+      ],
+      "evidencePaths": [
+        "docs/evidence/phase-2/issue-60-offline-lifecycle.md",
+        "tests/evidence/repository-removal/v1/static-offline-lifecycle-journey.json"
+      ],
+      "id": "static-offline-lifecycle-journey",
+      "outputPath": "tests/evidence/repository-removal/v1/static-offline-lifecycle-journey.json",
+      "outputSha256": "e090673d6c2fba795a65bbb1f1a1c003728f2ffdbb3be47ebeae328166352fe5",
+      "result": "passed"
+    },
+    {
+      "command": "npm run e2e --workspace @searise/web -- tests/projection-ux.spec.ts",
+      "coveredReplacementSuiteIds": [
+        "static-projection-browser-ux"
+      ],
+      "coveredTargetOwnerPaths": [
+        "src/web/playwright.config.ts"
+      ],
+      "evidencePaths": [
+        "src/web/playwright.config.ts",
+        "tests/evidence/repository-removal/v1/static-projection-browser-ux.json"
+      ],
+      "id": "static-projection-browser-ux",
+      "outputPath": "tests/evidence/repository-removal/v1/static-projection-browser-ux.json",
+      "outputSha256": "91049fc858682b1a654113bfee5fa87641fb5ae8f0a3cb3bce66b639546b53b9",
+      "result": "passed"
+    },
+    {
+      "command": "npm run web:check",
+      "coveredReplacementSuiteIds": [
+        "static-release-domain"
+      ],
+      "coveredTargetOwnerPaths": [
+        "contracts/release/v2/artifact.schema.json"
+      ],
+      "evidencePaths": [
+        "contracts/release/v2/artifact.schema.json",
+        "tests/evidence/repository-removal/v1/static-release-domain.json"
+      ],
+      "id": "static-release-domain",
+      "outputPath": "tests/evidence/repository-removal/v1/static-release-domain.json",
+      "outputSha256": "ad684e604afba4734e1f2ced06b2b86b07404a2a5a8ff7deba4e08ae2ab0f7d7",
+      "result": "passed"
+    },
+    {
+      "command": "npm run test:search-shard-builder --workspace @searise/web && npm run test:search-performance-evidence --workspace @searise/web",
+      "coveredReplacementSuiteIds": [
+        "static-settlement-search"
+      ],
+      "coveredTargetOwnerPaths": [
+        "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/search/europe-coastal.codepoint-trie.json.br"
+      ],
+      "evidencePaths": [
+        "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/search/europe-coastal.codepoint-trie.json.br",
+        "tests/evidence/repository-removal/v1/static-settlement-search.json"
+      ],
+      "id": "static-settlement-search",
+      "outputPath": "tests/evidence/repository-removal/v1/static-settlement-search.json",
+      "outputSha256": "1c3b3927b10c0e9df0bb15a3784d891360b14ed9cdb693a705bd4341f7db87dc",
+      "result": "passed"
+    },
+    {
+      "command": "node src/web/scripts/check-target-content.mjs && node src/web/scripts/static-repository-gates.mjs --target && node src/web/scripts/static-repository-gates.mjs --repository-readiness",
+      "coveredReplacementSuiteIds": [
+        "static-target-content"
+      ],
+      "coveredTargetOwnerPaths": [
+        ".github/workflows/static-quality.yml"
+      ],
+      "evidencePaths": [
+        ".github/workflows/static-quality.yml",
+        "tests/evidence/repository-removal/v1/static-target-content.json"
+      ],
+      "id": "static-target-content",
+      "outputPath": "tests/evidence/repository-removal/v1/static-target-content.json",
+      "outputSha256": "e6c2d642e49e12dcc123c2737d91a354a9ea693b7a876e385063f9d716bf39ec",
+      "result": "passed"
+    },
+    {
+      "command": "npm run web:check && npm run web:e2e",
+      "coveredReplacementSuiteIds": [
+        "static-web-shell"
+      ],
+      "coveredTargetOwnerPaths": [
+        "src/web/scripts/inspect-build.mjs"
+      ],
+      "evidencePaths": [
+        "src/web/scripts/inspect-build.mjs",
+        "tests/evidence/repository-removal/v1/static-web-shell.json"
+      ],
+      "id": "static-web-shell",
+      "outputPath": "tests/evidence/repository-removal/v1/static-web-shell.json",
+      "outputSha256": "f146320703e6de6a1fdd044a6b8f8d362b7df69422a08a3be122cafaa0d7c615",
+      "result": "passed"
+    }
+  ],
+  "cleanClone": true,
+  "contractHashes": {
+    "censusSchemaSha256": "097ef5e853716a107ad2ca48d2aa8ad1861a954c359962f0a3d7cb330a521fb6",
+    "censusSha256": "93d5bc30dabc2cf670e9a777e41eb5b604679d86c4e34bd41ad30b9f0fd6a7d6",
+    "checkOutputSchemaSha256": "ff735cefbe61adf5188ae0bf3d3b57ff987c116e661106176c1a8f40b24a5d3e",
+    "evidenceReceiptSchemaSha256": "f5a45fc4948a91172fedd9b20554cba75a6011944b8383a3e9ebea721469f13c",
+    "historicalAllowlistSchemaSha256": "92add4891c053b6a01ff1481ef9fcbc3a71a0d21e8e8f337281da1fed961a911",
+    "historicalAllowlistSha256": "b44f1490f21f494e9768c01cc6b0dfdce1157fdd14c85a0646202fd93012e590",
+    "inventorySchemaSha256": "8621afe8c0bfd1016819a8fd9b60eec82a09e8d055c732320442b9f24f9047de",
+    "ownerDecisionSchemaSha256": "cd66998c5c19247890b33679c6b313bf9cd50a565f9c0e29404d7fa1972acfab",
+    "replacementMatrixSha256": "9d46feafac0c983b8f646208634ad25637a53927982131916b8c78ac06046628",
+    "testInventorySha256": "bbaecca795ae2cd8bafe11d520937070124541a8660cd2226c04f819a6f88ade",
+    "validatorSha256": "cb37a81eafa671a2334968a3478e4381a7da0081617238727836c1e4a09b9d02"
+  },
+  "externalResourceMutation": false,
+  "inventorySha256": "6c22b7fbfd1e4686a85b1b8d47d88b710128476ad6adbfa48ff109f3ebbf0790",
+  "receiptId": "repository-removal-evidence-v1-phase-2-static-browser",
+  "recordedAt": "2026-08-17T18:40:00Z",
+  "schemaVersion": "1.0.0"
+}

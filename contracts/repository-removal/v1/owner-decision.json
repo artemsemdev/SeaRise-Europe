@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "decisionId": "repository-removal-owner-decision-v1-phase-2-static-browser",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-08-17T20:58:31Z",
+  "auditedCommit": "c151d76c59736d41dbe29f64bb2da1520f80a861",
+  "inventorySha256": "6c22b7fbfd1e4686a85b1b8d47d88b710128476ad6adbfa48ff109f3ebbf0790",
+  "evidenceReceiptSha256": "bb075c9a4a61d383ad2dfe1be67b79a5e9a7e01ead2709110adb606b43d1aa42",
+  "approvalText": "I approve repository-removal inventory v1 for issues #70, #71, and #72 at commit c151d76c59736d41dbe29f64bb2da1520f80a861, inventory SHA-256 6c22b7fbfd1e4686a85b1b8d47d88b710128476ad6adbfa48ff109f3ebbf0790, and evidence receipt SHA-256 bb075c9a4a61d383ad2dfe1be67b79a5e9a7e01ead2709110adb606b43d1aa42. This authorizes only the listed repository dispositions. It does not authorize Candidate-v7 publication/upload or deletion/mutation of any external resource, credential, GitHub environment, or secret.",
+  "approvalSource": {
+    "issue": 68,
+    "commentId": 5320169219,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/68#issuecomment-5320169219",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "decf277f43fa268317374dbb057a40be1dbd319e000b7c73ea2b500e113209ab"
+  },
+  "liveVerificationRequired": true,
+  "authorizedIssues": [70, 71, 72],
+  "candidatePublicationAuthorized": false,
+  "externalResourceMutationAuthorized": false
+}

@@ -1,0 +1,7 @@
+{
+  "auditedCommit": "c151d76c59736d41dbe29f64bb2da1520f80a861",
+  "checkId": "static-generic-host-lighthouse",
+  "command": "npm run web:build && npm ci --prefix tools/static-quality && node tools/static-quality/validate-generic-static-host.mjs && node tools/static-quality/run-lighthouse-gate.mjs",
+  "result": "passed",
+  "schemaVersion": "1.0.0"
+}
