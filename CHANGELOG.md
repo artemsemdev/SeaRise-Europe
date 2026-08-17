@@ -17,7 +17,8 @@ All notable changes to this project will be documented in this file.
   executing a v2-vendored, SHA-256- and Git-blob-bound historical validator
   rather than code from the mutable Phase 2 checkout. The gate verifies and
   materializes current-tree inputs without requiring Git history or a network
-  fetch. Current npm/pnpm/Yarn, workflow-job, local-action,
+  fetch, and binds every outside-v1 input plus the vendored validator to its
+  reviewed Git executable mode. Current npm/pnpm/Yarn, workflow-job, local-action,
   container/Compose, Pipenv/Poetry/uv/requirements, native-tool, SBOM, and
   scoped-schema authorities remain exact and fail closed; workflow parsing
   derives consistent jobs indentation, recognizes quoted or spaced keys, and

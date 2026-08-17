@@ -101,6 +101,10 @@ def _git_object_oid(kind: str, content: bytes) -> str:
     return hashlib.sha1(header + content, usedforsecurity=False).hexdigest()
 
 
+def _git_file_mode(path: Path) -> str:
+    return "100755" if path.stat().st_mode & 0o111 else "100644"
+
+
 def _retained_tree_oid(
     retained: dict[PurePosixPath, tuple[bytes, bool]],
     subtree: PurePosixPath,
@@ -170,6 +174,7 @@ def materialize_historical_dependency_authority(
         raise SupplyChainContractError("historical Phase 1 authority drifted")
     inventory_descriptor = historical["dependencyInventory"]
     git_authority = historical["gitAuthority"]
+    mode_authority = historical["modeAuthority"]
     validator_authority = historical["validatorAuthority"]
     validator_snapshot_path = _safe_path(validator_authority["path"])
     inventory_path = _safe_path(inventory_descriptor["path"])
@@ -196,6 +201,19 @@ def materialize_historical_dependency_authority(
         ]
     except (KeyError, TypeError, ValueError) as exc:
         raise SupplyChainContractError("historical v1 inventory structure is malformed") from exc
+    outside_inputs = {
+        path for path, _sha256 in input_descriptors if subtree not in path.parents
+    }
+    expected_mode_paths = {
+        *(path.as_posix() for path in outside_inputs),
+        validator_snapshot_path.as_posix(),
+    }
+    if set(mode_authority) != expected_mode_paths:
+        missing = sorted(expected_mode_paths - set(mode_authority))
+        extra = sorted(set(mode_authority) - expected_mode_paths)
+        raise SupplyChainContractError(
+            f"historical v1 mode authority is incomplete: missing={missing}, extra={extra}"
+        )
     retained_v1 = _retained_v1_files(repository_root, subtree)
     if _retained_tree_oid(retained_v1, subtree) != git_authority["phase1ContractsTree"]:
         raise SupplyChainContractError("historical Phase 1 contracts tree does not match")
@@ -206,6 +224,9 @@ def materialize_historical_dependency_authority(
     )
     if not validator_location.is_file():
         raise SupplyChainContractError("historical v1 validator snapshot must be a regular file")
+    validator_mode = mode_authority[validator_snapshot_path.as_posix()]
+    if _git_file_mode(validator_location) != validator_mode:
+        raise SupplyChainContractError("historical v1 validator snapshot mode changed")
     validator_bytes = validator_location.read_bytes()
     if hashlib.sha256(validator_bytes).hexdigest() != validator_authority["sha256"]:
         raise SupplyChainContractError("historical v1 validator binding changed")
@@ -228,18 +249,22 @@ def materialize_historical_dependency_authority(
                 raise SupplyChainContractError(
                     f"historical v1 dependency input must be a regular file: {logical}"
                 )
+            expected_mode = mode_authority[logical.as_posix()]
+            if _git_file_mode(source) != expected_mode:
+                raise SupplyChainContractError(
+                    f"historical v1 dependency input mode changed: {logical}"
+                )
             content = source.read_bytes()
             if hashlib.sha256(content).hexdigest() != expected_sha256:
                 raise SupplyChainContractError(
                     f"dependency input SHA-256 mismatch: {logical}"
                 )
-            executable = bool(source.stat().st_mode & 0o111)
-            _copy_materialized_file(root, logical, content, executable)
+            _copy_materialized_file(root, logical, content, expected_mode == "100755")
         _copy_materialized_file(
             root,
             _HISTORICAL_VALIDATOR_RUNTIME_PATH,
             validator_bytes,
-            False,
+            validator_mode == "100755",
         )
         yield root, root.joinpath(*inventory_path.parts)
 

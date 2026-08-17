@@ -74,6 +74,7 @@
         "status",
         "dependencyInventory",
         "gitAuthority",
+        "modeAuthority",
         "validatorAuthority"
       ],
       "properties": {
@@ -96,6 +97,17 @@
             "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
             "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
             "phase1ContractsTree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
+        },
+        "modeAuthority": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "enum": ["100644", "100755"]
+          },
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
           }
         },
         "validatorAuthority": {

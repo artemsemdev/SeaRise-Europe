@@ -262,7 +262,9 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
         "pipeline-requirements-azure": 71,
         "pipeline-requirements-postgis": 71,
     }
-    assert document["historicalEvidence"] == {
+    historical_evidence = copy.deepcopy(document["historicalEvidence"])
+    mode_authority = historical_evidence.pop("modeAuthority")
+    assert historical_evidence == {
         "path": "contracts/supply-chain/v1",
         "status": "immutable-phase-1-history",
         "dependencyInventory": {
@@ -280,6 +282,10 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
             "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df",
         },
     }
+    assert len(mode_authority) == 42
+    assert mode_authority["src/pipeline/toolchain/build_macos_tippecanoe.sh"] == "100755"
+    assert mode_authority[".github/workflows/ci.yml"] == "100644"
+    assert mode_authority["contracts/supply-chain/v2/historical/v1-contracts.py"] == "100644"
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
     assert "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json" in paths
     assert (
@@ -347,6 +353,79 @@ def test_historical_gate_rejects_vendored_validator_mutation(tmp_path: Path) -> 
             repository / "contracts/supply-chain/v2/static-target-profile.json",
             repository_root=repository,
         )
+
+
+@pytest.mark.parametrize(
+    ("path", "mode", "message"),
+    [
+        (
+            "src/pipeline/toolchain/build_macos_tippecanoe.sh",
+            0o644,
+            "dependency input mode changed",
+        ),
+        (".github/workflows/ci.yml", 0o755, "dependency input mode changed"),
+        (
+            "contracts/supply-chain/v2/historical/v1-contracts.py",
+            0o755,
+            "validator snapshot mode changed",
+        ),
+    ],
+)
+def test_historical_gate_rejects_mode_drift_in_both_directions(
+    tmp_path: Path,
+    path: str,
+    mode: int,
+    message: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    (repository / path).chmod(mode)
+
+    with pytest.raises(SupplyChainContractError, match=message):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
+
+
+def test_historical_gate_rejects_incomplete_mode_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    document = _load(profile_path)
+    authority = copy.deepcopy(document["historicalEvidence"])
+    del authority["modeAuthority"][".github/workflows/ci.yml"]
+    document["historicalEvidence"] = authority
+    _write(profile_path, document)
+    monkeypatch.setattr(historical_inventory, "_HISTORICAL_EVIDENCE", authority)
+    monkeypatch.setattr(static_profile, "_HISTORICAL_EVIDENCE", authority)
+
+    with pytest.raises(SupplyChainContractError, match="mode authority is incomplete"):
+        validate_historical_dependency_inventory(profile_path, repository_root=repository)
+
+
+def test_historical_gate_rejects_mode_authority_mutation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    document = _load(profile_path)
+    authority = copy.deepcopy(document["historicalEvidence"])
+    authority["modeAuthority"][
+        "src/pipeline/toolchain/build_macos_tippecanoe.sh"
+    ] = "100644"
+    document["historicalEvidence"] = authority
+    _write(profile_path, document)
+    monkeypatch.setattr(historical_inventory, "_HISTORICAL_EVIDENCE", authority)
+    monkeypatch.setattr(static_profile, "_HISTORICAL_EVIDENCE", authority)
+
+    with pytest.raises(SupplyChainContractError, match="dependency input mode changed"):
+        validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
 
 def test_historical_gate_recomputes_vendored_validator_git_blob(

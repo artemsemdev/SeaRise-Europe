@@ -13,7 +13,9 @@ profile binds the complete 48-file v1 subtree, reviewed inventory, Git tree,
 and a v2-vendored copy of the exact historical validator Git blob. Historical
 validation recomputes the tree and blob from checkout bytes, materializes the
 verified inputs, and executes only that vendored validator. Git history is
-provenance metadata and is not required by the gate.
+provenance metadata and is not required by the gate. A complete v2 mode manifest
+also binds executable status for every dependency input outside v1 and for the
+vendored validator.
 
 ## Evidence boundary
 

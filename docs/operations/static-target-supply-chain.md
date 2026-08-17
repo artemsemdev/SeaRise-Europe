@@ -78,6 +78,11 @@ not reactivate a deleted runtime. The retained v1 root and every path component 
 resolved strictly beneath the repository before traversal or reads; symlinks at
 the root or below it fail closed.
 
+The historical mode authority contains exactly every inventory input outside
+`contracts/supply-chain/v1` plus the vendored validator snapshot. Validation
+compares each current executable bit with its reviewed Git mode (`100644` or
+`100755`) before copying bytes, so either direction of mode drift fails closed.
+
 Current-tree discovery fails closed for alternative npm, pnpm, and Yarn locks;
 Pipenv, Poetry, uv, requirements, and pyproject Python authorities; and all four
 `compose`/`docker-compose` YAML filename aliases unless the profile classifies

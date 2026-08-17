@@ -51,6 +51,9 @@ checkout bytes, verifies every inventory input, materializes them in isolation,
 then executes only the vendored validator. It requires no Git history or network
 fetch. The mutable Phase 2 validator is not the historical authority, so a
 Phase 2 workflow edit cannot be mistaken for v1 evidence drift.
+An exact mode manifest binds every inventory input outside the retained v1 tree
+and the vendored validator to Git mode `100644` or `100755`; missing, extra, or
+changed executable bits fail before materialization.
 The retained v1 root and every traversed path component must resolve strictly
 beneath the repository without symlinks.
 
