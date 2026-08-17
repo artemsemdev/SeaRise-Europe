@@ -72,6 +72,10 @@ def _discover_test_files() -> set[str]:
     )
     files.update(
         str(path.relative_to(ROOT))
+        for path in (ROOT / "src/frontend/scripts").rglob("test-*.py")
+    )
+    files.update(
+        str(path.relative_to(ROOT))
         for pattern in ("*.test.ts", "*.test.tsx")
         for path in (ROOT / "src/web/src").rglob(pattern)
     )
