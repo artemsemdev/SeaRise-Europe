@@ -250,10 +250,6 @@ def _is_opentofu_input(path: PurePosixPath) -> bool:
 
 
 def _is_dependency_input(path: PurePosixPath) -> bool:
-    # The immutable v1 inventory discovers the Phase 1 repository boundary.
-    # Later versioned profiles own and validate their dependency inputs.
-    if path.parts[:3] == ("contracts", "supply-chain", "v2"):
-        return False
     name = path.name
     workflow = (
         len(path.parts) >= 3

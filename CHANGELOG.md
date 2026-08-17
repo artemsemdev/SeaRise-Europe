@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a versioned static-browser supply-chain transition profile that locks
+  the retained web npm, Python, settlement, scientific, build-plane, signing,
+  and SBOM target authorities while honestly recording the Azure/PostGIS and
+  CI/CodeQL/container legacy selectors owned by issues #70, #71, and #72.
+  Normalized requirement parsing, exact contributor parity, semantic workflow
+  checks, and tracked legacy-path absence prevent premature activation. Phase 1
+  v1 evidence remains unchanged as historical audit material and is now
+  validated as a complete 48-file subtree by recomputing its Git tree and
+  executing a v2-vendored, SHA-256- and Git-blob-bound historical validator
+  rather than code from the mutable Phase 2 checkout. The gate verifies and
+  materializes current-tree inputs without requiring Git history or a network
+  fetch, and binds every outside-v1 input plus the vendored validator to its
+  reviewed Git executable mode. Current npm/pnpm/Yarn, workflow-job, local-action,
+  container/Compose, Pipenv/Poetry/uv/requirements, native-tool, SBOM, and
+  scoped-schema authorities remain exact and fail closed; workflow parsing
+  derives consistent jobs indentation, recognizes quoted or spaced keys, and
+  rejects duplicate job identities. Retained Phase 1 paths are resolved beneath
+  the repository without symlink traversal.
+
 - Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
   paths are ignored, untracked, absent from CI workflows, and absent from the
   static output inventory without reading Candidate-v7 or TAR bytes.
