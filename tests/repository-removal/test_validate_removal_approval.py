@@ -954,10 +954,28 @@ class RemovalApprovalTests(unittest.TestCase):
             2,
         )
 
+    def test_requirements_dependency_rejects_all_declaration_option_prefixes(
+        self,
+    ) -> None:
+        for option in ("requirement", "constraint", "editable"):
+            for length in range(1, len(option) + 1):
+                prefix = option[:length]
+                for separator in (" ", "="):
+                    source = f"--{prefix}{separator}hidden.txt\n".encode()
+                    with self.subTest(source=source), self.assertRaises(
+                        RemovalApprovalError
+                    ):
+                        _selector_count(
+                            "requirements-dependency", "azure-storage-blob", source
+                        )
+
     def test_requirements_dependency_keeps_configuration_options_non_declarative(
         self,
     ) -> None:
         source = b'''--require-hashes
+--extra-index-url https://example.invalid/extra
+--only-binary=:all:
+--prefer-binary
 -fhttps://example.invalid/wheels
 -i https://example.invalid/simple
 azure-storage-blob==12.0.0

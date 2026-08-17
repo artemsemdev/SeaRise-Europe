@@ -343,10 +343,7 @@ def _requirements_logical_lines(source: bytes) -> list[str]:
 def _requirements_dependency_count(source: bytes, package: str) -> int:
     selected = _selector_package_name(package)
     count = 0
-    dependency_directive = re.compile(
-        r"^(?:-r|-c|-e|--requirement(?:\s|=|$)|"
-        r"--constraint(?:\s|=|$)|--editable(?:\s|=|$))"
-    )
+    declaration_options = ("requirement", "constraint", "editable")
     trailing_hashes = re.compile(
         r"(?:\s+--hash=[A-Za-z0-9]+:[A-Fa-f0-9]+)+\s*$"
     )
@@ -355,7 +352,18 @@ def _requirements_dependency_count(source: bytes, package: str) -> int:
         line = _strip_requirement_comment(raw_line).strip()
         if not line:
             continue
-        if dependency_directive.match(line):
+        short_directive = not line.startswith("--") and line.startswith(
+            ("-r", "-c", "-e")
+        )
+        long_token = (
+            re.split(r"[=\s]", line[2:], maxsplit=1)[0]
+            if line.startswith("--")
+            else ""
+        )
+        long_directive = bool(long_token) and any(
+            option.startswith(long_token) for option in declaration_options
+        )
+        if short_directive or long_directive:
             raise RemovalApprovalError(
                 "requirements include/constraint/editable directives are ambiguous "
                 "for an audited single-file selector"
