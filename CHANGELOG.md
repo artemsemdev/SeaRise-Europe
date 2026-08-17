@@ -206,6 +206,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Kept mobile Flight capability/update alerts below the optional basemap control
+  and made the browser technical-failure journey wait for its exact query-free
+  release COG `HEAD` interception before injecting the transient failure.
+
 - Bound one-shot coordinated-admission proofs and accepted receipt gates to
   their exact issuing and consuming storage profiles. Cross-profile
   Candidate/public reads, publication, and deletion now fail before any
