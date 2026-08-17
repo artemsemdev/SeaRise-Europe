@@ -22,6 +22,7 @@ from .model import (
     build_source_from_verified_archive,
     load_release_contract,
     load_source_fixture,
+    rebind_source_fixture_contract,
     write_source_fixture,
 )
 from .pmtiles import (
@@ -73,6 +74,7 @@ __all__ = [
     "finalize_recovery_gate",
     "load_release_contract",
     "load_source_fixture",
+    "rebind_source_fixture_contract",
     "validate_analysis_cog",
     "validate_boundary_geoparquet",
     "validate_boundary_pmtiles",

@@ -17,11 +17,12 @@ not a scientific lookup source. Exact projection values continue to come from
 the analysis COG; rendered colours must never be reverse-engineered into a
 value.
 
-From `src/frontend`, verify the committed receipt and PNG bytes with:
+From the repository root, verify the committed receipt and PNG bytes with:
 
 ```bash
-npm run evidence:pmtiles-render
+npm run evidence:pmtiles-render --workspace @searise/web
 ```
 
-Intentional updates use `node scripts/render-pmtiles-evidence.mjs --write`
-and require review of the input binding, receipt, PNGs, changelog, and CI.
+Intentional updates use
+`node src/web/scripts/render-pmtiles-evidence.mjs --write` and require review
+of the input binding, receipt, PNGs, changelog, and CI.

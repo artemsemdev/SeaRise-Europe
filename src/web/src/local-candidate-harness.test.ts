@@ -19,4 +19,15 @@ describe("local Candidate measurement harness", () => {
     );
     expect(source).not.toContain('new Worker(\'/assets/" + workerName');
   });
+
+  it("routes production measurements through the target-owned evidence gate", () => {
+    expect(source).toContain('loadPerformanceInputs(candidateRoot, querySetPath)');
+    expect(source).toContain('page.on("request"');
+    expect(source).toContain('search !== "" || !allowedPaths.has(path)');
+    expect(source).toContain('STARTUP_TARGET_MILLISECONDS');
+    expect(source).toContain('QUERY_TARGET_MILLISECONDS');
+    expect(source).toContain('finalizePerformanceReport({');
+    expect(source).toContain('publishPerformanceReport(outputPath, bytes)');
+    expect(source).not.toContain("query:item.query});fetch");
+  });
 });

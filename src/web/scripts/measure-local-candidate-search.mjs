@@ -1,12 +1,15 @@
-import { createHash } from "node:crypto";
-import { Buffer } from "node:buffer";
-import { createReadStream, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, readFileSync, readdirSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { cpus, platform, release, totalmem } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { chromium, devices } from "@playwright/test";
 import { assertPrivateMeasurementOutput } from "./local-measurement-paths.mjs";
+import {
+  QUERY_TARGET_MILLISECONDS, STARTUP_TARGET_MILLISECONDS, canonicalJson, distribution,
+  finalizePerformanceReport, loadPerformanceInputs, performanceReportBytes,
+  publishPerformanceReport, sha256, validatePerformanceReport,
+} from "./search-performance-evidence.mjs";
 
 const options = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -20,7 +23,6 @@ if (!options.get("--candidate-root") || !options.get("--query-set") || !options.
     || !Number.isSafeInteger(sampleCount) || sampleCount < 1 || sampleCount > 30) {
   throw new Error("Usage: --candidate-root PATH --query-set PATH --output PATH [--samples 5]");
 }
-const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const distRoot = resolve(import.meta.dirname, "../dist");
 const outputPath = assertPrivateMeasurementOutput({
   outputPath: requestedOutputPath,
@@ -30,22 +32,11 @@ const outputPath = assertPrivateMeasurementOutput({
 const workerName = readdirSync(resolve(distRoot, "assets"))
   .find((name) => /^search\.worker-[A-Za-z0-9_-]+\.js$/.test(name));
 if (!workerName) throw new Error("Run npm run build before this local measurement.");
-const manifest = JSON.parse(readFileSync(resolve(candidateRoot, "manifest.json"), "utf8"));
-const queryBytes = readFileSync(querySetPath);
-const querySet = JSON.parse(queryBytes.toString("utf8"));
-if (!Array.isArray(querySet.queries) || querySet.queries.length < 1) {
-  throw new Error("The local query set has no queries.");
-}
+const inputs = loadPerformanceInputs(candidateRoot, querySetPath);
+const { manifest, manifestBytes, queryBytes, querySet, receiptBytes } = inputs;
 const shards = {};
 for (const shardId of ["europe-core", "europe-coastal"]) {
-  const artifact = manifest.artifacts.find((item) => item.artifactId === "settlements-" + shardId);
-  if (!artifact) throw new Error("Manifest omits " + shardId);
-  const path = resolve(candidateRoot, artifact.path);
-  if (!path.startsWith(candidateRoot + sep)) throw new Error("Shard escapes candidate root.");
-  const bytes = readFileSync(path);
-  if (bytes.length !== artifact.byteSize || sha256(bytes) !== artifact.sha256) {
-    throw new Error(shardId + " differs from manifest authority.");
-  }
+  const { artifact, path } = inputs.shards[shardId];
   shards[shardId] = {
     path,
     authority: {
@@ -70,8 +61,10 @@ const pageScript = [
   "function request(worker,message){return new Promise((resolve,reject)=>{const token=++sequence;",
   "pending.set(token,{resolve,reject});worker.postMessage({...message,token})})}",
   "globalThis.runMeasurement=async configuration=>{if(!crossOriginIsolated)throw new Error('not isolated');",
-  "const initialization=[];for(let i=0;i<configuration.samples;i++){const worker=makeWorker();",
+  "const initialization=[],responsiveness=[];for(let i=0;i<configuration.samples;i++){const worker=makeWorker();",
+  "let previous=performance.now(),maximumGap=0;const timer=setInterval(()=>{const now=performance.now();maximumGap=Math.max(maximumGap,now-previous);previous=now},10);",
   "const ready=await request(worker,{kind:'initialize',authority:configuration.core});",
+  "clearInterval(timer);maximumGap=Math.max(maximumGap,performance.now()-previous);responsiveness.push(maximumGap);",
   "initialization.push(ready.durationMilliseconds);worker.postMessage({kind:'terminate',token:++sequence})}",
   "const worker=makeWorker();await request(worker,{kind:'initialize',authority:configuration.core});",
   "await request(worker,{kind:'load-shard',authority:configuration.coastal});const memory=[];",
@@ -80,7 +73,7 @@ const pageScript = [
   "for(let i=0;i<configuration.samples;i++){const result=await request(worker,{kind:'query',query:item.query});",
   "query.push(result.durationMilliseconds);counts.push([item.id,result.results.length])}}",
   "if(typeof performance.measureUserAgentSpecificMemory==='function'){try{memory.push((await performance.measureUserAgentSpecificMemory()).bytes)}catch{}}",
-  "globalThis.liveWorker=worker;return{initialization,query,counts,memory}};",
+  "globalThis.liveWorker=worker;return{initialization,query,counts,memory,responsiveness}};",
 ].join("");
 const html = "<!doctype html><meta charset=utf-8><title>Local measurement</title>"
   + "<script type=module src=/measurement-harness.js></script>";
@@ -129,14 +122,6 @@ const server = createServer((request, response) => {
   }
   response.writeHead(404).end();
 });
-const percentile = (values, fraction) =>
-  [...values].sort((left, right) => left - right)[Math.ceil(values.length * fraction) - 1];
-const distribution = (values) => ({
-  p50Milliseconds: percentile(values, 0.5),
-  p95Milliseconds: percentile(values, 0.95),
-  maximumMilliseconds: Math.max(...values),
-  sampleCount: values.length,
-});
 async function workerHeapUsage(browser) {
   const session = await browser.newBrowserCDPSession();
   try {
@@ -184,6 +169,8 @@ const browser = await chromium.launch({
 try {
   const context = await browser.newContext({ ...devices["Pixel 7"] });
   const page = await context.newPage();
+  const browserRequests = [];
+  page.on("request", (request) => browserRequests.push({ method: request.method(), url: request.url() }));
   await page.goto(origin);
   const observed = await page.evaluate((configuration) =>
     globalThis.runMeasurement(configuration), {
@@ -195,28 +182,66 @@ try {
   const cdp = await workerHeapUsage(browser);
   const cdpUpperBound = cdp.usedSize + cdp.embedderHeapUsedSize + cdp.backingStorageSize;
   const measuredConservativeUpperBoundBytes = Math.max(cdpUpperBound, ...observed.memory);
-  const report = {
-    schemaVersion: "static-search-local-candidate-measurement-v1",
+  const allowedPaths = new Set([
+    "/", "/measurement-harness.js", "/search.worker.js",
+    ...readdirSync(resolve(distRoot, "assets")).map((name) => `/assets/${name}`),
+    ...Object.values(shards).map(({ authority }) => new URL(authority.artifact.url).pathname),
+  ]);
+  const capturedRequests = browserRequests.map(({ method, url }) => {
+    const parsed = new URL(url);
+    return { method, path: parsed.pathname, search: parsed.search };
+  });
+  const unexpectedRequests = capturedRequests.filter(({ method, path, search }) =>
+    method !== "GET" || search !== "" || !allowedPaths.has(path));
+  const initialization = distribution(observed.initialization);
+  const query = distribution(observed.query);
+  const responsiveness = distribution(observed.responsiveness);
+  const report = finalizePerformanceReport({
+    schemaVersion: "static-search-browser-performance-v2",
     recordedAt: new Date().toISOString(),
     dataReleaseId: manifest.dataReleaseId,
+    provenance: {
+      corpusScale: querySet.corpusScale,
+      dataProvenanceClass: manifest.dataProvenanceClass,
+      scope: "local-read-only-candidate",
+    },
     profile: {
       browser: await browser.version(),
       deviceEmulation: "Pixel 7",
       workerV8OldSpaceLimitMiB: 512,
       host: { platform: platform(), release: release(), cpu: cpus()[0]?.model, totalMemoryBytes: totalmem() },
-      scope: "local-read-only-candidate",
     },
-    limits: { maximumCompressedBytes: 16777216, maximumDecodedBytes: 67108864 },
-    artifacts: Object.values(shards).map(({ authority }) => authority.artifact),
+    artifacts: {
+      manifest: { byteSize: manifestBytes.length, sha256: sha256(manifestBytes) },
+      receipt: { byteSize: receiptBytes.length, sha256: sha256(receiptBytes) },
+      shards: Object.values(inputs.shards).map(({ artifact }) => ({
+        artifactId: artifact.artifactId,
+        byteSize: artifact.byteSize,
+        path: artifact.path,
+        sha256: artifact.sha256,
+      })),
+    },
     querySet: {
       byteSize: queryBytes.length,
       queryCount: querySet.queries.length,
       sha256: sha256(queryBytes),
-      resultCountsSha256: sha256(Buffer.from(JSON.stringify(observed.counts))),
+      resultCountsSha256: sha256(canonicalJson(observed.counts)),
     },
     measurements: {
-      initialization: distribution(observed.initialization),
-      query: distribution(observed.query),
+      initialization: {
+        distribution: initialization,
+        outcome: initialization.p95Milliseconds < STARTUP_TARGET_MILLISECONDS ? "pass" : "fail",
+        targetMilliseconds: STARTUP_TARGET_MILLISECONDS,
+      },
+      query: {
+        distribution: query,
+        outcome: query.p95Milliseconds < QUERY_TARGET_MILLISECONDS ? "pass" : "fail",
+        targetMilliseconds: QUERY_TARGET_MILLISECONDS,
+      },
+      responsiveness: {
+        distribution: responsiveness,
+        metric: "maximum main-thread 10 ms timer gap during Worker initialization",
+      },
       memory: {
         measureUserAgentSpecificMemoryBytes: observed.memory,
         cdpRuntimeGetHeapUsage: cdp,
@@ -224,15 +249,37 @@ try {
         caveat: "CDP heap/backing storage and user-agent-specific memory do not equal device RSS; their maximum is retained as a numeric local upper bound.",
       },
     },
-    claims: { mobileDevice: false, publication: false, production: false, scientificOutcome: false },
+    network: {
+      queryTransmissionOutcome: unexpectedRequests.length === 0 ? "pass" : "fail",
+      requests: capturedRequests.map(({ method, path }) => ({ method, path })),
+      unexpectedRequests: unexpectedRequests.map(({ method, path }) => ({ method, path })),
+    },
+    claims: {
+      mobileDeviceClaim: false, ownerApprovalClaim: false, productionClaim: false,
+      publicationClaim: false, scientificApprovalClaim: false,
+    },
+    gateOutcome: initialization.p95Milliseconds < STARTUP_TARGET_MILLISECONDS
+      && query.p95Milliseconds < QUERY_TARGET_MILLISECONDS
+      && unexpectedRequests.length === 0 ? "pass" : "fail",
+  });
+  const expected = {
+    dataProvenanceClass: manifest.dataProvenanceClass,
+    dataReleaseId: manifest.dataReleaseId,
+    artifacts: report.artifacts,
+    querySet: { byteSize: queryBytes.length, queryCount: querySet.queries.length, sha256: sha256(queryBytes) },
   };
-  writeFileSync(outputPath, JSON.stringify(report, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+  validatePerformanceReport(report, expected);
+  const bytes = performanceReportBytes(report);
+  publishPerformanceReport(outputPath, bytes);
+  validatePerformanceReport(JSON.parse(readFileSync(outputPath, "utf8")), expected);
   console.log(JSON.stringify({
     output: basename(outputPath),
-    initializationP95Milliseconds: report.measurements.initialization.p95Milliseconds,
-    queryP95Milliseconds: report.measurements.query.p95Milliseconds,
+    gateOutcome: report.gateOutcome,
+    initializationP95Milliseconds: initialization.p95Milliseconds,
+    queryP95Milliseconds: query.p95Milliseconds,
     measuredConservativeUpperBoundBytes,
   }));
+  if (report.gateOutcome !== "pass") process.exitCode = 1;
 } finally {
   await browser.close();
   await new Promise((resolvePromise, reject) =>

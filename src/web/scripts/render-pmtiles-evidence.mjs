@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Build deterministic, source-bound render evidence from an approved #110 PMTiles. */
 
+import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -39,7 +40,7 @@ const outputDirectory = resolve(
 );
 const receiptPath = resolve(outputDirectory, "receipt.json");
 const scriptPath = fileURLToPath(import.meta.url);
-const packageLockPath = resolve(root, "src/frontend/package-lock.json");
+const packageLockPath = resolve(root, "package-lock.json");
 const size = 512;
 
 const samples = [
