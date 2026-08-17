@@ -7,8 +7,9 @@ Repository deletion under ADR-025 is authorized by three immutable documents:
    audited integration commit and inventory digest.
 3. `v1/owner-decision.json` records the project owner's exact, narrow approval.
 
-`v1/historical-allowlist.json` is a separate exact-path document. It cannot
-use directory globs and never permits an allowlisted term in active runtime.
+`v1/historical-allowlist.json` is a separate exact-path, audited-blob document.
+It cannot use directory globs or active target paths and never permits an
+allowlisted term in active runtime.
 
 The schemas deliberately separate repository cleanup from external cleanup.
 Every inventory item must declare `externalMutationAuthorized: false`, and an
@@ -30,7 +31,9 @@ approval to external resources.
 
 ## Hash chain
 
-SHA-256 is calculated over the committed file bytes. The evidence receipt
+The schemas define the closed document shapes; the trusted offline validator
+enforces all cross-document, Git-object, command, path, and GitHub-comment
+relationships. SHA-256 is calculated over the committed file bytes. The evidence receipt
 names the inventory digest plus the schemas, validator, test inventory,
 historical allowlist, and replacement matrix. The owner decision names both
 the inventory and evidence-receipt digests, repeats the audited commit, and

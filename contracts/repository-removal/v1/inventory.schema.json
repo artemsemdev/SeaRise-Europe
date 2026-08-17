@@ -76,7 +76,7 @@
     "repositoryPath": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[]).+$"
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[]).+$"
     },
     "locator": {
       "type": "object",
@@ -106,7 +106,6 @@
       "required": [
         "id",
         "kind",
-        "repositoryPaths",
         "locators",
         "disposition",
         "reason",
@@ -115,6 +114,7 @@
         "replacementEvidence",
         "targetOwnerPaths",
         "deferOwner",
+        "historicalAllowlistEntry",
         "externalMutationAuthorized"
       ],
       "properties": {
@@ -130,18 +130,18 @@
             "container-image",
             "infrastructure",
             "operational-documentation",
-            "contract-fixture-evidence"
+            "contract-fixture-evidence",
+            "runtime-endpoint",
+            "ci-route",
+            "container-service",
+            "container-volume",
+            "external-resource-reference"
           ]
-        },
-        "repositoryPaths": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/repositoryPath" }
         },
         "locators": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": { "$ref": "#/$defs/locator" }
         },
         "disposition": {
@@ -178,6 +178,10 @@
             }
           ]
         },
+        "historicalAllowlistEntry": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
         "externalMutationAuthorized": { "const": false }
       },
       "allOf": [
@@ -189,7 +193,8 @@
               "removalGate": { "type": "string", "minLength": 1 },
               "replacementEvidence": { "minItems": 1 },
               "targetOwnerPaths": { "minItems": 1 },
-              "deferOwner": { "type": "null" }
+              "deferOwner": { "type": "null" },
+              "historicalAllowlistEntry": { "type": "null" }
             }
           }
         },
@@ -200,7 +205,8 @@
               "ownerIssue": { "type": "null" },
               "removalGate": { "type": "null" },
               "targetOwnerPaths": { "minItems": 1 },
-              "deferOwner": { "type": "null" }
+              "deferOwner": { "type": "null" },
+              "historicalAllowlistEntry": { "type": "null" }
             }
           }
         },
@@ -210,7 +216,10 @@
             "properties": {
               "ownerIssue": { "type": "null" },
               "removalGate": { "type": "null" },
-              "deferOwner": { "type": "null" }
+              "replacementEvidence": { "maxItems": 0 },
+              "targetOwnerPaths": { "maxItems": 0 },
+              "deferOwner": { "type": "null" },
+              "historicalAllowlistEntry": { "type": "string" }
             }
           }
         },
@@ -220,7 +229,10 @@
             "properties": {
               "ownerIssue": { "type": "null" },
               "removalGate": { "type": "null" },
-              "deferOwner": { "type": "object" }
+              "replacementEvidence": { "maxItems": 0 },
+              "targetOwnerPaths": { "maxItems": 0 },
+              "deferOwner": { "type": "object" },
+              "historicalAllowlistEntry": { "type": "null" }
             }
           }
         }

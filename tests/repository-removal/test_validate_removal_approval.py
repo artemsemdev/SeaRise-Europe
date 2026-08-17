@@ -58,6 +58,7 @@ class ApprovalRepository:
         self._git("config", "user.name", "SeaRise Test")
         self._git("config", "user.email", "test@example.invalid")
         self._write(Path("legacy/runtime.txt"), b"legacy\n")
+        self._write(Path("historical/evidence.md"), b"historical evidence\n")
         self._write(Path("target/runtime.test.ts"), b"target\n")
         for destination, source in (
             (INVENTORY_SCHEMA_PATH, DEFAULT_INVENTORY_SCHEMA),
@@ -94,6 +95,9 @@ class ApprovalRepository:
         target_blob = self._git(
             "rev-parse", f"{self.audited_commit}:target/runtime.test.ts"
         ).decode().strip()
+        historical_blob = self._git(
+            "rev-parse", f"{self.audited_commit}:historical/evidence.md"
+        ).decode().strip()
         return {
             "schemaVersion": "1.0.0",
             "inventoryId": "repository-removal-v1-test",
@@ -119,7 +123,6 @@ class ApprovalRepository:
                 {
                     "id": "delete-runtime",
                     "kind": "runtime-source",
-                    "repositoryPaths": ["legacy/runtime.txt"],
                     "locators": [
                         {
                             "path": "legacy/runtime.txt",
@@ -140,12 +143,32 @@ class ApprovalRepository:
                     ],
                     "targetOwnerPaths": ["target/runtime.test.ts"],
                     "deferOwner": None,
+                    "historicalAllowlistEntry": None,
+                    "externalMutationAuthorized": False,
+                },
+                {
+                    "id": "retain-historical",
+                    "kind": "contract-fixture-evidence",
+                    "locators": [
+                        {
+                            "path": "historical/evidence.md",
+                            "selector": None,
+                            "gitBlobSha": historical_blob,
+                        }
+                    ],
+                    "disposition": "retain-historical-evidence",
+                    "reason": "Immutable historical evidence remains auditable.",
+                    "ownerIssue": None,
+                    "removalGate": None,
+                    "replacementEvidence": [],
+                    "targetOwnerPaths": [],
+                    "deferOwner": None,
+                    "historicalAllowlistEntry": "historical-evidence",
                     "externalMutationAuthorized": False,
                 },
                 {
                     "id": "retain-target",
                     "kind": "test",
-                    "repositoryPaths": ["target/runtime.test.ts"],
                     "locators": [
                         {
                             "path": "target/runtime.test.ts",
@@ -160,6 +183,7 @@ class ApprovalRepository:
                     "replacementEvidence": [],
                     "targetOwnerPaths": ["target/runtime.test.ts"],
                     "deferOwner": None,
+                    "historicalAllowlistEntry": None,
                     "externalMutationAuthorized": False,
                 },
             ],
@@ -177,11 +201,29 @@ class ApprovalRepository:
     ) -> None:
         inventory_bytes = _json_bytes(inventory or self.inventory())
         inventory_sha256 = _sha256(inventory_bytes)
+        historical_blob = self._git(
+            "rev-parse", f"{self.audited_commit}:historical/evidence.md"
+        ).decode().strip()
+        default_historical_entries = [
+            {
+                "id": "historical-evidence",
+                "path": "historical/evidence.md",
+                "gitBlobSha": historical_blob,
+                "rule": "historical-adr-term",
+                "reason": "Test exact-path historical classification.",
+                "activeRuntimeAllowed": False,
+            }
+        ]
         historical_allowlist_bytes = _json_bytes(
             {
                 "schemaVersion": "1.0.0",
                 "auditedCommit": self.audited_commit,
-                "entries": historical_entries or [],
+                "auditedTree": self.audited_tree,
+                "entries": (
+                    historical_entries
+                    if historical_entries is not None
+                    else default_historical_entries
+                ),
             }
         )
         contract_hash_inputs = {
@@ -365,27 +407,18 @@ class RemovalApprovalTests(unittest.TestCase):
             errors,
         )
 
-    def test_rejects_unsorted_and_globally_duplicate_inventory_entries(self) -> None:
+    def test_rejects_unsorted_and_globally_duplicate_locator_entries(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repository = ApprovalRepository(Path(directory))
             inventory = repository.inventory()
             inventory["items"].reverse()
-            inventory["items"][0]["repositoryPaths"] = [
-                "target/runtime.test.ts",
-                "legacy/runtime.txt",
-            ]
-            inventory["items"][1]["repositoryPaths"] = ["legacy/runtime.txt"]
+            inventory["items"][0]["locators"] = inventory["items"][2]["locators"]
             repository.commit_chain(inventory=inventory)
 
             errors = self._validate(repository)
 
         self.assertIn("inventory items must be sorted by id", errors)
-        self.assertIn("retain-target: repositoryPaths must be sorted", errors)
-        self.assertIn(
-            "repositoryPaths assigned to multiple items: ['legacy/runtime.txt']",
-            errors,
-        )
-        self.assertIn("retain-target: locator paths must equal repositoryPaths", errors)
+        self.assertIn("locator path/selector pairs assigned to multiple items", errors)
 
     def test_rejects_contract_hash_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -451,6 +484,10 @@ class RemovalApprovalTests(unittest.TestCase):
                     {
                         "id": "legacy-runtime-term",
                         "path": "legacy/runtime.txt",
+                        "gitBlobSha": repository._git(
+                            "rev-parse",
+                            f"{repository.audited_commit}:legacy/runtime.txt",
+                        ).decode().strip(),
                         "rule": "historical-adr-term",
                         "reason": "Test exact-path classification.",
                         "activeRuntimeAllowed": False,
@@ -461,8 +498,36 @@ class RemovalApprovalTests(unittest.TestCase):
             errors = self._validate(repository)
 
         self.assertIn(
-            "historical allowlist paths must be classified "
-            "retain-historical-evidence in inventory",
+            "historical allowlist entries must exactly match inventory "
+            "retain-historical-evidence cross-links",
+            errors,
+        )
+
+    def test_rejects_unsafe_evidence_command_and_untracked_evidence_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                evidence_mutation={
+                    "checks": [
+                        {
+                            "id": "unsafe-check",
+                            "command": "gh secret delete TOKEN",
+                            "result": "passed",
+                            "outputSha256": "2" * 64,
+                            "evidencePaths": ["evidence/not-committed.txt"],
+                        }
+                    ]
+                }
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "unsafe-check: evidence command is not read-only and local-safe", errors
+        )
+        self.assertIn(
+            "unsafe-check: evidencePaths not tracked at audited commit: "
+            "['evidence/not-committed.txt']",
             errors,
         )
 

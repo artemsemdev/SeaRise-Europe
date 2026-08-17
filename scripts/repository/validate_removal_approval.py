@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 from collections.abc import Iterable
 from pathlib import Path
@@ -30,6 +31,13 @@ DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA = CONTRACT_ROOT / "historical-allowlist.sche
 DEFAULT_VALIDATOR = ROOT / "scripts/repository/validate_removal_approval.py"
 DEFAULT_TEST_INVENTORY = ROOT / "tests/test-inventory.json"
 DEFAULT_REPLACEMENT_MATRIX = ROOT / "docs/testing/legacy-frontend-removal-inventory.md"
+
+ACTIVE_TARGET_ROOTS = ("src/web/", "src/pipeline/searise_pipeline/")
+FORBIDDEN_EVIDENCE_COMMAND = re.compile(
+    r"(?:candidate[-_ ]?v7|\.tar(?:\s|$)|\b(?:upload|publish|destroy|delete|secret)\b|"
+    r"gh\s+(?:secret|variable|environment)|terraform\s+(?:apply|destroy))",
+    re.IGNORECASE,
+)
 
 
 class RemovalApprovalError(ValueError):
@@ -256,20 +264,12 @@ def validate_removal_approval(
         if len(string_ids) == len(items) and string_ids != sorted(string_ids):
             errors.append("inventory items must be sorted by id")
 
-        repository_paths: list[str] = []
+        global_locator_keys: list[str] = []
+        delete_locator_paths: list[str] = []
         target_owner_paths: list[str] = []
-        historical_inventory_paths: set[str] = set()
+        historical_inventory: dict[str, tuple[str, str]] = {}
         for item in items:
             item_id = item.get("id", "<unknown>")
-            item_repository_paths = item.get("repositoryPaths")
-            if isinstance(item_repository_paths, list) and all(
-                isinstance(path, str) for path in item_repository_paths
-            ):
-                if item_repository_paths != sorted(item_repository_paths):
-                    errors.append(f"{item_id}: repositoryPaths must be sorted")
-                repository_paths.extend(item_repository_paths)
-                if item.get("disposition") == "retain-historical-evidence":
-                    historical_inventory_paths.update(item_repository_paths)
             item_target_paths = item.get("targetOwnerPaths")
             if isinstance(item_target_paths, list) and all(
                 isinstance(path, str) for path in item_target_paths
@@ -300,17 +300,25 @@ def validate_removal_approval(
                 )
                 if duplicate_locators:
                     errors.append(f"{item_id}: duplicate locator path/selector pairs")
-                locator_paths = {
-                    locator.get("path")
-                    for locator in locators
-                    if isinstance(locator.get("path"), str)
-                }
-                if isinstance(item_repository_paths, list) and all(
-                    isinstance(path, str) for path in item_repository_paths
-                ) and locator_paths != set(item_repository_paths):
-                    errors.append(
-                        f"{item_id}: locator paths must equal repositoryPaths"
-                    )
+                global_locator_keys.extend(
+                    f"{path}\0{selector}" for path, selector in locator_keys
+                )
+                locator_paths = [path for path, _selector in locator_keys]
+                if item.get("disposition") == "delete-phase-2":
+                    delete_locator_paths.extend(locator_paths)
+                if item.get("disposition") == "retain-historical-evidence":
+                    allowlist_id = item.get("historicalAllowlistEntry")
+                    if isinstance(allowlist_id, str):
+                        for locator in locators:
+                            path = locator.get("path")
+                            blob = locator.get("gitBlobSha")
+                            if isinstance(path, str) and isinstance(blob, str):
+                                if allowlist_id in historical_inventory:
+                                    errors.append(
+                                        f"{item_id}: historical allowlist entry must map "
+                                        "to exactly one inventory locator"
+                                    )
+                                historical_inventory[allowlist_id] = (path, blob)
 
             if item.get("disposition") == "delete-phase-2":
                 if not item.get("removalGate"):
@@ -320,11 +328,15 @@ def validate_removal_approval(
                 if not item.get("targetOwnerPaths"):
                     errors.append(f"{item_id}: deletion requires target owner paths")
 
-        duplicate_paths = _duplicates(repository_paths)
-        if duplicate_paths:
-            errors.append(f"repositoryPaths assigned to multiple items: {duplicate_paths}")
-        if repository_paths != sorted(repository_paths):
-            errors.append("repositoryPaths must be globally sorted")
+        duplicate_locator_keys = _duplicates(global_locator_keys)
+        if duplicate_locator_keys:
+            errors.append("locator path/selector pairs assigned to multiple items")
+        duplicate_delete_paths = _duplicates(delete_locator_paths)
+        if duplicate_delete_paths:
+            errors.append(
+                "delete locator paths assigned to multiple items: "
+                f"{duplicate_delete_paths}"
+            )
 
         if isinstance(audited_commit, str) and len(audited_commit) == 40:
             try:
@@ -332,12 +344,6 @@ def validate_removal_approval(
             except RemovalApprovalError as exc:
                 errors.append(str(exc))
             else:
-                missing_repository_paths = sorted(set(repository_paths) - set(tracked))
-                if missing_repository_paths:
-                    errors.append(
-                        "repositoryPaths not tracked at audited commit: "
-                        f"{missing_repository_paths}"
-                    )
                 missing_target_paths = sorted(set(target_owner_paths) - set(tracked))
                 if missing_target_paths:
                     errors.append(
@@ -354,7 +360,11 @@ def validate_removal_approval(
                             continue
                         path = locator.get("path")
                         expected_blob = tracked.get(path) if isinstance(path, str) else None
-                        if expected_blob is not None and locator.get("gitBlobSha") != expected_blob:
+                        if isinstance(path, str) and expected_blob is None:
+                            errors.append(
+                                f"{item_id}: locator path not tracked at audited commit: {path}"
+                            )
+                        elif expected_blob is not None and locator.get("gitBlobSha") != expected_blob:
                             errors.append(
                                 f"{item_id}: locator gitBlobSha does not match "
                                 f"audited blob for {path}"
@@ -389,11 +399,29 @@ def validate_removal_approval(
                     "historical allowlist paths must be exact and globally unique: "
                     f"{duplicate_allowlist_paths}"
                 )
-            if any(path not in historical_inventory_paths for path in allowlist_paths):
+            allowlist_by_id = {
+                entry.get("id"): entry
+                for entry in allowlist_entries
+                if isinstance(entry.get("id"), str)
+            }
+            if set(allowlist_by_id) != set(historical_inventory):
                 errors.append(
-                    "historical allowlist paths must be classified "
-                    "retain-historical-evidence in inventory"
+                    "historical allowlist entries must exactly match inventory "
+                    "retain-historical-evidence cross-links"
                 )
+            for allowlist_id, (path, blob) in historical_inventory.items():
+                entry = allowlist_by_id.get(allowlist_id)
+                if entry is not None and (
+                    entry.get("path") != path or entry.get("gitBlobSha") != blob
+                ):
+                    errors.append(
+                        f"historical allowlist entry {allowlist_id} does not match "
+                        "its inventory locator"
+                    )
+            if any(
+                path.startswith(ACTIVE_TARGET_ROOTS) for path in allowlist_paths
+            ):
+                errors.append("historical allowlist cannot include active target roots")
             if tracked is not None:
                 missing_allowlist_paths = sorted(set(allowlist_paths) - set(tracked))
                 if missing_allowlist_paths:
@@ -401,6 +429,15 @@ def validate_removal_approval(
                         "historical allowlist paths not tracked at audited commit: "
                         f"{missing_allowlist_paths}"
                     )
+                for entry in allowlist_entries:
+                    path = entry.get("path")
+                    if isinstance(path, str) and tracked.get(path) is not None and (
+                        entry.get("gitBlobSha") != tracked[path]
+                    ):
+                        errors.append(
+                            "historical allowlist gitBlobSha does not match audited "
+                            f"blob for {path}"
+                        )
 
     inventory_sha256 = _sha256(inventory_bytes)
     evidence_sha256 = _sha256(evidence_bytes)
@@ -414,12 +451,19 @@ def validate_removal_approval(
                 errors.append("inventory auditedTree does not match audited commit tree")
             if evidence.get("auditedTree") != audited_tree:
                 errors.append("evidence receipt auditedTree does not match audited commit tree")
+            if historical_allowlist.get("auditedTree") != audited_tree:
+                errors.append("historical allowlist auditedTree does not match audited commit tree")
     if evidence.get("auditedCommit") != audited_commit:
         errors.append("evidence receipt auditedCommit does not match inventory")
     if evidence.get("inventorySha256") != inventory_sha256:
         errors.append("evidence receipt inventorySha256 does not match committed inventory")
     if historical_allowlist.get("auditedCommit") != audited_commit:
         errors.append("historical allowlist auditedCommit does not match inventory")
+    recovery_policy = inventory.get("recoveryPolicy")
+    if isinstance(recovery_policy, dict) and (
+        recovery_policy.get("sourceRecoveryCommit") != audited_commit
+    ):
+        errors.append("recoveryPolicy sourceRecoveryCommit does not match audited commit")
 
     contract_hash_paths = {
         "inventorySchemaSha256": inventory_schema_path,
@@ -451,6 +495,23 @@ def validate_removal_approval(
         )
         if duplicate_check_ids:
             errors.append(f"duplicate evidence check ids: {duplicate_check_ids}")
+        for check in checks:
+            check_id = check.get("id", "<unknown>")
+            command = check.get("command")
+            if isinstance(command, str) and FORBIDDEN_EVIDENCE_COMMAND.search(command):
+                errors.append(f"{check_id}: evidence command is not read-only and local-safe")
+            evidence_paths = check.get("evidencePaths")
+            if tracked is not None and isinstance(evidence_paths, list):
+                missing_evidence_paths = sorted(
+                    path
+                    for path in evidence_paths
+                    if isinstance(path, str) and path not in tracked
+                )
+                if missing_evidence_paths:
+                    errors.append(
+                        f"{check_id}: evidencePaths not tracked at audited commit: "
+                        f"{missing_evidence_paths}"
+                    )
 
     if decision is None:
         if not allow_unapproved:
@@ -476,6 +537,14 @@ def validate_removal_approval(
         approval_source = decision.get("approvalSource")
         approval_text = decision.get("approvalText")
         if isinstance(approval_source, dict) and isinstance(approval_text, str):
+            if approval_source.get("issue") != 68:
+                errors.append("owner decision approvalSource must reference issue 68")
+            if approval_source.get("author") != "artemsemdev":
+                errors.append("owner decision approvalSource author is not project owner")
+            if approval_source.get("authorAssociation") != "OWNER":
+                errors.append(
+                    "owner decision approvalSource authorAssociation is not OWNER"
+                )
             if approval_source.get("bodySha256") != _sha256(
                 approval_text.encode("utf-8")
             ):
