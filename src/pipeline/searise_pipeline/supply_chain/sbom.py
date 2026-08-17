@@ -719,7 +719,14 @@ def _npm_application_entry(
     return workspace, frozenset({workspace_path, link_path}), workspace_path
 
 
-def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, Any]:
+def _generate_npm_sbom_file(
+    lock_path: Path,
+    *,
+    logical_path: str,
+    scope: str,
+) -> dict[str, Any]:
+    if scope not in {"frontend-npm-lock-only", "static-web-npm-lock-only"}:
+        raise SupplyChainContractError("unsupported npm SBOM scope")
     input_bytes, lock = _load_lock_bytes(lock_path)
     if lock.get("lockfileVersion") != 3 or lock.get("requires") is not True:
         raise SupplyChainContractError("npm SBOM generation requires package-lock v3")
@@ -780,7 +787,7 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
             ("input.path", _logical_path(logical_path)),
             ("input.sha256", input_sha256),
             ("production-claim", False),
-            ("scope", "frontend-npm-lock-only"),
+            ("scope", scope),
         ]
     )
     if workspace_path is not None:
@@ -873,10 +880,11 @@ def generate_npm_sbom(
     *,
     logical_path: str,
     repository_root: Path | None = None,
+    scope: str = "frontend-npm-lock-only",
 ) -> dict[str, Any]:
     """Generate a deterministic CycloneDX 1.7 graph from package-lock v3."""
     if repository_root is None:
-        return _generate_npm_sbom_file(lock_path, logical_path=logical_path)
+        return _generate_npm_sbom_file(lock_path, logical_path=logical_path, scope=scope)
     authority = _repository_lock_bytes(
         lock_path,
         repository_root=repository_root,
@@ -885,7 +893,11 @@ def generate_npm_sbom(
     with tempfile.TemporaryDirectory(prefix="searise-npm-sbom-") as temporary:
         snapshot = Path(temporary) / "package-lock.json"
         snapshot.write_bytes(authority)
-        document = _generate_npm_sbom_file(snapshot, logical_path=logical_path)
+        document = _generate_npm_sbom_file(
+            snapshot,
+            logical_path=logical_path,
+            scope=scope,
+        )
     if authority != _repository_lock_bytes(
         lock_path,
         repository_root=repository_root,
@@ -951,6 +963,7 @@ def validate_npm_sbom(
     *,
     repository_root: Path,
     logical_path: str,
+    scope: str = "frontend-npm-lock-only",
 ) -> dict[str, Any]:
     """Validate exact canonical BOM bytes against the current npm lock authority."""
     raw, document = _read_canonical_npm_sbom(sbom_path)
@@ -958,6 +971,7 @@ def validate_npm_sbom(
         lock_path,
         repository_root=repository_root,
         logical_path=logical_path,
+        scope=scope,
     )
     if raw != canonical_sbom_bytes(expected):
         raise SupplyChainContractError("npm SBOM differs from its lock authority")
@@ -970,12 +984,14 @@ def publish_npm_sbom(
     *,
     repository_root: Path,
     logical_path: str,
+    scope: str = "frontend-npm-lock-only",
 ) -> dict[str, Any]:
     """Generate and durably publish one immutable npm SBOM."""
     document = generate_npm_sbom(
         lock_path,
         repository_root=repository_root,
         logical_path=logical_path,
+        scope=scope,
     )
     write_new_sbom(output_path, canonical_sbom_bytes(document))
     return document

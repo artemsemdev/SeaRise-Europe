@@ -24,9 +24,11 @@ from searise_pipeline.supply_chain import (
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    validate_historical_dependency_inventory,
     validate_npm_sbom,
     validate_nuget_sbom,
     validate_python_sbom,
+    validate_static_target_profile,
     verify_candidate_evidence_cryptographically,
     write_candidate_artifact_authority,
 )
@@ -110,16 +112,24 @@ def _parser() -> argparse.ArgumentParser:
     inventory = commands.add_parser("inventory")
     inventory.add_argument("--document", type=Path, required=True)
     inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
+    historical_inventory = commands.add_parser("historical-inventory")
+    historical_inventory.add_argument("--profile", type=Path, required=True)
+    historical_inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
+    static_profile = commands.add_parser("static-profile")
+    static_profile.add_argument("--document", type=Path, required=True)
+    static_profile.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_sbom = commands.add_parser("npm-sbom")
     npm_sbom.add_argument("--lock", type=Path, required=True)
     npm_sbom.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_sbom.add_argument("--logical-path", required=True)
+    npm_sbom.add_argument("--scope", default="frontend-npm-lock-only")
     npm_sbom.add_argument("--output", type=Path, required=True)
     npm_validate = commands.add_parser("npm-sbom-validate")
     npm_validate.add_argument("--sbom", type=Path, required=True)
     npm_validate.add_argument("--lock", type=Path, required=True)
     npm_validate.add_argument("--repository-root", type=Path, default=Path.cwd())
     npm_validate.add_argument("--logical-path", required=True)
+    npm_validate.add_argument("--scope", default="frontend-npm-lock-only")
     nuget_sbom = commands.add_parser("nuget-sbom")
     nuget_sbom.add_argument("--project", type=Path, required=True)
     nuget_sbom.add_argument("--lock", type=Path, required=True)
@@ -278,12 +288,30 @@ def main(argv: list[str] | None = None) -> int:
             )
             input_count = sum(len(component["inputs"]) for component in document["components"])  # fmt: skip
             print(f"validated {input_count} dependency-defining inputs")
+        elif args.command == "historical-inventory":
+            document = validate_historical_dependency_inventory(
+                args.profile,
+                repository_root=args.repository_root.resolve(),
+            )
+            input_count = sum(len(component["inputs"]) for component in document["components"])
+            print(f"validated {input_count} historical v1 dependency-defining inputs")
+        elif args.command == "static-profile":
+            document = validate_static_target_profile(
+                args.document,
+                repository_root=args.repository_root.resolve(),
+            )
+            input_count = sum(len(component["inputs"]) for component in document["components"])
+            print(
+                f"validated {input_count} static-target supply-chain inputs "
+                f"({document['activation']['status']})"
+            )
         elif args.command == "npm-sbom":
             document = publish_npm_sbom(
                 args.output,
                 args.lock,
                 repository_root=args.repository_root.absolute(),
                 logical_path=args.logical_path,
+                scope=args.scope,
             )
             print(f"generated {len(document['components'])} npm components: {args.output}")  # fmt: skip
         elif args.command == "npm-sbom-validate":
@@ -292,6 +320,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.lock,
                 repository_root=args.repository_root.absolute(),
                 logical_path=args.logical_path,
+                scope=args.scope,
             )
             print(f"validated {len(document['components'])} npm components: {args.sbom}")  # fmt: skip
         elif args.command == "nuget-sbom":
