@@ -7,7 +7,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence
 
 import geopandas as gpd  # type: ignore[import-untyped]
 import numpy as np
@@ -17,7 +17,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from jsonschema import Draft202012Validator, FormatChecker  # type: ignore[import-untyped]
 from shapely.geometry import Point  # type: ignore[import-untyped]
 
-from ..domain.result_state import AssessmentSample, determine_result_state
 from .connectivity import ocean_connected_cells
 from .contracts import ScienceContractError
 from .vertical import REASON_LABELS, ClassificationReason
@@ -73,6 +72,29 @@ SLA_SOURCE_BOUNDS = {
 SLA_NORTHERN_COVERAGE_REASON = (
     "The locked product grid ends at 66.03125 degrees north."
 )
+
+Adr024Outcome = Literal[
+    "ProjectionAvailable",
+    "DataUnavailable",
+    "OutOfScope",
+    "UnsupportedGeography",
+]
+
+
+def classify_adr024_outcome(
+    *,
+    in_support: bool,
+    in_coastal_scope: bool | None,
+    projection_available: bool,
+) -> Adr024Outcome:
+    """Apply ADR-024 support, coastal-scope, and availability precedence."""
+    if not in_support:
+        return "UnsupportedGeography"
+    if in_coastal_scope is False:
+        return "OutOfScope"
+    if in_coastal_scope is not True or not projection_available:
+        return "DataUnavailable"
+    return "ProjectionAvailable"
 
 
 def _schema_path() -> Path:
@@ -670,12 +692,15 @@ def load_scope_connectivity_review(path: Path) -> Mapping[str, Any]:
 def observe_semantic_control(
     control: Mapping[str, Any], support: Any, coastal: Any
 ) -> dict[str, Any]:
-    """Evaluate result-state precedence at one review coordinate."""
+    """Evaluate ADR-024 outcome precedence at one review coordinate."""
     point = Point(control["longitude"], control["latitude"])
     in_support = bool(support.covers(point))
     in_coastal = bool(coastal.covers(point)) if in_support else False
-    class_value = None
-    observed = determine_result_state(AssessmentSample(in_support, in_coastal, class_value))
+    observed = classify_adr024_outcome(
+        in_support=in_support,
+        in_coastal_scope=in_coastal,
+        projection_available=False,
+    )
     if observed != control["expectedState"]:
         raise ScienceContractError(f"Semantic control failed: {control['id']}")
     return {

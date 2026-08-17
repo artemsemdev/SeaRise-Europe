@@ -1,5 +1,7 @@
 """Tests for the explicit eight-neighbour connectivity candidate."""
 
+from __future__ import annotations
+
 import base64
 import hashlib
 import json
@@ -15,6 +17,7 @@ from searise_pipeline.science import (
     assert_scope_connectivity_approved,
     build_pending_scope_connectivity_review,
     canonical_json_bytes,
+    classify_adr024_outcome,
     connectivity_comparison,
     decision_binding_sha256,
     evaluate_connectivity_controls,
@@ -223,6 +226,33 @@ def test_every_existing_control_has_expected_observed_and_review_status() -> Non
         assert item["expected"] == item["observed"]
         assert item["automationStatus"] == "passed"
         assert item["reviewerStatus"] == "pending-independent-review"
+
+
+@pytest.mark.parametrize(
+    ("in_support", "in_coastal_scope", "projection_available", "expected"),
+    [
+        (False, False, False, "UnsupportedGeography"),
+        (False, True, True, "UnsupportedGeography"),
+        (True, False, True, "OutOfScope"),
+        (True, None, True, "DataUnavailable"),
+        (True, True, False, "DataUnavailable"),
+        (True, True, True, "ProjectionAvailable"),
+    ],
+)
+def test_adr024_outcome_precedence_is_explicit(
+    in_support: bool,
+    in_coastal_scope: bool | None,
+    projection_available: bool,
+    expected: str,
+) -> None:
+    assert (
+        classify_adr024_outcome(
+            in_support=in_support,
+            in_coastal_scope=in_coastal_scope,
+            projection_available=projection_available,
+        )
+        == expected
+    )
 
 
 def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:
