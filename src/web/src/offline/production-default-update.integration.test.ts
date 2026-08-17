@@ -59,6 +59,9 @@ describe("production default update composition", () => {
     const currentPair = validateAppReleasePair({
       contractVersion: 1, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId,
     });
+    const retiredPair = validateAppReleasePair({
+      contractVersion: 1, appBuildId: "retired-browser-build", dataReleaseId: "retired-browser-release",
+    });
     const active = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) {
       if (message.type === "acquire-lease" || message.type === "heartbeat-lease") {
         ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "lease-state", messageToken: message.messageToken,
@@ -68,6 +71,12 @@ describe("production default update composition", () => {
       if (message.type === "release-lease") {
         ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "lease-released", messageToken: message.messageToken,
           pair: currentPair, leaseId: message.leaseId });
+        return;
+      }
+      if (message.type === "request-client-census") {
+        ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "client-census",
+          messageToken: message.messageToken, targetPair: message.targetPair,
+          observations: [{ clientId: "retired-tab", state: "inactive" }] });
         return;
       }
       ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken,
@@ -112,6 +121,17 @@ describe("production default update composition", () => {
       return response;
     });
 
+    const retiredLifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
+    await retiredLifecycle.stage(retiredPair);
+    await retiredLifecycle.completeBootstrap(retiredPair, "9".repeat(64));
+    await retiredLifecycle.completeCore(retiredPair, {
+      precacheSetSha256: "9".repeat(64),
+      resourcePlanSha256: "8".repeat(64),
+      receiptSha256: "7".repeat(64),
+    });
+    await retiredLifecycle.markCleanupPending(retiredPair);
+    retiredLifecycle.close();
+
     const runtime = await createBrowserRuntime(context);
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("current"));
     const methodology = context.artifact(context.manifest.contractArtifacts.methodology);
@@ -136,6 +156,10 @@ describe("production default update composition", () => {
         receiptSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
       } },
     });
+    await expect(runtime.resources.updateCoordinator?.inspectRetention?.()).resolves.toMatchObject({
+      state: "complete", activePair: currentPair, removedPairs: [retiredPair],
+    });
+    await expect(lifecycle.read(retiredPair)).resolves.toEqual({ status: "missing" });
     registration.waiting = waiting;
     await runtime.capability?.retry();
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("update-available"));

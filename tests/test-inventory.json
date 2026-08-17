@@ -1466,6 +1466,7 @@
     { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/client-lease-controller.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/pair-lifecycle-store.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/production-retention-coordinator.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/production-default-update.integration.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/register-service-worker.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/service-worker-client-authority.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },

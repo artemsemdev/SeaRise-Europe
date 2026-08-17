@@ -209,9 +209,10 @@ export async function createProductionResourceRouter(
     localCandidate,
   });
   let clientLease: ReturnType<typeof createClientLeaseController> | undefined;
+  let workerClientAuthority: ReturnType<typeof createWorkerClientAuthority> | undefined;
   try {
     if (workerAuthority) {
-      const workerClientAuthority = createWorkerClientAuthority(
+      workerClientAuthority = createWorkerClientAuthority(
         workerAuthority.worker,
         navigator.serviceWorker,
       );
@@ -236,7 +237,10 @@ export async function createProductionResourceRouter(
       artifactTransport: router.artifactTransport,
       cogRangeTransport: router.cogRangeTransport,
       inspectCapability: router.inspectCapability.bind(router),
-      updateCoordinator: createProductionUpdateCoordinator(router, precacheSetSha256),
+      updateCoordinator: createProductionUpdateCoordinator(router, precacheSetSha256, {
+        locks: browserAdmissionLockPort(navigator.locks),
+        clientCensus: workerClientAuthority,
+      }),
       close: () => router.close(),
     });
   } catch (error) {
