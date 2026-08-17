@@ -106,8 +106,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -122,6 +127,8 @@ jobs:
         run: npm audit --audit-level=critical --omit=dev
 
       - name: Validate static target
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: npm run web:check
 
       - name: Validate deterministic PMTiles render evidence
