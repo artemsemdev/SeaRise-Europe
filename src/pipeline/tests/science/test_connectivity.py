@@ -109,8 +109,11 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
             violations.add(f"dynamic-import:{node.attr}:{node.lineno}")
 
         constant = _constant_string(node)
-        if constant is not None and _is_legacy_domain(constant):
-            violations.add(constant)
+        if constant is not None:
+            if _is_legacy_domain(constant):
+                violations.add(constant)
+            if constant in DYNAMIC_IMPORT_PRIMITIVES:
+                violations.add(f"dynamic-import-literal:{constant}:{node.lineno}")
 
         if isinstance(node, ast.Call):
             positional = [_constant_string(argument) for argument in node.args]
@@ -487,6 +490,26 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
             source,
             "searise_pipeline.science",
             "science/mutation.py",
+        )
+
+    computed_callable_mutations = (
+        'import importlib\ngetattr(importlib, "import_" + "module")(module_name)',
+        'import builtins\ngetattr(builtins, "__im" + "port__")(module_name)',
+        'import importlib\nimportlib.__dict__["import_" + "module"](module_name)',
+        'vars(__builtins__)["__im" + "port__"](module_name)',
+        (
+            'import importlib\nprimitive = "import_" + "module"\n'
+            "importlib.__dict__[primitive](module_name)"
+        ),
+    )
+    for source in computed_callable_mutations:
+        assert any(
+            violation.startswith("dynamic-import-literal:")
+            for violation in _retained_import_violations(
+                source,
+                "searise_pipeline.science",
+                "science/mutation.py",
+            )
         )
 
     violations = []
