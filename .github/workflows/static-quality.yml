@@ -9,6 +9,8 @@ on:
       - ".github/workflows/static-quality.yml"
       - "package.json"
       - "package-lock.json"
+      - "contracts/release/v1/fixtures/release/**"
+      - "contracts/release/v2/fixtures/browser-release/**"
       - "src/web/**"
       - "tools/static-quality/**"
   push:
@@ -18,6 +20,8 @@ on:
       - ".github/workflows/static-quality.yml"
       - "package.json"
       - "package-lock.json"
+      - "contracts/release/v1/fixtures/release/**"
+      - "contracts/release/v2/fixtures/browser-release/**"
       - "src/web/**"
       - "tools/static-quality/**"
   workflow_dispatch:

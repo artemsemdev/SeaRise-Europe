@@ -21,7 +21,37 @@ def _workflow_job(workflow: str, job: str, next_job: str) -> str:
     )[0]
 
 
+def _workflow_event_paths(workflow: str, event: str, next_event: str) -> set[str]:
+    event_block = workflow.split(f"  {event}:\n", maxsplit=1)[1].split(
+        f"  {next_event}:\n", maxsplit=1
+    )[0]
+    paths_block = event_block.split("    paths:\n", maxsplit=1)[1]
+    return {
+        match.group(1)
+        for match in re.finditer(r'^      - "([^"]+)"$', paths_block, re.MULTILINE)
+    }
+
+
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_static_quality_routes_every_direct_release_fixture_input(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        workflow = (root / ".github/workflows/static-quality.yml").read_text(
+            encoding="utf-8"
+        )
+        expected = {
+            "contracts/release/v1/fixtures/release/**",
+            "contracts/release/v2/fixtures/browser-release/**",
+        }
+
+        self.assertLessEqual(
+            expected,
+            _workflow_event_paths(workflow, "pull_request", "push"),
+        )
+        self.assertLessEqual(
+            expected,
+            _workflow_event_paths(workflow, "push", "workflow_dispatch"),
+        )
+
     def test_release_evidence_exports_exact_producer_contract(self) -> None:
         root = Path(__file__).resolve().parents[2]
         contract = json.loads(

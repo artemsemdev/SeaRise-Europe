@@ -128,7 +128,7 @@
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },
         { "path": ".github/workflows/phase-1-release-sign.yml", "role": "workflow", "sha256": "cbe085418568888a089124c94f456e995e51badbe205546f4c637ebd9103de2f" },
-        { "path": ".github/workflows/static-quality.yml", "role": "workflow", "sha256": "f13c981c2330cf9b3d86866fca69611171f52312ed0e9e75618ff718b504e747" }
+        { "path": ".github/workflows/static-quality.yml", "role": "workflow", "sha256": "7bc23ad1d142f14f3ee1224aec2d585f439928c647ac7613464a6570d760de66" }
       ]
     },
     {
