@@ -34,8 +34,10 @@ DEFAULT_REPLACEMENT_MATRIX = ROOT / "docs/testing/legacy-frontend-removal-invent
 
 ACTIVE_TARGET_ROOTS = ("src/web/", "src/pipeline/searise_pipeline/")
 FORBIDDEN_EVIDENCE_COMMAND = re.compile(
-    r"(?:candidate[-_ ]?v7|\.tar(?:\s|$)|\b(?:upload|publish|destroy|delete|secret)\b|"
-    r"gh\s+(?:secret|variable|environment)|terraform\s+(?:apply|destroy))",
+    r"(?:candidate[-_ ]?v7|\.tar(?:\b|\.gz\b)|"
+    r"\b(?:upload|publish|destroy|delete|secret|rm|mv|cp|scp|rsync|rclone)\b|"
+    r"\b(?:curl|wget|aws|az)\b|gh\s+(?:secret|variable|environment|release)|"
+    r"git\s+push|docker\s+push|terraform\s+(?:apply|destroy))",
     re.IGNORECASE,
 )
 
