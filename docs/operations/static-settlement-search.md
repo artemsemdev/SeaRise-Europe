@@ -63,8 +63,11 @@ authority is insufficient. The builder also rechecks the canonical bounded
 projection and the authority's self-hash before producing either shard. It
 emits the exact v4 code-point trie format accepted by the production Worker
 decoder, with canonical numeric GeoNames order and the pinned runtime/ranking
-identity. Quality-11 Brotli bytes are deterministic only under the pinned Node
-runtime recorded in the artifact.
+identity. Before build or validation, the CLI compares every byte-affecting
+`process.versions` identity recorded in the artifact (Node, Brotli, zlib, ICU,
+and Unicode) and fails closed on any mismatch. Quality-11 Brotli bytes are
+deterministic only under that exact pinned Node binary profile; matching the
+Node version string alone is insufficient.
 
 Publication refuses existing names, symlink directories, path escape, and
 non-owner-controlled output. Each file is staged and synced, then promoted by

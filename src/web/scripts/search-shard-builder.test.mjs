@@ -6,12 +6,13 @@ import { brotliDecompressSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import {
   RECEIPT_FILE, SHARD_FILES, SHARD_IDS, buildSearchShardSet, canonicalJson,
-  publishSearchShardSet, validatePublishedSearchShardSet,
+  assertByteAffectingRuntime, publishSearchShardSet, validatePublishedSearchShardSet,
 } from "./search-shard-builder.mjs";
 import { createHash } from "node:crypto";
 import { validateSearchShardDocument } from "../src/search/contract";
 
 const RELEASE = "searise-europe-v1.0.0-20260812-0123456789ab";
+const PINNED_RUNTIME = { brotli: "1.1.0", icu: "78.2", node: "20.20.1", unicode: "17.0", zlib: "1.3.1-e00f703" };
 const sha = (value) => createHash("sha256").update(value).digest("hex");
 const hash = (character) => character.repeat(64);
 
@@ -48,10 +49,30 @@ function fixture(root, mutate = (value) => value) {
 }
 
 describe("static search shard builder", () => {
+  it("fails closed when any byte-affecting Node runtime identity differs", () => {
+    for (const [name, value] of Object.entries({ brotli: "0", icu: "0", node: "0", unicode: "0", zlib: "0" })) {
+      expect(() => assertByteAffectingRuntime({ ...PINNED_RUNTIME, [name]: value })).toThrow(
+        `byte-affecting Node runtime ${name}`,
+      );
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(process.versions, "brotli");
+    Object.defineProperty(process.versions, "brotli", { ...descriptor, value: "0" });
+    try {
+      const root = mkdtempSync(resolve(tmpdir(), "search-builder-"));
+      expect(() => buildSearchShardSet(fixture(root))).toThrow("byte-affecting Node runtime brotli");
+      expect(() => validatePublishedSearchShardSet(resolve(root, "absent"), {})).toThrow("byte-affecting Node runtime brotli");
+    } finally {
+      Object.defineProperty(process.versions, "brotli", descriptor);
+    }
+  });
+
   it("emits byte-identical v4 shards accepted by the production decoder", async () => {
     const root = mkdtempSync(resolve(tmpdir(), "search-builder-"));
     const input = fixture(root); const first = buildSearchShardSet(input); const second = buildSearchShardSet(input);
     expect(first.receipt).toEqual(second.receipt);
+    expect(sha(Buffer.concat([...SHARD_IDS.map((id) => first.shards[id]), first.receipt]))).toBe(
+      "bfe7726ef43142eb0675606606b3b8d3b9dc51bfd1ac3c82e0515c85a6bdb46d",
+    );
     for (const id of SHARD_IDS) {
       expect(first.shards[id]).toEqual(second.shards[id]);
       const shard = JSON.parse(brotliDecompressSync(first.shards[id]).toString());

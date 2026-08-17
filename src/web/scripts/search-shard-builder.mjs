@@ -38,6 +38,13 @@ const MAX_COMPRESSED_BYTES = 256 * 1024 * 1024;
 
 export class SearchShardBuildError extends Error {}
 function fail(message) { throw new SearchShardBuildError(message); }
+export function assertByteAffectingRuntime(versions = process.versions) {
+  for (const [name, expected] of Object.entries(RUNTIME)) {
+    if (versions[name] !== expected) {
+      fail(`byte-affecting Node runtime ${name} must be ${expected}; received ${versions[name] ?? "missing"}`);
+    }
+  }
+}
 export function compareCodePoints(left, right) {
   const a = Array.from(left, (point) => point.codePointAt(0));
   const b = Array.from(right, (point) => point.codePointAt(0));
@@ -222,6 +229,7 @@ function buildShard(records, shardId, authority, source) {
 }
 
 export function buildSearchShardSet({ projectionPath, authorityPath, dataReleaseId }) {
+  assertByteAffectingRuntime();
   if (!RELEASE.test(dataReleaseId)) fail("data release ID differs from the public contract");
   const projection = parseProjection(projectionPath);
   const { value: authority, source } = parseAuthority(authorityPath, projection, dataReleaseId);
@@ -231,6 +239,7 @@ export function buildSearchShardSet({ projectionPath, authorityPath, dataRelease
 }
 
 export function buildValidatedSearchShardSet(options) {
+  assertByteAffectingRuntime();
   for (const name of ["spatialDatabasePath", "spatialReceiptPath", "validationWorkDirectory"]) if (typeof options[name] !== "string" || !options[name]) fail(`${name} is required for exact projection replay`);
   const projection = parseProjection(options.projectionPath);
   const parsed = parseAuthority(options.authorityPath, projection, options.dataReleaseId);
@@ -285,6 +294,7 @@ export function publishSearchShardSet(outputDirectory, built, hooks = {}) {
 }
 
 export function validatePublishedSearchShardSet(outputDirectory, expected) {
+  assertByteAffectingRuntime();
   safeOutputDirectory(outputDirectory);
   const receipt = readRegular(resolve(outputDirectory, RECEIPT_FILE), 1024 * 1024, "search shard receipt");
   if (!receipt.equals(expected.receipt)) fail("published search shard receipt differs");
