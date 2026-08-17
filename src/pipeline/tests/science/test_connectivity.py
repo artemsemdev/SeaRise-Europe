@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import base64
 import hashlib
+import importlib.util
 import json
 from copy import deepcopy
 from pathlib import Path
@@ -33,6 +35,26 @@ from searise_pipeline.science.contracts import ScienceContractError
 CONTRACT_DIR = Path(__file__).parents[2] / "science"
 REPO_ROOT = Path(__file__).parents[4]
 REVIEW_PATH = CONTRACT_DIR / "scope-connectivity-review.json"
+PACKAGE_ROOT = REPO_ROOT / "src" / "pipeline" / "searise_pipeline"
+
+
+def _imported_modules(source: str, package: str) -> set[str]:
+    modules: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            relative_name = "." * node.level + (node.module or "")
+            base = importlib.util.resolve_name(relative_name, package)
+            modules.add(base)
+            modules.update(f"{base}.{alias.name}" for alias in node.names)
+    return modules
+
+
+def _module_package(path: Path) -> str:
+    relative = path.relative_to(PACKAGE_ROOT).with_suffix("")
+    parts = ["searise_pipeline", *relative.parts]
+    return ".".join(parts[:-1])
 
 
 def test_diagonal_cells_connect_under_eight_neighbour_rule() -> None:
@@ -233,15 +255,15 @@ def test_every_existing_control_has_expected_observed_and_review_status() -> Non
     [
         (False, False, False, "UnsupportedGeography"),
         (False, True, True, "UnsupportedGeography"),
+        (True, False, False, "OutOfScope"),
         (True, False, True, "OutOfScope"),
-        (True, None, True, "DataUnavailable"),
         (True, True, False, "DataUnavailable"),
         (True, True, True, "ProjectionAvailable"),
     ],
 )
 def test_adr024_outcome_precedence_is_explicit(
     in_support: bool,
-    in_coastal_scope: bool | None,
+    in_coastal_scope: bool,
     projection_available: bool,
     expected: str,
 ) -> None:
@@ -253,6 +275,66 @@ def test_adr024_outcome_precedence_is_explicit(
         )
         == expected
     )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "invalid_name"),
+    [
+        ({"in_support": 1}, "in_support"),
+        ({"in_coastal_scope": None}, "in_coastal_scope"),
+        ({"in_coastal_scope": np.bool_(True)}, "in_coastal_scope"),
+        ({"projection_available": "yes"}, "projection_available"),
+    ],
+)
+def test_adr024_outcome_rejects_non_boolean_inputs(
+    overrides: dict[str, object], invalid_name: str
+) -> None:
+    arguments: dict[str, object] = {
+        "in_support": True,
+        "in_coastal_scope": True,
+        "projection_available": True,
+        **overrides,
+    }
+    with pytest.raises(
+        ScienceContractError,
+        match=rf"built-in bool values: {invalid_name}$",
+    ):
+        classify_adr024_outcome(**arguments)  # type: ignore[arg-type]
+
+
+def test_retained_pipeline_cannot_import_legacy_domain() -> None:
+    mutations = (
+        ("import searise_pipeline.domain", "searise_pipeline.science"),
+        ("from searise_pipeline import domain", "searise_pipeline.science"),
+        (
+            "from ..domain.result_state import determine_result_state",
+            "searise_pipeline.science",
+        ),
+    )
+    for source, package in mutations:
+        assert any(
+            module == "searise_pipeline.domain"
+            or module.startswith("searise_pipeline.domain.")
+            for module in _imported_modules(source, package)
+        )
+
+    violations = []
+    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+        relative = path.relative_to(PACKAGE_ROOT)
+        if relative.parts[0] == "domain":
+            continue
+        imported = _imported_modules(
+            path.read_text(encoding="utf-8"),
+            _module_package(path),
+        )
+        if any(
+            module == "searise_pipeline.domain"
+            or module.startswith("searise_pipeline.domain.")
+            for module in imported
+        ):
+            violations.append(relative.as_posix())
+
+    assert violations == []
 
 
 def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:

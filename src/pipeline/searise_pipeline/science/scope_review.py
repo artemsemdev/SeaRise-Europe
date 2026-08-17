@@ -84,15 +84,26 @@ Adr024Outcome = Literal[
 def classify_adr024_outcome(
     *,
     in_support: bool,
-    in_coastal_scope: bool | None,
+    in_coastal_scope: bool,
     projection_available: bool,
 ) -> Adr024Outcome:
     """Apply ADR-024 support, coastal-scope, and availability precedence."""
+    inputs = {
+        "in_support": in_support,
+        "in_coastal_scope": in_coastal_scope,
+        "projection_available": projection_available,
+    }
+    invalid = [name for name, value in inputs.items() if type(value) is not bool]
+    if invalid:
+        raise ScienceContractError(
+            "ADR-024 outcome inputs must be built-in bool values: "
+            + ", ".join(invalid)
+        )
     if not in_support:
         return "UnsupportedGeography"
     if in_coastal_scope is False:
         return "OutOfScope"
-    if in_coastal_scope is not True or not projection_available:
+    if not projection_available:
         return "DataUnavailable"
     return "ProjectionAvailable"
 
