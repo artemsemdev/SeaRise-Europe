@@ -1,8 +1,11 @@
 import { cpSync, createReadStream, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { extname, resolve, sep } from "node:path";
+import { resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
-import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
+import { applicationBuildIdentityPlugin } from "./scripts/application-build-identity.mjs";
+import { buildIdentityFile, resolveBuildIdentity } from "./scripts/build-identity.mjs";
+import { releaseDeliveryPolicy } from "./scripts/release-delivery-policy.mjs";
+import { resolveStaticBuildRoot } from "./scripts/static-build-root.mjs";
 
 const fixtureReleaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
@@ -41,36 +44,25 @@ function forbiddenViteFilesystemRequest(requestUrl: string | undefined): boolean
     (root) => target === root || target.startsWith(`${root}${sep}`),
   );
 }
-const releaseMediaTypes: Readonly<Record<string, string>> = Object.freeze({
-  ".json": "application/json",
-  ".jsonl": "application/x-ndjson",
-  ".gz": "application/gzip",
-  ".parquet": "application/vnd.apache.parquet",
-  ".pmtiles": "application/vnd.pmtiles",
-  ".tif": "image/tiff; application=geotiff; profile=cloud-optimized",
-  ".txt": "text/plain",
-});
-
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, repositoryRoot, "SEARISE_");
-  const releaseId =
-    process.env.SEARISE_DATA_RELEASE_ID ?? env.SEARISE_DATA_RELEASE_ID ?? fixtureReleaseId;
-  const releaseDisposition =
-    process.env.SEARISE_RELEASE_DISPOSITION ??
-    env.SEARISE_RELEASE_DISPOSITION ??
-    "synthetic-fixture";
-  if (!["synthetic-fixture", "private-engineering", "public-promoted"].includes(releaseDisposition)) {
-    throw new Error("Unsupported release disposition.");
-  }
-  if (releaseDisposition === "private-engineering") {
-    throw new Error(
-      "Private engineering mode is owned by scripts/run-local-candidate-e2e.mjs, not Vite serve/build.",
-    );
-  }
-  const manifestUrl = `/releases/${releaseId}/manifest.json`;
+  const buildIdentity = resolveBuildIdentity({ mode, repositoryRoot });
+  const releaseId = buildIdentity.dataReleaseId;
+  const releaseDisposition = buildIdentity.releaseDisposition;
+  const buildRoot = resolveStaticBuildRoot({ webRoot: import.meta.dirname });
 
   return {
     plugins: [
+      applicationBuildIdentityPlugin(buildIdentity),
+      {
+        name: "canonical-build-identity",
+        generateBundle() {
+          this.emitFile({
+            type: "asset",
+            fileName: buildIdentityFile,
+            source: `${JSON.stringify(buildIdentity)}\n`,
+          });
+        },
+      },
       {
         name: "strict-vite-filesystem-boundary",
         configureServer(server) {
@@ -92,7 +84,7 @@ export default defineConfig(({ mode }) => {
         name: "committed-release-fixture",
         closeBundle() {
           if (releaseDisposition !== "synthetic-fixture" || releaseId !== fixtureReleaseId) return;
-          const destination = resolve(import.meta.dirname, "dist/releases", releaseId);
+          const destination = resolve(buildRoot, "releases", releaseId);
           rmSync(destination, { force: true, recursive: true });
           mkdirSync(destination, { recursive: true });
           cpSync(fixturePayloadRoot, destination, { recursive: true });
@@ -104,7 +96,10 @@ export default defineConfig(({ mode }) => {
         configurePreviewServer(server) {
           const releaseRoot = resolve(import.meta.dirname, "dist/releases", releaseId);
           const manifest = JSON.parse(readFileSync(resolve(releaseRoot, "manifest.json"), "utf8")) as {
-            artifacts: Array<{ path: string; sha256: string }>;
+            artifacts: Array<{
+              artifactId: string; role: string; path: string; mediaType: string;
+              byteSize: number; sha256: string;
+            }>;
           };
           const artifactByPath = new Map(
             manifest.artifacts.map((artifact) => [artifact.path, artifact]),
@@ -139,10 +134,23 @@ export default defineConfig(({ mode }) => {
               response.writeHead(404).end();
               return;
             }
+            const artifact = artifactByPath.get(relativePath);
+            let delivery: ReturnType<typeof releaseDeliveryPolicy>;
+            try {
+              delivery = releaseDeliveryPolicy(relativePath, artifact, size);
+            } catch {
+              response.writeHead(500, { "Cache-Control": "no-store" }).end();
+              return;
+            }
             const rangeHeader = request.headers.range;
             const range = rangeHeader ? /^bytes=(\d+)-(\d*)$/.exec(rangeHeader) : null;
             if (rangeHeader && !range) {
-              response.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
+              response.writeHead(416, {
+                "Cache-Control": delivery.cacheControl,
+                "Content-Range": `bytes */${size}`,
+                "Content-Type": delivery.contentType,
+                ...(delivery.etag ? { ETag: delivery.etag } : {}),
+              }).end();
               return;
             }
             const start = range ? Number(range[1]) : 0;
@@ -154,19 +162,23 @@ export default defineConfig(({ mode }) => {
               start > end ||
               start >= size
             ) {
-              response.writeHead(416, { "Content-Range": `bytes */${size}` }).end();
+              response.writeHead(416, {
+                "Cache-Control": delivery.cacheControl,
+                "Content-Range": `bytes */${size}`,
+                "Content-Type": delivery.contentType,
+                ...(delivery.etag ? { ETag: delivery.etag } : {}),
+              }).end();
               return;
             }
-            const artifact = artifactByPath.get(relativePath);
             const headers = {
               "Accept-Ranges": "bytes",
               "Access-Control-Allow-Origin": "http://127.0.0.1:4173",
               "Access-Control-Allow-Methods": "GET, HEAD",
               "Access-Control-Expose-Headers": "Accept-Ranges, Content-Length, Content-Range, ETag",
-              "Cache-Control": "public, max-age=31536000, immutable",
+              "Cache-Control": delivery.cacheControl,
               "Content-Length": String(end - start + 1),
-              "Content-Type": releaseMediaTypes[extname(path)] ?? "application/octet-stream",
-              ...(artifact ? { ETag: `"sha256-${artifact.sha256}"` } : {}),
+              "Content-Type": delivery.contentType,
+              ...(delivery.etag ? { ETag: delivery.etag } : {}),
               ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}),
               Vary: "Origin",
             };
@@ -178,10 +190,7 @@ export default defineConfig(({ mode }) => {
       },
     ],
     define: {
-      __APP_BUILD_ID__: JSON.stringify(process.env.SEARISE_APP_BUILD_ID ?? "local-fixture"),
-      __DATA_RELEASE_ID__: JSON.stringify(releaseId),
-      __RELEASE_DISPOSITION__: JSON.stringify(releaseDisposition),
-      __MANIFEST_URL__: JSON.stringify(manifestUrl),
+      __SEARISE_PRECACHE_JSON__: JSON.stringify("__SEARISE_PRECACHE_PENDING_V3__"),
     },
     server: {
       fs: {
@@ -191,6 +200,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      emptyOutDir: true,
+      outDir: buildRoot,
       target: "es2022",
       sourcemap: true,
       manifest: "vite-manifest.json",
@@ -200,6 +211,11 @@ export default defineConfig(({ mode }) => {
           index: resolve(import.meta.dirname, "index.html"),
           architecture: resolve(import.meta.dirname, "about/architecture/index.html"),
           scientificRuntime: resolve(import.meta.dirname, "src/scientific-runtime.ts"),
+          serviceWorker: resolve(import.meta.dirname, "src/offline/service-worker.ts"),
+        },
+        output: {
+          entryFileNames: (chunk) =>
+            chunk.name === "serviceWorker" ? "service-worker.js" : "assets/[name]-[hash].js",
         },
       },
     },

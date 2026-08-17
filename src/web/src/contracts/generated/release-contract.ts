@@ -3,7 +3,7 @@
  * Run `npm run generate:contracts --workspace @searise/web`; do not edit.
  */
 
-export const RELEASE_CONTRACT_SOURCE_SHA256 = "fe82074cb7b123a85ad7c1375803dbea83b3b297cd7d01c7df5c8dfd022a6cfe";
+export const RELEASE_CONTRACT_SOURCE_SHA256 = "6d9ef02fd1a988309bf2c4961e0d69136abe2e2f8fa3e592c26d32ce97289fad";
 export type SchemaVersion = "2.0.0";
 export const SCENARIO_IDS = ["ssp1-26", "ssp2-45", "ssp5-85"] as const;
 export type ScenarioId = "ssp1-26" | "ssp2-45" | "ssp5-85";

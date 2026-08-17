@@ -1,0 +1,41 @@
+{
+  "contractVersion": 1,
+  "defaultCacheControl": "public, max-age=31536000, immutable",
+  "mediaTypes": {
+    ".json": "application/json",
+    ".jsonl": "application/x-ndjson",
+    ".gz": "application/gzip",
+    ".parquet": "application/vnd.apache.parquet",
+    ".pmtiles": "application/vnd.pmtiles",
+    ".tif": "image/tiff; application=geotiff; profile=cloud-optimized",
+    ".txt": "text/plain"
+  },
+  "searchIndex": {
+    "mediaType": "application/vnd.searise.search-index+json",
+    "role": "settlement-search-index",
+    "identities": {
+      "settlements-europe-core": "search/europe-core.codepoint-trie.json.br",
+      "settlements-europe-coastal": "search/europe-coastal.codepoint-trie.json.br"
+    }
+  },
+  "visualPmtiles": {
+    "cacheControl": "no-store",
+    "mediaType": "application/vnd.pmtiles",
+    "statuses": [200, 206, 416],
+    "etag": "manifest-sha256",
+    "roles": {
+      "projection-visual-pmtiles": {
+        "artifactIdPattern": "^projection-(ssp1-26|ssp2-45|ssp5-85)-(2030|2050|2100)-pmtiles$",
+        "pathPattern": "^layers/(ssp1-26|ssp2-45|ssp5-85)/(2030|2050|2100)\\.pmtiles$"
+      },
+      "support-boundary": {
+        "artifactId": "support-boundary-pmtiles",
+        "path": "boundaries/europe.pmtiles"
+      },
+      "coastal-boundary": {
+        "artifactId": "coastal-boundary-pmtiles",
+        "path": "boundaries/coastal-analysis-zone.pmtiles"
+      }
+    }
+  }
+}

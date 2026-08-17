@@ -26,10 +26,7 @@ export default tseslint.config(
         document: "readonly",
         fetch: "readonly",
         navigator: "readonly",
-        window: "readonly",
-        __APP_BUILD_ID__: "readonly",
-        __DATA_RELEASE_ID__: "readonly",
-        __RELEASE_DISPOSITION__: "readonly"
+        window: "readonly"
       }
     },
     plugins: {

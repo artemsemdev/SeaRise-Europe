@@ -5,6 +5,14 @@ import { isForbiddenApplicationApiPath } from "../src/test/application-api-bound
 
 const RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const RELEASE_ROOT = `/releases/${RELEASE_ID}`;
+const RELEASE_ORIGIN = "http://127.0.0.1:4173";
+
+function isExactReleaseArtifact(url: URL, relativePath: string): boolean {
+  return url.origin === RELEASE_ORIGIN
+    && url.pathname === `${RELEASE_ROOT}/${relativePath}`
+    && url.search === ""
+    && url.hash === "";
+}
 
 type Scenario = "ssp1-26" | "ssp2-45" | "ssp5-85";
 type Horizon = 2030 | 2050 | 2100;
@@ -32,6 +40,19 @@ const PROJECTION_MATRIX: readonly ProjectionExpectation[] = Object.freeze([
 const outcome = (page: Page) => page.locator(".projection-panel__outcome");
 const panel = (page: Page) => page.locator(".projection-panel");
 const RESULT_CAVEAT = "This result does not determine flooding, inundation, terrain exposure, flood probability, or property risk.";
+// Exact COG decode, integrity verification, and high-DPI map motion share the
+// browser main thread. Keep their CI performance gate explicit and bounded
+// without widening Playwright's timeout for unrelated assertions.
+const PROJECTION_SETTLE_TIMEOUT_MS = 10_000;
+
+async function expectProjectionPhase(
+  page: Page,
+  phase: "result" | "integrity-error",
+): Promise<void> {
+  await expect(panel(page)).toHaveAttribute("data-phase", phase, {
+    timeout: PROJECTION_SETTLE_TIMEOUT_MS,
+  });
+}
 
 async function ready(page: Page): Promise<void> {
   await expect(page.getByText(/release contract ready · 9 exact combinations/i)).toBeVisible();
@@ -47,14 +68,14 @@ async function selectSettlement(page: Page, query: string, option: RegExp): Prom
   }
   await search.fill(query);
   await page.getByRole("option", { name: option }).click();
-  await expect(panel(page)).toHaveAttribute("data-phase", "result");
+  await expectProjectionPhase(page, "result");
 }
 
 async function expectAvailable(
   page: Page,
   expected: ProjectionExpectation,
 ): Promise<void> {
-  await expect(panel(page)).toHaveAttribute("data-phase", "result");
+  await expectProjectionPhase(page, "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "ProjectionAvailable");
   await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
   await expect(outcome(page).getByRole("heading", {
@@ -140,7 +161,7 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
   await attachStableState(page, testInfo, "unsupported-geography");
 
   await page.goto(`/?release=${RELEASE_ID}&scenario=ssp2-45&horizon=2050&lat=62&lon=44`);
-  await expect(panel(page)).toHaveAttribute("data-phase", "result");
+  await expectProjectionPhase(page, "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "DataUnavailable");
   await expect(outcome(page).getByText(RESULT_CAVEAT)).toBeVisible();
   await expect(outcome(page).getByRole("heading", { name: "Model data unavailable for this point" })).toBeVisible();
@@ -155,10 +176,13 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
 test("first selected-place technical failure receives focus after the transition", async ({ page }) => {
   let releaseFailure!: () => void;
   const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
+  let confirmHeadInterception!: () => void;
+  const headIntercepted = new Promise<void>((resolve) => { confirmHeadInterception = resolve; });
   let held = false;
-  await page.route(`**${RELEASE_ROOT}/analysis/ssp2-45/2050.tif`, async (route) => {
+  await page.route((url) => isExactReleaseArtifact(url, "analysis/ssp2-45/2050.tif"), async (route) => {
     if (!held && route.request().method() === "HEAD") {
       held = true;
+      confirmHeadInterception();
       await failureGate;
       await route.fulfill({ status: 503, contentType: "text/plain", body: "temporary" });
       return;
@@ -173,6 +197,7 @@ test("first selected-place technical failure receives focus after the transition
   await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
   await expect(page.getByText(/selected place accepted.*lookup is in progress/i)).toBeFocused();
 
+  await headIntercepted;
   releaseFailure();
   await expect(panel(page)).toHaveAttribute("data-phase", "technical-error");
   const alert = panel(page).getByRole("alert");
@@ -206,7 +231,7 @@ test("first selected-place integrity failure receives focus after the transition
   await expect(page.getByText(/selected place accepted.*lookup is in progress/i)).toBeFocused();
 
   releaseCorruption();
-  await expect(panel(page)).toHaveAttribute("data-phase", "integrity-error");
+  await expectProjectionPhase(page, "integrity-error");
   const alert = panel(page).getByRole("alert");
   await expect(alert).toContainText("Technical failure — not a DataUnavailable scientific outcome");
   await expect(alert).toBeFocused();
@@ -231,7 +256,7 @@ test("all nine accepted projections keep exact COG values and PMTiles identity",
   for (const expected of PROJECTION_MATRIX) {
     const scenario = page.getByRole("radio", { name: new RegExp(expected.scenario) });
     if (!(await scenario.isChecked())) await scenario.check();
-    await expect(panel(page)).toHaveAttribute("data-phase", "result");
+    await expectProjectionPhase(page, "result");
     const horizon = page.getByRole("radio", { name: String(expected.horizon), exact: true });
     if (!(await horizon.isChecked())) await horizon.check();
     await expectAvailable(page, expected);
@@ -280,7 +305,7 @@ test("corrupt real COG range is a technical integrity failure and preserves the 
   });
 
   await page.getByRole("radio", { name: "2100", exact: true }).check();
-  await expect(panel(page)).toHaveAttribute("data-phase", "integrity-error");
+  await expectProjectionPhase(page, "integrity-error");
   await expect(page.locator('[role="alert"][data-technical-error="IntegrityFailed"]')).toContainText(
     "Technical failure — not a DataUnavailable scientific outcome",
   );
@@ -364,7 +389,7 @@ test("rapid control and map commands cannot publish stale mixed state", async ({
   await page.getByRole("button", { name: /select coordinate at source extent centre/i }).click();
   releaseRange?.();
 
-  await expect(panel(page)).toHaveAttribute("data-phase", "result");
+  await expectProjectionPhase(page, "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "OutOfScope");
   await expect(outcome(page).getByRole("heading", { name: "Outside the coastal analysis area" })).toBeVisible();
   await expect(outcome(page)).toContainText("Selected point");
@@ -509,7 +534,7 @@ test("a superseded search response cannot replace the newest Worker query", asyn
   await expect(page.getByRole("option", { name: /Málaga.*Andalucía, ES/i })).toHaveCount(0);
 
   await page.getByRole("option", { name: /Springfield North.*AA/i }).click();
-  await expect(panel(page)).toHaveAttribute("data-phase", "result");
+  await expectProjectionPhase(page, "result");
   await expect(outcome(page)).toHaveAttribute("data-outcome", "OutOfScope");
   await expect(outcome(page)).toContainText("Selected settlement: geonames:900000003");
 });

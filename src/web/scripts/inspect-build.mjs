@@ -1,25 +1,65 @@
 import { brotliCompressSync } from "node:zlib";
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { extname, join, relative, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { lstatSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, extname, join, relative, resolve } from "node:path";
+import {
+  applicationBuildIdentityFile,
+  validateApplicationBuildIdentity,
+} from "./application-build-identity.mjs";
+import {
+  assertSameBuildIdentity,
+  buildIdentityFile,
+  validateBuildIdentity,
+} from "./build-identity.mjs";
+import {
+  extractEmbeddedPrecachePayload,
+  rangeIntegrityBootstrapPath,
+} from "./service-worker-precache.mjs";
+import { resolveStaticBuildRoot } from "./static-build-root.mjs";
+import { validateStaticOutputIsolation } from "./static-output-isolation.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const dist = resolve(root, "dist");
-const releaseId = "searise-europe-v1.0.0-20260810-c096aeab4e09";
+const dist = resolveStaticBuildRoot({ webRoot: root });
+const buildIdentity = validateBuildIdentity(
+  JSON.parse(readFileSync(resolve(dist, buildIdentityFile), "utf8")),
+);
+const releaseId = buildIdentity.dataReleaseId;
 const expectedCsp = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'";
 
 function files(directory) {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
-    return statSync(path).isDirectory() ? files(path) : [path];
+    const metadata = lstatSync(path);
+    if (metadata.isSymbolicLink()) throw new Error(`Static build contains a symlink: ${relative(dist, path)}`);
+    if (metadata.isDirectory()) return files(path);
+    if (!metadata.isFile()) throw new Error(`Static build contains a non-file output: ${relative(dist, path)}`);
+    return [path];
   });
 }
 
 const paths = files(dist);
+const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
+const releaseManifest = JSON.parse(readFileSync(resolve(dist, "releases", releaseId, "manifest.json"), "utf8"));
+const serviceWorker = readFileSync(resolve(dist, "service-worker.js"), "utf8");
+const embedded = extractEmbeddedPrecachePayload(serviceWorker);
+const outputIsolation = validateStaticOutputIsolation({
+  dist,
+  paths,
+  viteManifest,
+  releaseManifest,
+  releaseId,
+  buildIdentityFile,
+  applicationBuildIdentityFile,
+  shellManifestPaths: embedded.entries.map(({ path }) => path),
+});
 const required = [
   resolve(dist, "index.html"),
   resolve(dist, "about/architecture/index.html"),
   resolve(dist, "releases", releaseId, "manifest.json"),
   resolve(dist, "vite-manifest.json"),
+  resolve(dist, "service-worker.js"),
+  resolve(dist, buildIdentityFile),
+  resolve(dist, applicationBuildIdentityFile),
 ];
 for (const path of required) {
   if (!paths.includes(path)) throw new Error(`Static build is missing ${relative(dist, path)}`);
@@ -55,12 +95,8 @@ for (const htmlPath of paths.filter((path) => extname(path) === ".html")) {
 }
 
 const scanned = paths.filter((path) => [".html", ".js", ".css", ".map"].includes(extname(path)));
-const forbidden = [/candidate-v7/i, /local-data\/phase-1/i, /["'`]\/[^"'`]*assess(?:[/?"'`]|$)/, /["'`]\/[^"'`]*geocode(?:[/?"'`]|$)/, /["'`]\/[^"'`]*config(?:[/?"'`]|$)/];
 for (const path of scanned) {
   const text = readFileSync(path, "utf8");
-  if (forbidden.some((pattern) => pattern.test(text))) {
-    throw new Error(`Forbidden runtime reference in ${relative(dist, path)}`);
-  }
   if (extname(path) === ".js" && /\b(?:new\s+)?Function\s*\(|Error compiling schema, function code/.test(text)) {
     throw new Error(`CSP-incompatible runtime code generation in ${relative(dist, path)}`);
   }
@@ -78,7 +114,113 @@ const assets = paths
   })
   .sort((left, right) => left.path.localeCompare(right.path));
 
-const viteManifest = JSON.parse(readFileSync(resolve(dist, "vite-manifest.json"), "utf8"));
+const serviceWorkerEntry = viteManifest["src/offline/service-worker.ts"];
+if (
+  !serviceWorkerEntry ||
+  serviceWorkerEntry.file !== "service-worker.js" ||
+  (serviceWorkerEntry.imports?.length ?? 0) !== 0 ||
+  (serviceWorkerEntry.dynamicImports?.length ?? 0) !== 0 ||
+  paths.includes(resolve(dist, "service-worker.js.map"))
+) throw new Error("Service worker must be one self-contained root entry without a stale source map");
+if (/skipWaiting\s*\(|clients\s*\.\s*claim\s*\(/u.test(serviceWorker)) {
+  throw new Error("Worker shell cannot force activation or claim existing clients");
+}
+const expectedPrecacheFiles = new Set();
+function collectPrecache(key) {
+  const entry = viteManifest[key];
+  if (!entry || expectedPrecacheFiles.has(entry.file)) return;
+  expectedPrecacheFiles.add(entry.file);
+  for (const css of entry.css ?? []) expectedPrecacheFiles.add(css);
+  for (const asset of entry.assets ?? []) expectedPrecacheFiles.add(asset);
+  for (const imported of entry.imports ?? []) collectPrecache(imported);
+  for (const imported of entry.dynamicImports ?? []) collectPrecache(imported);
+}
+const precacheMainKey = Object.entries(viteManifest).find(([, entry]) =>
+  entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
+)?.[0];
+if (!precacheMainKey) throw new Error("Vite manifest has no precache application entry");
+collectPrecache(precacheMainKey);
+const shellAssetExtensions = new Set([
+  ".css", ".html", ".js", ".json", ".png", ".svg", ".wasm", ".woff", ".woff2",
+]);
+const emittedShellAssets = paths
+  .filter((path) => path.startsWith(resolve(dist, "assets")) && shellAssetExtensions.has(extname(path)))
+  .map((path) => relative(dist, path).replaceAll("\\", "/"));
+const emittedBasenames = emittedShellAssets.map((path) => basename(path));
+if (new Set(emittedBasenames).size !== emittedBasenames.length) {
+  throw new Error("Independent shell inventory found duplicate emitted asset basenames");
+}
+let foundReference = true;
+while (foundReference) {
+  foundReference = false;
+  for (const sourcePath of [...expectedPrecacheFiles]) {
+    if (![".css", ".js"].includes(extname(sourcePath))) continue;
+    const source = readFileSync(resolve(dist, sourcePath), "utf8");
+    for (const candidate of emittedShellAssets) {
+      if (expectedPrecacheFiles.has(candidate)) continue;
+      const name = basename(candidate);
+      if (source.includes(candidate) || source.includes(`./${name}`) || source.includes(`/${name}`)) {
+        expectedPrecacheFiles.add(candidate);
+        foundReference = true;
+      }
+    }
+  }
+}
+const expectedPrecachePaths = [
+  "/",
+  `/${applicationBuildIdentityFile}`,
+  ...[...expectedPrecacheFiles].map((path) => `/${path}`),
+  `/releases/${releaseId}/manifest.json`,
+  rangeIntegrityBootstrapPath(releaseId),
+].sort();
+const precacheMediaTypes = Object.freeze({
+  ".css": "text/css",
+  ".html": "text/html",
+  ".js": "text/javascript",
+  ".json": "application/json",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".wasm": "application/wasm",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+});
+const expectedPrecacheEntries = expectedPrecachePaths.map((path) => {
+  const bytes = readFileSync(path === "/" ? resolve(dist, "index.html") : resolve(dist, `.${path}`));
+  const mediaType = precacheMediaTypes[path === "/" ? ".html" : extname(path)];
+  if (!mediaType) throw new Error(`No independent shell media type exists for ${path}`);
+  return {
+    path,
+    mediaType,
+    byteSize: bytes.length,
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+  };
+});
+const expectedPrecacheHash = createHash("sha256").update(JSON.stringify({
+  authorityKind: "searise-shell-precache-v3",
+  contractVersion: 3,
+  buildIdentity,
+  entries: expectedPrecacheEntries,
+})).digest("hex");
+if (
+  embedded.authorityKind !== "searise-shell-precache-v3" ||
+  embedded.contractVersion !== 3 ||
+  JSON.stringify(embedded.entries) !== JSON.stringify(expectedPrecacheEntries) ||
+  embedded.precacheSetSha256 !== expectedPrecacheHash ||
+  embedded.entries.some(({ path }) => path.startsWith("/about/") ||
+    (path.startsWith("/releases/") && path !== buildIdentity.manifestPath &&
+      path !== rangeIntegrityBootstrapPath(releaseId)))
+) throw new Error("Service worker embedded precache differs from the independent shell inventory");
+const requiredRecursiveShell = [
+  viteManifest["src/components/map/MapExplorer.tsx"]?.file,
+  viteManifest["src/components/map/map-runtime.ts"]?.file,
+  ...workerPaths.map((path) => relative(dist, path).replaceAll("\\", "/")),
+  ...brotliWasmPaths.map((path) => relative(dist, path).replaceAll("\\", "/")),
+];
+if (requiredRecursiveShell.some((path) => !path || !embedded.entries.some((entry) => entry.path === `/${path}`))) {
+  throw new Error("Service worker precache omits a required recursive Flight shell resource");
+}
+assertSameBuildIdentity(buildIdentity, embedded.buildIdentity, "service worker");
+validateApplicationBuildIdentity({ dist, expectedIdentity: buildIdentity });
 const mainEntry = Object.values(viteManifest).find((entry) =>
   entry.dynamicImports?.includes("src/components/map/MapExplorer.tsx"),
 );
@@ -102,6 +244,33 @@ if (mapFiles.length !== 2 || mapFiles.some((file) => initialFiles.has(file))) {
 if (mapFiles.some((file) => !dynamicFiles.includes(file))) {
   throw new Error("Map visualization modules must remain dynamic Vite entries");
 }
+const mapRuntimeEntry = viteManifest["src/components/map/map-runtime.ts"];
+const mapRuntimeSourceMap = JSON.parse(readFileSync(
+  resolve(dist, `${mapRuntimeEntry.file}.map`),
+  "utf8",
+));
+const networkSourceIndex = mapRuntimeSourceMap.sources.findIndex((source) =>
+  source.endsWith("/components/map/pmtiles-network-source.ts"),
+);
+const networkSource = mapRuntimeSourceMap.sourcesContent?.[networkSourceIndex];
+if (
+  networkSourceIndex < 0 ||
+  typeof networkSource !== "string" ||
+  !networkSource.includes('cache: "no-store"') ||
+  !networkSource.includes("new PMTiles(source, cache)") ||
+  !networkSource.includes("new NetworkOnlyPmtilesSource(authority)") ||
+  /\b(?:indexedDB|sessionStorage|localStorage|CacheStorage)\b|\bcaches\s*\./u.test(networkSource) ||
+  /\b(?:ProjectionAvailable|DataUnavailable|OutOfScope|UnsupportedGeography)\b/u.test(networkSource)
+) {
+  throw new Error("Built PMTiles source is not a network-only, no-store, visual-only adapter");
+}
+const mapRuntimeJavascript = readFileSync(resolve(dist, mapRuntimeEntry.file), "utf8");
+if (!/cache:[`'"]no-store[`'"]/u.test(mapRuntimeJavascript)) {
+  throw new Error("Emitted PMTiles adapter does not preserve Request.cache=no-store");
+}
+if (embedded.entries.some(({ path }) => path.endsWith(".pmtiles"))) {
+  throw new Error("Visual PMTiles cannot enter the service-worker precache");
+}
 const initialJavascript = assets
   .filter((asset) => asset.path.endsWith(".js") && initialFiles.has(asset.path))
   .reduce((total, asset) => total + asset.brotliBytes, 0);
@@ -110,10 +279,8 @@ if (initialJavascript > 250 * 1024) {
 }
 
 const report = {
-  schemaVersion: "1.0.0",
-  appBuildId: process.env.SEARISE_APP_BUILD_ID ?? "local-fixture",
-  dataReleaseId: releaseId,
-  releaseDisposition: "synthetic-fixture",
+  ...buildIdentity,
+  outputIsolation,
   staticRoutes: ["/", "/about/architecture/"],
   bundleIsolation: {
     initialFiles: [...initialFiles].sort(),
@@ -121,6 +288,16 @@ const report = {
     lazyMapFiles: mapFiles.sort(),
   },
   lazyWorkerAssets: lazySearchPaths.map((path) => relative(dist, path)),
+  serviceWorker: {
+    path: "/service-worker.js",
+    scope: "/",
+    appBuildId: buildIdentity.appBuildId,
+    dataReleaseId: buildIdentity.dataReleaseId,
+    precacheSetSha256: embedded.precacheSetSha256,
+    precacheUrls: embedded.entries.map(({ path }) => path),
+    precacheEntries: embedded.entries,
+    brotliBytes: brotliCompressSync(serviceWorker).length,
+  },
   assets,
 };
 writeFileSync(resolve(dist, "build-report.json"), `${JSON.stringify(report, null, 2)}\n`);

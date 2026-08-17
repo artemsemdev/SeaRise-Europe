@@ -2,19 +2,23 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { technicalErrorFrom } from "../data/manifest-repository";
 import type { ReleaseMethodology } from "../data/methodology-repository";
+import type { ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import type { ProjectionState } from "../domain/projection-state";
 import type { ReleaseContext, Selection, TechnicalError } from "../domain/release";
+import type { RuntimeCapabilityV2 } from "../offline/contracts/policy";
 import {
   createBrowserRuntime,
   type BrowserRuntimeFactory,
   type BrowserRuntimeScope,
 } from "./browser-runtime";
+import type { RuntimeCapabilityInteractionV1 } from "./runtime-capability";
 
 export type MethodologyState =
   | { readonly phase: "idle" }
@@ -38,6 +42,10 @@ export interface AssessmentRuntimeView {
   readonly reset: () => void;
   readonly handleSearchLifecycle: (event: SearchLifecycleEvent) => void;
   readonly cancelSearch: () => void;
+  readonly searchArtifactTransport?: ArtifactTransport;
+  readonly capability: RuntimeCapabilityV2 | null;
+  readonly retryCapability: () => Promise<void>;
+  readonly requestUpdateAction: () => Promise<void>;
 }
 
 interface MethodologyRecord {
@@ -79,6 +87,7 @@ export function useAssessmentRuntime(
 ): AssessmentRuntimeView {
   const [runtime, setRuntime] = useState<BrowserRuntimeScope | null>(null);
   const [methodologyRecord, setMethodologyRecord] = useState<MethodologyRecord | null>(null);
+  const capabilityInteraction = useRef<RuntimeCapabilityInteractionV1 | null>(null);
   const active = runtime?.context === context ? runtime : null;
 
   useEffect(() => {
@@ -88,18 +97,27 @@ export function useAssessmentRuntime(
       return;
     }
 
-    const next = factory(context);
-    if (next.context !== context) {
-      next.controller.dispose();
-      throw new Error("The runtime factory returned a different ReleaseContext.");
-    }
     const controller = new AbortController();
     let current = true;
+    let next: BrowserRuntimeScope | null = null;
     // Runtime construction and publication deliberately happen after commit.
-    setRuntime(next);
-    void next.methodology.load(context, controller.signal).then(
+    void Promise.resolve().then(() => factory(context, controller.signal)).then((created) => {
+      if (created.context !== context) {
+        created.dispose?.();
+        if (!created.dispose) created.controller.dispose();
+        throw new Error("The runtime factory returned a different ReleaseContext.");
+      }
+      if (!current || controller.signal.aborted) {
+        created.dispose?.();
+        if (!created.dispose) created.controller.dispose();
+        return null;
+      }
+      next = created;
+      setRuntime(created);
+      return created.methodology.load(context, controller.signal);
+    }).then(
       (methodology) => {
-        if (!current || controller.signal.aborted) return;
+        if (!methodology || !current || controller.signal.aborted) return;
         const identityError = methodologyIdentityError(context, methodology);
         setMethodologyRecord({
           context,
@@ -132,7 +150,8 @@ export function useAssessmentRuntime(
     return () => {
       current = false;
       controller.abort("release context replaced or component unmounted");
-      next.controller.dispose();
+      next?.dispose?.();
+      if (next && !next.dispose) next.controller.dispose();
     };
   }, [context, factory]);
 
@@ -140,6 +159,11 @@ export function useAssessmentRuntime(
     active?.controller.subscribe ?? EMPTY_SUBSCRIBE,
     active?.controller.getSnapshot ?? NULL_SNAPSHOT,
     active?.controller.getSnapshot ?? NULL_SNAPSHOT,
+  );
+  const capability = useSyncExternalStore(
+    active?.capability?.subscribe ?? EMPTY_SUBSCRIBE,
+    active?.capability?.getSnapshot ?? NULL_SNAPSHOT,
+    active?.capability?.getSnapshot ?? NULL_SNAPSHOT,
   );
 
   const methodology = context === null
@@ -150,24 +174,73 @@ export function useAssessmentRuntime(
 
   const select = useCallback((selection: Selection): Promise<void> => {
     if (!active) return Promise.reject(unavailable());
-    return active.controller.select(selection);
+    const interaction = active.capability?.beginInteraction(Object.freeze({
+      kind: "assessment",
+      scenario: selection.scenario,
+      horizon: selection.horizon,
+    }));
+    capabilityInteraction.current = interaction ?? null;
+    return active.controller.select(selection).then(async () => {
+      if (interaction && active.controller.getSnapshot().phase === "result") {
+        await active.capability?.confirmInteractionAvailable(interaction);
+      }
+    });
   }, [active]);
-  const retry = useCallback((): Promise<boolean> => {
+  const retry = useCallback(async (): Promise<boolean> => {
     if (!active) return Promise.reject(unavailable());
-    return active.controller.retry();
+    const retried = await active.controller.retry();
+    const interaction = capabilityInteraction.current;
+    if (retried && interaction && active.controller.getSnapshot().phase === "result") {
+      await active.capability?.confirmInteractionAvailable(interaction);
+    }
+    return retried;
   }, [active]);
   const reset = useCallback((): void => {
     if (!active) throw unavailable();
+    capabilityInteraction.current = active.capability?.beginInteraction(
+      Object.freeze({ kind: "core" }),
+    ) ?? null;
     active.controller.reset();
   }, [active]);
   const handleSearchLifecycle = useCallback((event: SearchLifecycleEvent): void => {
     if (!active) return;
+    if (event.type === "search-started") {
+      capabilityInteraction.current = active.capability?.beginInteraction(Object.freeze({
+        kind: "search",
+        shards: Object.freeze(["core", "coastal"] as const),
+      })) ?? null;
+    } else if (event.type === "search-completed") {
+      const interaction = capabilityInteraction.current;
+      if (interaction) {
+        void active.capability?.confirmInteractionAvailable(interaction).catch(() => undefined);
+      }
+    }
     active.controller.handleSearchLifecycle(event);
   }, [active]);
   const cancelSearch = useCallback((): void => {
     if (!active) return;
     active.controller.cancelSearch();
   }, [active]);
+  const retryCapability = useCallback((): Promise<void> => {
+    if (!active?.capability) return Promise.reject(unavailable());
+    return active.capability.retry();
+  }, [active]);
+  const requestUpdateAction = useCallback((): Promise<void> => {
+    if (!active?.capability) return Promise.reject(unavailable());
+    return active.capability.requestUpdateAction();
+  }, [active]);
 
-  return { projection, methodology, select, retry, reset, handleSearchLifecycle, cancelSearch };
+  return {
+    projection,
+    methodology,
+    select,
+    retry,
+    reset,
+    handleSearchLifecycle,
+    cancelSearch,
+    searchArtifactTransport: active?.searchArtifactTransport,
+    capability,
+    retryCapability,
+    requestUpdateAction,
+  };
 }

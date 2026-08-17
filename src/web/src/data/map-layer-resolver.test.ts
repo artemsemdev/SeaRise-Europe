@@ -44,7 +44,7 @@ describe("visual map layer resolution", () => {
     const additions: readonly ResolvedArtifact[] = [
       {
         ...context.artifact(context.manifest.contractArtifacts.attribution),
-        artifactId: "support-map",
+        artifactId: "support-boundary-pmtiles",
         role: "support-boundary",
         mediaType: "application/vnd.pmtiles",
         scientificUse: "not-applicable",
@@ -72,8 +72,37 @@ describe("visual map layer resolution", () => {
 
     expect(resolveMapLayers(enriched, "ssp2-45", 2050).boundaries).toEqual([
       expect.objectContaining({ kind: "coastal-boundary", sourceLayer: "coastal_boundary" }),
-      expect.objectContaining({ kind: "support-boundary", sourceLayer: "support_boundary" }),
+      expect.objectContaining({
+        kind: "support-boundary",
+        sourceLayer: "support_boundary",
+        byteSize: additions[0].byteSize,
+        sha256: additions[0].sha256,
+      }),
     ]);
+  });
+
+  it("rejects a valid-looking boundary PMTiles path outside the exact candidate mapping", async () => {
+    const context = await releaseContext();
+    const artifacts = { ...context.artifacts };
+    const forged = {
+      ...context.artifact(context.manifest.contractArtifacts.attribution),
+      artifactId: "support-map",
+      role: "support-boundary",
+      mediaType: "application/vnd.pmtiles",
+      scientificUse: "not-applicable",
+      path: "boundaries/europe.pmtiles",
+      url: `${origin}/releases/${releaseId}/boundaries/europe.pmtiles`,
+    } as ResolvedArtifact;
+    artifacts[forged.artifactId] = forged;
+    const invalid = new ReleaseContext({
+      manifest: context.manifest,
+      manifestUrl: context.manifestUrl,
+      disposition: context.disposition,
+      artifacts,
+      datasets: { ...context.datasets },
+    });
+
+    expect(() => resolveMapLayers(invalid, "ssp2-45", 2050)).toThrowError(TechnicalFailure);
   });
 
   it("fails closed if the dataset visual reference is not visual-only PMTiles", async () => {

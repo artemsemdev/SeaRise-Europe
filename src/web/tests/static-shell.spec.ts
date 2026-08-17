@@ -12,6 +12,13 @@ const viteManifest = JSON.parse(
   readFileSync(resolve(import.meta.dirname, "../dist/vite-manifest.json"), "utf8"),
 ) as Record<string, { readonly file: string }>;
 const scientificRuntimeUrl = `/${viteManifest["src/scientific-runtime.ts"].file}`;
+const buildReport = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, "../dist/build-report.json"), "utf8"),
+) as {
+  appBuildId: string;
+  dataReleaseId: string;
+  serviceWorker: { precacheSetSha256: string; precacheUrls: string[] };
+};
 
 async function expectStaticDocumentSecurity(page: import("@playwright/test").Page) {
   const csp = page.locator('meta[http-equiv="Content-Security-Policy"]');
@@ -20,6 +27,103 @@ async function expectStaticDocumentSecurity(page: import("@playwright/test").Pag
   expect(await csp.getAttribute("content")).not.toContain("frame-ancestors");
   await expect(page.locator('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
 }
+
+test("root worker activates naturally, reports its exact pair, and controls only after reload", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium");
+  await page.goto("/");
+  expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+  const identity = await page.evaluate(async ({ appBuildId, dataReleaseId }) => {
+    const registration = await navigator.serviceWorker.ready;
+    const target = registration.active;
+    if (!target) throw new Error("Active service worker was unavailable");
+    return new Promise((resolveIdentity, rejectIdentity) => {
+      const channel = new MessageChannel();
+      const timeout = window.setTimeout(() => rejectIdentity(new Error("Worker identity timed out")), 2_000);
+      channel.port1.onmessage = (event) => {
+        window.clearTimeout(timeout);
+        resolveIdentity(event.data);
+      };
+      target.postMessage({
+        protocol: "searise-offline-worker-v1",
+        type: "inspect-identity",
+        messageToken: "e2e-identity",
+        pair: { contractVersion: 1, appBuildId, dataReleaseId },
+      }, [channel.port2]);
+    });
+  }, buildReport);
+  expect(identity).toMatchObject({
+    type: "worker-identity",
+    pair: { appBuildId: buildReport.appBuildId, dataReleaseId: buildReport.dataReleaseId },
+    precacheSetSha256: buildReport.serviceWorker.precacheSetSha256,
+  });
+
+  await page.goto("/?scenario=ssp2-45&horizon=2050");
+  expect(await page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+  const cachedRequests = await page.evaluate(async () => {
+    const names = await caches.keys();
+    const requests = await (await caches.open(names[0])).keys();
+    return requests.map((request) => {
+      const url = new URL(request.url);
+      return { pathname: url.pathname, search: url.search };
+    });
+  });
+  expect(cachedRequests.map(({ pathname }) => pathname).sort()).toEqual(
+    [...buildReport.serviceWorker.precacheUrls].sort(),
+  );
+  expect(cachedRequests.every(({ search }) => search === "")).toBe(true);
+});
+
+test("warmed Flight shell, search, and one assessment survive a full offline reload", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await expect(page.locator(".search-shell .status[data-search-readiness]"))
+    .toHaveAttribute("data-search-readiness", "all-ready");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  const panel = page.locator(".projection-panel");
+  const outcome = page.locator(".projection-panel__outcome");
+  await expect(panel).toHaveAttribute("data-phase", "result");
+  await expect(outcome).toHaveAttribute("data-outcome", "ProjectionAvailable");
+  await expect(outcome).toContainText("0.194 m");
+  await expect.poll(() => page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    return (await caches.keys()).some((name) => name.startsWith("searise-offline:v1:shell:"));
+  })).toBe(true);
+
+  const shellPaths = new Set(buildReport.serviceWorker.precacheUrls);
+  const recursiveAssets = {
+    mapExplorer: viteManifest["src/components/map/MapExplorer.tsx"].file,
+    mapRuntime: viteManifest["src/components/map/map-runtime.ts"].file,
+  };
+  expect(shellPaths.has(`/${recursiveAssets.mapExplorer}`)).toBe(true);
+  expect(shellPaths.has(`/${recursiveAssets.mapRuntime}`)).toBe(true);
+  expect([...shellPaths].some((path) => /\/search\.worker-[^/]+\.js$/u.test(path))).toBe(true);
+  expect([...shellPaths].some((path) => /\/brotli_wasm_bg-[^/]+\.wasm$/u.test(path))).toBe(true);
+  expect([...shellPaths].some((path) => path.endsWith(".pmtiles"))).toBe(false);
+  expect([...shellPaths].some((path) => /\/analysis\/[^/]+\/\d{4}\.tif$/u.test(path))).toBe(false);
+
+  await page.context().setOffline(true);
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Take me there.");
+  await expect(page.getByText(/Release contract ready · 9 exact combinations/i)).toBeVisible();
+  const offlineSearch = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await offlineSearch.fill("Málaga");
+  await expect(page.getByRole("option", { name: /Málaga.*Andalucía, ES/i })).toBeVisible();
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(panel).toHaveAttribute("data-phase", "result");
+  await expect(outcome).toHaveAttribute("data-outcome", "ProjectionAvailable");
+  await expect(outcome).toContainText("0.194 m");
+
+  await page.getByRole("radio", { name: "2100", exact: true }).check();
+  await expect(panel).toHaveAttribute("data-phase", "connection-required");
+  await expect(panel.getByRole("alert")).toContainText(/Connection required for selected data/i);
+  await expect(panel.getByText(/Previous accepted result — separate from the failed operation/i)).toBeVisible();
+  await expect(outcome).toContainText("2050");
+  await expect(outcome).not.toContainText("2100");
+});
 
 test("landing shell is static, keyboard reachable, and has no serious accessibility findings", async ({ page }, testInfo) => {
   if (testInfo.project.name === "mobile-chromium") {
@@ -89,6 +193,30 @@ test("landing shell is static, keyboard reachable, and has no serious accessibil
   const scan = await new AxeBuilder({ page }).analyze();
   expect(scan.violations.filter((item) => ["critical", "serious"].includes(item.impact ?? ""))).toEqual([]);
   expect(forbiddenRequests).toEqual([]);
+});
+
+test("375px Flight renders the runtime offline state in the canonical header", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium");
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const search = page.getByRole("combobox", { name: /find a city, town, or village/i });
+  await search.fill("Málaga");
+  await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
+  await expect(page.locator(".projection-panel")).toHaveAttribute("data-phase", "result");
+  const offlinePill = page.locator(
+    ".flight-header [data-capability-state='available-offline']",
+  );
+  await expect(offlinePill).toHaveText("Available offline for this assessment");
+  await expect(offlinePill.locator(".flight-capability-pill__dot")).toBeVisible();
+  await expect(offlinePill).toHaveCSS("background-color", "rgba(134, 214, 192, 0.22)");
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const pillBox = await offlinePill.boundingBox();
+  expect(pillBox).not.toBeNull();
+  if (!pillBox) throw new Error("375px Flight capability geometry was unavailable.");
+  expect(pillBox.x).toBeGreaterThanOrEqual(0);
+  expect(pillBox.x + pillBox.width).toBeLessThanOrEqual(375);
 });
 
 test("document CSP blocks an unlisted network origin before a request leaves the page", async ({ page }) => {
@@ -193,6 +321,42 @@ test("API inspection exposes the production-like HEAD, CORS-header, and byte-ran
     "Accept-Ranges, Content-Length, Content-Range, ETag",
   );
   expect(head.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+
+  const malformedUrl = await page.request.get(
+    `http://127.0.0.1:8091/releases/${releaseId}/layers/%ZZ.pmtiles`,
+  );
+  expect(malformedUrl.status()).toBe(400);
+  const subsequentValid = await page.request.get(artifactUrl, { headers: { Range: "bytes=0-0" } });
+  expect(subsequentValid.status()).toBe(206);
+  expect(await subsequentValid.body()).toHaveLength(1);
+});
+
+test("Vite preview makes PMTiles network-only while other release artifacts stay immutable", async ({ page }) => {
+  const releaseRoot = `http://127.0.0.1:4173/releases/${releaseId}`;
+  const pmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
+    headers: { Range: "bytes=0-127" },
+  });
+  const pmtilesHead = await page.request.head(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`);
+  const refusedPmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
+    headers: { Range: "bytes=9999999-10000000" },
+  });
+  const analysis = await page.request.head(`${releaseRoot}/${multichunkArtifactPath}`);
+
+  expect(pmtiles.status()).toBe(206);
+  expect(pmtiles.headers()["cache-control"]).toBe("no-store");
+  expect(pmtiles.headers()["content-range"]).toBe("bytes 0-127/624674");
+  expect(pmtiles.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(pmtiles.headers().etag).toMatch(/^"sha256-[0-9a-f]{64}"$/);
+  expect(pmtilesHead.status()).toBe(200);
+  expect(pmtilesHead.headers()["cache-control"]).toBe("no-store");
+  expect(pmtilesHead.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(pmtilesHead.headers().etag).toBe(pmtiles.headers().etag);
+  expect(refusedPmtiles.status()).toBe(416);
+  expect(refusedPmtiles.headers()["cache-control"]).toBe("no-store");
+  expect(refusedPmtiles.headers()["content-type"]).toContain("application/vnd.pmtiles");
+  expect(refusedPmtiles.headers().etag).toBe(pmtiles.headers().etag);
+  expect(analysis.status()).toBe(200);
+  expect(analysis.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
 });
 
 test("page context verifies a later COG chunk and measures cold versus cached lookup", async ({ page }, testInfo) => {

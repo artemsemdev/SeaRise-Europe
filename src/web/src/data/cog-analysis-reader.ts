@@ -28,6 +28,11 @@ import {
   type ArtifactTransport,
   type SharedArtifactResource,
 } from "./artifact-integrity";
+import {
+  parseCogRangeIntegrityDocument,
+  type CogRangeArtifactIdentityV1 as RangeArtifactIdentity,
+  type CogRangeIntegrityIndexV1 as RangeIntegrityIndex,
+} from "../offline/range-integrity-catalog";
 
 interface NativeLocation {
   readonly locationId: number;
@@ -42,6 +47,21 @@ interface CachedCog {
   readonly client: StrictRangeClient;
   readonly image: GeoTIFFImage;
   readonly locations: readonly NativeLocation[];
+}
+
+export interface CogRangeTransport {
+  validateDelivery(
+    artifact: ResolvedArtifact,
+    identity: RangeArtifactIdentity,
+    signal: AbortSignal,
+  ): Promise<void>;
+  readExpandedRange(
+    artifact: ResolvedArtifact,
+    identity: RangeArtifactIdentity,
+    start: number,
+    endExclusive: number,
+    signal: AbortSignal,
+  ): Promise<ArrayBuffer>;
 }
 
 interface ReadWave {
@@ -63,28 +83,6 @@ interface SourceGridDocument {
   readonly locationIds: readonly number[];
 }
 
-interface RangeChunkIdentity {
-  readonly start: number;
-  readonly endExclusive: number;
-  readonly sha256: string;
-}
-
-interface RangeArtifactIdentity {
-  readonly artifactId: string;
-  readonly path: string;
-  readonly byteSize: number;
-  readonly sha256: string;
-  readonly chunks: readonly RangeChunkIdentity[];
-}
-
-interface RangeIntegrityIndex {
-  readonly schemaVersion: 1;
-  readonly dataReleaseId: string;
-  readonly algorithm: "sha256";
-  readonly chunkSize: 65_536;
-  readonly artifacts: readonly RangeArtifactIdentity[];
-}
-
 interface ScientificMetadata {
   readonly sourceGrid: SourceGridDocument;
   readonly rangeIntegrity: RangeIntegrityIndex;
@@ -100,6 +98,14 @@ function technical(
 
 function equalNumbers(actual: readonly number[], expected: readonly number[]): boolean {
   return actual.length === expected.length && actual.every((value, index) => value === expected[index]);
+}
+
+function exactNoStore(value: string | null): boolean {
+  return value?.split(",").map((part) => part.trim().toLowerCase()).includes("no-store") === true;
+}
+
+function exactCogCacheAuthority(value: string | null): boolean {
+  return value === "public, max-age=31536000, immutable" || exactNoStore(value);
 }
 
 class BrowserResponse extends BaseResponse {
@@ -123,13 +129,133 @@ class BrowserResponse extends BaseResponse {
   }
 }
 
+export class StrictNetworkCogRangeTransport implements CogRangeTransport {
+  readonly #fetch: typeof fetch;
+  readonly #etags = new Map<string, string>();
+
+  constructor(fetcher: typeof fetch = globalThis.fetch.bind(globalThis)) {
+    this.#fetch = fetcher;
+  }
+
+  async validateDelivery(
+    artifact: ResolvedArtifact,
+    _identity: RangeArtifactIdentity,
+    signal: AbortSignal,
+  ): Promise<void> {
+    let response: Response;
+    try {
+      response = await this.#fetch(artifact.url, {
+        method: "HEAD",
+        cache: "no-store",
+        signal,
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+        headers: { Accept: artifact.mediaType },
+      });
+    } catch (error) {
+      if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        throw technical("Aborted", `Delivery metadata for ${artifact.artifactId} was cancelled.`, true);
+      }
+      throw technical("FetchFailed", `Delivery metadata for ${artifact.artifactId} is unavailable.`, true);
+    }
+    if (response.status !== 200) {
+      throw technical("FetchFailed", `Delivery metadata for ${artifact.artifactId} returned HTTP ${response.status}.`, true);
+    }
+    const etag = response.headers.get("etag");
+    if (
+      response.redirected ||
+      (response.url !== "" && response.url !== artifact.url) ||
+      response.headers.get("accept-ranges") !== "bytes" ||
+      response.headers.get("content-length") !== String(artifact.byteSize) ||
+      response.headers.get("content-type") !== artifact.mediaType ||
+      !exactCogCacheAuthority(response.headers.get("cache-control")) ||
+      !etag
+    ) {
+      throw technical("RangeUnsupported", `Host delivery for ${artifact.artifactId} lacks exact HEAD range identity.`, true);
+    }
+    const expectedEtag = `"sha256-${artifact.sha256}"`;
+    if (etag !== expectedEtag) {
+      throw technical("IntegrityFailed", `Host delivery for ${artifact.artifactId} does not match its manifest ETag.`);
+    }
+    this.#etags.set(artifact.url, etag);
+  }
+
+  async readExpandedRange(
+    artifact: ResolvedArtifact,
+    _identity: RangeArtifactIdentity,
+    start: number,
+    endExclusive: number,
+    signal: AbortSignal,
+  ): Promise<ArrayBuffer> {
+    const etag = this.#etags.get(artifact.url);
+    if (!etag) {
+      throw technical("RangeUnsupported", `HEAD identity is required before reading ${artifact.artifactId}.`, true);
+    }
+    const headers = new Headers({
+      Accept: artifact.mediaType,
+      Range: `bytes=${start}-${endExclusive - 1}`,
+      "If-Match": etag,
+    });
+    let response: Response;
+    try {
+      response = await this.#fetch(artifact.url, {
+        method: "GET",
+        cache: "no-store",
+        signal,
+        headers,
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+      });
+    } catch (error) {
+      if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        throw technical("Aborted", `A byte range for ${artifact.artifactId} was cancelled.`, true);
+      }
+      throw technical("FetchFailed", `A required byte range for ${artifact.artifactId} is unavailable.`, true);
+    }
+    const expectedLength = endExclusive - start;
+    if (!response.ok) {
+      throw technical("FetchFailed", `A required byte range for ${artifact.artifactId} returned HTTP ${response.status}.`, true);
+    }
+    if (
+      response.redirected ||
+      (response.url !== "" && response.url !== artifact.url) ||
+      response.status !== 206 ||
+      response.headers.get("accept-ranges") !== "bytes" ||
+      response.headers.get("content-length") !== String(expectedLength) ||
+      response.headers.get("content-range") !== `bytes ${start}-${endExclusive - 1}/${artifact.byteSize}` ||
+      response.headers.get("content-type") !== artifact.mediaType ||
+      !exactCogCacheAuthority(response.headers.get("cache-control")) ||
+      !response.headers.get("etag")
+    ) {
+      throw technical("RangeUnsupported", `Host delivery for ${artifact.artifactId} returned an inexact byte range.`, true);
+    }
+    if (response.headers.get("etag") !== etag) {
+      throw technical("IntegrityFailed", `Host delivery for ${artifact.artifactId} changed ETag during a range read.`);
+    }
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await response.arrayBuffer();
+    } catch (error) {
+      if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
+        throw technical("Aborted", `A byte range for ${artifact.artifactId} was cancelled.`, true);
+      }
+      throw technical("FetchFailed", `A byte-range body for ${artifact.artifactId} is unavailable.`, true);
+    }
+    if (bytes.byteLength !== expectedLength) {
+      throw technical("IntegrityFailed", `A byte range for ${artifact.artifactId} has the wrong size.`);
+    }
+    return bytes;
+  }
+}
+
 class StrictRangeClient extends BaseClient {
   readonly #artifact: ResolvedArtifact;
   readonly #identity: RangeArtifactIdentity;
-  readonly #fetch: typeof fetch;
+  readonly #transport: CogRangeTransport;
   readonly #openSignal: AbortSignal;
   #readWave: ReadWave | undefined;
-  #etag: string | undefined;
   failure: TechnicalFailure | undefined;
 
   #record(error: TechnicalFailure): TechnicalFailure {
@@ -141,13 +267,13 @@ class StrictRangeClient extends BaseClient {
     url: string,
     artifact: ResolvedArtifact,
     identity: RangeArtifactIdentity,
-    fetcher: typeof fetch,
+    transport: CogRangeTransport,
     signal: AbortSignal,
   ) {
     super(url);
     this.#artifact = artifact;
     this.#identity = identity;
-    this.#fetch = fetcher;
+    this.#transport = transport;
     this.#openSignal = signal;
   }
 
@@ -181,36 +307,15 @@ class StrictRangeClient extends BaseClient {
   }
 
   async validateDelivery(): Promise<void> {
-    let response: Response;
     try {
-      response = await this.#fetch(this.url, {
-        method: "HEAD",
-        signal: this.#openSignal,
-        credentials: "omit",
-        referrerPolicy: "no-referrer",
-      });
+      await this.#transport.validateDelivery(this.#artifact, this.#identity, this.#openSignal);
     } catch (error) {
+      if (error instanceof TechnicalFailure) throw error;
       if (this.#openSignal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         throw technical("Aborted", `Delivery metadata for ${this.#artifact.artifactId} was cancelled.`, true);
       }
       throw technical("FetchFailed", `Delivery metadata for ${this.#artifact.artifactId} is unavailable.`, true);
     }
-    if (!response.ok) {
-      throw technical("FetchFailed", `Delivery metadata for ${this.#artifact.artifactId} returned HTTP ${response.status}.`, true);
-    }
-    const etag = response.headers.get("etag");
-    if (
-      response.headers.get("accept-ranges") !== "bytes" ||
-      response.headers.get("content-length") !== String(this.#artifact.byteSize) ||
-      !etag
-    ) {
-      throw technical("RangeUnsupported", `Host delivery for ${this.#artifact.artifactId} lacks exact HEAD range identity.`, true);
-    }
-    const expectedEtag = `"sha256-${this.#artifact.sha256}"`;
-    if (etag !== expectedEtag) {
-      throw technical("IntegrityFailed", `Host delivery for ${this.#artifact.artifactId} does not match its manifest ETag.`);
-    }
-    this.#etag = etag;
   }
 
   override async request(options: RequestInit = {}): Promise<BaseResponse> {
@@ -235,53 +340,24 @@ class StrictRangeClient extends BaseClient {
     }
     const expandedStart = chunks[0].start;
     const expandedEnd = chunks.at(-1)!.endExclusive - 1;
-    const headers = new Headers(options.headers);
-    headers.set("Range", `bytes=${expandedStart}-${expandedEnd}`);
-    if (!this.#etag) {
-      throw this.#record(technical("RangeUnsupported", `HEAD identity is required before reading ${this.#artifact.artifactId}.`, true));
-    }
-    headers.set("If-Match", this.#etag);
-    let response: Response;
     const requestSignal = this.#readWave?.controller.signal ?? this.#openSignal;
+    let expanded: ArrayBuffer;
     try {
-      response = await this.#fetch(this.url, {
-        ...options,
-        signal: requestSignal,
-        headers,
-        credentials: "omit",
-        referrerPolicy: "no-referrer",
-      });
+      expanded = await this.#transport.readExpandedRange(
+        this.#artifact,
+        this.#identity,
+        expandedStart,
+        expandedEnd + 1,
+        requestSignal,
+      );
     } catch (error) {
+      if (error instanceof TechnicalFailure) throw this.#record(error);
       if (requestSignal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
         throw this.#record(technical("Aborted", `A byte range for ${this.#artifact.artifactId} was cancelled.`, true));
       }
       throw this.#record(technical("FetchFailed", `A required byte range for ${this.#artifact.artifactId} is unavailable.`, true));
     }
     const expectedLength = expandedEnd - expandedStart + 1;
-    if (response.status !== 200 && !response.ok) {
-      throw this.#record(technical("FetchFailed", `A required byte range for ${this.#artifact.artifactId} returned HTTP ${response.status}.`, true));
-    }
-    if (
-      response.status !== 206 ||
-      response.headers.get("accept-ranges") !== "bytes" ||
-      response.headers.get("content-length") !== String(expectedLength) ||
-      response.headers.get("content-range") !== `bytes ${expandedStart}-${expandedEnd}/${this.#artifact.byteSize}` ||
-      !response.headers.get("etag")
-    ) {
-      throw this.#record(technical("RangeUnsupported", `Host delivery for ${this.#artifact.artifactId} returned an inexact byte range.`, true));
-    }
-    if (response.headers.get("etag") !== this.#etag) {
-      throw this.#record(technical("IntegrityFailed", `Host delivery for ${this.#artifact.artifactId} changed ETag during a range read.`));
-    }
-    let expanded: ArrayBuffer;
-    try {
-      expanded = await response.arrayBuffer();
-    } catch (error) {
-      if (requestSignal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
-        throw this.#record(technical("Aborted", `A byte range for ${this.#artifact.artifactId} was cancelled.`, true));
-      }
-      throw this.#record(technical("FetchFailed", `A byte-range body for ${this.#artifact.artifactId} is unavailable.`, true));
-    }
     if (expanded.byteLength !== expectedLength) {
       throw this.#record(technical("IntegrityFailed", `A byte range for ${this.#artifact.artifactId} has the wrong size.`));
     }
@@ -466,85 +542,6 @@ function parseSourceGrid(value: unknown, context: ReleaseContext): SourceGridDoc
   });
 }
 
-function sha256String(value: unknown): value is string {
-  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-}
-
-function parseRangeIntegrity(value: unknown, context: ReleaseContext): RangeIntegrityIndex {
-  if (!value || typeof value !== "object") {
-    throw technical("SchemaInvalid", "The COG range-integrity artifact is not an object.");
-  }
-  const document = value as Record<string, unknown>;
-  if (
-    !exactKeys(document, ["schemaVersion", "dataReleaseId", "algorithm", "chunkSize", "artifacts"]) ||
-    document.schemaVersion !== 1 ||
-    document.dataReleaseId !== context.dataReleaseId ||
-    document.algorithm !== "sha256" ||
-    document.chunkSize !== 65_536 ||
-    !Array.isArray(document.artifacts)
-  ) {
-    throw technical("IntegrityFailed", "The COG range-integrity header is invalid.");
-  }
-  const artifacts = document.artifacts as unknown[];
-  const byId = new Map<string, RangeArtifactIdentity>();
-  for (const rawArtifact of artifacts) {
-    if (!rawArtifact || typeof rawArtifact !== "object") {
-      throw technical("IntegrityFailed", "The COG range-integrity index contains an invalid artifact.");
-    }
-    const record = rawArtifact as Record<string, unknown>;
-    const releaseArtifact = typeof record.artifactId === "string" ? context.artifacts[record.artifactId] : undefined;
-    if (
-      !exactKeys(record, ["artifactId", "path", "byteSize", "sha256", "chunks"]) ||
-      releaseArtifact?.role !== "projection-analysis-cog" ||
-      record.path !== releaseArtifact.path ||
-      record.byteSize !== releaseArtifact.byteSize ||
-      record.sha256 !== releaseArtifact.sha256 ||
-      !Array.isArray(record.chunks) ||
-      byId.has(releaseArtifact.artifactId)
-    ) {
-      throw technical("IntegrityFailed", "The COG range-integrity index does not match the release manifest.");
-    }
-    const chunks = (record.chunks as unknown[]).map((rawChunk, index) => {
-      if (!rawChunk || typeof rawChunk !== "object") {
-        throw technical("IntegrityFailed", "The COG range-integrity index contains an invalid chunk.");
-      }
-      const chunk = rawChunk as Record<string, unknown>;
-      const expectedStart = index * 65_536;
-      const expectedEnd = Math.min(expectedStart + 65_536, releaseArtifact.byteSize);
-      if (
-        !exactKeys(chunk, ["start", "endExclusive", "sha256"]) ||
-        chunk.start !== expectedStart ||
-        chunk.endExclusive !== expectedEnd ||
-        !sha256String(chunk.sha256)
-      ) {
-        throw technical("IntegrityFailed", "The COG range-integrity index has non-canonical chunk coverage.");
-      }
-      return Object.freeze(chunk as unknown as RangeChunkIdentity);
-    });
-    if (chunks.length !== Math.ceil(releaseArtifact.byteSize / 65_536)) {
-      throw technical("IntegrityFailed", "The COG range-integrity index has incomplete object coverage.");
-    }
-    byId.set(releaseArtifact.artifactId, Object.freeze({
-      ...(record as unknown as RangeArtifactIdentity),
-      chunks: Object.freeze(chunks),
-    }));
-  }
-  const expectedIds = Object.values(context.artifacts)
-    .filter((artifact) => artifact.role === "projection-analysis-cog")
-    .map((artifact) => artifact.artifactId)
-    .sort();
-  if ([...byId.keys()].sort().join("\0") !== expectedIds.join("\0")) {
-    throw technical("IntegrityFailed", "The COG range-integrity index does not cover the exact release COG set.");
-  }
-  return Object.freeze({
-    schemaVersion: 1,
-    dataReleaseId: context.dataReleaseId,
-    algorithm: "sha256",
-    chunkSize: 65_536,
-    artifacts: Object.freeze([...byId.values()]),
-  });
-}
-
 function classifyReadError(error: unknown, artifactId: string, signal: AbortSignal): TechnicalFailure {
   if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
     return technical("Aborted", `Analysis read for ${artifactId} was cancelled.`, true);
@@ -577,10 +574,12 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
   readonly #metadataCache = new Map<string, SharedArtifactResource<ScientificMetadata>>();
   readonly #fetch: typeof fetch;
   readonly #artifactTransport: ArtifactTransport;
+  readonly #cogRangeTransport: CogRangeTransport;
 
   constructor(options: {
     readonly fetch?: typeof fetch;
     readonly artifactTransport?: ArtifactTransport;
+    readonly cogRangeTransport?: CogRangeTransport;
   } = {}) {
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#artifactTransport = options.artifactTransport ?? ((input, init) =>
@@ -590,6 +589,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
         credentials: "omit",
         referrerPolicy: "no-referrer",
       }));
+    this.#cogRangeTransport = options.cogRangeTransport ?? new StrictNetworkCogRangeTransport(this.#fetch);
   }
 
   async #metadata(context: ReleaseContext, signal: AbortSignal): Promise<ScientificMetadata> {
@@ -622,7 +622,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
               await decodeGzipJson(sourceGridBytes, sourceGridArtifact.artifactId),
               context,
             ),
-            rangeIntegrity: parseRangeIntegrity(rangeValue, context),
+            rangeIntegrity: parseCogRangeIntegrityDocument(rangeValue, context),
           });
         }),
       );
@@ -672,7 +672,7 @@ export class CogAnalysisArtifactReader implements AnalysisArtifactReader {
           artifact.url,
           artifact,
           rangeIdentity,
-          this.#fetch,
+          this.#cogRangeTransport,
           resourceSignal,
         );
         try {

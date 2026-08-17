@@ -44,7 +44,7 @@ flowchart LR
 | Pipeline -> release | Internal, release time | Manifest/JSON Schema, static STAC, GeoParquet schemas, PMTiles/COG validation, provenance | Block publication on any incomplete or inconsistent contract |
 | CI -> R2 | Outbound, release time | New immutable prefix, least-privilege credential, checksum read-back | Leave candidate unreferenced; never overwrite production objects |
 | Browser -> static site | Runtime | Versioned HTML/JS/CSS/config over HTTPS | Use valid cached shell or show availability state |
-| Browser -> R2 custom domain | Runtime | `GET`, `HEAD`, byte-range `GET`, CORS, immutable caching | Use cached ranges or report missing data; never guess |
+| Browser -> R2 custom domain | Runtime | `GET`, `HEAD`, byte-range `GET`, CORS; visual PMTiles are network-only `no-store`, while analysis COG and other release objects retain immutable delivery | Use an integrity-authorized cached COG chunk where eligible; otherwise report unavailable data and never guess |
 | Browser -> OpenFreeMap | Runtime, optional | MapLibre style/tile protocol and attribution | Degrade to no basemap; assessment remains independent |
 
 No browser integration targets ASP.NET, Next.js server routes, PostgreSQL,
@@ -117,7 +117,9 @@ release and, where ADR-021 requires it, a new ADR.
 
 ## HTTP delivery contract
 
-Versioned artifacts use:
+The portable, checked-in role/path policy is
+[`contracts/http-delivery/v1/policy.json`](../../contracts/http-delivery/v1/policy.json).
+For non-PMTiles versioned artifacts the default is:
 
 ```http
 Cache-Control: public, max-age=31536000, immutable
@@ -127,11 +129,21 @@ Access-Control-Allow-Headers: Range, If-Match
 Access-Control-Expose-Headers: Accept-Ranges, Content-Length, Content-Range, ETag
 ```
 
+Visual PMTiles override the manifest's generic
+`publication.cacheControl`: every browser request uses `cache: "no-store"`, and
+the host/R2 metadata must return `Cache-Control: no-store` for `200`, `206`, and
+`416`. Those responses are bound to the exact manifest path, byte size,
+`application/vnd.pmtiles` media type, and strong `"sha256-<artifact digest>"`
+ETag; `206` and `416` totals must equal the manifest byte size. This ADR-026
+delivery override does not make PMTiles mutable—the release object remains
+append-only—but it prohibits browser and intermediary persistence.
+
 The data origin must return correct `Content-Type`, `Content-Length`, `ETag`,
 and `Accept-Ranges: bytes`; a valid partial request returns `206` and
 `Content-Range`. HTML and a mutable discovery pointer are short-lived and
-revalidated. Content-hashed application assets and release-versioned data are
-immutable.
+revalidated. Content-hashed application assets, analysis COGs, and other
+release-versioned data retain immutable delivery. Persistent range storage is
+limited to integrity-authorized analysis COG chunks.
 
 Production and preview CORS origins are explicit. Public open-data access with
 `Access-Control-Allow-Origin: *` would be a product/distribution decision and

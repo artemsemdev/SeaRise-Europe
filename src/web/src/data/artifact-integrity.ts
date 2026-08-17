@@ -51,6 +51,7 @@ export async function verifiedArtifactBytes(
     if (signal.aborted || (error instanceof DOMException && error.name === "AbortError")) {
       throw technical("Aborted", `Artifact read for ${artifact.artifactId} was cancelled.`, true);
     }
+    if (error instanceof TechnicalFailure) throw error;
     throw technical("FetchFailed", `Artifact ${artifact.artifactId} is unavailable.`, true);
   }
   if (!response.ok) {

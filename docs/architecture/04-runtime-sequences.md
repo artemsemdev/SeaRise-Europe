@@ -1,7 +1,7 @@
 # 04 — Browser Runtime Sequences
 
 > **Status:** Accepted target architecture
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
 
 All sequences below run without an application API, runtime database,
 geocoding service, or tile server. `CDN` represents static assets and immutable
@@ -229,13 +229,13 @@ sequenceDiagram
     participant UI as Browser app
     participant SW as Service worker / caches
 
-    Note over SW: Shell, manifest, boundaries, index and required ranges cached
+    Note over SW: Complete resources cached; required authorized COG chunks in IndexedDB
     U->>UI: Reopen site without network
     UI->>SW: Request core resources
     SW-->>UI: Release-matched cached resources
     U->>UI: Search and select cached location/layer
-    UI->>SW: Request analysis range
-    SW-->>UI: Cached range
+    UI->>SW: Request analysis COG range
+    SW-->>UI: Verified single-chunk slice
     UI-->>U: Complete result marked available offline
 ```
 
@@ -263,9 +263,104 @@ display a new domain result for the uncached selection.
 
 An active session remains pinned to one release. A newer deployment may notify
 the visitor that an update is available, but it does not mix manifests,
-indexes, geometries, or byte ranges. On reload, the new app/release pairing
-initializes in a new cache namespace. Rollback deploys the previous complete
-pair; immutable artifacts are never overwritten.
+indexes, geometries, or byte ranges. An ordinary reload does not activate the
+new app/release pairing while any tab remains controlled by the prior worker.
+Every SeaRise tab must close first, allowing natural service-worker activation; only
+the subsequent reopen initializes the new pairing in a new cache namespace.
+Rollback deploys the previous complete pair; immutable artifacts are never
+overwritten.
+
+The static-host update coordinator is a pure user-intent state machine over
+injected ports. A waiting worker can prove only its build-sealed exact
+app/release pair and shell precache hash; it cannot claim a runtime resource
+plan or admission receipt before it controls a page. Inspection can report
+only `sealed`, `incomplete`, `corrupt`, `mixed`, or `stale`; only a sealed
+waiting install identity can produce a confirmation token. Runtime
+resource-plan and receipt authority is recorded later, from exact active-pair
+admission after natural activation.
+
+Starting newer preparation synchronously enters `preparing` and revokes the
+prior pending confirmation before the first asynchronous port call. The
+coordinator wraps the provider token in its own monotonic, one-time generation,
+so provider reuse or collision cannot authorize a later intent and a consumed
+confirmation cannot be replayed. Each production coordinator mints its own
+instance identifier from browser cryptographic entropy; deterministic injection
+exists only as a test seam, and duplicate identifiers are rejected within one
+JavaScript realm. Two coordinators created during the same page boot therefore
+cannot mint the same transition identity. The first validated controller proof
+is pinned as that coordinator's immutable launch boot.
+
+Explicit confirmation first records a non-consumable `PENDING` transition
+intent. Only after that write resolves unambiguously and the same coordinator
+generation remains current may a second durable transaction change the exact
+intent to `ARMED`. That arm transaction remains bound to an abort signal until
+commit. Only an exact `ARMED` intent can be consumed once; `PENDING`, consumed,
+missing, mismatched, tombstoned, and unknown records fail closed. The
+coordinator then presents the exact instruction: `Update ready. Close all
+SeaRise tabs and reopen to use it.` It does not swap browser-storage authority,
+activate a worker, call
+`skipWaiting`, call `clients.claim`, navigate, reload, or claim that the new
+pair is current. Existing tabs remain pinned to their controlling worker. A
+verified waiting worker becomes eligible to activate naturally only after all
+clients of the prior worker close. Cancellation or an ambiguous first write can
+leave only harmless `PENDING` evidence. Conditional cleanup may remove that
+exact pending record, but cleanup failure can never make it consumable.
+
+All durable intent mutations share a non-reentrant exclusive guard. The
+`PENDING` to `ARMED` transaction is the publication linearization point. A
+concurrent or adapter-reentrant mutation returns immediate, recoverable
+`mutation-busy` instead of queueing behind the port callback; the caller may
+retry after publication settles. After a compliant delayed arm settles, a
+retried rollback atomically tombstones the exact
+intent whether it is `PENDING` or `ARMED`; tombstoned transition IDs can never
+arm or consume. Only after that tombstone commits may rollback publish
+`deployment-required`. If tombstoning fails, the coordinator instead reports
+`rollback-failed` with the preserved durable intent and its `pending` or
+`armed` state. It never claims completed rollback while durable update
+authority remains.
+
+Durable adapter methods are non-reentrant and receive a bounded deadline plus
+an `AbortSignal`. They must keep their transaction bound to the signal and
+settle promptly after abort. The coordinator does not release its exclusive
+guard until the adapter acknowledges settlement. If the deadline expires and
+the adapter never settles, state becomes fail-closed `adapter-stalled`; later
+mutations return immediately with that technical state instead of waiting or
+claiming a durable outcome.
+
+On the subsequent fresh boot, activation is recognized only after exact active
+resources are admitted and the page challenges
+`navigator.serviceWorker.controller` directly. The controller-reported pair
+and precache must match the router's current pair and the newly recorded
+resource-plan/receipt authority before the matching one-shot intent is consumed.
+`registration.active` and a cached precache value are not controller proof.
+Malformed JSON, unknown durable states, wrong shapes, same-page,
+mismatched-controller, stale-intent, missing-intent, pending-intent, and replay
+attempts fail closed; malformed records are removed and controller mismatches
+are tombstoned under the update Web Lock. A changed controller proof reported
+to the original coordinator is still the same page, not a fresh boot, and
+cannot finalize activation. Async completion from a cancelled generation
+cannot overwrite a newer operation.
+Candidate evidence failures remain distinct from technical controller,
+inspection-port, token-provider, and intent-store failures. All are technical
+update states, never scientific outcomes.
+
+After that exact fresh-boot reconciliation, production retention inventories
+only lifecycle records already marked `cleanup-pending`. The lifecycle store
+acquires an exact-pair admission Web Lock and asks the current controlling
+worker for a stable client census. Active, unknown, or unresponsive clients,
+unexpired stored leases, corrupt authority, and incomplete active/previous
+records block deletion. The active complete pair and immediately previous
+complete recoverable pair are never cleanup targets. Eligible older pairs are
+removed in receipt/lease, Cache Storage, range-record, then lifecycle order;
+the durable cleanup fence prevents stale admission throughout partial failure
+and retry. The coordinator exposes retryable technical retention state without
+creating a scientific outcome. See the
+[production browser retention runbook](../operations/production-browser-retention.md).
+
+Browser storage is not application rollback authority. Rollback requires a
+verified static deployment, using repository Git history when source recovery
+is needed. The browser coordinator reports `deployment-required` and keeps the
+current controller usable; it never claims a local application rollback.
 
 ## 12. Architecture and methodology access
 

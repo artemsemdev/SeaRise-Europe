@@ -167,8 +167,8 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
                 reachable.add(reference)
                 pending.append(reference)
 
-    assert len(components) == 339
-    assert len(reachable) == 340
+    assert len(components) == 340
+    assert len(reachable) == 341
     by_path = _components_by_path(document)
     phosphor = by_path["node_modules/@phosphor-icons/react"]
     assert (phosphor["name"], phosphor["version"], phosphor["purl"]) == (
@@ -191,7 +191,7 @@ def test_checked_in_real_frontend_artifact_matches_exact_lock_authority() -> Non
     root_properties = _properties(document["metadata"]["component"])
 
     assert raw == canonical_sbom_bytes(document)
-    assert len(document["components"]) == 339
+    assert len(document["components"]) == 340
     assert root_properties["org.searise.sbom.input.path"] == REAL_LOGICAL_PATH
     assert root_properties["org.searise.sbom.npm.workspace.path"] == "src/web"
     assert (

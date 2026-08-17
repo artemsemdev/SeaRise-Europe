@@ -85,6 +85,20 @@ a { color: inherit; }
   font-size: 0.68rem;
   backdrop-filter: blur(12px);
 }
+.flight-capability-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgb(134 214 192 / 22%);
+}
+.flight-capability-pill__dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #86d6c0;
+  box-shadow: 0 0 0 0.16rem rgb(134 214 192 / 14%);
+}
 .flight-header button {
   min-height: 2.75rem;
   padding: 0.5rem 0.95rem;
@@ -479,6 +493,15 @@ a { color: inherit; }
   outline: 3px solid #f5c66b;
   outline-offset: 3px;
 }
+.application-technical-alert button {
+  margin-left: 0.6rem;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
 .map-module-loading {
   position: absolute;
   inset: 0;
@@ -560,9 +583,10 @@ footer { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-
   }
   .maplibregl-ctrl-top-right { display: none; }
   .map-selection-pin { top: 8.7rem; right: auto; left: 50%; transform: translateX(-50%); }
-  .map-status { top: 15.5rem; right: auto; bottom: auto; left: 0.5rem; max-width: 10.5rem; }
-  .basemap-button { top: 11rem; right: auto; bottom: auto; left: 0.5rem; }
-  .flight-alerts { top: 11rem; left: 0.5rem; width: calc(100% - 1rem); }
+  .map-status { top: 16.25rem; right: auto; bottom: auto; left: 0.5rem; max-width: 10.5rem; }
+  .basemap-button { top: 13.25rem; right: auto; bottom: auto; left: 0.5rem; }
+  /* Keep dynamic capability/update notices below the canonical map controls. */
+  .flight-alerts { top: 16.75rem; left: 0.5rem; width: calc(100% - 1rem); }
   .flight-progress { bottom: 1rem; }
   .site-header { align-items: flex-start; }
   .site-header nav { display: none; }

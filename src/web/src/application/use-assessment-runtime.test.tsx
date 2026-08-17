@@ -7,9 +7,10 @@ import {
   createBootingProjectionState,
   projectionReducer,
   projectionReleaseIdentity,
+  selectionKey,
   type ProjectionState,
 } from "../domain/projection-state";
-import { AssessmentEngine } from "../domain/scientific-lookup";
+import { AssessmentEngine, type AssessmentResult } from "../domain/scientific-lookup";
 import {
   ReleaseContext,
   TechnicalFailure,
@@ -17,7 +18,12 @@ import {
 } from "../domain/release";
 import { fixtureReleaseContext } from "../test/release-fixture";
 import { createSearchQueryOperation } from "../search/lifecycle";
+import { validateAppReleasePair } from "../offline/contracts/keys";
 import { AssessmentController } from "./assessment-controller";
+import type {
+  RuntimeCapabilityInteractionV1,
+  RuntimeCapabilityPort,
+} from "./runtime-capability";
 import {
   createBrowserRuntime,
   type AssessmentControllerPort,
@@ -112,7 +118,10 @@ interface RuntimeRecord {
   readonly signals: AbortSignal[];
 }
 
-function runtimeRecord(context: ReleaseContext): RuntimeRecord {
+function runtimeRecord(
+  context: ReleaseContext,
+  capability?: RuntimeCapabilityPort,
+): RuntimeRecord {
   const controller = new TestController(context);
   const pending = deferred<ReleaseMethodology>();
   const signals: AbortSignal[] = [];
@@ -129,6 +138,7 @@ function runtimeRecord(context: ReleaseContext): RuntimeRecord {
           return pending.promise;
         },
       },
+      ...(capability ? { capability } : {}),
     },
   };
 }
@@ -145,9 +155,36 @@ function selected(context: ReleaseContext): Selection {
   };
 }
 
+function outOfScopeResult(context: ReleaseContext, selection: Selection): AssessmentResult {
+  const dataset = context.dataset(selection.scenario, selection.horizon);
+  return {
+    dataReleaseId: context.dataReleaseId,
+    methodologyVersion: context.methodologyVersion,
+    scenario: selection.scenario,
+    horizon: selection.horizon,
+    analysisArtifactId: dataset.analysisArtifactId,
+    analysisArtifactSha256: context.artifact(dataset.analysisArtifactId).sha256,
+    visualArtifactId: dataset.visualArtifactId,
+    visualArtifactSha256: context.artifact(dataset.visualArtifactId).sha256,
+    visualArtifactUrl: context.artifact(dataset.visualArtifactId).url,
+    resultState: "OutOfScope",
+    reason: "outside-coastal-scope",
+  };
+}
+
 describe("static browser runtime adapter", () => {
-  it("wires the production runtime from the real static scientific classes", () => {
-    const runtime = createBrowserRuntime(firstContext);
+  it("wires the production runtime from the real static scientific classes through the verified router", async () => {
+    const close = vi.fn();
+    const runtime = await createBrowserRuntime(firstContext, new AbortController().signal, {
+      resourceRouter: {
+        artifactTransport: vi.fn(),
+        cogRangeTransport: {
+          validateDelivery: vi.fn(async () => undefined),
+          readExpandedRange: vi.fn(async () => new ArrayBuffer(0)),
+        },
+        close,
+      },
+    });
 
     expect(runtime.context).toBe(firstContext);
     expect(runtime.geography).toBeInstanceOf(StaticGeographyClassifier);
@@ -158,7 +195,84 @@ describe("static browser runtime adapter", () => {
       phase: "ready",
       release: { dataReleaseId: firstContext.dataReleaseId },
     });
-    runtime.controller.dispose();
+    runtime.dispose();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("wires coordinator update state and actions through the production capability controller", async () => {
+    const candidate = validateAppReleasePair({
+      contractVersion: 1,
+      appBuildId: "next-static-build",
+      dataReleaseId: "next-static-release",
+    });
+    const inspectCapability = vi.fn(async (subject, inspection) => Object.freeze({
+      contractVersion: 2 as const,
+      subject,
+      data: Object.freeze({
+        state: "online-complete" as const,
+        pair: validateAppReleasePair({
+          contractVersion: 1,
+          appBuildId: "current-static-build",
+          dataReleaseId: firstContext.dataReleaseId,
+        }),
+      }),
+      update: inspection.update ?? Object.freeze({ state: "current" as const }),
+    }));
+    const requestAction = vi.fn(async () => undefined);
+    const runtime = await createBrowserRuntime(firstContext, new AbortController().signal, {
+      resourceRouter: {
+        artifactTransport: vi.fn(),
+        cogRangeTransport: {
+          validateDelivery: vi.fn(async () => undefined),
+          readExpandedRange: vi.fn(async () => new ArrayBuffer(0)),
+        },
+        inspectCapability,
+        updateCoordinator: {
+          inspect: async () => Object.freeze({ state: "update-available" as const, candidate }),
+          requestAction,
+        },
+        close: vi.fn(),
+      },
+    });
+
+    await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update).toEqual({
+      state: "update-available",
+      candidate,
+    }));
+    await runtime.capability?.requestUpdateAction();
+    expect(requestAction).toHaveBeenCalledOnce();
+    expect(requestAction).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({ state: "update-available", candidate }),
+    }));
+    runtime.dispose();
+  });
+
+  it("classifies a missing release resource as connection-required", async () => {
+    const runtime = await createBrowserRuntime(firstContext, new AbortController().signal, {
+      resourceRouter: {
+        artifactTransport: vi.fn(async () => {
+          throw new TechnicalFailure({
+            kind: "technical-error",
+            code: "FetchFailed",
+            message: "COG delivery metadata for projection-ssp2-45-2050-cog is unavailable.",
+            recoverable: true,
+          });
+        }),
+        cogRangeTransport: {
+          validateDelivery: vi.fn(async () => undefined),
+          readExpandedRange: vi.fn(async () => new ArrayBuffer(0)),
+        },
+        close: vi.fn(),
+      },
+    });
+
+    await runtime.controller.select(selected(firstContext));
+
+    expect(runtime.controller.getSnapshot()).toMatchObject({
+      phase: "connection-required",
+      error: { code: "FetchFailed" },
+    });
+    runtime.dispose();
   });
 
   it("constructs once per context, keeps snapshots stable, and exposes every controller command", async () => {
@@ -214,6 +328,76 @@ describe("static browser runtime adapter", () => {
     expect(records[0].controller.dispose).toHaveBeenCalledOnce();
     expect(records[0].controller.listenerCount).toBe(0);
     act(() => records[0].controller.publish(readyState(firstContext)));
+  });
+
+  it("reconfirms the same assessment interaction after a failed operation retries successfully", async () => {
+    const selection = selected(firstContext);
+    const interaction: RuntimeCapabilityInteractionV1 = Object.freeze({
+      generation: 7,
+      subject: Object.freeze({
+        kind: "assessment",
+        scenario: selection.scenario,
+        horizon: selection.horizon,
+      }),
+    });
+    const capability = {
+      getSnapshot: vi.fn(() => null),
+      subscribe: vi.fn(() => () => undefined),
+      beginInteraction: vi.fn(() => interaction),
+      confirmInteractionAvailable: vi.fn(async () => undefined),
+      retry: vi.fn(async () => undefined),
+      requestUpdateAction: vi.fn(async () => undefined),
+      dispose: vi.fn(() => undefined),
+    } satisfies RuntimeCapabilityPort;
+    const record = runtimeRecord(firstContext, capability);
+    const factory: BrowserRuntimeFactory = () => record.scope;
+    const { result } = renderHook(() => useAssessmentRuntime(firstContext, factory));
+    await waitFor(() => expect(result.current.projection?.phase).toBe("ready"));
+
+    record.controller.select.mockImplementationOnce(async () => {
+      const evaluating = projectionReducer(readyState(firstContext), {
+        type: "evaluation-started",
+        operationToken: 1,
+        selection,
+      });
+      record.controller.publish(projectionReducer(evaluating, {
+        type: "operation-unavailable",
+        availability: "connection-required",
+        operationToken: 1,
+        selectionKey: selectionKey(selection),
+        dataReleaseId: firstContext.dataReleaseId,
+        error: {
+          kind: "technical-error",
+          code: "FetchFailed",
+          message: "Exact assessment bytes are unavailable.",
+          recoverable: true,
+        },
+      }));
+    });
+    await act(async () => result.current.select(selection));
+    expect(result.current.projection?.phase).toBe("connection-required");
+    expect(capability.confirmInteractionAvailable).not.toHaveBeenCalled();
+
+    record.controller.retry.mockImplementationOnce(async () => {
+      const evaluating = projectionReducer(readyState(firstContext), {
+        type: "evaluation-started",
+        operationToken: 2,
+        selection,
+      });
+      record.controller.publish(projectionReducer(evaluating, {
+        type: "assessment-completed",
+        operationToken: 2,
+        selectionKey: selectionKey(selection),
+        dataReleaseId: firstContext.dataReleaseId,
+        result: outOfScopeResult(firstContext, selection),
+      }));
+      return true;
+    });
+    await act(async () => expect(result.current.retry()).resolves.toBe(true));
+
+    expect(capability.beginInteraction).toHaveBeenCalledOnce();
+    expect(capability.confirmInteractionAvailable).toHaveBeenCalledOnce();
+    expect(capability.confirmInteractionAvailable).toHaveBeenCalledWith(interaction);
   });
 
   it("replaces and disposes the exact release scope without accepting stale methodology", async () => {

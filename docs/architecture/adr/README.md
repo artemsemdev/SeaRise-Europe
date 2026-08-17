@@ -12,6 +12,7 @@ are active, amended, or superseded.
 | [ADR-021](ADR-021-static-first-offline-geospatial-architecture.md) | Accepted | Adopt the static-first offline geospatial architecture |
 | [ADR-024](ADR-024-ar6-regional-projection-contract.md) | Accepted; Phase 1 evidence complete | Report source-native AR6 regional projection values without terrain exposure classification |
 | [ADR-025](ADR-025-accelerated-static-runtime-cutover.md) | Accepted | Make the static application the only repository runtime in Phase 2; recover removed source through Git history |
+| [ADR-026](ADR-026-authoritative-browser-range-persistence.md) | Accepted | Persist complete resources in Cache Storage and only integrity-authorized COG chunks in bounded IndexedDB; keep PMTiles network-only and `no-store` |
 
 ## Superseded publication decisions
 

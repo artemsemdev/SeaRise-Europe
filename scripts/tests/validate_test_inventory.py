@@ -91,7 +91,9 @@ def _discover_test_files() -> set[str]:
         content = path.read_text(encoding="utf-8")
         if "[Fact]" in content or "[Theory]" in content:
             files.add(str(path.relative_to(ROOT)))
-    files.add("scripts/compose-smoke.sh")
+    compose_smoke = ROOT / "scripts/compose-smoke.sh"
+    if compose_smoke.is_file():
+        files.add("scripts/compose-smoke.sh")
     return files
 
 
@@ -136,13 +138,21 @@ def validate_inventory(
     covered: set[str] = set()
     for suite in suites:
         suite_id = suite["id"]
+        status = suite["status"]
         matched: set[str] = set()
         for pattern in suite["sourcePaths"]:
             matches = _matching_paths(pattern)
-            if not matches:
+            if status == "active" and not matches:
                 errors.append(f"{suite_id}: sourcePaths pattern matches no files: {pattern}")
             matched.update(matches)
-        covered.update(matched)
+        if status == "active":
+            covered.update(matched)
+
+        if status == "retired":
+            if suite["removalGate"] is None or suite["replacementEvidence"] is None:
+                errors.append(f"{suite_id}: retired suite requires gate and evidence")
+        elif suite["removalGate"] is not None or suite["replacementEvidence"] is not None:
+            errors.append(f"{suite_id}: active suite cannot carry retirement metadata")
 
         if suite["cost"]["evidenceRef"] not in evidence:
             errors.append(f"{suite_id}: cost evidenceRef does not exist")
@@ -177,7 +187,8 @@ def validate_inventory(
     if uncovered:
         errors.append(f"test files missing from inventory: {uncovered}")
 
-    suite_ids = {suite["id"] for suite in suites}
+    suite_by_id = {suite["id"]: suite for suite in suites}
+    suite_ids = set(suite_by_id)
     baseline = inventory["baselineTests"]
     duplicate_paths = _duplicates(item["path"] for item in baseline)
     if duplicate_paths:
@@ -193,9 +204,16 @@ def validate_inventory(
     for item in baseline:
         if item["suite"] not in suite_ids:
             errors.append(f"{item['path']}: unknown suite {item['suite']}")
+        elif (
+            item["status"] == "active"
+            and suite_by_id[item["suite"]]["status"] == "retired"
+        ):
+            errors.append(f"{item['path']}: active baseline is owned by retired suite")
         if item["status"] == "retired":
             if item["removalGate"] is None or item["replacementEvidence"] is None:
                 errors.append(f"{item['path']}: retired test requires gate and evidence")
+            if item["path"] in discovered:
+                errors.append(f"{item['path']}: on-disk test cannot be declared retired")
         elif item["replacementEvidence"] is not None:
             errors.append(f"{item['path']}: active test cannot claim replacement evidence")
     return errors

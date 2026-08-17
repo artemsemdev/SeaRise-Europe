@@ -21,6 +21,8 @@ import {
 import { createServer as createHttpServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { applicationBuildIdentityPlugin } from "./application-build-identity.mjs";
+import { privateCandidateBuildIdentity } from "./build-identity.mjs";
 
 const ARTIFACT_SCHEMA =
   "https://artemsemdev.github.io/SeaRise-Europe/contracts/release/v2/artifact.schema.json";
@@ -1131,6 +1133,7 @@ export function forbiddenLocalFilesystemRequest(binding, requestUrl) {
 
 export async function servePrivateCandidate(options) {
   const binding = createPrivateCandidateBinding(options);
+  const buildIdentity = privateCandidateBuildIdentity(binding.releaseId);
   const webRoot = resolve(repositoryRoot, "src/web");
   const appRoot = resolve(binding.overlayRoot, "app");
   let server;
@@ -1142,15 +1145,7 @@ export async function servePrivateCandidate(options) {
     await build({
       configFile: false,
       root: webRoot,
-      plugins: [react()],
-      define: {
-        __APP_BUILD_ID__: JSON.stringify("private-local-candidate"),
-        __DATA_RELEASE_ID__: JSON.stringify(binding.releaseId),
-        __RELEASE_DISPOSITION__: JSON.stringify("private-engineering"),
-        __MANIFEST_URL__: JSON.stringify(
-          `${binding.origin}/releases/${binding.releaseId}/manifest.json`,
-        ),
-      },
+      plugins: [applicationBuildIdentityPlugin(buildIdentity), react()],
       build: {
         emptyOutDir: true,
         outDir: appRoot,

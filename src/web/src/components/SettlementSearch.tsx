@@ -10,6 +10,7 @@ import {
 } from "react";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import type { ReleaseContext } from "../domain/release";
+import type { ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent } from "../domain/projection-search";
 import { SettlementSearchClient, type SearchWorkerFactory } from "../search/client";
 import type { SettlementSearchRecord, SettlementSearchState } from "../search/types";
@@ -21,6 +22,7 @@ interface SettlementSearchProps {
   /** Increment to clear the local query from an application-level reset. */
   readonly clearToken?: number;
   readonly workerFactory?: SearchWorkerFactory;
+  readonly artifactTransport?: ArtifactTransport;
   readonly inputRef?: RefObject<HTMLInputElement | null>;
 }
 
@@ -40,11 +42,12 @@ const unavailable: SettlementSearchState = Object.freeze({
 function useClient(
   release: ReleaseContext | null,
   factory: SearchWorkerFactory | undefined,
+  artifactTransport: ArtifactTransport | undefined,
   onLifecycle: ((event: SearchLifecycleEvent) => void) | undefined,
 ) {
   const client = useMemo(
-    () => release ? new SettlementSearchClient(release, factory) : null,
-    [factory, release],
+    () => release ? new SettlementSearchClient(release, factory, artifactTransport) : null,
+    [artifactTransport, factory, release],
   );
   const lifecycleListener = useRef(onLifecycle);
   useEffect(() => {
@@ -281,9 +284,10 @@ export function SettlementSearch({
   onSearchLifecycle,
   clearToken = 0,
   workerFactory,
+  artifactTransport,
   inputRef,
 }: SettlementSearchProps) {
-  const [client, state] = useClient(release, workerFactory, onSearchLifecycle);
+  const [client, state] = useClient(release, workerFactory, artifactTransport, onSearchLifecycle);
   return (
     <SettlementSearchSession
       key={client?.generation ?? "unavailable"}

@@ -4,8 +4,8 @@ import type { RankedSearchResult, SearchShardAuthority, SearchShardId } from "./
 export const SEARCH_WORKER_VERSION = "settlement-browser-worker-v2" as const;
 
 export type SearchWorkerRequest =
-  | { readonly kind: "initialize"; readonly token: number; readonly authority: SearchShardAuthority }
-  | { readonly kind: "load-shard"; readonly token: number; readonly authority: SearchShardAuthority }
+  | { readonly kind: "initialize"; readonly token: number; readonly authority: SearchShardAuthority; readonly verifiedBytes?: ArrayBuffer }
+  | { readonly kind: "load-shard"; readonly token: number; readonly authority: SearchShardAuthority; readonly verifiedBytes?: ArrayBuffer }
   | { readonly kind: "query"; readonly token: number; readonly query: string }
   | { readonly kind: "terminate"; readonly token: number };
 
@@ -34,6 +34,6 @@ export type SearchWorkerResponse =
 export interface SearchWorkerPort {
   onmessage: ((event: MessageEvent<SearchWorkerResponse>) => void) | null;
   onerror: ((event: ErrorEvent) => void) | null;
-  postMessage(message: SearchWorkerRequest): void;
+  postMessage(message: SearchWorkerRequest, transfer?: Transferable[]): void;
   terminate(): void;
 }

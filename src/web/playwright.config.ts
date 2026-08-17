@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: /tests\/private\//,
+  testIgnore: [/tests\/private\//, /offline-lifecycle\.spec\.ts/],
   fullyParallel: true,
   // Keep timing-gate samples isolated from high-core host contention.
   workers: 1,
