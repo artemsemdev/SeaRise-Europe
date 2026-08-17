@@ -16,6 +16,13 @@ export interface AcceptedPairIdentityV1 {
   readonly receiptSha256: string;
 }
 
+/** Install-time authority sealed into a waiting worker; no runtime receipt exists yet. */
+export interface BuildSealedPairIdentityV1 {
+  readonly contractVersion: 1;
+  readonly pair: AppReleasePairV1;
+  readonly precacheSetSha256: string;
+}
+
 export interface ControllerBootProofV1 {
   readonly contractVersion: 1;
   readonly bootId: string;
@@ -23,7 +30,7 @@ export interface ControllerBootProofV1 {
 }
 
 export type WaitingCandidateInspectionV1 =
-  | Readonly<{ status: "sealed"; candidate: AcceptedPairIdentityV1 }>
+  | Readonly<{ status: "sealed"; candidate: BuildSealedPairIdentityV1 }>
   | Readonly<{ status: "incomplete" | "corrupt" | "mixed" | "stale"; reason: string }>;
 
 export interface CloseAndReopenIntentV1 {
@@ -32,7 +39,7 @@ export interface CloseAndReopenIntentV1 {
   readonly confirmationGeneration: number;
   readonly sourceBootId: string;
   readonly sourceController: AcceptedPairIdentityV1;
-  readonly candidate: AcceptedPairIdentityV1;
+  readonly candidate: BuildSealedPairIdentityV1;
   readonly message: typeof UPDATE_READY_MESSAGE;
 }
 
@@ -54,7 +61,7 @@ export interface StaticUpdateCoordinatorPorts {
   issueConfirmationToken(request: Readonly<{
     coordinatorGeneration: number;
     boot: ControllerBootProofV1;
-    candidate: AcceptedPairIdentityV1;
+    candidate: BuildSealedPairIdentityV1;
   }>): string;
   /** Persist a non-consumable PENDING intent for this exact source boot. */
   recordPendingTransitionIntent(intent: CloseAndReopenIntentV1, permit: DurablePortPermitV1): Promise<void>;
@@ -93,7 +100,7 @@ export type StaticUpdateCoordinatorStateV1 =
   | Readonly<{
     phase: "waiting-candidate-verified";
     boot: ControllerBootProofV1;
-    candidate: AcceptedPairIdentityV1;
+    candidate: BuildSealedPairIdentityV1;
     confirmationToken: string;
     currentUsable: true;
   }>
@@ -118,7 +125,7 @@ export type StaticUpdateCoordinatorStateV1 =
   | Readonly<{
     phase: "recording-close-and-reopen-intent";
     boot: ControllerBootProofV1;
-    candidate: AcceptedPairIdentityV1;
+    candidate: BuildSealedPairIdentityV1;
     currentUsable: true;
   }>
   | Readonly<{
@@ -181,6 +188,13 @@ function sameIdentity(left: AcceptedPairIdentityV1, right: AcceptedPairIdentityV
     left.receiptSha256 === right.receiptSha256;
 }
 
+function sameInstallIdentity(
+  active: AcceptedPairIdentityV1,
+  candidate: BuildSealedPairIdentityV1,
+): boolean {
+  return samePair(active.pair, candidate.pair) && active.precacheSetSha256 === candidate.precacheSetSha256;
+}
+
 function opaque(value: unknown, name: string, pattern = OPAQUE_ID): string {
   if (typeof value !== "string" || !pattern.test(value)) throw new TypeError(`${name} is invalid.`);
   return value;
@@ -229,6 +243,17 @@ export function validateAcceptedPairIdentity(value: AcceptedPairIdentityV1): Acc
   });
 }
 
+export function validateBuildSealedPairIdentity(value: BuildSealedPairIdentityV1): BuildSealedPairIdentityV1 {
+  if (!value || typeof value !== "object" || value.contractVersion !== 1) {
+    throw new TypeError("Build-sealed pair identity is invalid.");
+  }
+  return Object.freeze({
+    contractVersion: 1,
+    pair: validateAppReleasePair(value.pair),
+    precacheSetSha256: sha256Hex(value.precacheSetSha256, "precacheSetSha256"),
+  });
+}
+
 export function validateControllerBootProof(value: ControllerBootProofV1): ControllerBootProofV1 {
   if (!value || typeof value !== "object" || value.contractVersion !== 1) {
     throw new TypeError("Controller boot proof is invalid.");
@@ -258,8 +283,8 @@ export function validateCloseAndReopenIntent(value: CloseAndReopenIntentV1): Clo
     INSTANCE_ID,
   );
   const sourceController = validateAcceptedPairIdentity(value.sourceController);
-  const candidate = validateAcceptedPairIdentity(value.candidate);
-  if (sameIdentity(sourceController, candidate)) throw new TypeError("Transition candidate is already active.");
+  const candidate = validateBuildSealedPairIdentity(value.candidate);
+  if (sameInstallIdentity(sourceController, candidate)) throw new TypeError("Transition candidate is already active.");
   return Object.freeze({
     contractVersion: 1,
     transitionId,
@@ -277,7 +302,7 @@ function validateInspection(
 ): WaitingCandidateInspectionV1 {
   if (!value || typeof value !== "object") throw new TypeError("Waiting-candidate inspection is invalid.");
   if (value.status === "sealed") {
-    const candidate = validateAcceptedPairIdentity(value.candidate);
+    const candidate = validateBuildSealedPairIdentity(value.candidate);
     if (!samePair(candidate.pair, requested)) throw new TypeError("Waiting candidate contains a mixed pair.");
     return Object.freeze({ status: "sealed", candidate });
   }
@@ -541,7 +566,7 @@ export class StaticHostUpdateCoordinator {
       !this.#isLaunchBoot(boot) ||
       this.#launchBoot?.bootId === intent.sourceBootId ||
       boot.bootId === intent.sourceBootId ||
-      !sameIdentity(boot.controller, intent.candidate)
+      !sameInstallIdentity(boot.controller, intent.candidate)
     ) {
       return this.#commit(operation, failed(
         "verify-next-boot", "controller-mismatch", boot,
