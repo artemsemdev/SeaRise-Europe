@@ -197,31 +197,56 @@ the static build, committed, sent to CI, or uploaded anywhere.
 ### Read-only Candidate-v7 measurement
 
 The static target includes a local-only measurement command. It reads an
-explicit candidate root in place, verifies each compressed shard against the
-candidate manifest, serves the production Worker bundle and those source files
-from a cross-origin-isolated loopback origin, and writes its raw report with
-exclusive creation. Keep that report under `/tmp` or another ignored private
-directory outside every Git worktree, the Candidate tree, and the deployable
+explicit candidate root in place and requires the manifest, the
+`settlements-search-shard-set-receipt` artifact, and both compressed shards to
+agree on release, provenance, path, size, encoding, format, and SHA-256. The
+query set must be canonical JSON with a final newline, declare the same
+provenance as the candidate, use `production-candidate` corpus scale for a
+real-source candidate, contain one to 100 unique stable IDs, and keep each
+nonempty query within 256 Unicode code points.
+
+The harness serves the production Worker bundle and the read-only source files
+from a cross-origin-isolated loopback origin. Keep its report in an existing
+owner-controlled private directory under `/tmp`, or another ignored private
+directory, outside every Git worktree, the Candidate tree, and the deployable
 `dist` tree. The command resolves canonical paths and rejects those locations
 before it reads or opens the report path:
 
 ```bash
 cd src/web
 npm run build
+mkdir -m 700 /tmp/searise-search-evidence
 npm run measure:local-candidate-search -- \
   --candidate-root /absolute/ignored/candidate-v7 \
   --query-set /absolute/ignored/performance-queries.json \
-  --output /tmp/static-search-candidate-v7-measurement.json \
+  --output /tmp/searise-search-evidence/candidate-v7-measurement.json \
   --samples 5
 ```
 
 The command uses Pixel 7 emulation and a 512 MiB Worker V8 old-space limit. It
-records Chromium version, initialization and query distributions,
+records Chromium version, retained cold-initialization and warmed-query
+observations, the maximum main-thread 10 ms timer gap during each cold start,
 `performance.measureUserAgentSpecificMemory()` when available, and dedicated
-Worker `Runtime.getHeapUsage` telemetry. The conservative numeric observation
-adds V8 used heap, embedder heap, and backing storage, then takes the maximum
-with the user-agent-specific observations. This is not device RSS and Pixel
-emulation is not physical mobile hardware.
+Worker `Runtime.getHeapUsage` telemetry. Initialization passes only below
+1,000 ms p95 and query performance passes only below 50 ms p95. Every browser
+request must be an allowlisted same-origin `GET` without a query string; the
+report retains only method and path, while raw settlement queries remain in
+page/Worker session memory and never enter a URL, request body, report, log,
+cache key, or persistent browser storage.
+
+The canonical report binds the candidate manifest, shard receipt, both shard
+authorities, canonical query-set bytes, and result-count identity. Its content
+identity is recomputed and its distributions, thresholds, request gate, and
+false production/publication/scientific/owner/mobile-device claims are
+self-validated before and after publication. Publication writes and syncs a
+private stage, makes it read-only, promotes it with an exclusive hard link,
+syncs the parent directory, and never overwrites an existing report. Failure
+rollback removes only the invocation's own inode.
+
+The conservative numeric memory observation adds V8 used heap, embedder heap,
+and backing storage, then takes the maximum with the user-agent-specific
+observations. This is not device RSS and Pixel emulation is not physical mobile
+hardware.
 
 The 2026-08-16 read-only run observed 38,512,542-byte and 46,221,779-byte
 decoded shards. The 64 MiB decoded ceiling therefore leaves 20,887,085 bytes

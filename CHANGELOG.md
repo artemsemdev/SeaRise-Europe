@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added target-owned production settlement-search browser evidence with exact
+  manifest/receipt/shard/query bindings, private request allowlisting, retained
+  responsiveness and latency distributions, explicit browser budgets,
+  hash-bound nonclaim validation, and durable no-overwrite report publication.
+
 - Added the static target's production settlement-search shard builder. It
   consumes the exact Python-validated projection authority, emits deterministic
   v4 code-point-trie Brotli shards and a release/source/hash-bound receipt, and
