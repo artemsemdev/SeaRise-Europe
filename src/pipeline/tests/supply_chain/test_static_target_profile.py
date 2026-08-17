@@ -253,7 +253,8 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
         },
         "validatorAuthority": {
             "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
-            "sha256": "0205872b64cef44d3188398d9e9369f8da5be22e7e0abebcb8acac615fb9992a",
+            "sha256": "f87e079c534d3bfe10da0c71127f140988436d4e0bec91400fec8a913b8e8ced",
+            "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df",
         },
     }
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
@@ -278,6 +279,50 @@ def test_historical_v1_inventory_validates_against_its_git_tree() -> None:
 
     assert len(inputs) == 49
     assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+def test_historical_gate_ignores_mutable_current_validator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    current_validator = repository / "src/pipeline/searise_pipeline/supply_chain/contracts.py"
+    current_validator.write_text("raise RuntimeError('must not execute')\n", encoding="utf-8")
+    original_git = historical_inventory._git
+    monkeypatch.setattr(
+        historical_inventory,
+        "_git",
+        lambda _repository, *arguments: original_git(ROOT, *arguments),
+    )
+
+    document = validate_historical_dependency_inventory(
+        repository / "contracts/supply-chain/v2/static-target-profile.json",
+        repository_root=repository,
+    )
+
+    assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+def test_historical_gate_rejects_validator_binding_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    document = _load(profile_path)
+    document["historicalEvidence"]["validatorAuthority"]["sha256"] = "f" * 64
+    _write(profile_path, document)
+    original_git = historical_inventory._git
+    monkeypatch.setattr(
+        historical_inventory,
+        "_git",
+        lambda _repository, *arguments: original_git(ROOT, *arguments),
+    )
+
+    with pytest.raises(SupplyChainContractError, match="historical Phase 1 authority drifted"):
+        validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
 
 @pytest.mark.parametrize(
@@ -387,6 +432,17 @@ def test_profile_rejects_unclassified_static_quality_npm_authority(tmp_path: Pat
     "path",
     [
         "tools/unclassified/Dockerfile",
+        "tools/unclassified/npm-shrinkwrap.json",
+        "tools/unclassified/pnpm-lock.yaml",
+        "tools/unclassified/yarn.lock",
+        "tools/unclassified/Pipfile",
+        "tools/unclassified/Pipfile.lock",
+        "tools/unclassified/poetry.lock",
+        "tools/unclassified/uv.lock",
+        "tools/unclassified/compose.yaml",
+        "tools/unclassified/compose.yml",
+        "tools/unclassified/docker-compose.yaml",
+        "tools/unclassified/docker-compose.yml",
         "src/pipeline/requirements-unclassified.txt",
         ".github/actions/unclassified/action.yml",
         "contracts/supply-chain/v2/sboms/unclassified.cdx.json",
@@ -503,6 +559,49 @@ def test_workflow_job_authority_resists_split_env_indirection(
         selector["id"] == selector_id
         for selector in validated["activation"]["pendingSelectors"]
     )
+
+
+@pytest.mark.parametrize("replacement", ['  "api" :', "  api :"])
+def test_workflow_yaml_parser_finds_quoted_or_spaced_job_keys(
+    tmp_path: Path,
+    replacement: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    workflow = repository / ".github/workflows/ci.yml"
+    value = workflow.read_text(encoding="utf-8")
+    workflow.write_text(value.replace("  api:", replacement, 1), encoding="utf-8")
+    document = copy.deepcopy(_load())
+    _refresh_hash(document, repository, ".github/workflows/ci.yml")
+
+    validated = validate_static_target_profile(
+        _write(tmp_path / "profile.json", document),
+        repository_root=repository,
+    )
+
+    assert any(
+        selector["id"] == "ci-legacy-api"
+        for selector in validated["activation"]["pendingSelectors"]
+    )
+
+
+def test_workflow_yaml_parser_rejects_duplicate_job_keys(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    workflow = repository / ".github/workflows/ci.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8")
+        + '\n  "api" :\n    runs-on: ubuntu-latest\n    steps: []\n',
+        encoding="utf-8",
+    )
+    document = copy.deepcopy(_load())
+    _refresh_hash(document, repository, ".github/workflows/ci.yml")
+
+    with pytest.raises(SupplyChainContractError, match="duplicate workflow job identifier: api"):
+        validate_static_target_profile(
+            _write(tmp_path / "profile.json", document),
+            repository_root=repository,
+        )
 
 
 def test_profile_accepts_exact_partial_selector_shrink(tmp_path: Path) -> None:

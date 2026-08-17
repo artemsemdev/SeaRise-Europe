@@ -45,7 +45,8 @@
     },
     "validatorAuthority": {
       "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
-      "sha256": "0205872b64cef44d3188398d9e9369f8da5be22e7e0abebcb8acac615fb9992a"
+      "sha256": "f87e079c534d3bfe10da0c71127f140988436d4e0bec91400fec8a913b8e8ced",
+      "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df"
     }
   },
   "excludedLegacyRequirements": [
@@ -156,7 +157,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "34064d47f2db0562f61e3e9f3e440cc13a5f3c90bdad1d51c17d01e934d16fcc" }
+        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "521be12623ce0f2c792e37c67351babfb8ca44a4a96987d6f58a031eb333cdc9" }
       ]
     },
     {

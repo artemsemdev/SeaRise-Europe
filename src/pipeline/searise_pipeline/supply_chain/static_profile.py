@@ -31,7 +31,8 @@ _HISTORICAL_EVIDENCE = {
     },
     "validatorAuthority": {
         "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
-        "sha256": "0205872b64cef44d3188398d9e9369f8da5be22e7e0abebcb8acac615fb9992a",
+        "sha256": "f87e079c534d3bfe10da0c71127f140988436d4e0bec91400fec8a913b8e8ced",
+        "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df",
     },
 }
 
@@ -226,6 +227,9 @@ _LEGACY_SELECTORS = {
     "legacy-api-dockerfile": (72, "src/api/Dockerfile", "path-exists"),
     "legacy-blob-seed-tree": (71, "infra/blob-seed", "path-exists"),
     "legacy-compose-file": (72, "docker-compose.yml", "path-exists"),
+    "legacy-compose-short-yaml": (72, "compose.yaml", "path-exists"),
+    "legacy-compose-short-yml": (72, "compose.yml", "path-exists"),
+    "legacy-compose-yaml": (72, "docker-compose.yaml", "path-exists"),
     "legacy-compose-smoke": (72, "scripts/compose-smoke.sh", "path-exists"),
     "legacy-db-geography": (71, "infra/db/init-geography.sql", "path-exists"),
     "legacy-db-init": (71, "infra/db/init.sql", "path-exists"),
@@ -303,7 +307,18 @@ _DISCOVERY_IGNORED_PARTS = frozenset(
         "node_modules",
     }
 )
-_NODE_AUTHORITY_FILES = frozenset({"package.json", "package-lock.json"})
+_NODE_AUTHORITY_FILES = frozenset(
+    {
+        "npm-shrinkwrap.json",
+        "package-lock.json",
+        "package.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+    }
+)
+_PYTHON_AUTHORITY_FILES = frozenset(
+    {"Pipfile", "Pipfile.lock", "poetry.lock", "pyproject.toml", "uv.lock"}
+)
 _CURRENT_SCHEMA_ROOTS = (
     PurePosixPath("contracts/supply-chain/v2"),
     PurePosixPath("src/pipeline/offline_release/profiles"),
@@ -575,7 +590,7 @@ def _is_current_dependency_authority(path: PurePosixPath) -> bool:
     )
     dockerfile = path.name.startswith("Dockerfile")
     python_authority = (
-        path.name == "pyproject.toml"
+        path.name in _PYTHON_AUTHORITY_FILES
         or (
             path.name.startswith("requirements")
             and path.suffix in {".in", ".lock", ".txt"}
@@ -593,6 +608,7 @@ def _is_current_dependency_authority(path: PurePosixPath) -> bool:
     sbom = path.parent == _CURRENT_SBOM_ROOT and path.name.endswith(".cdx.json")
     return (
         path.name in _NODE_AUTHORITY_FILES
+        or path.name in _FORBIDDEN_FILES
         or workflow
         or local_action
         or dockerfile
@@ -628,15 +644,104 @@ def _workflow_selector_present(value: str, selector: str) -> bool:
         or not re.fullmatch(r"[A-Za-z0-9_-]+", job_id)
     ):
         raise SupplyChainContractError(f"invalid workflow selector: {selector}")
-    jobs_markers = tuple(re.finditer(r"(?m)^jobs:[ \t]*(?:#.*)?$", value))
-    if len(jobs_markers) != 1:
-        raise SupplyChainContractError("workflow must contain one exact top-level jobs mapping")
-    jobs = value[jobs_markers[0].end() :]
-    job_ids = {
-        match.group(1)
-        for match in re.finditer(r"(?m)^  ([A-Za-z0-9_-]+):[ \t]*(?:#.*)?$", jobs)
-    }
-    return job_id in job_ids
+    return job_id in _parse_workflow_jobs(value)
+
+
+def _yaml_mapping_entry(line: str, indent: int) -> tuple[str, str] | None:
+    prefix = line[:indent]
+    if "\t" in prefix:
+        raise SupplyChainContractError("workflow YAML indentation must not use tabs")
+    content = line[indent:]
+    if not content.strip() or content.lstrip().startswith("#"):
+        return None
+    quote: str | None = None
+    escaped = False
+    colon = -1
+    index = 0
+    while index < len(content):
+        character = content[index]
+        if quote == '"':
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                quote = None
+        elif quote == "'":
+            if character == "'":
+                if index + 1 < len(content) and content[index + 1] == "'":
+                    index += 1
+                else:
+                    quote = None
+        elif character in {'"', "'"}:
+            quote = character
+        elif character == ":":
+            colon = index
+            break
+        elif character == "#" and (index == 0 or content[index - 1].isspace()):
+            break
+        index += 1
+    if quote is not None or colon < 0:
+        raise SupplyChainContractError("workflow YAML mapping entry is malformed")
+    raw_key = content[:colon].strip()
+    remainder = content[colon + 1 :].strip()
+    if not raw_key:
+        raise SupplyChainContractError("workflow YAML mapping key is empty")
+    try:
+        if raw_key.startswith('"'):
+            if not raw_key.endswith('"'):
+                raise ValueError("unterminated double-quoted key")
+            key = json.loads(raw_key)
+        elif raw_key.startswith("'"):
+            if not raw_key.endswith("'"):
+                raise ValueError("unterminated single-quoted key")
+            key = raw_key[1:-1].replace("''", "'")
+        else:
+            key = raw_key
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SupplyChainContractError("workflow YAML mapping key is invalid") from exc
+    if not isinstance(key, str) or not key:
+        raise SupplyChainContractError("workflow YAML mapping key must be a nonempty string")
+    return key, remainder
+
+
+def _parse_workflow_jobs(value: str) -> frozenset[str]:
+    jobs_seen = False
+    in_jobs = False
+    job_ids: set[str] = set()
+    for line in value.splitlines():
+        indent = len(line) - len(line.lstrip(" "))
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if indent != 0 and not (in_jobs and indent == 2):
+            continue
+        entry = _yaml_mapping_entry(line, indent)
+        if entry is None:
+            continue
+        key, remainder = entry
+        if indent == 0:
+            if key == "jobs":
+                if jobs_seen or remainder and not remainder.startswith("#"):
+                    raise SupplyChainContractError(
+                        "workflow must contain one block-style top-level jobs mapping"
+                    )
+                jobs_seen = True
+                in_jobs = True
+            elif in_jobs:
+                in_jobs = False
+            continue
+        if not in_jobs or indent != 2:
+            continue
+        if remainder and not remainder.startswith("#"):
+            raise SupplyChainContractError("workflow job must use a block mapping")
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", key):
+            raise SupplyChainContractError(f"workflow job identifier is invalid: {key}")
+        if key in job_ids:
+            raise SupplyChainContractError(f"duplicate workflow job identifier: {key}")
+        job_ids.add(key)
+    if not jobs_seen:
+        raise SupplyChainContractError("workflow must contain one top-level jobs mapping")
+    return frozenset(job_ids)
 
 
 def _expected_transition(

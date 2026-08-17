@@ -101,12 +101,13 @@
         "validatorAuthority": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["path", "sha256"],
+          "required": ["path", "sha256", "gitBlob"],
           "properties": {
             "path": {
               "const": "src/pipeline/searise_pipeline/supply_chain/contracts.py"
             },
-            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "gitBlob": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
           }
         }
       }

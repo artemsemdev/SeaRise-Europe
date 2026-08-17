@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import io
 import json
 import stat
@@ -14,7 +15,7 @@ from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from .contracts import SupplyChainContractError, validate_dependency_inventory
+from .contracts import SupplyChainContractError
 from .static_profile import _HISTORICAL_EVIDENCE, load_static_target_profile_contract
 
 
@@ -90,9 +91,6 @@ def materialize_historical_dependency_authority(
     git_authority = historical["gitAuthority"]
     validator_authority = historical["validatorAuthority"]
     validator_path = _safe_path(validator_authority["path"])
-    validator_bytes = repository_root.joinpath(*validator_path.parts).read_bytes()
-    if hashlib.sha256(validator_bytes).hexdigest() != validator_authority["sha256"]:
-        raise SupplyChainContractError("historical v1 validator semantics changed")
     inventory_path = _safe_path(inventory_descriptor["path"])
     inventory_bytes = (repository_root / inventory_path).read_bytes()
     if hashlib.sha256(inventory_bytes).hexdigest() != inventory_descriptor["sha256"]:
@@ -107,7 +105,10 @@ def materialize_historical_dependency_authority(
     except (KeyError, TypeError, ValueError) as exc:
         raise SupplyChainContractError("historical v1 inventory structure is malformed") from exc
     subtree = _safe_path(historical["path"])
-    outside_inputs = {path for path in inputs if subtree not in path.parents}
+    outside_inputs = {
+        validator_path,
+        *(path for path in inputs if subtree not in path.parents),
+    }
 
     commit = git_authority["commit"]
     actual_tree = _git(repository_root, "rev-parse", f"{commit}^{{tree}}").decode().strip()
@@ -120,6 +121,13 @@ def materialize_historical_dependency_authority(
     ).decode().strip()
     if actual_subtree != git_authority["phase1ContractsTree"]:
         raise SupplyChainContractError("historical Phase 1 contracts tree does not match")
+    actual_validator_blob = _git(
+        repository_root,
+        "rev-parse",
+        f"{commit}:{validator_path.as_posix()}",
+    ).decode().strip()
+    if actual_validator_blob != validator_authority["gitBlob"]:
+        raise SupplyChainContractError("historical v1 validator Git blob does not match")
     archive = _git(
         repository_root,
         "archive",
@@ -204,8 +212,24 @@ def validate_historical_dependency_inventory(
         profile_path,
         repository_root=repository_root,
     ) as (historical_root, inventory_path):
-        return validate_dependency_inventory(
-            inventory_path,
-            repository_root=historical_root,
-            contract_root=historical_root / "contracts/supply-chain/v1",
+        authority = _HISTORICAL_EVIDENCE["validatorAuthority"]
+        validator_path = historical_root / authority["path"]
+        validator_bytes = validator_path.read_bytes()
+        if hashlib.sha256(validator_bytes).hexdigest() != authority["sha256"]:
+            raise SupplyChainContractError("historical v1 validator binding changed")
+        spec = importlib.util.spec_from_file_location(
+            "_searise_historical_v1_contracts",
+            validator_path,
         )
+        if spec is None or spec.loader is None:
+            raise SupplyChainContractError("historical v1 validator cannot be loaded")
+        module = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(module)
+            validator = module.validate_dependency_inventory
+            return validator(inventory_path, repository_root=historical_root)
+        except Exception as exc:
+            historical_error = getattr(module, "SupplyChainContractError", ())
+            if historical_error and isinstance(exc, historical_error):
+                raise SupplyChainContractError(str(exc)) from exc
+            raise SupplyChainContractError("historical v1 validator execution failed") from exc
