@@ -39,8 +39,25 @@ PACKAGE_ROOT = REPO_ROOT / "src" / "pipeline" / "searise_pipeline"
 
 
 def _imported_modules(source: str, package: str) -> set[str]:
+    tree = ast.parse(source)
     modules: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
+    importlib_aliases = {"importlib"}
+    import_module_aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            importlib_aliases.update(
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "importlib"
+            )
+        elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            import_module_aliases.update(
+                alias.asname or alias.name
+                for alias in node.names
+                if alias.name == "import_module"
+            )
+
+    for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             modules.update(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
@@ -48,6 +65,29 @@ def _imported_modules(source: str, package: str) -> set[str]:
             base = importlib.util.resolve_name(relative_name, package)
             modules.add(base)
             modules.update(f"{base}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.Call):
+            direct_import = isinstance(node.func, ast.Name) and (
+                node.func.id == "__import__" or node.func.id in import_module_aliases
+            )
+            module_import = (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "import_module"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in importlib_aliases
+            )
+            if not direct_import and not module_import:
+                continue
+            if not node.args or not (
+                isinstance(node.args[0], ast.Constant)
+                and type(node.args[0].value) is str
+            ):
+                raise ValueError("Dynamic import target must be a string literal")
+            target = node.args[0].value
+            modules.add(
+                importlib.util.resolve_name(target, package)
+                if target.startswith(".")
+                else target
+            )
     return modules
 
 
@@ -310,6 +350,23 @@ def test_retained_pipeline_cannot_import_legacy_domain() -> None:
             "from ..domain.result_state import determine_result_state",
             "searise_pipeline.science",
         ),
+        (
+            '__import__("searise_pipeline.domain.result_state")',
+            "searise_pipeline.science",
+        ),
+        (
+            'import importlib\nimportlib.import_module("searise_pipeline.domain")',
+            "searise_pipeline.science",
+        ),
+        (
+            'import importlib as loader\nloader.import_module("searise_pipeline.domain")',
+            "searise_pipeline.science",
+        ),
+        (
+            "from importlib import import_module as load\n"
+            'load("searise_pipeline.domain.result_state")',
+            "searise_pipeline.science",
+        ),
     )
     for source, package in mutations:
         assert any(
@@ -335,6 +392,20 @@ def test_retained_pipeline_cannot_import_legacy_domain() -> None:
             violations.append(relative.as_posix())
 
     assert violations == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "__import__(module_name)",
+        "import importlib\nimportlib.import_module(module_name)",
+        "import importlib as loader\nloader.import_module(module_name)",
+        "from importlib import import_module as load\nload(module_name)",
+    ],
+)
+def test_legacy_domain_gate_rejects_nonliteral_dynamic_imports(source: str) -> None:
+    with pytest.raises(ValueError, match="Dynamic import target must be a string literal"):
+        _imported_modules(source, "searise_pipeline.science")
 
 
 def test_public_states_and_sla_limit_are_distinct_and_fail_closed() -> None:
