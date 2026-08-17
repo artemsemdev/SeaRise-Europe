@@ -344,6 +344,19 @@ Candidate evidence failures remain distinct from technical controller,
 inspection-port, token-provider, and intent-store failures. All are technical
 update states, never scientific outcomes.
 
+After that exact fresh-boot reconciliation, production retention inventories
+only lifecycle records already marked `cleanup-pending`. The lifecycle store
+acquires an exact-pair admission Web Lock and asks the current controlling
+worker for a stable client census. Active, unknown, or unresponsive clients,
+unexpired stored leases, corrupt authority, and incomplete active/previous
+records block deletion. The active complete pair and immediately previous
+complete recoverable pair are never cleanup targets. Eligible older pairs are
+removed in receipt/lease, Cache Storage, range-record, then lifecycle order;
+the durable cleanup fence prevents stale admission throughout partial failure
+and retry. The coordinator exposes retryable technical retention state without
+creating a scientific outcome. See the
+[production browser retention runbook](../operations/production-browser-retention.md).
+
 Browser storage is not application rollback authority. Rollback requires a
 verified static deployment, using repository Git history when source recovery
 is needed. The browser coordinator reports `deployment-required` and keeps the
