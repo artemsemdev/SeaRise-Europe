@@ -78,15 +78,16 @@ def test_unknown_selector_fails_before_any_validator_runs() -> None:
     assert caught.value.code == "qa-validator-route"
 
 
-def test_dispatcher_fails_closed_if_a_bound_implementation_disappears() -> None:
-    dispatcher = QaValidatorDispatcher(_registry())
+def test_dispatcher_copies_and_freezes_the_validated_registry() -> None:
+    registry = _registry()
+    dispatcher = QaValidatorDispatcher(registry)
     validator_id = dispatcher.validator_id_for(_request().selector)
-    dispatcher._validators.pop(validator_id)
+    registry.pop(validator_id)
 
-    with pytest.raises(CandidateContractError) as caught:
-        dispatcher.dispatch(_request())
+    assert dispatcher.dispatch(_request()).status == "pass"
 
-    assert caught.value.code == "qa-validator-route"
+    with pytest.raises(TypeError):
+        dispatcher._validators[validator_id] = _pass  # type: ignore[index]
 
 
 @pytest.mark.parametrize(

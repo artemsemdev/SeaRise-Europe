@@ -156,6 +156,76 @@ def _is_safe_data_dict(node: ast.Attribute, path: str, parent: ast.AST | None) -
     return False
 
 
+def _mapping_callable_aliases(tree: ast.AST) -> dict[str, ast.AST]:
+    aliases: dict[str, ast.AST] = {}
+    for node in ast.walk(tree):
+        target: ast.AST | None = None
+        value: ast.AST | None = None
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target, value = node.targets[0], node.value
+        elif isinstance(node, ast.AnnAssign):
+            target, value = node.target, node.value
+        elif isinstance(node, ast.NamedExpr):
+            target, value = node.target, node.value
+        if not isinstance(target, ast.Name) or value is None:
+            continue
+        from_mapping = isinstance(value, ast.Subscript) or (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Attribute)
+            and value.func.attr in {"get", "pop", "setdefault", "__getitem__"}
+        )
+        if from_mapping:
+            aliases[target.id] = node
+    return aliases
+
+
+def _enclosing_function(
+    node: ast.AST, parents: dict[int, ast.AST]
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    parent = parents.get(id(node))
+    while parent is not None:
+        if isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return parent
+        parent = parents.get(id(parent))
+    return None
+
+
+def _is_trusted_qa_callback_call(
+    node: ast.Call,
+    assignment: ast.AST,
+    path: str,
+    parents: dict[int, ast.AST],
+) -> bool:
+    """Recognize only the immutable, matrix-validated internal QA callback dispatch."""
+    if (
+        path != "candidate_completeness/qa_dispatch.py"
+        or not _is_name(node.func, "validator")
+        or len(node.args) != 1
+        or not _is_name(node.args[0], "request")
+        or node.keywords
+        or not isinstance(assignment, ast.Assign)
+        or len(assignment.targets) != 1
+        or not _is_name(assignment.targets[0], "validator")
+        or not isinstance(assignment.value, ast.Call)
+        or not isinstance(assignment.value.func, ast.Attribute)
+        or assignment.value.func.attr != "get"
+        or not isinstance(assignment.value.func.value, ast.Attribute)
+        or not _is_name(assignment.value.func.value.value, "self")
+        or assignment.value.func.value.attr != "_validators"
+        or len(assignment.value.args) != 1
+        or not _is_name(assignment.value.args[0], "validator_id")
+        or assignment.value.keywords
+    ):
+        return False
+    function = _enclosing_function(node, parents)
+    return (
+        function is not None
+        and function is _enclosing_function(assignment, parents)
+        and function.name == "dispatch"
+        and [argument.arg for argument in function.args.args] == ["self", "request"]
+    )
+
+
 def _retained_import_violations(source: str, package: str, path: str) -> set[str]:
     tree = ast.parse(source)
     violations: set[str] = set()
@@ -164,6 +234,7 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
         for node in ast.walk(tree)
         for child in ast.iter_child_nodes(node)
     }
+    mapping_callable_aliases = _mapping_callable_aliases(tree)
     for node in ast.walk(tree):
         parent = parents.get(id(node))
         if isinstance(node, ast.Import):
@@ -202,6 +273,12 @@ def _retained_import_violations(source: str, package: str, path: str) -> set[str
         if isinstance(node, ast.Call):
             if isinstance(node.func, (ast.Call, ast.Subscript)):
                 violations.add(f"dynamic-import:computed-callable:{node.lineno}")
+            if isinstance(node.func, ast.Name) and node.func.id in mapping_callable_aliases:
+                assignment = mapping_callable_aliases[node.func.id]
+                if not _is_trusted_qa_callback_call(node, assignment, path, parents):
+                    violations.add(
+                        f"dynamic-import:computed-callable-alias:{node.lineno}"
+                    )
             if isinstance(node.func, ast.Name):
                 if node.func.id == "getattr" and not _is_safe_getattr(
                     node, path, parent
@@ -531,7 +608,7 @@ def test_adr024_outcome_rejects_non_boolean_inputs(
         classify_adr024_outcome(**arguments)  # type: ignore[arg-type]
 
 
-def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
+def test_retained_pipeline_has_no_legacy_domain_or_dynamic_import_mechanisms() -> None:
     mutations = (
         ("import searise_pipeline.domain", "searise_pipeline.science"),
         ("from searise_pipeline import domain", "searise_pipeline.science"),
@@ -715,6 +792,16 @@ def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
             "actions[name]()",
             "settlements/full_source_stage.py",
             "dynamic-import:computed-callable:1",
+        ),
+        (
+            "loader = registry[key]\nloader(request)",
+            "science/mutation.py",
+            "dynamic-import:computed-callable-alias:2",
+        ),
+        (
+            "loader = registry.get(key)\nloader(request)",
+            "science/mutation.py",
+            "dynamic-import:computed-callable-alias:2",
         ),
         (
             "getattr(acquirer, operation)(source, asset)",
