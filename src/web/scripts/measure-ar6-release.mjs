@@ -160,17 +160,17 @@ const browser = await chromium.launch({ headless: true, args: ["--enable-precise
 async function oneLookup(page, sample, reuse) {
   return page.evaluate(
     async ({ origin, sample, sourceColumn, cogRow, expectedLocationId, expectedValuesMillimetres, reuse }) => {
-      const started = performance.now();
-      const heapBeforeBytes = performance.memory?.usedJSHeapSize ?? -1;
+      const started = globalThis.performance.now();
+      const heapBeforeBytes = globalThis.performance.memory?.usedJSHeapSize ?? -1;
       let peakHeapBytes = heapBeforeBytes;
       const sampleHeap = () => {
-        peakHeapBytes = Math.max(peakHeapBytes, performance.memory?.usedJSHeapSize ?? -1);
+        peakHeapBytes = Math.max(peakHeapBytes, globalThis.performance.memory?.usedJSHeapSize ?? -1);
       };
       const cache = globalThis.__seariseCache ?? {};
       let sourceGrid = cache.sourceGrid;
       let image = cache.image;
       if (!reuse || !sourceGrid) {
-        sourceGrid = await (await fetch(`${origin}/source-grid.json.gz?sample=${sample}`)).json();
+        sourceGrid = await (await globalThis.fetch(`${origin}/source-grid.json.gz?sample=${sample}`)).json();
         sampleHeap();
       }
       if (!reuse || !image) {
@@ -194,9 +194,9 @@ async function oneLookup(page, sample, reuse) {
         throw new Error("COG quantiles differ from the independent golden");
       }
       return {
-        durationMilliseconds: performance.now() - started,
+        durationMilliseconds: globalThis.performance.now() - started,
         heapBeforeBytes,
-        heapAfterBytes: performance.memory?.usedJSHeapSize ?? -1,
+        heapAfterBytes: globalThis.performance.memory?.usedJSHeapSize ?? -1,
         peakHeapBytes,
         locationId: actualLocationId,
         valuesMillimetres,

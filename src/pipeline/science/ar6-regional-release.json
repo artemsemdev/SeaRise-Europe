@@ -186,7 +186,7 @@
   },
   "deliveryMeasurement": {
     "harnessPath": "src/web/scripts/measure-ar6-release.mjs",
-    "harnessSha256": "f68b13300b002d6290f9b89fc4988def23d214f84c98d3da02d3e54772791a82",
+    "harnessSha256": "26edc7144166df526239728f41c27c7cf928c18d38496740ab119d31afe87bf9",
     "packageLockPath": "package-lock.json",
     "packageLockSha256": "88aaedbe42e82d3c917aed171d02a1c3d95d1758f3a0b710bb649012c418bf59",
     "playwrightVersion": "1.62.1",
