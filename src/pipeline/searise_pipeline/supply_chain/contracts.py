@@ -38,6 +38,9 @@ _IGNORED_DEPENDENCY_PARTS = frozenset(
         "target",
     }
 )
+_V1_NON_CANDIDATE_DEPENDENCY_PREFIXES = (
+    PurePosixPath("tools/static-quality"),
+)
 _COMPOSE_FILES = frozenset(
     {"compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"}
 )
@@ -298,9 +301,19 @@ def discover_dependency_inputs(repository_root: Path = REPOSITORY_ROOT) -> tuple
         if any(part in _IGNORED_DEPENDENCY_PARTS for part in relative.parts):
             continue
         logical_path = PurePosixPath(relative.as_posix())
+        if _is_v1_non_candidate_dependency(logical_path):
+            continue
         if candidate.is_file() and _is_dependency_input(logical_path):
             discovered.append(logical_path.as_posix())
     return tuple(sorted(discovered))
+
+
+def _is_v1_non_candidate_dependency(path: PurePosixPath) -> bool:
+    """Exclude isolated validation tooling from the immutable v1 candidate graph."""
+    return any(
+        path == prefix or prefix in path.parents
+        for prefix in _V1_NON_CANDIDATE_DEPENDENCY_PREFIXES
+    )
 
 
 def _component_for_input(path: PurePosixPath) -> str:

@@ -495,6 +495,24 @@ def test_dependency_discovery_rejects_new_unclassified_input(tmp_path: Path) -> 
         validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
 
 
+def test_v1_dependency_discovery_excludes_only_isolated_static_quality_tooling(
+    tmp_path: Path,
+) -> None:
+    quality = tmp_path / "tools" / "static-quality"
+    quality.mkdir(parents=True)
+    (quality / "package.json").write_text('{"private": true}\n', encoding="utf-8")
+    (quality / "package-lock.json").write_text(
+        '{"lockfileVersion": 3, "packages": {}}\n', encoding="utf-8"
+    )
+    similarly_named = tmp_path / "other" / "static-quality" / "package.json"
+    similarly_named.parent.mkdir(parents=True)
+    similarly_named.write_text('{"private": true}\n', encoding="utf-8")
+
+    assert discover_dependency_inputs(tmp_path) == (
+        "other/static-quality/package.json",
+    )
+
+
 def test_dependency_discovery_includes_local_composite_actions(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     _copy_dependency_inputs(repository)

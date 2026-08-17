@@ -13,10 +13,10 @@ Run the isolated static-quality tools with Node 22.23.2 and npm 11.12.1:
 ```sh
 npm ci
 npm run web:build
-npm run static-quality:install
+npm ci --prefix tools/static-quality
 npm run --prefix tools/static-quality install:chromium
-npm run web:validate:static-host
-npm run web:validate:lighthouse
+node tools/static-quality/validate-generic-static-host.mjs
+node tools/static-quality/run-lighthouse-gate.mjs
 ```
 
 The build emits deterministic Brotli and gzip sidecars for application-shell
@@ -42,9 +42,10 @@ Chromium audits and preserves every raw report. Performance, accessibility,
 best practices, and SEO must each have a median raw score of at least 0.90;
 the stricter guard also rejects any individual raw score below 0.90. Reports
 and the machine-readable run/median summary are written beneath the ignored
-`src/web/test-results/lighthouse/` directory and retained by a dedicated CI
-artifact before Playwright owns its output directory. This is a Chromium-only
-Phase 2 gate and makes no Firefox or WebKit support claim.
+`src/web/test-results/lighthouse/` directory. The Phase 2 v2 supply-chain
+profile must own this isolated toolchain before the gate is wired into CI; the
+immutable Phase 1 v1 dependency authority is not rewritten. This is a
+Chromium-only Phase 2 gate and makes no Firefox or WebKit support claim.
 
 The initial stylesheet is embedded into both static documents to remove a
 render-blocking request. The two Latin fonts used by the initial Flight command

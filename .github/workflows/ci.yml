@@ -127,7 +127,7 @@ jobs:
       - name: Validate deterministic PMTiles render evidence
         run: npm run evidence:pmtiles-render --workspace @searise/web
 
-      - name: Install application Chromium
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Browser smoke and accessibility
@@ -143,37 +143,6 @@ jobs:
           name: phase2-browser-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: src/web/test-results/
           if-no-files-found: error
-          retention-days: 14
-
-      - name: Select isolated static-quality runtime
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22.23.2
-          cache: npm
-          cache-dependency-path: tools/static-quality/package-lock.json
-
-      - name: Install isolated static-quality tooling
-        run: npx --yes npm@11.12.1 ci --prefix tools/static-quality
-
-      - name: Audit isolated static-quality tooling
-        run: npx --yes npm@11.12.1 audit --prefix tools/static-quality --audit-level=high
-
-      - name: Install quality-tool Chromium
-        run: npm run --prefix tools/static-quality install:chromium
-
-      - name: Validate generic static hosting
-        run: npm run web:validate:static-host
-
-      - name: Enforce Lighthouse mobile quality budgets
-        run: npm run web:validate:lighthouse
-
-      - name: Retain Lighthouse evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: phase2-lighthouse-evidence-${{ github.event.pull_request.head.sha || github.sha }}
-          path: src/web/test-results/lighthouse/
-          if-no-files-found: warn
           retention-days: 14
 
       - name: Retain browser failure diagnostics

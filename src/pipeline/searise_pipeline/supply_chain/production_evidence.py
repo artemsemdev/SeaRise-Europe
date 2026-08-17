@@ -49,6 +49,7 @@ from .contracts import (
     SupplyChainContractError,
     _component_for_input,
     _is_dependency_input,
+    _is_v1_non_candidate_dependency,
     _role_for_input,
     _validate_real_source_unverified_evidence,
     _validate_schema,
@@ -497,7 +498,7 @@ def _discover_source_dependencies(
         visited += len(names)
         for name in names:
             logical = _logical(PurePosixPath(*prefix, name).as_posix(), "repository discovery")
-            if name in _IGNORED_DEPENDENCY_PARTS:
+            if name in _IGNORED_DEPENDENCY_PARTS or _is_v1_non_candidate_dependency(logical):
                 continue
             try:
                 linked = os.stat(name, dir_fd=directory, follow_symlinks=False)
