@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v2/preapproval.schema.json",
+  "title": "SeaRise Europe repository-removal v2 preapproval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "preapprovalId", "decisionState", "auditedCommit", "auditedTree", "removalPlanSha256", "trustRoots", "trustRootSha256", "ownerApprovalTemplate", "safety"],
+  "properties": {
+    "$schema": { "const": "./preapproval.schema.json" },
+    "schemaVersion": { "const": "2.0.0" },
+    "preapprovalId": { "const": "phase-2-issue-72-removal-v2" },
+    "decisionState": { "const": "owner-approval-required" },
+    "auditedCommit": { "$ref": "#/$defs/gitSha" },
+    "auditedTree": { "$ref": "#/$defs/gitSha" },
+    "removalPlanSha256": { "$ref": "#/$defs/sha256" },
+    "trustRoots": { "type": "object", "additionalProperties": { "$ref": "#/$defs/path" }, "minProperties": 1 },
+    "trustRootSha256": { "type": "object", "additionalProperties": { "$ref": "#/$defs/sha256" }, "minProperties": 1 },
+    "ownerApprovalTemplate": { "type": "string", "minLength": 1 },
+    "safety": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidatePublicationAuthorized", "externalResourceMutationAuthorized"],
+      "properties": { "candidatePublicationAuthorized": { "const": false }, "externalResourceMutationAuthorized": { "const": false } }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" }
+  }
+}

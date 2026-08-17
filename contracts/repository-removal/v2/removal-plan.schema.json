@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v2/removal-plan.schema.json",
+  "title": "SeaRise Europe exact repository-removal plan v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "planId", "issue", "auditedCommit", "auditedTree", "entries", "safety"],
+  "properties": {
+    "$schema": { "const": "./removal-plan.schema.json" },
+    "schemaVersion": { "const": "2.0.0" },
+    "planId": { "const": "phase-2-issue-72-exact-removal-v2" },
+    "issue": { "const": 72 },
+    "auditedCommit": { "$ref": "#/$defs/gitSha" },
+    "auditedTree": { "$ref": "#/$defs/gitSha" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateV7BytesUsed", "tarBytesUsed", "publicationAuthorized", "externalResourceMutationAuthorized"],
+      "properties": {
+        "candidateV7BytesUsed": { "const": false },
+        "tarBytesUsed": { "const": false },
+        "publicationAuthorized": { "const": false },
+        "externalResourceMutationAuthorized": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[]).+$"
+    },
+    "operationBase": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "kind": { "type": "string" }
+      }
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "allOf": [{ "$ref": "#/$defs/operationBase" }],
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "file-delete" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "job"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "workflow-job-delete" }, "job": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "consumer", "dependency"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "workflow-needs-edge-delete" }, "consumer": { "type": "string" }, "dependency": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "job", "output"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "workflow-output-delete" }, "job": { "type": "string" }, "output": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "job", "name"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "workflow-step-delete" }, "job": { "type": "string" }, "name": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "job", "field", "from", "to"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "workflow-scalar-replace" }, "job": { "type": "string" }, "field": { "type": "string" }, "from": { "type": "string" }, "to": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "name", "expectedLoadCount", "useContainers"],
+          "properties": {
+            "id": { "type": "string" }, "kind": { "const": "python-binding-closure-delete" }, "name": { "type": "string" },
+            "expectedLoadCount": { "type": "integer", "minimum": 1 },
+            "useContainers": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/useContainer" } }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "name", "values"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "python-tuple-literals-delete" }, "name": { "type": "string" }, "values": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "name"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "python-function-delete" }, "name": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "issue", "suiteIds", "baselinePaths", "replacementEvidence", "fromUpdatedAt", "toUpdatedAt"],
+          "properties": {
+            "id": { "type": "string" }, "kind": { "const": "test-inventory-retire" }, "issue": { "const": 72 },
+            "suiteIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+            "baselinePaths": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+            "replacementEvidence": { "type": "string", "minLength": 1 },
+            "fromUpdatedAt": { "type": "string", "format": "date" }, "toUpdatedAt": { "type": "string", "format": "date" }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "from", "to"],
+          "properties": { "id": { "type": "string" }, "kind": { "const": "exact-text-replace" }, "from": { "type": "string", "minLength": 1 }, "to": { "type": "string" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "keys", "expectedAssertionCount"],
+          "properties": {
+            "id": { "type": "string" }, "kind": { "const": "python-assertion-key-delete" },
+            "keys": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+            "expectedAssertionCount": { "type": "integer", "minimum": 1 }
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "issue", "pendingSelectorIds", "componentId", "inputPath", "fromSha256", "toSha256"],
+          "properties": {
+            "id": { "type": "string" },
+            "kind": { "const": "static-profile-activation-transition" },
+            "issue": { "const": 72 },
+            "pendingSelectorIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+            "componentId": { "const": "github-actions" },
+            "inputPath": { "const": ".github/workflows/ci.yml" },
+            "fromSha256": { "$ref": "#/$defs/sha256" },
+            "toSha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "useContainer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["function", "mapping", "key"],
+      "properties": { "function": { "type": "string" }, "mapping": { "type": "string" }, "key": { "type": "string" } }
+    },
+    "entry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "beforeMode", "beforeGitBlobSha", "after", "operations"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "beforeMode": { "enum": ["100644", "100755"] },
+        "beforeGitBlobSha": { "$ref": "#/$defs/gitSha" },
+        "after": {
+          "oneOf": [
+            { "type": "object", "additionalProperties": false, "required": ["state"], "properties": { "state": { "const": "absent" } } },
+            { "type": "object", "additionalProperties": false, "required": ["state", "mode", "gitBlobSha", "sha256"], "properties": { "state": { "const": "present" }, "mode": { "enum": ["100644", "100755"] }, "gitBlobSha": { "$ref": "#/$defs/gitSha" }, "sha256": { "$ref": "#/$defs/sha256" } } }
+          ]
+        },
+        "operations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/operation" } }
+      }
+    }
+  }
+}
