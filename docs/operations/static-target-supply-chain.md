@@ -17,7 +17,7 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
   --repository-root .
 ```
 
-The current readiness record validates 53 exact inputs. It also regenerates and compares the
+The current readiness record validates 54 exact inputs. It also regenerates and compares the
 static `src/web` npm SBOM and the Linux/macOS release and settlement Python
 SBOMs against their locked graphs. Input paths must be repository-relative,
 regular, non-symlinked files with exact SHA-256 values.
@@ -66,15 +66,15 @@ The active profile rejects all of these as requirements:
 Phase 1 evidence under `contracts/supply-chain/v1` is retained unchanged for
 audit history. Do not run its dependency-input inventory as the current-tree
 Phase 2 gate: it intentionally records the Phase 1 repository boundary.
-The v2 profile binds its SHA-256, complete 48-file subtree tree, exact reviewed
-Git commit/tree, and exact historical validator Git blob. The
-`historical-inventory` command first compares every retained v1 path and byte,
-then materializes the archived schema, dependency inputs, and validator in a
-temporary directory. It verifies the validator SHA-256 and Git blob before
-executing that archived implementation; the mutable Phase 2 validator is never
-used as historical authority. Git history must therefore be available to this
-gate; CI checkout must not omit the recorded commit. A Phase 1 record does not
-reactivate a deleted runtime. The retained v1 root and every path component are
+The v2 profile binds its SHA-256, complete 48-file subtree Git tree, exact
+reviewed Git provenance, and a vendored copy of the exact historical validator
+blob. The `historical-inventory` command recomputes the subtree tree and
+validator blob from checkout bytes, verifies every inventory input, then
+materializes the retained schema, inputs, and vendored validator in a temporary
+directory. It executes only that historical implementation; the mutable Phase 2
+validator is never used as historical authority. The gate works in a clean
+shallow checkout without Git history or a network fetch. A Phase 1 record does
+not reactivate a deleted runtime. The retained v1 root and every path component are
 resolved strictly beneath the repository before traversal or reads; symlinks at
 the root or below it fail closed.
 

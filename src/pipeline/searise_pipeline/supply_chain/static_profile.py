@@ -17,6 +17,7 @@ from .sbom import validate_npm_sbom
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _SCHEMA_PATH = "contracts/supply-chain/v2/static-target-profile.schema.json"
+_HISTORICAL_VALIDATOR_PATH = "contracts/supply-chain/v2/historical/v1-contracts.py"
 _HISTORICAL_EVIDENCE = {
     "path": "contracts/supply-chain/v1",
     "status": "immutable-phase-1-history",
@@ -30,7 +31,7 @@ _HISTORICAL_EVIDENCE = {
         "phase1ContractsTree": "b69cd57b74e9a2dfa7738c8bc07a0b32b3f97a16",
     },
     "validatorAuthority": {
-        "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+        "path": _HISTORICAL_VALIDATOR_PATH,
         "sha256": "f87e079c534d3bfe10da0c71127f140988436d4e0bec91400fec8a913b8e8ced",
         "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df",
     },
@@ -134,6 +135,7 @@ _BASE_INPUT_AUTHORITY = {
         "contracts/supply-chain/v2/python/static-target-contributor-requirements.txt",
     ),
     **_authority("profile-contract", "schema", _SCHEMA_PATH),
+    **_authority("profile-contract", "manifest", _HISTORICAL_VALIDATOR_PATH),
     **_authority("static-web-npm", "lock", "package-lock.json"),
     **_authority("static-web-npm", "manifest", "package.json", "src/web/package.json"),
     **_authority(

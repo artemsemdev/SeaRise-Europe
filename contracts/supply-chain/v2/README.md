@@ -44,12 +44,13 @@ candidate execution remains governed by the retained release graphs and locks.
 NuGet and legacy runtime records describe that reviewed candidate boundary;
 they are not the current application dependency graph and must not be rewritten
 to resemble the Phase 2 target. The v2 transition record binds the complete
-48-file v1 subtree tree, exact inventory bytes, reviewed Git commit/tree, and
-the exact historical validator Git blob. Historical validation compares every
-retained v1 path and byte, materializes the archived schema, dependency inputs,
-and validator, verifies their bindings, then executes that archived validator.
-The mutable Phase 2 validator is not the historical authority, so a Phase 2
-workflow edit or later legacy deletion cannot be mistaken for v1 evidence drift.
+48-file v1 subtree tree, exact inventory bytes, reviewed Git provenance, and a
+v2-vendored copy of the exact historical validator Git blob. Historical
+validation recomputes the retained subtree Git tree and validator blob from
+checkout bytes, verifies every inventory input, materializes them in isolation,
+then executes only the vendored validator. It requires no Git history or network
+fetch. The mutable Phase 2 validator is not the historical authority, so a
+Phase 2 workflow edit cannot be mistaken for v1 evidence drift.
 The retained v1 root and every traversed path component must resolve strictly
 beneath the repository without symlinks.
 

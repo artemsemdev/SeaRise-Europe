@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
-import io
 import json
 import stat
-import subprocess
-import tarfile
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -18,20 +15,9 @@ from typing import Any
 from .contracts import SupplyChainContractError
 from .static_profile import _HISTORICAL_EVIDENCE, load_static_target_profile_contract
 
-
-def _git(repository_root: Path, *arguments: str) -> bytes:
-    try:
-        completed = subprocess.run(
-            ["git", "-C", str(repository_root), *arguments],
-            check=False,
-            capture_output=True,
-        )
-    except OSError as exc:
-        raise SupplyChainContractError("Git is required for historical v1 validation") from exc
-    if completed.returncode != 0:
-        detail = completed.stderr.decode("utf-8", errors="replace").strip()
-        raise SupplyChainContractError(f"historical v1 Git authority is unavailable: {detail}")
-    return completed.stdout
+_HISTORICAL_VALIDATOR_RUNTIME_PATH = PurePosixPath(
+    "src/pipeline/searise_pipeline/supply_chain/contracts.py"
+)
 
 
 def _safe_path(value: str) -> PurePosixPath:
@@ -110,6 +96,67 @@ def _strict_repository_path(
     return resolved
 
 
+def _git_object_oid(kind: str, content: bytes) -> str:
+    header = f"{kind} {len(content)}\0".encode()
+    return hashlib.sha1(header + content, usedforsecurity=False).hexdigest()
+
+
+def _retained_tree_oid(
+    retained: dict[PurePosixPath, tuple[bytes, bool]],
+    subtree: PurePosixPath,
+) -> str:
+    root: dict[str, Any] = {}
+    for path, entry in retained.items():
+        try:
+            relative = path.relative_to(subtree)
+        except ValueError as exc:
+            raise SupplyChainContractError(
+                f"retained Phase 1 path escapes its subtree: {path}"
+            ) from exc
+        cursor = root
+        for part in relative.parts[:-1]:
+            child = cursor.setdefault(part, {})
+            if not isinstance(child, dict):
+                raise SupplyChainContractError("retained Phase 1 tree has a path collision")
+            cursor = child
+        if not relative.parts or relative.name in cursor:
+            raise SupplyChainContractError("retained Phase 1 tree has a path collision")
+        cursor[relative.name] = entry
+
+    def tree_oid(node: dict[str, Any]) -> str:
+        entries: list[tuple[bytes, bool, bytes, str]] = []
+        for name, value in node.items():
+            encoded_name = name.encode("utf-8")
+            if isinstance(value, dict):
+                oid = tree_oid(value)
+                entries.append((encoded_name, True, b"40000", oid))
+            else:
+                content, executable = value
+                mode = b"100755" if executable else b"100644"
+                entries.append((encoded_name, False, mode, _git_object_oid("blob", content)))
+        entries.sort(key=lambda entry: entry[0] + (b"/" if entry[1] else b""))
+        content = b"".join(
+            mode + b" " + name + b"\0" + bytes.fromhex(oid)
+            for name, _directory, mode, oid in entries
+        )
+        return _git_object_oid("tree", content)
+
+    return tree_oid(root)
+
+
+def _copy_materialized_file(
+    root: Path,
+    logical: PurePosixPath,
+    content: bytes,
+    executable: bool,
+) -> Path:
+    target = root.joinpath(*logical.parts)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
+    target.chmod(0o755 if executable else 0o644)
+    return target
+
+
 @contextmanager
 def materialize_historical_dependency_authority(
     profile_path: Path,
@@ -124,7 +171,7 @@ def materialize_historical_dependency_authority(
     inventory_descriptor = historical["dependencyInventory"]
     git_authority = historical["gitAuthority"]
     validator_authority = historical["validatorAuthority"]
-    validator_path = _safe_path(validator_authority["path"])
+    validator_snapshot_path = _safe_path(validator_authority["path"])
     inventory_path = _safe_path(inventory_descriptor["path"])
     subtree = _safe_path(historical["path"])
     _strict_repository_path(
@@ -142,108 +189,59 @@ def materialize_historical_dependency_authority(
         raise SupplyChainContractError("historical v1 inventory bytes changed")
     try:
         inventory = json.loads(inventory_bytes)
-        inputs = [
-            _safe_path(item["path"])
+        input_descriptors = [
+            (_safe_path(item["path"]), item["sha256"])
             for component in inventory["components"]
             for item in component["inputs"]
         ]
     except (KeyError, TypeError, ValueError) as exc:
         raise SupplyChainContractError("historical v1 inventory structure is malformed") from exc
-    outside_inputs = {
-        validator_path,
-        *(path for path in inputs if subtree not in path.parents),
-    }
-
-    commit = git_authority["commit"]
-    actual_tree = _git(repository_root, "rev-parse", f"{commit}^{{tree}}").decode().strip()
-    if actual_tree != git_authority["tree"]:
-        raise SupplyChainContractError("historical v1 Git tree does not match its authority")
-    actual_subtree = _git(
-        repository_root,
-        "rev-parse",
-        f"{commit}:{subtree.as_posix()}",
-    ).decode().strip()
-    if actual_subtree != git_authority["phase1ContractsTree"]:
+    retained_v1 = _retained_v1_files(repository_root, subtree)
+    if _retained_tree_oid(retained_v1, subtree) != git_authority["phase1ContractsTree"]:
         raise SupplyChainContractError("historical Phase 1 contracts tree does not match")
-    actual_validator_blob = _git(
+    validator_location = _strict_repository_path(
         repository_root,
-        "rev-parse",
-        f"{commit}:{validator_path.as_posix()}",
-    ).decode().strip()
-    if actual_validator_blob != validator_authority["gitBlob"]:
-        raise SupplyChainContractError("historical v1 validator Git blob does not match")
-    archive = _git(
-        repository_root,
-        "archive",
-        "--format=tar",
-        commit,
-        "--",
-        subtree.as_posix(),
-        *(path.as_posix() for path in sorted(outside_inputs)),
+        validator_snapshot_path,
+        description="historical v1 validator snapshot",
     )
+    if not validator_location.is_file():
+        raise SupplyChainContractError("historical v1 validator snapshot must be a regular file")
+    validator_bytes = validator_location.read_bytes()
+    if hashlib.sha256(validator_bytes).hexdigest() != validator_authority["sha256"]:
+        raise SupplyChainContractError("historical v1 validator binding changed")
+    if _git_object_oid("blob", validator_bytes) != validator_authority["gitBlob"]:
+        raise SupplyChainContractError("historical v1 validator Git blob does not match")
 
     with tempfile.TemporaryDirectory(prefix="searise-v1-authority-") as temporary:
         root = Path(temporary).resolve()
-        extracted: dict[PurePosixPath, bytes] = {}
-        archived_modes: dict[PurePosixPath, bool] = {}
-        try:
-            with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as bundle:
-                for member in bundle:
-                    logical = _safe_path(member.name.removesuffix("/"))
-                    if member.isdir():
-                        continue
-                    is_v1_contract = logical == subtree or subtree in logical.parents
-                    if (not is_v1_contract and logical not in outside_inputs) or not member.isreg():
-                        raise SupplyChainContractError(
-                            f"historical v1 archive contains an unexpected entry: {member.name}"
-                        )
-                    source = bundle.extractfile(member)
-                    if source is None:
-                        raise SupplyChainContractError(
-                            f"historical v1 archive entry cannot be read: {member.name}"
-                        )
-                    target = root.joinpath(*logical.parts)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    content = source.read()
-                    target.write_bytes(content)
-                    target.chmod(stat.S_IRUSR | stat.S_IWUSR)
-                    extracted[logical] = content
-                    archived_modes[logical] = bool(member.mode & 0o111)
-        except (tarfile.TarError, OSError) as exc:
-            raise SupplyChainContractError("historical v1 Git archive is invalid") from exc
-        expected = {inventory_path, *inputs}
-        if not expected <= extracted.keys():
-            missing = sorted(path.as_posix() for path in expected - extracted.keys())
-            raise SupplyChainContractError(
-                f"historical v1 Git archive is incomplete: {missing}"
+        for logical, (content, executable) in retained_v1.items():
+            _copy_materialized_file(root, logical, content, executable)
+        for logical, expected_sha256 in input_descriptors:
+            if logical == subtree or subtree in logical.parents:
+                continue
+            source = _strict_repository_path(
+                repository_root,
+                logical,
+                description="historical v1 dependency input",
             )
-        archived_v1 = {
-            path: (content, archived_modes[path])
-            for path, content in extracted.items()
-            if path == subtree or subtree in path.parents
-        }
-        retained_v1 = _retained_v1_files(repository_root, subtree)
-        if retained_v1.keys() != archived_v1.keys():
-            added = sorted(path.as_posix() for path in retained_v1.keys() - archived_v1.keys())
-            deleted = sorted(path.as_posix() for path in archived_v1.keys() - retained_v1.keys())
-            raise SupplyChainContractError(
-                f"retained Phase 1 subtree path drift; added={added}, deleted={deleted}"
-            )
-        changed = sorted(
-            path.as_posix()
-            for path in retained_v1
-            if retained_v1[path] != archived_v1[path]
+            if not source.is_file():
+                raise SupplyChainContractError(
+                    f"historical v1 dependency input must be a regular file: {logical}"
+                )
+            content = source.read_bytes()
+            if hashlib.sha256(content).hexdigest() != expected_sha256:
+                raise SupplyChainContractError(
+                    f"dependency input SHA-256 mismatch: {logical}"
+                )
+            executable = bool(source.stat().st_mode & 0o111)
+            _copy_materialized_file(root, logical, content, executable)
+        _copy_materialized_file(
+            root,
+            _HISTORICAL_VALIDATOR_RUNTIME_PATH,
+            validator_bytes,
+            False,
         )
-        if changed:
-            raise SupplyChainContractError(
-                f"retained Phase 1 subtree bytes changed: {changed}"
-            )
-        archived_inventory = root.joinpath(*inventory_path.parts)
-        if archived_inventory.read_bytes() != inventory_bytes:
-            raise SupplyChainContractError(
-                "historical v1 inventory differs from its Git authority"
-            )
-        yield root, archived_inventory
+        yield root, root.joinpath(*inventory_path.parts)
 
 
 def validate_historical_dependency_inventory(
@@ -257,7 +255,7 @@ def validate_historical_dependency_inventory(
         repository_root=repository_root,
     ) as (historical_root, inventory_path):
         authority = _HISTORICAL_EVIDENCE["validatorAuthority"]
-        validator_path = historical_root / authority["path"]
+        validator_path = historical_root / _HISTORICAL_VALIDATOR_RUNTIME_PATH
         validator_bytes = validator_path.read_bytes()
         if hashlib.sha256(validator_bytes).hexdigest() != authority["sha256"]:
             raise SupplyChainContractError("historical v1 validator binding changed")

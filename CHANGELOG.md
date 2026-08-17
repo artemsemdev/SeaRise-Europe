@@ -13,9 +13,11 @@ All notable changes to this project will be documented in this file.
   Normalized requirement parsing, exact contributor parity, semantic workflow
   checks, and tracked legacy-path absence prevent premature activation. Phase 1
   v1 evidence remains unchanged as historical audit material and is now
-  validated as a complete 48-file subtree by materializing and executing its
-  SHA-256- and Git-blob-bound historical validator rather than code from the
-  mutable Phase 2 checkout. Current npm/pnpm/Yarn, workflow-job, local-action,
+  validated as a complete 48-file subtree by recomputing its Git tree and
+  executing a v2-vendored, SHA-256- and Git-blob-bound historical validator
+  rather than code from the mutable Phase 2 checkout. The gate verifies and
+  materializes current-tree inputs without requiring Git history or a network
+  fetch. Current npm/pnpm/Yarn, workflow-job, local-action,
   container/Compose, Pipenv/Poetry/uv/requirements, native-tool, SBOM, and
   scoped-schema authorities remain exact and fail closed; workflow parsing
   derives consistent jobs indentation, recognizes quoted or spaced keys, and

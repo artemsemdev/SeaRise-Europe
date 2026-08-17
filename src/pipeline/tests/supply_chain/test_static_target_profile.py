@@ -14,6 +14,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 import searise_pipeline.supply_chain.historical_inventory as historical_inventory
+import searise_pipeline.supply_chain.static_profile as static_profile
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     discover_dependency_inputs,
@@ -71,6 +72,7 @@ def _copy_historical_authority(destination: Path) -> None:
     for path in (
         "contracts/supply-chain/v2/static-target-profile.json",
         "contracts/supply-chain/v2/static-target-profile.schema.json",
+        "contracts/supply-chain/v2/historical/v1-contracts.py",
         "src/pipeline/searise_pipeline/supply_chain/contracts.py",
     ):
         target = destination / path
@@ -80,6 +82,15 @@ def _copy_historical_authority(destination: Path) -> None:
         ROOT / "contracts/supply-chain/v1",
         destination / "contracts/supply-chain/v1",
     )
+    inventory = _load(ROOT / "contracts/supply-chain/v1/dependency-inventory.json")
+    for component in inventory["components"]:
+        for item in component["inputs"]:
+            source = ROOT / item["path"]
+            target = destination / item["path"]
+            if target.exists():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
 
 
 def _refresh_hash(document: dict[str, Any], repository: Path, path: str) -> None:
@@ -264,13 +275,17 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
             "phase1ContractsTree": "b69cd57b74e9a2dfa7738c8bc07a0b32b3f97a16",
         },
         "validatorAuthority": {
-            "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+            "path": "contracts/supply-chain/v2/historical/v1-contracts.py",
             "sha256": "f87e079c534d3bfe10da0c71127f140988436d4e0bec91400fec8a913b8e8ced",
             "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df",
         },
     }
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
     assert "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json" in paths
+    assert (
+        "contracts/supply-chain/v2/historical/v1-contracts.py"
+        not in discover_dependency_inputs()
+    )
     assert "contracts/supply-chain/v1/sboms/frontend-npm.cdx.json" not in paths
     assert "src/pipeline/pyproject.toml" in paths
     assert "src/pipeline/requirements-pipeline.txt" in paths
@@ -293,21 +308,11 @@ def test_historical_v1_inventory_validates_against_its_git_tree() -> None:
     assert document["inventoryKind"] == "dependency-defining-inputs"
 
 
-def test_historical_gate_ignores_mutable_current_validator(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    repository = tmp_path / "repository"
+def test_historical_gate_validates_without_git_history(tmp_path: Path) -> None:
+    repository = tmp_path / "shallow-clean-checkout"
     _copy_historical_authority(repository)
-    current_validator = repository / "src/pipeline/searise_pipeline/supply_chain/contracts.py"
-    current_validator.write_text("raise RuntimeError('must not execute')\n", encoding="utf-8")
-    original_git = historical_inventory._git
-    monkeypatch.setattr(
-        historical_inventory,
-        "_git",
-        lambda _repository, *arguments: original_git(ROOT, *arguments),
-    )
 
+    assert not (repository / ".git").exists()
     document = validate_historical_dependency_inventory(
         repository / "contracts/supply-chain/v2/static-target-profile.json",
         repository_root=repository,
@@ -316,7 +321,35 @@ def test_historical_gate_ignores_mutable_current_validator(
     assert document["inventoryKind"] == "dependency-defining-inputs"
 
 
-def test_historical_gate_rejects_validator_binding_drift(
+def test_historical_gate_ignores_mutable_current_validator(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    current_validator = repository / "src/pipeline/searise_pipeline/supply_chain/contracts.py"
+    current_validator.write_text("raise RuntimeError('must not execute')\n", encoding="utf-8")
+    document = validate_historical_dependency_inventory(
+        repository / "contracts/supply-chain/v2/static-target-profile.json",
+        repository_root=repository,
+    )
+
+    assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+def test_historical_gate_rejects_vendored_validator_mutation(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    validator = repository / "contracts/supply-chain/v2/historical/v1-contracts.py"
+    validator.write_bytes(validator.read_bytes() + b"\n")
+
+    with pytest.raises(SupplyChainContractError, match="validator binding changed"):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
+
+
+def test_historical_gate_recomputes_vendored_validator_git_blob(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -324,15 +357,48 @@ def test_historical_gate_rejects_validator_binding_drift(
     _copy_historical_authority(repository)
     profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
     document = _load(profile_path)
+    authority = copy.deepcopy(document["historicalEvidence"])
+    authority["validatorAuthority"]["gitBlob"] = "f" * 40
+    document["historicalEvidence"] = authority
+    _write(profile_path, document)
+    monkeypatch.setattr(historical_inventory, "_HISTORICAL_EVIDENCE", authority)
+    monkeypatch.setattr(static_profile, "_HISTORICAL_EVIDENCE", authority)
+
+    with pytest.raises(SupplyChainContractError, match="validator Git blob does not match"):
+        validate_historical_dependency_inventory(profile_path, repository_root=repository)
+
+
+def test_historical_gate_recomputes_retained_v1_tree(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    document = _load(profile_path)
+    authority = copy.deepcopy(document["historicalEvidence"])
+    authority["gitAuthority"]["phase1ContractsTree"] = "f" * 40
+    document["historicalEvidence"] = authority
+    _write(profile_path, document)
+    monkeypatch.setattr(historical_inventory, "_HISTORICAL_EVIDENCE", authority)
+    monkeypatch.setattr(static_profile, "_HISTORICAL_EVIDENCE", authority)
+
+    with pytest.raises(
+        SupplyChainContractError,
+        match="historical Phase 1 contracts tree does not match",
+    ):
+        validate_historical_dependency_inventory(profile_path, repository_root=repository)
+
+
+def test_historical_gate_rejects_validator_binding_drift(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    profile_path = repository / "contracts/supply-chain/v2/static-target-profile.json"
+    document = _load(profile_path)
     document["historicalEvidence"]["validatorAuthority"]["sha256"] = "f" * 64
     _write(profile_path, document)
-    original_git = historical_inventory._git
-    monkeypatch.setattr(
-        historical_inventory,
-        "_git",
-        lambda _repository, *arguments: original_git(ROOT, *arguments),
-    )
-
     with pytest.raises(SupplyChainContractError, match="historical Phase 1 authority drifted"):
         validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
@@ -347,18 +413,11 @@ def test_historical_gate_rejects_validator_binding_drift(
 )
 def test_historical_gate_rejects_any_retained_v1_subtree_drift(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     path: str,
     operation: str,
 ) -> None:
     repository = tmp_path / "repository"
     _copy_historical_authority(repository)
-    original_git = historical_inventory._git
-    monkeypatch.setattr(
-        historical_inventory,
-        "_git",
-        lambda _repository, *arguments: original_git(ROOT, *arguments),
-    )
     target = repository / path
     if operation == "mutate":
         target.write_bytes(target.read_bytes() + b"\n")
@@ -367,7 +426,7 @@ def test_historical_gate_rejects_any_retained_v1_subtree_drift(
 
     with pytest.raises(
         SupplyChainContractError,
-        match="retained Phase 1 subtree (?:path drift|bytes changed)",
+        match="historical Phase 1 contracts tree does not match",
     ):
         validate_historical_dependency_inventory(
             repository / "contracts/supply-chain/v2/static-target-profile.json",
@@ -377,7 +436,6 @@ def test_historical_gate_rejects_any_retained_v1_subtree_drift(
 
 def test_historical_gate_rejects_symlinked_retained_v1_root(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repository = tmp_path / "repository"
     _copy_historical_authority(repository)
@@ -386,13 +444,6 @@ def test_historical_gate_rejects_symlinked_retained_v1_root(
     shutil.copytree(retained, outside)
     shutil.rmtree(retained)
     retained.symlink_to(outside, target_is_directory=True)
-    original_git = historical_inventory._git
-    monkeypatch.setattr(
-        historical_inventory,
-        "_git",
-        lambda _repository, *arguments: original_git(ROOT, *arguments),
-    )
-
     with pytest.raises(
         SupplyChainContractError,
         match="retained Phase 1 subtree must not use symlinks",
