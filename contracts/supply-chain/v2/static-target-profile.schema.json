@@ -69,7 +69,13 @@
     "historicalEvidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "status", "dependencyInventory", "gitAuthority"],
+      "required": [
+        "path",
+        "status",
+        "dependencyInventory",
+        "gitAuthority",
+        "validatorAuthority"
+      ],
       "properties": {
         "path": { "const": "contracts/supply-chain/v1" },
         "status": { "const": "immutable-phase-1-history" },
@@ -85,10 +91,22 @@
         "gitAuthority": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["commit", "tree"],
+          "required": ["commit", "tree", "phase1ContractsTree"],
           "properties": {
             "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-            "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+            "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "phase1ContractsTree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
+        },
+        "validatorAuthority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {
+              "const": "src/pipeline/searise_pipeline/supply_chain/contracts.py"
+            },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
           }
         }
       }

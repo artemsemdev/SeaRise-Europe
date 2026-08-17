@@ -221,8 +221,13 @@ def parse_timestamp(value: str) -> datetime:
     return parsed
 
 
-def _validate_schema(document: Mapping[str, Any], schema_name: str) -> None:
-    schema = load_json(CONTRACT_ROOT / schema_name)
+def _validate_schema(
+    document: Mapping[str, Any],
+    schema_name: str,
+    *,
+    contract_root: Path | None = None,
+) -> None:
+    schema = load_json((contract_root or CONTRACT_ROOT) / schema_name)
     Draft202012Validator.check_schema(schema)
     errors = sorted(
         Draft202012Validator(
@@ -475,10 +480,15 @@ def validate_dependency_inventory(
     inventory_path: Path,
     *,
     repository_root: Path = REPOSITORY_ROOT,
+    contract_root: Path | None = None,
 ) -> dict[str, Any]:
     """Validate exact dependency-input discovery and immutable byte bindings."""
     document = load_json(inventory_path)
-    _validate_schema(document, "dependency-inventory.schema.json")
+    _validate_schema(
+        document,
+        "dependency-inventory.schema.json",
+        contract_root=contract_root,
+    )
     components = document["components"]
     component_ids = [component["id"] for component in components]
     if len(component_ids) != len(set(component_ids)):

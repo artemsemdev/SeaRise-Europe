@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 
+import searise_pipeline.supply_chain.historical_inventory as historical_inventory
 from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     discover_dependency_inputs,
@@ -66,8 +67,35 @@ def _copy_active_authority(destination: Path) -> None:
             shutil.copy2(source, target)
 
 
+def _copy_historical_authority(destination: Path) -> None:
+    for path in (
+        "contracts/supply-chain/v2/static-target-profile.json",
+        "contracts/supply-chain/v2/static-target-profile.schema.json",
+        "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+    ):
+        target = destination / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / path, target)
+    shutil.copytree(
+        ROOT / "contracts/supply-chain/v1",
+        destination / "contracts/supply-chain/v1",
+    )
+
+
 def _refresh_hash(document: dict[str, Any], repository: Path, path: str) -> None:
     _item(document, path)["sha256"] = hashlib.sha256((repository / path).read_bytes()).hexdigest()
+
+
+def _remove_workflow_job(value: str, selector: str) -> str:
+    kind, separator, job_id = selector.partition(":")
+    assert separator and kind == "workflow-job"
+    pattern = re.compile(
+        rf"(?ms)^  {re.escape(job_id)}:[ \t]*(?:#.*)?\n.*?"
+        rf"(?=^  [A-Za-z0-9_-]+:[ \t]*(?:#.*)?$|\Z)"
+    )
+    updated, count = pattern.subn("", value, count=1)
+    assert count == 1
+    return updated
 
 
 def _remove_issue_selectors(
@@ -87,15 +115,8 @@ def _remove_issue_selectors(
                 target.unlink()
         elif not selector["id"].startswith("pipeline-"):
             value = target.read_text(encoding="utf-8")
-            _kind, _separator, expression = selector["selector"].partition(":")
-            words = expression.split()
-            pattern = (
-                r"(?i)(?<![a-z0-9])"
-                + r"[^a-z0-9]+".join(map(re.escape, words))
-                + r"(?![a-z0-9])"
-            )
             target.write_text(
-                re.sub(pattern, "removed-legacy-token", value),
+                _remove_workflow_job(value, selector["selector"]),
                 encoding="utf-8",
             )
             changed_files.add(selector["path"])
@@ -103,6 +124,10 @@ def _remove_issue_selectors(
         selector
         for selector in document["activation"]["pendingSelectors"]
         if selector["issue"] != issue
+        and not (
+            selector["selector"] == "path-exists"
+            and not (repository / selector["path"]).exists()
+        )
     ]
     document["activation"]["blockingIssues"] = sorted(
         {selector["issue"] for selector in document["activation"]["pendingSelectors"]}
@@ -193,20 +218,21 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
         for selector in document["activation"]["pendingSelectors"]
     } == {
         "ci-legacy-api": 71,
-        "ci-legacy-compose": 72,
-        "ci-legacy-compose-command": 72,
-        "ci-legacy-dotnet": 71,
-        "ci-legacy-dotnet-command": 71,
+        "ci-legacy-compose-smoke": 72,
+        "ci-legacy-docker-api": 72,
+        "ci-legacy-docker-frontend": 72,
         "ci-legacy-frontend": 70,
+        "ci-legacy-infrastructure": 71,
         "codeql-legacy-csharp": 71,
-        "codeql-legacy-dotnet": 71,
         "legacy-api-tree": 71,
-        "legacy-blob-seed-tree": 72,
+        "legacy-api-dockerfile": 72,
+        "legacy-blob-seed-tree": 71,
         "legacy-compose-file": 72,
         "legacy-compose-smoke": 72,
         "legacy-db-geography": 71,
         "legacy-db-init": 71,
         "legacy-frontend-tree": 70,
+        "legacy-frontend-dockerfile": 72,
         "legacy-solution-file": 71,
         "pipeline-pyproject-azure": 71,
         "pipeline-pyproject-postgis": 71,
@@ -223,6 +249,11 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
         "gitAuthority": {
             "commit": "1637057f758599b1edcd35ffba0d31ec65cf8c24",
             "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32",
+            "phase1ContractsTree": "b69cd57b74e9a2dfa7738c8bc07a0b32b3f97a16",
+        },
+        "validatorAuthority": {
+            "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+            "sha256": "0205872b64cef44d3188398d9e9369f8da5be22e7e0abebcb8acac615fb9992a",
         },
     }
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
@@ -247,6 +278,44 @@ def test_historical_v1_inventory_validates_against_its_git_tree() -> None:
 
     assert len(inputs) == 49
     assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+@pytest.mark.parametrize(
+    ("path", "operation"),
+    [
+        ("contracts/supply-chain/v1/evidence-envelope.schema.json", "mutate"),
+        ("contracts/supply-chain/v1/dependency-inventory.schema.json", "mutate"),
+        ("contracts/supply-chain/v1/fixtures/valid/evidence-envelope.json", "delete"),
+    ],
+)
+def test_historical_gate_rejects_any_retained_v1_subtree_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    operation: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    original_git = historical_inventory._git
+    monkeypatch.setattr(
+        historical_inventory,
+        "_git",
+        lambda _repository, *arguments: original_git(ROOT, *arguments),
+    )
+    target = repository / path
+    if operation == "mutate":
+        target.write_bytes(target.read_bytes() + b"\n")
+    else:
+        target.unlink()
+
+    with pytest.raises(
+        SupplyChainContractError,
+        match="retained Phase 1 subtree (?:path drift|bytes changed)",
+    ):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
 
 
 def test_profile_rejects_repointed_historical_git_authority(tmp_path: Path) -> None:
@@ -314,6 +383,29 @@ def test_profile_rejects_unclassified_static_quality_npm_authority(tmp_path: Pat
         validate_static_target_profile(PROFILE, repository_root=repository)
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "tools/unclassified/Dockerfile",
+        "src/pipeline/requirements-unclassified.txt",
+        ".github/actions/unclassified/action.yml",
+        "contracts/supply-chain/v2/sboms/unclassified.cdx.json",
+    ],
+)
+def test_profile_rejects_unclassified_current_dependency_categories(
+    tmp_path: Path,
+    path: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    target = repository / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("unclassified\n", encoding="utf-8")
+
+    with pytest.raises(SupplyChainContractError, match="unclassified=.*unclassified"):
+        validate_static_target_profile(PROFILE, repository_root=repository)
+
+
 def test_profile_rejects_changed_authority_bytes(tmp_path: Path) -> None:
     document = copy.deepcopy(_load())
     _item(document, "package.json")["sha256"] = "f" * 64
@@ -366,26 +458,26 @@ def test_profile_detects_pep508_legacy_name_with_alternate_whitespace(tmp_path: 
             ".github/workflows/ci.yml",
             "ci-legacy-api",
             "src/api",
-            "${LEGACY_API_PATH}",
-            'LEGACY_API_PATH: "src\t/\n  api"',
+            "${{ env.LEGACY_ROOT }}${{ env.LEGACY_LEAF }}",
+            'LEGACY_ROOT: "src/"\nLEGACY_LEAF: "api"',
         ),
         (
             ".github/workflows/codeql.yml",
             "codeql-legacy-csharp",
-            "csharp",
-            "${LEGACY_LANGUAGE}",
-            'LEGACY_LANGUAGE: "csharp"',
+            "languages: csharp",
+            "languages: ${{ env.LANGUAGE_A }}${{ env.LANGUAGE_B }}",
+            'LANGUAGE_A: "csh"\nLANGUAGE_B: "arp"',
         ),
         (
             ".github/workflows/ci.yml",
-            "ci-legacy-compose-command",
+            "ci-legacy-compose-smoke",
             "docker compose",
-            "${CONTAINER_CLI}",
-            'CONTAINER_CLI: "docker\n  compose"',
+            "${{ env.CONTAINER_CLI }} ${{ env.CONTAINER_SUBCOMMAND }}",
+            'CONTAINER_CLI: "docker"\nCONTAINER_SUBCOMMAND: "compose"',
         ),
     ],
 )
-def test_workflow_scanner_resists_whitespace_and_env_indirection(
+def test_workflow_job_authority_resists_split_env_indirection(
     tmp_path: Path,
     path: str,
     selector_id: str,

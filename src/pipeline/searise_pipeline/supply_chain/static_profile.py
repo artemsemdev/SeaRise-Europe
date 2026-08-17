@@ -27,6 +27,11 @@ _HISTORICAL_EVIDENCE = {
     "gitAuthority": {
         "commit": "1637057f758599b1edcd35ffba0d31ec65cf8c24",
         "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32",
+        "phase1ContractsTree": "b69cd57b74e9a2dfa7738c8bc07a0b32b3f97a16",
+    },
+    "validatorAuthority": {
+        "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+        "sha256": "0205872b64cef44d3188398d9e9369f8da5be22e7e0abebcb8acac615fb9992a",
     },
 }
 
@@ -194,21 +199,38 @@ _ACTIVE_CONTRIBUTOR_INPUT_AUTHORITY = {
     )
 }
 _LEGACY_SELECTORS = {
-    "ci-legacy-api": (71, ".github/workflows/ci.yml", "tokens:src api"),
-    "ci-legacy-compose": (72, ".github/workflows/ci.yml", "tokens:compose smoke"),
-    "ci-legacy-compose-command": (72, ".github/workflows/ci.yml", "tokens:docker compose"),
-    "ci-legacy-dotnet": (71, ".github/workflows/ci.yml", "tokens:setup dotnet"),
-    "ci-legacy-dotnet-command": (71, ".github/workflows/ci.yml", "token:dotnet"),
-    "ci-legacy-frontend": (70, ".github/workflows/ci.yml", "tokens:src frontend"),
-    "codeql-legacy-csharp": (71, ".github/workflows/codeql.yml", "token:csharp"),
-    "codeql-legacy-dotnet": (71, ".github/workflows/codeql.yml", "token:dotnet"),
+    "ci-legacy-api": (71, ".github/workflows/ci.yml", "workflow-job:api"),
+    "ci-legacy-compose-smoke": (
+        72,
+        ".github/workflows/ci.yml",
+        "workflow-job:compose-smoke",
+    ),
+    "ci-legacy-docker-api": (72, ".github/workflows/ci.yml", "workflow-job:docker-api"),
+    "ci-legacy-docker-frontend": (
+        72,
+        ".github/workflows/ci.yml",
+        "workflow-job:docker-frontend",
+    ),
+    "ci-legacy-frontend": (70, ".github/workflows/ci.yml", "workflow-job:frontend"),
+    "ci-legacy-infrastructure": (
+        71,
+        ".github/workflows/ci.yml",
+        "workflow-job:infrastructure",
+    ),
+    "codeql-legacy-csharp": (
+        71,
+        ".github/workflows/codeql.yml",
+        "workflow-job:analyze-csharp",
+    ),
     "legacy-api-tree": (71, "src/api", "path-exists"),
-    "legacy-blob-seed-tree": (72, "infra/blob-seed", "path-exists"),
+    "legacy-api-dockerfile": (72, "src/api/Dockerfile", "path-exists"),
+    "legacy-blob-seed-tree": (71, "infra/blob-seed", "path-exists"),
     "legacy-compose-file": (72, "docker-compose.yml", "path-exists"),
     "legacy-compose-smoke": (72, "scripts/compose-smoke.sh", "path-exists"),
     "legacy-db-geography": (71, "infra/db/init-geography.sql", "path-exists"),
     "legacy-db-init": (71, "infra/db/init.sql", "path-exists"),
     "legacy-frontend-tree": (70, "src/frontend", "path-exists"),
+    "legacy-frontend-dockerfile": (72, "src/frontend/Dockerfile", "path-exists"),
     "legacy-solution-file": (71, "SeaRise Europe.sln", "path-exists"),
     "pipeline-pyproject-azure": (
         71,
@@ -282,6 +304,13 @@ _DISCOVERY_IGNORED_PARTS = frozenset(
     }
 )
 _NODE_AUTHORITY_FILES = frozenset({"package.json", "package-lock.json"})
+_CURRENT_SCHEMA_ROOTS = (
+    PurePosixPath("contracts/supply-chain/v2"),
+    PurePosixPath("src/pipeline/offline_release/profiles"),
+)
+_CURRENT_SBOM_ROOT = PurePosixPath("contracts/supply-chain/v2/sboms")
+_CURRENT_TOOLCHAIN_ROOT = PurePosixPath("src/pipeline/toolchain")
+_CURRENT_PROFILE_ROOT = PurePosixPath("src/pipeline/offline_release/profiles")
 _REQUIREMENT_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.-]*)")
 _PYTHON_SBOMS = {
     "contracts/supply-chain/v1/sboms/python-release-linux-x86-64-cp311.cdx.json": (
@@ -535,6 +564,47 @@ def _path_lexists(path: Path) -> bool:
     return True
 
 
+def _is_current_dependency_authority(path: PurePosixPath) -> bool:
+    workflow = (
+        path.parts[:2] == (".github", "workflows")
+        and path.suffix in {".yaml", ".yml"}
+    )
+    local_action = (
+        path.parts[:2] == (".github", "actions")
+        and path.name in {"action.yaml", "action.yml"}
+    )
+    dockerfile = path.name.startswith("Dockerfile")
+    python_authority = (
+        path.name == "pyproject.toml"
+        or (
+            path.name.startswith("requirements")
+            and path.suffix in {".in", ".lock", ".txt"}
+        )
+        or path.name.endswith("requirements.txt")
+    )
+    toolchain = _CURRENT_TOOLCHAIN_ROOT in path.parents
+    build_profile = _CURRENT_PROFILE_ROOT in path.parents
+    schema = path.name.endswith(".schema.json") and any(
+        root == path.parent or root in path.parents for root in _CURRENT_SCHEMA_ROOTS
+    )
+    release_schema = path == PurePosixPath(
+        "contracts/release/v2/browser-derivation-provenance.schema.json"
+    )
+    sbom = path.parent == _CURRENT_SBOM_ROOT and path.name.endswith(".cdx.json")
+    return (
+        path.name in _NODE_AUTHORITY_FILES
+        or workflow
+        or local_action
+        or dockerfile
+        or python_authority
+        or toolchain
+        or build_profile
+        or schema
+        or release_schema
+        or sbom
+    )
+
+
 def _discover_current_authority(repository_root: Path) -> set[str]:
     discovered: set[str] = set()
     for candidate in repository_root.rglob("*"):
@@ -545,29 +615,28 @@ def _discover_current_authority(repository_root: Path) -> set[str]:
         value = logical.as_posix()
         if value in _FORBIDDEN_FILES or value.startswith(_FORBIDDEN_PREFIXES):
             continue
-        node_authority = logical.name in _NODE_AUTHORITY_FILES
-        workflow = (
-            logical.parts[:2] == (".github", "workflows")
-            and logical.suffix in {".yaml", ".yml"}
-        )
-        if (node_authority or workflow) and _path_lexists(candidate):
+        if _is_current_dependency_authority(logical) and _path_lexists(candidate):
             discovered.add(value)
     return discovered
 
 
 def _workflow_selector_present(value: str, selector: str) -> bool:
-    kind, separator, expression = selector.partition(":")
-    if not separator or kind not in {"token", "tokens"}:
+    kind, separator, job_id = selector.partition(":")
+    if (
+        not separator
+        or kind != "workflow-job"
+        or not re.fullmatch(r"[A-Za-z0-9_-]+", job_id)
+    ):
         raise SupplyChainContractError(f"invalid workflow selector: {selector}")
-    expected = tuple(expression.split())
-    if not expected or (kind == "token" and len(expected) != 1):
-        raise SupplyChainContractError(f"invalid workflow selector: {selector}")
-    tokens = tuple(re.findall(r"[a-z0-9]+", value.casefold()))
-    width = len(expected)
-    return any(
-        tokens[index : index + width] == expected
-        for index in range(len(tokens) - width + 1)
-    )
+    jobs_markers = tuple(re.finditer(r"(?m)^jobs:[ \t]*(?:#.*)?$", value))
+    if len(jobs_markers) != 1:
+        raise SupplyChainContractError("workflow must contain one exact top-level jobs mapping")
+    jobs = value[jobs_markers[0].end() :]
+    job_ids = {
+        match.group(1)
+        for match in re.finditer(r"(?m)^  ([A-Za-z0-9_-]+):[ \t]*(?:#.*)?$", jobs)
+    }
+    return job_id in job_ids
 
 
 def _expected_transition(
@@ -668,8 +737,7 @@ def validate_static_target_profile(
     classified_current = {
         path
         for path in expected_inputs
-        if PurePosixPath(path).name in _NODE_AUTHORITY_FILES
-        or PurePosixPath(path).parts[:2] == (".github", "workflows")
+        if _is_current_dependency_authority(PurePosixPath(path))
     }
     if discovered_current != classified_current:
         missing = sorted(discovered_current - classified_current)

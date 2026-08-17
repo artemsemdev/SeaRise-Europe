@@ -8,20 +8,21 @@
     "status": "pending-legacy-removal",
     "blockingIssues": [70, 71, 72],
     "pendingSelectors": [
-      { "id": "ci-legacy-api", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "tokens:src api" },
-      { "id": "ci-legacy-compose", "issue": 72, "path": ".github/workflows/ci.yml", "selector": "tokens:compose smoke" },
-      { "id": "ci-legacy-compose-command", "issue": 72, "path": ".github/workflows/ci.yml", "selector": "tokens:docker compose" },
-      { "id": "ci-legacy-dotnet", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "tokens:setup dotnet" },
-      { "id": "ci-legacy-dotnet-command", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "token:dotnet" },
-      { "id": "ci-legacy-frontend", "issue": 70, "path": ".github/workflows/ci.yml", "selector": "tokens:src frontend" },
-      { "id": "codeql-legacy-csharp", "issue": 71, "path": ".github/workflows/codeql.yml", "selector": "token:csharp" },
-      { "id": "codeql-legacy-dotnet", "issue": 71, "path": ".github/workflows/codeql.yml", "selector": "token:dotnet" },
+      { "id": "ci-legacy-api", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "workflow-job:api" },
+      { "id": "ci-legacy-compose-smoke", "issue": 72, "path": ".github/workflows/ci.yml", "selector": "workflow-job:compose-smoke" },
+      { "id": "ci-legacy-docker-api", "issue": 72, "path": ".github/workflows/ci.yml", "selector": "workflow-job:docker-api" },
+      { "id": "ci-legacy-docker-frontend", "issue": 72, "path": ".github/workflows/ci.yml", "selector": "workflow-job:docker-frontend" },
+      { "id": "ci-legacy-frontend", "issue": 70, "path": ".github/workflows/ci.yml", "selector": "workflow-job:frontend" },
+      { "id": "ci-legacy-infrastructure", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "workflow-job:infrastructure" },
+      { "id": "codeql-legacy-csharp", "issue": 71, "path": ".github/workflows/codeql.yml", "selector": "workflow-job:analyze-csharp" },
+      { "id": "legacy-api-dockerfile", "issue": 72, "path": "src/api/Dockerfile", "selector": "path-exists" },
       { "id": "legacy-api-tree", "issue": 71, "path": "src/api", "selector": "path-exists" },
-      { "id": "legacy-blob-seed-tree", "issue": 72, "path": "infra/blob-seed", "selector": "path-exists" },
+      { "id": "legacy-blob-seed-tree", "issue": 71, "path": "infra/blob-seed", "selector": "path-exists" },
       { "id": "legacy-compose-file", "issue": 72, "path": "docker-compose.yml", "selector": "path-exists" },
       { "id": "legacy-compose-smoke", "issue": 72, "path": "scripts/compose-smoke.sh", "selector": "path-exists" },
       { "id": "legacy-db-geography", "issue": 71, "path": "infra/db/init-geography.sql", "selector": "path-exists" },
       { "id": "legacy-db-init", "issue": 71, "path": "infra/db/init.sql", "selector": "path-exists" },
+      { "id": "legacy-frontend-dockerfile", "issue": 72, "path": "src/frontend/Dockerfile", "selector": "path-exists" },
       { "id": "legacy-frontend-tree", "issue": 70, "path": "src/frontend", "selector": "path-exists" },
       { "id": "legacy-solution-file", "issue": 71, "path": "SeaRise Europe.sln", "selector": "path-exists" },
       { "id": "pipeline-pyproject-azure", "issue": 71, "path": "src/pipeline/pyproject.toml", "selector": "azure-storage-blob" },
@@ -39,7 +40,12 @@
     },
     "gitAuthority": {
       "commit": "1637057f758599b1edcd35ffba0d31ec65cf8c24",
-      "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32"
+      "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32",
+      "phase1ContractsTree": "b69cd57b74e9a2dfa7738c8bc07a0b32b3f97a16"
+    },
+    "validatorAuthority": {
+      "path": "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+      "sha256": "0205872b64cef44d3188398d9e9369f8da5be22e7e0abebcb8acac615fb9992a"
     }
   },
   "excludedLegacyRequirements": [
@@ -150,7 +156,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "9b9c0788b1aca4e7c973d54c85093d75781332b1e1a6b72ccf3107962933b178" }
+        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "34064d47f2db0562f61e3e9f3e440cc13a5f3c90bdad1d51c17d01e934d16fcc" }
       ]
     },
     {
