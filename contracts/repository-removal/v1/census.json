@@ -103,12 +103,12 @@
         { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "API" },
         { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "CODEQL_CSHARP" },
         { "path": "scripts/ci/changed_components.py", "kind": "python-assignment", "value": "INFRASTRUCTURE" },
-        { "path": "src/pipeline/pyproject.toml", "kind": "python-package", "value": "azure-storage-blob" },
-        { "path": "src/pipeline/pyproject.toml", "kind": "python-package", "value": "psycopg2-binary" },
+        { "path": "src/pipeline/pyproject.toml", "kind": "pyproject-dependency", "value": "azure-storage-blob" },
+        { "path": "src/pipeline/pyproject.toml", "kind": "pyproject-dependency", "value": "psycopg2-binary" },
         { "path": "src/pipeline/pyproject.toml", "kind": "setuptools-package", "value": "pipeline" },
         { "path": "src/pipeline/pyproject.toml", "kind": "setuptools-package-dir", "value": "pipeline" },
-        { "path": "src/pipeline/requirements-pipeline.txt", "kind": "python-package", "value": "azure-storage-blob" },
-        { "path": "src/pipeline/requirements-pipeline.txt", "kind": "python-package", "value": "psycopg2-binary" }
+        { "path": "src/pipeline/requirements-pipeline.txt", "kind": "requirements-dependency", "value": "azure-storage-blob" },
+        { "path": "src/pipeline/requirements-pipeline.txt", "kind": "requirements-dependency", "value": "psycopg2-binary" }
       ]
     },
     {

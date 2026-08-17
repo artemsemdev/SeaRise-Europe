@@ -18,6 +18,13 @@ from pathlib import Path
 from typing import Any
 
 import jsonschema
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import InvalidName, canonicalize_name
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - exercised by Python 3.9/3.10
+    import tomli as tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_ROOT = ROOT / "contracts/repository-removal/v1"
@@ -237,19 +244,130 @@ def _python_assignment_count(source: bytes, name: str) -> int:
     return count
 
 
-def _python_package_count(source: bytes, package: str) -> int:
+def _dependency_name(requirement: str, source_kind: str) -> str:
     try:
-        text = source.decode("utf-8")
-    except UnicodeDecodeError as exc:
-        raise RemovalApprovalError("Python dependency selector source is not UTF-8") from exc
-    normalized = package.lower().replace("_", "-").replace(".", "-")
+        return canonicalize_name(Requirement(requirement).name, validate=True)
+    except (InvalidName, InvalidRequirement) as exc:
+        raise RemovalApprovalError(
+            f"{source_kind} contains an invalid PEP 508 requirement: {requirement!r}"
+        ) from exc
+
+
+def _selector_package_name(package: str) -> str:
+    try:
+        return canonicalize_name(package, validate=True)
+    except InvalidName as exc:
+        raise RemovalApprovalError(
+            f"dependency selector is not a valid package name: {package!r}"
+        ) from exc
+
+
+def _pyproject_dependency_count(source: bytes, package: str) -> int:
+    try:
+        document = tomllib.loads(source.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise RemovalApprovalError("pyproject selector source is not valid UTF-8 TOML") from exc
+
+    project = document.get("project")
+    if not isinstance(project, dict):
+        raise RemovalApprovalError("pyproject must contain a [project] table")
+
+    dependency_sets: list[tuple[str, Any]] = [
+        ("project.dependencies", project.get("dependencies", []))
+    ]
+    optional = project.get("optional-dependencies", {})
+    if not isinstance(optional, dict):
+        raise RemovalApprovalError(
+            "project.optional-dependencies must be a table when present"
+        )
+    dependency_sets.extend(
+        (f"project.optional-dependencies.{group}", dependencies)
+        for group, dependencies in optional.items()
+    )
+
+    selected = _selector_package_name(package)
     count = 0
-    for raw_line in text.splitlines():
-        line = raw_line.split("#", maxsplit=1)[0]
-        for match in re.finditer(r"[A-Za-z0-9][A-Za-z0-9_.-]*", line):
-            candidate = match.group(0).lower().replace("_", "-").replace(".", "-")
-            if candidate == normalized:
-                count += 1
+    for location, dependencies in dependency_sets:
+        if not isinstance(dependencies, list) or not all(
+            isinstance(requirement, str) for requirement in dependencies
+        ):
+            raise RemovalApprovalError(f"{location} must be an array of strings")
+        count += sum(
+            _dependency_name(requirement, "pyproject") == selected
+            for requirement in dependencies
+        )
+    return count
+
+
+def _strip_requirement_comment(line: str) -> str:
+    quote: str | None = None
+    escaped = False
+    for index, character in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if character == "\\" and quote is not None:
+            escaped = True
+            continue
+        if character in {'"', "'"}:
+            quote = None if quote == character else character if quote is None else quote
+            continue
+        if character == "#" and quote is None and (
+            index == 0 or line[index - 1].isspace()
+        ):
+            return line[:index]
+    return line
+
+
+def _requirements_logical_lines(source: bytes) -> list[str]:
+    try:
+        physical_lines = source.decode("utf-8").splitlines()
+    except UnicodeDecodeError as exc:
+        raise RemovalApprovalError("requirements selector source is not UTF-8") from exc
+
+    logical_lines: list[str] = []
+    pending = ""
+    for physical in physical_lines:
+        stripped = physical.rstrip()
+        continues = stripped.endswith("\\")
+        fragment = stripped[:-1] if continues else physical
+        pending = f"{pending} {fragment.lstrip()}" if pending else fragment
+        if not continues:
+            logical_lines.append(pending)
+            pending = ""
+    if pending:
+        raise RemovalApprovalError("requirements file has a dangling line continuation")
+    return logical_lines
+
+
+def _requirements_dependency_count(source: bytes, package: str) -> int:
+    selected = _selector_package_name(package)
+    count = 0
+    dependency_directive = re.compile(
+        r"^(?:-r(?:\s|=|$)|--requirement(?:\s|=|$)|"
+        r"-c(?:\s|=|$)|--constraint(?:\s|=|$)|"
+        r"-e(?:\s|=|$)|--editable(?:\s|=|$))"
+    )
+    trailing_hashes = re.compile(
+        r"(?:\s+--hash=[A-Za-z0-9]+:[A-Fa-f0-9]+)+\s*$"
+    )
+
+    for raw_line in _requirements_logical_lines(source):
+        line = _strip_requirement_comment(raw_line).strip()
+        if not line:
+            continue
+        if dependency_directive.match(line):
+            raise RemovalApprovalError(
+                "requirements include/constraint/editable directives are ambiguous "
+                "for an audited single-file selector"
+            )
+        if line.startswith("-"):
+            # Index, find-links, resolver, and hash-policy options are pip
+            # configuration, not dependency declarations.
+            continue
+        requirement = trailing_hashes.sub("", line).rstrip()
+        if _dependency_name(requirement, "requirements file") == selected:
+            count += 1
     return count
 
 
@@ -298,8 +416,10 @@ def _selector_count(kind: str, value: str, source: bytes) -> int:
         return _workflow_job_count(source, value)
     if kind == "python-assignment":
         return _python_assignment_count(source, value)
-    if kind == "python-package":
-        return _python_package_count(source, value)
+    if kind == "pyproject-dependency":
+        return _pyproject_dependency_count(source, value)
+    if kind == "requirements-dependency":
+        return _requirements_dependency_count(source, value)
     if kind == "setuptools-package":
         return _setuptools_package_count(source, value)
     if kind == "setuptools-package-dir":

@@ -86,9 +86,12 @@ suite's inventoried focused or full command.
 
 Runtime endpoints and environment variables inside fully deleted files are
 owned byte-for-byte by the census root or exact-path locator. Shared retained
-files use semantic selectors (workflow jobs, Python assignments, dependencies,
-and setuptools mappings). The mandatory target/repository and built-output
-scanner suites close the remaining boundary by rejecting any legacy route,
+files use semantic selectors (workflow jobs, Python assignments, structurally
+parsed PEP 621/PEP 508 dependencies, and setuptools mappings). Pyproject and
+requirements selectors have distinct identities so metadata, comments, pip
+options, index URLs, and hashes cannot satisfy a dependency locator. The
+mandatory target/repository and built-output scanner suites close the remaining
+boundary by rejecting any legacy route,
 server, database, container, or mutable runtime configuration that leaks into
 the static target.
 

@@ -19,6 +19,7 @@ from scripts.repository.validate_removal_approval import (
     DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA,
     DEFAULT_INVENTORY_SCHEMA,
     DEFAULT_VALIDATOR,
+    RemovalApprovalError,
     _canonical_census,
     _selector_count,
     _tracked_blobs,
@@ -867,6 +868,86 @@ class RemovalApprovalTests(unittest.TestCase):
         self.assertEqual(
             _selector_count("setuptools-package", "missing", source),
             0,
+        )
+
+    def test_pyproject_dependency_ignores_metadata_and_unrelated_toml(self) -> None:
+        source = b'''[project]\nname = "demo"\ndescription = "azure-storage-blob"\ndependencies = []\n\n[tool.demo]\npackage = "azure-storage-blob"\n'''
+
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "azure-storage-blob", source),
+            0,
+        )
+
+    def test_pyproject_dependency_parses_main_and_optional_pep508_entries(self) -> None:
+        source = b'''[project]\nname = "demo"\ndependencies = ["Azure_Storage.Blob[crypto]>=12; python_version >= '3.11'"]\n\n[project.optional-dependencies]\ndatabase = ["Psycopg2_Binary>=2.9"]\n'''
+
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "azure-storage-blob", source),
+            1,
+        )
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "psycopg2-binary", source),
+            1,
+        )
+
+    def test_pyproject_dependency_rejects_malformed_or_ambiguous_input(self) -> None:
+        malformed_toml = b'[project]\ndependencies = ["azure-storage-blob"\n'
+        malformed_requirement = b'''[project]\ndependencies = ["not a requirement !!!"]\n'''
+
+        for source in (malformed_toml, malformed_requirement):
+            with self.subTest(source=source), self.assertRaises(RemovalApprovalError):
+                _selector_count("pyproject-dependency", "azure-storage-blob", source)
+
+        duplicate = b'''[project]\ndependencies = ["azure-storage-blob"]\n\n[project.optional-dependencies]\ndev = ["Azure_Storage.Blob"]\n'''
+        self.assertEqual(
+            _selector_count("pyproject-dependency", "azure-storage-blob", duplicate),
+            2,
+        )
+
+    def test_requirements_dependency_ignores_comments_options_and_urls(self) -> None:
+        source = b'''# azure-storage-blob\n--find-links https://example.invalid/azure-storage-blob\n--index-url https://azure-storage-blob.example.invalid/simple\n--extra-index-url=https://example.invalid/psycopg2-binary\n--require-hashes\n'''
+
+        self.assertEqual(
+            _selector_count("requirements-dependency", "azure-storage-blob", source),
+            0,
+        )
+        self.assertEqual(
+            _selector_count("requirements-dependency", "psycopg2-binary", source),
+            0,
+        )
+
+    def test_requirements_dependency_parses_markers_hashes_and_canonical_names(self) -> None:
+        source = b'''Azure_Storage.Blob[crypto]>=12; python_version >= "3.11"  # retained\nPsycopg2.Binary==2.9.10 \\\n    --hash=sha256:0123456789abcdef \\\n    --hash=sha256:abcdef0123456789\n'''
+
+        self.assertEqual(
+            _selector_count("requirements-dependency", "azure-storage-blob", source),
+            1,
+        )
+        self.assertEqual(
+            _selector_count("requirements-dependency", "psycopg2-binary", source),
+            1,
+        )
+
+    def test_requirements_dependency_rejects_hidden_or_invalid_dependencies(self) -> None:
+        sources = (
+            b"-r shared-requirements.txt\n",
+            b"--constraint constraints.txt\n",
+            b"-e git+https://example.invalid/project.git#egg=project\n",
+            b"not a requirement !!!\n",
+            b"azure-storage-blob \\\n",
+        )
+
+        for source in sources:
+            with self.subTest(source=source), self.assertRaises(RemovalApprovalError):
+                _selector_count("requirements-dependency", "azure-storage-blob", source)
+
+        self.assertEqual(
+            _selector_count(
+                "requirements-dependency",
+                "azure-storage-blob",
+                b"azure-storage-blob\nAzure_Storage.Blob\n",
+            ),
+            2,
         )
 
     def test_rejects_unlinked_replacement_and_retirement_evidence(self) -> None:
