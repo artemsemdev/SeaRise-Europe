@@ -22,6 +22,7 @@ function approvalRepository() {
   mkdirSync(resolve(root, "docs/evidence"), { recursive: true });
   writeFileSync(resolve(root, "docs/evidence/history.md"), "Historical evidence.\n");
   mkdirSync(resolve(root, "src/web/scripts"), { recursive: true });
+  writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// synthetic approval launcher\n");
   writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "// synthetic gate policy\n");
   writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.test.mjs"), "// synthetic gate tests\n");
   mkdirSync(resolve(root, "contracts/supply-chain/v2"), { recursive: true });
@@ -159,13 +160,20 @@ describe("static repository dependency gates", () => {
     expect(scanDependencyRecords(unlisted, { mode: "repository-final" }).violations).toHaveLength(1);
   });
 
-  it("classifies only exact removal-policy allowlist documents as gate definitions", () => {
-    const exact = [{ path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json", text: "NuGet" }];
+  it("classifies only exact removal-policy documents as gate definitions", () => {
+    const exact = [
+      { path: "contracts/repository-removal/v1/census.json", text: "SeaRise Europe.sln" },
+      { path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json", text: "NuGet" },
+    ];
     const unlisted = [{ path: "contracts/repository-removal/v1/unreviewed.json", text: "NuGet" }];
     expect(scanDependencyRecords(exact, { mode: "repository-final" }).violations).toHaveLength(0);
     expect(scanDependencyRecords(unlisted, { mode: "repository-final" }).violations).toHaveLength(1);
     expect(scanDependencyRecords([{
       path: "contracts/repository-removal/v1/historical-allowlist.preapproval.json",
+      text: "AZURE_MAPS_KEY=mutation",
+    }], { mode: "repository-final" }).violations).toHaveLength(1);
+    expect(scanDependencyRecords([{
+      path: "contracts/repository-removal/v1/census.json",
       text: "AZURE_MAPS_KEY=mutation",
     }], { mode: "repository-final" }).violations).toHaveLength(1);
   });
@@ -277,6 +285,13 @@ describe("static repository dependency gates", () => {
       .toHaveLength(0);
     expect(approvals).toBe(2);
     expect(readFileSync(resolve(root, "docs/evidence/history.md"), "utf8")).toBe("Historical evidence.\n");
+
+    writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// changed approval launcher\n");
+    expect(() => validateStaticRepository({
+      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
+    }))
+      .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
+    writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// synthetic approval launcher\n");
 
     writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "createServer(app)\n");
     expect(() => validateStaticRepository({

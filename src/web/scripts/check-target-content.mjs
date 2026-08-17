@@ -83,6 +83,7 @@ const activeAuthorityPaths = new Set([
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 ]);
 const gatePolicyTrustPaths = Object.freeze([
+  "src/web/scripts/check-target-content.mjs",
   "src/web/scripts/static-repository-gates.mjs",
   "src/web/scripts/static-repository-gates.test.mjs",
 ]);
