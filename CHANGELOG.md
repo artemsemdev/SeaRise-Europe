@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
+  paths are ignored, untracked, absent from CI workflows, and absent from the
+  static output inventory without reading Candidate-v7 or TAR bytes.
+
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,
