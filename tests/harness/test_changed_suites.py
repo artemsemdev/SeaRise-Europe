@@ -127,7 +127,9 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         errors = validate_inventory(inventory)
 
         self.assertTrue(
-            any("retired suite requires gate and evidence" in error for error in errors),
+            any(
+                "retired suite requires gate and evidence" in error for error in errors
+            ),
             errors,
         )
 
@@ -141,7 +143,10 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         errors = validate_inventory(inventory)
 
         self.assertTrue(
-            any("active suite cannot carry retirement metadata" in error for error in errors),
+            any(
+                "active suite cannot carry retirement metadata" in error
+                for error in errors
+            ),
             errors,
         )
 
@@ -158,7 +163,9 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         errors = validate_inventory(inventory)
 
         self.assertTrue(
-            any("active baseline is owned by retired suite" in error for error in errors),
+            any(
+                "active baseline is owned by retired suite" in error for error in errors
+            ),
             errors,
         )
 
@@ -267,6 +274,18 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
             with patch("scripts.tests.validate_test_inventory.ROOT", root):
                 self.assertIn(
                     "src/frontend/scripts/test-browser-shard-fs.py",
+                    _discover_test_files(),
+                )
+
+    def test_repository_removal_python_test_is_discovered(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            test_path = root / "tests/repository-removal/test_v2.py"
+            test_path.parent.mkdir(parents=True)
+            test_path.write_text("def test_fixture(): pass\n")
+            with patch("scripts.tests.validate_test_inventory.ROOT", root):
+                self.assertIn(
+                    "tests/repository-removal/test_v2.py",
                     _discover_test_files(),
                 )
 

@@ -37,7 +37,9 @@ def _schema_validate(inventory: dict[str, Any], schema_path: Path) -> None:
         }
         missing = required - inventory.keys()
         if missing:
-            raise InventoryError(f"inventory is missing required keys: {sorted(missing)}")
+            raise InventoryError(
+                f"inventory is missing required keys: {sorted(missing)}"
+            )
         return
 
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -91,6 +93,10 @@ def _discover_test_files() -> set[str]:
         str(path.relative_to(ROOT))
         for path in (ROOT / "tests/harness").rglob("test_*.py")
     )
+    files.update(
+        str(path.relative_to(ROOT))
+        for path in (ROOT / "tests/repository-removal").rglob("test_*.py")
+    )
     for path in (ROOT / "src/api/SeaRise.Api.Tests").rglob("*.cs"):
         content = path.read_text(encoding="utf-8")
         if "[Fact]" in content or "[Theory]" in content:
@@ -126,9 +132,13 @@ def validate_inventory(
         raise InventoryError("inventory validation time must include a timezone")
     for evidence_id, record in evidence.items():
         try:
-            observed_at = datetime.fromisoformat(record["observedAt"].replace("Z", "+00:00"))
+            observed_at = datetime.fromisoformat(
+                record["observedAt"].replace("Z", "+00:00")
+            )
         except (TypeError, ValueError):
-            errors.append(f"{evidence_id}: observedAt is not a valid timezone-aware timestamp")
+            errors.append(
+                f"{evidence_id}: observedAt is not a valid timezone-aware timestamp"
+            )
             continue
         if observed_at.tzinfo is None:
             errors.append(f"{evidence_id}: observedAt must include a timezone")
@@ -147,7 +157,9 @@ def validate_inventory(
         for pattern in suite["sourcePaths"]:
             matches = _matching_paths(pattern)
             if status == "active" and not matches:
-                errors.append(f"{suite_id}: sourcePaths pattern matches no files: {pattern}")
+                errors.append(
+                    f"{suite_id}: sourcePaths pattern matches no files: {pattern}"
+                )
             matched.update(matches)
         if status == "active":
             covered.update(matched)
@@ -155,14 +167,18 @@ def validate_inventory(
         if status == "retired":
             if suite["removalGate"] is None or suite["replacementEvidence"] is None:
                 errors.append(f"{suite_id}: retired suite requires gate and evidence")
-        elif suite["removalGate"] is not None or suite["replacementEvidence"] is not None:
+        elif (
+            suite["removalGate"] is not None or suite["replacementEvidence"] is not None
+        ):
             errors.append(f"{suite_id}: active suite cannot carry retirement metadata")
 
         if suite["cost"]["evidenceRef"] not in evidence:
             errors.append(f"{suite_id}: cost evidenceRef does not exist")
         if suite["disposition"] == "keep-permanently":
             if suite["replacementGate"]["issue"] is not None:
-                errors.append(f"{suite_id}: permanent suite must not have a deletion issue")
+                errors.append(
+                    f"{suite_id}: permanent suite must not have a deletion issue"
+                )
         elif suite["replacementGate"]["issue"] is None:
             errors.append(f"{suite_id}: migratable suite requires a replacement issue")
 
@@ -173,7 +189,9 @@ def validate_inventory(
             and not execution["requiresCredentials"]
             and suite["commands"]["focused"] is None
         ):
-            errors.append(f"{suite_id}: credential-free fast suite requires a focused command")
+            errors.append(
+                f"{suite_id}: credential-free fast suite requires a focused command"
+            )
 
         flake = suite["flakiness"]
         if flake["status"] == "quarantined":
@@ -184,7 +202,9 @@ def validate_inventory(
             ):
                 errors.append(f"{suite_id}: quarantine is expired at inventory update")
         elif flake["issue"] is not None or flake["expiresAt"] is not None:
-            errors.append(f"{suite_id}: non-quarantined suite cannot carry quarantine metadata")
+            errors.append(
+                f"{suite_id}: non-quarantined suite cannot carry quarantine metadata"
+            )
 
     discovered = _discover_test_files()
     uncovered = sorted(discovered - covered)
@@ -204,7 +224,9 @@ def validate_inventory(
         if missing:
             errors.append(f"new tests require an inventory baseline entry: {missing}")
         if removed:
-            errors.append(f"baseline tests removed without retirement evidence: {removed}")
+            errors.append(
+                f"baseline tests removed without retirement evidence: {removed}"
+            )
     for item in baseline:
         if item["suite"] not in suite_ids:
             errors.append(f"{item['path']}: unknown suite {item['suite']}")
@@ -215,11 +237,17 @@ def validate_inventory(
             errors.append(f"{item['path']}: active baseline is owned by retired suite")
         if item["status"] == "retired":
             if item["removalGate"] is None or item["replacementEvidence"] is None:
-                errors.append(f"{item['path']}: retired test requires gate and evidence")
+                errors.append(
+                    f"{item['path']}: retired test requires gate and evidence"
+                )
             if item["path"] in discovered:
-                errors.append(f"{item['path']}: on-disk test cannot be declared retired")
+                errors.append(
+                    f"{item['path']}: on-disk test cannot be declared retired"
+                )
         elif item["replacementEvidence"] is not None:
-            errors.append(f"{item['path']}: active test cannot claim replacement evidence")
+            errors.append(
+                f"{item['path']}: active test cannot claim replacement evidence"
+            )
     return errors
 
 
