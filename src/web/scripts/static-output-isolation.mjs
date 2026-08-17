@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync } from "node:fs";
 import { extname, posix, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT_OUTPUTS = Object.freeze([
   "index.html",
@@ -9,7 +10,13 @@ const ROOT_OUTPUTS = Object.freeze([
   "service-worker.js",
   "build-report.json",
 ]);
-const CANONICAL_FLIGHT_SHA256 = "2f39c5f4d9d1050df7613999bc205bd08086cd689deefed730db3515a5d0b00f";
+const moduleUrl = new URL(import.meta.url);
+const webRoot = moduleUrl.protocol === "file:"
+  ? resolve(fileURLToPath(new URL("..", moduleUrl)))
+  : process.cwd();
+const repositoryRoot = resolve(webRoot, "../..");
+const canonicalFlightPath = resolve(repositoryRoot, "docs/product/Mock/SeaRise-Flight.html");
+const canonicalFlightRequirementsPath = resolve(repositoryRoot, "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md");
 const FORBIDDEN_STATIC_OUTPUT_PATHS = Object.freeze([
   /(?:^|\/)candidate(?:[-_.]?v?\d+)?(?:[/.\-_]|$)/i,
   /(?:^|\/)local-data(?:\/|$)/i,
@@ -26,6 +33,21 @@ const RELATIVE_RUNTIME_ENDPOINT = /(["'`])((?:\.\/)?(?:v1\/)?(?:assess|geocode|c
 const RELEASE_CONFIG_REFERENCE = /\/releases\/[A-Za-z0-9._-]+\/config\/[A-Za-z0-9._-]+\.json(?:[?#][A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/gu;
 
 function fail(message) { throw new Error(message); }
+
+export function deriveCanonicalFlightDigest(mockBytes, requirements) {
+  const digest = createHash("sha256").update(mockBytes).digest("hex");
+  if (typeof requirements !== "string" || !requirements.includes(digest)) {
+    fail(`Canonical Flight requirements do not declare the current mock SHA-256: ${digest}`);
+  }
+  return digest;
+}
+
+function currentCanonicalFlightDigest() {
+  return deriveCanonicalFlightDigest(
+    readFileSync(canonicalFlightPath),
+    readFileSync(canonicalFlightRequirementsPath, "utf8"),
+  );
+}
 
 function containsForbiddenRuntimeReference(text, allowedReleaseConfigPaths, allowedReleaseConfigReferences) {
   if (FORBIDDEN_RUNTIME_REFERENCES.some((pattern) => pattern.test(text))) return true;
@@ -135,6 +157,7 @@ export function validateStaticOutputIsolation({
   applicationBuildIdentityFile,
   shellManifestPaths,
 }) {
+  const canonicalFlightSha256 = currentCanonicalFlightDigest();
   const expected = new Set([...ROOT_OUTPUTS, buildIdentityFile, applicationBuildIdentityFile]
     .map((path) => safeStaticOutputPath(path, "Required static output")));
   const releasePrefix = safeStaticOutputPath(`releases/${safeRelativePath(releaseId, "release ID")}`, "Release prefix");
@@ -198,7 +221,7 @@ export function validateStaticOutputIsolation({
 
   for (const path of actual) {
     const bytes = readFileSync(resolve(dist, path));
-    if (createHash("sha256").update(bytes).digest("hex") === CANONICAL_FLIGHT_SHA256) {
+    if (createHash("sha256").update(bytes).digest("hex") === canonicalFlightSha256) {
       fail(`Canonical Flight mock bytes are forbidden in static output: ${path}`);
     }
     const text = activeProhibitionContent(path, inspectableStrings(bytes), releaseArtifactsByOutput);

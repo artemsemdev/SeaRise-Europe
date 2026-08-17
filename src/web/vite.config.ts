@@ -222,7 +222,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       headers: {
         // Preserve precompressed release artifacts as opaque bytes. Without this
-        // identity override, Vite preview decodes .br responses before hashing.
+        // identity override, Vite's preview mode decodes .br responses before hashing.
         "Content-Encoding": "identity",
         "Access-Control-Allow-Origin": "http://127.0.0.1:4173",
         "Access-Control-Allow-Methods": "GET, HEAD",

@@ -29,7 +29,7 @@ export const forbiddenDependencyRules = Object.freeze([
   Object.freeze({ id: "azurite-runtime", pattern: /(?:\bAzurite\b|mcr\.microsoft\.com\/azure-storage\/azurite|UseDevelopmentStorage=true)/giu }),
   Object.freeze({ id: "azure-runtime-geocoder", pattern: /(?:\bAzure Maps\b.{0,80}\bgeocod|atlas\.microsoft\.com\/(?:search|geocode|sdk)|maps\.azure\.com.{0,120}(?:search|geocode)|\bAZURE_MAPS_[A-Z_]+\b|azure-maps-control|subscription-key.{0,80}(?:atlas|maps\.azure))/giu }),
   Object.freeze({ id: "legacy-compose-runtime", pattern: /^\s{0,8}(?:api|frontend|db|postgres|postgis|titiler|azurite):\s*$/gimu }),
-  Object.freeze({ id: "node-production-server", pattern: /(?:\bvite preview\b|\bnext start\b|\bnode\s+(?:\.\/)?(?:server|app|index)\.(?:js|mjs|cjs)\b|\bcreateServer\s*\(|["'](?:express|fastify|http-server|serve)["']\s*:|\bnpx\s+(?:http-server|serve)\b|\bfastify\s+start\b)/giu }),
+  Object.freeze({ id: "node-production-server", pattern: /(?:\bvite preview\b|\bnext start\b|\bnode\s+(?:\.\/)?(?:server|app|index)\.(?:js|mjs|cjs)\b|\bcreateServer\s*\(|["'](?:@hono\/node-server|express|fastify|hono|http-server|koa)["']\s*:|\bnpx\s+(?:http-server|serve)\b|\bfastify\s+start\b|\b(?:Bun|Deno)\.serve\s*\()/giu }),
 ]);
 
 const pendingRemovalPaths = Object.freeze([
@@ -44,20 +44,22 @@ const pendingRemovalPaths = Object.freeze([
 const legacyPipelineAdapters = /^src\/pipeline\/(?:__init__|cogify|compute_exposure|config|download|preprocess|register|run_pipeline|upload|validate)\.py$/u;
 const mustDeletePrefixes = Object.freeze(["src/api/", "src/frontend/", "infra/db/", "infra/blob-seed/"]);
 const exactRetainedRulePurpose = new Map([
-  ["src/web/package.json", new Set(["node-production-server"])],
-  ["src/web/vite.config.ts", new Set(["node-production-server"])],
-  ["src/web/tests/static-shell.spec.ts", new Set(["node-production-server"])],
-  ["src/web/scripts/measure-ar6-release.mjs", new Set(["node-production-server"])],
-  ["src/web/scripts/measure-local-candidate-search.mjs", new Set(["node-production-server"])],
-  ["src/web/scripts/offline-lifecycle-server.mjs", new Set(["node-production-server"])],
-  ["src/web/scripts/run-local-candidate-e2e.mjs", new Set(["node-production-server"])],
-  ["src/web/scripts/serve-committed-release.mjs", new Set(["node-production-server"])],
-  ["src/web/scripts/serve-range-cache-spike.mjs", new Set(["node-production-server"])],
-  ["src/web/scripts/verify-boundary-pmtiles-browser.mjs", new Set(["node-production-server"])],
-  ["tests/evidence/mutation-pilot-result-state.json", new Set(["dotnet-csharp-nuget"])],
-  ["tests/evidence/tdd-slices.json", new Set(["dotnet-csharp-nuget"])],
-  ["tests/harness/test_immutable_dependencies.py", new Set(["postgres-postgis-npgsql"])],
-  ["tests/test-inventory.json", new Set(["dotnet-csharp-nuget", "postgres-postgis-npgsql", "titiler-runtime"])],
+  ["src/web/package.json", new Map([["node-production-server", new Set(["vite preview"])]])],
+  ["src/web/scripts/measure-ar6-release.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["src/web/scripts/measure-local-candidate-search.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["src/web/scripts/offline-lifecycle-server.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["src/web/scripts/run-local-candidate-e2e.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["src/web/scripts/serve-committed-release.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["src/web/scripts/serve-range-cache-spike.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["src/web/scripts/verify-boundary-pmtiles-browser.mjs", new Map([["node-production-server", new Set(["createserver("])]])],
+  ["tests/evidence/mutation-pilot-result-state.json", new Map([["dotnet-csharp-nuget", new Set(["dotnet test", ".sln"])]])],
+  ["tests/evidence/tdd-slices.json", new Map([["dotnet-csharp-nuget", new Set(["dotnet test", ".sln"])]])],
+  ["tests/harness/test_immutable_dependencies.py", new Map([["postgres-postgis-npgsql", new Set(["postgis"])]])],
+  ["tests/test-inventory.json", new Map([
+    ["dotnet-csharp-nuget", new Set(["dotnet test", ".sln"])],
+    ["postgres-postgis-npgsql", new Set(["postgis"])],
+    ["titiler-runtime", new Set(["titiler", "developmentseed/titiler"])],
+  ])],
 ]);
 const allPolicyRuleIds = new Set(forbiddenDependencyRules.map(({ id }) => id));
 const gatePolicyRulePurpose = new Map([
@@ -79,14 +81,14 @@ function isPendingRemoval(path, ruleId) {
     ));
 }
 
-function retainedClass(path, ruleId, historicalEntries) {
+function retainedClass(path, ruleId, findingText, historicalEntries) {
   if (historicalEntries.get(path)?.rule === "immutable-v1-supply-chain-evidence") {
     return "immutable-v1-supply-chain-evidence";
   }
   if (gatePolicyRulePurpose.get(path)?.has(ruleId)) {
     return "gate-policy-definition";
   }
-  if (exactRetainedRulePurpose.get(path)?.has(ruleId)) {
+  if (exactRetainedRulePurpose.get(path)?.get(ruleId)?.has(findingText.toLocaleLowerCase("en-US"))) {
     return path.startsWith("tests/") ? "retained-test-evidence" : "retained-test-tooling";
   }
   return null;
@@ -110,6 +112,27 @@ function scanText(path, text) {
   }
   if (legacyPipelineAdapters.test(path)) {
     findings.push(Object.freeze({ path, rule: "legacy-pipeline-adapter", line: 1, text: "legacy root pipeline adapter" }));
+  }
+  if (path.endsWith("package.json")) {
+    let manifest;
+    try { manifest = JSON.parse(text); } catch { manifest = null; }
+    const serverPackages = new Set([
+      "@hono/node-server", "express", "fastify", "hono", "http-server", "koa", "serve",
+    ]);
+    for (const section of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
+      const dependencies = manifest?.[section];
+      if (!dependencies || typeof dependencies !== "object" || Array.isArray(dependencies)) continue;
+      for (const dependency of Object.keys(dependencies)) {
+        if (serverPackages.has(dependency)) {
+          findings.push(Object.freeze({
+            path,
+            rule: "node-production-server",
+            line: 1,
+            text: `${section}.${dependency}`,
+          }));
+        }
+      }
+    }
   }
   return findings;
 }
@@ -167,7 +190,7 @@ export function scanDependencyRecords(records, {
   const findings = rawFindings.map((finding) => {
     const { path } = finding;
     const classification = finding.rule === "private-or-archive-path" ? null : isPendingRemoval(path, finding.rule)
-      ? "pending-removal" : retainedClass(path, finding.rule, historicalEntries);
+      ? "pending-removal" : retainedClass(path, finding.rule, finding.text, historicalEntries);
     return Object.freeze({ ...finding, classification });
   });
   const violations = findings.filter(({ classification }) => {

@@ -20,6 +20,9 @@ function approvalRepository() {
   git(root, "init", "-q");
   mkdirSync(resolve(root, "docs/evidence"), { recursive: true });
   writeFileSync(resolve(root, "docs/evidence/history.md"), "Historical evidence.\n");
+  mkdirSync(resolve(root, "src/web/scripts"), { recursive: true });
+  writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "// synthetic gate policy\n");
+  writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.test.mjs"), "// synthetic gate tests\n");
   mkdirSync(resolve(root, "src/frontend"), { recursive: true });
   writeFileSync(resolve(root, "src/frontend/token-free"), "survivor\n");
   git(root, "add", ".");
@@ -76,7 +79,7 @@ describe("static repository dependency gates", () => {
 
   it("allows only explicit retained test/evidence and policy classes in the final repository", () => {
     const records = [
-      { path: "src/web/tests/static-shell.spec.ts", text: "node server.js" },
+      { path: "src/web/package.json", text: '{"scripts":{"serve":"vite preview"}}' },
       { path: "src/web/scripts/static-repository-gates.mjs", text: "PostGIS policy mutation" },
       { path: "unexpected/runtime.yml", text: "azurite:latest" },
     ];
@@ -209,6 +212,15 @@ describe("static repository dependency gates", () => {
     expect(scanDependencyRecords(records, { mode: "repository-final" }).violations).toHaveLength(1);
   });
 
+  it.each([
+    ["src/web/package.json", '{"dependencies":{"express":"5.0.0"}}'],
+    ["src/web/package.json", '{"dependencies":{"serve":"14.0.0"}}'],
+    ["src/web/vite.config.ts", "createServer(app)"],
+  ])("rejects a production server at exact formerly exempt path %s", (path, text) => {
+    const result = scanDependencyRecords([{ path, text }], { mode: "repository-final", paths: [path] });
+    expect(result.violations.map(({ rule }) => rule)).toContain("node-production-server");
+  });
+
   it("extracts forbidden dependencies from binary built output", () => {
     const dist = mkdtempSync(resolve(tmpdir(), "repository-built-gate-"));
     writeFileSync(resolve(dist, "payload.bin"), Buffer.from([0, ...Buffer.from("postgres:latest"), 0]));
@@ -247,5 +259,9 @@ describe("static repository dependency gates", () => {
       .toHaveLength(0);
     expect(approvals).toBe(2);
     expect(readFileSync(resolve(root, "docs/evidence/history.md"), "utf8")).toBe("Historical evidence.\n");
+
+    writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "createServer(app)\n");
+    expect(() => validateStaticRepository({ mode: "repository-final", root, approvalValidator: approve }))
+      .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
   });
 });

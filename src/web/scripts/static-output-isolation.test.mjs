@@ -1,9 +1,10 @@
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { validateStaticOutputIsolation } from "./static-output-isolation.mjs";
+import { deriveCanonicalFlightDigest, validateStaticOutputIsolation } from "./static-output-isolation.mjs";
 
 const RELEASE = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 
@@ -64,6 +65,18 @@ function addArchitectureEvidence(fixtureValue, mutation = {}) {
 }
 
 describe("static output isolation", () => {
+  it("derives a changed canonical Flight digest from its matching requirements contract", () => {
+    const first = Buffer.from("synthetic canonical Flight A");
+    const second = Buffer.from("synthetic canonical Flight B");
+    const firstDigest = createHash("sha256").update(first).digest("hex");
+    const secondDigest = createHash("sha256").update(second).digest("hex");
+    expect(deriveCanonicalFlightDigest(first, `Mock SHA-256: ${firstDigest}`)).toBe(firstDigest);
+    expect(deriveCanonicalFlightDigest(second, `Mock SHA-256: ${secondDigest}`)).toBe(secondDigest);
+    expect(secondDigest).not.toBe(firstDigest);
+    expect(() => deriveCanonicalFlightDigest(second, `Mock SHA-256: ${firstDigest}`))
+      .toThrow(/do not declare the current mock SHA-256/);
+  });
+
   it("accepts only the exact root, Vite, source-map, and release-manifest closure", () => {
     const { dist, options, paths } = fixture();
     writeFileSync(resolve(dist, "assets/main-01234567.js"),

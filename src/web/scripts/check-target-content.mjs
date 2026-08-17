@@ -82,6 +82,10 @@ const activeAuthorityPaths = new Set([
   "docs/methodology.md",
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 ]);
+const gatePolicyTrustPaths = Object.freeze([
+  "src/web/scripts/static-repository-gates.mjs",
+  "src/web/scripts/static-repository-gates.test.mjs",
+]);
 
 export const prohibitedTargetClaims = Object.freeze([
   Object.freeze({ id: "legacy-outcome-modeled-exposure", pattern: /\bModeledExposureDetected\b/giu }),
@@ -198,6 +202,19 @@ function approvedRemovalChain(root) {
   }
 }
 
+function validateGatePolicyTrustRoots(root, auditedCommit) {
+  for (const path of gatePolicyTrustPaths) {
+    const currentBlob = gitBlobSha(readFileSync(resolve(root, path)));
+    const auditedBlob = execFileSync("git", ["rev-parse", `${auditedCommit}:${path}`], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+    if (currentBlob !== auditedBlob) {
+      throw new Error(`Gate-policy trust root differs from the owner-approved audited blob: ${path}`);
+    }
+  }
+}
+
 export function loadHistoricalAllowlist({
   authority = "readiness",
   root = repositoryRoot,
@@ -214,7 +231,7 @@ export function loadHistoricalAllowlist({
   const path = existsSync(approvedPath) ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
   const document = JSON.parse(readFileSync(path, "utf8"));
-  return validateHistoricalAllowlist(document, (repositoryPath) =>
+  const entries = validateHistoricalAllowlist(document, (repositoryPath) =>
     readFileSync(resolve(root, repositoryPath), "utf8"), {
     resolveTree: (commit) => execFileSync("git", ["rev-parse", `${commit}^{tree}`], {
       cwd: root,
@@ -225,6 +242,8 @@ export function loadHistoricalAllowlist({
       encoding: "utf8",
     }).trim(),
   });
+  if (authority === "approved") validateGatePolicyTrustRoots(root, document.auditedCommit);
+  return entries;
 }
 
 function activeMethodology(content, path) {

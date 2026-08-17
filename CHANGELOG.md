@@ -13,8 +13,9 @@ All notable changes to this project will be documented in this file.
   retained build/test tooling and build-plane containers remain explicitly
   classified without authorizing repository deletion. Token-free legacy paths,
   alternate Compose names, JSON/binary build mutations, all authorization
-  channels, exact Flight bytes, and owner-approved final authority now fail
-  closed with purpose-bound exceptions only.
+  channels, current canonical Flight bytes, and owner-approved final authority
+  now fail closed with match-purpose exceptions only. The two self-describing
+  gate-policy files are additionally bound to their owner-approved Git blobs.
 
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two

@@ -93,14 +93,19 @@ three scopes:
   environment, Terraform, Docker/Compose, and extensionless configuration
   paths. Presence under a must-delete root fails final mode even when a survivor
   contains no legacy token. Shared workflows and retained local server tools
-  use exact path/rule-purpose selectors rather than directory or filename
-  wildcards.
+  use exact path/rule/matched-text purpose selectors rather than directory or
+  filename wildcards. A package-level structural check separately rejects
+  production HTTP-server dependencies, including a dependency whose name is
+  also used by a retained test script.
 
 Readiness classification is not removal approval. `--repository-final` changes
 every remaining pending-removal reference into a failure and also rejects any
 unclassified reference. It is the Phase 2 final clean-repository gate. Printed
 occurrence counts are diagnostics only; they are not an inventory-completeness
-claim.
+claim. The scanner and its mutation suite necessarily contain the literal
+policy tokens they reject. They are the only executable policy-definition
+trust roots: final mode requires their current Git blobs to equal the blobs in
+the owner-approved audited commit, whose tree is bound by the approval chain.
 
 Static-output isolation independently rejects both unversioned and `/v1/`
 forms of `/assess`, `/geocode`, and `/config`. Only exact
@@ -109,7 +114,9 @@ manifest are allowed. Candidate/local-data/archive paths and the canonical
 Flight path are rejected through every Vite, shell, release-manifest, and
 actual-output authorization channel before bytes are read. Every authorized
 output is then inspected as text or extracted ASCII/UTF-16 strings; exact
-Flight bytes are rejected even under a renamed manifest-authorized path.
+Flight bytes are rejected even under a renamed manifest-authorized path. The
+digest is recalculated from the current canonical mock and must be declared by
+`MOCK_REQUIREMENTS_MAP.md`; it is never a stale constant in the output gate.
 
 ## Commands
 
