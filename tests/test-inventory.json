@@ -1,8 +1,14 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-16",
+  "updatedAt": "2026-08-17",
   "evidence": {
+    "local-2026-08-17-static-client-census": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T02:11:00+02:00",
+      "reference": "docs/operations/static-offline-client-lifecycle.md, src/web/src/offline/service-worker-client-authority.test.ts, src/web/src/offline/worker-client-authority.test.ts, and src/web/tests/client-lease-lifecycle.spec.ts",
+      "environment": "macOS arm64; Node 20.20.1; Vite 8.2.1; Vitest 4.1.10; Playwright 1.62.1 Chromium; 681 deterministic static-target tests and one production-build two-tab Chromium lifecycle journey passed; source-bound worker-minted leases, cross-client refusal, stable census, cleanup fencing, and orderly per-tab release; committed synthetic fixture only; no Candidate-v7, TAR, external storage, or runtime service"
+    },
     "local-2026-08-16-static-browser-assisted-keyboard": {
       "kind": "local-measurement",
       "observedAt": "2026-08-16T11:05:00+02:00",
@@ -1456,8 +1462,13 @@
     { "path": "src/web/src/offline/contracts/policy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/privacy.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/contracts/v1.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/client-lease-controller.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/pair-lifecycle-store.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/register-service-worker.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/service-worker-client-authority.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/service-worker-runtime.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/update-coordinator.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/worker-client-authority.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/whole-resource-cache.test.ts", "suite": "static-whole-resource-cache", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/range-store.test.ts", "suite": "static-authoritative-range-store", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/release-resource-plan.test.ts", "suite": "static-release-resource-plan", "status": "active", "removalGate": null, "replacementEvidence": null },
@@ -1473,6 +1484,7 @@
     { "path": "src/web/src/components/map/pmtiles-network-source.test.ts", "suite": "static-pmtiles-network-only", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/release-delivery-policy.test.mjs", "suite": "static-pmtiles-network-only", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/client-lease-lifecycle.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/projection-ux.spec.ts", "suite": "static-projection-browser-ux", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/range-cache-compatibility.spec.ts", "suite": "static-range-cache-compatibility", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/local-candidate-binding.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },

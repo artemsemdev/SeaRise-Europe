@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Bound every persistent browser lease to the service worker's authenticated
+  `Client.id` instead of a caller-supplied tab identity. The worker now mints
+  expiry, refuses cross-tab heartbeat and release attempts, challenges a stable
+  two-pass window-client census before pair cleanup, and keeps the durable
+  cleanup fence as the final race-prevention authority. Private Candidate
+  sessions still create no worker authority, lease, census listener, timer, or
+  persistent record.
+
 - Added a conservative static-host update coordinator that verifies a sealed
   waiting candidate and records an explicit one-shot close-and-reopen intent
   without activating a worker, reloading, or changing current authority. A
