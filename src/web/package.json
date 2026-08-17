@@ -15,6 +15,7 @@
     "generate:search-fixture": "node scripts/generate-search-fixture.mjs",
     "check:search-fixture": "node scripts/generate-search-fixture.mjs --check",
     "measure:local-candidate-search": "node scripts/measure-local-candidate-search.mjs",
+    "measure:ar6-release": "node scripts/measure-ar6-release.mjs",
     "dev": "vite",
     "serve:local-release": "node scripts/serve-local-release.mjs",
     "serve:committed-release": "node scripts/serve-committed-release.mjs",

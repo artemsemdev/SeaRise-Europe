@@ -21,6 +21,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Relocated the reusable AR6 Chromium delivery measurement harness into the
+  static `src/web` workspace and rebound its exact release contract to the
+  root npm lockfile without changing lookup values or engineering budgets.
+
 - Relocated the permanent PMTiles browser and deterministic render evidence
   harnesses into the static `src/web` workspace and bound them to the root npm
   lockfile, without changing the approved scientific inputs or rendered PNG

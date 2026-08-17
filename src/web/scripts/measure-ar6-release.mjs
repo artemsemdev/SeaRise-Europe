@@ -18,7 +18,7 @@ const manifest = JSON.parse(readFileSync(join(candidate, "manifest.json"), "utf8
 const buildEvidence = JSON.parse(readFileSync(join(candidate, "build-evidence.json"), "utf8"));
 const packageLock = readFileSync(resolve("package-lock.json"));
 const packageLockDocument = JSON.parse(packageLock.toString("utf8"));
-const goldensPath = resolve("../pipeline/science/evidence/ar6-lookup-goldens.json");
+const goldensPath = resolve("src/pipeline/science/evidence/ar6-lookup-goldens.json");
 const goldensBytes = readFileSync(goldensPath);
 const goldens = JSON.parse(goldensBytes.toString("utf8"));
 if (buildEvidence.lookupGoldenEvidence.sha256 !== sha256(goldensBytes)) {
@@ -256,7 +256,7 @@ const artifactByteSizes = Object.fromEntries(
 );
 const trace = {
   schemaVersion: 1,
-  harness: "src/frontend/scripts/measure-ar6-release.mjs",
+  harness: "src/web/scripts/measure-ar6-release.mjs",
   candidate: {
     releaseId: manifest.releaseId,
     manifestSha256: sha256(readFileSync(join(candidate, "manifest.json"))),
