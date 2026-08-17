@@ -50,7 +50,7 @@ Capture reproduction from `src/web`, while `npm run serve` is running:
 node -e 'const {chromium}=require("playwright"); const path=require("path"); (async()=>{const b=await chromium.launch(); for(const [n,w,h] of [["desktop-1440x900",1440,900],["mobile-375x812",375,812]]) for(const [kind,url] of [["mock","file://"+path.resolve("../../docs/product/Mock/SeaRise-Flight.html")],["implementation","http://127.0.0.1:4173/"]]){const p=await b.newPage({viewport:{width:w,height:h},reducedMotion:"reduce"}); await p.goto(url); await p.screenshot({path:`../../docs/evidence/phase-2/issue-60-flight-capability/${kind}-${n}.png`}); await p.close();} await b.close();})()'
 ```
 
-Results: lint and contract scans passed; TypeScript passed; 699 unit and
+Results: lint and contract scans passed; TypeScript passed; 707 unit and
 integration tests passed; production build inspection passed; focused
 Playwright passed for root worker identity on desktop Chromium and the 375 px
 runtime state on mobile Chromium (the opposite project/viewport combinations
