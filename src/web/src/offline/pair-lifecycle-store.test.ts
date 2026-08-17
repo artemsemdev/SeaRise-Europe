@@ -306,7 +306,8 @@ describe("versioned exact-pair lifecycle store", () => {
   it("enumerates only exact pair Cache Storage, range, receipt, and lease records", async () => {
     const target = pair();
     const namespaces = cacheNamespaces(target);
-    caches.seed(namespaces.shell, "https://static.example/index.html");
+    const sealedShell = `${namespaces.shell}:${A}`;
+    caches.seed(sealedShell, "https://static.example/index.html");
     caches.seed(namespaces.release, "https://static.example/releases/release-a/manifest.json");
     caches.seed(`${namespaces.release}:staging:operation-1`, "https://static.example/staged");
     caches.seed(cacheNamespaces(pair("build-z", "release-z")).release, "https://static.example/other");
@@ -316,7 +317,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(store.storageInventory(target)).resolves.toEqual({
       contractVersion: 1,
       pair: target,
-      cacheNames: [namespaces.release, `${namespaces.release}:staging:operation-1`, namespaces.shell].sort(),
+      cacheNames: [namespaces.release, `${namespaces.release}:staging:operation-1`, sealedShell].sort(),
       cacheRequestCount: 3,
       rangeRecordCount: 1,
       rangeBytes: 4,
@@ -390,7 +391,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await makeComplete(store, target);
     await store.markCleanupPending(target);
     const namespaces = cacheNamespaces(target);
-    caches.seed(namespaces.shell, "https://static.example/index.html");
+    caches.seed(`${namespaces.shell}:${A}`, "https://static.example/index.html");
     await seedRangeDatabase(factory, target, { leaseExpiresAt: 900 });
     await seedReceiptDatabase(factory, target);
 
@@ -413,7 +414,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await expect(cleanup).rejects.toMatchObject({ code: "CleanupBlocked" });
     await expect(store.read(target)).resolves.toMatchObject({ status: "found", record: { state: "cleanup-pending" } });
     await expect(store.storageInventory(target)).resolves.toMatchObject({
-      cacheNames: [namespaces.shell], rangeRecordCount: 1, receiptRecordCount: 1, leaseRecordCount: 2,
+      cacheNames: [`${namespaces.shell}:${A}`], rangeRecordCount: 1, receiptRecordCount: 1, leaseRecordCount: 2,
     });
   });
 
@@ -422,7 +423,7 @@ describe("versioned exact-pair lifecycle store", () => {
     await makeComplete(store, target);
     await store.markCleanupPending(target);
     const namespaces = cacheNamespaces(target);
-    caches.seed(namespaces.shell, "https://static.example/index.html");
+    caches.seed(`${namespaces.shell}:${A}`, "https://static.example/index.html");
     await seedRangeDatabase(factory, target, { leaseExpiresAt: 900 });
     await seedReceiptDatabase(factory, target);
 

@@ -6,6 +6,7 @@ import { createBrowserRuntime } from "../application/browser-runtime";
 import { runtimeConfig } from "../config";
 import { PairLifecycleStore } from "./pair-lifecycle-store";
 import { createProductionUpdateCoordinator } from "./production-update-coordinator";
+import type { CloseAndReopenIntentV1 } from "./update-coordinator";
 import type { VerifiedResourceRouter } from "./verified-resource-router";
 import { validateAppReleasePair } from "./contracts/keys";
 import { fixtureArtifactPath, fixtureBytes, fixtureReleaseContext, responseBody } from "../test/release-fixture";
@@ -54,6 +55,7 @@ describe("production default update composition", () => {
     const candidatePrecache = "b".repeat(64);
     const candidateA = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-a", dataReleaseId: "next-browser-release-a" });
     const candidateB = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-b", dataReleaseId: "next-browser-release-b" });
+    const candidateC = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-c", dataReleaseId: "next-browser-release-c" });
     let waitingPair = candidateA;
     let waitingPrecache = candidatePrecache;
     const currentPair = validateAppReleasePair({
@@ -185,18 +187,86 @@ describe("production default update composition", () => {
     if (!naturallyArmed) throw new Error("natural armed intent was unavailable");
     runtime.dispose();
 
-    const candidateRouter = { current: () => ({
+    const candidateSnapshot = () => ({
       contractVersion: 1 as const,
       plan: { pair: candidateA, resourcePlanSha256: "f".repeat(64) },
       gate: { receiptSha256: "1".repeat(64) },
-    }) } as unknown as VerifiedResourceRouter;
+    });
+    let admittedCandidate: ReturnType<typeof candidateSnapshot> | null = null;
+    const candidateRouter = { current: () => admittedCandidate } as unknown as VerifiedResourceRouter;
     serviceWorkerBoundary.controller = waiting;
     registration.waiting = null;
     const successRuntime = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
-    await successRuntime.inspect();
+    await Promise.all([successRuntime.inspect(), successRuntime.inspectRetention()]);
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"armed"');
+    admittedCandidate = candidateSnapshot();
+    const concurrent = await Promise.all([
+      successRuntime.inspect(),
+      successRuntime.inspect(),
+      successRuntime.inspectRetention(),
+    ]);
+    expect(concurrent[0]).toEqual(concurrent[1]);
     expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
     await successRuntime.inspect();
     expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"consumed"');
+
+    const waitingB = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) {
+      ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken,
+        pair: candidateB, precacheSetSha256: "c".repeat(64) });
+    } };
+    registration.waiting = waitingB;
+    admittedCandidate = {
+      ...candidateSnapshot(),
+      plan: { pair: candidateA, resourcePlanSha256: "2".repeat(64) },
+      gate: { receiptSha256: "3".repeat(64) },
+    };
+    const candidateBCapability = Object.freeze({
+      contractVersion: 2 as const,
+      subject: Object.freeze({ kind: "core" as const }),
+      data: Object.freeze({ state: "online-complete" as const, pair: candidateA }),
+      update: Object.freeze({ state: "update-available" as const, candidate: candidateB }),
+    });
+    const consumedRollover = successRuntime;
+    await expect(consumedRollover.inspect()).resolves.toMatchObject({ state: "update-available" });
+    await consumedRollover.requestAction(candidateBCapability);
+    await expect(consumedRollover.inspect()).resolves.toMatchObject({ state: "ready-to-activate" });
+    const secondArmed = localStorage.getItem("searise:update-intent:v1");
+    expect(secondArmed).toContain('"state":"armed"');
+
+    const secondRecord = JSON.parse(secondArmed ?? "null") as { intent: CloseAndReopenIntentV1 };
+    admittedCandidate = candidateSnapshot();
+    localStorage.setItem("searise:update-intent:v1", JSON.stringify({ intent: secondRecord.intent, state: "pending" }));
+    const nonterminalRollover = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await expect(nonterminalRollover.inspect()).resolves.toMatchObject({ state: "update-available" });
+    await nonterminalRollover.requestAction(candidateBCapability);
+    await expect(nonterminalRollover.inspect()).resolves.toMatchObject({
+      state: "failed", reason: expect.stringContaining("nonterminal durable update intent"),
+    });
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"pending"');
+
+    localStorage.setItem("searise:update-intent:v1", JSON.stringify({ intent: secondRecord.intent, state: "tombstoned" }));
+    const terminalReplay = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await expect(terminalReplay.inspect()).resolves.toMatchObject({ state: "update-available" });
+    await terminalReplay.requestAction(candidateBCapability);
+    await expect(terminalReplay.inspect()).resolves.toMatchObject({
+      state: "failed", reason: expect.stringContaining("terminal update candidate cannot be replayed"),
+    });
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"tombstoned"');
+
+    const waitingC = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) {
+      ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken,
+        pair: candidateC, precacheSetSha256: "d".repeat(64) });
+    } };
+    registration.waiting = waitingC;
+    const candidateCCapability = Object.freeze({
+      ...candidateBCapability,
+      update: Object.freeze({ state: "update-available" as const, candidate: candidateC }),
+    });
+    const tombstonedRollover = createProductionUpdateCoordinator(candidateRouter, candidatePrecache);
+    await expect(tombstonedRollover.inspect()).resolves.toMatchObject({ state: "update-available" });
+    await tombstonedRollover.requestAction(candidateCCapability);
+    await expect(tombstonedRollover.inspect()).resolves.toMatchObject({ state: "ready-to-activate" });
+    expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"armed"');
 
     for (const corrupt of [
       "{malformed",
