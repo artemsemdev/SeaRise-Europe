@@ -127,8 +127,21 @@ jobs:
       - name: Validate deterministic PMTiles render evidence
         run: npm run evidence:pmtiles-render --workspace @searise/web
 
+      - name: Select isolated static-quality runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.23.2
+          cache: npm
+          cache-dependency-path: tools/static-quality/package-lock.json
+
+      - name: Install isolated static-quality tooling
+        run: npx --yes npm@11.12.1 ci --prefix tools/static-quality
+
+      - name: Audit isolated static-quality tooling
+        run: npx --yes npm@11.12.1 audit --prefix tools/static-quality --audit-level=high
+
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npm run --prefix tools/static-quality install:chromium:ci
 
       - name: Validate generic static hosting
         run: npm run web:validate:static-host

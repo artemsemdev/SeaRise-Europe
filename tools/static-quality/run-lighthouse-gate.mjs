@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { chromium } from "@playwright/test";
 import { launch } from "chrome-launcher";
 import lighthouse from "lighthouse";
-import { chromium } from "@playwright/test";
-import { startGenericStaticHost, stopGenericStaticHost, validateGenericStaticHost } from "./generic-static-host.mjs";
+import { validateGenericStaticHost } from "../../src/web/scripts/generic-static-host.mjs";
+import { startGenericStaticHost, stopGenericStaticHost } from "./generic-static-host.mjs";
 
 const categories = ["performance", "accessibility", "best-practices", "seo"];
-const dist = resolve(import.meta.dirname, "../dist");
-const evidenceDirectory = resolve(import.meta.dirname, "../test-results/lighthouse");
+const dist = resolve(import.meta.dirname, "../../src/web/dist");
+const evidenceDirectory = resolve(import.meta.dirname, "../../src/web/test-results/lighthouse");
 const { child, origin } = await startGenericStaticHost({ dist, port: 4175 });
 try {
   await validateGenericStaticHost(origin, dist);

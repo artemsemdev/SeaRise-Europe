@@ -6,8 +6,8 @@
     "local-2026-08-17-generic-static-lighthouse": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T12:16:37+02:00",
-      "reference": "docs/operations/generic-static-host-validation.md, src/web/scripts/validate-generic-static-host.mjs, and src/web/scripts/run-lighthouse-gate.mjs",
-      "environment": "macOS arm64; Node 20.20.1; Lighthouse 12.8.2; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; three fresh simulated-mobile Chromium audits each produced raw scores performance 0.90, accessibility 1.00, best practices 0.96, SEO 1.00, with the same medians; exact manifest-only release inventory, static routes, build/release/config identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
+      "reference": "docs/operations/generic-static-host-validation.md, tools/static-quality/validate-generic-static-host.mjs, and tools/static-quality/run-lighthouse-gate.mjs",
+      "environment": "macOS arm64; application build on Node 20.20.1; isolated quality tools on Node 22.23.2; Lighthouse 13.4.1; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; three fresh simulated-mobile Chromium audits each produced raw scores performance 0.90, accessibility 1.00, best practices 0.96, SEO 1.00, with the same medians; exact manifest-only release inventory, static routes, build/release/config identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
     },
     "local-2026-08-17-offline-lifecycle-journey": {
       "kind": "local-measurement",
@@ -457,11 +457,11 @@
       "layer": "integration",
       "owner": "platform",
       "purpose": "Prove the production output works on a pinned generic static-file server, exposes only the two intended document routes and immutable build/release assets, returns static 404 responses for unknown and legacy application endpoints, and meets the >=90 Lighthouse mobile performance, accessibility, best-practices, and SEO budgets in Chromium.",
-      "sourcePaths": ["src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "src/web/scripts/validate-generic-static-host.mjs", "src/web/scripts/run-lighthouse-gate.mjs", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
-      "changedPaths": ["src/web/**", "package.json", "package-lock.json", ".github/workflows/ci.yml"],
+      "sourcePaths": ["src/web/scripts/generic-static-host.mjs", "src/web/scripts/generic-static-host.test.mjs", "tools/static-quality/validate-generic-static-host.mjs", "tools/static-quality/run-lighthouse-gate.mjs", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "src/web/scripts/inline-initial-styles.mjs", "src/web/scripts/precompress-static-build.mjs", "docs/operations/generic-static-host-validation.md"],
+      "changedPaths": ["src/web/**", "tools/static-quality/**", "package.json", ".github/workflows/ci.yml"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent generic static-host portability, static-route, zero-dynamic-endpoint, and Chromium Lighthouse quality gate." },
-      "commands": { "focused": "npm run web:build && npm run web:validate:static-host && npm run web:validate:lighthouse", "full": "npm run web:check && npm run web:validate:static-host && npm run web:validate:lighthouse && npm run web:e2e" },
+      "commands": { "focused": "npm run web:build && npm run static-quality:install && npm run web:validate:static-host && npm run web:validate:lighthouse", "full": "npm run web:check && npm run static-quality:install && npm run web:validate:static-host && npm run web:validate:lighthouse && npm run web:e2e" },
       "execution": { "tier": "release", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 65, "class": "slow", "evidenceRef": "local-2026-08-17-generic-static-lighthouse", "scope": "focused-suite" },
       "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A single simulated-mobile audit varied from 0.88 to 0.90 before the initial Flight fonts were preloaded. The owned gate now preserves three fresh raw reports, evaluates the raw median, and additionally rejects every individual category below 0.90. The post-fix three-run evidence was 0.90/1.00/0.96/1.00 in every run; no external service, data, or network is involved." }

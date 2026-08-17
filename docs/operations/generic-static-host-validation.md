@@ -7,12 +7,14 @@ TAR bytes and uses only the committed synthetic fixture copied by the build.
 
 ## Reproduce the gates
 
-Use the repository-pinned Node 20.20.1 and npm 11.12.1 versions:
+Build the application with repository-pinned Node 20.20.1 and npm 11.12.1.
+Run the isolated static-quality tools with Node 22.23.2 and npm 11.12.1:
 
 ```sh
 npm ci
-npx playwright install chromium
 npm run web:build
+npm run static-quality:install
+npm run --prefix tools/static-quality install:chromium
 npm run web:validate:static-host
 npm run web:validate:lighthouse
 ```
@@ -29,11 +31,12 @@ versioned assessment POST acquires dynamic handling. Every manifest-authorized
 `config/*.json` asset is fetched from its release-scoped path and checked
 against its byte size, SHA-256, release identity, and provenance.
 
-`sirv-cli` is a validation-only generic static-file server. It is a pinned
-development dependency for CI portability evidence, never a production Node
-application-server or deployment runtime dependency.
+`sirv-cli` is a validation-only generic static-file server. Lighthouse,
+Chromium control, and `sirv-cli` are isolated beneath `tools/static-quality/`
+with their own audited lock. They never enter the static application's root
+lock or its production runtime, and are not a deployment dependency.
 
-The Lighthouse gate uses Lighthouse 12.8.2 and Playwright 1.62.1 Chromium on
+The Lighthouse gate uses Lighthouse 13.4.1 and Playwright 1.62.1 Chromium on
 the Lighthouse mobile profile with simulated throttling. It runs three fresh
 Chromium audits and preserves every raw report. Performance, accessibility,
 best practices, and SEO must each have a median raw score of at least 0.90;

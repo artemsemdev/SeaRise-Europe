@@ -13,7 +13,9 @@ All notable changes to this project will be documented in this file.
   Lighthouse mobile categories across three isolated audits. Initial CSS is
   embedded, the two initial Flight fonts are preloaded, scientific runtime
   loading is deferred past the initial render, and generated delivery sidecars
-  cannot expand the exact manifest-authorized release inventory.
+  cannot expand the exact manifest-authorized release inventory. Lighthouse
+  and generic-host dependencies use a separate audited quality-tool lock so
+  immutable Phase 1 npm and PMTiles evidence remains unchanged.
 
 - Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
   paths are ignored, untracked, absent from CI workflows, and absent from the

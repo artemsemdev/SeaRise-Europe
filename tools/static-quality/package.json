@@ -1,0 +1,21 @@
+{
+  "name": "@searise/static-quality",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.12.1",
+  "engines": {
+    "node": "22.23.2",
+    "npm": "11.12.1"
+  },
+  "scripts": {
+    "install:chromium": "playwright install chromium",
+    "install:chromium:ci": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@playwright/test": "1.62.1",
+    "chrome-launcher": "1.0.0",
+    "lighthouse": "13.4.1",
+    "sirv-cli": "3.0.1"
+  }
+}
