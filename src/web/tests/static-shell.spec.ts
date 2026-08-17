@@ -331,7 +331,7 @@ test("API inspection exposes the production-like HEAD, CORS-header, and byte-ran
   expect(await subsequentValid.body()).toHaveLength(1);
 });
 
-test("Vite preview makes PMTiles network-only while other release artifacts stay immutable", async ({ page }) => {
+test("Preview delivery makes PMTiles network-only while other release artifacts stay immutable", async ({ page }) => {
   const releaseRoot = `http://127.0.0.1:4173/releases/${releaseId}`;
   const pmtiles = await page.request.get(`${releaseRoot}/layers/ssp2-45/2050.pmtiles`, {
     headers: { Range: "bytes=0-127" },

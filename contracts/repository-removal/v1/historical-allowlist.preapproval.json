@@ -1,0 +1,142 @@
+{
+  "schemaVersion": "1.0.0",
+  "authority": "preapproval-current-blobs",
+  "entries": [
+    {
+      "id": "adr-021-static-cutover-history",
+      "path": "docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md",
+      "gitBlobSha": "2e10de40e647bfe25484ba55db03c206c84df006",
+      "rule": "historical-adr-term",
+      "reason": "Retain the superseded architecture decision as historical evidence while excluding it from the active target domain.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "adr-023-vertical-method-history",
+      "path": "docs/architecture/adr/ADR-023-vertical-reference-methodology.md",
+      "gitBlobSha": "7e0d384c5292cd9e386c3fd990ab33daad1b2970",
+      "rule": "historical-adr-term",
+      "reason": "Retain the superseded vertical-method discussion as historical evidence only.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "phase-0-regional-fixture-history",
+      "path": "docs/evidence/phase-0-regional-fixture.md",
+      "gitBlobSha": "b07634639ec90520bce15ea948e9ee6fbfd66e60",
+      "rule": "historical-five-state-evidence",
+      "reason": "Retain the Phase 0 characterization fixture record without admitting its legacy terminology into the target domain.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "phase-0-basin-controls-history",
+      "path": "docs/science/phase-0-12-basin-controls.md",
+      "gitBlobSha": "8fadc1c90e767817e3a42af3bcaec8260d5891a3",
+      "rule": "historical-five-state-evidence",
+      "reason": "Retain audited Phase 0 basin controls as historical scientific evidence only.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "phase-0-vertical-evidence-history",
+      "path": "docs/science/phase-0-5-vertical-methodology-evidence.md",
+      "gitBlobSha": "c5c7c4d313b00cc0fddf28d631dc42e16529aa73",
+      "rule": "historical-five-state-evidence",
+      "reason": "Retain audited Phase 0 vertical-method evidence while keeping it outside the current scientific outcome domain.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "phase-0-terrain-controls-history",
+      "path": "docs/science/phase-0-8-terrain-geography-controls.md",
+      "gitBlobSha": "d5ad6b392eb813459452546cf07e47df4b1ec1f8",
+      "rule": "historical-five-state-evidence",
+      "reason": "Retain audited Phase 0 terrain controls as rejected-method evidence only.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-dependency-inventory-evidence",
+      "path": "contracts/supply-chain/v1/dependency-inventory.json",
+      "gitBlobSha": "960f43d4ce5cc3c82e55b3e9ed761dd4da57b1f6",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 dependency inventory as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-dependency-inventory-schema-evidence",
+      "path": "contracts/supply-chain/v1/dependency-inventory.schema.json",
+      "gitBlobSha": "2fed3f74d0487af0a50816031244ebbc412d6b0d",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 dependency inventory schema as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-nuget-fixture-project",
+      "path": "contracts/supply-chain/v1/fixtures/nuget/Fixture.App.xml",
+      "gitBlobSha": "b5567fda118251dc6e5880cb4f1954dc79122742",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 synthetic NuGet project fixture as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-unverified-evidence-envelope-schema",
+      "path": "contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json",
+      "gitBlobSha": "544e370ff8f8e357554eb0e084494b3b544fc71e",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 unverified-evidence envelope schema for audit.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-release-evidence-retention-schema",
+      "path": "contracts/supply-chain/v1/release-evidence-retention-receipt.schema.json",
+      "gitBlobSha": "8eed7f3899f5693c9b16a2c49d83f97a232eb7eb",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 evidence-retention receipt schema for audit.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-nuget-sbom-manifest",
+      "path": "contracts/supply-chain/v1/sboms/nuget/manifest.json",
+      "gitBlobSha": "65c48bd3652fb97957b316a25eadfba3b29a3e84",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 NuGet SBOM manifest as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-nuget-api-sbom",
+      "path": "contracts/supply-chain/v1/sboms/nuget/searise-api-net8.0.cdx.json",
+      "gitBlobSha": "1b96716eca031cd4aa2ff5ba81e7acfabb4bd76e",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 API SBOM as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-nuget-application-sbom",
+      "path": "contracts/supply-chain/v1/sboms/nuget/searise-application-net8.0.cdx.json",
+      "gitBlobSha": "11c8429db1066b01655e5d157dbfe1c3c9a79129",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 application SBOM as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-nuget-domain-sbom",
+      "path": "contracts/supply-chain/v1/sboms/nuget/searise-domain-net8.0.cdx.json",
+      "gitBlobSha": "c3d03819e39bb49a249ac3b541f451759bda74b9",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 domain SBOM as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-nuget-infrastructure-sbom",
+      "path": "contracts/supply-chain/v1/sboms/nuget/searise-infrastructure-net8.0.cdx.json",
+      "gitBlobSha": "a5d39a05d713cc51f824783e3f51675794d20468",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the immutable Phase 1 infrastructure SBOM as historical supply-chain evidence.",
+      "activeRuntimeAllowed": false
+    },
+    {
+      "id": "v1-spdx-vendor-schema",
+      "path": "contracts/supply-chain/v1/vendor/spdx.schema.json",
+      "gitBlobSha": "af42060a52647e6db41f429b897cb35a40f66c6e",
+      "rule": "immutable-v1-supply-chain-evidence",
+      "reason": "Retain the exact vendored SPDX schema used to validate the immutable Phase 1 SBOMs.",
+      "activeRuntimeAllowed": false
+    }
+  ]
+}

@@ -6,6 +6,23 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added fail-closed static target, repository-readiness, final-repository, and
+  built-output gates for legacy runtime dependencies and both unversioned and
+  `/v1/` dynamic endpoints. Historical terminology exceptions now require an
+  exact committed path, Git blob, and rule instead of directory exemptions;
+  retained build/test tooling and build-plane containers remain explicitly
+  classified without authorizing repository deletion. Token-free legacy paths,
+  alternate Compose names, JSON/binary build mutations, all authorization
+  channels, current canonical Flight bytes, and owner-approved final authority
+  now fail closed with match-purpose exceptions only. The two self-describing
+  gate-policy files are additionally bound to their owner-approved Git blobs;
+  repository modes bind all exact bytes and Git modes in the current
+  14-component, 57-input v2 profile. Repository and build traversal rejects
+  symlinks before reading them, while preapproval binds current historical
+  blobs without claiming the final post-gate audited commit prematurely. The
+  final gate also requires the trusted approval validator to advertise and run
+  exact owner-comment verification before accepting the removal chain.
+
 - Added clean-clone generic static-host and Chromium Lighthouse gates. The
   production build now emits deterministic Brotli/gzip sidecars, validates
   both static routes, build/release identity, assets, static 404 behavior, and
@@ -307,6 +324,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Allowed content validation to scan lifecycle builds staged outside the Git
+  checkout while retaining strict containment and symlink rejection within the
+  selected build root.
 - Kept mobile Flight capability/update alerts below the optional basemap control
   and made the browser technical-failure journey wait for its exact query-free
   release COG `HEAD` interception before injecting the transient failure.
