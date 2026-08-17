@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the static target's production settlement-search shard builder. It
+  consumes the exact Python-validated projection authority, emits deterministic
+  v4 code-point-trie Brotli shards and a release/source/hash-bound receipt, and
+  publishes without overwrite through fail-closed atomic file promotion.
+
 - Added production-static browser journey evidence for all four ADR-024
   outcomes and all nine scenario/horizon projections, including exact COG
   values, release-scoped PMTiles identity, keyboard and reduced-motion flows,

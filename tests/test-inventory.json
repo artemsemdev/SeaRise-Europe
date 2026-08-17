@@ -1,7 +1,7 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-16",
+  "updatedAt": "2026-08-17",
   "evidence": {
     "local-2026-08-16-static-browser-assisted-keyboard": {
       "kind": "local-measurement",
@@ -74,6 +74,12 @@
       "observedAt": "2026-08-16T06:34:30+02:00",
       "reference": "docs/operations/static-settlement-search.md and src/web/tests/static-shell.spec.ts",
       "environment": "macOS arm64; Node 20.20.1; Vitest 4.1.10; Chromium desktop/mobile; committed synthetic fixture; production-scale memory not measured"
+    },
+    "local-2026-08-17-static-search-shard-builder": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T02:45:00+02:00",
+      "reference": "src/web/scripts/search-shard-builder.test.mjs and docs/operations/static-settlement-search.md",
+      "environment": "macOS arm64 host; official Node 20.20.1 darwin-x64 binary under Rosetta with Brotli 1.1.0, zlib 1.3.1-e00f703, ICU 78.2, and Unicode 17.0; Vitest 4.1.10; six generated bounded synthetic-projection cases; no Candidate-v7, TAR, legacy runtime, or external storage"
     },
     "local-2026-08-16-private-candidate-binding": {
       "kind": "local-measurement",
@@ -379,15 +385,15 @@
       "id": "static-settlement-search",
       "layer": "e2e",
       "owner": "frontend",
-      "purpose": "Verify release-bound GeoNames shards, deterministic normalization and ranking, exact coordinates, private Worker-only queries, accessible keyboard search, partial readiness, integrity-first decode, and technical failure isolation.",
-      "sourcePaths": ["src/web/src/search/**", "src/web/src/components/SettlementSearch.test.tsx", "src/web/src/local-candidate-harness.test.ts", "src/web/src/local-measurement-paths.test.ts", "src/web/tests/static-shell.spec.ts", "contracts/release/v1/fixtures/release/*/search/*.br"],
+      "purpose": "Verify release-bound GeoNames shard construction and consumption, deterministic normalization and ranking, exact coordinates, private Worker-only queries, accessible keyboard search, partial readiness, integrity-first decode, atomic publication, and technical failure isolation.",
+      "sourcePaths": ["src/web/scripts/build-settlement-search-shards.mjs", "src/web/scripts/search-shard-builder.mjs", "src/web/scripts/search-shard-builder.test.mjs", "src/web/src/search/**", "src/web/src/components/SettlementSearch.test.tsx", "src/web/src/local-candidate-harness.test.ts", "src/web/src/local-measurement-paths.test.ts", "src/web/tests/static-shell.spec.ts", "contracts/release/v1/fixtures/release/*/search/*.br"],
       "changedPaths": ["package.json", "package-lock.json", "src/web/**", "contracts/release/v1/**", "contracts/supply-chain/v1/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static settlement-search, privacy, accessibility, integrity, and no-runtime-geocoder contract." },
-      "commands": { "focused": "npm run web:check && npm run web:e2e", "full": "npm run web:check && npm run web:e2e" },
+      "commands": { "focused": "npm run test:search-shard-builder --workspace @searise/web", "full": "npm run web:check && npm run web:e2e" },
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-16-static-settlement-search", "scope": "focused-suite" },
-      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Deterministic Vitest and desktop/mobile Chromium cases passed against exact committed fixture bytes; production-corpus performance remains a separate local-only gate." }
+      "cost": { "estimatedSeconds": 25, "class": "fast", "evidenceRef": "local-2026-08-17-static-search-shard-builder", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "frontend", "issue": null, "expiresAt": null, "evidence": "Six deterministic builder cases passed under the exact binary profile, including every runtime-identity mismatch and a fixed whole-set artifact golden; desktop/mobile Chromium cases passed against exact committed fixture bytes; production-corpus performance remains a separate local-only gate." }
     },
     {
       "id": "quality-inventory-harness",
@@ -1283,6 +1289,7 @@
     { "path": "src/web/src/components/map/MapExplorer.test.tsx", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/map/render-token.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/components/SettlementSearch.test.tsx", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/scripts/search-shard-builder.test.mjs", "suite": "static-settlement-search", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/cog-analysis-reader.golden.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/geography-classifier.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/data/map-layer-resolver.test.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },

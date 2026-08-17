@@ -53,7 +53,7 @@
         { "path": "package.json", "role": "manifest", "sha256": "340a13f00e5be4cd6d1a5397f380ba75388611ed9d191f220fdaf43185da3d4d" },
         { "path": "src/frontend/package-lock.json", "role": "lock", "sha256": "c5d8af53b1029f9bfb75424ccad83b3da4ad096d175f4ba05789e847d5548cdd" },
         { "path": "src/frontend/package.json", "role": "manifest", "sha256": "7cea772154dfd3ce7739b6f14f3d0b8f0bda4957e61781959e9fe14a8efad702" },
-        { "path": "src/web/package.json", "role": "manifest", "sha256": "149f086f558a12c290fd7a0ab012fa8664255a863b2e843045b76089613afd74" }
+        { "path": "src/web/package.json", "role": "manifest", "sha256": "9f53b02be6ba59ebf6da1034ef6b4332fb8cf627e4455429003e42b66778b854" }
       ],
       "note": "The static web workspace uses the root npm lockfileVersion 3 with exact registry URLs and SHA-512 integrity; the legacy frontend remains separately locked during the migration."
     },
