@@ -5,9 +5,13 @@ import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { basename, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
+import { clearTimeout, setTimeout } from "node:timers";
+import { fileURLToPath } from "node:url";
 
-import { chromium } from "playwright";
+import { chromium } from "@playwright/test";
+
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const candidate = resolve(process.argv[2] ?? "");
 const output = resolve(process.argv[3] ?? "");
@@ -15,10 +19,12 @@ if (!process.argv[2] || !process.argv[3]) {
   throw new Error("usage: verify-boundary-pmtiles-browser.mjs CANDIDATE OUTPUT");
 }
 
-const packageLockBytes = readFileSync(resolve("package-lock.json"));
+const packageLockBytes = readFileSync(resolve(repositoryRoot, "package-lock.json"));
 const packageLock = JSON.parse(packageLockBytes);
-const maplibreBytes = readFileSync(resolve("node_modules/maplibre-gl/dist/maplibre-gl.js"));
-const pmtilesBytes = readFileSync(resolve("node_modules/pmtiles/dist/pmtiles.js"));
+const maplibreBytes = readFileSync(
+  resolve(repositoryRoot, "node_modules/maplibre-gl/dist/maplibre-gl.js"),
+);
+const pmtilesBytes = readFileSync(resolve(repositoryRoot, "node_modules/pmtiles/dist/pmtiles.js"));
 const roles = [
   {
     role: "coastal-boundary",

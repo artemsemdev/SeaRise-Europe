@@ -67,7 +67,7 @@ def _arrange(
     receipt = repository / "src/pipeline/toolchain/tippecanoe-receipt.json"
     receipt.parent.mkdir(parents=True, exist_ok=True)
     receipt.write_text('{"schemaVersion":1}\n', encoding="utf-8")
-    browser_harness = repository / "src/frontend/scripts/browser.mjs"
+    browser_harness = repository / "src/web/scripts/browser.mjs"
     browser_harness.parent.mkdir(parents=True, exist_ok=True)
     browser_harness.write_text("// fixture\n", encoding="utf-8")
     tool = tmp_path / "tool"
@@ -188,8 +188,8 @@ def test_build_boundary_evidence_publishes_complete_candidate_atomically(
         python_lock_path=lock,
         tools=tools,
         node_path=tools.tippecanoe,
-        browser_harness_path=repository / "src/frontend/scripts/browser.mjs",
-        frontend_directory=repository / "src/frontend",
+        browser_harness_path=repository / "src/web/scripts/browser.mjs",
+        node_workspace_directory=repository,
     )
 
     assert result == output
@@ -233,8 +233,8 @@ def test_build_boundary_evidence_publishes_complete_candidate_atomically(
             python_lock_path=lock,
             tools=tools,
             node_path=tools.tippecanoe,
-            browser_harness_path=repository / "src/frontend/scripts/browser.mjs",
-            frontend_directory=repository / "src/frontend",
+            browser_harness_path=repository / "src/web/scripts/browser.mjs",
+            node_workspace_directory=repository,
         )
 
 
@@ -257,8 +257,8 @@ def test_build_boundary_evidence_rejects_non_deterministic_bytes_without_output(
             python_lock_path=lock,
             tools=tools,
             node_path=tools.tippecanoe,
-            browser_harness_path=repository / "src/frontend/scripts/browser.mjs",
-            frontend_directory=repository / "src/frontend",
+            browser_harness_path=repository / "src/web/scripts/browser.mjs",
+            node_workspace_directory=repository,
         )
     assert not output.exists()
 
@@ -280,10 +280,10 @@ def test_browser_harness_binds_candidate_and_safe_limitations(
         path.write_bytes(payload)
     node = tmp_path / "node"
     harness = tmp_path / "browser.mjs"
-    frontend = tmp_path / "frontend"
+    node_workspace = tmp_path / "node-workspace"
     node.write_bytes(b"node")
     harness.write_text("// fixture\n", encoding="utf-8")
-    frontend.mkdir()
+    node_workspace.mkdir()
     output = tmp_path / "browser-report.json"
 
     def run(command: list[str], **_kwargs: object) -> None:
@@ -329,7 +329,7 @@ def test_browser_harness_binds_candidate_and_safe_limitations(
                 candidate=candidate,
                 node_path=node,
                 browser_harness_path=harness,
-                frontend_directory=frontend,
+                node_workspace_directory=node_workspace,
             )
     else:
         record = boundary_evidence._run_browser_harness(
@@ -337,7 +337,7 @@ def test_browser_harness_binds_candidate_and_safe_limitations(
             candidate=candidate,
             node_path=node,
             browser_harness_path=harness,
-            frontend_directory=frontend,
+            node_workspace_directory=node_workspace,
         )
         assert record["path"] == "browser-report.json"
         assert record["sha256"] == boundary_evidence.sha256(output)

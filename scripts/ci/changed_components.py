@@ -37,9 +37,6 @@ FORCE_ALL = (
 
 FRONTEND = (
     "src/frontend/**",
-    "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
-    "src/pipeline/evidence/ar6-regional-release/**",
-    "src/pipeline/fixtures/ar6-regional-release/**",
     "contracts/**",
     "tests/fixtures/tdd/**",
 )
@@ -50,6 +47,9 @@ WEB = (
     "package-lock.json",
     "src/web/**",
     "contracts/release/v1/**",
+    "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
+    "src/pipeline/evidence/ar6-regional-release/**",
+    "src/pipeline/fixtures/ar6-regional-release/**",
 )
 
 API = (
@@ -90,9 +90,13 @@ RELEASE = (
     "scripts/science/*ar6*release*.py",
     "scripts/science/build_ar6_lookup_goldens.py",
     "scripts/science/validate_ar6_delivery_trace.py",
+    "package.json",
+    "package-lock.json",
     "src/frontend/package.json",
     "src/frontend/package-lock.json",
     "src/frontend/scripts/measure-ar6-release.mjs",
+    "src/web/package.json",
+    "src/web/scripts/verify-boundary-pmtiles-browser.mjs",
     "src/pipeline/fixtures/ar6-regional-release/**",
     "src/pipeline/requirements-release*.lock",
     "src/pipeline/science/ar6-regional-release*.json",

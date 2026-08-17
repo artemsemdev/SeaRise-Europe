@@ -124,6 +124,9 @@ jobs:
       - name: Validate static target
         run: npm run web:check
 
+      - name: Validate deterministic PMTiles render evidence
+        run: npm run evidence:pmtiles-render --workspace @searise/web
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
@@ -196,9 +199,6 @@ jobs:
 
       - name: Unit tests
         run: npm test
-
-      - name: Validate deterministic PMTiles render evidence
-        run: npm run evidence:pmtiles-render
 
   api:
     name: API (format, build, test)
@@ -562,13 +562,12 @@ jobs:
         with:
           node-version: 20.20.1
           cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install locked boundary browser environment
-        working-directory: src/frontend
         run: |
           npm ci
-          ./node_modules/.bin/playwright install chromium
+          npx playwright install chromium
 
       - name: Build and inspect exact boundary candidates twice
         env:
@@ -586,8 +585,8 @@ jobs:
             --pmtiles-distribution-platform darwin-arm64 \
             --build-run-id "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-darwin-arm64" \
             --node "$(command -v node)" \
-            --browser-harness src/frontend/scripts/verify-boundary-pmtiles-browser.mjs \
-            --frontend-directory src/frontend \
+            --browser-harness src/web/scripts/verify-boundary-pmtiles-browser.mjs \
+            --node-workspace-directory . \
             --output "${RUNNER_TEMP}/boundary-pmtiles-evidence"
 
       - name: Validate boundary evidence package
