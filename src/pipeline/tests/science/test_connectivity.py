@@ -37,6 +37,8 @@ REPO_ROOT = Path(__file__).parents[4]
 REVIEW_PATH = CONTRACT_DIR / "scope-connectivity-review.json"
 PACKAGE_ROOT = REPO_ROOT / "src" / "pipeline" / "searise_pipeline"
 LEGACY_DOMAIN = "searise_pipeline.domain"
+DYNAMIC_IMPORT_PRIMITIVES = frozenset({"__import__", "import_module"})
+DUCKDB_IMPORT_PATH = "settlements/spatial_toolchain.py"
 
 
 def _constant_string(node: ast.AST) -> str | None:
@@ -54,23 +56,61 @@ def _is_legacy_domain(value: str) -> bool:
     return value == LEGACY_DOMAIN or value.startswith(f"{LEGACY_DOMAIN}.")
 
 
-def _legacy_domain_references(source: str, package: str) -> set[str]:
+def _is_allowlisted_duckdb_import(node: ast.Call, path: str) -> bool:
+    return (
+        path == DUCKDB_IMPORT_PATH
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "importlib"
+        and node.func.attr == "import_module"
+        and len(node.args) == 1
+        and isinstance(node.args[0], ast.Constant)
+        and type(node.args[0].value) is str
+        and node.args[0].value == "duckdb"
+        and not node.keywords
+    )
+
+
+def _retained_import_violations(source: str, package: str, path: str) -> set[str]:
     tree = ast.parse(source)
-    references: set[str] = set()
+    violations: set[str] = set()
+    allowlisted_dynamic_references = {
+        id(node.func)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and _is_allowlisted_duckdb_import(node, path)
+    }
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            references.update(
+            violations.update(
                 alias.name for alias in node.names if _is_legacy_domain(alias.name)
             )
         elif isinstance(node, ast.ImportFrom):
             relative_name = "." * node.level + (node.module or "")
             base = importlib.util.resolve_name(relative_name, package)
             candidates = {base, *(f"{base}.{alias.name}" for alias in node.names)}
-            references.update(value for value in candidates if _is_legacy_domain(value))
+            violations.update(value for value in candidates if _is_legacy_domain(value))
+            violations.update(
+                f"dynamic-import:{alias.name}:{node.lineno}"
+                for alias in node.names
+                if alias.name in DYNAMIC_IMPORT_PRIMITIVES
+            )
+
+        if (
+            isinstance(node, ast.Name)
+            and node.id in DYNAMIC_IMPORT_PRIMITIVES
+            and id(node) not in allowlisted_dynamic_references
+        ):
+            violations.add(f"dynamic-import:{node.id}:{node.lineno}")
+        elif (
+            isinstance(node, ast.Attribute)
+            and node.attr in DYNAMIC_IMPORT_PRIMITIVES
+            and id(node) not in allowlisted_dynamic_references
+        ):
+            violations.add(f"dynamic-import:{node.attr}:{node.lineno}")
 
         constant = _constant_string(node)
         if constant is not None and _is_legacy_domain(constant):
-            references.add(constant)
+            violations.add(constant)
 
         if isinstance(node, ast.Call):
             positional = [_constant_string(argument) for argument in node.args]
@@ -93,7 +133,7 @@ def _legacy_domain_references(source: str, package: str) -> set[str]:
                     or value.startswith("searise_pipeline.")
                 )
             ]
-            references.update(
+            violations.update(
                 resolved
                 for target in relative_targets
                 for package_value in package_values
@@ -101,7 +141,7 @@ def _legacy_domain_references(source: str, package: str) -> set[str]:
                     resolved := importlib.util.resolve_name(target, package_value)
                 )
             )
-    return references
+    return violations
 
 
 def _module_package(path: Path) -> str:
@@ -355,7 +395,7 @@ def test_adr024_outcome_rejects_non_boolean_inputs(
         classify_adr024_outcome(**arguments)  # type: ignore[arg-type]
 
 
-def test_retained_pipeline_cannot_import_legacy_domain() -> None:
+def test_retained_pipeline_has_no_legacy_domain_or_dynamic_imports() -> None:
     mutations = (
         ("import searise_pipeline.domain", "searise_pipeline.science"),
         ("from searise_pipeline import domain", "searise_pipeline.science"),
@@ -408,24 +448,56 @@ def test_retained_pipeline_cannot_import_legacy_domain() -> None:
         ),
     )
     for source, package in mutations:
-        assert _legacy_domain_references(source, package)
+        assert _retained_import_violations(source, package, "science/mutation.py")
 
     assert (
-        _legacy_domain_references(
+        _retained_import_violations(
             'import importlib\nimportlib.import_module("duckdb")',
             "searise_pipeline.settlements",
+            DUCKDB_IMPORT_PATH,
         )
         == set()
     )
+    rejected_duckdb_mutations = (
+        'import importlib\nimportlib.import_module("sqlite")',
+        'import importlib as loader\nloader.import_module("duckdb")',
+        'import importlib\nimportlib.import_module("duckdb", package="searise_pipeline")',
+        'import importlib\nimportlib.import_module(module_name)',
+    )
+    for source in rejected_duckdb_mutations:
+        assert _retained_import_violations(
+            source,
+            "searise_pipeline.settlements",
+            DUCKDB_IMPORT_PATH,
+        )
+    assert _retained_import_violations(
+        'import importlib\nimportlib.import_module("duckdb")',
+        "searise_pipeline.science",
+        "science/mutation.py",
+    )
+
+    nonliteral_mutations = (
+        "__import__(module_name)",
+        "import importlib\nimportlib.import_module(module_name)",
+        "import importlib\nimportlib.import_module('.domain', package_name)",
+        "import importlib\nimportlib.import_module(prefix + 'domain')",
+    )
+    for source in nonliteral_mutations:
+        assert _retained_import_violations(
+            source,
+            "searise_pipeline.science",
+            "science/mutation.py",
+        )
 
     violations = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         relative = path.relative_to(PACKAGE_ROOT)
         if relative.parts[0] == "domain":
             continue
-        references = _legacy_domain_references(
+        references = _retained_import_violations(
             path.read_text(encoding="utf-8"),
             _module_package(path),
+            relative.as_posix(),
         )
         if references:
             violations.append(relative.as_posix())
