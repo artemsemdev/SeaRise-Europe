@@ -26,6 +26,7 @@ from .candidate_evidence import (
 )
 from .contracts import REPOSITORY_ROOT, SupplyChainContractError, _validate_schema
 from .cosign_tool import parse_cosign_tool_lock
+from .historical_inventory import materialize_historical_dependency_authority
 from .sbom import write_new_sbom
 
 _IDENTITY = (
@@ -224,6 +225,34 @@ def verify_candidate_evidence_cryptographically(
     trusted_cosign_tool_lock_sha256: str,
     receipt_path: Path | None = None,
 ) -> _CryptographicVerification:
+    profile = repository_root / "contracts/supply-chain/v2/static-target-profile.json"
+    with materialize_historical_dependency_authority(
+        profile,
+        repository_root=repository_root,
+    ) as (historical_root, _historical_inventory):
+        return _verify_candidate_evidence_cryptographically(
+            candidate_root,
+            evidence_root,
+            repository_root=historical_root,
+            controlled_build_run_id=controlled_build_run_id,
+            cosign_executable=cosign_executable,
+            cosign_tool_lock=cosign_tool_lock,
+            trusted_cosign_tool_lock_sha256=trusted_cosign_tool_lock_sha256,
+            receipt_path=receipt_path,
+        )
+
+
+def _verify_candidate_evidence_cryptographically(
+    candidate_root: Path,
+    evidence_root: Path,
+    *,
+    repository_root: Path,
+    controlled_build_run_id: str,
+    cosign_executable: Path,
+    cosign_tool_lock: Path,
+    trusted_cosign_tool_lock_sha256: str,
+    receipt_path: Path | None = None,
+) -> _CryptographicVerification:
     if _RUN_ID.fullmatch(controlled_build_run_id) is None:
         _fail("controlled build run ID must be one canonical positive integer")
     if _SHA256.fullmatch(trusted_cosign_tool_lock_sha256) is None:
@@ -304,6 +333,7 @@ def verify_candidate_evidence_cryptographically(
                 repository_root=repository_snapshot,
                 trusted_invocation_uri=invocation_uri,
                 allow_production_envelope=True,
+                dependency_inventory=repository_snapshot / _DEPENDENCY_INVENTORY,
             )
             identities = (
                 manifest_document["candidateId"],
