@@ -18,6 +18,13 @@ from .static_profile import _HISTORICAL_EVIDENCE, load_static_target_profile_con
 _HISTORICAL_VALIDATOR_RUNTIME_PATH = PurePosixPath(
     "src/pipeline/searise_pipeline/supply_chain/contracts.py"
 )
+_TRANSITIONAL_V2_AUTHORITY_PATHS = frozenset(
+    {
+        ".github/workflows/static-quality.yml",
+        "tools/static-quality/package-lock.json",
+        "tools/static-quality/package.json",
+    }
+)
 
 
 def _safe_path(value: str) -> PurePosixPath:
@@ -207,6 +214,7 @@ def materialize_historical_dependency_authority(
     expected_mode_paths = {
         *(path.as_posix() for path in outside_inputs),
         validator_snapshot_path.as_posix(),
+        *_TRANSITIONAL_V2_AUTHORITY_PATHS,
     }
     if set(mode_authority) != expected_mode_paths:
         missing = sorted(expected_mode_paths - set(mode_authority))
@@ -232,6 +240,33 @@ def materialize_historical_dependency_authority(
         raise SupplyChainContractError("historical v1 validator binding changed")
     if _git_object_oid("blob", validator_bytes) != validator_authority["gitBlob"]:
         raise SupplyChainContractError("historical v1 validator Git blob does not match")
+    transition_hashes = {
+        item["path"]: item["sha256"]
+        for component in profile["components"]
+        for item in component["inputs"]
+        if item["path"] in _TRANSITIONAL_V2_AUTHORITY_PATHS
+    }
+    if set(transition_hashes) != _TRANSITIONAL_V2_AUTHORITY_PATHS:
+        raise SupplyChainContractError("transitional v2 byte authority is incomplete")
+    for value in sorted(_TRANSITIONAL_V2_AUTHORITY_PATHS):
+        logical = _safe_path(value)
+        transition_input = _strict_repository_path(
+            repository_root,
+            logical,
+            description="transitional v2 authority input",
+        )
+        if not transition_input.is_file():
+            raise SupplyChainContractError(
+                f"transitional v2 authority input must be a regular file: {logical}"
+            )
+        if hashlib.sha256(transition_input.read_bytes()).hexdigest() != transition_hashes[value]:
+            raise SupplyChainContractError(
+                f"transitional v2 authority input bytes changed: {logical}"
+            )
+        if _git_file_mode(transition_input) != mode_authority[value]:
+            raise SupplyChainContractError(
+                f"transitional v2 authority input mode changed: {logical}"
+            )
 
     with tempfile.TemporaryDirectory(prefix="searise-v1-authority-") as temporary:
         root = Path(temporary).resolve()

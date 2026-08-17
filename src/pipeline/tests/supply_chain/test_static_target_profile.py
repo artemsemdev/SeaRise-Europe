@@ -70,10 +70,13 @@ def _copy_active_authority(destination: Path) -> None:
 
 def _copy_historical_authority(destination: Path) -> None:
     for path in (
+        ".github/workflows/static-quality.yml",
         "contracts/supply-chain/v2/static-target-profile.json",
         "contracts/supply-chain/v2/static-target-profile.schema.json",
         "contracts/supply-chain/v2/historical/v1-contracts.py",
         "src/pipeline/searise_pipeline/supply_chain/contracts.py",
+        "tools/static-quality/package-lock.json",
+        "tools/static-quality/package.json",
     ):
         target = destination / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -282,12 +285,18 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
             "gitBlob": "d24ad90dcd45fe927ccc1e6bc8c558068833b1df",
         },
     }
-    assert len(mode_authority) == 42
+    assert len(mode_authority) == 45
     assert mode_authority["src/pipeline/toolchain/build_macos_tippecanoe.sh"] == "100755"
     assert mode_authority[".github/workflows/ci.yml"] == "100644"
     assert mode_authority["contracts/supply-chain/v2/historical/v1-contracts.py"] == "100644"
+    assert mode_authority[".github/workflows/static-quality.yml"] == "100644"
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
     assert "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json" in paths
+    assert {
+        ".github/workflows/static-quality.yml",
+        "tools/static-quality/package-lock.json",
+        "tools/static-quality/package.json",
+    } <= paths
     assert (
         "contracts/supply-chain/v2/historical/v1-contracts.py"
         not in discover_dependency_inputs()
@@ -428,6 +437,20 @@ def test_historical_gate_rejects_mode_authority_mutation(
         validate_historical_dependency_inventory(profile_path, repository_root=repository)
 
 
+def test_historical_gate_checks_transition_bytes_before_modes(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_historical_authority(repository)
+    workflow = repository / ".github/workflows/static-quality.yml"
+    workflow.write_bytes(workflow.read_bytes() + b"\n")
+    workflow.chmod(0o755)
+
+    with pytest.raises(SupplyChainContractError, match="authority input bytes changed"):
+        validate_historical_dependency_inventory(
+            repository / "contracts/supply-chain/v2/static-target-profile.json",
+            repository_root=repository,
+        )
+
+
 def test_historical_gate_recomputes_vendored_validator_git_blob(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -547,7 +570,7 @@ def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> 
 
     validated = validate_static_target_profile(PROFILE, repository_root=repository)
 
-    assert len(validated["components"]) == 13
+    assert len(validated["components"]) == 14
     assert validated["activation"]["status"] == "pending-legacy-removal"
     assert validated["activation"]["blockingIssues"] == [70, 71, 72]
 
@@ -580,19 +603,11 @@ def test_profile_rejects_missing_required_static_input(tmp_path: Path) -> None:
         validate_static_target_profile(_write(tmp_path / "profile.json", document))
 
 
-def test_profile_rejects_unclassified_static_quality_npm_authority(tmp_path: Path) -> None:
+def test_profile_rejects_unclassified_static_quality_lock_alias(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     _copy_active_authority(repository)
     quality = repository / "tools/static-quality"
-    quality.mkdir(parents=True)
-    (quality / "package.json").write_text(
-        '{"name":"@searise/static-quality","private":true}\n',
-        encoding="utf-8",
-    )
-    (quality / "package-lock.json").write_text(
-        '{"name":"@searise/static-quality","lockfileVersion":3,"packages":{}}\n',
-        encoding="utf-8",
-    )
+    (quality / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
 
     with pytest.raises(SupplyChainContractError, match="unclassified=.*static-quality"):
         validate_static_target_profile(PROFILE, repository_root=repository)

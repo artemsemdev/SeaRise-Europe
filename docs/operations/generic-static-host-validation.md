@@ -42,9 +42,10 @@ Chromium audits and preserves every raw report. Performance, accessibility,
 best practices, and SEO must each have a median raw score of at least 0.90;
 the stricter guard also rejects any individual raw score below 0.90. Reports
 and the machine-readable run/median summary are written beneath the ignored
-`src/web/test-results/lighthouse/` directory. The Phase 2 v2 supply-chain
-profile must own this isolated toolchain before the gate is wired into CI; the
-immutable Phase 1 v1 dependency authority is not rewritten. This is a
+`src/web/test-results/lighthouse/` directory. The isolated
+`.github/workflows/static-quality.yml` job runs the production build, generic
+host validation, and Lighthouse gate from their exact v2 locks. The immutable
+Phase 1 `ci.yml` and v1 dependency authority are not rewritten. This is a
 Chromium-only Phase 2 gate and makes no Firefox or WebKit support claim.
 
 The initial stylesheet is embedded into both static documents to remove a

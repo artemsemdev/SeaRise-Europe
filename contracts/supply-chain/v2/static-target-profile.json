@@ -49,6 +49,7 @@
       ".github/workflows/offline-release-controlled.yml": "100644",
       ".github/workflows/phase-0r-owner-promotion.yml": "100644",
       ".github/workflows/phase-1-release-sign.yml": "100644",
+      ".github/workflows/static-quality.yml": "100644",
       "contracts/supply-chain/v2/historical/v1-contracts.py": "100644",
       "docker-compose.yml": "100644",
       "infra/blob-seed/Dockerfile": "100644",
@@ -85,7 +86,9 @@
       "src/pipeline/toolchain/duckdb-spatial-extensions.json": "100644",
       "src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json": "100644",
       "src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json": "100644",
-      "src/web/package.json": "100644"
+      "src/web/package.json": "100644",
+      "tools/static-quality/package-lock.json": "100644",
+      "tools/static-quality/package.json": "100644"
     },
     "validatorAuthority": {
       "path": "contracts/supply-chain/v2/historical/v1-contracts.py",
@@ -124,7 +127,8 @@
         { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },
-        { "path": ".github/workflows/phase-1-release-sign.yml", "role": "workflow", "sha256": "cbe085418568888a089124c94f456e995e51badbe205546f4c637ebd9103de2f" }
+        { "path": ".github/workflows/phase-1-release-sign.yml", "role": "workflow", "sha256": "cbe085418568888a089124c94f456e995e51badbe205546f4c637ebd9103de2f" },
+        { "path": ".github/workflows/static-quality.yml", "role": "workflow", "sha256": "f13c981c2330cf9b3d86866fca69611171f52312ed0e9e75618ff718b504e747" }
       ]
     },
     {
@@ -233,6 +237,16 @@
         { "path": "contracts/supply-chain/v1/python-graphs/settlement-spatial-runtime.json", "role": "manifest", "sha256": "64d00b72ce9226e639f506e359242beff4fbbeb45feaa22569ec1c180d0fff80" },
         { "path": "src/pipeline/requirements-settlements-spatial-linux-x86_64.lock", "role": "lock", "sha256": "52b9b9081a9f84cac3c3067ca2f68622b4515f2ef8929183f0ae57c6df3db497" },
         { "path": "src/pipeline/requirements-settlements-spatial-macos-arm64.lock", "role": "lock", "sha256": "1c992360d57158a51053536ca8d70d6d718b7caa96f60af1b5615a0c8535e33e" }
+      ]
+    },
+    {
+      "id": "static-quality-npm",
+      "ecosystem": "npm",
+      "releaseUse": "development",
+      "coverage": "locked",
+      "inputs": [
+        { "path": "tools/static-quality/package-lock.json", "role": "lock", "sha256": "d763af9186e7a1bb1470d26dd77111293963fbd2e3efc9700103ea6066512a9e" },
+        { "path": "tools/static-quality/package.json", "role": "manifest", "sha256": "0ca845c1825ee8cf93e576dd3ff6f3d518929cd0c3af1b1a58349ef71705bb1b" }
       ]
     },
     {

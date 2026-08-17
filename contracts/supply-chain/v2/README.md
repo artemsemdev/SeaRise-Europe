@@ -8,6 +8,13 @@ SBOMs. The npm SBOM is published under `v2/sboms` from the root lock whose sole
 workspace is `src/web`; active validation rejects Next.js components and any
 `src/frontend` workspace property.
 
+The isolated `static-quality-npm` component locks the generic-host, Playwright,
+and Lighthouse tool manifest and lock without adding them to the application
+runtime. Its dedicated workflow is separately hash-bound under `github-actions`.
+Only those three exact v2 paths are exempted from mutable v1 discovery; no
+directory prefix or sibling workflow/lock alias is ignored. Their profile-bound
+bytes are verified before their transition mode authority.
+
 The target graph deliberately has no requirement for NuGet, `src/api`,
 `src/frontend`, Azurite/blob-seed, Compose, or any legacy runtime image. The
 validator rejects those paths even if a profile edit supplies a valid hash.
