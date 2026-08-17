@@ -230,7 +230,7 @@ test("all nine release selections resolve without mixing visual artifact identit
   }
 });
 
-test("basemap failure preserves release overlay, attribution, text, and coordinate selection", async ({ page }) => {
+test("basemap failure preserves release overlay, attribution, text, and coordinate selection", async ({ page }, testInfo) => {
   const pageErrors: string[] = [];
   let openFreeMapRequestObserved = false;
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -244,7 +244,26 @@ test("basemap failure preserves release overlay, attribution, text, and coordina
   const map = page.getByRole("region", { name: /interactive visual map/i });
   await expect(map).toHaveAttribute("data-artifact-id", "projection-ssp2-45-2050-pmtiles");
 
-  await page.getByRole("button", { name: /load optional basemap/i }).click();
+  const basemapButton = page.getByRole("button", { name: /load optional basemap/i });
+  if (testInfo.project.name === "mobile-chromium") {
+    await page.locator(".flight-alerts").evaluate((slot) => {
+      const alert = document.createElement("div");
+      alert.className = "application-technical-alert";
+      alert.setAttribute("role", "status");
+      alert.setAttribute("aria-live", "polite");
+      alert.dataset.updateState = "failed";
+      alert.dataset.layoutProbe = "failed-update";
+      alert.textContent = "Update check failed. The current version remains active.";
+      slot.prepend(alert);
+    });
+    const alert = page.locator("[data-layout-probe='failed-update']");
+    await expect(alert).toBeVisible();
+    const [buttonBox, alertBox] = await Promise.all([basemapButton.boundingBox(), alert.boundingBox()]);
+    if (!buttonBox || !alertBox) throw new Error("Mobile basemap/alert geometry was unavailable.");
+    expect(alertBox.y).toBeGreaterThanOrEqual(buttonBox.y + buttonBox.height + 8);
+  }
+
+  await basemapButton.click();
   await expect(page.locator(".map-status")).toContainText(/optional basemap unavailable/i);
   expect(openFreeMapRequestObserved).toBe(true);
   await expect(map).toHaveAttribute("data-artifact-id", "projection-ssp2-45-2050-pmtiles");

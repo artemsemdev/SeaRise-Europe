@@ -5,6 +5,14 @@ import { isForbiddenApplicationApiPath } from "../src/test/application-api-bound
 
 const RELEASE_ID = "searise-europe-v1.0.0-20260810-c096aeab4e09";
 const RELEASE_ROOT = `/releases/${RELEASE_ID}`;
+const RELEASE_ORIGIN = "http://127.0.0.1:4173";
+
+function isExactReleaseArtifact(url: URL, relativePath: string): boolean {
+  return url.origin === RELEASE_ORIGIN
+    && url.pathname === `${RELEASE_ROOT}/${relativePath}`
+    && url.search === ""
+    && url.hash === "";
+}
 
 type Scenario = "ssp1-26" | "ssp2-45" | "ssp5-85";
 type Horizon = 2030 | 2050 | 2100;
@@ -168,10 +176,13 @@ test("real browser chain renders the four exact scientific outcomes", async ({ p
 test("first selected-place technical failure receives focus after the transition", async ({ page }) => {
   let releaseFailure!: () => void;
   const failureGate = new Promise<void>((resolve) => { releaseFailure = resolve; });
+  let confirmHeadInterception!: () => void;
+  const headIntercepted = new Promise<void>((resolve) => { confirmHeadInterception = resolve; });
   let held = false;
-  await page.route(`**${RELEASE_ROOT}/analysis/ssp2-45/2050.tif`, async (route) => {
+  await page.route((url) => isExactReleaseArtifact(url, "analysis/ssp2-45/2050.tif"), async (route) => {
     if (!held && route.request().method() === "HEAD") {
       held = true;
+      confirmHeadInterception();
       await failureGate;
       await route.fulfill({ status: 503, contentType: "text/plain", body: "temporary" });
       return;
@@ -186,6 +197,7 @@ test("first selected-place technical failure receives focus after the transition
   await page.getByRole("option", { name: /Málaga.*Andalucía, ES/i }).click();
   await expect(page.getByText(/selected place accepted.*lookup is in progress/i)).toBeFocused();
 
+  await headIntercepted;
   releaseFailure();
   await expect(panel(page)).toHaveAttribute("data-phase", "technical-error");
   const alert = panel(page).getByRole("alert");
