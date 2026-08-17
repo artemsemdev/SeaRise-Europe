@@ -63,7 +63,13 @@ must exactly bind its audited commit, check ID, command, and passing result;
 the receipt binds its bytes by SHA-256. A tracked log or arbitrary repository
 file cannot substitute for this output. Receipt checks declare the exact
 replacement suites and target-owner paths they cover, and deletion items must
-match those declarations bidirectionally.
+match those declarations bidirectionally. A check command must be byte-for-byte
+equal to `commands.focused` or `commands.full` for every suite it claims. Each
+covered suite must own at least one covered target path through its
+`sourcePaths`, and every covered target path must match a covered suite pattern
+with slash-aware glob semantics. The canonical census separately limits and
+requires replacement suite IDs for each owning issue, so consistent relabelling
+across an inventory and receipt cannot turn unrelated evidence into authority.
 
 ## Integration gate
 
@@ -77,6 +83,7 @@ python scripts/repository/validate_removal_approval.py --verify-owner-comment
 The gate needs authenticated, read-only GitHub API access to the public Issue
 #68 comment. An offline invocation, or an invocation without that flag, is not
 an approved removal chain and must block integration. Apply this exact command
-and a failing-without-the-flag integration test when refreshing PR #421 after
-this contract commit; this focused branch does not edit the separate PR
+and a failing-without-the-flag integration test when refreshing this hardening
+branch after PR #421 and the PR #422 scope-review decoupling change merge into
+the integration branch. This focused branch does not edit either separate PR
 worktree.

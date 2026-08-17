@@ -89,16 +89,31 @@ class ApprovalRepository:
                 {
                     "schemaVersion": "1.0.0",
                     "censusId": "phase-2-legacy-runtime-v1",
-                    "requiredReplacementSuiteIds": ["target-suite"],
                     "issues": [
                         {
                             "ownerIssue": 70,
+                            "allowedReplacementSuiteIds": ["target-suite"],
+                            "requiredReplacementSuiteIds": ["target-suite"],
                             "roots": [],
                             "paths": ["legacy/runtime.txt"],
                             "selectors": [],
                         },
-                        {"ownerIssue": 71, "roots": [], "paths": [], "selectors": []},
-                        {"ownerIssue": 72, "roots": [], "paths": [], "selectors": []},
+                        {
+                            "ownerIssue": 71,
+                            "allowedReplacementSuiteIds": [],
+                            "requiredReplacementSuiteIds": [],
+                            "roots": [],
+                            "paths": [],
+                            "selectors": [],
+                        },
+                        {
+                            "ownerIssue": 72,
+                            "allowedReplacementSuiteIds": [],
+                            "requiredReplacementSuiteIds": [],
+                            "roots": [],
+                            "paths": [],
+                            "selectors": [],
+                        },
                     ],
                 }
             ),
@@ -116,6 +131,21 @@ class ApprovalRepository:
                         {
                             "id": "target-suite",
                             "status": "active",
+                            "sourcePaths": ["target/**/*.test.ts"],
+                            "commands": {
+                                "focused": "npm run web:check",
+                                "full": "npm run web:check && npm run web:e2e",
+                            },
+                            "replacementGate": {"issue": None},
+                        },
+                        {
+                            "id": "other-issue-suite",
+                            "status": "active",
+                            "sourcePaths": ["target/**/*.test.ts"],
+                            "commands": {
+                                "focused": "npm run web:check",
+                                "full": "npm run web:check && npm run web:e2e",
+                            },
                             "replacementGate": {"issue": None},
                         },
                     ],
@@ -457,6 +487,24 @@ class RemovalApprovalTests(unittest.TestCase):
         self.assertEqual(
             {issue: sum(owner == issue for owner in owners.values()) for issue in (70, 71, 72)},
             {70: 109, 71: 107, 72: 13},
+        )
+        test_inventory = json.loads(
+            (root / "tests/test-inventory.json").read_text(encoding="utf-8")
+        )
+        active_suites = {
+            suite["id"]
+            for suite in test_inventory["suites"]
+            if suite.get("status") == "active"
+        }
+        for issue in census["issues"]:
+            allowed = set(issue["allowedReplacementSuiteIds"])
+            required = set(issue["requiredReplacementSuiteIds"])
+            self.assertLessEqual(required, allowed)
+            self.assertLessEqual(allowed, active_suites)
+        issue71 = next(issue for issue in census["issues"] if issue["ownerIssue"] == 71)
+        self.assertIn(
+            "pipeline-science-contracts",
+            issue71["requiredReplacementSuiteIds"],
         )
 
     def _validate(
@@ -838,11 +886,17 @@ class RemovalApprovalTests(unittest.TestCase):
         self.assertTrue(any("deleted baseline tests lack retirement mapping" in e for e in errors))
         self.assertTrue(any("semantic retirement suite census drifted" in e for e in errors))
 
-    def test_requires_census_mandated_replacement_scanner_suites(self) -> None:
+    def test_requires_census_mandated_replacement_suites_per_issue(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repository = ApprovalRepository(Path(directory))
             census = json.loads((repository.root / CENSUS_PATH).read_text())
-            census["requiredReplacementSuiteIds"] = ["mandatory-absence-scan"]
+            census["issues"][0]["allowedReplacementSuiteIds"] = [
+                "mandatory-absence-scan",
+                "target-suite",
+            ]
+            census["issues"][0]["requiredReplacementSuiteIds"] = [
+                "mandatory-absence-scan"
+            ]
             self._commit_census(repository, census)
             repository.commit_chain()
 
@@ -850,7 +904,8 @@ class RemovalApprovalTests(unittest.TestCase):
 
         self.assertTrue(
             any(
-                "deletion inventory lacks mandatory replacement scanner suites" in error
+                "deletion inventory lacks mandatory replacement suites for "
+                "ownerIssue #70" in error
                 for error in errors
             ),
             errors,
@@ -961,6 +1016,73 @@ class RemovalApprovalTests(unittest.TestCase):
                 errors = self._validate(repository)
 
             self.assertIn(expected_error, errors)
+
+    def test_rejects_consistently_relabelled_unrelated_replacement_suite(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            delete_item = inventory["items"][0]
+            delete_item["replacementSuiteIds"] = ["other-issue-suite"]
+            delete_item["replacementEvidence"][0]["reference"] = "other-issue-suite"
+            repository.commit_chain(
+                inventory=inventory,
+                check_mutation={
+                    "coveredReplacementSuiteIds": ["other-issue-suite"]
+                },
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "delete-runtime: replacementSuiteIds are not allowed for ownerIssue "
+            "#70: ['other-issue-suite']",
+            errors,
+        )
+
+    def test_rejects_consistently_bound_true_command(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                check_mutation={"command": "true"},
+                check_output_mutation={"command": "true"},
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: command must exactly match target-suite "
+            "commands.focused or commands.full",
+            errors,
+        )
+
+    def test_rejects_consistently_bound_unrelated_workflow_target(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            inventory["items"][0]["targetOwnerPaths"] = [
+                ".github/workflows/ci.yml"
+            ]
+            output_path = "tests/evidence/repository-removal/v1/static-target.json"
+            repository.commit_chain(
+                inventory=inventory,
+                check_mutation={
+                    "coveredTargetOwnerPaths": [".github/workflows/ci.yml"],
+                    "evidencePaths": [".github/workflows/ci.yml", output_path],
+                },
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: covered suite target-suite has no matching "
+            "coveredTargetOwnerPath",
+            errors,
+        )
+        self.assertIn(
+            "static-target: coveredTargetOwnerPaths do not match covered suite "
+            "sourcePaths: ['.github/workflows/ci.yml']",
+            errors,
+        )
 
     def test_requires_live_owner_comment_and_rejects_live_identity_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

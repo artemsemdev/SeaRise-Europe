@@ -65,6 +65,9 @@ All notable changes to this project will be documented in this file.
   Canonical #70/#71/#72 scope, issue-owned semantic test retirement, exact
   replacement-suite/target-path check coverage, structured committed command
   outputs, and live Issue #68 owner-comment verification now fail closed.
+  Per-issue allowed/required replacement suites, inventoried command identity,
+  and glob-aware suite-source ownership prevent consistently relabelled or
+  unrelated evidence from authorizing deletion.
 
 - Added a production-like Chromium browser journey that rotates sealed
   static deployments from A to B to C without forced activation, proves the

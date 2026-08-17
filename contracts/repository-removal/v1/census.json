@@ -1,13 +1,25 @@
 {
   "schemaVersion": "1.0.0",
   "censusId": "phase-2-legacy-runtime-v1",
-  "requiredReplacementSuiteIds": [
-    "static-target-content",
-    "static-web-shell"
-  ],
   "issues": [
     {
       "ownerIssue": 70,
+      "allowedReplacementSuiteIds": [
+        "static-assessment-controller",
+        "static-projection-browser-ux",
+        "static-projection-panel",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "requiredReplacementSuiteIds": [
+        "static-projection-browser-ux",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content",
+        "static-web-shell"
+      ],
       "roots": [
         {
           "path": "src/frontend",
@@ -25,6 +37,28 @@
     },
     {
       "ownerIssue": 71,
+      "allowedReplacementSuiteIds": [
+        "pipeline-ar6-release-builder",
+        "pipeline-regional-fixture",
+        "pipeline-reviewed-cog-range-access",
+        "pipeline-science-contracts",
+        "pipeline-supply-chain-contract",
+        "static-assessment-controller",
+        "static-map-visualization",
+        "static-pmtiles-network-only",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content"
+      ],
+      "requiredReplacementSuiteIds": [
+        "pipeline-ar6-release-builder",
+        "pipeline-reviewed-cog-range-access",
+        "pipeline-science-contracts",
+        "static-assessment-controller",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content"
+      ],
       "roots": [
         { "path": "infra/blob-seed", "excludePaths": [] },
         { "path": "infra/db", "excludePaths": [] },
@@ -79,6 +113,19 @@
     },
     {
       "ownerIssue": 72,
+      "allowedReplacementSuiteIds": [
+        "static-generic-host-lighthouse",
+        "static-offline-lifecycle-journey",
+        "static-pmtiles-network-only",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "requiredReplacementSuiteIds": [
+        "static-generic-host-lighthouse",
+        "static-offline-lifecycle-journey",
+        "static-target-content",
+        "static-web-shell"
+      ],
       "roots": [],
       "paths": [
         ".env.local.example",

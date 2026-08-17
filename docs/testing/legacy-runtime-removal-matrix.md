@@ -77,6 +77,12 @@ exactly once in an inventory item's `retirementSuiteIds`. Every deleted
 baseline path must be owned by that mapped suite. Each deletion item also names
 active `replacementSuiteIds` and evidence-receipt `replacementCheckIds`; the
 validator rejects missing, retired, duplicated, or unlinked identities.
+The canonical census defines allowed and mandatory replacement suites
+separately for #70, #71, and #72. Issue #71 specifically requires
+`pipeline-science-contracts`, whose receipt check must name a real retained
+science-test path matching that suite's `sourcePaths`; an unrelated workflow
+path cannot substitute. Recorded commands must exactly equal each covered
+suite's inventoried focused or full command.
 
 Runtime endpoints and environment variables inside fully deleted files are
 owned byte-for-byte by the census root or exact-path locator. Shared retained

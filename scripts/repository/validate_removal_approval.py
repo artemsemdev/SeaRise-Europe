@@ -143,6 +143,30 @@ def _duplicates(values: Iterable[str]) -> list[str]:
     return sorted(duplicates)
 
 
+def _matches_source_pattern(path: str, pattern: str) -> bool:
+    """Match repository paths with slash-aware `*`, `?`, and recursive `**`."""
+
+    expression = ""
+    index = 0
+    while index < len(pattern):
+        if pattern.startswith("**/", index):
+            expression += "(?:.*/)?"
+            index += 3
+        elif pattern.startswith("**", index):
+            expression += ".*"
+            index += 2
+        elif pattern[index] == "*":
+            expression += "[^/]*"
+            index += 1
+        elif pattern[index] == "?":
+            expression += "[^/]"
+            index += 1
+        else:
+            expression += re.escape(pattern[index])
+            index += 1
+    return re.fullmatch(expression, path) is not None
+
+
 def _tracked_blobs(repository_root: Path, commit: str) -> dict[str, str]:
     # cat-file rejects a syntactically valid but unavailable/non-commit object.
     _git(repository_root, "cat-file", "-e", f"{commit}^{{commit}}")
@@ -557,6 +581,30 @@ def validate_removal_approval(
         else {}
     )
     tracked: dict[str, str] | None = None
+    census_suite_policy_by_issue: dict[int, tuple[set[str], set[str]]] = {}
+    if not census_schema_errors:
+        for issue in census["issues"]:
+            owner = issue["ownerIssue"]
+            allowed_values = issue["allowedReplacementSuiteIds"]
+            required_values = issue["requiredReplacementSuiteIds"]
+            if allowed_values != sorted(allowed_values):
+                errors.append(
+                    f"canonical census issue #{owner} allowedReplacementSuiteIds "
+                    "must be sorted"
+                )
+            if required_values != sorted(required_values):
+                errors.append(
+                    f"canonical census issue #{owner} requiredReplacementSuiteIds "
+                    "must be sorted"
+                )
+            allowed = set(allowed_values)
+            required = set(required_values)
+            if not required.issubset(allowed):
+                errors.append(
+                    f"canonical census issue #{owner} required replacement suites "
+                    "must be allowed"
+                )
+            census_suite_policy_by_issue[owner] = (allowed, required)
     if isinstance(items, list) and all(isinstance(item, dict) for item in items):
         item_ids = [item.get("id") for item in items]
         string_ids = [item_id for item_id in item_ids if isinstance(item_id, str)]
@@ -569,7 +617,11 @@ def validate_removal_approval(
         global_locator_keys: list[str] = []
         delete_locator_keys: list[str] = []
         delete_locator_owners: dict[str, int] = {}
-        mapped_replacement_suites: list[str] = []
+        mapped_replacement_suites_by_issue: dict[int, set[str]] = {
+            70: set(),
+            71: set(),
+            72: set(),
+        }
         mapped_replacement_checks: list[str] = []
         mapped_retirement_suites: list[str] = []
         target_owner_paths: list[str] = []
@@ -647,7 +699,19 @@ def validate_removal_approval(
                         errors.append(f"{item_id}: {field} must be sorted")
                 replacement_suites = item.get("replacementSuiteIds")
                 if isinstance(replacement_suites, list):
-                    mapped_replacement_suites.extend(replacement_suites)
+                    owner = item.get("ownerIssue")
+                    if isinstance(owner, int):
+                        mapped_replacement_suites_by_issue.setdefault(owner, set()).update(
+                            replacement_suites
+                        )
+                        policy = census_suite_policy_by_issue.get(owner)
+                        if policy is not None:
+                            disallowed = sorted(set(replacement_suites) - policy[0])
+                            if disallowed:
+                                errors.append(
+                                    f"{item_id}: replacementSuiteIds are not allowed for "
+                                    f"ownerIssue #{owner}: {disallowed}"
+                                )
                     missing = sorted(set(replacement_suites) - set(suites_by_id))
                     if missing:
                         errors.append(
@@ -769,22 +833,14 @@ def validate_removal_approval(
                 f"{unused_receipt_checks}"
             )
 
-        required_replacement_suites = (
-            census.get("requiredReplacementSuiteIds")
-            if not census_schema_errors
-            else None
-        )
-        if isinstance(required_replacement_suites, list) and all(
-            isinstance(suite_id, str) for suite_id in required_replacement_suites
-        ):
-            if required_replacement_suites != sorted(required_replacement_suites):
-                errors.append("canonical census requiredReplacementSuiteIds must be sorted")
+        for owner, (_allowed, required) in census_suite_policy_by_issue.items():
             missing_required = sorted(
-                set(required_replacement_suites) - set(mapped_replacement_suites)
+                required - mapped_replacement_suites_by_issue.get(owner, set())
             )
             if missing_required:
                 errors.append(
-                    "deletion inventory lacks mandatory replacement scanner suites: "
+                    f"deletion inventory lacks mandatory replacement suites for "
+                    f"ownerIssue #{owner}: "
                     f"{missing_required}"
                 )
 
@@ -1056,6 +1112,62 @@ def validate_removal_approval(
                     errors.append(
                         f"{check_id}: coveredTargetOwnerPaths must be evidencePaths: "
                         f"{missing_path_evidence}"
+                    )
+            if isinstance(covered_suites, list) and isinstance(covered_paths, list):
+                valid_covered_suites = [
+                    suite_id
+                    for suite_id in covered_suites
+                    if suite_id in suites_by_id
+                ]
+                for suite_id in valid_covered_suites:
+                    suite = suites_by_id[suite_id]
+                    commands = suite.get("commands")
+                    accepted_commands = {
+                        value
+                        for key in ("focused", "full")
+                        if isinstance(commands, dict)
+                        and isinstance((value := commands.get(key)), str)
+                    }
+                    if command not in accepted_commands:
+                        errors.append(
+                            f"{check_id}: command must exactly match {suite_id} "
+                            "commands.focused or commands.full"
+                        )
+                    source_patterns = suite.get("sourcePaths")
+                    patterns = (
+                        [pattern for pattern in source_patterns if isinstance(pattern, str)]
+                        if isinstance(source_patterns, list)
+                        else []
+                    )
+                    if not any(
+                        _matches_source_pattern(path, pattern)
+                        for path in covered_paths
+                        for pattern in patterns
+                    ):
+                        errors.append(
+                            f"{check_id}: covered suite {suite_id} has no matching "
+                            "coveredTargetOwnerPath"
+                        )
+                unmatched_covered_paths = sorted(
+                    path
+                    for path in covered_paths
+                    if not any(
+                        _matches_source_pattern(path, pattern)
+                        for suite_id in valid_covered_suites
+                        for pattern in (
+                            suites_by_id[suite_id].get("sourcePaths", [])
+                            if isinstance(
+                                suites_by_id[suite_id].get("sourcePaths"), list
+                            )
+                            else []
+                        )
+                        if isinstance(pattern, str)
+                    )
+                )
+                if unmatched_covered_paths:
+                    errors.append(
+                        f"{check_id}: coveredTargetOwnerPaths do not match covered "
+                        f"suite sourcePaths: {unmatched_covered_paths}"
                     )
             if isinstance(output_path, str):
                 try:
