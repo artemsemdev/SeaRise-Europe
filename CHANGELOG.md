@@ -12,8 +12,9 @@ All notable changes to this project will be documented in this file.
   zero dynamic legacy endpoint handling, and requires at least 90 in all four
   Lighthouse mobile categories across three isolated audits. Initial CSS is
   embedded, the two initial Flight fonts are preloaded, scientific runtime
-  loading is deferred past the initial render, and generated delivery sidecars
-  cannot expand the exact manifest-authorized release inventory. Lighthouse
+  and release bootstrap loading are deferred past the initial render, and
+  generated delivery sidecars cannot expand the exact manifest-authorized
+  release inventory. Lighthouse
   and generic-host dependencies use a separate audited quality-tool lock so
   immutable Phase 1 npm and PMTiles evidence remains unchanged.
 

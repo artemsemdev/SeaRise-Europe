@@ -1,4 +1,4 @@
-import { technicalErrorFrom } from "../data/manifest-repository";
+import { technicalErrorFrom } from "../data/technical-error";
 import {
   createBootingProjectionState,
   projectionReducer,

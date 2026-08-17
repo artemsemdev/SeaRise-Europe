@@ -33,7 +33,7 @@ export function extractApplicationBuildIdentity(source) {
 
 export function applicationBuildIdentityPlugin(identity) {
   const source = serializeApplicationBuildIdentity(identity);
-  const script = `<script src="/${applicationBuildIdentityFile}"></script>`;
+  const script = `<script defer src="/${applicationBuildIdentityFile}"></script>`;
   return {
     name: "authoritative-application-build-identity",
     configureServer(server) {
@@ -81,7 +81,7 @@ export function validateApplicationBuildIdentity({ dist, expectedIdentity }) {
   const identity = extractApplicationBuildIdentity(readFileSync(authoritativePath, "utf8"));
   assertSameBuildIdentity(expectedIdentity, identity, "application runtime");
 
-  const scriptReference = `src="/${applicationBuildIdentityFile}"`;
+  const scriptReference = `defer src="/${applicationBuildIdentityFile}"`;
   for (const path of files(dist)) {
     if (extname(path) === ".html") {
       const html = readFileSync(path, "utf8");

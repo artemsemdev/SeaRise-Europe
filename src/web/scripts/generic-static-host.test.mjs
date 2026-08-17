@@ -58,6 +58,14 @@ describe("generic static-host contract", () => {
     );
   });
 
+  it("rejects dynamic POST handling at a non-assessment legacy endpoint", async () => {
+    const test = fixture();
+    test.responses.set("POST /v1/geocode", new globalThis.Response("dynamic", { status: 200 }));
+    await expect(validateGenericStaticHost("https://fixture.test", test.dist, test.request)).rejects.toThrow(
+      /POST \/v1\/geocode returned 200/u,
+    );
+  });
+
   it("rejects a mutated release-scoped config", async () => {
     const test = fixture();
     const mutated = new Uint8Array(test.configBytes);

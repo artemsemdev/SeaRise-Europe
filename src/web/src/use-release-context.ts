@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { runtimeConfig } from "./config";
-import { ManifestRepository, technicalErrorFrom } from "./data/manifest-repository";
+import { technicalErrorFrom } from "./data/technical-error";
 import type { ReleaseContext, TechnicalError } from "./domain/release";
 
 const MAX_ATTEMPTS = 3;
@@ -13,26 +13,39 @@ export type ReleaseBootstrapState =
 export function useReleaseContext(): readonly [ReleaseBootstrapState, () => void] {
   const [attempt, setAttempt] = useState(1);
   const [state, setState] = useState<ReleaseBootstrapState>({ phase: "loading", attempt });
-  const repository = useMemo(() => {
+  const repositoryOptions = useMemo(() => {
     const manifestUrl = new URL(runtimeConfig.manifestPath, window.location.href);
-    return new ManifestRepository({
+    return {
       manifestUrl: manifestUrl.href,
       allowedOrigins: [manifestUrl.origin],
       expectedDisposition: runtimeConfig.releaseDisposition,
-    });
+    } as const;
   }, []);
 
   useEffect(() => {
     const controller = new AbortController();
-    repository.load(runtimeConfig.dataReleaseId, controller.signal).then(
-      (context) => setState({ phase: "ready", context }),
-      (error: unknown) => {
-        if (controller.signal.aborted) return;
-        setState({ phase: "error", attempt, error: technicalErrorFrom(error) });
-      },
-    );
-    return () => controller.abort();
-  }, [attempt, repository]);
+    const load = () => {
+      void import("./data/manifest-repository").then(
+        ({ ManifestRepository }) => new ManifestRepository(repositoryOptions).load(
+          runtimeConfig.dataReleaseId,
+          controller.signal,
+        ),
+      ).then(
+        (context) => setState({ phase: "ready", context }),
+        (error: unknown) => {
+          if (controller.signal.aborted) return;
+          setState({ phase: "error", attempt, error: technicalErrorFrom(error) });
+        },
+      );
+    };
+    const idle = window.requestIdleCallback?.(load, { timeout: 1_000 });
+    const timer = idle === undefined ? window.setTimeout(load, 0) : undefined;
+    return () => {
+      if (idle !== undefined) window.cancelIdleCallback(idle);
+      if (timer !== undefined) window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [attempt, repositoryOptions]);
 
   const retry = () => {
     if (attempt >= MAX_ATTEMPTS) return;

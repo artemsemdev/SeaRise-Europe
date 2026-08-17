@@ -75,6 +75,18 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["compose"])
 
+    def test_static_quality_tool_change_routes_web_and_javascript_codeql(self) -> None:
+        for path in (
+            "tools/static-quality/package-lock.json",
+            "tools/static-quality/run-lighthouse-gate.mjs",
+        ):
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["web"])
+                self.assertTrue(outputs["codeql_javascript"])
+                self.assertFalse(outputs["frontend"])
+                self.assertFalse(outputs["api"])
+
     def test_frontend_test_change_does_not_rebuild_image(self) -> None:
         outputs = classify_paths(
             ["src/frontend/src/__tests__/components/ResultPanel.test.tsx"]

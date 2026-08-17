@@ -51,7 +51,10 @@ render-blocking request. The two Latin fonts used by the initial Flight command
 are preloaded from the same immutable hashed assets; this changes delivery
 timing, not font selection or rendered styling. Scientific COG/runtime code is
 loaded after the first application render rather than entering the initial
-dependency graph. The
+dependency graph. The tiny build-identity authority is deferred while retaining
+document order ahead of the application module, and manifest validation starts
+at browser idle so the complete Flight command can paint before verified release
+startup begins. The
 existing build inspector independently retains the 250 KiB Brotli budget and
 lazy map/search checks.
 

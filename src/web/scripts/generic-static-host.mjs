@@ -82,7 +82,10 @@ export async function validateGenericStaticHost(origin, dist, request = globalTh
   ]) {
     await responseAt(request, origin, path, 404);
   }
-  for (const path of ["/assess", "/v1/assess"]) {
+  for (const path of [
+    "/assess", "/geocode", "/config",
+    "/v1/assess", "/v1/geocode", "/v1/config",
+  ]) {
     await responseAt(request, origin, path, 404, {
       method: "POST",
       headers: { "content-type": "application/json" },

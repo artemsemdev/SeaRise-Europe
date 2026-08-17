@@ -6,7 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { technicalErrorFrom } from "../data/manifest-repository";
+import { technicalErrorFrom } from "../data/technical-error";
 import type { ReleaseMethodology } from "../data/methodology-repository";
 import type { ArtifactTransport } from "../data/artifact-integrity";
 import type { SearchLifecycleEvent } from "../domain/projection-search";

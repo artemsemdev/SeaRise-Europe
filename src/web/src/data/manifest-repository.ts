@@ -20,6 +20,7 @@ import {
   type ResolvedArtifact,
   type TechnicalError,
 } from "../domain/release";
+export { technicalErrorFrom } from "./technical-error";
 
 export type ManifestTransport = (
   input: URL,
@@ -363,14 +364,4 @@ export class ManifestRepository {
       ...resolved,
     });
   }
-}
-
-export function technicalErrorFrom(error: unknown): TechnicalError {
-  if (error instanceof TechnicalFailure) return error.detail;
-  return Object.freeze({
-    kind: "technical-error",
-    code: "DecodeFailed",
-    message: "The pinned release could not be initialized.",
-    recoverable: false,
-  });
 }

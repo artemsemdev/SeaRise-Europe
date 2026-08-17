@@ -7,7 +7,7 @@
       "kind": "local-measurement",
       "observedAt": "2026-08-17T12:16:37+02:00",
       "reference": "docs/operations/generic-static-host-validation.md, tools/static-quality/validate-generic-static-host.mjs, and tools/static-quality/run-lighthouse-gate.mjs",
-      "environment": "macOS arm64; application build on Node 20.20.1; isolated quality tools on Node 22.23.2; Lighthouse 13.4.1; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; three fresh simulated-mobile Chromium audits each produced raw scores performance 0.90, accessibility 1.00, best practices 0.96, SEO 1.00, with the same medians; exact manifest-only release inventory, static routes, build/release/config identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
+      "environment": "macOS arm64; application build on Node 20.20.1; isolated quality tools on Node 22.23.2; Lighthouse 13.4.1; Playwright 1.62.1 Chromium; pinned sirv-cli 3.0.1 generic static server; three fresh simulated-mobile Chromium audits produced performance 0.92/0.99/0.99, accessibility 1.00/1.00/1.00, best practices 0.96/0.96/0.96, and SEO 1.00/1.00/1.00, with medians 0.99/1.00/0.96/1.00; exact manifest-only release inventory, static routes, build/release/config identity, all build-report assets, static 404 behavior, and absence of dynamic legacy endpoint handling passed; committed synthetic fixture only; no Candidate-v7, TAR, external storage, Firefox, or WebKit claim"
     },
     "local-2026-08-17-offline-lifecycle-journey": {
       "kind": "local-measurement",
@@ -464,7 +464,7 @@
       "commands": { "focused": "npm run web:build && npm run static-quality:install && npm run web:validate:static-host && npm run web:validate:lighthouse", "full": "npm run web:check && npm run static-quality:install && npm run web:validate:static-host && npm run web:validate:lighthouse && npm run web:e2e" },
       "execution": { "tier": "release", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 65, "class": "slow", "evidenceRef": "local-2026-08-17-generic-static-lighthouse", "scope": "focused-suite" },
-      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A single simulated-mobile audit varied from 0.88 to 0.90 before the initial Flight fonts were preloaded. The owned gate now preserves three fresh raw reports, evaluates the raw median, and additionally rejects every individual category below 0.90. The post-fix three-run evidence was 0.90/1.00/0.96/1.00 in every run; no external service, data, or network is involved." }
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "A single simulated-mobile audit varied before initial Flight assets and release validation were moved off the render-critical path. The owned gate preserves three fresh raw reports, evaluates the raw median, and additionally rejects every individual category below 0.90. The final local performance evidence was 0.92/0.99/0.99 with 1.00 accessibility, 0.96 best practices, and 1.00 SEO in every run; no external service, data, or network is involved." }
     },
     {
       "id": "static-offline-contracts",
