@@ -15,6 +15,7 @@
     "evidenceReceiptSha256",
     "approvalText",
     "approvalSource",
+    "liveVerificationRequired",
     "authorizedIssues",
     "candidatePublicationAuthorized",
     "externalResourceMutationAuthorized"
@@ -45,6 +46,7 @@
         "bodySha256": { "$ref": "#/$defs/sha256" }
       }
     },
+    "liveVerificationRequired": { "const": true },
     "authorizedIssues": {
       "type": "array",
       "prefixItems": [{ "const": 70 }, { "const": 71 }, { "const": 72 }],

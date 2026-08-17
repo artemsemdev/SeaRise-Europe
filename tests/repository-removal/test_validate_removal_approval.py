@@ -11,11 +11,16 @@ from pathlib import Path
 from typing import Any
 
 from scripts.repository.validate_removal_approval import (
+    DEFAULT_CENSUS,
+    DEFAULT_CENSUS_SCHEMA,
     DEFAULT_DECISION_SCHEMA,
     DEFAULT_EVIDENCE_SCHEMA,
     DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA,
     DEFAULT_INVENTORY_SCHEMA,
     DEFAULT_VALIDATOR,
+    _canonical_census,
+    _selector_count,
+    _tracked_blobs,
     expected_approval_text,
     validate_removal_approval,
 )
@@ -27,6 +32,8 @@ HISTORICAL_ALLOWLIST_PATH = Path(
     "contracts/repository-removal/v1/historical-allowlist.json"
 )
 INVENTORY_SCHEMA_PATH = Path("contracts/repository-removal/v1/inventory.schema.json")
+CENSUS_PATH = Path("contracts/repository-removal/v1/census.json")
+CENSUS_SCHEMA_PATH = Path("contracts/repository-removal/v1/census.schema.json")
 EVIDENCE_SCHEMA_PATH = Path(
     "contracts/repository-removal/v1/evidence-receipt.schema.json"
 )
@@ -39,7 +46,7 @@ HISTORICAL_ALLOWLIST_SCHEMA_PATH = Path(
 VALIDATOR_PATH = Path("scripts/repository/validate_removal_approval.py")
 TEST_INVENTORY_PATH = Path("tests/test-inventory.json")
 REPLACEMENT_MATRIX_PATH = Path(
-    "docs/testing/legacy-frontend-removal-inventory.md"
+    "docs/testing/legacy-runtime-removal-matrix.md"
 )
 
 
@@ -60,15 +67,60 @@ class ApprovalRepository:
         self._write(Path("legacy/runtime.txt"), b"legacy\n")
         self._write(Path("historical/evidence.md"), b"historical evidence\n")
         self._write(Path("target/runtime.test.ts"), b"target\n")
+        self._write(Path("evidence/static-target.txt"), b"4 passed\n")
+        self._write(Path(".github/workflows/ci.yml"), b"jobs:\n  frontend:\n    runs-on: ubuntu-latest\n")
+        self._write(Path("scripts/ci/routes.py"), b"FRONTEND = ('src/frontend/**',)\n")
         for destination, source in (
             (INVENTORY_SCHEMA_PATH, DEFAULT_INVENTORY_SCHEMA),
+            (CENSUS_SCHEMA_PATH, DEFAULT_CENSUS_SCHEMA),
             (EVIDENCE_SCHEMA_PATH, DEFAULT_EVIDENCE_SCHEMA),
             (DECISION_SCHEMA_PATH, DEFAULT_DECISION_SCHEMA),
             (HISTORICAL_ALLOWLIST_SCHEMA_PATH, DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA),
             (VALIDATOR_PATH, DEFAULT_VALIDATOR),
         ):
             self._write(destination, source.read_bytes())
-        self._write(TEST_INVENTORY_PATH, b"test inventory\n")
+        self._write(
+            CENSUS_PATH,
+            _json_bytes(
+                {
+                    "schemaVersion": "1.0.0",
+                    "censusId": "phase-2-legacy-runtime-v1",
+                    "requiredReplacementSuiteIds": ["target-suite"],
+                    "issues": [
+                        {
+                            "ownerIssue": 70,
+                            "roots": [],
+                            "paths": ["legacy/runtime.txt"],
+                            "selectors": [],
+                        },
+                        {"ownerIssue": 71, "roots": [], "paths": [], "selectors": []},
+                        {"ownerIssue": 72, "roots": [], "paths": [], "selectors": []},
+                    ],
+                }
+            ),
+        )
+        self._write(
+            TEST_INVENTORY_PATH,
+            _json_bytes(
+                {
+                    "suites": [
+                        {
+                            "id": "legacy-suite",
+                            "status": "active",
+                            "replacementGate": {"issue": 70},
+                        },
+                        {
+                            "id": "target-suite",
+                            "status": "active",
+                            "replacementGate": {"issue": None},
+                        },
+                    ],
+                    "baselineTests": [
+                        {"path": "legacy/runtime.txt", "suite": "legacy-suite"}
+                    ],
+                }
+            ),
+        )
         self._write(REPLACEMENT_MATRIX_PATH, b"replacement matrix\n")
         self._git("add", ".")
         self._git("commit", "-q", "-m", "test: add audited tree")
@@ -137,10 +189,13 @@ class ApprovalRepository:
                     "replacementEvidence": [
                         {
                             "kind": "test-suite",
-                            "reference": "target/runtime.test.ts",
+                            "reference": "target-suite",
                             "invariant": "The static target owns runtime behavior.",
                         }
                     ],
+                    "replacementSuiteIds": ["target-suite"],
+                    "replacementCheckIds": ["static-target"],
+                    "retirementSuiteIds": ["legacy-suite"],
                     "targetOwnerPaths": ["target/runtime.test.ts"],
                     "deferOwner": None,
                     "historicalAllowlistEntry": None,
@@ -161,6 +216,9 @@ class ApprovalRepository:
                     "ownerIssue": None,
                     "removalGate": None,
                     "replacementEvidence": [],
+                    "replacementSuiteIds": [],
+                    "replacementCheckIds": [],
+                    "retirementSuiteIds": [],
                     "targetOwnerPaths": [],
                     "deferOwner": None,
                     "historicalAllowlistEntry": "historical-evidence",
@@ -181,6 +239,9 @@ class ApprovalRepository:
                     "ownerIssue": None,
                     "removalGate": None,
                     "replacementEvidence": [],
+                    "replacementSuiteIds": [],
+                    "replacementCheckIds": [],
+                    "retirementSuiteIds": [],
                     "targetOwnerPaths": ["target/runtime.test.ts"],
                     "deferOwner": None,
                     "historicalAllowlistEntry": None,
@@ -230,6 +291,10 @@ class ApprovalRepository:
             "inventorySchemaSha256": self._git(
                 "show", f"HEAD:{INVENTORY_SCHEMA_PATH}"
             ),
+            "censusSha256": self._git("show", f"HEAD:{CENSUS_PATH}"),
+            "censusSchemaSha256": self._git(
+                "show", f"HEAD:{CENSUS_SCHEMA_PATH}"
+            ),
             "evidenceReceiptSchemaSha256": self._git(
                 "show", f"HEAD:{EVIDENCE_SCHEMA_PATH}"
             ),
@@ -274,8 +339,12 @@ class ApprovalRepository:
                     "id": "static-target",
                     "command": "npm run web:check",
                     "result": "passed",
-                    "outputSha256": "1" * 64,
-                    "evidencePaths": ["target/runtime.test.ts"],
+                    "outputPath": "evidence/static-target.txt",
+                    "outputSha256": _sha256(b"4 passed\n"),
+                    "evidencePaths": [
+                        "evidence/static-target.txt",
+                        "target/runtime.test.ts",
+                    ],
                 }
             ],
         }
@@ -325,6 +394,7 @@ class ApprovalRepository:
                         ).encode("utf-8")
                     ),
                 },
+                "liveVerificationRequired": True,
                 "authorizedIssues": [70, 71, 72],
                 "candidatePublicationAuthorized": False,
                 "externalResourceMutationAuthorized": False,
@@ -338,9 +408,57 @@ class ApprovalRepository:
 
 
 class RemovalApprovalTests(unittest.TestCase):
+    def test_repository_census_resolves_every_canonical_locator(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        census = json.loads(DEFAULT_CENSUS.read_text(encoding="utf-8"))
+
+        owners, errors = _canonical_census(
+            census,
+            repository_root=root,
+            audited_commit=commit,
+            tracked=_tracked_blobs(root, commit),
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            {issue: sum(owner == issue for owner in owners.values()) for issue in (70, 71, 72)},
+            {70: 109, 71: 107, 72: 13},
+        )
+
     def _validate(
-        self, repository: ApprovalRepository, *, allow_unapproved: bool = False
+        self,
+        repository: ApprovalRepository,
+        *,
+        allow_unapproved: bool = False,
+        live_comment_mutation: dict[str, Any] | None = None,
+        verify_owner_comment: bool = True,
     ) -> list[str]:
+        def owner_comment(comment_id: int) -> dict[str, Any]:
+            decision = json.loads(
+                repository._git("show", f"HEAD:{DECISION_PATH}")
+            )
+            comment = {
+                "id": comment_id,
+                "html_url": decision["approvalSource"]["commentUrl"],
+                "issue_url": (
+                    "https://api.github.com/repos/artemsemdev/"
+                    "SeaRise-Europe/issues/68"
+                ),
+                "body": decision["approvalText"],
+                "author_association": "OWNER",
+                "user": {"login": "artemsemdev"},
+            }
+            if live_comment_mutation:
+                comment.update(live_comment_mutation)
+            return comment
+
         return validate_removal_approval(
             repository_root=repository.root,
             inventory_path=INVENTORY_PATH,
@@ -351,11 +469,21 @@ class RemovalApprovalTests(unittest.TestCase):
             evidence_schema_path=EVIDENCE_SCHEMA_PATH,
             decision_schema_path=DECISION_SCHEMA_PATH,
             historical_allowlist_schema_path=HISTORICAL_ALLOWLIST_SCHEMA_PATH,
+            census_path=CENSUS_PATH,
+            census_schema_path=CENSUS_SCHEMA_PATH,
             validator_path=VALIDATOR_PATH,
             test_inventory_path=TEST_INVENTORY_PATH,
             replacement_matrix_path=REPLACEMENT_MATRIX_PATH,
             allow_unapproved=allow_unapproved,
+            verify_owner_comment=verify_owner_comment and not allow_unapproved,
+            owner_comment_fetcher=owner_comment,
         )
+
+    @staticmethod
+    def _commit_census(repository: ApprovalRepository, census: dict[str, Any]) -> None:
+        repository._write(CENSUS_PATH, _json_bytes(census))
+        repository._git("add", str(CENSUS_PATH))
+        repository._git("commit", "-q", "-m", "test: update census")
 
     def test_accepts_exact_committed_approval_chain(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -441,8 +569,9 @@ class RemovalApprovalTests(unittest.TestCase):
                 "id": "static-target",
                 "command": "npm run web:test",
                 "result": "passed",
+                "outputPath": "evidence/static-target.txt",
                 "outputSha256": "2" * 64,
-                "evidencePaths": ["target/runtime.test.ts"],
+                "evidencePaths": ["evidence/static-target.txt"],
             }
             repository.commit_chain(
                 evidence_mutation={
@@ -513,6 +642,7 @@ class RemovalApprovalTests(unittest.TestCase):
                             "id": "unsafe-check",
                             "command": "gh secret delete TOKEN",
                             "result": "passed",
+                            "outputPath": "evidence/not-committed.txt",
                             "outputSha256": "2" * 64,
                             "evidencePaths": ["evidence/not-committed.txt"],
                         }
@@ -571,6 +701,164 @@ class RemovalApprovalTests(unittest.TestCase):
         self.assertIn(
             "owner decision approvalText is not the exact required approval",
             errors,
+        )
+
+    def test_rejects_non_exhaustive_canonical_census_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            census = json.loads((repository.root / CENSUS_PATH).read_text())
+            census["issues"][0]["paths"].insert(0, "historical/evidence.md")
+            self._commit_census(repository, census)
+            repository.commit_chain()
+
+            errors = self._validate(repository)
+
+        self.assertTrue(
+            any("delete inventory does not exhaust canonical census" in error for error in errors),
+            errors,
+        )
+
+    def test_rejects_missing_and_duplicate_canonical_selectors(self) -> None:
+        for duplicate in (False, True):
+            with self.subTest(duplicate=duplicate), tempfile.TemporaryDirectory() as directory:
+                repository = ApprovalRepository(Path(directory))
+                selector_value = "frontend" if duplicate else "missing"
+                if duplicate:
+                    repository._write(
+                        Path(".github/workflows/ci.yml"),
+                        b"jobs:\n  frontend:\n    runs-on: ubuntu-latest\n  frontend:\n    runs-on: ubuntu-latest\n",
+                    )
+                    repository._git("add", ".github/workflows/ci.yml")
+                    repository._git("commit", "-q", "-m", "test: duplicate selector")
+                    repository.audited_commit = repository._git(
+                        "rev-parse", "HEAD"
+                    ).decode().strip()
+                    repository.audited_tree = repository._git(
+                        "rev-parse", "HEAD^{tree}"
+                    ).decode().strip()
+                census = json.loads((repository.root / CENSUS_PATH).read_text())
+                census["issues"][0]["selectors"] = [
+                    {
+                        "path": ".github/workflows/ci.yml",
+                        "kind": "workflow-job",
+                        "value": selector_value,
+                    }
+                ]
+                self._commit_census(repository, census)
+                inventory = repository.inventory()
+                workflow_blob = repository._git(
+                    "rev-parse",
+                    f"{repository.audited_commit}:.github/workflows/ci.yml",
+                ).decode().strip()
+                inventory["items"][0]["locators"].insert(
+                    0,
+                    {
+                        "path": ".github/workflows/ci.yml",
+                        "selector": f"workflow-job:{selector_value}",
+                        "gitBlobSha": workflow_blob,
+                    },
+                )
+                repository.commit_chain(inventory=inventory)
+
+                errors = self._validate(repository)
+
+            self.assertTrue(
+                any("canonical selector must exist exactly once" in error for error in errors),
+                errors,
+            )
+
+    def test_setuptools_mapping_selectors_are_structural_and_independent(self) -> None:
+        source = b'''[tool.setuptools]\npackages = ["pipeline", "searise_pipeline"]\n\n[tool.setuptools.package-dir]\npipeline = "."\nsearise_pipeline = "searise_pipeline"\n'''
+
+        self.assertEqual(_selector_count("setuptools-package", "pipeline", source), 1)
+        self.assertEqual(
+            _selector_count("setuptools-package-dir", "pipeline", source),
+            1,
+        )
+        self.assertEqual(
+            _selector_count("setuptools-package", "missing", source),
+            0,
+        )
+
+    def test_rejects_unlinked_replacement_and_retirement_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            delete_item = inventory["items"][0]
+            delete_item["replacementSuiteIds"] = ["unknown-suite"]
+            delete_item["replacementCheckIds"] = ["unknown-check"]
+            delete_item["retirementSuiteIds"] = []
+            repository.commit_chain(inventory=inventory)
+
+            errors = self._validate(repository)
+
+        self.assertTrue(any("replacementSuiteIds not in test inventory" in e for e in errors))
+        self.assertTrue(any("replacementCheckIds not in evidence receipt" in e for e in errors))
+        self.assertTrue(any("deleted baseline tests lack retirement mapping" in e for e in errors))
+        self.assertTrue(any("semantic retirement suite census drifted" in e for e in errors))
+
+    def test_requires_census_mandated_replacement_scanner_suites(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            census = json.loads((repository.root / CENSUS_PATH).read_text())
+            census["requiredReplacementSuiteIds"] = ["mandatory-absence-scan"]
+            self._commit_census(repository, census)
+            repository.commit_chain()
+
+            errors = self._validate(repository)
+
+        self.assertTrue(
+            any(
+                "deletion inventory lacks mandatory replacement scanner suites" in error
+                for error in errors
+            ),
+            errors,
+        )
+
+    def test_rejects_unverifiable_retained_command_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                evidence_mutation={
+                    "checks": [
+                        {
+                            "id": "static-target",
+                            "command": "npm run web:check",
+                            "result": "passed",
+                            "outputPath": "evidence/static-target.txt",
+                            "outputSha256": "0" * 64,
+                            "evidencePaths": ["evidence/static-target.txt"],
+                        }
+                    ]
+                }
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: outputSha256 does not match retained command output: "
+            "evidence/static-target.txt",
+            errors,
+        )
+
+    def test_requires_live_owner_comment_and_rejects_live_identity_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain()
+
+            offline_errors = self._validate(repository, verify_owner_comment=False)
+            live_errors = self._validate(
+                repository,
+                live_comment_mutation={"author_association": "CONTRIBUTOR"},
+            )
+
+        self.assertIn(
+            "live GitHub owner comment verification is required for approval",
+            offline_errors,
+        )
+        self.assertIn(
+            "live GitHub owner comment does not exactly match the recorded owner approval",
+            live_errors,
         )
 
 

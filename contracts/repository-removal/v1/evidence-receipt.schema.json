@@ -29,6 +29,8 @@
       "additionalProperties": false,
       "required": [
         "inventorySchemaSha256",
+        "censusSha256",
+        "censusSchemaSha256",
         "evidenceReceiptSchemaSha256",
         "ownerDecisionSchemaSha256",
         "historicalAllowlistSchemaSha256",
@@ -39,6 +41,8 @@
       ],
       "properties": {
         "inventorySchemaSha256": { "$ref": "#/$defs/sha256" },
+        "censusSha256": { "$ref": "#/$defs/sha256" },
+        "censusSchemaSha256": { "$ref": "#/$defs/sha256" },
         "evidenceReceiptSchemaSha256": { "$ref": "#/$defs/sha256" },
         "ownerDecisionSchemaSha256": { "$ref": "#/$defs/sha256" },
         "historicalAllowlistSchemaSha256": { "$ref": "#/$defs/sha256" },
@@ -84,11 +88,12 @@
     "check": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "command", "result", "outputSha256", "evidencePaths"],
+      "required": ["id", "command", "result", "outputPath", "outputSha256", "evidencePaths"],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
         "command": { "type": "string", "minLength": 1, "maxLength": 1000 },
         "result": { "const": "passed" },
+        "outputPath": { "$ref": "#/$defs/evidencePath" },
         "outputSha256": { "$ref": "#/$defs/sha256" },
         "evidencePaths": {
           "type": "array",

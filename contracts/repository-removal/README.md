@@ -7,6 +7,11 @@ Repository deletion under ADR-025 is authorized by three immutable documents:
    audited integration commit and inventory digest.
 3. `v1/owner-decision.json` records the project owner's exact, narrow approval.
 
+`v1/census.json` is the canonical #70/#71/#72 scope. The validator expands its
+roots against the audited Git tree, verifies every semantic selector exists
+exactly once, and requires the delete inventory to match that expanded set
+without missing, extra, duplicate, or cross-owned locators.
+
 `v1/historical-allowlist.json` is a separate exact-path, audited-blob document.
 It cannot use directory globs or active target paths and never permits an
 allowlisted term in active runtime.
@@ -37,11 +42,17 @@ approval to external resources.
 
 ## Hash chain
 
-The schemas define the closed document shapes; the trusted offline validator
+The schemas define the closed document shapes; the trusted validator
 enforces all cross-document, Git-object, command, path, and GitHub-comment
 relationships. SHA-256 is calculated over the committed file bytes. The evidence receipt
-names the inventory digest plus the schemas, validator, test inventory,
+names the inventory digest plus the census, schemas, validator, test inventory,
 historical allowlist, and replacement matrix. The owner decision names both
 the inventory and evidence-receipt digests, repeats the audited commit, and
 records the OWNER-associated Issue #68 comment. Any edit invalidates the
 approval chain and requires a new owner decision.
+
+Every check hash is recomputed from its retained command-output file. Every
+deletion item links active replacement suites and receipt check IDs, and every
+legacy suite owned by #70/#71/#72 is mapped exactly once for retirement. An
+approved chain passes only when the recorded Issue #68 comment is fetched from
+GitHub and its ID, URL, body, author login, and `OWNER` association all match.

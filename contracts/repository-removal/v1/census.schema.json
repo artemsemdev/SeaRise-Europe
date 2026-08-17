@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v1/census.schema.json",
+  "title": "SeaRise Europe canonical Phase 2 repository-removal census",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "censusId", "requiredReplacementSuiteIds", "issues"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "censusId": { "const": "phase-2-legacy-runtime-v1" },
+    "requiredReplacementSuiteIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "issues": {
+      "type": "array",
+      "prefixItems": [
+        { "$ref": "#/$defs/issue70" },
+        { "$ref": "#/$defs/issue71" },
+        { "$ref": "#/$defs/issue72" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "$defs": {
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*[*?\\[]).+$"
+    },
+    "root": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "excludePaths"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "excludePaths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/repositoryPath" }
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "value"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "kind": {
+          "enum": [
+            "workflow-job",
+            "python-assignment",
+            "python-package",
+            "setuptools-package",
+            "setuptools-package-dir"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ownerIssue", "roots", "paths", "selectors"],
+      "properties": {
+        "ownerIssue": { "enum": [70, 71, 72] },
+        "roots": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/root" }
+        },
+        "paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/repositoryPath" }
+        },
+        "selectors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/selector" }
+        }
+      }
+    },
+    "issue70": {
+      "allOf": [
+        { "$ref": "#/$defs/issue" },
+        { "properties": { "ownerIssue": { "const": 70 } } }
+      ]
+    },
+    "issue71": {
+      "allOf": [
+        { "$ref": "#/$defs/issue" },
+        { "properties": { "ownerIssue": { "const": 71 } } }
+      ]
+    },
+    "issue72": {
+      "allOf": [
+        { "$ref": "#/$defs/issue" },
+        { "properties": { "ownerIssue": { "const": 72 } } }
+      ]
+    }
+  }
+}
