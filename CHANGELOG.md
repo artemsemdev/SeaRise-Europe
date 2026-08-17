@@ -19,7 +19,9 @@ All notable changes to this project will be documented in this file.
   repository modes bind all exact bytes and Git modes in the current
   14-component, 57-input v2 profile. Repository and build traversal rejects
   symlinks before reading them, while preapproval binds current historical
-  blobs without claiming the final post-gate audited commit prematurely.
+  blobs without claiming the final post-gate audited commit prematurely. The
+  final gate also requires the trusted approval validator to advertise and run
+  exact owner-comment verification before accepting the removal chain.
 
 - Added clean-clone generic static-host and Chromium Lighthouse gates. The
   production build now emits deterministic Brotli/gzip sidecars, validates

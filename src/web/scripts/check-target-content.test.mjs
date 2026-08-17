@@ -2,7 +2,12 @@ import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { activeAuthoritativeDocument, scanContent, validateHistoricalAllowlist } from "./check-target-content.mjs";
+import {
+  activeAuthoritativeDocument,
+  ownerCommentVerificationArguments,
+  scanContent,
+  validateHistoricalAllowlist,
+} from "./check-target-content.mjs";
 
 function blob(content) {
   const bytes = Buffer.from(content);
@@ -29,6 +34,26 @@ function fixture(overrides = {}) {
     },
   };
 }
+
+describe("repository-removal validator capability", () => {
+  it("fails closed when owner-comment verification is unavailable", () => {
+    expect(() => ownerCommentVerificationArguments(
+      "usage: validator [--repository-root REPOSITORY_ROOT]",
+      "/repository",
+    )).toThrow(/lacks required --verify-owner-comment capability/);
+    expect(() => ownerCommentVerificationArguments(
+      "usage: validator [--verify-owner-commentary]",
+      "/repository",
+    )).toThrow(/lacks required --verify-owner-comment capability/);
+  });
+
+  it("passes the exact owner-comment verification flag when advertised", () => {
+    expect(ownerCommentVerificationArguments(
+      "usage: validator [--repository-root REPOSITORY_ROOT] [--verify-owner-comment]",
+      "/repository",
+    )).toEqual(["--repository-root", "/repository", "--verify-owner-comment"]);
+  });
+});
 
 describe("historical terminology allowlist", () => {
   it("accepts an exact path/blob/rule entry", () => {

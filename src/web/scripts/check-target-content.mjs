@@ -221,11 +221,36 @@ export function validateHistoricalAllowlist(document, readPath, {
   return entries;
 }
 
+export function ownerCommentVerificationArguments(helpText, root) {
+  const options = new Set(String(helpText).match(/--[a-z0-9-]+/gu) ?? []);
+  if (!options.has("--verify-owner-comment")) {
+    throw new Error(
+      "Repository-removal validator lacks required --verify-owner-comment capability",
+    );
+  }
+  return ["--repository-root", root, "--verify-owner-comment"];
+}
+
 function approvedRemovalChain(root) {
   const validator = resolve(root, "scripts/repository/validate_removal_approval.py");
   if (!existsSync(validator)) throw new Error("Approved repository-removal validator is missing");
+  readRegularFile(validator, null, root);
+  let helpText;
   try {
-    execFileSync("python3", [validator, "--repository-root", root], {
+    helpText = execFileSync("python3", [validator, "--help"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: "pipe",
+    });
+  } catch (error) {
+    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
+    throw new Error(
+      `Repository-removal validator capability check failed${detail ? `: ${detail}` : ""}`,
+    );
+  }
+  const arguments_ = ownerCommentVerificationArguments(helpText, root);
+  try {
+    execFileSync("python3", [validator, ...arguments_], {
       cwd: root,
       encoding: "utf8",
       stdio: "pipe",
