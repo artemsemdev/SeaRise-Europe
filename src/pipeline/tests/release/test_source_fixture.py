@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import io
 import json
+import runpy
 from pathlib import Path
 
 import numpy as np
@@ -24,6 +25,7 @@ REPO_ROOT = Path(__file__).parents[4]
 CONTRACT_PATH = REPO_ROOT / "src/pipeline/science/ar6-regional-release.json"
 FIXTURE_DIR = REPO_ROOT / "src/pipeline/fixtures/ar6-regional-release"
 GOLDENS_PATH = REPO_ROOT / "src/pipeline/science/evidence/ar6-lookup-goldens.json"
+REBIND_SCRIPT = REPO_ROOT / "scripts/science/rebind_ar6_release_fixture.py"
 
 
 def contract() -> dict[str, object]:
@@ -160,11 +162,17 @@ def test_contract_rebind_preserves_science_and_removes_archive_capability(
             "releaseContractSha256": previous_contract_sha256,
         }
     )
+    previous_receipt_bytes = (json.dumps(previous_receipt, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
     rebound_bytes, rebound_receipt = rebind_source_fixture_contract(
         previous_path,
         receipt=previous_receipt,
         release_contract=contract(),
         expected_previous_contract_sha256=previous_contract_sha256,
+        expected_previous_fixture_sha256=hashlib.sha256(previous_path.read_bytes()).hexdigest(),
+        observed_previous_receipt_sha256=hashlib.sha256(previous_receipt_bytes).hexdigest(),
+        expected_previous_receipt_sha256=hashlib.sha256(previous_receipt_bytes).hexdigest(),
     )
     rebound_path = tmp_path / "source-fixture.json.gz"
     rebound_path.write_bytes(rebound_bytes)
@@ -193,4 +201,60 @@ def test_contract_rebind_rejects_unauthorized_previous_contract() -> None:
             receipt=receipt,
             release_contract=contract(),
             expected_previous_contract_sha256="0" * 64,
+            expected_previous_fixture_sha256=receipt["sha256"],
+            observed_previous_receipt_sha256="0" * 64,
+            expected_previous_receipt_sha256="0" * 64,
         )
+
+
+def test_contract_rebind_rejects_coupled_fixture_and_receipt_mutation(tmp_path: Path) -> None:
+    fixture_path = FIXTURE_DIR / "source-fixture.json.gz"
+    receipt = json.loads((FIXTURE_DIR / "source-fixture-receipt.json").read_text(encoding="utf-8"))
+    document = json.loads(gzip.decompress(fixture_path.read_bytes()))
+    document["layers"][0]["lowerMm"][0] += 1
+    payload = (
+        json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    buffer = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=buffer, mtime=0) as stream:
+        stream.write(payload)
+    mutated_path = tmp_path / "mutated.json.gz"
+    mutated_path.write_bytes(buffer.getvalue())
+    mutated_receipt = dict(receipt)
+    mutated_receipt.update(
+        {
+            "byteSize": mutated_path.stat().st_size,
+            "sha256": hashlib.sha256(mutated_path.read_bytes()).hexdigest(),
+        }
+    )
+
+    with pytest.raises(ScienceContractError, match="authorized previous bytes"):
+        rebind_source_fixture_contract(
+            mutated_path,
+            receipt=mutated_receipt,
+            release_contract=contract(),
+            expected_previous_contract_sha256=receipt["releaseContractSha256"],
+            expected_previous_fixture_sha256=receipt["sha256"],
+            observed_previous_receipt_sha256="a" * 64,
+            expected_previous_receipt_sha256="a" * 64,
+        )
+
+
+def test_contract_rebind_recovers_after_fixture_publish_before_receipt(
+    tmp_path: Path,
+) -> None:
+    namespace = runpy.run_path(str(REBIND_SCRIPT))
+    current_fixture = (FIXTURE_DIR / "source-fixture.json.gz").read_bytes()
+    current_receipt = (FIXTURE_DIR / "source-fixture-receipt.json").read_bytes()
+    fixture_path = tmp_path / "source-fixture.json.gz"
+    receipt_path = tmp_path / "source-fixture-receipt.json"
+
+    fixture_path.write_bytes(current_fixture)
+    receipt_path.write_bytes(namespace["_receipt_bytes"](namespace["AUTHORIZED_PREVIOUS_RECEIPT"]))
+    namespace["migrate_fixture_pair"](fixture_path, receipt_path, contract())
+
+    assert fixture_path.read_bytes() == current_fixture
+    assert receipt_path.read_bytes() == current_receipt
+    namespace["migrate_fixture_pair"](fixture_path, receipt_path, contract())
+    assert fixture_path.read_bytes() == current_fixture
+    assert receipt_path.read_bytes() == current_receipt

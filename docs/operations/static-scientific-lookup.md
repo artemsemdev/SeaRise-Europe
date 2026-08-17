@@ -93,15 +93,18 @@ performed from the repository root with:
 PYTHONPATH=src/pipeline python scripts/science/rebind_ar6_release_fixture.py
 ```
 
-The script accepts only the pinned previous contract digest, verifies the
-previous fixture receipt plus archive and member identities, changes only the
-embedded contract digest, and revalidates every array against the current
-contract. The new receipt records both previous digests, declares
-`scientificValuesChanged: false`, and deliberately sets
-`sourceArchiveVerifiedForThisWrite` and `scientificReleaseEligible` to false.
+The script accepts only independently pinned previous contract, fixture, and
+receipt digests, verifies the exact archive and member identities, changes only
+the embedded contract digest, and revalidates every array against the current
+contract. Coupled fixture/receipt drift is rejected. The new receipt records
+both previous digests, declares `scientificValuesChanged: false`, and
+deliberately sets `sourceArchiveVerifiedForThisWrite` and
+`scientificReleaseEligible` to false.
 Rerunning the command is idempotent: it validates the already rebound fixture
-and performs no write. This migration never reads Candidate-v7 or the private
-Phase 1 TAR.
+and performs no write. If execution stops after the new fixture is published
+but before its receipt, the next run recognizes only that exact pinned
+intermediate pair and finishes the receipt publication. This migration never
+reads Candidate-v7 or the private Phase 1 TAR.
 
 ## Clean-clone verification
 

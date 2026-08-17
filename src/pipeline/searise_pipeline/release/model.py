@@ -365,6 +365,9 @@ def rebind_source_fixture_contract(
     receipt: Mapping[str, Any],
     release_contract: Mapping[str, Any],
     expected_previous_contract_sha256: str,
+    expected_previous_fixture_sha256: str,
+    observed_previous_receipt_sha256: str,
+    expected_previous_receipt_sha256: str,
 ) -> tuple[bytes, Mapping[str, Any]]:
     """Rebind an intact offline fixture after a non-scientific contract edit.
 
@@ -374,6 +377,10 @@ def rebind_source_fixture_contract(
     plus an explicitly non-release-eligible receipt.
     """
     previous_fixture_sha256 = _sha256(path)
+    if previous_fixture_sha256 != expected_previous_fixture_sha256:
+        raise ScienceContractError("Fixture differs from the authorized previous bytes")
+    if observed_previous_receipt_sha256 != expected_previous_receipt_sha256:
+        raise ScienceContractError("Fixture receipt differs from the authorized previous bytes")
     if path.stat().st_size != receipt.get("byteSize") or previous_fixture_sha256 != receipt.get(
         "sha256"
     ):
