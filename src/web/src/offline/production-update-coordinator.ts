@@ -65,7 +65,7 @@ export function createProductionUpdateCoordinator(
   };
   const writeDurable = (value: DurableIntent): void => localStorage.setItem(INTENT_KEY, JSON.stringify(value));
   const guard = (permit: DurablePortPermitV1): void => {
-    if (permit.signal.aborted || Date.now() > permit.deadlineMs) throw new DOMException("Update intent operation aborted.", "AbortError");
+    if (permit.signal.aborted) throw new DOMException("Update intent operation aborted.", "AbortError");
   };
   const withLock = async <T>(permit: DurablePortPermitV1, operation: () => T): Promise<T> => {
     guard(permit);
