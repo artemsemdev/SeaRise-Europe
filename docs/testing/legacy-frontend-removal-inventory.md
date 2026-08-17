@@ -47,7 +47,9 @@ replacement evidence.
 | `frontend-ar6-lookup-parity` | Delete after #70 gate | `static-release-domain` and `pipeline-reviewed-cog-range-access` cover exact quantiles, integer millimetres, nodata, nearest native-grid tie-breaks, and the inclusive 100 km limit. |
 | `frontend-static-checks` | Rewrite against the #70 public/static target | `static-target-content` plus the `src/web` lint, type-check, generated-contract, content, and production-build gates replace every legacy-only authoring command. |
 | `frontend-public-contract-parity` | Rewrite against the #70 public/static target | `static-release-domain`, `static-target-content`, and generated `src/web` release-contract checks validate the retained release, STAC, manifest, and gate-report fixtures. |
-| `api-shared-characterization` | Retain as characterization until #71 | `static-release-domain`, `static-projection-panel`, `static-projection-browser-ux`, and `pipeline-science-contracts` replace the C# execution path while the shared five-state fixture remains historical-only evidence. |
+| `api-shared-characterization` | Delete after #71 gate | `static-release-domain`, `static-projection-panel`, `static-projection-browser-ux`, and `pipeline-science-contracts` replace the C# execution path while the shared five-state fixture remains historical-only evidence. |
+| `pipeline-five-state-characterization` | Delete after #71 gate | Preserve the labelled fixture and evidence receipts outside active target roots, then rely on ADR-024 four-outcome static and pipeline suites instead of executing the superseded five-state model. |
+| `pipeline-result-state-mutation-pilot` | Delete after #71 gate | Preserve the measured pilot report as historical-only evidence; the executable mutation runner must not remain an active target-domain gate. |
 
 These mappings are readiness evidence, not retirement metadata. Active suite
 and baseline rows keep null retirement evidence until the same PR actually
