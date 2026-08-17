@@ -43,16 +43,19 @@ afterEach(() => {
 });
 
 describe("production default update composition", () => {
-  it("uses the real factory/coordinator and refuses incomplete candidate authority", async () => {
+  it("refuses mixed and corrupt candidates before arming exact default-factory authority", async () => {
     const context = await fixtureReleaseContext();
     const idb = new IDBFactory();
     const caches = new MemoryCaches();
     const locks = new ImmediateLocks();
     const currentPrecache = "a".repeat(64);
     const candidatePrecache = "b".repeat(64);
-    const candidate = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build", dataReleaseId: "next-browser-release" });
+    const candidateA = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-a", dataReleaseId: "next-browser-release-a" });
+    const candidateB = validateAppReleasePair({ contractVersion: 1, appBuildId: "next-browser-build-b", dataReleaseId: "next-browser-release-b" });
+    let waitingPair = candidateA;
+    let waitingPrecache = candidatePrecache;
     const active = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: { contractVersion: 1, appBuildId: runtimeConfig.appBuildId, dataReleaseId: context.dataReleaseId }, precacheSetSha256: currentPrecache }); } };
-    const waiting = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: candidate, precacheSetSha256: candidatePrecache }); } };
+    const waiting = { postMessage(message: Record<string, unknown>, ports: MessagePort[]) { ports[0].postMessage({ protocol: "searise-offline-worker-v1", type: "worker-identity", messageToken: message.messageToken, pair: waitingPair, precacheSetSha256: waitingPrecache }); } };
     const registration = { active, waiting };
     Object.assign(globalThis, { caches, indexedDB: idb });
     Object.defineProperty(globalThis, "crypto", { configurable: true, value: {
@@ -102,14 +105,35 @@ describe("production default update composition", () => {
       location: { kind: "coordinate", coordinates: { latitude: 36.72, longitude: -4.42 } },
     });
     if (interaction) await runtime.capability?.confirmInteractionAvailable(interaction);
+
+    // The UI advertised A, but the exact waiting worker changed to B before
+    // action. The production coordinator must reject the mixed pair before
+    // any durable transition record exists.
+    waitingPair = candidateB;
     await runtime.capability?.requestUpdateAction();
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("failed"));
-    expect(runtime.capability?.getSnapshot()?.update).toMatchObject({ state: "failed", reason: expect.stringContaining("complete accepted resource authority") });
+    expect(runtime.capability?.getSnapshot()?.update).toMatchObject({
+      state: "failed", reason: expect.stringContaining("does not match the requested candidate"),
+    });
+    expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
 
     const lifecycle = new PairLifecycleStore({ indexedDB: idb, cacheStorage: caches as never });
-    await lifecycle.stage(candidate);
-    await lifecycle.completeBootstrap(candidate, candidatePrecache);
-    await lifecycle.completeCore(candidate, { precacheSetSha256: candidatePrecache, resourcePlanSha256: "c".repeat(64), receiptSha256: "d".repeat(64) });
+    await lifecycle.stage(candidateB);
+    await lifecycle.completeBootstrap(candidateB, "e".repeat(64));
+    await lifecycle.completeCore(candidateB, { precacheSetSha256: "e".repeat(64), resourcePlanSha256: "c".repeat(64), receiptSha256: "d".repeat(64) });
+    await runtime.capability?.retry();
+    await runtime.capability?.requestUpdateAction();
+    expect(runtime.capability?.getSnapshot()?.update).toMatchObject({
+      state: "failed", reason: expect.stringContaining("accepted resource authority disagree"),
+    });
+    expect(localStorage.getItem("searise:update-intent:v1")).toBeNull();
+
+    await lifecycle.stage(candidateA);
+    await lifecycle.completeBootstrap(candidateA, candidatePrecache);
+    await lifecycle.completeCore(candidateA, { precacheSetSha256: candidatePrecache, resourcePlanSha256: "f".repeat(64), receiptSha256: "1".repeat(64) });
+    waitingPair = candidateA;
+    waitingPrecache = candidatePrecache;
+    await runtime.capability?.retry();
     await runtime.capability?.requestUpdateAction();
     await vi.waitFor(() => expect(runtime.capability?.getSnapshot()?.update.state).toBe("ready-to-activate"));
     expect(localStorage.getItem("searise:update-intent:v1")).toContain('"state":"armed"');

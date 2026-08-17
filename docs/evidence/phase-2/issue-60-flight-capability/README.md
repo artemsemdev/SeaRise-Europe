@@ -11,9 +11,15 @@ SHA-256 `2f39c5f4d9d1050df7613999bc205bd08086cd689deefed730db3515a5d0b00f`.
 | 1440 × 900 | [capture](mock-desktop-1440x900.png) | [capture](implementation-desktop-1440x900.png) |
 | 375 × 812 | [capture](mock-mobile-375x812.png) | [capture](implementation-mobile-375x812.png) |
 
-The four comparison captures use identical viewport dimensions, reduced
-motion, and the initial Flight state. They provide a direct side-by-side
-comparison without resizing either authority.
+The four comparison captures use identical viewport dimensions and reduced
+motion, without resizing either authority. They are not identical application
+states: the canonical mock contains its authored demo/fixture and release copy,
+while the production capture reports the committed synthetic release contract.
+The production `Methodology` and `Fly` controls can also be disabled until the
+verified methodology/search state is ready; the self-contained mock presents
+its controls immediately. These intentional runtime differences are reviewed
+as content/state differences, not treated as pixel mismatches or hidden from
+the comparison.
 
 - `desktop-offline-assessment.png` — production static build at 1440 × 900,
   after the real browser runtime completed the Málaga assessment and derived
@@ -55,5 +61,5 @@ only when the waiting worker reports its exact embedded pair and precache hash
 and the pair lifecycle store contains matching complete resource-plan and
 receipt authority. The durable transition port uses cross-tab Web Locks and
 exact conditional local storage records. Missing or mixed evidence fails
-closed.
-It never reloads the page, activates a worker, or invents a candidate.
+closed without creating a pending or armed intent. It never reloads the page,
+activates a worker, or invents a candidate.
