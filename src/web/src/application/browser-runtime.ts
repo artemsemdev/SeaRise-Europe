@@ -18,6 +18,7 @@ import type {
   UpdateCapabilityV1,
 } from "../offline/contracts/policy";
 import type { RuntimeCapabilityInspectionV1 } from "../offline/verified-resource-router";
+import type { ProductionRetentionStateV1 } from "../offline/production-retention-coordinator";
 import {
   RuntimeCapabilityController,
   type RuntimeCapabilityPort,
@@ -72,6 +73,7 @@ export interface BrowserResourceRouter {
 /** Production bridge from the static-host coordinator into capability UI. */
 export interface BrowserUpdateCoordinator {
   readonly inspect: () => UpdateCapabilityV1 | Promise<UpdateCapabilityV1>;
+  readonly inspectRetention?: () => Promise<ProductionRetentionStateV1 | null>;
   readonly requestAction: (capability: RuntimeCapabilityV2) => Promise<void>;
 }
 

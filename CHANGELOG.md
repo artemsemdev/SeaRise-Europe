@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added production browser retention after exact fresh-boot reconciliation.
+  The current worker now supplies the cleanup census under exact-pair Web
+  Locks; active, unknown, or unresponsive clients fail closed, while only
+  unleased `cleanup-pending` pairs older than the active and immediately
+  previous complete pair are removed. Partial deletion remains idempotently
+  retryable and is exposed as technical state, never as a scientific outcome.
+  Private Candidate sessions remain memory-only and do not create the
+  retention coordinator.
+
 - Bound every persistent browser lease to the service worker's authenticated
   `Client.id` instead of a caller-supplied tab identity. The worker now mints
   expiry, refuses cross-tab heartbeat and release attempts, challenges a stable

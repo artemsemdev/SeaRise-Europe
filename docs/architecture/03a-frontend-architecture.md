@@ -322,7 +322,10 @@ may hold only complete integrity-authorized analysis COG chunks. PMTiles stays
 network-only and visual-only with a `no-store` caching policy; it cannot enter
 Cache Storage, IndexedDB, or the session-memory range store without the
 separate promotion contract required by ADR-026. Cache cleanup may delete old
-releases only when no active client uses them.
+releases only after exact fresh-boot authority is reconciled and the current
+worker proves that no active, unknown, or unresponsive client uses them. The
+active complete pair and immediately previous complete pair are retained;
+private Candidate sessions never enter production retention.
 
 The production shell inventory is generated from the recursive Vite main
 graph and exact references in emitted JavaScript and CSS. It includes lazy

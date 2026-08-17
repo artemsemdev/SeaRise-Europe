@@ -2,7 +2,11 @@ import type { BrowserUpdateCoordinator } from "../application/browser-runtime";
 import type { RuntimeCapabilityV2, UpdateCapabilityV1 } from "./contracts/policy";
 import { OFFLINE_WORKER_PROTOCOL, validateOfflineWorkerToClientMessage } from "./contracts/policy";
 import type { AppReleasePairV1 } from "./contracts/keys";
-import { PairLifecycleStore } from "./pair-lifecycle-store";
+import { PairLifecycleStore, type PairLifecycleStoreDependencies } from "./pair-lifecycle-store";
+import {
+  ProductionRetentionCoordinator,
+  type ProductionRetentionStateV1,
+} from "./production-retention-coordinator";
 import { StaticUpdateCapabilityCoordinator } from "./static-update-capability";
 import {
   StaticHostUpdateCoordinator,
@@ -58,8 +62,17 @@ function accepted(
 export function createProductionUpdateCoordinator(
   router: VerifiedResourceRouter,
   currentPrecacheSetSha256: string,
-): BrowserUpdateCoordinator {
-  const lifecycle = new PairLifecycleStore({ indexedDB, cacheStorage: caches });
+  retentionDependencies: Pick<PairLifecycleStoreDependencies, "locks" | "clientCensus"> = {},
+): BrowserUpdateCoordinator & Readonly<{
+  inspectRetention(): Promise<ProductionRetentionStateV1 | null>;
+}> {
+  const lifecycle = new PairLifecycleStore({
+    indexedDB,
+    cacheStorage: caches,
+    ...(retentionDependencies.locks ? { locks: retentionDependencies.locks } : {}),
+    ...(retentionDependencies.clientCensus ? { clientCensus: retentionDependencies.clientCensus } : {}),
+  });
+  const retention = new ProductionRetentionCoordinator(lifecycle);
   const bootId = crypto.randomUUID();
   let discovered: Awaited<ReturnType<typeof workerIdentity>> | null = null;
   const readDurable = (): DurableIntent | null => {
@@ -192,8 +205,15 @@ export function createProductionUpdateCoordinator(
   });
   let reconciled = false;
   let reconciliationFailure = "";
+  let provenBoot: ControllerBootProofV1 | null = null;
   const reconcileFreshBoot = async (): Promise<void> => {
-    if (reconciled || !router.current()) return;
+    if (reconciled) {
+      if (provenBoot && retention.state()?.state === "retryable-technical-failure") {
+        await retention.reconcile(provenBoot.controller.pair);
+      }
+      return;
+    }
+    if (!router.current()) return;
     let durable: DurableIntent | null;
     try {
       durable = readDurable();
@@ -237,6 +257,8 @@ export function createProductionUpdateCoordinator(
         reconciliationFailure = "Armed update intent does not match the exact fresh-boot controller authority.";
       }
     }
+    provenBoot = boot;
+    await retention.reconcile(boot.controller.pair);
     reconciled = true;
   };
   return Object.freeze({
@@ -248,6 +270,10 @@ export function createProductionUpdateCoordinator(
     requestAction: async (capability: RuntimeCapabilityV2): Promise<void> => {
       await reconcileFreshBoot();
       return adapter.requestAction(capability);
+    },
+    inspectRetention: async (): Promise<ProductionRetentionStateV1 | null> => {
+      await reconcileFreshBoot();
+      return retention.state();
     },
   });
 }
