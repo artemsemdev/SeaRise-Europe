@@ -1138,7 +1138,7 @@ jobs:
       - name: Run repository-removal framework and routing tests
         run: |
           python scripts/repository/validate_removal_plan_v2.py framework
-          python -m pytest tests/repository-removal/test_validate_removal_plan_v2.py tests/harness/test_changed_components.py -q
+          python -m pytest tests/repository-removal tests/harness/test_changed_components.py tests/harness/test_changed_suites.py -q
           python scripts/tests/validate_test_inventory.py
 
       - name: Validate current static supply-chain profile
