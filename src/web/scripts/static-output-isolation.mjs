@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync } from "node:fs";
 import { extname, posix, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT_OUTPUTS = Object.freeze([
   "index.html",
@@ -9,22 +10,45 @@ const ROOT_OUTPUTS = Object.freeze([
   "service-worker.js",
   "build-report.json",
 ]);
-const SCANNED_EXTENSIONS = new Set([".html", ".js", ".css", ".map"]);
+const moduleUrl = new URL(import.meta.url);
+const webRoot = moduleUrl.protocol === "file:"
+  ? resolve(fileURLToPath(new URL("..", moduleUrl)))
+  : process.cwd();
+const repositoryRoot = resolve(webRoot, "../..");
+const canonicalFlightPath = resolve(repositoryRoot, "docs/product/Mock/SeaRise-Flight.html");
+const canonicalFlightRequirementsPath = resolve(repositoryRoot, "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md");
 const PRECOMPRESSED_BASE_EXTENSIONS = new Set([".css", ".html", ".js", ".json", ".svg", ".xml"]);
 const FORBIDDEN_STATIC_OUTPUT_PATHS = Object.freeze([
   /(?:^|\/)candidate(?:[-_.]?v?\d+)?(?:[/.\-_]|$)/i,
   /(?:^|\/)local-data(?:\/|$)/i,
   /\.(?:7z|rar|tar|tar\.bz2|tar\.gz|tar\.xz|tgz|zip)$/i,
+  /^docs\/product\/Mock\/SeaRise-Flight\.html$/u,
 ]);
 const FORBIDDEN_RUNTIME_REFERENCES = Object.freeze([
   /candidate-v7/i,
   /local-data\/phase-1/i,
-  /["'`](?:(?:https?:)?\/\/[^/"'`]+)?\/(?:assess|geocode|config)(?:[/?#"'`]|$)/,
+  /["'`](?:(?:https?:)?\/\/[^/"'`]+)?\/(?:v1\/)?(?:assess|geocode|config)(?:[/?#"'`]|$)/,
+  /(?:^|[\s=:(,])\/(?:v1\/)?(?:assess|geocode|config)(?:[/?#\s]|$)/m,
 ]);
-const RELATIVE_RUNTIME_ENDPOINT = /(["'`])((?:\.\/)?(?:assess|geocode|config)(?:[/?#][^"'`]*)?)\1/gu;
+const RELATIVE_RUNTIME_ENDPOINT = /(["'`])((?:\.\/)?(?:v1\/)?(?:assess|geocode|config)(?:[/?#][^"'`]*)?)\1/gu;
 const RELEASE_CONFIG_REFERENCE = /\/releases\/[A-Za-z0-9._-]+\/config\/[A-Za-z0-9._-]+\.json(?:[?#][A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/gu;
 
 function fail(message) { throw new Error(message); }
+
+export function deriveCanonicalFlightDigest(mockBytes, requirements) {
+  const digest = createHash("sha256").update(mockBytes).digest("hex");
+  if (typeof requirements !== "string" || !requirements.includes(digest)) {
+    fail(`Canonical Flight requirements do not declare the current mock SHA-256: ${digest}`);
+  }
+  return digest;
+}
+
+function currentCanonicalFlightDigest() {
+  return deriveCanonicalFlightDigest(
+    readFileSync(canonicalFlightPath),
+    readFileSync(canonicalFlightRequirementsPath, "utf8"),
+  );
+}
 
 function containsForbiddenRuntimeReference(text, allowedReleaseConfigPaths, allowedReleaseConfigReferences) {
   if (FORBIDDEN_RUNTIME_REFERENCES.some((pattern) => pattern.test(text))) return true;
@@ -46,21 +70,21 @@ function safeRelativePath(value, label) {
   return value;
 }
 
-function safePublicReleaseArtifactPath(value, label) {
+function safeStaticOutputPath(value, label) {
   const path = safeRelativePath(value, label);
   if (FORBIDDEN_STATIC_OUTPUT_PATHS.some((pattern) => pattern.test(path))) {
-    fail(`${label} names a private Candidate or archive output`);
+    fail(`${label} names a private Candidate, archive, or canonical design-reference output`);
   }
   return path;
 }
 
 function addViteEntryOutputs(expected, entry, label) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) fail(`${label} is not a Vite manifest entry`);
-  expected.add(safeRelativePath(entry.file, `${label}.file`));
+  expected.add(safeStaticOutputPath(entry.file, `${label}.file`));
   for (const field of ["css", "assets"]) {
     if (entry[field] === undefined) continue;
     if (!Array.isArray(entry[field])) fail(`${label}.${field} is not an array`);
-    for (const value of entry[field]) expected.add(safeRelativePath(value, `${label}.${field}`));
+    for (const value of entry[field]) expected.add(safeStaticOutputPath(value, `${label}.${field}`));
   }
 }
 
@@ -74,7 +98,54 @@ function referencedSourceMap(dist, output) {
   if (reference.includes("/") || reference.includes("\\") || reference.startsWith("data:")) {
     fail(`${output} declares a non-local source map`);
   }
-  return safeRelativePath(posix.join(posix.dirname(output), reference), `${output} source map`);
+  return safeStaticOutputPath(posix.join(posix.dirname(output), reference), `${output} source map`);
+}
+
+function inspectableStrings(bytes) {
+  if (!bytes.includes(0)) return bytes.toString("utf8");
+  const strings = [];
+  let current = "";
+  for (const byte of bytes) {
+    if (byte >= 0x20 && byte <= 0x7e) current += String.fromCharCode(byte);
+    else {
+      if (current.length >= 4) strings.push(current);
+      current = "";
+    }
+  }
+  if (current.length >= 4) strings.push(current);
+  for (const [characterOffset, zeroOffset] of [[0, 1], [1, 0]]) {
+    current = "";
+    for (let index = 0; index + 1 < bytes.length; index += 2) {
+      const character = bytes[index + characterOffset];
+      const zero = bytes[index + zeroOffset];
+      if (zero === 0 && character >= 0x20 && character <= 0x7e) current += String.fromCharCode(character);
+      else {
+        if (current.length >= 4) strings.push(current);
+        current = "";
+      }
+    }
+    if (current.length >= 4) strings.push(current);
+  }
+  return strings.join("\n");
+}
+
+function activeProhibitionContent(path, text, releaseArtifactsByOutput) {
+  const artifact = releaseArtifactsByOutput.get(path);
+  if (artifact?.role !== "architecture-evidence") return text;
+  let document;
+  try {
+    document = JSON.parse(text);
+  } catch {
+    fail(`Architecture evidence is not valid JSON: ${path}`);
+  }
+  const prohibitedRoutes = document?.runtime?.prohibitedRoutes;
+  if (document?.runtime?.applicationApiCalls !== 0
+      || JSON.stringify(prohibitedRoutes) !== JSON.stringify(["/assess", "/geocode", "/config"])) {
+    fail(`Architecture evidence does not contain the exact zero-call route prohibition: ${path}`);
+  }
+  const sanitized = JSON.parse(JSON.stringify(document));
+  delete sanitized.runtime.prohibitedRoutes;
+  return JSON.stringify(sanitized);
 }
 
 export function validateStaticOutputIsolation({
@@ -87,8 +158,10 @@ export function validateStaticOutputIsolation({
   applicationBuildIdentityFile,
   shellManifestPaths,
 }) {
-  const expected = new Set([...ROOT_OUTPUTS, buildIdentityFile, applicationBuildIdentityFile]);
-  const releasePrefix = `releases/${safeRelativePath(releaseId, "release ID")}`;
+  const canonicalFlightSha256 = currentCanonicalFlightDigest();
+  const expected = new Set([...ROOT_OUTPUTS, buildIdentityFile, applicationBuildIdentityFile]
+    .map((path) => safeStaticOutputPath(path, "Required static output")));
+  const releasePrefix = safeStaticOutputPath(`releases/${safeRelativePath(releaseId, "release ID")}`, "Release prefix");
   const releaseManifestPath = `${releasePrefix}/manifest.json`;
   expected.add(releaseManifestPath);
 
@@ -102,7 +175,7 @@ export function validateStaticOutputIsolation({
   for (const [index, path] of shellManifestPaths.entries()) {
     if (path === "/") expected.add("index.html");
     else if (typeof path === "string" && path.startsWith("/")) {
-      expected.add(safeRelativePath(path.slice(1), `Embedded shell manifest path ${index}`));
+      expected.add(safeStaticOutputPath(path.slice(1), `Embedded shell manifest path ${index}`));
     } else fail(`Embedded shell manifest path ${index} is not root-relative`);
   }
 
@@ -122,17 +195,20 @@ export function validateStaticOutputIsolation({
     if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
       fail(`Release manifest artifact ${index} is not an object`);
     }
-    expected.add(`${releasePrefix}/${safePublicReleaseArtifactPath(artifact.path, `Release manifest artifact ${index}`)}`);
+    expected.add(safeStaticOutputPath(`${releasePrefix}/${safeRelativePath(artifact.path, `Release manifest artifact ${index}`)}`,
+      `Release manifest artifact ${index}`));
   }
   const allowedReleaseConfigPaths = new Set(releaseManifest.artifacts
     .map(({ path }) => path)
     .filter((path) => typeof path === "string" && /^config\/[A-Za-z0-9._-]+\.json$/u.test(path)));
   const allowedReleaseConfigReferences = new Set([...allowedReleaseConfigPaths]
     .map((path) => `/${releasePrefix}/${path}`));
+  const releaseArtifactsByOutput = new Map(releaseManifest.artifacts.map((artifact) =>
+    [`${releasePrefix}/${artifact.path}`, artifact]));
 
   const actual = paths.map((path) => {
     const relativePath = relative(dist, path).replaceAll("\\", "/");
-    const safePath = safeRelativePath(relativePath, "Static output");
+    const safePath = safeStaticOutputPath(relativePath, "Static output");
     const metadata = lstatSync(path);
     if (!metadata.isFile() || metadata.isSymbolicLink()) fail(`Static output is not a regular file: ${safePath}`);
     return safePath;
@@ -161,8 +237,12 @@ export function validateStaticOutputIsolation({
   const unknown = actual.filter((path) => !expected.has(path)).sort();
   if (unknown.length) fail(`Static output contains unlisted files: ${unknown.join(", ")}`);
 
-  for (const path of actual.filter((path) => SCANNED_EXTENSIONS.has(extname(path)))) {
-    const text = readFileSync(resolve(dist, path), "utf8");
+  for (const path of actual) {
+    const bytes = readFileSync(resolve(dist, path));
+    if (createHash("sha256").update(bytes).digest("hex") === canonicalFlightSha256) {
+      fail(`Canonical Flight mock bytes are forbidden in static output: ${path}`);
+    }
+    const text = activeProhibitionContent(path, inspectableStrings(bytes), releaseArtifactsByOutput);
     if (containsForbiddenRuntimeReference(text, allowedReleaseConfigPaths, allowedReleaseConfigReferences)) {
       fail(`Forbidden runtime reference in ${path}`);
     }

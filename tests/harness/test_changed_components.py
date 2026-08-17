@@ -117,6 +117,25 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertFalse(outputs["frontend"])
                 self.assertFalse(outputs["api"])
 
+    def test_static_repository_gate_authorities_route_web_validation(self) -> None:
+        paths = (
+            ".github/workflows/static-quality.yml",
+            ".github/workflows/offline-release-controlled.yml",
+            "contracts/repository-removal/v1/historical-allowlist.preapproval.json",
+            "contracts/supply-chain/v2/static-target-profile.json",
+            "contracts/supply-chain/v2/static-target-profile.schema.json",
+            "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+            "docs/methodology.md",
+            "docs/product/Mock/SeaRise-Flight.html",
+            "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
+        )
+
+        for path in paths:
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["web"])
+                self.assertTrue(outputs["heavy"])
+
     def test_frontend_test_change_does_not_rebuild_image(self) -> None:
         outputs = classify_paths(
             ["src/frontend/src/__tests__/components/ResultPanel.test.tsx"]
