@@ -18,9 +18,9 @@ const FORBIDDEN_STATIC_OUTPUT_PATHS = Object.freeze([
 const FORBIDDEN_RUNTIME_REFERENCES = Object.freeze([
   /candidate-v7/i,
   /local-data\/phase-1/i,
-  /["'`](?:(?:https?:)?\/\/[^/"'`]+)?\/(?:assess|geocode|config)(?:[/?#"'`]|$)/,
+  /["'`](?:(?:https?:)?\/\/[^/"'`]+)?\/(?:v1\/)?(?:assess|geocode|config)(?:[/?#"'`]|$)/,
 ]);
-const RELATIVE_RUNTIME_ENDPOINT = /(["'`])((?:\.\/)?(?:assess|geocode|config)(?:[/?#][^"'`]*)?)\1/gu;
+const RELATIVE_RUNTIME_ENDPOINT = /(["'`])((?:\.\/)?(?:v1\/)?(?:assess|geocode|config)(?:[/?#][^"'`]*)?)\1/gu;
 const RELEASE_CONFIG_REFERENCE = /\/releases\/[A-Za-z0-9._-]+\/config\/[A-Za-z0-9._-]+\.json(?:[?#][A-Za-z0-9._~!$&'()*+,;=:@%/?-]*)?/gu;
 
 function fail(message) { throw new Error(message); }

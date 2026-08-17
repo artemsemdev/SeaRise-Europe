@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added fail-closed static target, repository-readiness, final-repository, and
+  built-output gates for legacy runtime dependencies and both unversioned and
+  `/v1/` dynamic endpoints. Historical terminology exceptions now require an
+  exact committed path, Git blob, and rule instead of directory exemptions;
+  retained build/test tooling and build-plane containers remain explicitly
+  classified without authorizing repository deletion.
+
 - Added versioned repository-removal inventory, evidence-receipt, and owner-
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,

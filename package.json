@@ -19,6 +19,8 @@
     "web:serve:offline-lifecycle": "npm run serve:offline-lifecycle --workspace @searise/web",
     "web:e2e:offline-lifecycle": "npm run e2e:offline-lifecycle --workspace @searise/web",
     "web:e2e": "npm run e2e --workspace @searise/web",
+    "repository:readiness": "node src/web/scripts/static-repository-gates.mjs --repository-readiness",
+    "repository:final": "node src/web/scripts/static-repository-gates.mjs --repository-final",
     "web:check": "npm run web:lint && npm run web:type-check && npm run web:test && npm run web:build"
   }
 }

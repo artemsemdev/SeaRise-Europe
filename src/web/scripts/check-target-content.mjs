@@ -1,11 +1,20 @@
 import { createHash } from "node:crypto";
+import { Buffer } from "node:buffer";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const webRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const moduleUrl = new URL(import.meta.url);
+const webRoot = moduleUrl.protocol === "file:"
+  ? resolve(fileURLToPath(new URL("..", moduleUrl)))
+  : process.cwd();
 const repositoryRoot = resolve(webRoot, "../..");
 const historicalMethodologyMarker = "## Historical binary-method evidence (superseded)";
+const authoritativeAdr024Path = resolve(
+  repositoryRoot,
+  "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+);
+const authoritativeAdr024Rejection = "`ProjectionAvailable` replaces both legacy binary exposure outcomes. The\nhistorical `ModeledExposureDetected` and `NoModeledExposureDetected` states do\nnot appear in a release governed by this ADR.";
 const canonicalFlightMockPath = resolve(
   repositoryRoot,
   "docs/product/Mock/SeaRise-Flight.html",
@@ -13,6 +22,14 @@ const canonicalFlightMockPath = resolve(
 const canonicalFlightRequirementsPath = resolve(
   repositoryRoot,
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
+);
+const approvedHistoricalAllowlistPath = resolve(
+  repositoryRoot,
+  "contracts/repository-removal/v1/historical-allowlist.json",
+);
+const preapprovalHistoricalAllowlistPath = resolve(
+  repositoryRoot,
+  "contracts/repository-removal/v1/historical-allowlist.preapproval.json",
 );
 const canonicalFlightContractMarkers = Object.freeze([
   "ACTIVE CANONICAL VISUAL AND INTERACTION REFERENCE.",
@@ -40,11 +57,13 @@ const excludedSourceParts = [
   ".test.ts",
   ".test.tsx",
 ];
-const historicalPathAllowlist = [
-  `docs${sep}architecture${sep}adr${sep}`,
-  `docs${sep}evidence${sep}`,
-  `docs${sep}science${sep}`,
-];
+const historicalRules = Object.freeze({
+  "historical-adr-term": /^docs\/architecture\/adr\/[^/]+\.md$/u,
+  "historical-changelog-term": /^CHANGELOG\.md$/u,
+  "historical-five-state-evidence": /^docs\/(?:evidence|science)\/[^/]+(?:\/[^/]+)*\.md$/u,
+  "immutable-v1-supply-chain-evidence": /^contracts\/supply-chain\/v1\//u,
+  "canonical-design-reference": /^docs\/product\/Mock\/SeaRise-Flight\.html$/u,
+});
 
 export const prohibitedTargetClaims = Object.freeze([
   Object.freeze({ id: "legacy-outcome-modeled-exposure", pattern: /\bModeledExposureDetected\b/giu }),
@@ -88,6 +107,42 @@ function filesBelow(root, extensions) {
   return files;
 }
 
+function gitBlobSha(content) {
+  const bytes = Buffer.from(content);
+  return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
+}
+
+export function validateHistoricalAllowlist(document, readPath) {
+  if (!document || document.schemaVersion !== "1.0.0" || !Array.isArray(document.entries)) {
+    throw new Error("Historical terminology allowlist is not a v1 document");
+  }
+  const entries = new Map();
+  for (const entry of document.entries) {
+    const rule = historicalRules[entry?.rule];
+    if (!entry || typeof entry.path !== "string" || !rule || !rule.test(entry.path)
+        || entry.activeRuntimeAllowed !== false || entry.path.startsWith("src/web/")
+        || entry.path.startsWith("src/pipeline/searise_pipeline/")) {
+      throw new Error(`Historical terminology allowlist has an invalid entry: ${entry?.id ?? "unknown"}`);
+    }
+    if (entries.has(entry.path)) throw new Error(`Historical terminology allowlist repeats ${entry.path}`);
+    const content = readPath(entry.path);
+    if (gitBlobSha(content) !== entry.gitBlobSha) {
+      throw new Error(`Historical terminology allowlist blob mismatch: ${entry.path}`);
+    }
+    entries.set(entry.path, Object.freeze({ rule: entry.rule, gitBlobSha: entry.gitBlobSha }));
+  }
+  return entries;
+}
+
+export function loadHistoricalAllowlist() {
+  const path = existsSync(approvedHistoricalAllowlistPath)
+    ? approvedHistoricalAllowlistPath : preapprovalHistoricalAllowlistPath;
+  if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
+  const document = JSON.parse(readFileSync(path, "utf8"));
+  return validateHistoricalAllowlist(document, (repositoryPath) =>
+    readFileSync(resolve(repositoryRoot, repositoryPath), "utf8"));
+}
+
 function activeMethodology(content, path) {
   if (path !== resolve(repositoryRoot, "docs/methodology.md")) return content;
   const marker = content.indexOf(historicalMethodologyMarker);
@@ -95,6 +150,12 @@ function activeMethodology(content, path) {
     throw new Error("Methodology is missing its explicit historical-evidence boundary");
   }
   return content.slice(0, marker);
+}
+
+export function activeAuthoritativeDocument(content, path) {
+  if (path !== authoritativeAdr024Path) return activeMethodology(content, path);
+  return content.replace(authoritativeAdr024Rejection,
+    "`ProjectionAvailable` replaces both explicitly rejected legacy state identifiers, which do not appear in a release governed by this ADR.");
 }
 
 function verifyCanonicalFlightContract() {
@@ -151,8 +212,7 @@ function repositorySources() {
     (path) => !excludedSourceParts.some((part) => path.includes(part)),
   );
   const documents = filesBelow(resolve(repositoryRoot, "docs"), sourceExtensions).filter(
-    (path) => path !== canonicalFlightMockPath &&
-      !historicalPathAllowlist.some((part) => path.includes(part)),
+    (path) => path !== canonicalFlightMockPath,
   );
   return [...production, resolve(webRoot, "index.html"), ...documents];
 }
@@ -199,15 +259,18 @@ function main() {
   const files = builtRoot
     ? filesBelow(resolve(webRoot, builtRoot), builtExtensions)
     : repositorySources();
+  const allowedHistoricalPaths = builtRoot ? new Map() : loadHistoricalAllowlist();
   const violations = [];
   for (const path of files) {
-    const content = activeMethodology(readFileSync(path, "utf8"), path);
+    const content = activeAuthoritativeDocument(readFileSync(path, "utf8"), path);
     const contentViolations = [...scanContent(content)];
     const isProductCopy = builtRoot
       || path === resolve(webRoot, "index.html")
       || path.startsWith(`${resolve(webRoot, "src")}${sep}`);
     if (isProductCopy) contentViolations.push(...scanProductCopy(content));
     for (const violation of contentViolations) {
+      const repositoryPath = relative(repositoryRoot, path).replaceAll("\\", "/");
+      if (allowedHistoricalPaths.has(repositoryPath)) continue;
       violations.push(`${relative(repositoryRoot, path)}:${violation.line}: ${violation.claim} (${violation.text})`);
     }
   }
@@ -218,4 +281,5 @@ function main() {
   console.log(`Target content contract passed for ${files.length} files (${scope}).`);
 }
 
-main();
+if (moduleUrl.protocol === "file:" && process.argv[1]
+    && resolve(process.argv[1]) === fileURLToPath(moduleUrl)) main();

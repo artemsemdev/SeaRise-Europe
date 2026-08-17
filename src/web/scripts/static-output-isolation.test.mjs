@@ -77,6 +77,15 @@ describe("static output isolation", () => {
     },
   );
 
+  it("rejects the canonical Flight mock from built output", () => {
+    const { dist, options, paths } = fixture();
+    const injected = resolve(dist, "docs/product/Mock/SeaRise-Flight.html");
+    mkdirSync(resolve(injected, ".."), { recursive: true });
+    writeFileSync(injected, "synthetic design-reference mutation only");
+    expect(() => validateStaticOutputIsolation({ ...options, paths: [...paths, injected] }))
+      .toThrow(/Static output contains unlisted files: docs\/product\/Mock\/SeaRise-Flight\.html/);
+  });
+
   it.each([
     "candidate-v7.tar",
     "analysis/Candidate_v7.bin",
@@ -94,7 +103,16 @@ describe("static output isolation", () => {
       .toThrow(/names a private Candidate or archive output/);
   });
 
-  it.each(["/assess", "/geocode", "/config", "https://runtime.invalid/config"])("rejects an allowlisted built asset requesting %s", (endpoint) => {
+  it.each([
+    "/assess",
+    "/geocode",
+    "/config",
+    "/v1/assess",
+    "/v1/geocode",
+    "/v1/config",
+    "https://runtime.invalid/config",
+    "https://runtime.invalid/v1/assess?lat=1",
+  ])("rejects an allowlisted built asset requesting %s", (endpoint) => {
     const { dist, options, paths } = fixture();
     writeFileSync(resolve(dist, "assets/main-01234567.js"), `fetch(${JSON.stringify(endpoint)});\n//# sourceMappingURL=main-01234567.js.map\n`);
     expect(() => validateStaticOutputIsolation({ ...options, paths })).toThrow(/Forbidden runtime reference/);
