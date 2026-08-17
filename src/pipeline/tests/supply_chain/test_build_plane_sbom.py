@@ -17,11 +17,15 @@ from searise_pipeline.supply_chain.build_plane_sbom import (
     validate_build_plane_sbom,
 )
 from searise_pipeline.supply_chain.contracts import SupplyChainContractError
+from searise_pipeline.supply_chain.historical_inventory import (
+    materialize_historical_dependency_authority,
+)
 from searise_pipeline.supply_chain.sbom import canonical_sbom_bytes
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 INVENTORY = REPOSITORY_ROOT / "contracts/supply-chain/v1/dependency-inventory.json"
 ARTIFACT = REPOSITORY_ROOT / "contracts/supply-chain/v1/sboms/build-plane.cdx.json"
+PROFILE = REPOSITORY_ROOT / "contracts/supply-chain/v2/static-target-profile.json"
 INVENTORY_LOGICAL = Path("contracts/supply-chain/v1/dependency-inventory.json")
 PROPERTY_PREFIX = "org.searise.sbom.build-plane."
 EXPECTED_FILE_COMPONENTS = {
@@ -120,12 +124,24 @@ def _mutate(tmp_path: Path, label: str, path: str, old: bytes, new: bytes) -> tu
     return repository, inventory
 
 
-def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs() -> None:
+@pytest.fixture(scope="module")
+def historical_authority() -> Any:
+    with materialize_historical_dependency_authority(
+        PROFILE,
+        repository_root=REPOSITORY_ROOT,
+    ) as authority:
+        yield authority
+
+
+def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs(
+    historical_authority: tuple[Path, Path],
+) -> None:
+    historical_root, historical_inventory = historical_authority
     raw = ARTIFACT.read_bytes()
     document = validate_build_plane_sbom(
         ARTIFACT,
-        INVENTORY,
-        repository_root=REPOSITORY_ROOT,
+        historical_inventory,
+        repository_root=historical_root,
     )
     recorded = {
         item["path"]: (component["id"], item)
@@ -164,7 +180,7 @@ def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs() -> None
         assert bindings
         assert all(
             item["sha256"]
-            == hashlib.sha256((REPOSITORY_ROOT / item["path"]).read_bytes()).hexdigest()
+            == hashlib.sha256((historical_root / item["path"]).read_bytes()).hexdigest()
             for item in bindings
         )
         assert properties["digest"]
@@ -175,8 +191,14 @@ def test_checked_in_artifact_exactly_binds_reviewed_build_plane_inputs() -> None
             assert properties["action.comment-version-authoritative"] == "false"
 
 
-def test_dependency_graph_is_exact_and_closed() -> None:
-    document = generate_build_plane_sbom(INVENTORY, repository_root=REPOSITORY_ROOT)
+def test_dependency_graph_is_exact_and_closed(
+    historical_authority: tuple[Path, Path],
+) -> None:
+    historical_root, historical_inventory = historical_authority
+    document = generate_build_plane_sbom(
+        historical_inventory,
+        repository_root=historical_root,
+    )
     root_ref = document["metadata"]["component"]["bom-ref"]
     by_ref = {component["bom-ref"]: component for component in document["components"]}
     edges = {item["ref"]: set(item["dependsOn"]) for item in document["dependencies"]}
@@ -223,10 +245,13 @@ def test_dependency_graph_is_exact_and_closed() -> None:
     assert actual == expected
 
 
-def test_root_records_opentofu_absence_and_explicit_nonclaims() -> None:
+def test_root_records_opentofu_absence_and_explicit_nonclaims(
+    historical_authority: tuple[Path, Path],
+) -> None:
+    historical_root, historical_inventory = historical_authority
     document = generate_build_plane_sbom(
-        INVENTORY,
-        repository_root=REPOSITORY_ROOT,
+        historical_inventory,
+        repository_root=historical_root,
     )
     root = document["metadata"]["component"]
     properties = _properties(root)
@@ -247,9 +272,12 @@ def test_root_records_opentofu_absence_and_explicit_nonclaims() -> None:
         assert properties[nonclaim] == "false"
 
 
-def test_generation_is_byte_stable() -> None:
-    first = generate_build_plane_sbom(INVENTORY, repository_root=REPOSITORY_ROOT)
-    second = generate_build_plane_sbom(INVENTORY, repository_root=REPOSITORY_ROOT)
+def test_generation_is_byte_stable(
+    historical_authority: tuple[Path, Path],
+) -> None:
+    historical_root, historical_inventory = historical_authority
+    first = generate_build_plane_sbom(historical_inventory, repository_root=historical_root)
+    second = generate_build_plane_sbom(historical_inventory, repository_root=historical_root)
 
     assert canonical_sbom_bytes(first) == canonical_sbom_bytes(second)
     assert first["serialNumber"] == second["serialNumber"]

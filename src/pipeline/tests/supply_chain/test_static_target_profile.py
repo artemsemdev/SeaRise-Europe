@@ -17,6 +17,7 @@ from searise_pipeline.supply_chain import (
     SupplyChainContractError,
     discover_dependency_inputs,
     generate_npm_sbom,
+    validate_historical_dependency_inventory,
     validate_static_target_profile,
 )
 
@@ -49,6 +50,10 @@ def _copy_active_authority(destination: Path) -> None:
             target = destination / item["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / item["path"], target)
+    historical_inventory = _load()["historicalEvidence"]["dependencyInventory"]["path"]
+    inventory_target = destination / historical_inventory
+    inventory_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(ROOT / historical_inventory, inventory_target)
     for selector in _load()["activation"]["pendingSelectors"]:
         if selector["selector"] != "path-exists":
             continue
@@ -211,6 +216,14 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     assert document["historicalEvidence"] == {
         "path": "contracts/supply-chain/v1",
         "status": "immutable-phase-1-history",
+        "dependencyInventory": {
+            "path": "contracts/supply-chain/v1/dependency-inventory.json",
+            "sha256": "250a9579372492e58649714f102be2b5673471c04d86b628c23b412ed6d7b70a",
+        },
+        "gitAuthority": {
+            "commit": "1637057f758599b1edcd35ffba0d31ec65cf8c24",
+            "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32",
+        },
     }
     assert {"package.json", "package-lock.json", "src/web/package.json"} <= paths
     assert "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json" in paths
@@ -226,6 +239,22 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
         or Path(path).name.startswith(("compose.", "docker-compose."))
         for path in paths
     )
+
+
+def test_historical_v1_inventory_validates_against_its_git_tree() -> None:
+    document = validate_historical_dependency_inventory(PROFILE, repository_root=ROOT)
+    inputs = [item for component in document["components"] for item in component["inputs"]]
+
+    assert len(inputs) == 49
+    assert document["inventoryKind"] == "dependency-defining-inputs"
+
+
+def test_profile_rejects_repointed_historical_git_authority(tmp_path: Path) -> None:
+    document = copy.deepcopy(_load())
+    document["historicalEvidence"]["gitAuthority"]["commit"] = "f" * 40
+
+    with pytest.raises(SupplyChainContractError, match="historical Phase 1 authority drifted"):
+        validate_static_target_profile(_write(tmp_path / "profile.json", document))
 
 
 def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> None:
@@ -265,6 +294,24 @@ def test_profile_rejects_missing_required_static_input(tmp_path: Path) -> None:
 
     with pytest.raises(SupplyChainContractError, match="input set drifted"):
         validate_static_target_profile(_write(tmp_path / "profile.json", document))
+
+
+def test_profile_rejects_unclassified_static_quality_npm_authority(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    _copy_active_authority(repository)
+    quality = repository / "tools/static-quality"
+    quality.mkdir(parents=True)
+    (quality / "package.json").write_text(
+        '{"name":"@searise/static-quality","private":true}\n',
+        encoding="utf-8",
+    )
+    (quality / "package-lock.json").write_text(
+        '{"name":"@searise/static-quality","lockfileVersion":3,"packages":{}}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SupplyChainContractError, match="unclassified=.*static-quality"):
+        validate_static_target_profile(PROFILE, repository_root=repository)
 
 
 def test_profile_rejects_changed_authority_bytes(tmp_path: Path) -> None:

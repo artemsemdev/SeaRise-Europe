@@ -32,7 +32,15 @@
   },
   "historicalEvidence": {
     "path": "contracts/supply-chain/v1",
-    "status": "immutable-phase-1-history"
+    "status": "immutable-phase-1-history",
+    "dependencyInventory": {
+      "path": "contracts/supply-chain/v1/dependency-inventory.json",
+      "sha256": "250a9579372492e58649714f102be2b5673471c04d86b628c23b412ed6d7b70a"
+    },
+    "gitAuthority": {
+      "commit": "1637057f758599b1edcd35ffba0d31ec65cf8c24",
+      "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32"
+    }
   },
   "excludedLegacyRequirements": [
     "api-nuget",
@@ -142,7 +150,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "7e401ce5fbd6229b3bf7f1d80f972f64f719bbe066b2886e331aa8733216d43e" }
+        { "path": "contracts/supply-chain/v2/static-target-profile.schema.json", "role": "schema", "sha256": "9b9c0788b1aca4e7c973d54c85093d75781332b1e1a6b72ccf3107962933b178" }
       ]
     },
     {

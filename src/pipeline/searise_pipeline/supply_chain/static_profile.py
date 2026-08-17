@@ -17,6 +17,18 @@ from .sbom import validate_npm_sbom
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 _SCHEMA_PATH = "contracts/supply-chain/v2/static-target-profile.schema.json"
+_HISTORICAL_EVIDENCE = {
+    "path": "contracts/supply-chain/v1",
+    "status": "immutable-phase-1-history",
+    "dependencyInventory": {
+        "path": "contracts/supply-chain/v1/dependency-inventory.json",
+        "sha256": "250a9579372492e58649714f102be2b5673471c04d86b628c23b412ed6d7b70a",
+    },
+    "gitAuthority": {
+        "commit": "1637057f758599b1edcd35ffba0d31ec65cf8c24",
+        "tree": "d517d57cc80a097a54da641d638b8dfc2abd6b32",
+    },
+}
 
 _BASE_COMPONENTS = {
     "active-sboms": ("cyclonedx", "candidate", "locked"),
@@ -256,6 +268,20 @@ _EXPECTED_CONTRIBUTOR_PACKAGES = frozenset(
     }
 )
 _LEGACY_PYTHON_PACKAGES = frozenset({"azure-storage-blob", "psycopg2-binary"})
+_DISCOVERY_IGNORED_PARTS = frozenset(
+    {
+        ".git",
+        ".next",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "build",
+        "coverage",
+        "dist",
+        "node_modules",
+    }
+)
+_NODE_AUTHORITY_FILES = frozenset({"package.json", "package-lock.json"})
 _REQUIREMENT_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_.-]*)")
 _PYTHON_SBOMS = {
     "contracts/supply-chain/v1/sboms/python-release-linux-x86-64-cp311.cdx.json": (
@@ -509,6 +535,26 @@ def _path_lexists(path: Path) -> bool:
     return True
 
 
+def _discover_current_authority(repository_root: Path) -> set[str]:
+    discovered: set[str] = set()
+    for candidate in repository_root.rglob("*"):
+        relative = candidate.relative_to(repository_root)
+        if any(part in _DISCOVERY_IGNORED_PARTS for part in relative.parts):
+            continue
+        logical = PurePosixPath(relative.as_posix())
+        value = logical.as_posix()
+        if value in _FORBIDDEN_FILES or value.startswith(_FORBIDDEN_PREFIXES):
+            continue
+        node_authority = logical.name in _NODE_AUTHORITY_FILES
+        workflow = (
+            logical.parts[:2] == (".github", "workflows")
+            and logical.suffix in {".yaml", ".yml"}
+        )
+        if (node_authority or workflow) and _path_lexists(candidate):
+            discovered.add(value)
+    return discovered
+
+
 def _workflow_selector_present(value: str, selector: str) -> bool:
     kind, separator, expression = selector.partition(":")
     if not separator or kind not in {"token", "tokens"}:
@@ -581,6 +627,12 @@ def validate_static_target_profile(
 
     if document["excludedLegacyRequirements"] != _EXPECTED_EXCLUSIONS:
         raise SupplyChainContractError("static supply-chain legacy exclusions drifted")
+    if document["historicalEvidence"] != _HISTORICAL_EVIDENCE:
+        raise SupplyChainContractError("historical Phase 1 authority drifted")
+    inventory = _HISTORICAL_EVIDENCE["dependencyInventory"]
+    inventory_path = _safe_regular_file(repository_root, inventory["path"])
+    if hashlib.sha256(inventory_path.read_bytes()).hexdigest() != inventory["sha256"]:
+        raise SupplyChainContractError("historical Phase 1 inventory bytes changed")
     pending_selectors, blocking_issues, python_pending = _expected_transition(repository_root)
     expected_status = "pending-legacy-removal" if pending_selectors else "active"
     activation = document["activation"]
@@ -599,6 +651,20 @@ def validate_static_target_profile(
         expected_inputs.update(_PENDING_INPUT_AUTHORITY)
     else:
         expected_inputs.update(_ACTIVE_CONTRIBUTOR_INPUT_AUTHORITY)
+    discovered_current = _discover_current_authority(repository_root)
+    classified_current = {
+        path
+        for path in expected_inputs
+        if PurePosixPath(path).name in _NODE_AUTHORITY_FILES
+        or PurePosixPath(path).parts[:2] == (".github", "workflows")
+    }
+    if discovered_current != classified_current:
+        missing = sorted(discovered_current - classified_current)
+        extra = sorted(classified_current - discovered_current)
+        raise SupplyChainContractError(
+            f"static current-tree authority discovery drifted; unclassified={missing}, "
+            f"missing={extra}"
+        )
     components = document["components"]
     component_ids = [component["id"] for component in components]
     if component_ids != sorted(component_ids) or len(component_ids) != len(set(component_ids)):

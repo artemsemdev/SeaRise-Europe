@@ -69,10 +69,28 @@
     "historicalEvidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "status"],
+      "required": ["path", "status", "dependencyInventory", "gitAuthority"],
       "properties": {
         "path": { "const": "contracts/supply-chain/v1" },
-        "status": { "const": "immutable-phase-1-history" }
+        "status": { "const": "immutable-phase-1-history" },
+        "dependencyInventory": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": { "const": "contracts/supply-chain/v1/dependency-inventory.json" },
+            "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        },
+        "gitAuthority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit", "tree"],
+          "properties": {
+            "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
+        }
       }
     },
     "excludedLegacyRequirements": {

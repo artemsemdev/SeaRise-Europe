@@ -22,6 +22,7 @@ from searise_pipeline.supply_chain import (
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    validate_historical_dependency_inventory,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -224,17 +225,16 @@ def test_expired_dependency_exception_fails_closed() -> None:
 
 
 def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
-    document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
-    discovered = discover_dependency_inputs()
+    profile = REPOSITORY_ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    document = validate_historical_dependency_inventory(profile, repository_root=REPOSITORY_ROOT)
     recorded = tuple(
         item["path"] for component in document["components"] for item in component["inputs"]
     )
     opentofu = _dependency_component(document, "deployment-opentofu")
 
-    assert len(discovered) == 49
-    assert discovered == tuple(sorted(set(discovered)))
-    assert set(recorded) == set(discovered)
-    assert {"package.json", "package-lock.json", "src/web/package.json"} <= set(discovered)
+    assert len(recorded) == 49
+    assert len(set(recorded)) == 49
+    assert {"package.json", "package-lock.json", "src/web/package.json"} <= set(recorded)
     assert document["inventoryKind"] == "dependency-defining-inputs"
     assert document["productionClaim"] is False
     assert (opentofu["releaseUse"], opentofu["coverage"], opentofu["inputs"]) == (
@@ -296,8 +296,8 @@ def test_dependency_inventory_rejects_incomplete_npm_registry_identity(
 
 
 def test_dependency_discovery_binds_real_python_graphs_but_not_synthetic_fixtures() -> None:
-    discovered = set(discover_dependency_inputs())
-    document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
+    profile = REPOSITORY_ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    document = validate_historical_dependency_inventory(profile, repository_root=REPOSITORY_ROOT)
     recorded = {
         item["path"]: item["sha256"]
         for component in document["components"]
@@ -312,9 +312,9 @@ def test_dependency_discovery_binds_real_python_graphs_but_not_synthetic_fixture
         ),
     }
 
-    assert expected.keys() <= discovered
+    assert expected.keys() <= recorded.keys()
     assert {path: recorded[path] for path in expected} == expected
-    assert "contracts/supply-chain/v1/fixtures/python-graph/valid.json" not in discovered
+    assert "contracts/supply-chain/v1/fixtures/python-graph/valid.json" not in recorded
 
 
 def test_dependency_inventory_rejects_changed_or_missing_real_python_graph(

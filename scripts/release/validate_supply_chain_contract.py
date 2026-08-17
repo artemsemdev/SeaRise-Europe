@@ -24,6 +24,7 @@ from searise_pipeline.supply_chain import (
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    validate_historical_dependency_inventory,
     validate_npm_sbom,
     validate_nuget_sbom,
     validate_python_sbom,
@@ -111,6 +112,9 @@ def _parser() -> argparse.ArgumentParser:
     inventory = commands.add_parser("inventory")
     inventory.add_argument("--document", type=Path, required=True)
     inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
+    historical_inventory = commands.add_parser("historical-inventory")
+    historical_inventory.add_argument("--profile", type=Path, required=True)
+    historical_inventory.add_argument("--repository-root", type=Path, default=Path.cwd())
     static_profile = commands.add_parser("static-profile")
     static_profile.add_argument("--document", type=Path, required=True)
     static_profile.add_argument("--repository-root", type=Path, default=Path.cwd())
@@ -284,6 +288,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             input_count = sum(len(component["inputs"]) for component in document["components"])  # fmt: skip
             print(f"validated {input_count} dependency-defining inputs")
+        elif args.command == "historical-inventory":
+            document = validate_historical_dependency_inventory(
+                args.profile,
+                repository_root=args.repository_root.resolve(),
+            )
+            input_count = sum(len(component["inputs"]) for component in document["components"])
+            print(f"validated {input_count} historical v1 dependency-defining inputs")
         elif args.command == "static-profile":
             document = validate_static_target_profile(
                 args.document,

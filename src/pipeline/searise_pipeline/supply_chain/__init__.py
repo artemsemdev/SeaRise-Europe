@@ -16,6 +16,10 @@ from .evidence_retention import (
     retain_release_evidence,
     validate_release_evidence_retention,
 )
+from .historical_inventory import (
+    materialize_historical_dependency_authority,
+    validate_historical_dependency_inventory,
+)
 from .nuget_sbom import generate_nuget_sbom, publish_nuget_sbom, validate_nuget_sbom
 from .protected_workflow_artifacts import (
     CandidateArtifactAuthority,
@@ -58,6 +62,7 @@ __all__ = [
     "generate_python_sbom",
     "load_json",
     "load_candidate_artifact_authority",
+    "materialize_historical_dependency_authority",
     "parse_timestamp",
     "publish_npm_sbom",
     "publish_nuget_sbom",
@@ -70,6 +75,7 @@ __all__ = [
     "validate_candidate_artifact_authority",
     "validate_cosign_tool_lock",
     "validate_evidence_files",
+    "validate_historical_dependency_inventory",
     "validate_npm_sbom",
     "validate_nuget_sbom",
     "validate_python_lock_graph",
