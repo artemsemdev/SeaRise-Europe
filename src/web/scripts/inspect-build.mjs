@@ -15,9 +15,10 @@ import {
   extractEmbeddedPrecachePayload,
   rangeIntegrityBootstrapPath,
 } from "./service-worker-precache.mjs";
+import { resolveStaticBuildRoot } from "./static-build-root.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const dist = resolve(root, "dist");
+const dist = resolveStaticBuildRoot({ webRoot: root });
 const buildIdentity = validateBuildIdentity(
   JSON.parse(readFileSync(resolve(dist, buildIdentityFile), "utf8")),
 );
