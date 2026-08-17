@@ -3,6 +3,12 @@
   "schemaVersion": "1.0.0",
   "updatedAt": "2026-08-17",
   "evidence": {
+    "local-2026-08-17-offline-lifecycle-journey": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T09:42:00+02:00",
+      "reference": "docs/evidence/phase-2/issue-60-offline-lifecycle.md, src/web/tests/offline-lifecycle.spec.ts, and src/web/playwright.offline-lifecycle.config.ts",
+      "environment": "macOS arm64; Node 20.20.1; Playwright 1.62.1; production static builds A/B/C over the committed synthetic fixture; required Chromium A-to-B-to-C natural activation, exact intent consumption, two-generation retention, sealed-shell cleanup, host-outage offline boot, and sanitized request evidence passed; WebKit 26.5 passed as optional local evidence; Firefox 153 natural waiting-worker activation is explicitly deferred and not claimed; no Candidate-v7, TAR, external storage, or legacy runtime"
+    },
     "local-2026-08-17-production-lifecycle-harness": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T05:45:30+02:00",
@@ -516,6 +522,20 @@
       "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
       "cost": { "estimatedSeconds": 2, "class": "fast", "evidenceRef": "local-2026-08-17-production-lifecycle-harness", "scope": "focused-suite" },
       "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "All filesystem bytes, build identities, seals, mutations, and symlink controls are deterministic; the HTTP cases require only an ephemeral loopback bind, which restricted local sandboxes may deny while pinned CI and normal hosts pass." }
+    },
+    {
+      "id": "static-offline-lifecycle-journey",
+      "layer": "e2e",
+      "owner": "platform",
+      "purpose": "Prove the required Chromium production-static A-to-B-to-C natural worker activation, exact close-and-reopen intent consumption and safe terminal rollover, active/previous retention, exact A cleanup including sealed shell caches, warmed offline assessment reload, technical-state separation, and sanitized forbidden-request evidence.",
+      "sourcePaths": ["src/web/tests/offline-lifecycle.spec.ts", "src/web/playwright.offline-lifecycle.config.ts", "src/web/scripts/offline-lifecycle-server.mjs", "src/web/src/offline/production-update-coordinator.ts", "src/web/src/offline/pair-lifecycle-store.ts", "docs/evidence/phase-2/issue-60-offline-lifecycle.md"],
+      "changedPaths": ["src/web/tests/offline-lifecycle.spec.ts", "src/web/playwright.offline-lifecycle.config.ts", "src/web/scripts/offline-lifecycle-*", "src/web/src/offline/production-update-coordinator.ts", "src/web/src/offline/pair-lifecycle-store.ts", ".github/workflows/ci.yml"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent Chromium natural update, exact terminal rollover, two-generation retention, sealed cache cleanup, offline reload, forbidden-request, and Candidate-isolation gate." },
+      "commands": { "focused": "npm run e2e:offline-lifecycle --workspace @searise/web", "full": "npm run web:check && npm run web:e2e:offline-lifecycle" },
+      "execution": { "tier": "release", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 45, "class": "medium", "evidenceRef": "local-2026-08-17-offline-lifecycle-journey", "scope": "chromium-production-journey" },
+      "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Committed synthetic bytes, exact deployment seals, authenticated host switching, same-origin script-free activation probes, bounded polling, and one worker make the Chromium journey deterministic; it requires the pinned Chromium binary and a loopback bind. Firefox compatibility is explicitly deferred." }
     },
     {
       "id": "static-range-cache-compatibility",
@@ -1529,6 +1549,7 @@
     { "path": "src/web/scripts/release-delivery-policy.test.mjs", "suite": "static-pmtiles-network-only", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/map-visualization.spec.ts", "suite": "static-map-visualization", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/client-lease-lifecycle.spec.ts", "suite": "static-web-shell", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/tests/offline-lifecycle.spec.ts", "suite": "static-offline-lifecycle-journey", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/projection-ux.spec.ts", "suite": "static-projection-browser-ux", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/tests/range-cache-compatibility.spec.ts", "suite": "static-range-cache-compatibility", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/scripts/local-candidate-binding.test.mjs", "suite": "static-private-candidate-binding", "status": "active", "removalGate": null, "replacementEvidence": null },

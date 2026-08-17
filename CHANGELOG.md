@@ -6,6 +6,16 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a production-like Chromium browser journey that rotates sealed
+  static deployments from A to B to C without forced activation, proves the
+  close-and-reopen update contract, retains only the active and immediately
+  previous generations, and reloads a warmed assessment offline. Terminal
+  update intents now roll forward only to a distinct verified candidate, and
+  exact-pair cleanup includes precache-addressed service-worker shell caches.
+  WebKit passed the same local journey as optional evidence; Firefox natural
+  waiting-worker activation remains explicitly deferred and is not a support
+  claim or required CI gate.
+
 - Added a fail-closed static-output inventory gate derived from the exact Vite,
   embedded shell-precache, and release manifests. Production builds now reject
   every unlisted file, including TAR/archive contamination, and scan emitted
