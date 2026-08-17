@@ -31,6 +31,7 @@
         "inventorySchemaSha256",
         "censusSha256",
         "censusSchemaSha256",
+        "checkOutputSchemaSha256",
         "evidenceReceiptSchemaSha256",
         "ownerDecisionSchemaSha256",
         "historicalAllowlistSchemaSha256",
@@ -43,6 +44,7 @@
         "inventorySchemaSha256": { "$ref": "#/$defs/sha256" },
         "censusSha256": { "$ref": "#/$defs/sha256" },
         "censusSchemaSha256": { "$ref": "#/$defs/sha256" },
+        "checkOutputSchemaSha256": { "$ref": "#/$defs/sha256" },
         "evidenceReceiptSchemaSha256": { "$ref": "#/$defs/sha256" },
         "ownerDecisionSchemaSha256": { "$ref": "#/$defs/sha256" },
         "historicalAllowlistSchemaSha256": { "$ref": "#/$defs/sha256" },
@@ -88,13 +90,37 @@
     "check": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "command", "result", "outputPath", "outputSha256", "evidencePaths"],
+      "required": [
+        "id",
+        "command",
+        "result",
+        "outputPath",
+        "outputSha256",
+        "coveredReplacementSuiteIds",
+        "coveredTargetOwnerPaths",
+        "evidencePaths"
+      ],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
         "command": { "type": "string", "minLength": 1, "maxLength": 1000 },
         "result": { "const": "passed" },
-        "outputPath": { "$ref": "#/$defs/evidencePath" },
+        "outputPath": {
+          "type": "string",
+          "pattern": "^tests/evidence/repository-removal/v1/[a-z0-9]+(?:-[a-z0-9]+)*\\.json$"
+        },
         "outputSha256": { "$ref": "#/$defs/sha256" },
+        "coveredReplacementSuiteIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+        },
+        "coveredTargetOwnerPaths": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/repositoryPath" }
+        },
         "evidencePaths": {
           "type": "array",
           "minItems": 1,

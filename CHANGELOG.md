@@ -62,6 +62,9 @@ All notable changes to this project will be documented in this file.
   decision schemas. The approval chain is bound to one audited commit and two
   SHA-256 digests, requires replacement evidence for every Phase 2 deletion,
   and cannot authorize Candidate-v7 publication or external-resource mutation.
+  Canonical #70/#71/#72 scope, issue-owned semantic test retirement, exact
+  replacement-suite/target-path check coverage, structured committed command
+  outputs, and live Issue #68 owner-comment verification now fail closed.
 
 - Added a production-like Chromium browser journey that rotates sealed
   static deployments from A to B to C without forced activation, proves the

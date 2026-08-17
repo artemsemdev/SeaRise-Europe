@@ -56,3 +56,27 @@ deletion item links active replacement suites and receipt check IDs, and every
 legacy suite owned by #70/#71/#72 is mapped exactly once for retirement. An
 approved chain passes only when the recorded Issue #68 comment is fetched from
 GitHub and its ID, URL, body, author login, and `OWNER` association all match.
+
+Check outputs are closed JSON documents committed only below
+`tests/evidence/repository-removal/v1/`. Each document is schema-validated and
+must exactly bind its audited commit, check ID, command, and passing result;
+the receipt binds its bytes by SHA-256. A tracked log or arbitrary repository
+file cannot substitute for this output. Receipt checks declare the exact
+replacement suites and target-owner paths they cover, and deletion items must
+match those declarations bidirectionally.
+
+## Integration gate
+
+PR #421's `approvedRemovalChain` gate must execute the validator with live
+comment verification enabled:
+
+```text
+python scripts/repository/validate_removal_approval.py --verify-owner-comment
+```
+
+The gate needs authenticated, read-only GitHub API access to the public Issue
+#68 comment. An offline invocation, or an invocation without that flag, is not
+an approved removal chain and must block integration. Apply this exact command
+and a failing-without-the-flag integration test when refreshing PR #421 after
+this contract commit; this focused branch does not edit the separate PR
+worktree.

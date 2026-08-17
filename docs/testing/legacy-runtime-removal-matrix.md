@@ -49,6 +49,14 @@ builder must use ADR-024 support/coastal semantics directly and must not import
 the superseded five-state model. Immutable historical evidence may name old
 paths but cannot execute inside the active target package.
 
+Issue #71 must be updated before owner approval to state the narrow exception
+explicitly: `src/pipeline/searise_pipeline/domain/**` is deleted because it is
+the superseded executable five-state model, while historical five-state
+evidence remains retained only in its allowlisted evidence locations. The
+scope-review decoupling change that removes active imports of that model must
+merge first. Until both the issue text and dependency order reflect those
+facts, the #71 census entry is inventory scope, not deletion authorization.
+
 ## Issue #72 — Compose and runtime containers
 
 | Retiring behavior | Permanent target evidence |

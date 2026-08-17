@@ -31,6 +31,7 @@ DEFAULT_DECISION_SCHEMA = CONTRACT_ROOT / "owner-decision.schema.json"
 DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA = CONTRACT_ROOT / "historical-allowlist.schema.json"
 DEFAULT_CENSUS = CONTRACT_ROOT / "census.json"
 DEFAULT_CENSUS_SCHEMA = CONTRACT_ROOT / "census.schema.json"
+DEFAULT_CHECK_OUTPUT_SCHEMA = CONTRACT_ROOT / "check-output.schema.json"
 DEFAULT_VALIDATOR = ROOT / "scripts/repository/validate_removal_approval.py"
 DEFAULT_TEST_INVENTORY = ROOT / "tests/test-inventory.json"
 DEFAULT_REPLACEMENT_MATRIX = ROOT / "docs/testing/legacy-runtime-removal-matrix.md"
@@ -423,6 +424,7 @@ def validate_removal_approval(
     historical_allowlist_schema_path: Path = DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA,
     census_path: Path = DEFAULT_CENSUS,
     census_schema_path: Path = DEFAULT_CENSUS_SCHEMA,
+    check_output_schema_path: Path = DEFAULT_CHECK_OUTPUT_SCHEMA,
     validator_path: Path = DEFAULT_VALIDATOR,
     test_inventory_path: Path = DEFAULT_TEST_INVENTORY,
     replacement_matrix_path: Path = DEFAULT_REPLACEMENT_MATRIX,
@@ -455,6 +457,9 @@ def validate_removal_approval(
     census_schema_bytes = _committed_blob(
         repository_root, census_schema_path, required=True
     )
+    check_output_schema_bytes = _committed_blob(
+        repository_root, check_output_schema_path, required=True
+    )
     test_inventory_bytes = _committed_blob(
         repository_root, test_inventory_path, required=True
     )
@@ -467,6 +472,7 @@ def validate_removal_approval(
     assert historical_allowlist_schema_bytes is not None
     assert census_bytes is not None
     assert census_schema_bytes is not None
+    assert check_output_schema_bytes is not None
     assert test_inventory_bytes is not None
 
     inventory = _load_document(inventory_bytes, "inventory")
@@ -482,6 +488,9 @@ def validate_removal_approval(
     )
     census = _load_document(census_bytes, "canonical census")
     census_schema = _load_document(census_schema_bytes, "canonical census schema")
+    check_output_schema = _load_document(
+        check_output_schema_bytes, "check output schema"
+    )
     test_inventory = _load_document(test_inventory_bytes, "test inventory")
     decision = (
         _load_document(decision_bytes, "owner decision")
@@ -515,6 +524,15 @@ def validate_removal_approval(
         }
         if isinstance(checks, list)
         else set()
+    )
+    receipt_checks_by_id = (
+        {
+            check["id"]: check
+            for check in checks
+            if isinstance(check, dict) and isinstance(check.get("id"), str)
+        }
+        if isinstance(checks, list)
+        else {}
     )
     suites = test_inventory.get("suites")
     baseline_tests = test_inventory.get("baselineTests")
@@ -552,6 +570,7 @@ def validate_removal_approval(
         delete_locator_keys: list[str] = []
         delete_locator_owners: dict[str, int] = {}
         mapped_replacement_suites: list[str] = []
+        mapped_replacement_checks: list[str] = []
         mapped_retirement_suites: list[str] = []
         target_owner_paths: list[str] = []
         historical_inventory: dict[str, tuple[str, str]] = {}
@@ -645,10 +664,42 @@ def validate_removal_approval(
                         )
                 replacement_checks = item.get("replacementCheckIds")
                 if isinstance(replacement_checks, list):
+                    mapped_replacement_checks.extend(replacement_checks)
                     missing = sorted(set(replacement_checks) - receipt_check_ids)
                     if missing:
                         errors.append(
                             f"{item_id}: replacementCheckIds not in evidence receipt: {missing}"
+                        )
+                    selected_checks = [
+                        receipt_checks_by_id[check_id]
+                        for check_id in replacement_checks
+                        if check_id in receipt_checks_by_id
+                    ]
+                    covered_suites = {
+                        suite_id
+                        for check in selected_checks
+                        for suite_id in check.get("coveredReplacementSuiteIds", [])
+                        if isinstance(suite_id, str)
+                    }
+                    covered_paths = {
+                        path
+                        for check in selected_checks
+                        for path in check.get("coveredTargetOwnerPaths", [])
+                        if isinstance(path, str)
+                    }
+                    if isinstance(replacement_suites, list) and covered_suites != set(
+                        replacement_suites
+                    ):
+                        errors.append(
+                            f"{item_id}: replacement checks do not exactly cover "
+                            "replacementSuiteIds"
+                        )
+                    if isinstance(item_target_paths, list) and covered_paths != set(
+                        item_target_paths
+                    ):
+                        errors.append(
+                            f"{item_id}: replacement checks do not exactly cover "
+                            "targetOwnerPaths"
                         )
                 retirement_suites = item.get("retirementSuiteIds")
                 if isinstance(retirement_suites, list):
@@ -657,6 +708,22 @@ def validate_removal_approval(
                     if missing:
                         errors.append(
                             f"{item_id}: retirementSuiteIds not in test inventory: {missing}"
+                        )
+                    owner = item.get("ownerIssue")
+                    wrong_owner = sorted(
+                        suite_id
+                        for suite_id in retirement_suites
+                        if not isinstance(
+                            suites_by_id.get(suite_id, {}).get("replacementGate"),
+                            dict,
+                        )
+                        or suites_by_id[suite_id]["replacementGate"].get("issue")
+                        != owner
+                    )
+                    if wrong_owner:
+                        errors.append(
+                            f"{item_id}: retirementSuiteIds must have replacementGate.issue "
+                            f"equal to ownerIssue: {wrong_owner}"
                         )
                     locator_test_suites = {
                         baseline_suite_by_path[path]
@@ -678,12 +745,12 @@ def validate_removal_approval(
                         and reference.get("kind") == "test-suite"
                         and isinstance(reference.get("reference"), str)
                     }
-                    if isinstance(replacement_suites, list) and not set(
+                    if isinstance(replacement_suites, list) and set(
                         replacement_suites
-                    ).issubset(suite_references):
+                    ) != suite_references:
                         errors.append(
-                            f"{item_id}: replacementEvidence must link every "
-                            "replacementSuiteId"
+                            f"{item_id}: replacementEvidence test-suite references must "
+                            "exactly match replacementSuiteIds"
                         )
 
         duplicate_locator_keys = _duplicates(global_locator_keys)
@@ -694,6 +761,12 @@ def validate_removal_approval(
             errors.append(
                 "delete locator keys assigned to multiple items: "
                 f"{duplicate_delete_keys}"
+            )
+        unused_receipt_checks = sorted(receipt_check_ids - set(mapped_replacement_checks))
+        if unused_receipt_checks:
+            errors.append(
+                "evidence receipt checks are not referenced by deletion items: "
+                f"{unused_receipt_checks}"
             )
 
         required_replacement_suites = (
@@ -895,6 +968,7 @@ def validate_removal_approval(
         "inventorySchemaSha256": inventory_schema_path,
         "censusSha256": census_path,
         "censusSchemaSha256": census_schema_path,
+        "checkOutputSchemaSha256": check_output_schema_path,
         "evidenceReceiptSchemaSha256": evidence_schema_path,
         "ownerDecisionSchemaSha256": decision_schema_path,
         "historicalAllowlistSchemaSha256": historical_allowlist_schema_path,
@@ -930,6 +1004,12 @@ def validate_removal_approval(
                 errors.append(f"{check_id}: evidence command is not read-only and local-safe")
             evidence_paths = check.get("evidencePaths")
             output_path = check.get("outputPath")
+            expected_output_path = f"tests/evidence/repository-removal/v1/{check_id}.json"
+            if output_path != expected_output_path:
+                errors.append(
+                    f"{check_id}: outputPath must be the canonical check namespace: "
+                    f"{expected_output_path}"
+                )
             if (
                 isinstance(output_path, str)
                 and isinstance(evidence_paths, list)
@@ -942,31 +1022,81 @@ def validate_removal_approval(
                 missing_evidence_paths = sorted(
                     path
                     for path in evidence_paths
-                    if isinstance(path, str) and path not in tracked
+                    if isinstance(path, str)
+                    and path != output_path
+                    and path not in tracked
                 )
                 if missing_evidence_paths:
                     errors.append(
                         f"{check_id}: evidencePaths not tracked at audited commit: "
                         f"{missing_evidence_paths}"
                     )
-            if (
-                tracked is not None
-                and isinstance(audited_commit, str)
-                and isinstance(output_path, str)
-                and output_path in tracked
-            ):
+            covered_suites = check.get("coveredReplacementSuiteIds")
+            if isinstance(covered_suites, list):
+                missing_suites = sorted(set(covered_suites) - set(suites_by_id))
+                if missing_suites:
+                    errors.append(
+                        f"{check_id}: coveredReplacementSuiteIds not in test inventory: "
+                        f"{missing_suites}"
+                    )
+                non_active_suites = sorted(
+                    suite_id
+                    for suite_id in covered_suites
+                    if suites_by_id.get(suite_id, {}).get("status") != "active"
+                )
+                if non_active_suites:
+                    errors.append(
+                        f"{check_id}: covered replacement suites must be active: "
+                        f"{non_active_suites}"
+                    )
+            covered_paths = check.get("coveredTargetOwnerPaths")
+            if isinstance(covered_paths, list) and isinstance(evidence_paths, list):
+                missing_path_evidence = sorted(set(covered_paths) - set(evidence_paths))
+                if missing_path_evidence:
+                    errors.append(
+                        f"{check_id}: coveredTargetOwnerPaths must be evidencePaths: "
+                        f"{missing_path_evidence}"
+                    )
+            if isinstance(output_path, str):
                 try:
-                    output_bytes = _audited_blob(
-                        repository_root, audited_commit, output_path
+                    output_bytes = _committed_blob(
+                        repository_root, Path(output_path), required=True
                     )
                 except RemovalApprovalError as exc:
                     errors.append(str(exc))
                 else:
+                    assert output_bytes is not None
                     if check.get("outputSha256") != _sha256(output_bytes):
                         errors.append(
                             f"{check_id}: outputSha256 does not match retained "
                             f"command output: {output_path}"
                         )
+                    try:
+                        output_document = _load_document(
+                            output_bytes, f"{check_id} check output"
+                        )
+                    except RemovalApprovalError as exc:
+                        errors.append(str(exc))
+                    else:
+                        errors.extend(
+                            _schema_errors(
+                                output_document,
+                                check_output_schema,
+                                f"{check_id} check output",
+                            )
+                        )
+                        expected_output = {
+                            "schemaVersion": "1.0.0",
+                            "auditedCommit": audited_commit,
+                            "checkId": check_id,
+                            "command": command,
+                            "result": check.get("result"),
+                        }
+                        if output_document != expected_output:
+                            errors.append(
+                                f"{check_id}: committed check output does not exactly "
+                                "bind auditedCommit/checkId/command/result"
+                            )
 
     if decision is None:
         if not allow_unapproved:
@@ -1079,6 +1209,9 @@ def main() -> int:
     )
     parser.add_argument("--census", type=Path, default=DEFAULT_CENSUS)
     parser.add_argument("--census-schema", type=Path, default=DEFAULT_CENSUS_SCHEMA)
+    parser.add_argument(
+        "--check-output-schema", type=Path, default=DEFAULT_CHECK_OUTPUT_SCHEMA
+    )
     parser.add_argument("--validator", type=Path, default=DEFAULT_VALIDATOR)
     parser.add_argument("--test-inventory", type=Path, default=DEFAULT_TEST_INVENTORY)
     parser.add_argument(
@@ -1109,6 +1242,7 @@ def main() -> int:
             historical_allowlist_schema_path=args.historical_allowlist_schema,
             census_path=args.census,
             census_schema_path=args.census_schema,
+            check_output_schema_path=args.check_output_schema,
             validator_path=args.validator,
             test_inventory_path=args.test_inventory,
             replacement_matrix_path=args.replacement_matrix,

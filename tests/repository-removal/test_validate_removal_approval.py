@@ -13,6 +13,7 @@ from typing import Any
 from scripts.repository.validate_removal_approval import (
     DEFAULT_CENSUS,
     DEFAULT_CENSUS_SCHEMA,
+    DEFAULT_CHECK_OUTPUT_SCHEMA,
     DEFAULT_DECISION_SCHEMA,
     DEFAULT_EVIDENCE_SCHEMA,
     DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA,
@@ -34,6 +35,9 @@ HISTORICAL_ALLOWLIST_PATH = Path(
 INVENTORY_SCHEMA_PATH = Path("contracts/repository-removal/v1/inventory.schema.json")
 CENSUS_PATH = Path("contracts/repository-removal/v1/census.json")
 CENSUS_SCHEMA_PATH = Path("contracts/repository-removal/v1/census.schema.json")
+CHECK_OUTPUT_SCHEMA_PATH = Path(
+    "contracts/repository-removal/v1/check-output.schema.json"
+)
 EVIDENCE_SCHEMA_PATH = Path(
     "contracts/repository-removal/v1/evidence-receipt.schema.json"
 )
@@ -67,12 +71,12 @@ class ApprovalRepository:
         self._write(Path("legacy/runtime.txt"), b"legacy\n")
         self._write(Path("historical/evidence.md"), b"historical evidence\n")
         self._write(Path("target/runtime.test.ts"), b"target\n")
-        self._write(Path("evidence/static-target.txt"), b"4 passed\n")
         self._write(Path(".github/workflows/ci.yml"), b"jobs:\n  frontend:\n    runs-on: ubuntu-latest\n")
         self._write(Path("scripts/ci/routes.py"), b"FRONTEND = ('src/frontend/**',)\n")
         for destination, source in (
             (INVENTORY_SCHEMA_PATH, DEFAULT_INVENTORY_SCHEMA),
             (CENSUS_SCHEMA_PATH, DEFAULT_CENSUS_SCHEMA),
+            (CHECK_OUTPUT_SCHEMA_PATH, DEFAULT_CHECK_OUTPUT_SCHEMA),
             (EVIDENCE_SCHEMA_PATH, DEFAULT_EVIDENCE_SCHEMA),
             (DECISION_SCHEMA_PATH, DEFAULT_DECISION_SCHEMA),
             (HISTORICAL_ALLOWLIST_SCHEMA_PATH, DEFAULT_HISTORICAL_ALLOWLIST_SCHEMA),
@@ -256,6 +260,8 @@ class ApprovalRepository:
         inventory: dict[str, Any] | None = None,
         include_decision: bool = True,
         evidence_mutation: dict[str, Any] | None = None,
+        check_mutation: dict[str, Any] | None = None,
+        check_output_mutation: dict[str, Any] | None = None,
         contract_hash_mutation: dict[str, str] | None = None,
         decision_mutation: dict[str, Any] | None = None,
         historical_entries: list[dict[str, Any]] | None = None,
@@ -295,6 +301,9 @@ class ApprovalRepository:
             "censusSchemaSha256": self._git(
                 "show", f"HEAD:{CENSUS_SCHEMA_PATH}"
             ),
+            "checkOutputSchemaSha256": self._git(
+                "show", f"HEAD:{CHECK_OUTPUT_SCHEMA_PATH}"
+            ),
             "evidenceReceiptSchemaSha256": self._git(
                 "show", f"HEAD:{EVIDENCE_SCHEMA_PATH}"
             ),
@@ -311,6 +320,34 @@ class ApprovalRepository:
                 "show", f"HEAD:{REPLACEMENT_MATRIX_PATH}"
             ),
         }
+        check_output: dict[str, Any] = {
+            "schemaVersion": "1.0.0",
+            "auditedCommit": self.audited_commit,
+            "checkId": "static-target",
+            "command": "npm run web:check",
+            "result": "passed",
+        }
+        if check_output_mutation:
+            check_output.update(check_output_mutation)
+        check_output_bytes = _json_bytes(check_output)
+        output_path = Path(
+            "tests/evidence/repository-removal/v1/static-target.json"
+        )
+        check: dict[str, Any] = {
+            "id": "static-target",
+            "command": "npm run web:check",
+            "result": "passed",
+            "outputPath": str(output_path),
+            "outputSha256": _sha256(check_output_bytes),
+            "coveredReplacementSuiteIds": ["target-suite"],
+            "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+            "evidencePaths": [
+                "target/runtime.test.ts",
+                str(output_path),
+            ],
+        }
+        if check_mutation:
+            check.update(check_mutation)
         evidence: dict[str, Any] = {
             "schemaVersion": "1.0.0",
             "receiptId": "repository-removal-evidence-v1-test",
@@ -334,19 +371,7 @@ class ApprovalRepository:
                 "uploaded": False,
             },
             "externalResourceMutation": False,
-            "checks": [
-                {
-                    "id": "static-target",
-                    "command": "npm run web:check",
-                    "result": "passed",
-                    "outputPath": "evidence/static-target.txt",
-                    "outputSha256": _sha256(b"4 passed\n"),
-                    "evidencePaths": [
-                        "evidence/static-target.txt",
-                        "target/runtime.test.ts",
-                    ],
-                }
-            ],
+            "checks": [check],
         }
         if contract_hash_mutation:
             evidence["contractHashes"].update(contract_hash_mutation)
@@ -357,10 +382,12 @@ class ApprovalRepository:
         self._write(INVENTORY_PATH, inventory_bytes)
         self._write(EVIDENCE_PATH, evidence_bytes)
         self._write(HISTORICAL_ALLOWLIST_PATH, historical_allowlist_bytes)
+        self._write(output_path, check_output_bytes)
         paths = [
             str(INVENTORY_PATH),
             str(EVIDENCE_PATH),
             str(HISTORICAL_ALLOWLIST_PATH),
+            str(output_path),
         ]
         if include_decision:
             decision: dict[str, Any] = {
@@ -471,6 +498,7 @@ class RemovalApprovalTests(unittest.TestCase):
             historical_allowlist_schema_path=HISTORICAL_ALLOWLIST_SCHEMA_PATH,
             census_path=CENSUS_PATH,
             census_schema_path=CENSUS_SCHEMA_PATH,
+            check_output_schema_path=CHECK_OUTPUT_SCHEMA_PATH,
             validator_path=VALIDATOR_PATH,
             test_inventory_path=TEST_INVENTORY_PATH,
             replacement_matrix_path=REPLACEMENT_MATRIX_PATH,
@@ -569,9 +597,14 @@ class RemovalApprovalTests(unittest.TestCase):
                 "id": "static-target",
                 "command": "npm run web:test",
                 "result": "passed",
-                "outputPath": "evidence/static-target.txt",
+                "outputPath": "tests/evidence/repository-removal/v1/static-target.json",
                 "outputSha256": "2" * 64,
-                "evidencePaths": ["evidence/static-target.txt"],
+                "coveredReplacementSuiteIds": ["target-suite"],
+                "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+                "evidencePaths": [
+                    "target/runtime.test.ts",
+                    "tests/evidence/repository-removal/v1/static-target.json",
+                ],
             }
             repository.commit_chain(
                 evidence_mutation={
@@ -642,9 +675,17 @@ class RemovalApprovalTests(unittest.TestCase):
                             "id": "unsafe-check",
                             "command": "gh secret delete TOKEN",
                             "result": "passed",
-                            "outputPath": "evidence/not-committed.txt",
+                            "outputPath": (
+                                "tests/evidence/repository-removal/v1/unsafe-check.json"
+                            ),
                             "outputSha256": "2" * 64,
-                            "evidencePaths": ["evidence/not-committed.txt"],
+                            "coveredReplacementSuiteIds": ["target-suite"],
+                            "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+                            "evidencePaths": [
+                                "missing/evidence.ts",
+                                "target/runtime.test.ts",
+                                "tests/evidence/repository-removal/v1/unsafe-check.json",
+                            ],
                         }
                     ]
                 }
@@ -657,7 +698,7 @@ class RemovalApprovalTests(unittest.TestCase):
         )
         self.assertIn(
             "unsafe-check: evidencePaths not tracked at audited commit: "
-            "['evidence/not-committed.txt']",
+            "['missing/evidence.ts']",
             errors,
         )
 
@@ -825,9 +866,16 @@ class RemovalApprovalTests(unittest.TestCase):
                             "id": "static-target",
                             "command": "npm run web:check",
                             "result": "passed",
-                            "outputPath": "evidence/static-target.txt",
+                            "outputPath": (
+                                "tests/evidence/repository-removal/v1/static-target.json"
+                            ),
                             "outputSha256": "0" * 64,
-                            "evidencePaths": ["evidence/static-target.txt"],
+                            "coveredReplacementSuiteIds": ["target-suite"],
+                            "coveredTargetOwnerPaths": ["target/runtime.test.ts"],
+                            "evidencePaths": [
+                                "target/runtime.test.ts",
+                                "tests/evidence/repository-removal/v1/static-target.json",
+                            ],
                         }
                     ]
                 }
@@ -837,9 +885,82 @@ class RemovalApprovalTests(unittest.TestCase):
 
         self.assertIn(
             "static-target: outputSha256 does not match retained command output: "
-            "evidence/static-target.txt",
+            "tests/evidence/repository-removal/v1/static-target.json",
             errors,
         )
+
+    def test_rejects_arbitrary_tracked_file_as_check_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                check_mutation={
+                    "outputPath": "historical/evidence.md",
+                    "outputSha256": _sha256(b"historical evidence\n"),
+                    "evidencePaths": [
+                        "historical/evidence.md",
+                        "target/runtime.test.ts",
+                    ],
+                }
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: outputPath must be the canonical check namespace: "
+            "tests/evidence/repository-removal/v1/static-target.json",
+            errors,
+        )
+
+    def test_rejects_structured_check_output_binding_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            repository.commit_chain(
+                check_output_mutation={"command": "npm run web:test"}
+            )
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "static-target: committed check output does not exactly bind "
+            "auditedCommit/checkId/command/result",
+            errors,
+        )
+
+    def test_rejects_retirement_suite_owned_by_another_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            inventory = repository.inventory()
+            inventory["items"][0]["ownerIssue"] = 71
+            repository.commit_chain(inventory=inventory)
+
+            errors = self._validate(repository)
+
+        self.assertIn(
+            "delete-runtime: retirementSuiteIds must have replacementGate.issue "
+            "equal to ownerIssue: ['legacy-suite']",
+            errors,
+        )
+
+    def test_rejects_semantically_unbound_check_suite_and_target_path(self) -> None:
+        mutations = (
+            {"coveredReplacementSuiteIds": ["legacy-suite"]},
+            {"coveredTargetOwnerPaths": ["historical/evidence.md"]},
+        )
+        expected = (
+            (
+                "delete-runtime: replacement checks do not exactly cover "
+                "replacementSuiteIds"
+            ),
+            "delete-runtime: replacement checks do not exactly cover targetOwnerPaths",
+        )
+        for mutation, expected_error in zip(mutations, expected):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                repository = ApprovalRepository(Path(directory))
+                repository.commit_chain(check_mutation=mutation)
+
+                errors = self._validate(repository)
+
+            self.assertIn(expected_error, errors)
 
     def test_requires_live_owner_comment_and_rejects_live_identity_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
