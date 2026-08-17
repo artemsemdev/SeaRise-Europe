@@ -978,21 +978,18 @@ jobs:
         with:
           node-version: 20.20.1
           cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install locked browser measurement environment
-        working-directory: src/frontend
         run: npm ci
 
       - name: Install package-lock-owned Playwright Chromium
-        working-directory: src/frontend
         run: ./node_modules/.bin/playwright install chromium
 
       - name: Measure trusted browser delivery
-        working-directory: src/frontend
         run: |
           rm -f -- /tmp/browser-trace-macos-arm64.json
-          node scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 /tmp/browser-trace-macos-arm64.json
+          node src/web/scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 /tmp/browser-trace-macos-arm64.json
           test -s /tmp/browser-trace-macos-arm64.json
 
       - name: Validate browser delivery evidence
@@ -1003,7 +1000,7 @@ jobs:
           python scripts/science/validate_ar6_delivery_trace.py \
             --candidate /tmp/phase-0r-ar6-v1 \
             --trace /tmp/browser-trace-macos-arm64.json \
-            --harness src/frontend/scripts/measure-ar6-release.mjs \
+            --harness src/web/scripts/measure-ar6-release.mjs \
             --release-contract src/pipeline/science/ar6-regional-release.json \
             --build-timing /tmp/build-timing-macos-arm64.json \
             --output /tmp/delivery-report-macos-arm64.json

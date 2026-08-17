@@ -18,6 +18,7 @@
     "build:search-shards": "node scripts/build-settlement-search-shards.mjs build",
     "validate:search-shards": "node scripts/build-settlement-search-shards.mjs validate",
     "measure:local-candidate-search": "node scripts/measure-local-candidate-search.mjs",
+    "measure:ar6-release": "node scripts/measure-ar6-release.mjs",
     "dev": "vite",
     "serve:local-release": "node scripts/serve-local-release.mjs",
     "serve:committed-release": "node scripts/serve-committed-release.mjs",

@@ -94,7 +94,7 @@ RELEASE = (
     "package-lock.json",
     "src/frontend/package.json",
     "src/frontend/package-lock.json",
-    "src/frontend/scripts/measure-ar6-release.mjs",
+    "src/web/scripts/measure-ar6-release.mjs",
     "src/web/package.json",
     "src/web/scripts/verify-boundary-pmtiles-browser.mjs",
     "src/pipeline/fixtures/ar6-regional-release/**",

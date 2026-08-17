@@ -359,6 +359,93 @@ def write_source_fixture(source: RegionalReleaseSource, path: Path) -> Mapping[s
     }
 
 
+def rebind_source_fixture_contract(
+    path: Path,
+    *,
+    receipt: Mapping[str, Any],
+    release_contract: Mapping[str, Any],
+    expected_previous_contract_sha256: str,
+    expected_previous_fixture_sha256: str,
+    observed_previous_receipt_sha256: str,
+    expected_previous_receipt_sha256: str,
+) -> tuple[bytes, Mapping[str, Any]]:
+    """Rebind an intact offline fixture after a non-scientific contract edit.
+
+    This migration never grants verified-archive capability. It verifies the
+    previous byte receipt and source identities, validates every retained array
+    against the current contract, and returns deterministic replacement bytes
+    plus an explicitly non-release-eligible receipt.
+    """
+    previous_fixture_sha256 = _sha256(path)
+    if previous_fixture_sha256 != expected_previous_fixture_sha256:
+        raise ScienceContractError("Fixture differs from the authorized previous bytes")
+    if observed_previous_receipt_sha256 != expected_previous_receipt_sha256:
+        raise ScienceContractError("Fixture receipt differs from the authorized previous bytes")
+    if path.stat().st_size != receipt.get("byteSize") or previous_fixture_sha256 != receipt.get(
+        "sha256"
+    ):
+        raise ScienceContractError("AR6 regional source fixture integrity mismatch")
+    try:
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            document = json.load(stream)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScienceContractError(f"Cannot read AR6 regional source fixture: {exc}") from exc
+    if (
+        document.get("releaseContractSha256") != expected_previous_contract_sha256
+        or receipt.get("releaseContractSha256") != expected_previous_contract_sha256
+    ):
+        raise ScienceContractError("Fixture does not match the authorized previous contract")
+    if (
+        document.get("archiveSha256") != receipt.get("archiveSha256")
+        or document.get("archiveSha256") != release_contract["source"]["archiveSha256"]
+    ):
+        raise ScienceContractError("Fixture archive identity differs during contract rebind")
+
+    expected_members = receipt.get("memberSha256")
+    if not isinstance(expected_members, Mapping):
+        raise ScienceContractError("Fixture receipt has no member identity mapping")
+    for item in document.get("layers", []):
+        if expected_members.get(item.get("scenario")) != item.get("memberSha256"):
+            raise ScienceContractError("Fixture member identity differs during contract rebind")
+
+    current_contract_sha256 = hashlib.sha256(_canonical_json(release_contract)).hexdigest()
+    rebound_document = dict(document)
+    rebound_document["releaseContractSha256"] = current_contract_sha256
+    payload = _canonical_json(rebound_document)
+    with tempfile.TemporaryFile() as temporary:
+        with gzip.GzipFile(filename="", mode="wb", fileobj=temporary, mtime=0) as stream:
+            stream.write(payload)
+        temporary.seek(0)
+        rebound_bytes = temporary.read()
+
+    with tempfile.TemporaryDirectory() as directory:
+        rebound_path = Path(directory) / "source-fixture.json.gz"
+        rebound_path.write_bytes(rebound_bytes)
+        base_receipt = {
+            "fixtureId": "ar6-europe-regional-source-v1",
+            "byteSize": len(rebound_bytes),
+            "sha256": hashlib.sha256(rebound_bytes).hexdigest(),
+            "archiveSha256": document["archiveSha256"],
+            "memberSha256": dict(expected_members),
+            "releaseContractSha256": current_contract_sha256,
+            "derivation": "verified-archive-native-grid-subset-no-resampling-contract-rebind",
+            "sourceArchiveVerifiedForThisWrite": False,
+            "scientificReleaseEligible": False,
+            "contractRebind": {
+                "previousContractSha256": expected_previous_contract_sha256,
+                "previousFixtureSha256": previous_fixture_sha256,
+                "scientificValuesChanged": False,
+            },
+        }
+        rebound = load_source_fixture(
+            rebound_path,
+            receipt=base_receipt,
+            release_contract=release_contract,
+        )
+        _assert_source_content_seal(rebound)
+    return rebound_bytes, base_receipt
+
+
 def load_source_fixture(
     path: Path,
     *,

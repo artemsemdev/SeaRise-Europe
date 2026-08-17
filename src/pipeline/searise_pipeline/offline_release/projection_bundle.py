@@ -29,6 +29,7 @@ _SOURCE_RECEIPT = Path(
     "src/pipeline/fixtures/ar6-regional-release/source-fixture-receipt.json"
 )
 _GOLDENS = Path("src/pipeline/science/evidence/ar6-lookup-goldens.json")
+_DELIVERY_AMENDMENT = Path("src/pipeline/science/evidence/ar6-delivery-harness-relocation.json")
 _MAC_EVIDENCE = Path("src/pipeline/evidence/ar6-regional-release/macos-arm64-cp311")
 _OWNER_EVIDENCE = Path("src/pipeline/evidence/ar6-regional-release/owner-promotion")
 
@@ -191,6 +192,11 @@ def _validate_approved_evidence(
     owner = _read_json(owner_root / "owner-attestation.json")
     build_receipt = _read_json(mac_root / "build-receipt.json")
     binding_digest = binding_sha256(binding)
+    approved_contract_sha256 = _validate_delivery_amendment(
+        repository_root,
+        contract=contract,
+        current_contract_sha256=contract_sha256,
+    )
     required_checks = {
         "artifactBudgets",
         "cogStructureAndValues",
@@ -241,7 +247,7 @@ def _validate_approved_evidence(
         or binding.get("environmentIdentity") != build_receipt.get("environmentIdentity")
         or binding.get("validatedEnvironmentProfile") != validated_profile
         or binding.get("buildReceiptSha256") != sha256(mac_root / "build-receipt.json")
-        or promotion.get("releaseContractSha256") != contract_sha256
+        or promotion.get("releaseContractSha256") != approved_contract_sha256
         or promotion.get("ownerEvidenceSha256")
         != sha256(owner_root / "owner-attestation.json")
         or not isinstance(promotion_evidence, dict)
@@ -255,6 +261,46 @@ def _validate_approved_evidence(
         _fail("reviewed projection source, tool, or build identity changed")
     _validate_owner_checksums(owner_root)
     return final_gate
+
+
+def _validate_delivery_amendment(
+    repository_root: Path,
+    *,
+    contract: Mapping[str, Any],
+    current_contract_sha256: str,
+) -> str:
+    """Preserve historical science approval across one exact delivery-only edit."""
+    amendment = _read_json(repository_root / _DELIVERY_AMENDMENT)
+    required = {
+        "schemaVersion",
+        "amendmentId",
+        "authority",
+        "previousContractSha256",
+        "currentContractSha256",
+        "changedContractMember",
+        "previousDeliveryMeasurement",
+        "currentDeliveryMeasurement",
+        "scientificFieldsChanged",
+        "historicalOwnerApprovalRewritten",
+    }
+    if (
+        set(amendment) != required
+        or amendment.get("schemaVersion") != 1
+        or amendment.get("amendmentId") != "ar6-delivery-harness-relocation-v1"
+        or amendment.get("authority") != "owner-directed-phase-2-static-runtime-removal"
+        or amendment.get("changedContractMember") != "deliveryMeasurement"
+        or amendment.get("scientificFieldsChanged") is not False
+        or amendment.get("historicalOwnerApprovalRewritten") is not False
+        or amendment.get("currentContractSha256") != current_contract_sha256
+        or amendment.get("currentDeliveryMeasurement") != contract.get("deliveryMeasurement")
+    ):
+        _fail("AR6 delivery-only contract amendment is invalid")
+    reconstructed = dict(contract)
+    reconstructed["deliveryMeasurement"] = amendment["previousDeliveryMeasurement"]
+    previous_sha256 = binding_sha256(reconstructed)
+    if previous_sha256 != amendment.get("previousContractSha256"):
+        _fail("AR6 delivery-only contract amendment changes approved science")
+    return previous_sha256
 
 
 def _validate_owner_checksums(root: Path) -> None:
