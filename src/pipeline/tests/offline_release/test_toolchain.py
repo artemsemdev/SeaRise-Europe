@@ -63,6 +63,7 @@ def test_every_profile_binds_the_same_container_identity() -> None:
             "src/pipeline/searise_pipeline/offline_release/schemas/stage-receipt.schema.json",
             "src/pipeline/evidence/ar6-regional-release/owner-promotion/final-gate.json",
             "src/pipeline/science/ar6-regional-release.json",
+            "src/pipeline/science/evidence/ar6-delivery-harness-relocation.json",
         }.issubset(pipeline.identity_paths)
         pipeline_identities.append(pipeline)
 

@@ -1029,7 +1029,7 @@
       "owner": "science",
       "purpose": "Recompute Chromium delivery budgets from candidate-bound HTTP Range traces and reject detached paths, hashes, target values, or malformed measurements.",
       "sourcePaths": ["src/pipeline/tests/release/test_delivery.py"],
-      "changedPaths": ["scripts/science/validate_ar6_delivery_trace.py", "src/frontend/scripts/measure-ar6-release.mjs", "src/frontend/package-lock.json", "src/pipeline/science/ar6-regional-release*.json", "src/pipeline/searise_pipeline/release/delivery.py", "src/pipeline/tests/release/test_delivery.py"],
+      "changedPaths": ["package-lock.json", "scripts/science/validate_ar6_delivery_trace.py", "src/web/scripts/measure-ar6-release.mjs", "src/pipeline/science/ar6-regional-release*.json", "src/pipeline/searise_pipeline/release/delivery.py", "src/pipeline/tests/release/test_delivery.py"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent exact-candidate browser delivery, toolchain, Range-request, cache, heap, latency, and budget gate." },
       "commands": { "focused": "python -m pytest src/pipeline/tests/release/test_delivery.py -q", "full": "python -m pytest src/pipeline/tests -q" },
