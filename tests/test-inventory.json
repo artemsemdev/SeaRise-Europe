@@ -1689,6 +1689,8 @@
     { "path": "src/web/src/offline/release-resource-plan.test.ts", "suite": "static-release-resource-plan", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/admission-receipt.test.ts", "suite": "static-coordinated-admission", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/offline/verified-resource-router.test.ts", "suite": "static-verified-resource-router", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/client-lease-controller.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/offline/update-coordinator.test.ts", "suite": "static-offline-contracts", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/private-candidate-validation.test.ts", "suite": "static-verified-resource-router", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/scientific-lookup.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/domain/url-state.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
