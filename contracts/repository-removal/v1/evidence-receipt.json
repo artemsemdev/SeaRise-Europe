@@ -1,6 +1,6 @@
 {
-  "auditedCommit": "cc39cb17c3ed76163ad1411b3d19af78a80ec860",
-  "auditedTree": "02adcb190c148b41a5738579688ab08954e59c4e",
+  "auditedCommit": "c151d76c59736d41dbe29f64bb2da1520f80a861",
+  "auditedTree": "43375cc00fd54e875e26c145412f82b428125b9f",
   "browserDisposition": {
     "firefox": "deferred",
     "required": "chromium",
@@ -27,7 +27,7 @@
       ],
       "id": "pipeline-ar6-release-builder",
       "outputPath": "tests/evidence/repository-removal/v1/pipeline-ar6-release-builder.json",
-      "outputSha256": "09f0833748cc3760ad54c7613ca3af95ebdc0331b9acaf6ffb45e8884abdbd57",
+      "outputSha256": "f956d5534168ab955f84d9d65096016b0286239f773c4c152c0db0f55a2f4a4b",
       "result": "passed"
     },
     {
@@ -44,7 +44,7 @@
       ],
       "id": "pipeline-reviewed-cog-range-access",
       "outputPath": "tests/evidence/repository-removal/v1/pipeline-reviewed-cog-range-access.json",
-      "outputSha256": "d81d7166005ce07138d1d96f1067cac88847af23be29215fc529ac1e1c53b2af",
+      "outputSha256": "9af27117759442de5cb5ddb533436298328d9a165d0289c6873e73b0f86e204d",
       "result": "passed"
     },
     {
@@ -61,7 +61,7 @@
       ],
       "id": "pipeline-science-contracts",
       "outputPath": "tests/evidence/repository-removal/v1/pipeline-science-contracts.json",
-      "outputSha256": "89ccab0a96c4b8b51fef65db790e42ff960fa9b6ab94cb2da438da4af11b72de",
+      "outputSha256": "b834cf5c317234638a6938855146c21b43efbf9e49b7b8e85088d44fb4a19300",
       "result": "passed"
     },
     {
@@ -78,7 +78,7 @@
       ],
       "id": "static-assessment-controller",
       "outputPath": "tests/evidence/repository-removal/v1/static-assessment-controller.json",
-      "outputSha256": "605f413f138681b7610f5bf9c1e400e7f8bfb5e819f5abd3e0a126734150b23e",
+      "outputSha256": "87b88b1e712cb162237b3eb9b7e9a1273a8f866666ef498340db1d8d73eaf7e2",
       "result": "passed"
     },
     {
@@ -95,7 +95,7 @@
       ],
       "id": "static-generic-host-lighthouse",
       "outputPath": "tests/evidence/repository-removal/v1/static-generic-host-lighthouse.json",
-      "outputSha256": "0943af153d164aa6fda8cbb3193553195ca6f8eeb7abc0c1eac6662c8a6bb95f",
+      "outputSha256": "b738a83f2c750675da8110fc7d36114d3dd3358c5a7445350103e53e58cb9569",
       "result": "passed"
     },
     {
@@ -112,7 +112,7 @@
       ],
       "id": "static-offline-lifecycle-journey",
       "outputPath": "tests/evidence/repository-removal/v1/static-offline-lifecycle-journey.json",
-      "outputSha256": "a8e1c5553f85714bbb2a0c1f3322d660b794dbb55cb037c4b4bbd450126c0471",
+      "outputSha256": "e090673d6c2fba795a65bbb1f1a1c003728f2ffdbb3be47ebeae328166352fe5",
       "result": "passed"
     },
     {
@@ -129,7 +129,7 @@
       ],
       "id": "static-projection-browser-ux",
       "outputPath": "tests/evidence/repository-removal/v1/static-projection-browser-ux.json",
-      "outputSha256": "e0a67edb415f1e8d4d7a8f3a6759d25b109fac950e5bcec14373fa613b59ce82",
+      "outputSha256": "91049fc858682b1a654113bfee5fa87641fb5ae8f0a3cb3bce66b639546b53b9",
       "result": "passed"
     },
     {
@@ -146,7 +146,7 @@
       ],
       "id": "static-release-domain",
       "outputPath": "tests/evidence/repository-removal/v1/static-release-domain.json",
-      "outputSha256": "2bfcb2f3b9af1b706f620247dffda2a44a2d6f5e44ca4e15f3ac21cc8e7e71d0",
+      "outputSha256": "ad684e604afba4734e1f2ced06b2b86b07404a2a5a8ff7deba4e08ae2ab0f7d7",
       "result": "passed"
     },
     {
@@ -163,7 +163,7 @@
       ],
       "id": "static-settlement-search",
       "outputPath": "tests/evidence/repository-removal/v1/static-settlement-search.json",
-      "outputSha256": "5fbb239e8d55e026d73258101caa1d5c1c66001b424c5ccec1ee63fa47dcd025",
+      "outputSha256": "1c3b3927b10c0e9df0bb15a3784d891360b14ed9cdb693a705bd4341f7db87dc",
       "result": "passed"
     },
     {
@@ -180,7 +180,7 @@
       ],
       "id": "static-target-content",
       "outputPath": "tests/evidence/repository-removal/v1/static-target-content.json",
-      "outputSha256": "04a728fac66a0f6c3ce991a2dd8188c206671199784054c3591211424eab3b12",
+      "outputSha256": "e6c2d642e49e12dcc123c2737d91a354a9ea693b7a876e385063f9d716bf39ec",
       "result": "passed"
     },
     {
@@ -197,7 +197,7 @@
       ],
       "id": "static-web-shell",
       "outputPath": "tests/evidence/repository-removal/v1/static-web-shell.json",
-      "outputSha256": "ef840414c7159345ea6ebc153cd40ffdc67ecd3dc402147af63ad6f7fa686b8b",
+      "outputSha256": "f146320703e6de6a1fdd044a6b8f8d362b7df69422a08a3be122cafaa0d7c615",
       "result": "passed"
     }
   ],
@@ -208,7 +208,7 @@
     "checkOutputSchemaSha256": "ff735cefbe61adf5188ae0bf3d3b57ff987c116e661106176c1a8f40b24a5d3e",
     "evidenceReceiptSchemaSha256": "f5a45fc4948a91172fedd9b20554cba75a6011944b8383a3e9ebea721469f13c",
     "historicalAllowlistSchemaSha256": "92add4891c053b6a01ff1481ef9fcbc3a71a0d21e8e8f337281da1fed961a911",
-    "historicalAllowlistSha256": "5979859713c1e9646cfd7990c2886ad3b4c7caf58fa8e275985718cf06ab51fc",
+    "historicalAllowlistSha256": "b44f1490f21f494e9768c01cc6b0dfdce1157fdd14c85a0646202fd93012e590",
     "inventorySchemaSha256": "8621afe8c0bfd1016819a8fd9b60eec82a09e8d055c732320442b9f24f9047de",
     "ownerDecisionSchemaSha256": "cd66998c5c19247890b33679c6b313bf9cd50a565f9c0e29404d7fa1972acfab",
     "replacementMatrixSha256": "9d46feafac0c983b8f646208634ad25637a53927982131916b8c78ac06046628",
@@ -216,7 +216,7 @@
     "validatorSha256": "cb37a81eafa671a2334968a3478e4381a7da0081617238727836c1e4a09b9d02"
   },
   "externalResourceMutation": false,
-  "inventorySha256": "585e407d3e12ec629505cf6cc85f1e5ffb8f417e31289b85fedadb6b8b9075c6",
+  "inventorySha256": "6c22b7fbfd1e4686a85b1b8d47d88b710128476ad6adbfa48ff109f3ebbf0790",
   "receiptId": "repository-removal-evidence-v1-phase-2-static-browser",
   "recordedAt": "2026-08-17T18:40:00Z",
   "schemaVersion": "1.0.0"
