@@ -534,7 +534,7 @@
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent Chromium natural update, exact terminal rollover, two-generation retention, sealed cache cleanup, offline reload, forbidden-request, and Candidate-isolation gate." },
       "commands": { "focused": "npm run e2e:offline-lifecycle --workspace @searise/web", "full": "npm run web:check && npm run web:e2e:offline-lifecycle" },
       "execution": { "tier": "release", "ciWorkflow": "ci.yml", "ciJob": "web", "requiresDocker": false, "requiresCredentials": false },
-      "cost": { "estimatedSeconds": 45, "class": "medium", "evidenceRef": "local-2026-08-17-offline-lifecycle-journey", "scope": "chromium-production-journey" },
+      "cost": { "estimatedSeconds": 45, "class": "medium", "evidenceRef": "local-2026-08-17-offline-lifecycle-journey", "scope": "ci-job" },
       "flakiness": { "status": "environment-sensitive", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "Committed synthetic bytes, exact deployment seals, authenticated host switching, same-origin script-free activation probes, bounded polling, and one worker make the Chromium journey deterministic; it requires the pinned Chromium binary and a loopback bind. Firefox compatibility is explicitly deferred." }
     },
     {
