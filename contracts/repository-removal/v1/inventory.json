@@ -1,0 +1,1785 @@
+{
+  "auditedCommit": "cc39cb17c3ed76163ad1411b3d19af78a80ec860",
+  "auditedTree": "02adcb190c148b41a5738579688ab08954e59c4e",
+  "candidatePolicy": {
+    "bytesInspected": false,
+    "candidateV7LocalOnly": true,
+    "publicationAuthorized": false
+  },
+  "createdAt": "2026-08-17T18:30:00Z",
+  "externalResourcePolicy": {
+    "deferredToSeparateApproval": true,
+    "mutationAuthorized": false
+  },
+  "governingIssues": [
+    68,
+    70,
+    71,
+    72
+  ],
+  "inventoryId": "repository-removal-v1-phase-2-static-browser",
+  "items": [
+    {
+      "deferOwner": null,
+      "disposition": "delete-phase-2",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": null,
+      "id": "delete-issue-70-legacy-runtime",
+      "kind": "runtime-source",
+      "locators": [
+        {
+          "gitBlobSha": "72313e96d313324fe67eea66e660b3d0488aebc2",
+          "path": ".github/workflows/ci.yml",
+          "selector": "workflow-job:frontend"
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:FRONTEND"
+        },
+        {
+          "gitBlobSha": "bffb357a7122523ec94045523758c4b825b448ef",
+          "path": "src/frontend/.eslintrc.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f010c133af34e21d20693b9356e95e9b3e262611",
+          "path": "src/frontend/.nvmrc",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "40c3d68096c270ef976f3db4e9eb42b05c7067bb",
+          "path": "src/frontend/next-env.d.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "5f5d295f9417ed48536891b66d59e02b65ce522a",
+          "path": "src/frontend/next.config.js",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "0d9b459f935d976dcf2edee45b61315269e365b1",
+          "path": "src/frontend/package-lock.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "84acb282621fd50eb4b2d43549ad49c85711f698",
+          "path": "src/frontend/package.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "79bcf135dc4391e8ff691d471c1fe46d10ff8329",
+          "path": "src/frontend/postcss.config.mjs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "348b65bd4ff552798a161f1030a108700f1e1b90",
+          "path": "src/frontend/public/.gitkeep",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "36cbd37b878728be05fe00a198fbfc03b6818d98",
+          "path": "src/frontend/scripts/browser-shard-fs.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f006ecc5de5b88b45533c8a51fbbd389decc5034",
+          "path": "src/frontend/scripts/build-settlement-search-shards.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "0db36913f3de1515a7a0f1b379f1df5c838b3451",
+          "path": "src/frontend/scripts/generate-public-contract-types.mjs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "68130f717521a5a4e8ba1b03db6e0516b9579a15",
+          "path": "src/frontend/scripts/lint-i18n-externalization.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b54ad21df26a445793d061324e7e93e59b8024b7",
+          "path": "src/frontend/scripts/lint-prohibited-language.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "12977fb4cb3439332aaa766969b307a3ee06d6bd",
+          "path": "src/frontend/scripts/measure-production-browser-worker.mjs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b743b6450bbc0157633e24ffb9a2bda08b13db3e",
+          "path": "src/frontend/scripts/measure-regional-fixture.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "4536067612daf31e1f747291e0cc5572a9f5ca78",
+          "path": "src/frontend/scripts/measure-settlement-browser-worker.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3f1687ff050bf98ceef28bf9074b50a765196218",
+          "path": "src/frontend/scripts/test-browser-shard-fs.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b4b121bed5b1d7bee16a4ceaa769b62f4d9696bd",
+          "path": "src/frontend/src/__tests__/api/methodology.contract.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ca8e70a5657de146f1c90c141710cd128345b849",
+          "path": "src/frontend/src/__tests__/builders/resultStateBuilder.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "eb359ab1d6fffc12095f334b1262ba49029a1ff4",
+          "path": "src/frontend/src/__tests__/components/CandidateList.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b7dd5d13c4eba8bf3a7daed765481597783bba81",
+          "path": "src/frontend/src/__tests__/components/EmptyState.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "57baf3b926edf5031e3589a0b3a183c9cba5b29f",
+          "path": "src/frontend/src/__tests__/components/ErrorBanner.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f27775ce703ca4eb51a450d2006d83f1ef5c75ee",
+          "path": "src/frontend/src/__tests__/components/HorizonControl.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ea92c192b41474dd1ce2ecc9e4312cdd8702b5ac",
+          "path": "src/frontend/src/__tests__/components/Legend.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "6ccf2915cf43bdd2697c5a5fa023dfcd124da49b",
+          "path": "src/frontend/src/__tests__/components/LoadingState.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1de1731dfd0619942cb1192676026c41d3edf204",
+          "path": "src/frontend/src/__tests__/components/NoResults.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "4b4491a9f22c755e40152bc3ada4241ab4706181",
+          "path": "src/frontend/src/__tests__/components/ResultPanel.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a828301f7257054a963dac16108b098d93c77bee",
+          "path": "src/frontend/src/__tests__/components/ScenarioControl.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "17178fe48ec0d923d115cac491dcc4767b4e1706",
+          "path": "src/frontend/src/__tests__/components/SearchBar.test.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b595cd69f07e578978cc2046357838ced78d75a1",
+          "path": "src/frontend/src/__tests__/domain/resultState.characterization.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f149f27ae4bbd7cc4f6253570176a4fce144ef95",
+          "path": "src/frontend/src/__tests__/setup.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3555efbca842c5802e52c2e97fa48958c3df61b0",
+          "path": "src/frontend/src/__tests__/stores/appStore.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "6a5a855c8f0824f5915cb0da50ea77f0a954326f",
+          "path": "src/frontend/src/__tests__/stores/mapStore.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1753e3b5acc8d539c0a819e2fecece0a703c42c1",
+          "path": "src/frontend/src/__tests__/stores/uiStore.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "575d9a9fcfc5615c278847fdd4be2f79b73acf5d",
+          "path": "src/frontend/src/app/api/health/route.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "cefc7fe3561d62f271106e6046ff658792201964",
+          "path": "src/frontend/src/app/components/AppShell.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "859088b5c76fb0714f0e682ba6b9a361b359b5dc",
+          "path": "src/frontend/src/app/components/Providers.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "10d7ddaba5e0c7091d67d44e480da95a62f8ae6a",
+          "path": "src/frontend/src/app/components/assessment/AssessmentView.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "e493b80d4d64444115eeb19def34bfb4118d9f8a",
+          "path": "src/frontend/src/app/components/assessment/HorizonControl.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "30c67be44c1250ceb3b95a452a597bb2beb26f7f",
+          "path": "src/frontend/src/app/components/assessment/Legend.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "61c7f9ca7558a36769a378c381caca49221303d6",
+          "path": "src/frontend/src/app/components/assessment/MethodologyPanel.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "03ab6f143b2f091122bab541ce67ff73fd390001",
+          "path": "src/frontend/src/app/components/assessment/ResultPanel.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "9475f886fd7ef26a7f1cf385bb7172247fe4b4fe",
+          "path": "src/frontend/src/app/components/assessment/ScenarioControl.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ba4951c6315c1878669954c6dccbcaef32a2ce38",
+          "path": "src/frontend/src/app/components/assessment/Sidebar.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "e9b3b07f72383d195d613cf4452d31f12d3bd78a",
+          "path": "src/frontend/src/app/components/map/LocationMarker.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1c2892316e731bd03ecb2b01d388fa389b9e3b8c",
+          "path": "src/frontend/src/app/components/map/MapSurface.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a306f34f43210eb08258f125ca00de2ab25da2aa",
+          "path": "src/frontend/src/app/components/search/CandidateList.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "76c993c7929d2e8536d40520e8f584b9eca9f01d",
+          "path": "src/frontend/src/app/components/search/SearchBar.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "bc20f1470c35d83804009c1524d2eab156dc7bd8",
+          "path": "src/frontend/src/app/components/search/SearchOverlay.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f9c55e774c6f664c4fa2a452e05acbc865607522",
+          "path": "src/frontend/src/app/components/shared/EmptyState.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "7e92bc4105c07c4f2eeb7c00ec804425d68bab4e",
+          "path": "src/frontend/src/app/components/shared/ErrorBanner.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b95b5c0f9dd302e8e8bc9c0b155c3e5966ce6720",
+          "path": "src/frontend/src/app/components/shared/LoadingState.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "726763dc8d2604856140dd0833de6544e5502c3d",
+          "path": "src/frontend/src/app/components/shared/NoResults.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "bbe8e0d6b5149532c1a276c5181653f221d371c2",
+          "path": "src/frontend/src/app/globals.css",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "7985be1d3ec2c3d35af4bdca207b4f129ef11f19",
+          "path": "src/frontend/src/app/layout.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "52ac5ad8928d4fef7bb4512db72f85bab4ce3bb3",
+          "path": "src/frontend/src/app/page.tsx",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "35cc78d575c383bef2d38c18185383d42ad14342",
+          "path": "src/frontend/src/lib/api/assessment.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "eaa6037e5ca595ec6210f8bad86503531c61bfcd",
+          "path": "src/frontend/src/lib/api/config.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "2ad328b72677cf40d5301482c42c0a8bec2e4977",
+          "path": "src/frontend/src/lib/api/geocoding.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "81f53bf6a704f7193fb6b378a91899d6721e8d4a",
+          "path": "src/frontend/src/lib/api/methodology.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f9e84a1758dfd739e98671d7d3fd3ef0f820ba2c",
+          "path": "src/frontend/src/lib/ar6/projection-lookup.golden.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "64bd8774efb86fdb3282af45f9d19bb449c64884",
+          "path": "src/frontend/src/lib/ar6/projection-lookup.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "29c416662d0a55832a1444e18e983173d9b5c545",
+          "path": "src/frontend/src/lib/ar6/projection-lookup.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "901bba74e9adf1439d7c2b818763f8edf9112faa",
+          "path": "src/frontend/src/lib/contracts/gate-report-semantics.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a4168d7be1ff1989c949ef8f27648a066cf31668",
+          "path": "src/frontend/src/lib/contracts/generated/architecture-evidence.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "5cc4b21d55ba0cde8ccca80e7f9aec1167d1ee2e",
+          "path": "src/frontend/src/lib/contracts/generated/manifest.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "8f249cd0d173c0f4230a35f19883a2f3a8416961",
+          "path": "src/frontend/src/lib/contracts/generated/projection-result.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "19085feb1185fe7e1572d8a67b5e19663d99c001",
+          "path": "src/frontend/src/lib/contracts/generated/scenario-config.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "4b7a285dab21f858a44c34fa289d928258db7acc",
+          "path": "src/frontend/src/lib/contracts/public-contract-parity.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "73b920a8c6980421f7ba1985957eee6fb2e8a2ba",
+          "path": "src/frontend/src/lib/contracts/settlement-semantics.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "19cc7f5dab7b287f8e332b8d8e31033652422699",
+          "path": "src/frontend/src/lib/domain/resultState.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "edfb4eace99c9c65db8692ccece2a1c7c86cbf9f",
+          "path": "src/frontend/src/lib/hooks/useUrlState.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f4314aadb311fa767db3e5e9bb054224886ce175",
+          "path": "src/frontend/src/lib/i18n/en.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "bf59f177c8f6690b5ac8d2dcd43f3308a5c60b84",
+          "path": "src/frontend/src/lib/regional-fixture/reference-reader.golden.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "d303dbab2756fbf62cadd130c4d146988684a079",
+          "path": "src/frontend/src/lib/regional-fixture/reference-reader.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ac58604db641d64b67c3dc3c16e52a4a4bc50b6b",
+          "path": "src/frontend/src/lib/regional-fixture/reference-reader.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "62f8bf2b831197815d8ca924629aea938ca8541d",
+          "path": "src/frontend/src/lib/store/appStore.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ac8e89cb892597cbd3c441f0afc1a79a78b2f69b",
+          "path": "src/frontend/src/lib/store/mapStore.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "094f8ea2d1d2b828c9e8d1fde8551c32f52173f8",
+          "path": "src/frontend/src/lib/store/uiStore.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "458d947ec7b6ba06fee2fb9e556361dfabacee79",
+          "path": "src/frontend/src/lib/types/index.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "af4229d30774ec195f577cde3370608d37debb7d",
+          "path": "src/frontend/src/search/evaluation/adapters.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "480db0f91bd1c7f0947d2fd21ec56d4764266748",
+          "path": "src/frontend/src/search/evaluation/bounded-traversal.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "577990b6ebde12e8c25c8f2325a2653568f5206f",
+          "path": "src/frontend/src/search/evaluation/evaluation.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "16ded527511c7c6895e14f904f19bf70c2901338",
+          "path": "src/frontend/src/search/evaluation/search.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "25c6fa5a0b0b2c9fafb7af25e2c81a6ca106a901",
+          "path": "src/frontend/src/search/evaluation/semantics.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "9cf330d760c73311098e6860bddd706b1c791f9f",
+          "path": "src/frontend/src/search/evaluation/types.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b3160d18edac9b36d9905eb046e13b5687eacb46",
+          "path": "src/frontend/src/search/performance/browser-worker-bootstrap.mjs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ae815c50458c81e478c5c9923763b161bf354694",
+          "path": "src/frontend/src/search/performance/browser-worker-evidence.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f6e4b8aaac2568ff8399555d4e89e9f158ab5a33",
+          "path": "src/frontend/src/search/performance/browser-worker-evidence.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "eb3b98e1bf4294df7ef4afeefefea50123b9566c",
+          "path": "src/frontend/src/search/performance/browser-worker-runner.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3f96c781450ec668e94f51bd3305371d911bf687",
+          "path": "src/frontend/src/search/performance/fixtures/README.md",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "88f3352ac5ddd80db5ca4ddd6c5b61d5faeb77e7",
+          "path": "src/frontend/src/search/performance/fixtures/browser-shards/europe-coastal.codepoint-trie.json.br",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "768aac3f3f1e966d11a1ab9cefa75c5563da1c34",
+          "path": "src/frontend/src/search/performance/fixtures/browser-shards/europe-core.codepoint-trie.json.br",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "d59217e8b542826f2c88a6c6ab08a1af43d2a78c",
+          "path": "src/frontend/src/search/performance/fixtures/browser-shards/settlement-browser-search-shards.receipt.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "dcf764ac946fb0a8c5d7e100384c1aa484cbeaa7",
+          "path": "src/frontend/src/search/performance/fixtures/browser-worker-performance.synthetic.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "26e59d2ec7937514293a0e74b8690de6605266b0",
+          "path": "src/frontend/src/search/performance/fixtures/performance-queries.synthetic.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "8b98140686522bfd6e1d241e01456e30dd4e189d",
+          "path": "src/frontend/src/search/performance/fixtures/projection.v3.synthetic.ndjson",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b098bc8570131cd65c849d5119d795e80b1c841f",
+          "path": "src/frontend/src/search/shards/browser-shards.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "b380aefbb75a1b84671d0e490e2bb53904565f2f",
+          "path": "src/frontend/src/search/shards/browser-shards.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "96b0b72952f284ebf60c42903ec9bca2ed30beab",
+          "path": "src/frontend/src/search/shards/fixtures/projection-authority.synthetic.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "8bf685f662b37456bf038908f8d76b89cfc62e60",
+          "path": "src/frontend/src/search/shards/fixtures/projection.synthetic.ndjson",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "2638da549515d1e0c131e206114e7ab8d7c4a603",
+          "path": "src/frontend/src/search/shards/fixtures/spatial-receipt.synthetic.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "2d74e09aa47de4c8577f98c4839d7925d06c8c70",
+          "path": "src/frontend/src/search/worker/browser-runtime.test.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "0db1a19286d0fc20dc07e836d547d9fc4096c13f",
+          "path": "src/frontend/src/search/worker/browser-runtime.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1114212f0cae0189816ab98181145078aa899372",
+          "path": "src/frontend/src/search/worker/browser-worker.ts",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1f9a3fb755227376ae9233371a34daeea56b87ea",
+          "path": "src/frontend/tsconfig.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "83f760c9722ebed4791a69aa7ee20c548c8bbf0e",
+          "path": "src/frontend/vitest.config.ts",
+          "selector": null
+        }
+      ],
+      "ownerIssue": 70,
+      "reason": "Issue #70 removes only its canonical legacy-runtime census after the bound static replacement suites pass.",
+      "removalGate": "Issue #70 may delete only these locators after this exact owner-approved evidence chain validates.",
+      "replacementCheckIds": [
+        "static-projection-browser-ux",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "replacementEvidence": [
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-projection-browser-ux"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-release-domain"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-settlement-search"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-target-content"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-web-shell"
+        }
+      ],
+      "replacementSuiteIds": [
+        "static-projection-browser-ux",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "retirementSuiteIds": [
+        "frontend-api-contract",
+        "frontend-ar6-lookup-parity",
+        "frontend-components",
+        "frontend-five-state-characterization",
+        "frontend-public-contract-parity",
+        "frontend-regional-fixture-parity",
+        "frontend-search-evaluation-foundation",
+        "frontend-settlement-worker-performance",
+        "frontend-static-checks",
+        "frontend-stores"
+      ],
+      "targetOwnerPaths": [
+        ".github/workflows/static-quality.yml",
+        "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/search/europe-coastal.codepoint-trie.json.br",
+        "contracts/release/v2/artifact.schema.json",
+        "src/web/playwright.config.ts",
+        "src/web/scripts/inspect-build.mjs"
+      ]
+    },
+    {
+      "deferOwner": null,
+      "disposition": "delete-phase-2",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": null,
+      "id": "delete-issue-71-legacy-runtime",
+      "kind": "runtime-source",
+      "locators": [
+        {
+          "gitBlobSha": "f927de4951a3d64e198b9abdb67eeb67e97259e8",
+          "path": ".env.pipeline.example",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "72313e96d313324fe67eea66e660b3d0488aebc2",
+          "path": ".github/workflows/ci.yml",
+          "selector": "workflow-job:api"
+        },
+        {
+          "gitBlobSha": "72313e96d313324fe67eea66e660b3d0488aebc2",
+          "path": ".github/workflows/ci.yml",
+          "selector": "workflow-job:infrastructure"
+        },
+        {
+          "gitBlobSha": "a769c29e9ded223b62598fbf9adbeb530c5eaad1",
+          "path": ".github/workflows/codeql.yml",
+          "selector": "workflow-job:analyze-csharp"
+        },
+        {
+          "gitBlobSha": "80532f5dc6b40ef6255fa288ae3fae74600b7cd9",
+          "path": "SeaRise Europe.sln",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "729862229b448d7c527b1a9e5840007f568be3fa",
+          "path": "infra/blob-seed/Dockerfile",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "8d1ac342300e278868f137966455a0b094b02f84",
+          "path": "infra/blob-seed/requirements.lock",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f15f70629a81f054fb9a53adc4a2e5592835a7d5",
+          "path": "infra/blob-seed/requirements.txt",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "84f29060bdc37dd18ba339642b7c1fee91a4e354",
+          "path": "infra/blob-seed/seed.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c336319f6f158540d85ecee03f619551b48b0fcb",
+          "path": "infra/db/init-geography.sql",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "0fa690f7de593a6b9e92c2a697bb9f06107e44dd",
+          "path": "infra/db/init.sql",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:API"
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:CODEQL_CSHARP"
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:INFRASTRUCTURE"
+        },
+        {
+          "gitBlobSha": "ef8d4a31505ac06e88f23e156690d87c6d1734d6",
+          "path": "scripts/tests/run_mutation_pilot.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1b1aa214322b426a5bd75aeeaf2e4fe54e5afcac",
+          "path": "src/api/Directory.Build.props",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "67d9d7adbc22cc2d8486f53b69f58df0f8754b86",
+          "path": "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "03b2e6084adeb102a37c703e65cf104ec5689c3d",
+          "path": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "89e0c5b34616f402d0c0499d5a4df1309d23538a",
+          "path": "src/api/SeaRise.Api.Tests/Domain/SharedResultStateFixtureTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c802f4480b198aad9bb8709a616c0891f99086c9",
+          "path": "src/api/SeaRise.Api.Tests/GlobalUsings.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "2eba790a2996ed9375a2f6e1f33d258c109211f9",
+          "path": "src/api/SeaRise.Api.Tests/Infrastructure/TiTilerBlobPathValidationTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "30a14c79b98459bbed3a9b140a8d56fa0ed3d753",
+          "path": "src/api/SeaRise.Api.Tests/Integration/EndpointTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "669b36c8addea7e64efcb5bf500285908ba49e2b",
+          "path": "src/api/SeaRise.Api.Tests/Integration/GeographyRepositoryTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "109f6c1d47e56263540d9befe3eae64057f4a392",
+          "path": "src/api/SeaRise.Api.Tests/Integration/LayerRepositoryTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "0b93a99e6784b311a1be24d1657d7b1c11fd13c0",
+          "path": "src/api/SeaRise.Api.Tests/Integration/ScenarioRepositoryTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "136b6f5c7ef2d25706c967dbb964aea7bac06d07",
+          "path": "src/api/SeaRise.Api.Tests/Integration/SecurityHeaderTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "cfaa204bce7dee298b914ec85a12c9235f537d78",
+          "path": "src/api/SeaRise.Api.Tests/Integration/TestDbFixture.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a30ee07efe88f08c5d814b0fded994fbf6da518d",
+          "path": "src/api/SeaRise.Api.Tests/SeaRise.Api.Tests.csproj",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "bc9adde80846a8f418715f58b57907b9f9ed6d50",
+          "path": "src/api/SeaRise.Api.Tests/Validators/AssessRequestValidatorTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "55db25300092417f661fc7f20dd211a80fb6d43c",
+          "path": "src/api/SeaRise.Api.Tests/Validators/GeocodeRequestValidatorTests.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "bdcd2c10a64c1e76d6a0398a1aa5e862774b0159",
+          "path": "src/api/SeaRise.Api.Tests/packages.lock.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "bb46e512828706963f4d710766fc8fda4f485052",
+          "path": "src/api/SeaRise.Api/Dtos/AssessRequest.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "d673a1285878b0713426dedbd98b473bed760326",
+          "path": "src/api/SeaRise.Api/Dtos/AssessResponse.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "21d1c17f1a91fc0534ab20a2d71a51ef204c4373",
+          "path": "src/api/SeaRise.Api/Dtos/ConfigMethodologyResponse.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "8b444c59277f8c43e6bbc106ae6b7e419c84bab2",
+          "path": "src/api/SeaRise.Api/Dtos/ConfigScenariosResponse.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "be8e4cd96a0d759d381de3a7cf8a6c2c826502bb",
+          "path": "src/api/SeaRise.Api/Dtos/ErrorResponse.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a0b030b412e6c11f877a69116399672948bbf29c",
+          "path": "src/api/SeaRise.Api/Dtos/GeocodeRequest.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "fa549ef3bf8d1c96b3e9df693a0b777bfd8140a8",
+          "path": "src/api/SeaRise.Api/Dtos/GeocodeResponse.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "dcacb2500d01e780e517603693239126ea5a6a7d",
+          "path": "src/api/SeaRise.Api/Dtos/HealthResponse.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "792678d311b0b32b71656713adaa2026aaae7b1f",
+          "path": "src/api/SeaRise.Api/Program.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "9c035028c72b80ccccab5b2442e2766a6633a272",
+          "path": "src/api/SeaRise.Api/SeaRise.Api.csproj",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "6695561b4062aecf351e8b2d2d73dbd1674e8d25",
+          "path": "src/api/SeaRise.Api/StreamJsonResults.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "978af3f632833c9e60b7f352223780e36cc5b54b",
+          "path": "src/api/SeaRise.Api/Validators/AssessRequestValidator.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "90fdf8eabb7cf80c8468ef7c84f2ad91b79d7fc3",
+          "path": "src/api/SeaRise.Api/Validators/GeocodeRequestValidator.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a6e86ace7a32495f9fb2d489949743e66f63b32a",
+          "path": "src/api/SeaRise.Api/appsettings.Development.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "2d0595f9664808a14ca0ac9e0a895a318214ad3b",
+          "path": "src/api/SeaRise.Api/appsettings.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "21153d18403d28d99763c6c6450191905d164f48",
+          "path": "src/api/SeaRise.Api/packages.lock.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "852367f0039e03b9c88ca197cf770cd76a9ba8e8",
+          "path": "src/api/SeaRise.Application/Interfaces/IAssessmentService.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "912c41c4b934374e3f95cf53ff29fab81aecbf9d",
+          "path": "src/api/SeaRise.Application/SeaRise.Application.csproj",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c7ece9b42a8cfda0f2d56daeb81c617b2ac2ca51",
+          "path": "src/api/SeaRise.Application/Services/AssessmentService.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ebbf7a41fe2ef6ad94b915b3485bf9011e2791da",
+          "path": "src/api/SeaRise.Application/packages.lock.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "d99fcd3d2bef81a3d0ba668237c421bebbbd03e8",
+          "path": "src/api/SeaRise.Domain/Exceptions/GeocodingProviderException.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3eb85e32c082be8e086a01e73ec15851fd8c5ebd",
+          "path": "src/api/SeaRise.Domain/Interfaces/IExposureEvaluator.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3ef2704ed4e042aa3435ebcfb84566c67c42f6df",
+          "path": "src/api/SeaRise.Domain/Interfaces/IGeocodingService.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "913ba1fa590e898728c33691cf5833a8d4b34a62",
+          "path": "src/api/SeaRise.Domain/Interfaces/IGeographyRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "acf14e1572e731d318e44742410291c2aa21222c",
+          "path": "src/api/SeaRise.Domain/Interfaces/ILayerResolver.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "9aaffbbf8d125b2b3bc71c703195b1784b742631",
+          "path": "src/api/SeaRise.Domain/Interfaces/IMethodologyRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f218d0393d766268f9cb1c8c0b85917aeb1eaec4",
+          "path": "src/api/SeaRise.Domain/Interfaces/IScenarioRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "7ad6cd3be6976cd592c2fb62d2477334c30eeb44",
+          "path": "src/api/SeaRise.Domain/Logic/ResultStateDeterminator.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f15df358813da9b133568248cab8ddbbe542cb9f",
+          "path": "src/api/SeaRise.Domain/Models/AssessmentQuery.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ae636c436a40d8ac6b966ea386474a36f5d80a86",
+          "path": "src/api/SeaRise.Domain/Models/AssessmentResult.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "5ee7cdc41b385ab5e1247aed461bf4a01058100a",
+          "path": "src/api/SeaRise.Domain/Models/ExposureLayer.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "77aa8ddf8282ecdae3d4f90d4f54003c0c28a1e8",
+          "path": "src/api/SeaRise.Domain/Models/GeocodingCandidate.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "747d2f4b2afe11c2e28d9e52d00f5d4c1c24ebcb",
+          "path": "src/api/SeaRise.Domain/Models/GeographyClassification.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "5b4f55f3c45dc10cf12182d141047f74822dcc5c",
+          "path": "src/api/SeaRise.Domain/Models/Horizon.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3f31e059b13024f2cac8dab8d7ae43ff81e26ff2",
+          "path": "src/api/SeaRise.Domain/Models/MethodologyVersion.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "97366f13975ea7a8448f109a934af1359172159f",
+          "path": "src/api/SeaRise.Domain/Models/ResultState.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "e5da2aed178c65bef420ca72c3b6282c3bf2c523",
+          "path": "src/api/SeaRise.Domain/Models/Scenario.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "5d6e8277cbf44dff2f68189908f084568a18b185",
+          "path": "src/api/SeaRise.Domain/SeaRise.Domain.csproj",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "807ab822b670b0140918f7d2eec0273c0b1dbdc7",
+          "path": "src/api/SeaRise.Domain/packages.lock.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "2a62163583594a0e3af05bc826e1e049d9c8ea24",
+          "path": "src/api/SeaRise.Infrastructure/Clients/NominatimGeocodingClient.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "053a73591baa1f6bc2c869bdd40205b926c4582e",
+          "path": "src/api/SeaRise.Infrastructure/Clients/TiTilerExposureEvaluator.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "9cf6e457a5c4caf13945ca0dc934ac927d9dd58f",
+          "path": "src/api/SeaRise.Infrastructure/Repositories/LayerRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "694e6f0a2cbd9b843aae5772f5527cdc27a68b09",
+          "path": "src/api/SeaRise.Infrastructure/Repositories/MethodologyRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "ff1346c50c223856ddf5a8060e22c439df4d153e",
+          "path": "src/api/SeaRise.Infrastructure/Repositories/PostGisGeographyRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "73d467956fd68ad0d521d24b8bf3854870f313db",
+          "path": "src/api/SeaRise.Infrastructure/Repositories/ScenarioRepository.cs",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "d4b9f4c9fa7697d80aad12cd93553664abc3f1e5",
+          "path": "src/api/SeaRise.Infrastructure/SeaRise.Infrastructure.csproj",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "5679c132519dcd31e743888c07fce12644ebcf39",
+          "path": "src/api/SeaRise.Infrastructure/packages.lock.json",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "05a9e0f9be5275a55c41ce9aeda2ef11750ac3f7",
+          "path": "src/api/SeaRise.sln",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a3c10dd8e2be048d9a4200947d5656e2dcdc14e3",
+          "path": "src/pipeline/__init__.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c9ddb357790cba996fafe10603df4677cbb8463d",
+          "path": "src/pipeline/cogify.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c735c366f5f2a6d533889c81e0ac52a593eda893",
+          "path": "src/pipeline/compute_exposure.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "218b7c97bfe84d9992bd0010aec7743dd2df87d2",
+          "path": "src/pipeline/config.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "f8ecf6b5f22f6a21654eb1d8da1bc2271d4d8f71",
+          "path": "src/pipeline/download.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "a7f0cede5cd7f34deeea3c72929adbc8ab85a0a9",
+          "path": "src/pipeline/preprocess.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "532c1bcafba301e38efd5ab2fb4c2c550fb147b8",
+          "path": "src/pipeline/pyproject.toml",
+          "selector": "pyproject-dependency:azure-storage-blob"
+        },
+        {
+          "gitBlobSha": "532c1bcafba301e38efd5ab2fb4c2c550fb147b8",
+          "path": "src/pipeline/pyproject.toml",
+          "selector": "pyproject-dependency:psycopg2-binary"
+        },
+        {
+          "gitBlobSha": "532c1bcafba301e38efd5ab2fb4c2c550fb147b8",
+          "path": "src/pipeline/pyproject.toml",
+          "selector": "setuptools-package-dir:pipeline"
+        },
+        {
+          "gitBlobSha": "532c1bcafba301e38efd5ab2fb4c2c550fb147b8",
+          "path": "src/pipeline/pyproject.toml",
+          "selector": "setuptools-package:pipeline"
+        },
+        {
+          "gitBlobSha": "8ff9d1a842674d43dcdfbf914a49c422561e9472",
+          "path": "src/pipeline/register.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "72a6d332b669c4a896fc353b0d1b2b844ecc940f",
+          "path": "src/pipeline/requirements-pipeline.txt",
+          "selector": "requirements-dependency:azure-storage-blob"
+        },
+        {
+          "gitBlobSha": "72a6d332b669c4a896fc353b0d1b2b844ecc940f",
+          "path": "src/pipeline/requirements-pipeline.txt",
+          "selector": "requirements-dependency:psycopg2-binary"
+        },
+        {
+          "gitBlobSha": "ae3d4e0f4f805acb90261bfbe9c19edebf987b08",
+          "path": "src/pipeline/run_pipeline.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "12d451ce11c66fbdaa71d5a56d5ed9713f6d47f1",
+          "path": "src/pipeline/searise_pipeline/domain/__init__.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "44c09182c168ecea852ee0961e39e15355df410b",
+          "path": "src/pipeline/searise_pipeline/domain/result_state.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "61789e29e2b43323225c782984733755f8aefbba",
+          "path": "src/pipeline/tests/builders/result_state.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "eeb2e77ca5e3df19df97e2f4d4738fa0e634699e",
+          "path": "src/pipeline/tests/tdd/test_result_state_characterization.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c73292caf8ff176d4cdabf0c6a7db60b851e410a",
+          "path": "src/pipeline/tests/test_cogify.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "93aede37a9657a462b41a273981a767893b2ef2f",
+          "path": "src/pipeline/tests/test_compute_exposure.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "6c3f9004e36783344f2e75bbb70dd04204cfda92",
+          "path": "src/pipeline/tests/test_config.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "c274066d0512399bb868de16e626b4fe1b691166",
+          "path": "src/pipeline/tests/test_download.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "eda0802617b4d531313e6446443145d640d88af9",
+          "path": "src/pipeline/tests/test_preprocess.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "10797594a90b7edda170929ef1be9a81edb007c1",
+          "path": "src/pipeline/tests/test_register.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "e1b90f04143882ff2bfeee914cdc132fcacb88ce",
+          "path": "src/pipeline/tests/test_upload.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "caa8490a5bd81196a4ac7d97e8c2a7040ce844e2",
+          "path": "src/pipeline/tests/test_validate.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "23f6362a258af9ceffd89eff2311db9933c6edf1",
+          "path": "src/pipeline/upload.py",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "0b719eae281931e83aa4e0f2f29639155134825d",
+          "path": "src/pipeline/validate.py",
+          "selector": null
+        }
+      ],
+      "ownerIssue": 71,
+      "reason": "Issue #71 removes only its canonical legacy-runtime census after the bound static replacement suites pass.",
+      "removalGate": "Issue #71 may delete only these locators after this exact owner-approved evidence chain validates.",
+      "replacementCheckIds": [
+        "pipeline-ar6-release-builder",
+        "pipeline-reviewed-cog-range-access",
+        "pipeline-science-contracts",
+        "static-assessment-controller",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content"
+      ],
+      "replacementEvidence": [
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "pipeline-ar6-release-builder"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "pipeline-reviewed-cog-range-access"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "pipeline-science-contracts"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-assessment-controller"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-release-domain"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-settlement-search"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-target-content"
+        }
+      ],
+      "replacementSuiteIds": [
+        "pipeline-ar6-release-builder",
+        "pipeline-reviewed-cog-range-access",
+        "pipeline-science-contracts",
+        "static-assessment-controller",
+        "static-release-domain",
+        "static-settlement-search",
+        "static-target-content"
+      ],
+      "retirementSuiteIds": [
+        "api-application-unit",
+        "api-domain-legacy",
+        "api-http-integration",
+        "api-postgis-integration",
+        "api-shared-characterization",
+        "api-validation-unit",
+        "codeql-csharp",
+        "pipeline-five-state-characterization",
+        "pipeline-legacy-transform",
+        "pipeline-result-state-mutation-pilot"
+      ],
+      "targetOwnerPaths": [
+        ".github/workflows/static-quality.yml",
+        "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/search/europe-coastal.codepoint-trie.json.br",
+        "contracts/release/v2/artifact.schema.json",
+        "src/pipeline/tests/offline_release/test_cog_range.py",
+        "src/pipeline/tests/release/test_builder.py",
+        "src/pipeline/tests/science/test_ar6.py",
+        "src/web/src/application/assessment-controller.test.ts"
+      ]
+    },
+    {
+      "deferOwner": null,
+      "disposition": "delete-phase-2",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": null,
+      "id": "delete-issue-72-legacy-runtime",
+      "kind": "runtime-source",
+      "locators": [
+        {
+          "gitBlobSha": "98cd7e09b83ef405209c0fe6b17e6011a4155d28",
+          "path": ".env.local.example",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "72313e96d313324fe67eea66e660b3d0488aebc2",
+          "path": ".github/workflows/ci.yml",
+          "selector": "workflow-job:compose-smoke"
+        },
+        {
+          "gitBlobSha": "72313e96d313324fe67eea66e660b3d0488aebc2",
+          "path": ".github/workflows/ci.yml",
+          "selector": "workflow-job:docker-api"
+        },
+        {
+          "gitBlobSha": "72313e96d313324fe67eea66e660b3d0488aebc2",
+          "path": ".github/workflows/ci.yml",
+          "selector": "workflow-job:docker-frontend"
+        },
+        {
+          "gitBlobSha": "5231e6d1e2cb896f5a53caa3205b5c7a412da590",
+          "path": "docker-compose.yml",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:API_IMAGE"
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:COMPOSE"
+        },
+        {
+          "gitBlobSha": "46402244332582bb0418cfcbc03a4b61111f3087",
+          "path": "scripts/ci/changed_components.py",
+          "selector": "python-assignment:FRONTEND_IMAGE"
+        },
+        {
+          "gitBlobSha": "62e9631eb110145733eefc8de5bc06eac5a54a38",
+          "path": "scripts/compose-smoke.sh",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "3335ac5d417db86ed87186f4865ccfd7d783c2de",
+          "path": "src/api/.dockerignore",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "1ad6960d8858dd4f6e9b3539816c8cfb6773c687",
+          "path": "src/api/Dockerfile",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "38988bdf5ca3cdb1a90a1b2819e8c46543cee9c2",
+          "path": "src/frontend/.dockerignore",
+          "selector": null
+        },
+        {
+          "gitBlobSha": "36c7adae4f7a9203a96d458bee7e1668964b7180",
+          "path": "src/frontend/Dockerfile",
+          "selector": null
+        }
+      ],
+      "ownerIssue": 72,
+      "reason": "Issue #72 removes only its canonical legacy-runtime census after the bound static replacement suites pass.",
+      "removalGate": "Issue #72 may delete only these locators after this exact owner-approved evidence chain validates.",
+      "replacementCheckIds": [
+        "static-generic-host-lighthouse",
+        "static-offline-lifecycle-journey",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "replacementEvidence": [
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-generic-host-lighthouse"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-offline-lifecycle-journey"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-target-content"
+        },
+        {
+          "invariant": "The active target suite passes at the audited integration commit and owns the listed replacement path.",
+          "kind": "test-suite",
+          "reference": "static-web-shell"
+        }
+      ],
+      "replacementSuiteIds": [
+        "static-generic-host-lighthouse",
+        "static-offline-lifecycle-journey",
+        "static-target-content",
+        "static-web-shell"
+      ],
+      "retirementSuiteIds": [
+        "compose-smoke",
+        "container-api-build",
+        "container-frontend-build",
+        "container-tiler-pull"
+      ],
+      "targetOwnerPaths": [
+        ".github/workflows/static-quality.yml",
+        "docs/evidence/phase-2/issue-60-offline-lifecycle.md",
+        "src/web/scripts/inspect-build.mjs"
+      ]
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "adr-021-static-cutover-history",
+      "id": "retain-adr-021-static-cutover-history",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "2e10de40e647bfe25484ba55db03c206c84df006",
+          "path": "docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the superseded architecture decision as historical evidence while excluding it from the active target domain.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "adr-023-vertical-method-history",
+      "id": "retain-adr-023-vertical-method-history",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "7e0d384c5292cd9e386c3fd990ab33daad1b2970",
+          "path": "docs/architecture/adr/ADR-023-vertical-reference-methodology.md",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the superseded vertical-method discussion as historical evidence only.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "phase-0-basin-controls-history",
+      "id": "retain-phase-0-basin-controls-history",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "8fadc1c90e767817e3a42af3bcaec8260d5891a3",
+          "path": "docs/science/phase-0-12-basin-controls.md",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain audited Phase 0 basin controls as historical scientific evidence only.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "phase-0-regional-fixture-history",
+      "id": "retain-phase-0-regional-fixture-history",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "b07634639ec90520bce15ea948e9ee6fbfd66e60",
+          "path": "docs/evidence/phase-0-regional-fixture.md",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the Phase 0 characterization fixture record without admitting its legacy terminology into the target domain.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "phase-0-terrain-controls-history",
+      "id": "retain-phase-0-terrain-controls-history",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "d5ad6b392eb813459452546cf07e47df4b1ec1f8",
+          "path": "docs/science/phase-0-8-terrain-geography-controls.md",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain audited Phase 0 terrain controls as rejected-method evidence only.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "phase-0-vertical-evidence-history",
+      "id": "retain-phase-0-vertical-evidence-history",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "c5c7c4d313b00cc0fddf28d631dc42e16529aa73",
+          "path": "docs/science/phase-0-5-vertical-methodology-evidence.md",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain audited Phase 0 vertical-method evidence while keeping it outside the current scientific outcome domain.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-dependency-inventory-evidence",
+      "id": "retain-v1-dependency-inventory-evidence",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "960f43d4ce5cc3c82e55b3e9ed761dd4da57b1f6",
+          "path": "contracts/supply-chain/v1/dependency-inventory.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 dependency inventory as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-dependency-inventory-schema-evidence",
+      "id": "retain-v1-dependency-inventory-schema-evidence",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "2fed3f74d0487af0a50816031244ebbc412d6b0d",
+          "path": "contracts/supply-chain/v1/dependency-inventory.schema.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 dependency inventory schema as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-nuget-api-sbom",
+      "id": "retain-v1-nuget-api-sbom",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "1b96716eca031cd4aa2ff5ba81e7acfabb4bd76e",
+          "path": "contracts/supply-chain/v1/sboms/nuget/searise-api-net8.0.cdx.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 API SBOM as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-nuget-application-sbom",
+      "id": "retain-v1-nuget-application-sbom",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "11c8429db1066b01655e5d157dbfe1c3c9a79129",
+          "path": "contracts/supply-chain/v1/sboms/nuget/searise-application-net8.0.cdx.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 application SBOM as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-nuget-domain-sbom",
+      "id": "retain-v1-nuget-domain-sbom",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "c3d03819e39bb49a249ac3b541f451759bda74b9",
+          "path": "contracts/supply-chain/v1/sboms/nuget/searise-domain-net8.0.cdx.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 domain SBOM as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-nuget-fixture-project",
+      "id": "retain-v1-nuget-fixture-project",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "b5567fda118251dc6e5880cb4f1954dc79122742",
+          "path": "contracts/supply-chain/v1/fixtures/nuget/Fixture.App.xml",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 synthetic NuGet project fixture as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-nuget-infrastructure-sbom",
+      "id": "retain-v1-nuget-infrastructure-sbom",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "a5d39a05d713cc51f824783e3f51675794d20468",
+          "path": "contracts/supply-chain/v1/sboms/nuget/searise-infrastructure-net8.0.cdx.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 infrastructure SBOM as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-nuget-sbom-manifest",
+      "id": "retain-v1-nuget-sbom-manifest",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "65c48bd3652fb97957b316a25eadfba3b29a3e84",
+          "path": "contracts/supply-chain/v1/sboms/nuget/manifest.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 NuGet SBOM manifest as historical supply-chain evidence.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-release-evidence-retention-schema",
+      "id": "retain-v1-release-evidence-retention-schema",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "8eed7f3899f5693c9b16a2c49d83f97a232eb7eb",
+          "path": "contracts/supply-chain/v1/release-evidence-retention-receipt.schema.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 evidence-retention receipt schema for audit.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-spdx-vendor-schema",
+      "id": "retain-v1-spdx-vendor-schema",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "af42060a52647e6db41f429b897cb35a40f66c6e",
+          "path": "contracts/supply-chain/v1/vendor/spdx.schema.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the exact vendored SPDX schema used to validate the immutable Phase 1 SBOMs.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    },
+    {
+      "deferOwner": null,
+      "disposition": "retain-historical-evidence",
+      "externalMutationAuthorized": false,
+      "historicalAllowlistEntry": "v1-unverified-evidence-envelope-schema",
+      "id": "retain-v1-unverified-evidence-envelope-schema",
+      "kind": "contract-fixture-evidence",
+      "locators": [
+        {
+          "gitBlobSha": "544e370ff8f8e357554eb0e084494b3b544fc71e",
+          "path": "contracts/supply-chain/v1/real-source-unverified-evidence-envelope.schema.json",
+          "selector": null
+        }
+      ],
+      "ownerIssue": null,
+      "reason": "Retain the immutable Phase 1 unverified-evidence envelope schema for audit.",
+      "removalGate": null,
+      "replacementCheckIds": [],
+      "replacementEvidence": [],
+      "replacementSuiteIds": [],
+      "retirementSuiteIds": [],
+      "targetOwnerPaths": []
+    }
+  ],
+  "recoveryPolicy": {
+    "productRollback": "previous-verified-static-pair",
+    "sourceRecoveryCommit": "cc39cb17c3ed76163ad1411b3d19af78a80ec860"
+  },
+  "repository": "artemsemdev/SeaRise-Europe",
+  "schemaVersion": "1.0.0"
+}
