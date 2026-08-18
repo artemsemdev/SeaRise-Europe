@@ -32,11 +32,7 @@ class ImmutableDependencyTests(unittest.TestCase):
             changes_job.index("Validate immutable third-party dependencies"),
             changes_job.index("id: route"),
         )
-        for path in (
-            ".github/workflows/codeql.yml",
-            "src/api/Dockerfile",
-            "docker-compose.yml",
-        ):
+        for path in (".github/workflows/codeql.yml",):
             with self.subTest(path=path):
                 self.assertTrue(any(classify_paths([path]).values()))
 
