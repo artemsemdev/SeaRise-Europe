@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+from scripts.repository import validate_removal_plan_v2 as v2_validator
 from scripts.repository.validate_removal_approval import (
     DEFAULT_CENSUS_SCHEMA,
     DEFAULT_CHECK_OUTPUT_SCHEMA,
@@ -23,6 +24,7 @@ from scripts.repository.validate_removal_approval import (
     _canonical_census,
     _selector_count,
     _tracked_blobs,
+    _load_v2_validator,
     _v2_authorizes_test_inventory_transition,
     expected_approval_text,
     validate_removal_approval,
@@ -467,6 +469,13 @@ class ApprovalRepository:
 
 
 class RemovalApprovalTests(unittest.TestCase):
+    def test_loads_v2_validator_independent_of_package_import_path(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+
+        validator = _load_v2_validator(root)
+
+        self.assertTrue(callable(validator.validate_ci_state))
+
     def _commit_v2_inventory_transition(
         self,
         repository: ApprovalRepository,
@@ -506,6 +515,9 @@ class RemovalApprovalTests(unittest.TestCase):
         repository._git("commit", "-q", "-m", "test: apply v2 inventory transition")
 
         with mock.patch(
+            "scripts.repository.validate_removal_approval._load_v2_validator",
+            return_value=v2_validator,
+        ), mock.patch(
             "scripts.repository.validate_removal_plan_v2.validate_ci_state"
         ) as validate_v2:
             _v2_authorizes_test_inventory_transition(
@@ -610,6 +622,9 @@ class RemovalApprovalTests(unittest.TestCase):
             from scripts.repository.validate_removal_plan_v2 import PlanError
 
             with mock.patch(
+                "scripts.repository.validate_removal_approval._load_v2_validator",
+                return_value=v2_validator,
+            ), mock.patch(
                 "scripts.repository.validate_removal_plan_v2.validate_ci_state",
                 side_effect=PlanError("invalid receipt history"),
             ), self.assertRaisesRegex(
