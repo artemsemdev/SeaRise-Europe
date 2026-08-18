@@ -314,6 +314,11 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
+- Bound the signed v1 test-inventory transition to a complete, live-owner-
+  verified v2 removal receipt. Inventory drift is accepted only when the v1
+  hash matches the exact v2 before-state and committed bytes match its approved
+  after-state; missing, invalid, or altered authority continues to fail closed.
+
 - Pinned private overlay cleanup to an open directory identity so immediate
   inode reuse cannot redirect recursive deletion to a replacement directory.
 
