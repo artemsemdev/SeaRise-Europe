@@ -609,7 +609,7 @@ def _activation_operation(workflow: bytes) -> dict:
         ],
         "componentId": "github-actions",
         "inputPath": ".github/workflows/ci.yml",
-        "fromSha256": "6ce17942de5f0535c249a4b799fa58acda87e3d0c831b6b2d8c2f7a2eb256af0",
+        "fromSha256": "88b9b030ee2eda31d513486dfad5b59501c45340cbe44e0b314f72b7ee41caf9",
         "toSha256": hashlib.sha256(workflow).hexdigest(),
     }
 
