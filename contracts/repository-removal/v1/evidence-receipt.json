@@ -213,11 +213,11 @@
     "ownerDecisionSchemaSha256": "cd66998c5c19247890b33679c6b313bf9cd50a565f9c0e29404d7fa1972acfab",
     "replacementMatrixSha256": "9d46feafac0c983b8f646208634ad25637a53927982131916b8c78ac06046628",
     "testInventorySha256": "d254021fd8c2d9856be39ae9bb63b7c2ee1416e181c6edfe41727530542c2d1f",
-    "validatorSha256": "cb37a81eafa671a2334968a3478e4381a7da0081617238727836c1e4a09b9d02"
+    "validatorSha256": "1f71638160058e5507807e5c3b58ec24009747762a768edc65d01e1e232ea500"
   },
   "externalResourceMutation": false,
   "inventorySha256": "6c22b7fbfd1e4686a85b1b8d47d88b710128476ad6adbfa48ff109f3ebbf0790",
   "receiptId": "repository-removal-evidence-v1-phase-2-static-browser",
-  "recordedAt": "2026-08-18T08:33:32Z",
+  "recordedAt": "2026-08-18T21:34:33Z",
   "schemaVersion": "1.0.0"
 }
