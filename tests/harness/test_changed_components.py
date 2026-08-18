@@ -379,6 +379,21 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertIn("permissions:\n      contents: read\n      issues: read", web)
         self.assertIn("fetch-depth: 0", web)
+        self.assertIn(
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            web,
+        )
+        self.assertIn('python-version: "3.11.9"', web)
+        dependency_install = (
+            "python -m pip install -r "
+            "contracts/supply-chain/v2/python/"
+            "static-target-contributor-requirements.txt"
+        )
+        self.assertIn(dependency_install, web)
+        self.assertLess(
+            web.index(dependency_install),
+            web.index("- name: Validate static target"),
+        )
         validation = web.split("- name: Validate static target", maxsplit=1)[1]
         validation = validation.split("\n      - name:", maxsplit=1)[0]
         self.assertIn("GH_TOKEN: ${{ github.token }}", validation)
