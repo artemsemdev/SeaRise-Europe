@@ -1,0 +1,147 @@
+{
+  "$schema": "./removal-plan.schema.json",
+  "schemaVersion": "2.0.0",
+  "planId": "phase-2-issue-72-exact-removal-v2",
+  "issue": 72,
+  "auditedCommit": "e2873a8e6b398e7532789b633527536be3b43be9",
+  "auditedTree": "357faa70eff863b0237ebc0c50cf733f738ca2ca",
+  "entries": [
+    {
+      "path": ".env.local.example",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "98cd7e09b83ef405209c0fe6b17e6011a4155d28",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "cc9d4c03dacfd2c723190effddcf2a29a09a3d00",
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "cfe9f2f844b143bcaf2cadb61dce825d68b5f5bc", "sha256": "40c04f8d8e2e248039b3dd55d1721117dd2c545f67b49c35678f36bf4df8719a" },
+      "operations": [
+        { "id": "delete-compose-output", "kind": "workflow-output-delete", "job": "changes", "output": "compose" },
+        { "id": "delete-compose-smoke-job", "kind": "workflow-job-delete", "job": "compose-smoke" },
+        { "id": "delete-compose-smoke-need", "kind": "workflow-needs-edge-delete", "consumer": "ci-gate", "dependency": "compose-smoke" },
+        { "id": "delete-docker-api-job", "kind": "workflow-job-delete", "job": "docker-api" },
+        { "id": "delete-docker-api-need", "kind": "workflow-needs-edge-delete", "consumer": "ci-gate", "dependency": "docker-api" },
+        { "id": "delete-docker-api-output", "kind": "workflow-output-delete", "job": "changes", "output": "docker_api" },
+        { "id": "delete-docker-frontend-job", "kind": "workflow-job-delete", "job": "docker-frontend" },
+        { "id": "delete-docker-frontend-need", "kind": "workflow-needs-edge-delete", "consumer": "ci-gate", "dependency": "docker-frontend" },
+        { "id": "delete-docker-frontend-output", "kind": "workflow-output-delete", "job": "changes", "output": "docker_frontend" },
+        { "id": "delete-infrastructure-compose-step", "kind": "workflow-step-delete", "job": "infrastructure", "name": "Validate compose model" },
+        { "id": "rename-infrastructure-job", "kind": "workflow-scalar-replace", "job": "infrastructure", "field": "name", "from": "Infrastructure (compose config)", "to": "Infrastructure (blob seed compile)" }
+      ]
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "832ea564af5aa51b41dcb6cf32c7da2377dbe64e",
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "af459f1ac88fced17d8d77cb4f05b9de38ccb35f", "sha256": "d14cf12bdf23c7baa28f44677665cfd7d9f6ff97b4a7f8d517fbbeafbec7cb78" },
+      "operations": [
+        { "id": "activate-issue-72-profile", "kind": "static-profile-activation-transition", "issue": 72, "pendingSelectorIds": ["ci-legacy-compose-smoke", "ci-legacy-docker-api", "ci-legacy-docker-frontend", "legacy-api-dockerfile", "legacy-compose-file", "legacy-compose-smoke", "legacy-frontend-dockerfile"], "componentId": "github-actions", "inputPath": ".github/workflows/ci.yml", "fromSha256": "88b9b030ee2eda31d513486dfad5b59501c45340cbe44e0b314f72b7ee41caf9", "toSha256": "40c04f8d8e2e248039b3dd55d1721117dd2c545f67b49c35678f36bf4df8719a" }
+      ]
+    },
+    {
+      "path": "docker-compose.yml",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "5231e6d1e2cb896f5a53caa3205b5c7a412da590",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": "scripts/ci/changed_components.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "0455733211d6531a2bf262efc03b420f1cb64102",
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "9b9e67bb2be5011a3d81b4b749b80f3776298156", "sha256": "a9f766e56e6bdc198d4dc603bf3dfac6035c525c93ca2635782b576d27ff377f" },
+      "operations": [
+        { "id": "delete-api-image-binding", "kind": "python-binding-closure-delete", "name": "API_IMAGE", "expectedLoadCount": 1, "useContainers": [{ "function": "classify_paths", "mapping": "result", "key": "docker_api" }] },
+        { "id": "delete-compose-binding", "kind": "python-binding-closure-delete", "name": "COMPOSE", "expectedLoadCount": 1, "useContainers": [{ "function": "classify_paths", "mapping": "result", "key": "compose" }] },
+        { "id": "delete-frontend-image-binding", "kind": "python-binding-closure-delete", "name": "FRONTEND_IMAGE", "expectedLoadCount": 1, "useContainers": [{ "function": "classify_paths", "mapping": "result", "key": "docker_frontend" }] },
+        { "id": "delete-image-test-helpers", "kind": "python-function-delete", "name": "_is_api_test" },
+        { "id": "delete-image-test-helpers-frontend", "kind": "python-function-delete", "name": "_is_frontend_test" },
+        { "id": "delete-infrastructure-compose-inputs", "kind": "python-tuple-literals-delete", "name": "INFRASTRUCTURE", "values": [".env.local.example", "docker-compose.yml", "scripts/compose-smoke.sh"] },
+        { "id": "delete-legacy-route-outputs", "kind": "python-tuple-literals-delete", "name": "OUTPUTS", "values": ["compose", "docker_api", "docker_frontend"] }
+      ]
+    },
+    {
+      "path": "scripts/compose-smoke.sh",
+      "beforeMode": "100755",
+      "beforeGitBlobSha": "62e9631eb110145733eefc8de5bc06eac5a54a38",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": "src/api/.dockerignore",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "3335ac5d417db86ed87186f4865ccfd7d783c2de",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": "src/api/Dockerfile",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "1ad6960d8858dd4f6e9b3539816c8cfb6773c687",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": "src/frontend/.dockerignore",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "38988bdf5ca3cdb1a90a1b2819e8c46543cee9c2",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": "src/frontend/Dockerfile",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "36c7adae4f7a9203a96d458bee7e1668964b7180",
+      "after": { "state": "absent" },
+      "operations": [{ "id": "delete-file", "kind": "file-delete" }]
+    },
+    {
+      "path": "tests/harness/test_changed_components.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "809646136d4060fcd1d5edb568e001d654f1bed9",
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "9c6a8fb439fc087b49e6c34c78f1552a68cbe481", "sha256": "71232cc01eeb9d95accd25aabfa866de79d1d858b7fc79f984a14b76f2a93475" },
+      "operations": [
+        { "id": "delete-retired-route-assertions", "kind": "python-assertion-key-delete", "keys": ["compose", "docker_api", "docker_frontend"], "expectedAssertionCount": 17 },
+        { "id": "rename-frontend-runtime-route-test", "kind": "exact-text-replace", "from": "def test_frontend_runtime_change_routes_tests_image_and_codeql(self) -> None:", "to": "def test_frontend_runtime_change_routes_tests_and_codeql(self) -> None:" },
+        { "id": "rename-frontend-test-route-test", "kind": "exact-text-replace", "from": "def test_frontend_test_change_does_not_rebuild_image(self) -> None:", "to": "def test_frontend_test_change_routes_frontend(self) -> None:" },
+        { "id": "rename-infrastructure-route-test", "kind": "exact-text-replace", "from": "def test_infrastructure_schema_change_routes_api_and_compose(self) -> None:", "to": "def test_infrastructure_schema_change_routes_api_and_infrastructure(self) -> None:" }
+      ]
+    },
+    {
+      "path": "tests/harness/test_immutable_dependencies.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "d3dfe65e62a95ca4b0abb56024b906906bde34c7",
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "be58194dd0a4366db0f9689c5c2b9aa1f0f4a0cd", "sha256": "252a21a8fda88f3ac62c297198fb6bbf5813a18ff1e354fc5650ed4ca4a76b06" },
+      "operations": [
+        { "id": "retire-live-container-route-inputs", "kind": "exact-text-replace", "from": "        for path in (\n            \".github/workflows/codeql.yml\",\n            \"src/api/Dockerfile\",\n            \"docker-compose.yml\",\n        ):\n", "to": "        for path in (\".github/workflows/codeql.yml\",):\n" }
+      ]
+    },
+    {
+      "path": "tests/test-inventory.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "061c0c0647d0596ee709cf36e3526d5e61fae417",
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "517cb1d774c8db8ddf26fd925b1c8ea56704c138", "sha256": "f0589daeed2f0d345adadb4939a32cc49d79ff0ae810894b44ddea9fda11967f" },
+      "operations": [
+        {
+          "id": "retire-issue-72-suites",
+          "kind": "test-inventory-retire",
+          "issue": 72,
+          "suiteIds": ["compose-smoke", "container-api-build", "container-frontend-build", "container-tiler-pull"],
+          "baselinePaths": ["scripts/compose-smoke.sh"],
+          "replacementEvidence": "Repository-removal v2 issue #72 plan and signed checks: static-generic-host-lighthouse, static-offline-lifecycle-journey, static-target-content, static-web-shell.",
+          "fromUpdatedAt": "2026-08-17",
+          "toUpdatedAt": "2026-08-17"
+        }
+      ]
+    }
+  ],
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
