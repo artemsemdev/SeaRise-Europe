@@ -123,7 +123,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "058f8d30bc611f0b819a9a28716bd5e30b84aafe27a396be09edf729175b5c58" },
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "6ce17942de5f0535c249a4b799fa58acda87e3d0c831b6b2d8c2f7a2eb256af0" },
         { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v2/owner-decision.schema.json",
+  "title": "SeaRise Europe repository-removal v2 owner decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "decision", "approvedBy", "approvedAt", "preapprovalCommit", "preapprovalSha256", "removalPlanSha256", "approvalText", "approvalSource", "candidatePublicationAuthorized", "externalResourceMutationAuthorized"],
+  "properties": {
+    "$schema": { "const": "./owner-decision.schema.json" },
+    "schemaVersion": { "const": "2.0.0" },
+    "decision": { "const": "approved" },
+    "approvedBy": { "const": "project-owner" },
+    "approvedAt": { "type": "string", "format": "date-time" },
+    "preapprovalCommit": { "$ref": "#/$defs/gitSha" },
+    "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+    "removalPlanSha256": { "$ref": "#/$defs/sha256" },
+    "approvalText": { "type": "string", "minLength": 1 },
+    "approvalSource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issue", "commentId", "commentUrl", "author", "authorAssociation", "bodySha256"],
+      "properties": {
+        "issue": { "const": 68 }, "commentId": { "type": "integer", "minimum": 1 },
+        "commentUrl": { "type": "string", "format": "uri" }, "author": { "const": "artemsemdev" },
+        "authorAssociation": { "const": "OWNER" }, "bodySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "candidatePublicationAuthorized": { "const": false },
+    "externalResourceMutationAuthorized": { "const": false }
+  },
+  "$defs": { "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+}

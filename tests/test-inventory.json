@@ -344,6 +344,12 @@
       "observedAt": "2026-08-05T00:10:00+02:00",
       "reference": ".github/workflows/ci.yml and .github/workflows/codeql.yml",
       "environment": "agent/issue-73-tdd-harness worktree"
+    },
+    "local-2026-08-17-removal-v2-framework": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-17T00:00:00+02:00",
+      "reference": "scripts/repository/validate_removal_plan_v2.py and tests/repository-removal/test_validate_removal_plan_v2.py",
+      "environment": "macOS arm64; Python 3.11; deterministic temporary Git P-to-D-to-A repositories; strict JSON, committed trust roots, ancestry, exact diff, Git mode, owner-decision, static-profile activation, Candidate/TAR non-access, and adversarial mutation controls; no external mutation or Candidate bytes"
     }
   },
   "suites": [
@@ -1706,6 +1712,23 @@
       "execution": { "tier": "scheduled", "ciWorkflow": "codeql.yml", "ciJob": "analyze (csharp)", "requiresDocker": false, "requiresCredentials": true },
       "cost": { "estimatedSeconds": 145, "class": "slow", "evidenceRef": "codeql-27532482321", "scope": "ci-job" },
       "flakiness": { "status": "environment-sensitive", "owner": "security", "issue": null, "expiresAt": null, "evidence": "GitHub service action plus C# build; referenced scheduled run passed." }
+    },
+    {
+      "id": "repository-removal-v2-framework",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Fail closed across the repository-removal v2 P-to-D-to-A authority lifecycle before any issue 72 deletion is approved or applied.",
+      "sourcePaths": ["contracts/repository-removal/v2/*.schema.json", "scripts/repository/*.py", "tests/repository-removal/*.py", ".github/workflows/ci.yml"],
+      "changedPaths": ["contracts/repository-removal/**", "contracts/supply-chain/v2/static-target-profile.json", "scripts/repository/**", "tests/repository-removal/**", ".github/workflows/ci.yml"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Repository deletion authority must remain exact, committed, owner-bound, and independently enforced." },
+      "commands": { "focused": "python scripts/repository/validate_removal_plan_v2.py framework && python -m pytest tests/repository-removal tests/harness/test_changed_components.py -q", "full": "python -m pytest tests/repository-removal tests/harness/test_changed_components.py tests/harness/test_changed_suites.py tests/harness/test_immutable_dependencies.py -q" },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "repository-removal-v2", "requiresDocker": false, "requiresCredentials": true },
+      "cost": { "estimatedSeconds": 180, "class": "medium", "evidenceRef": "local-2026-08-17-removal-v2-framework", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "All repository mutations occur in isolated temporary Git repositories; live owner verification is mocked only in unit tests and mandatory in CI lifecycle states." }
     }
   ],
   "baselineTests": [
@@ -1939,7 +1962,10 @@
     { "path": "tests/harness/test_changed_suites.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/harness/test_inventory_evidence_time.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/harness/test_changed_components.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
-    { "path": "tests/harness/test_immutable_dependencies.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null }
+    { "path": "tests/harness/test_immutable_dependencies.py", "suite": "quality-inventory-harness", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_candidate_isolation.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_removal_approval.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_removal_plan_v2.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null }
   ],
   "knownGaps": [
     {
