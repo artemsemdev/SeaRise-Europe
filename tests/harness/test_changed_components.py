@@ -87,13 +87,15 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["heavy"])
         self.assertTrue(all(not outputs[name] for name in OUTPUTS))
 
-    def test_frontend_runtime_change_routes_tests_and_codeql(self) -> None:
+    def test_frontend_runtime_change_routes_tests_image_and_codeql(self) -> None:
         outputs = classify_paths(["src/frontend/src/app/page.tsx"])
 
         self.assertTrue(outputs["frontend"])
+        self.assertTrue(outputs["docker_frontend"])
         self.assertTrue(outputs["codeql_javascript"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["pipeline"])
+        self.assertFalse(outputs["compose"])
 
     def test_static_web_change_routes_only_target_web_and_codeql(self) -> None:
         outputs = classify_paths(["src/web/src/App.tsx"])
@@ -101,7 +103,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["web"])
         self.assertTrue(outputs["codeql_javascript"])
         self.assertFalse(outputs["frontend"])
+        self.assertFalse(outputs["docker_frontend"])
         self.assertFalse(outputs["api"])
+        self.assertFalse(outputs["compose"])
 
     def test_static_quality_tool_change_routes_web_and_javascript_codeql(self) -> None:
         for path in (
@@ -151,12 +155,13 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(classify_paths([path])["repository_removal"])
 
-    def test_frontend_test_change_routes_frontend(self) -> None:
+    def test_frontend_test_change_does_not_rebuild_image(self) -> None:
         outputs = classify_paths(
             ["src/frontend/src/__tests__/components/ResultPanel.test.tsx"]
         )
 
         self.assertTrue(outputs["frontend"])
+        self.assertFalse(outputs["docker_frontend"])
 
     def test_pmtiles_render_authorities_route_static_web_evidence_check(self) -> None:
         paths = [
@@ -172,6 +177,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["pipeline"])
                 self.assertFalse(outputs["frontend"])
+                self.assertFalse(outputs["docker_frontend"])
 
     def test_static_pmtiles_release_dependencies_route_macos_toolchain(self) -> None:
         paths = [
@@ -187,7 +193,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["release"])
                 self.assertFalse(outputs["frontend"])
+                self.assertFalse(outputs["docker_frontend"])
                 self.assertFalse(outputs["api"])
+                self.assertFalse(outputs["compose"])
 
     def test_unrelated_static_and_pipeline_paths_skip_release_toolchain(self) -> None:
         paths = [
@@ -210,6 +218,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["infrastructure"])
+        self.assertFalse(outputs["compose"])
 
     def test_ordinary_pipeline_change_skips_release_toolchain(self) -> None:
         outputs = classify_paths(["src/pipeline/searise_pipeline/config.py"])
@@ -249,11 +258,12 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(classify_paths([path])["release"])
 
-    def test_infrastructure_schema_change_routes_api_and_infrastructure(self) -> None:
+    def test_infrastructure_schema_change_routes_api_and_compose(self) -> None:
         outputs = classify_paths(["infra/db/init.sql"])
 
         self.assertTrue(outputs["infrastructure"])
         self.assertTrue(outputs["api"])
+        self.assertTrue(outputs["compose"])
         self.assertFalse(outputs["frontend"])
 
     def test_shared_contract_routes_all_language_tests_without_images(self) -> None:
@@ -264,6 +274,8 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["frontend"])
         self.assertTrue(outputs["api"])
         self.assertTrue(outputs["pipeline"])
+        self.assertFalse(outputs["docker_frontend"])
+        self.assertFalse(outputs["docker_api"])
 
     def test_public_release_contract_routes_python_and_frontend_only(self) -> None:
         outputs = classify_paths(["contracts/release/v1/manifest.schema.json"])
@@ -273,6 +285,9 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["pipeline"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["release"])
+        self.assertFalse(outputs["docker_frontend"])
+        self.assertFalse(outputs["docker_api"])
+        self.assertFalse(outputs["compose"])
         candidate = classify_paths(
             ["contracts/candidate-completeness/v1/candidate.schema.json"]
         )
@@ -364,6 +379,21 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertIn("permissions:\n      contents: read\n      issues: read", web)
         self.assertIn("fetch-depth: 0", web)
+        self.assertIn(
+            "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+            web,
+        )
+        self.assertIn('python-version: "3.11.9"', web)
+        dependency_install = (
+            "python -m pip install -r "
+            "contracts/supply-chain/v2/python/"
+            "static-target-contributor-requirements.txt"
+        )
+        self.assertIn(dependency_install, web)
+        self.assertLess(
+            web.index(dependency_install),
+            web.index("- name: Validate static target"),
+        )
         validation = web.split("- name: Validate static target", maxsplit=1)[1]
         validation = validation.split("\n      - name:", maxsplit=1)[0]
         self.assertIn("GH_TOKEN: ${{ github.token }}", validation)
@@ -803,6 +833,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertFalse(outputs["frontend"])
                 self.assertFalse(outputs["api"])
                 self.assertFalse(outputs["infrastructure"])
+                self.assertFalse(outputs["compose"])
 
     def test_offline_receipt_example_routes_pipeline_validation(self) -> None:
         outputs = classify_paths(
@@ -813,6 +844,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["infrastructure"])
+        self.assertFalse(outputs["compose"])
 
     def test_controlled_offline_build_is_manual_identity_bound_and_offline(
         self,
