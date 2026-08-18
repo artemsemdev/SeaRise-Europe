@@ -9,9 +9,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from scripts.repository.validate_removal_approval import (
-    DEFAULT_CENSUS,
     DEFAULT_CENSUS_SCHEMA,
     DEFAULT_CHECK_OUTPUT_SCHEMA,
     DEFAULT_DECISION_SCHEMA,
@@ -23,6 +23,7 @@ from scripts.repository.validate_removal_approval import (
     _canonical_census,
     _selector_count,
     _tracked_blobs,
+    _v2_authorizes_test_inventory_transition,
     expected_approval_text,
     validate_removal_approval,
 )
@@ -466,6 +467,163 @@ class ApprovalRepository:
 
 
 class RemovalApprovalTests(unittest.TestCase):
+    def _commit_v2_inventory_transition(
+        self,
+        repository: ApprovalRepository,
+        *,
+        before_sha256: str,
+        after_bytes: bytes,
+        after_sha256: str | None = None,
+        include_receipt: bool = True,
+    ) -> None:
+        audited_commit = repository._git("rev-parse", "HEAD").decode().strip()
+        plan = {
+            "auditedCommit": audited_commit,
+            "entries": [
+                {
+                    "path": str(TEST_INVENTORY_PATH),
+                    "after": {
+                        "state": "present",
+                        "sha256": after_sha256 or _sha256(after_bytes),
+                    },
+                }
+            ],
+        }
+        repository._write(
+            Path("contracts/repository-removal/v2/removal-plan.json"),
+            _json_bytes(plan),
+        )
+        paths = ["contracts/repository-removal/v2/removal-plan.json"]
+        if include_receipt:
+            repository._write(
+                Path("contracts/repository-removal/v2/application-receipt.json"),
+                b"{}\n",
+            )
+            paths.append("contracts/repository-removal/v2/application-receipt.json")
+        repository._write(TEST_INVENTORY_PATH, after_bytes)
+        paths.append(str(TEST_INVENTORY_PATH))
+        repository._git("add", *paths)
+        repository._git("commit", "-q", "-m", "test: apply v2 inventory transition")
+
+        with mock.patch(
+            "scripts.repository.validate_removal_plan_v2.validate_ci_state"
+        ) as validate_v2:
+            _v2_authorizes_test_inventory_transition(
+                repository.root,
+                test_inventory_path=TEST_INVENTORY_PATH,
+                expected_before_sha256=before_sha256,
+                current_bytes=after_bytes,
+                verify_owner_comment=True,
+            )
+        validate_v2.assert_called_once()
+
+    def test_v2_receipt_can_authorize_exact_test_inventory_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            before_bytes = repository._git("show", f"HEAD:{TEST_INVENTORY_PATH}")
+            self._commit_v2_inventory_transition(
+                repository,
+                before_sha256=_sha256(before_bytes),
+                after_bytes=b'{"suites": []}\n',
+            )
+
+    def test_v2_transition_rejects_wrong_v1_before_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            with self.assertRaisesRegex(
+                RemovalApprovalError,
+                "before-state does not match v1 evidence",
+            ):
+                self._commit_v2_inventory_transition(
+                    repository,
+                    before_sha256="0" * 64,
+                    after_bytes=b'{"suites": []}\n',
+                )
+
+    def test_v2_transition_rejects_wrong_after_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            before_bytes = repository._git("show", f"HEAD:{TEST_INVENTORY_PATH}")
+            with self.assertRaisesRegex(
+                RemovalApprovalError,
+                "after-state does not match committed bytes",
+            ):
+                self._commit_v2_inventory_transition(
+                    repository,
+                    before_sha256=_sha256(before_bytes),
+                    after_bytes=b'{"suites": []}\n',
+                    after_sha256="0" * 64,
+                )
+
+    def test_v2_transition_requires_live_owner_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            before_bytes = repository._git("show", f"HEAD:{TEST_INVENTORY_PATH}")
+            with self.assertRaisesRegex(
+                RemovalApprovalError,
+                "live GitHub owner comment verification is required",
+            ):
+                _v2_authorizes_test_inventory_transition(
+                    repository.root,
+                    test_inventory_path=TEST_INVENTORY_PATH,
+                    expected_before_sha256=_sha256(before_bytes),
+                    current_bytes=before_bytes + b" ",
+                    verify_owner_comment=False,
+                )
+
+    def test_v2_transition_rejects_invalid_receipt_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ApprovalRepository(Path(directory))
+            before_bytes = repository._git("show", f"HEAD:{TEST_INVENTORY_PATH}")
+            after_bytes = b'{"suites": []}\n'
+            audited_commit = repository._git("rev-parse", "HEAD").decode().strip()
+            repository._write(
+                Path("contracts/repository-removal/v2/removal-plan.json"),
+                _json_bytes(
+                    {
+                        "auditedCommit": audited_commit,
+                        "entries": [
+                            {
+                                "path": str(TEST_INVENTORY_PATH),
+                                "after": {
+                                    "state": "present",
+                                    "sha256": _sha256(after_bytes),
+                                },
+                            }
+                        ],
+                    }
+                ),
+            )
+            repository._write(
+                Path("contracts/repository-removal/v2/application-receipt.json"),
+                b"{}\n",
+            )
+            repository._write(TEST_INVENTORY_PATH, after_bytes)
+            repository._git(
+                "add",
+                "contracts/repository-removal/v2/removal-plan.json",
+                "contracts/repository-removal/v2/application-receipt.json",
+                str(TEST_INVENTORY_PATH),
+            )
+            repository._git("commit", "-q", "-m", "test: add invalid v2 receipt")
+
+            from scripts.repository.validate_removal_plan_v2 import PlanError
+
+            with mock.patch(
+                "scripts.repository.validate_removal_plan_v2.validate_ci_state",
+                side_effect=PlanError("invalid receipt history"),
+            ), self.assertRaisesRegex(
+                RemovalApprovalError,
+                "v2 application authority is invalid: invalid receipt history",
+            ):
+                _v2_authorizes_test_inventory_transition(
+                    repository.root,
+                    test_inventory_path=TEST_INVENTORY_PATH,
+                    expected_before_sha256=_sha256(before_bytes),
+                    current_bytes=after_bytes,
+                    verify_owner_comment=True,
+                )
+
     def test_repository_census_resolves_every_canonical_locator(self) -> None:
         root = Path(__file__).resolve().parents[2]
         inventory = json.loads(

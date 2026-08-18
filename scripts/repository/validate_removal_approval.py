@@ -42,6 +42,8 @@ DEFAULT_CHECK_OUTPUT_SCHEMA = CONTRACT_ROOT / "check-output.schema.json"
 DEFAULT_VALIDATOR = ROOT / "scripts/repository/validate_removal_approval.py"
 DEFAULT_TEST_INVENTORY = ROOT / "tests/test-inventory.json"
 DEFAULT_REPLACEMENT_MATRIX = ROOT / "docs/testing/legacy-runtime-removal-matrix.md"
+V2_PLAN_PATH = Path("contracts/repository-removal/v2/removal-plan.json")
+V2_RECEIPT_PATH = Path("contracts/repository-removal/v2/application-receipt.json")
 
 ACTIVE_TARGET_ROOTS = ("src/web/", "src/pipeline/searise_pipeline/")
 FORBIDDEN_EVIDENCE_COMMAND = re.compile(
@@ -560,6 +562,84 @@ def expected_approval_text(
         "publication/upload or deletion/mutation of any external resource, "
         "credential, GitHub environment, or secret."
     )
+
+
+def _v2_authorizes_test_inventory_transition(
+    repository_root: Path,
+    *,
+    test_inventory_path: Path,
+    expected_before_sha256: str,
+    current_bytes: bytes,
+    verify_owner_comment: bool,
+) -> None:
+    """Require an exact, durable v2 authority chain for inventory drift."""
+
+    logical_path = _repository_path(repository_root, test_inventory_path)
+    if logical_path != "tests/test-inventory.json":
+        raise RemovalApprovalError(
+            "v2 transition authority is limited to tests/test-inventory.json"
+        )
+    if not verify_owner_comment:
+        raise RemovalApprovalError(
+            "live GitHub owner comment verification is required for v2 transition"
+        )
+    if _committed_blob(repository_root, V2_RECEIPT_PATH, required=False) is None:
+        raise RemovalApprovalError("v2 application receipt is absent")
+
+    try:
+        from scripts.repository import validate_removal_plan_v2 as v2
+    except ImportError as exc:
+        raise RemovalApprovalError("v2 validator cannot be imported") from exc
+    try:
+        head = _git(repository_root, "rev-parse", "HEAD^{commit}").decode().strip()
+        v2.validate_ci_state(
+            repository_root,
+            head,
+            head,
+            verify_owner_comment=True,
+        )
+        plan_bytes = _committed_blob(repository_root, V2_PLAN_PATH, required=True)
+        assert plan_bytes is not None
+        plan = v2._json_load_bytes(plan_bytes, "removal plan")
+    except (UnicodeDecodeError, v2.PlanError) as exc:
+        raise RemovalApprovalError(
+            f"v2 application authority is invalid: {exc}"
+        ) from exc
+
+    entries = [
+        entry
+        for entry in plan.get("entries", [])
+        if isinstance(entry, dict) and entry.get("path") == logical_path
+    ]
+    if len(entries) != 1:
+        raise RemovalApprovalError(
+            "v2 plan must contain exactly one tests/test-inventory.json entry"
+        )
+    entry = entries[0]
+    audited_commit = plan.get("auditedCommit")
+    if not isinstance(audited_commit, str):
+        raise RemovalApprovalError("v2 plan auditedCommit is invalid")
+    try:
+        before_bytes = _git(
+            repository_root, "show", f"{audited_commit}:{logical_path}"
+        )
+    except RemovalApprovalError as exc:
+        raise RemovalApprovalError(
+            "v2 plan inventory before-state cannot be read"
+        ) from exc
+    if _sha256(before_bytes) != expected_before_sha256:
+        raise RemovalApprovalError(
+            "v2 plan inventory before-state does not match v1 evidence"
+        )
+    after = entry.get("after")
+    if not isinstance(after, dict) or after.get("state") != "present":
+        raise RemovalApprovalError(
+            "v2 plan inventory after-state must remain present"
+        )
+    if after.get("sha256") != _sha256(current_bytes):
+        raise RemovalApprovalError(
+            "v2 plan inventory after-state does not match committed bytes"
+        )
 
 
 def validate_removal_approval(
@@ -1169,8 +1249,26 @@ def validate_removal_approval(
                 errors.append(str(exc))
                 continue
             assert committed_bytes is not None
-            if contract_hashes.get(field) != _sha256(committed_bytes):
-                errors.append(f"evidence receipt {field} does not match committed bytes")
+            expected_hash = contract_hashes.get(field)
+            if expected_hash != _sha256(committed_bytes):
+                if field == "testInventorySha256" and isinstance(expected_hash, str):
+                    try:
+                        _v2_authorizes_test_inventory_transition(
+                            repository_root,
+                            test_inventory_path=path,
+                            expected_before_sha256=expected_hash,
+                            current_bytes=committed_bytes,
+                            verify_owner_comment=verify_owner_comment,
+                        )
+                    except RemovalApprovalError as exc:
+                        errors.append(
+                            "evidence receipt testInventorySha256 does not match "
+                            f"committed bytes; {exc}"
+                        )
+                else:
+                    errors.append(
+                        f"evidence receipt {field} does not match committed bytes"
+                    )
 
     checks = evidence.get("checks")
     if isinstance(checks, list) and all(isinstance(check, dict) for check in checks):
