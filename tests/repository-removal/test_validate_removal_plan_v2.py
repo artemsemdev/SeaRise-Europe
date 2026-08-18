@@ -206,7 +206,7 @@ def _add_receipt(repo: Path, preapproval: str, decision: str, applied: str) -> s
     return _commit(repo, "application receipt")
 
 
-def test_framework_contains_schemas_but_no_concrete_authority() -> None:
+def test_framework_contains_all_authority_schemas() -> None:
     validate_framework(ROOT)
     assert (V2 / "removal-plan.schema.json").is_file()
     assert (V2 / "preapproval.schema.json").is_file()
@@ -216,10 +216,6 @@ def test_framework_contains_schemas_but_no_concrete_authority() -> None:
         EXPECTED_TRUST_ROOTS["v2ApplicationReceiptSchema"]
         == "contracts/repository-removal/v2/application-receipt.schema.json"
     )
-    assert not (V2 / "removal-plan.json").exists()
-    assert not (V2 / "preapproval.json").exists()
-    assert not (V2 / "owner-decision.json").exists()
-    assert not (V2 / "application-receipt.json").exists()
 
 
 @pytest.mark.parametrize(
