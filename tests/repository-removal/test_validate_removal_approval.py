@@ -468,14 +468,19 @@ class ApprovalRepository:
 class RemovalApprovalTests(unittest.TestCase):
     def test_repository_census_resolves_every_canonical_locator(self) -> None:
         root = Path(__file__).resolve().parents[2]
-        commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        census = json.loads(DEFAULT_CENSUS.read_text(encoding="utf-8"))
+        inventory = json.loads(
+            (root / INVENTORY_PATH).read_text(encoding="utf-8")
+        )
+        commit = inventory["auditedCommit"]
+        census = json.loads(
+            subprocess.run(
+                ["git", "show", f"{commit}:{CENSUS_PATH}"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+        )
 
         owners, errors = _canonical_census(
             census,

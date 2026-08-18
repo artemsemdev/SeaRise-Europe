@@ -593,35 +593,65 @@ def test_schema_rejects_candidate_tar_publication_and_external_authority(
             _schema_validate_document(plan, schema, "plan")
 
 
-def _activation_operation(workflow: bytes) -> dict:
+ISSUE_72_SELECTOR_IDS = [
+    "ci-legacy-compose-smoke",
+    "ci-legacy-docker-api",
+    "ci-legacy-docker-frontend",
+    "legacy-api-dockerfile",
+    "legacy-compose-file",
+    "legacy-compose-smoke",
+    "legacy-frontend-dockerfile",
+]
+
+
+def _pending_issue_72_profile(workflow_sha256: str) -> bytes:
+    selectors = "".join(
+        f'      {{ "id": "{selector_id}", "issue": 72 }}' + ",\n"
+        for selector_id in ISSUE_72_SELECTOR_IDS
+    )
+    return (
+        "{\n"
+        '  "activation": {\n'
+        '    "blockingIssues": [70, 71, 72],\n'
+        '    "pendingSelectors": [\n'
+        f"{selectors}"
+        '      { "id": "legacy-api-tree", "issue": 71 }\n'
+        "    ]\n"
+        "  },\n"
+        '  "components": [\n'
+        "    {\n"
+        '      "id": "github-actions",\n'
+        '      "inputs": [\n'
+        '        { "path": ".github/workflows/ci.yml", '
+        f'"sha256": "{workflow_sha256}" }}\n'
+        "      ]\n"
+        "    }\n"
+        "  ]\n"
+        "}\n"
+    ).encode("utf-8")
+
+
+def _activation_operation(workflow: bytes, from_sha256: str) -> dict:
     return {
         "id": "activate-issue-72-profile",
         "kind": "static-profile-activation-transition",
         "issue": 72,
-        "pendingSelectorIds": [
-            "ci-legacy-compose-smoke",
-            "ci-legacy-docker-api",
-            "ci-legacy-docker-frontend",
-            "legacy-api-dockerfile",
-            "legacy-compose-file",
-            "legacy-compose-smoke",
-            "legacy-frontend-dockerfile",
-        ],
+        "pendingSelectorIds": ISSUE_72_SELECTOR_IDS,
         "componentId": "github-actions",
         "inputPath": ".github/workflows/ci.yml",
-        "fromSha256": "88b9b030ee2eda31d513486dfad5b59501c45340cbe44e0b314f72b7ee41caf9",
+        "fromSha256": from_sha256,
         "toSha256": hashlib.sha256(workflow).hexdigest(),
     }
 
 
 def test_static_profile_activation_removes_all_issue_72_state_and_rebinds_ci() -> None:
-    profile = (
-        ROOT / "contracts/supply-chain/v2/static-target-profile.json"
-    ).read_bytes()
+    original_workflow = b"audited workflow\n"
+    original_sha256 = hashlib.sha256(original_workflow).hexdigest()
+    profile = _pending_issue_72_profile(original_sha256)
     workflow = b"planned workflow\n"
     transformed = _static_profile_activation(
         profile,
-        _activation_operation(workflow),
+        _activation_operation(workflow, original_sha256),
         {".github/workflows/ci.yml": workflow},
         verify_target=True,
     )
@@ -641,11 +671,11 @@ def test_static_profile_activation_removes_all_issue_72_state_and_rebinds_ci() -
 
 
 def test_static_profile_activation_rejects_confirmed_selector_drift() -> None:
-    profile = (
-        ROOT / "contracts/supply-chain/v2/static-target-profile.json"
-    ).read_bytes()
+    original_workflow = b"audited workflow\n"
+    original_sha256 = hashlib.sha256(original_workflow).hexdigest()
+    profile = _pending_issue_72_profile(original_sha256)
     workflow = b"planned workflow\n"
-    operation = _activation_operation(workflow)
+    operation = _activation_operation(workflow, original_sha256)
     operation["pendingSelectorIds"] = operation["pendingSelectorIds"][:-1]
     with pytest.raises(PlanError, match="selectors pre-state changed"):
         _static_profile_activation(

@@ -89,14 +89,29 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         self.assertIn(
             "api-postgis-integration", {suite["id"] for suite in database_suites}
         )
-        self.assertIn("compose-smoke", {suite["id"] for suite in blob_seed_suites})
+        compose = next(
+            suite for suite in self.inventory["suites"] if suite["id"] == "compose-smoke"
+        )
+        selected_ids = {suite["id"] for suite in blob_seed_suites}
+        if compose["status"] == "active":
+            self.assertIn("compose-smoke", selected_ids)
+        else:
+            self.assertEqual(compose["status"], "retired")
+            self.assertNotIn("compose-smoke", selected_ids)
+            self.assertEqual(compose["removalGate"], 72)
+            self.assertIsNotNone(compose["replacementEvidence"])
 
-    def test_every_current_suite_has_explicit_active_lifecycle(self) -> None:
+    def test_every_current_suite_has_consistent_lifecycle_metadata(self) -> None:
         self.assertTrue(self.inventory["suites"])
         for suite in self.inventory["suites"]:
-            self.assertEqual(suite["status"], "active")
-            self.assertIsNone(suite["removalGate"])
-            self.assertIsNone(suite["replacementEvidence"])
+            with self.subTest(suite=suite["id"]):
+                if suite["status"] == "active":
+                    self.assertIsNone(suite["removalGate"])
+                    self.assertIsNone(suite["replacementEvidence"])
+                else:
+                    self.assertEqual(suite["status"], "retired")
+                    self.assertIsNotNone(suite["removalGate"])
+                    self.assertIsNotNone(suite["replacementEvidence"])
 
     def test_retired_suite_can_reference_removed_sources_with_evidence(self) -> None:
         inventory = copy.deepcopy(self.inventory)
@@ -152,7 +167,10 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
 
     def test_active_baseline_cannot_be_owned_by_retired_suite(self) -> None:
         inventory = copy.deepcopy(self.inventory)
-        suite_id = inventory["baselineTests"][0]["suite"]
+        baseline = next(
+            item for item in inventory["baselineTests"] if item["status"] == "active"
+        )
+        suite_id = baseline["suite"]
         suite = next(item for item in inventory["suites"] if item["id"] == suite_id)
         suite.update(
             status="retired",
@@ -171,7 +189,9 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
 
     def test_existing_test_cannot_be_declared_retired(self) -> None:
         inventory = copy.deepcopy(self.inventory)
-        baseline = inventory["baselineTests"][0]
+        baseline = next(
+            item for item in inventory["baselineTests"] if item["status"] == "active"
+        )
         baseline.update(
             status="retired",
             removalGate=73,
