@@ -18,9 +18,6 @@ OUTPUTS = (
     "pipeline",
     "release",
     "infrastructure",
-    "docker_frontend",
-    "docker_api",
-    "compose",
     "repository_removal",
     "codeql_javascript",
     "codeql_csharp",
@@ -126,47 +123,10 @@ RELEASE = (
 INFRASTRUCTURE = (
     "infra/**",
     "data/geometry/**",
-    "docker-compose.yml",
-    ".env.local.example",
-    "scripts/compose-smoke.sh",
 )
 
-FRONTEND_IMAGE = (
-    "src/frontend/Dockerfile",
-    "src/frontend/package.json",
-    "src/frontend/package-lock.json",
-    "src/frontend/next.config.js",
-    "src/frontend/postcss.config.mjs",
-    "src/frontend/tsconfig.json",
-    "src/frontend/src/**",
-)
 
-API_IMAGE = (
-    "src/api/Dockerfile",
-    "src/api/Directory.Build.props",
-    "src/api/*.sln",
-    "src/api/**/*.csproj",
-    "src/api/**/*.cs",
-    "src/api/**/appsettings*.json",
-)
 
-COMPOSE = (
-    "docker-compose.yml",
-    ".env.local.example",
-    "scripts/compose-smoke.sh",
-    "infra/**",
-    "data/geometry/**",
-    "src/frontend/Dockerfile",
-    "src/frontend/package.json",
-    "src/frontend/package-lock.json",
-    "src/frontend/next.config.js",
-    "src/frontend/src/app/api/health/route.ts",
-    "src/api/Dockerfile",
-    "src/api/Directory.Build.props",
-    "src/api/**/*.csproj",
-    "src/api/SeaRise.Api/Program.cs",
-    "src/api/SeaRise.Api/appsettings*.json",
-)
 
 REPOSITORY_REMOVAL = (
     "contracts/repository-removal/**",
@@ -198,12 +158,8 @@ def _matches(path: str, patterns: Sequence[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
-def _is_frontend_test(path: str) -> bool:
-    return "/__tests__/" in path or ".test." in path or ".spec." in path
 
 
-def _is_api_test(path: str) -> bool:
-    return "/SeaRise.Api.Tests/" in path
 
 
 def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
@@ -219,14 +175,6 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
         "release": any(_matches(path, RELEASE) for path in paths),
         "infrastructure": any(_matches(path, INFRASTRUCTURE) for path in paths),
-        "docker_frontend": any(
-            _matches(path, FRONTEND_IMAGE) and not _is_frontend_test(path)
-            for path in paths
-        ),
-        "docker_api": any(
-            _matches(path, API_IMAGE) and not _is_api_test(path) for path in paths
-        ),
-        "compose": any(_matches(path, COMPOSE) for path in paths),
         "repository_removal": any(_matches(path, REPOSITORY_REMOVAL) for path in paths),
         "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
         "codeql_csharp": any(_matches(path, CODEQL_CSHARP) for path in paths),

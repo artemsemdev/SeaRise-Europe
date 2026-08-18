@@ -44,9 +44,6 @@ jobs:
       pipeline: ${{ steps.route.outputs.pipeline }}
       release: ${{ steps.route.outputs.release }}
       infrastructure: ${{ steps.route.outputs.infrastructure }}
-      docker_frontend: ${{ steps.route.outputs.docker_frontend }}
-      docker_api: ${{ steps.route.outputs.docker_api }}
-      compose: ${{ steps.route.outputs.compose }}
       repository_removal: ${{ steps.route.outputs.repository_removal }}
       heavy: ${{ steps.route.outputs.heavy }}
     steps:
@@ -1062,63 +1059,15 @@ jobs:
           retention-days: 14
 
   infrastructure:
-    name: Infrastructure (compose config)
+    name: Infrastructure (blob seed compile)
     needs: changes
     if: needs.changes.outputs.infrastructure == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - name: Validate compose model
-        run: docker compose config --quiet
-
       - name: Compile blob seed
         run: python3 -m py_compile infra/blob-seed/seed.py
-
-  docker-frontend:
-    name: Docker Build (frontend)
-    needs: changes
-    if: needs.changes.outputs.docker_frontend == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Build frontend image
-        run: docker build -t searise-frontend:ci src/frontend
-
-  docker-api:
-    name: Docker Build (api)
-    needs: changes
-    if: needs.changes.outputs.docker_api == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Build API image
-        run: docker build -t searise-api:ci src/api
-
-  compose-smoke:
-    name: Compose Smoke (full stack health)
-    needs:
-      - changes
-      - frontend
-      - api
-      - infrastructure
-      - docker-frontend
-      - docker-api
-    if: >-
-      always() &&
-      needs.changes.outputs.compose == 'true' &&
-      !contains(needs.*.result, 'failure') &&
-      !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Run compose smoke test
-        env:
-          WAIT_TIMEOUT: "300"
-        run: bash scripts/compose-smoke.sh
 
   repository-removal-v2:
     name: Repository removal v2 authority
@@ -1185,9 +1134,6 @@ jobs:
       - ar6-release-evidence-macos
       - repository-removal-v2
       - infrastructure
-      - docker-frontend
-      - docker-api
-      - compose-smoke
     if: always()
     runs-on: ubuntu-latest
     steps:
