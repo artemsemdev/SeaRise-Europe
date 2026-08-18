@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -564,6 +565,29 @@ def expected_approval_text(
     )
 
 
+def _load_v2_validator(repository_root: Path) -> Any:
+    """Load the adjacent v2 validator independent of Python invocation mode."""
+
+    validator_path = (
+        repository_root / "scripts/repository/validate_removal_plan_v2.py"
+    ).resolve()
+    try:
+        validator_path.relative_to(repository_root.resolve())
+    except ValueError as exc:
+        raise RemovalApprovalError("v2 validator path escapes repository") from exc
+    spec = importlib.util.spec_from_file_location(
+        "searise_repository_removal_v2", validator_path
+    )
+    if spec is None or spec.loader is None:
+        raise RemovalApprovalError("v2 validator cannot be loaded")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (ImportError, OSError) as exc:
+        raise RemovalApprovalError("v2 validator cannot be loaded") from exc
+    return module
+
+
 def _v2_authorizes_test_inventory_transition(
     repository_root: Path,
     *,
@@ -586,10 +610,7 @@ def _v2_authorizes_test_inventory_transition(
     if _committed_blob(repository_root, V2_RECEIPT_PATH, required=False) is None:
         raise RemovalApprovalError("v2 application receipt is absent")
 
-    try:
-        from scripts.repository import validate_removal_plan_v2 as v2
-    except ImportError as exc:
-        raise RemovalApprovalError("v2 validator cannot be imported") from exc
+    v2 = _load_v2_validator(repository_root)
     try:
         head = _git(repository_root, "rev-parse", "HEAD^{commit}").decode().strip()
         v2.validate_ci_state(
