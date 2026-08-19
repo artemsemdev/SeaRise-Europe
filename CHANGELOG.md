@@ -242,6 +242,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- The issue #70 authority adapter can now atomically bind an explicitly planned
+  legacy baseline from `removalGate: null` to issue #70 before retirement, but
+  only when the same exact plan selects its owning suite and that suite already
+  declares `replacementGate.issue == 70`. Cross-suite and unlisted baseline
+  promotion remains fail-closed; no legacy source is removed by this change.
+
 - Corrected the test-retirement inventory so executable legacy frontend
   Python tests cannot escape discovery, removal-bound suites point to explicit
   stronger static-target evidence, and PostGIS/blob-seed changes route through
