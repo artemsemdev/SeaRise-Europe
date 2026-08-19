@@ -92,7 +92,9 @@ def _copy_historical_authority(destination: Path) -> None:
     retained.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(ROOT / "contracts/supply-chain/v1", retained)
 
-    inventory = _load()["historicalEvidence"]["dependencyInventory"]["path"]
+    historical = _load()["historicalEvidence"]
+    inventory = historical["dependencyInventory"]["path"]
+    authority_commit = historical["gitAuthority"]["commit"]
     inventory_document = json.loads((ROOT / inventory).read_bytes())
     for component in inventory_document["components"]:
         for item in component["inputs"]:
@@ -100,7 +102,18 @@ def _copy_historical_authority(destination: Path) -> None:
             if target.exists():
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(ROOT / item["path"], target)
+            source = ROOT / item["path"]
+            if source.exists():
+                shutil.copy2(source, target)
+                continue
+            target.write_bytes(
+                subprocess.run(
+                    ["git", "show", f"{authority_commit}:{item['path']}"],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+            )
 
 
 def _commit(repository: Path, message: str) -> str:
@@ -300,27 +313,20 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     assert document["target"] == "static-browser"
     assert document["productionClaim"] is False
     assert document["activation"]["status"] == "pending-legacy-removal"
-    assert document["activation"]["blockingIssues"] == [70, 71, 72]
+    assert document["activation"]["blockingIssues"] == [70, 71]
     assert {
         selector["id"]: selector["issue"]
         for selector in document["activation"]["pendingSelectors"]
     } == {
         "ci-legacy-api": 71,
-        "ci-legacy-compose-smoke": 72,
-        "ci-legacy-docker-api": 72,
-        "ci-legacy-docker-frontend": 72,
         "ci-legacy-frontend": 70,
         "ci-legacy-infrastructure": 71,
         "codeql-legacy-csharp": 71,
         "legacy-api-tree": 71,
-        "legacy-api-dockerfile": 72,
         "legacy-blob-seed-tree": 71,
-        "legacy-compose-file": 72,
-        "legacy-compose-smoke": 72,
         "legacy-db-geography": 71,
         "legacy-db-init": 71,
         "legacy-frontend-tree": 70,
-        "legacy-frontend-dockerfile": 72,
         "legacy-solution-file": 71,
         "pipeline-pyproject-azure": 71,
         "pipeline-pyproject-postgis": 71,
@@ -742,7 +748,7 @@ def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> 
 
     assert len(validated["components"]) == 14
     assert validated["activation"]["status"] == "pending-legacy-removal"
-    assert validated["activation"]["blockingIssues"] == [70, 71, 72]
+    assert validated["activation"]["blockingIssues"] == [70, 71]
 
 
 def test_profile_rejects_legacy_runtime_as_an_active_input(tmp_path: Path) -> None:
@@ -879,13 +885,6 @@ def test_profile_detects_pep508_legacy_name_with_alternate_whitespace(tmp_path: 
             "languages: ${{ env.LANGUAGE_A }}${{ env.LANGUAGE_B }}",
             'LANGUAGE_A: "csh"\nLANGUAGE_B: "arp"',
         ),
-        (
-            ".github/workflows/ci.yml",
-            "ci-legacy-compose-smoke",
-            "docker compose",
-            "${{ env.CONTAINER_CLI }} ${{ env.CONTAINER_SUBCOMMAND }}",
-            'CONTAINER_CLI: "docker"\nCONTAINER_SUBCOMMAND: "compose"',
-        ),
     ],
 )
 def test_workflow_job_authority_resists_split_env_indirection(
@@ -1000,7 +999,7 @@ def test_profile_accepts_exact_partial_selector_shrink(tmp_path: Path) -> None:
         repository_root=repository,
     )
 
-    assert validated["activation"]["blockingIssues"] == [71, 72]
+    assert validated["activation"]["blockingIssues"] == [71]
     assert all(
         selector["issue"] != 70
         for selector in validated["activation"]["pendingSelectors"]
@@ -1019,7 +1018,7 @@ def test_issue_71_migration_requires_exact_static_contributor_parity(tmp_path: P
         repository_root=repository,
     )
 
-    assert validated["activation"]["blockingIssues"] == [70, 72]
+    assert validated["activation"]["blockingIssues"] == [70]
     assert all(
         component["id"] != "pending-legacy-python-authorities"
         for component in validated["components"]
@@ -1031,7 +1030,7 @@ def test_profile_becomes_active_only_after_final_tracked_absence(tmp_path: Path)
     _copy_active_authority(repository)
     document = copy.deepcopy(_load())
     _migrate_issue_71_python_authority(document, repository)
-    for issue in (70, 71, 72):
+    for issue in (70, 71):
         _remove_issue_selectors(document, repository, issue)
 
     validated = validate_static_target_profile(
@@ -1064,7 +1063,7 @@ def test_broken_symlink_cannot_satisfy_active_absence(tmp_path: Path) -> None:
     _copy_active_authority(repository)
     document = copy.deepcopy(_load())
     _migrate_issue_71_python_authority(document, repository)
-    for issue in (70, 71, 72):
+    for issue in (70, 71):
         _remove_issue_selectors(document, repository, issue)
     geography = repository / "infra/db/init-geography.sql"
     geography.parent.mkdir(parents=True, exist_ok=True)
