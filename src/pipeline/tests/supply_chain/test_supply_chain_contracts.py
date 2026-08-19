@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import shutil
+import subprocess
 from datetime import timezone
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ POLICY = CONTRACT_ROOT / "identity-policy.json"
 SBOM = VALID_ROOT / "frontend.cdx.json"
 SBOM_LOGICAL_PATH = "sbom/frontend.cdx.json"
 DEPENDENCY_INVENTORY = CONTRACT_ROOT / "dependency-inventory.json"
+HISTORICAL_AUTHORITY_COMMIT = "1637057f758599b1edcd35ffba0d31ec65cf8c24"
 
 
 def _write_json(path: Path, document: dict[str, Any]) -> Path:
@@ -58,7 +60,40 @@ def _copy_dependency_inputs(destination: Path) -> None:
         for item in component["inputs"]:
             target = destination / item["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(REPOSITORY_ROOT / item["path"], target)
+            target.write_bytes(
+                subprocess.run(
+                    [
+                        "git",
+                        "show",
+                        f"{HISTORICAL_AUTHORITY_COMMIT}:{item['path']}",
+                    ],
+                    cwd=REPOSITORY_ROOT,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+            )
+
+
+def _validate_dependency_document(
+    tmp_path: Path,
+    document: dict[str, Any],
+) -> dict[str, Any]:
+    repository = tmp_path / "historical-inputs"
+    _copy_dependency_inputs(repository)
+    for component in document["components"]:
+        for item in component["inputs"]:
+            logical = Path(item["path"])
+            if logical.is_absolute() or ".." in logical.parts:
+                continue
+            source = REPOSITORY_ROOT / logical
+            target = repository / logical
+            if source.is_file() and not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+    return validate_dependency_inventory(
+        _write_json(tmp_path / "inventory.json", document),
+        repository_root=repository,
+    )
 
 
 def _dependency_component(document: dict[str, Any], component_id: str) -> dict[str, Any]:
@@ -350,7 +385,7 @@ def test_dependency_inventory_rejects_stale_recorded_hash(tmp_path: Path) -> Non
     document["components"][0]["inputs"][0]["sha256"] = "f" * 64
 
     with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_changed_input_bytes(tmp_path: Path) -> None:
@@ -368,7 +403,7 @@ def test_dependency_inventory_rejects_missing_record(tmp_path: Path) -> None:
     document["components"][0]["inputs"].pop(0)
 
     with pytest.raises(SupplyChainContractError, match="discovery mismatch"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_extra_record(tmp_path: Path) -> None:
@@ -385,7 +420,7 @@ def test_dependency_inventory_rejects_extra_record(tmp_path: Path) -> None:
     component["inputs"].sort(key=lambda item: item["path"])
 
     with pytest.raises(SupplyChainContractError, match="unclassified dependency input"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_duplicate_input(tmp_path: Path) -> None:
@@ -396,7 +431,7 @@ def test_dependency_inventory_rejects_duplicate_input(tmp_path: Path) -> None:
     component["inputs"].insert(1, duplicate)
 
     with pytest.raises(SupplyChainContractError, match="duplicate dependency input"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 @pytest.mark.parametrize("mutation", ["missing", "extra", "duplicate"])
@@ -429,7 +464,7 @@ def test_dependency_inventory_rejects_component_set_drift(
         SupplyChainContractError,
         match="component set mismatch|identifiers must be unique",
     ):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_path_escape(tmp_path: Path) -> None:
@@ -437,7 +472,7 @@ def test_dependency_inventory_rejects_path_escape(tmp_path: Path) -> None:
     document["components"][0]["inputs"][0]["path"] = "../outside"
 
     with pytest.raises(SupplyChainContractError, match="unsafe dependency input path"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_symlinked_input(tmp_path: Path) -> None:
@@ -469,7 +504,7 @@ def test_dependency_inventory_rejects_invalid_status_combination(tmp_path: Path)
     document["components"][0]["coverage"] = "range-constrained"
 
     with pytest.raises(SupplyChainContractError, match="invalid dependency status combination"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 @pytest.mark.parametrize("level", ["component", "input"])
@@ -481,7 +516,7 @@ def test_dependency_inventory_rejects_unstable_order(tmp_path: Path, level: str)
         document["components"][0]["inputs"].reverse()
 
     with pytest.raises(SupplyChainContractError, match="stable sorted order"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_discovery_rejects_new_unclassified_input(tmp_path: Path) -> None:
