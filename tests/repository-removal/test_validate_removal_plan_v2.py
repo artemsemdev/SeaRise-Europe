@@ -804,3 +804,100 @@ def test_issue70_framework_cli_runs_from_an_exact_path() -> None:
     assert completed.stdout.strip() == (
         "validated repository-removal v2 issue-70 framework"
     )
+
+
+def test_issue70_inventory_retirement_promotes_selected_suite_baseline() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    content = (
+        b'{\n'
+        b'  "updatedAt": "2026-08-17",\n'
+        b'  "suites": [\n'
+        b'    {"id": "legacy", "status": "active", "removalGate": null, '
+        b'"replacementEvidence": null, "replacementGate": {"issue": 70}}\n'
+        b'  ],\n'
+        b'  "baselineTests": [\n'
+        b'    {"path": "legacy.test.ts", "suite": "legacy", "status": "active", '
+        b'"removalGate": null, "replacementEvidence": null}\n'
+        b'  ]\n'
+        b'}\n'
+    )
+    operation = {
+        "issue": 70,
+        "suiteIds": ["legacy"],
+        "baselinePaths": ["legacy.test.ts"],
+        "replacementEvidence": "Static target evidence remains green.",
+        "fromUpdatedAt": "2026-08-17",
+        "toUpdatedAt": "2026-08-20",
+    }
+
+    transformed = json.loads(engine._test_inventory_transform(content, operation))
+
+    assert transformed["suites"][0]["status"] == "retired"
+    assert transformed["suites"][0]["removalGate"] == 70
+    assert transformed["baselineTests"][0]["status"] == "retired"
+    assert transformed["baselineTests"][0]["removalGate"] == 70
+
+
+def test_issue70_inventory_retirement_rejects_cross_suite_baseline() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    content = (
+        b'{"updatedAt":"2026-08-17","suites":['
+        b'{"id":"other","status":"active","removalGate":null,'
+        b'"replacementEvidence":null,"replacementGate":{"issue":71}}],'
+        b'"baselineTests":[{"path":"other.test.ts","suite":"other",'
+        b'"status":"active","removalGate":null,"replacementEvidence":null}]}\n'
+    )
+    operation = {
+        "issue": 70,
+        "suiteIds": ["legacy"],
+        "baselinePaths": ["other.test.ts"],
+        "replacementEvidence": "Static target evidence remains green.",
+        "fromUpdatedAt": "2026-08-17",
+        "toUpdatedAt": "2026-08-20",
+    }
+
+    with pytest.raises(engine.PlanError, match="baseline authority mismatch"):
+        engine._test_inventory_transform(content, operation)
+
+
+def test_issue70_inventory_retirement_accepts_current_exact_frontend_set() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    inventory_path = ROOT / "tests/test-inventory.json"
+    content = inventory_path.read_bytes()
+    inventory = json.loads(content)
+    suite_ids = sorted(
+        suite["id"]
+        for suite in inventory["suites"]
+        if suite["replacementGate"]["issue"] == 70
+    )
+    baseline_paths = sorted(
+        item["path"]
+        for item in inventory["baselineTests"]
+        if item["suite"] in suite_ids
+    )
+    operation = {
+        "issue": 70,
+        "suiteIds": suite_ids,
+        "baselinePaths": baseline_paths,
+        "replacementEvidence": (
+            "Static target suites preserve equivalent-or-stronger issue #70 coverage."
+        ),
+        "fromUpdatedAt": inventory["updatedAt"],
+        "toUpdatedAt": "2026-08-20",
+    }
+
+    transformed = json.loads(engine._test_inventory_transform(content, operation))
+    retired_suites = {
+        suite["id"] for suite in transformed["suites"] if suite["status"] == "retired"
+    }
+    retired_baselines = {
+        item["path"]
+        for item in transformed["baselineTests"]
+        if item["status"] == "retired" and item["removalGate"] == 70
+    }
+
+    assert retired_suites.issuperset(suite_ids)
+    assert retired_baselines.issuperset(baseline_paths)

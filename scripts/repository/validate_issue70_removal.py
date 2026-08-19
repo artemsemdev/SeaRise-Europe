@@ -81,6 +81,58 @@ def _specialize_schema(value: Any) -> Any:
     return value
 
 
+def _issue70_test_inventory_transform(
+    engine: Any,
+    content: bytes,
+    operation: dict[str, Any],
+) -> bytes:
+    """Promote only exact-plan baselines owned by selected issue #70 suites."""
+
+    document = engine._json_load_bytes(content, "issue #70 test inventory")
+    selected_suites = set(operation["suiteIds"])
+    suites = {suite["id"]: suite for suite in document["suites"]}
+    text = content.decode("utf-8")
+
+    for path in operation["baselinePaths"]:
+        matches = [item for item in document["baselineTests"] if item["path"] == path]
+        if len(matches) != 1:
+            raise engine.PlanError(
+                f"baseline retirement path must exist exactly once: {path}"
+            )
+        item = matches[0]
+        suite = suites.get(item["suite"])
+        if (
+            item["status"] != "active"
+            or item["replacementEvidence"] is not None
+            or item["suite"] not in selected_suites
+            or suite is None
+            or suite["replacementGate"]["issue"] != 70
+        ):
+            raise engine.PlanError(f"issue #70 baseline authority mismatch: {path}")
+        if item["removalGate"] not in {None, 70}:
+            raise engine.PlanError(f"issue #70 baseline gate differs: {path}")
+        if item["removalGate"] is None:
+            lines = text.splitlines(keepends=True)
+            selected = [
+                index for index, line in enumerate(lines) if f'"path": "{path}"' in line
+            ]
+            if len(selected) != 1:
+                raise engine.PlanError(
+                    f"issue #70 baseline formatting drifted: {path}"
+                )
+            index = selected[0]
+            if lines[index].count('"removalGate": null') != 1:
+                raise engine.PlanError(f"issue #70 baseline gate drifted: {path}")
+            lines[index] = lines[index].replace(
+                '"removalGate": null', '"removalGate": 70', 1
+            )
+            text = "".join(lines)
+
+    return engine._issue70_base_test_inventory_transform(
+        text.encode("utf-8"), operation
+    )
+
+
 def configure_engine(repository_root: Path) -> Any:
     engine = _load_base_engine(repository_root)
     profile = engine._json_load_path(repository_root / PROFILE_PATH, "issue #70 profile")
@@ -117,6 +169,10 @@ def configure_engine(repository_root: Path) -> Any:
         base_validate(document, schema, label)
 
     engine._schema_validate_document = validate_specialized
+    engine._issue70_base_test_inventory_transform = engine._test_inventory_transform
+    engine._test_inventory_transform = lambda content, operation: (
+        _issue70_test_inventory_transform(engine, content, operation)
+    )
     return engine
 
 
