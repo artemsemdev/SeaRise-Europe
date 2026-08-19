@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "2.0.0",
+  "profileId": "phase-2-issue-70-removal-v2",
+  "issue": 70,
+  "approvalIssue": 68,
+  "contractDirectory": "contracts/repository-removal/v2/issue-70",
+  "planId": "phase-2-issue-70-exact-removal-v2",
+  "preapprovalId": "phase-2-issue-70-removal-v2",
+  "receiptId": "phase-2-issue-70-removal-v2-application",
+  "baseValidator": "scripts/repository/validate_removal_plan_v2.py",
+  "baseSchemaDirectory": "contracts/repository-removal/v2",
+  "safety": {
+    "candidatePublicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}

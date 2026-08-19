@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import copy
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -32,6 +35,7 @@ from scripts.repository.validate_removal_plan_v2 import (
 
 ROOT = Path(__file__).resolve().parents[2]
 V2 = ROOT / "contracts/repository-removal/v2"
+ISSUE70_ADAPTER = ROOT / "scripts/repository/validate_issue70_removal.py"
 
 
 def _run(repo: Path, *arguments: str) -> str:
@@ -628,7 +632,7 @@ def _pending_issue_72_profile(workflow_sha256: str) -> bytes:
         "    }\n"
         "  ]\n"
         "}\n"
-    ).encode("utf-8")
+    ).encode()
 
 
 def _activation_operation(workflow: bytes, from_sha256: str) -> dict:
@@ -708,3 +712,95 @@ def test_candidate_and_tar_paths_are_never_read(
     lowered = " ".join(EXPECTED_TRUST_ROOTS.values()).lower()
     assert "candidate" not in lowered
     assert ".tar" not in lowered
+
+
+def _load_issue70_adapter():
+    spec = importlib.util.spec_from_file_location(
+        "_issue70_removal_adapter", ISSUE70_ADAPTER
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _issue70_plan() -> dict:
+    plan = json.loads((V2 / "removal-plan.json").read_bytes())
+    plan["planId"] = "phase-2-issue-70-exact-removal-v2"
+    plan["issue"] = 70
+    for entry in plan["entries"]:
+        for operation in entry["operations"]:
+            if operation.get("issue") == 72:
+                operation["issue"] = 70
+    return plan
+
+
+def test_issue70_framework_is_additive_and_valid() -> None:
+    adapter = _load_issue70_adapter()
+    adapter.validate_framework(ROOT)
+    engine = adapter.configure_engine(ROOT)
+
+    assert engine.PLAN_PATH == (
+        "contracts/repository-removal/v2/issue-70/removal-plan.json"
+    )
+    assert engine.RECEIPT_PATH == (
+        "contracts/repository-removal/v2/issue-70/application-receipt.json"
+    )
+    assert engine.EXPECTED_TRUST_ROOTS["issue72ApplicationReceipt"] == (
+        "contracts/repository-removal/v2/application-receipt.json"
+    )
+    assert engine.EXPECTED_TRUST_ROOTS["issue70Validator"] == (
+        "scripts/repository/validate_issue70_removal.py"
+    )
+
+
+def test_issue70_schema_specialization_is_exact() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    schema = json.loads((V2 / "removal-plan.schema.json").read_bytes())
+    specialized = adapter._specialize_schema(copy.deepcopy(schema))
+
+    engine._schema_validate_document(_issue70_plan(), schema, "removal plan")
+    with pytest.raises(engine.PlanError, match="schema violation"):
+        engine._schema_validate_document(
+            json.loads((V2 / "removal-plan.json").read_bytes()),
+            schema,
+            "removal plan",
+        )
+    assert specialized["properties"]["issue"]["const"] == 70
+
+
+def test_issue70_configuration_does_not_mutate_completed_issue72_files() -> None:
+    adapter = _load_issue70_adapter()
+    before = {
+        path: (ROOT / path).read_bytes()
+        for path in adapter.COMPLETED_ISSUE_72_ARTIFACTS.values()
+    }
+
+    adapter.configure_engine(ROOT)
+
+    assert {
+        path: (ROOT / path).read_bytes()
+        for path in adapter.COMPLETED_ISSUE_72_ARTIFACTS.values()
+    } == before
+
+
+def test_issue70_framework_cli_runs_from_an_exact_path() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ISSUE70_ADAPTER),
+            "--repository-root",
+            str(ROOT),
+            "framework",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == (
+        "validated repository-removal v2 issue-70 framework"
+    )

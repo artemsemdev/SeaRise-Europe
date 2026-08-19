@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added an isolated issue #70 repository-removal authority profile and adapter
+  that reuses the reviewed v2 lifecycle engine without rewriting the completed
+  issue #72 chain. Future Next.js removal approval must bind the dedicated
+  contract directory, adapter, and preserved issue #72 decision artifacts.
+
 - Added fail-closed static target, repository-readiness, final-repository, and
   built-output gates for legacy runtime dependencies and both unversioned and
   `/v1/` dynamic endpoints. Historical terminology exceptions now require an
