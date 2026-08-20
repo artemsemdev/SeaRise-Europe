@@ -105,6 +105,19 @@ def _issue70_schema(schema: dict[str, Any]) -> dict[str, Any]:
             {
                 "type": "object",
                 "additionalProperties": False,
+                "required": ["id", "kind", "from", "to"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "kind": {"const": "content-authority-handoff"},
+                    "from": {"type": "string", "minLength": 1},
+                    "to": {"type": "string", "minLength": 1},
+                },
+            }
+        )
+        operations.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
                 "required": ["id", "kind", "name", "values"],
                 "properties": {
                     "id": {"type": "string"},
@@ -212,6 +225,7 @@ def _issue70_materialize_plan(
     verify_after: bool = True,
 ) -> dict[str, bytes | None]:
     custom_kinds = {
+        "content-authority-handoff",
         "python-tuple-literal-value-delete",
         "workflow-step-run-replace",
     }
@@ -226,26 +240,49 @@ def _issue70_materialize_plan(
         )
 
     base_plan = copy.deepcopy(plan)
-    for entry in base_plan["entries"]:
+    for entry, original_entry in zip(base_plan["entries"], plan["entries"]):
         entry["operations"] = [
             operation
             for operation in entry["operations"]
             if operation["kind"] not in custom_kinds
         ]
-        if not entry["operations"]:
+        if not entry["operations"] and not (
+            entry["path"] == "src/web/scripts/check-target-content.mjs"
+            and len(original_entry["operations"]) == 1
+            and original_entry["operations"][0]["kind"] == "content-authority-handoff"
+        ):
             raise engine.PlanError(
                 "issue #70 custom operation must accompany a structural operation"
             )
+    base_plan["entries"] = [entry for entry in base_plan["entries"] if entry["operations"]]
     materialized = engine._issue70_base_materialize_plan(
         root, base_plan, verify_after=False
     )
 
     for entry in custom_entries:
-        content = materialized[entry["path"]]
+        content = materialized.get(entry["path"])
+        if content is None and all(
+            operation["kind"] == "content-authority-handoff"
+            for operation in entry["operations"]
+        ):
+            content = engine._audited_blob(
+                root, plan["auditedCommit"], entry["path"]
+            )
         if content is None:
             raise engine.PlanError("issue #70 custom operation target is absent")
         for operation in entry["operations"]:
-            if operation["kind"] == "workflow-step-run-replace":
+            if operation["kind"] == "content-authority-handoff":
+                if entry["path"] != "src/web/scripts/check-target-content.mjs":
+                    raise engine.PlanError(
+                        "content authority handoff is restricted to the content checker"
+                    )
+                source = operation["from"].encode("utf-8")
+                if content.count(source) != 1:
+                    raise engine.PlanError(
+                        "content authority handoff source must match exactly once"
+                    )
+                content = content.replace(source, operation["to"].encode("utf-8"), 1)
+            elif operation["kind"] == "workflow-step-run-replace":
                 if entry["path"] != ".github/workflows/ci.yml":
                     raise engine.PlanError("workflow step handoff is restricted to CI")
                 content = _replace_workflow_step_run(engine, content, operation)

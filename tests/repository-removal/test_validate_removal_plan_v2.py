@@ -977,6 +977,41 @@ def test_issue70_tuple_value_deletion_fails_closed() -> None:
         )
 
 
+def test_issue70_content_authority_handoff_is_path_and_text_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    path = "src/web/scripts/check-target-content.mjs"
+    operation = {
+        "id": "handoff-content-authority",
+        "kind": "content-authority-handoff",
+        "from": "old authority",
+        "to": "issue-70 authority",
+    }
+    plan = {
+        "auditedCommit": "0" * 40,
+        "entries": [{
+            "path": path,
+            "after": {"state": "present"},
+            "operations": [operation],
+        }],
+    }
+    monkeypatch.setattr(
+        engine, "_issue70_base_materialize_plan", lambda *args, **kwargs: {}
+    )
+    monkeypatch.setattr(engine, "_audited_blob", lambda *args: b"old authority")
+
+    materialized = adapter._issue70_materialize_plan(
+        engine, ROOT, plan, verify_after=False
+    )
+    assert materialized[path] == b"issue-70 authority"
+
+    plan["entries"][0]["path"] = "src/web/scripts/other.mjs"
+    with pytest.raises(engine.PlanError, match="must accompany a structural operation"):
+        adapter._issue70_materialize_plan(engine, ROOT, plan, verify_after=False)
+
+
 def test_issue70_schema_accepts_only_explicit_workflow_handoff_shape() -> None:
     adapter = _load_issue70_adapter()
     engine = adapter.configure_engine(ROOT)
