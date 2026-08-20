@@ -1188,6 +1188,11 @@ def test_issue71_exact_rewrite_allowlist_is_narrow() -> None:
     assert engine._exact_text_transform(
         b"before\nstale assertion\nafter\n",
         [operation],
+        "src/web/scripts/check-target-content.mjs",
+    ) == b"before\nafter\n"
+    assert engine._exact_text_transform(
+        b"before\nstale assertion\nafter\n",
+        [operation],
         "src/web/scripts/static-repository-gates.mjs",
     ) == b"before\nafter\n"
     assert engine._exact_text_transform(
