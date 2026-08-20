@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -164,7 +165,6 @@ def _activate_static_profile(
     *,
     verify_target: bool,
 ) -> bytes:
-    text = engine._decode(content, "static target profile")
     document = engine._json_load_bytes(content, "static target profile")
     activation = document["activation"]
     issue = operation["issue"]
@@ -177,30 +177,6 @@ def _activate_static_profile(
     paths = [binding["inputPath"] for binding in bindings]
     if sorted(paths) != [".github/workflows/ci.yml", ".github/workflows/codeql.yml"]:
         raise engine.PlanError("static profile bindings must cover both workflows")
-
-    blocking_line = next(
-        (line for line in text.splitlines(keepends=True) if '"blockingIssues":' in line),
-        None,
-    )
-    if blocking_line is None:
-        raise engine.PlanError("static profile blockingIssues line is missing")
-    text = engine._replace_once(
-        text,
-        blocking_line,
-        blocking_line.replace(
-            json.dumps(activation["blockingIssues"]),
-            json.dumps([value for value in activation["blockingIssues"] if value != issue]),
-        ),
-        operation["id"],
-    )
-    for selector in selected:
-        marker = f'"id": "{selector["id"]}"'
-        lines = [line for line in text.splitlines(keepends=True) if marker in line]
-        if len(lines) != 1:
-            raise engine.PlanError(
-                f"static profile selector formatting drifted: {selector['id']}"
-            )
-        text = engine._replace_once(text, lines[0], "", selector["id"])
 
     for binding in bindings:
         components = [
@@ -224,66 +200,89 @@ def _activate_static_profile(
         expected = engine._sha256(dependency)
         if verify_target and binding["toSha256"] != expected:
             raise engine.PlanError("static profile input post-state is not bound")
-        text = engine._replace_once(
-            text, binding["fromSha256"], expected, binding["inputPath"]
-        )
+        inputs[0]["sha256"] = expected
 
-    transformed = engine._json_load_bytes(
-        text.encode("utf-8"), "transformed static target profile"
-    )
-    if (
-        transformed["activation"]["pendingSelectors"]
-        or transformed["activation"]["blockingIssues"]
-    ):
+    activation["blockingIssues"] = [
+        value for value in activation["blockingIssues"] if value != issue
+    ]
+    activation["pendingSelectors"] = [
+        item for item in activation["pendingSelectors"] if item["issue"] != issue
+    ]
+    if activation["pendingSelectors"] or activation["blockingIssues"]:
         raise engine.PlanError("issue #71 must be the final static profile blocker")
-    text = engine._replace_once(
-        text,
-        '"status": "pending-legacy-removal"',
-        '"status": "active"',
-        operation["id"],
+    if activation["status"] != "pending-legacy-removal":
+        raise engine.PlanError("static profile activation status pre-state changed")
+    activation["status"] = "active"
+
+    pending = [
+        component
+        for component in document["components"]
+        if component["id"] == "pending-legacy-python-authorities"
+    ]
+    contributor = [
+        component
+        for component in document["components"]
+        if component["id"] == "pipeline-python-contributor"
+    ]
+    if len(pending) != 1 or len(contributor) != 1:
+        raise engine.PlanError("static Python authority components changed")
+    pending_inputs = pending[0]["inputs"]
+    expected_paths = {
+        "src/pipeline/pyproject.toml",
+        "src/pipeline/requirements-pipeline.txt",
+    }
+    if {item["path"] for item in pending_inputs} != expected_paths:
+        raise engine.PlanError("pending Python authority inputs changed")
+    for item in pending_inputs:
+        dependency = materialized.get(item["path"])
+        if dependency is None:
+            raise engine.PlanError("static Python authority dependency is absent")
+        item["sha256"] = engine._sha256(dependency)
+    contributor[0]["inputs"].extend(pending_inputs)
+    contributor[0]["inputs"].sort(key=lambda item: item["path"])
+    document["components"].remove(pending[0])
+    return (json.dumps(document, indent=2) + "\n").encode("utf-8")
+
+
+def _static_contributor_requirements(root: Path) -> list[str]:
+    path = root / "contracts/supply-chain/v2/python/static-target-contributor-requirements.txt"
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+def _prune_pyproject(engine: Any, content: bytes, root: Path) -> bytes:
+    text = engine._decode(content, "issue #71 pyproject prune")
+    requirements = _static_contributor_requirements(root)
+    pytest_requirement = [item for item in requirements if item.casefold().startswith("pytest")]
+    if len(pytest_requirement) != 1:
+        raise engine.PlanError("static contributor pytest authority changed")
+    dependencies = [item for item in requirements if item not in pytest_requirement]
+    dependency_block = "dependencies = [\n" + "".join(
+        f'    "{item}",\n' for item in dependencies
+    ) + "]"
+    dev_block = f'dev = [\n    "{pytest_requirement[0]}",\n]'
+    text, dependency_count = re.subn(
+        r"(?ms)^dependencies\s*=\s*\[.*?^\]", dependency_block, text, count=1
     )
-    return text.encode("utf-8")
-
-
-def _delete_exact_lines(
-    engine: Any,
-    content: bytes,
-    expected_lines: tuple[str, ...],
-    label: str,
-) -> bytes:
-    text = engine._decode(content, label)
-    for line in expected_lines:
+    text, dev_count = re.subn(r"(?ms)^dev\s*=\s*\[.*?^\]", dev_block, text, count=1)
+    if dependency_count != 1 or dev_count != 1:
+        raise engine.PlanError("pyproject dependency authority pre-state changed")
+    for line in ('    "pipeline",\n', '    "searise_pipeline.domain",\n', 'pipeline = "."\n'):
         if text.count(line) != 1:
-            raise engine.PlanError(f"{label} exact entry pre-state changed")
+            raise engine.PlanError("pyproject package mapping pre-state changed")
         text = text.replace(line, "", 1)
     return text.encode("utf-8")
 
 
-def _prune_pyproject(engine: Any, content: bytes) -> bytes:
-    return _delete_exact_lines(
-        engine,
-        content,
-        (
-            '    "azure-storage-blob>=12.19,<13.0",\n',
-            '    "psycopg2-binary>=2.9,<3.0",\n',
-            '    "pipeline",\n',
-            '    "searise_pipeline.domain",\n',
-            'pipeline = "."\n',
-        ),
-        "issue #71 pyproject prune",
-    )
-
-
-def _prune_requirements(engine: Any, content: bytes) -> bytes:
-    return _delete_exact_lines(
-        engine,
-        content,
-        (
-            "azure-storage-blob>=12.19,<13.0\n",
-            "psycopg2-binary>=2.9,<3.0\n",
-        ),
-        "issue #71 requirements prune",
-    )
+def _prune_requirements(engine: Any, content: bytes, root: Path) -> bytes:
+    text = engine._decode(content, "issue #71 requirements prune")
+    for retired in ("azure-storage-blob>=12.19,<13.0", "psycopg2-binary>=2.9,<3.0"):
+        if text.splitlines().count(retired) != 1:
+            raise engine.PlanError("requirements dependency pre-state changed")
+    return ("\n".join(_static_contributor_requirements(root)) + "\n").encode("utf-8")
 
 
 def _materialize_plan(
@@ -385,13 +384,13 @@ def _materialize_plan(
             elif kind == "pyproject-static-runtime-prune":
                 if entry["path"] != "src/pipeline/pyproject.toml":
                     raise engine.PlanError("pyproject prune is restricted to pyproject.toml")
-                content = _prune_pyproject(engine, content)
+                content = _prune_pyproject(engine, content, root)
             elif kind == "requirements-static-runtime-prune":
                 if entry["path"] != "src/pipeline/requirements-pipeline.txt":
                     raise engine.PlanError(
                         "requirements prune is restricted to requirements-pipeline.txt"
                     )
-                content = _prune_requirements(engine, content)
+                content = _prune_requirements(engine, content, root)
             elif kind == "static-profile-multi-input-activation":
                 continue
         materialized[entry["path"]] = content

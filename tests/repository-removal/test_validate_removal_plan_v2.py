@@ -1205,6 +1205,14 @@ def _issue71_profile_activation_fixture(adapter):
     workflows = {
         ".github/workflows/ci.yml": b"planned CI workflow\n",
         ".github/workflows/codeql.yml": b"planned CodeQL workflow\n",
+        "src/pipeline/pyproject.toml": adapter._prune_pyproject(
+            engine, (ROOT / "src/pipeline/pyproject.toml").read_bytes(), ROOT
+        ),
+        "src/pipeline/requirements-pipeline.txt": adapter._prune_requirements(
+            engine,
+            (ROOT / "src/pipeline/requirements-pipeline.txt").read_bytes(),
+            ROOT,
+        ),
     }
     github = next(
         component
@@ -1229,6 +1237,7 @@ def _issue71_profile_activation_fixture(adapter):
                 "toSha256": hashlib.sha256(content).hexdigest(),
             }
             for path, content in workflows.items()
+            if path.startswith(".github/workflows/")
         ],
     }
     return engine, profile, workflows, operation
@@ -1257,7 +1266,24 @@ def test_issue71_profile_activation_rebinds_both_workflows_and_activates() -> No
     )
     inputs = {item["path"]: item["sha256"] for item in github["inputs"]}
     for path, content in workflows.items():
+        if not path.startswith(".github/workflows/"):
+            continue
         assert inputs[path] == hashlib.sha256(content).hexdigest()
+    assert all(
+        component["id"] != "pending-legacy-python-authorities"
+        for component in document["components"]
+    )
+    contributor = next(
+        component
+        for component in document["components"]
+        if component["id"] == "pipeline-python-contributor"
+    )
+    assert {
+        item["path"] for item in contributor["inputs"]
+    } >= {
+        "src/pipeline/pyproject.toml",
+        "src/pipeline/requirements-pipeline.txt",
+    }
 
 
 def test_issue71_profile_activation_requires_both_exact_workflow_bindings() -> None:
@@ -1293,10 +1319,10 @@ def test_issue71_dependency_prunes_are_exact_and_path_specific() -> None:
     engine = adapter.configure_engine(ROOT)
 
     pyproject = adapter._prune_pyproject(
-        engine, (ROOT / "src/pipeline/pyproject.toml").read_bytes()
+        engine, (ROOT / "src/pipeline/pyproject.toml").read_bytes(), ROOT
     ).decode()
     requirements = adapter._prune_requirements(
-        engine, (ROOT / "src/pipeline/requirements-pipeline.txt").read_bytes()
+        engine, (ROOT / "src/pipeline/requirements-pipeline.txt").read_bytes(), ROOT
     ).decode()
 
     for retired in ("azure-storage-blob", "psycopg2-binary"):
@@ -1315,8 +1341,8 @@ def test_issue71_dependency_prunes_reject_prestate_drift() -> None:
         b'    "pipeline",\n', b'    "pipeline-legacy",\n'
     )
 
-    with pytest.raises(engine.PlanError, match="exact entry pre-state changed"):
-        adapter._prune_pyproject(engine, pyproject)
+    with pytest.raises(engine.PlanError, match="package mapping pre-state changed"):
+        adapter._prune_pyproject(engine, pyproject, ROOT)
 
 
 def test_issue71_dependency_operations_accept_no_variable_scope() -> None:
