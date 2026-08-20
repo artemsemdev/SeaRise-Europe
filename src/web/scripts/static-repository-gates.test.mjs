@@ -342,7 +342,7 @@ describe("static repository dependency gates", () => {
     const readPath = (path) => readFileSync(resolve(root, path));
     const readMode = (path) => git(root, "ls-files", "--stage", "--", path).split(" ", 1)[0];
     expect(validateStaticSupplyChainProfile(profile, readPath, readMode))
-      .toEqual({ componentCount: 14, inputCount: 57 });
+      .toEqual({ componentCount: 13, inputCount: 57 });
 
     const countMutation = JSON.parse(JSON.stringify(profile));
     countMutation.components.at(-1).inputs.pop();

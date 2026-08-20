@@ -27,7 +27,6 @@ jobs:
       contents: read
     outputs:
       javascript: ${{ steps.route.outputs.codeql_javascript }}
-      csharp: ${{ steps.route.outputs.codeql_csharp }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -70,38 +69,11 @@ jobs:
         with:
           category: /language:javascript-typescript
 
-  analyze-csharp:
-    name: Analyze (csharp)
-    needs: changes
-    if: needs.changes.outputs.csharp == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@28deaeda66b76a05916b6923827895f2b14ab387 # v3.28.16
-        with:
-          languages: csharp
-          build-mode: manual
-
-      - name: Build C#
-        run: dotnet build src/api/SeaRise.sln
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@28deaeda66b76a05916b6923827895f2b14ab387 # v3.28.16
-        with:
-          category: /language:csharp
-
   codeql-gate:
     name: CodeQL Gate
     needs:
       - changes
       - analyze-javascript
-      - analyze-csharp
     if: always()
     runs-on: ubuntu-latest
     steps:

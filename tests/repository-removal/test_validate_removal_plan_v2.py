@@ -1211,21 +1211,31 @@ def test_issue71_exact_rewrite_allowlist_is_narrow() -> None:
         )
 
 
+def _issue71_audited_bytes(path: str) -> bytes:
+    plan = json.loads((V2 / "issue-71/removal-plan.json").read_bytes())
+    return subprocess.run(
+        ["git", "show", f"{plan['auditedCommit']}:{path}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+
+
 def _issue71_profile_activation_fixture(adapter):
     engine = adapter.configure_engine(ROOT)
-    profile = (
-        ROOT / "contracts/supply-chain/v2/static-target-profile.json"
-    ).read_bytes()
+    profile = _issue71_audited_bytes(
+        "contracts/supply-chain/v2/static-target-profile.json"
+    )
     document = json.loads(profile)
     workflows = {
         ".github/workflows/ci.yml": b"planned CI workflow\n",
         ".github/workflows/codeql.yml": b"planned CodeQL workflow\n",
         "src/pipeline/pyproject.toml": adapter._prune_pyproject(
-            engine, (ROOT / "src/pipeline/pyproject.toml").read_bytes(), ROOT
+            engine, _issue71_audited_bytes("src/pipeline/pyproject.toml"), ROOT
         ),
         "src/pipeline/requirements-pipeline.txt": adapter._prune_requirements(
             engine,
-            (ROOT / "src/pipeline/requirements-pipeline.txt").read_bytes(),
+            _issue71_audited_bytes("src/pipeline/requirements-pipeline.txt"),
             ROOT,
         ),
     }
@@ -1334,10 +1344,10 @@ def test_issue71_dependency_prunes_are_exact_and_path_specific() -> None:
     engine = adapter.configure_engine(ROOT)
 
     pyproject = adapter._prune_pyproject(
-        engine, (ROOT / "src/pipeline/pyproject.toml").read_bytes(), ROOT
+        engine, _issue71_audited_bytes("src/pipeline/pyproject.toml"), ROOT
     ).decode()
     requirements = adapter._prune_requirements(
-        engine, (ROOT / "src/pipeline/requirements-pipeline.txt").read_bytes(), ROOT
+        engine, _issue71_audited_bytes("src/pipeline/requirements-pipeline.txt"), ROOT
     ).decode()
 
     for retired in ("azure-storage-blob", "psycopg2-binary"):
@@ -1352,7 +1362,7 @@ def test_issue71_dependency_prunes_are_exact_and_path_specific() -> None:
 def test_issue71_dependency_prunes_reject_prestate_drift() -> None:
     adapter = _load_issue71_adapter()
     engine = adapter.configure_engine(ROOT)
-    pyproject = (ROOT / "src/pipeline/pyproject.toml").read_bytes().replace(
+    pyproject = _issue71_audited_bytes("src/pipeline/pyproject.toml").replace(
         b'    "pipeline",\n', b'    "pipeline-legacy",\n'
     )
 
