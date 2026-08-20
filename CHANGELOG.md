@@ -242,6 +242,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Activated the 13-component, 57-input static-target supply-chain profile after
+  the final repository-only legacy removal. Active contributor, architecture,
+  delivery, and operations guidance now describes the same static-only
+  filesystem and clean-clone workflow.
+
 - The issue #70 authority adapter can now atomically bind an explicitly planned
   legacy baseline from `removalGate: null` to issue #70 before retirement, but
   only when the same exact plan selects its owning suite and that suite already
@@ -327,6 +332,14 @@ All notable changes to this project will be documented in this file.
   controls, responsive behavior, and interaction character remain required;
   binary exposure, terrain/flood/property meaning, and other prohibited claims
   remain excluded from the target application and built assets.
+
+### Removed
+
+- Removed the superseded Next.js and ASP.NET runtimes, request-time PostGIS,
+  TiTiler, runtime geocoder and Azurite/blob-seed integrations, aggregate
+  Compose stack, obsolete deployment entrypoints, and their retired CI jobs.
+  Immutable scientific and Phase 1 evidence, deterministic offline build code,
+  local-only candidate documentation, and Git-history rollback are retained.
 
 ### Security
 

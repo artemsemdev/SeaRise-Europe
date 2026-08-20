@@ -1,6 +1,6 @@
 # 05 — Data Architecture
 
-> **Status:** Accepted target architecture; migration in progress
+> **Status:** Current static-only repository architecture
 >
 > **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md)
 > **Important:** checked-in demo rasters and the current pipeline are not a validated real-data release.
@@ -212,12 +212,12 @@ and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
 - The browser rejects an unsupported manifest schema or mismatched pinned
   release instead of silently falling back.
 
-## 8. Migration boundary
+## 8. Repository boundary
 
-The existing PostgreSQL schema, Azure Blob registration, TiTiler integration,
-and synthetic `demo.tif` describe the legacy runtime and are not part of this
-target data architecture. They remain only until ADR-021 Phases 0–3 establish
-scientific validity and parity. Removal is allowed only at the Phase 4 gate.
+The request-time database, mutable blob-registration path, and dynamic tile
+service have been removed. The retained pipeline produces immutable release
+artifacts and the browser validates them before use. Historical contracts and
+Git history preserve the removal evidence without reactivating that runtime.
 
 See [16 — Geospatial Data Pipeline](16-geospatial-data-pipeline.md) for build
 stages and [10 — Testing Strategy](10-testing-strategy.md) for publication
