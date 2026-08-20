@@ -392,6 +392,10 @@ def configure_engine(repository_root: Path) -> Any:
     engine.PREAPPROVAL_PATH = f"{contract_directory}/preapproval.json"
     engine.DECISION_PATH = f"{contract_directory}/owner-decision.json"
     engine.RECEIPT_PATH = f"{contract_directory}/application-receipt.json"
+    engine.SUPPORT_REWRITE_PATHS = {
+        *engine.SUPPORT_REWRITE_PATHS,
+        "src/web/scripts/static-repository-gates.test.mjs",
+    }
     engine.EXPECTED_TRUST_ROOTS = {
         **engine.EXPECTED_TRUST_ROOTS,
         **COMPLETED_ISSUE_72_ARTIFACTS,
