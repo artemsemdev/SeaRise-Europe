@@ -1184,3 +1184,95 @@ def test_issue71_exact_rewrite_allowlist_is_narrow() -> None:
         engine._exact_text_transform(
             b"stale assertion\n", [operation], "README.md"
         )
+
+
+def _issue71_profile_activation_fixture(adapter):
+    engine = adapter.configure_engine(ROOT)
+    profile = (
+        ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    ).read_bytes()
+    document = json.loads(profile)
+    workflows = {
+        ".github/workflows/ci.yml": b"planned CI workflow\n",
+        ".github/workflows/codeql.yml": b"planned CodeQL workflow\n",
+    }
+    github = next(
+        component
+        for component in document["components"]
+        if component["id"] == "github-actions"
+    )
+    current = {item["path"]: item["sha256"] for item in github["inputs"]}
+    operation = {
+        "id": "activate-issue-71-profile",
+        "kind": "static-profile-multi-input-activation",
+        "issue": 71,
+        "pendingSelectorIds": [
+            item["id"]
+            for item in document["activation"]["pendingSelectors"]
+            if item["issue"] == 71
+        ],
+        "inputBindings": [
+            {
+                "componentId": "github-actions",
+                "inputPath": path,
+                "fromSha256": current[path],
+                "toSha256": hashlib.sha256(content).hexdigest(),
+            }
+            for path, content in workflows.items()
+        ],
+    }
+    return engine, profile, workflows, operation
+
+
+def test_issue71_profile_activation_rebinds_both_workflows_and_activates() -> None:
+    adapter = _load_issue71_adapter()
+    engine, profile, workflows, operation = _issue71_profile_activation_fixture(
+        adapter
+    )
+
+    transformed = adapter._activate_static_profile(
+        engine, profile, operation, workflows, verify_target=True
+    )
+    document = json.loads(transformed)
+
+    assert document["activation"] == {
+        "status": "active",
+        "blockingIssues": [],
+        "pendingSelectors": [],
+    }
+    github = next(
+        component
+        for component in document["components"]
+        if component["id"] == "github-actions"
+    )
+    inputs = {item["path"]: item["sha256"] for item in github["inputs"]}
+    for path, content in workflows.items():
+        assert inputs[path] == hashlib.sha256(content).hexdigest()
+
+
+def test_issue71_profile_activation_requires_both_exact_workflow_bindings() -> None:
+    adapter = _load_issue71_adapter()
+    engine, profile, workflows, operation = _issue71_profile_activation_fixture(
+        adapter
+    )
+    operation["inputBindings"] = operation["inputBindings"][:1]
+
+    with pytest.raises(engine.PlanError, match="must cover both workflows"):
+        adapter._activate_static_profile(
+            engine, profile, operation, workflows, verify_target=True
+        )
+
+
+def test_issue71_profile_activation_rejects_remaining_authority_state() -> None:
+    adapter = _load_issue71_adapter()
+    engine, profile, workflows, operation = _issue71_profile_activation_fixture(
+        adapter
+    )
+    document = json.loads(profile)
+    document["activation"]["blockingIssues"].append(99)
+    drifted = (json.dumps(document, indent=2) + "\n").encode()
+
+    with pytest.raises(engine.PlanError, match="final static profile blocker"):
+        adapter._activate_static_profile(
+            engine, drifted, operation, workflows, verify_target=True
+        )

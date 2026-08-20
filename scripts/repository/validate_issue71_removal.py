@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -84,7 +85,149 @@ def _specialize(value: Any) -> Any:
 
 
 def _issue71_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    return _specialize(issue70._issue70_schema(copy.deepcopy(schema)))
+    specialized = _specialize(issue70._issue70_schema(copy.deepcopy(schema)))
+    operations = specialized.get("$defs", {}).get("operation", {}).get("oneOf")
+    if isinstance(operations, list):
+        operations.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "id",
+                    "kind",
+                    "issue",
+                    "pendingSelectorIds",
+                    "inputBindings",
+                ],
+                "properties": {
+                    "id": {"type": "string"},
+                    "kind": {"const": "static-profile-multi-input-activation"},
+                    "issue": {"const": 71},
+                    "pendingSelectorIds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": True,
+                        "items": {"type": "string"},
+                    },
+                    "inputBindings": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": [
+                                "componentId",
+                                "inputPath",
+                                "fromSha256",
+                                "toSha256",
+                            ],
+                            "properties": {
+                                "componentId": {"const": "github-actions"},
+                                "inputPath": {
+                                    "enum": [
+                                        ".github/workflows/ci.yml",
+                                        ".github/workflows/codeql.yml",
+                                    ]
+                                },
+                                "fromSha256": {"$ref": "#/$defs/sha256"},
+                                "toSha256": {"$ref": "#/$defs/sha256"},
+                            },
+                        },
+                    },
+                },
+            }
+        )
+    return specialized
+
+
+def _activate_static_profile(
+    engine: Any,
+    content: bytes,
+    operation: dict[str, Any],
+    materialized: dict[str, bytes | None],
+    *,
+    verify_target: bool,
+) -> bytes:
+    text = engine._decode(content, "static target profile")
+    document = engine._json_load_bytes(content, "static target profile")
+    activation = document["activation"]
+    issue = operation["issue"]
+    if activation["blockingIssues"].count(issue) != 1:
+        raise engine.PlanError("static profile blocking issue pre-state changed")
+    selected = [item for item in activation["pendingSelectors"] if item["issue"] == issue]
+    if sorted(item["id"] for item in selected) != sorted(operation["pendingSelectorIds"]):
+        raise engine.PlanError("static profile issue selectors pre-state changed")
+    bindings = operation["inputBindings"]
+    paths = [binding["inputPath"] for binding in bindings]
+    if sorted(paths) != [".github/workflows/ci.yml", ".github/workflows/codeql.yml"]:
+        raise engine.PlanError("static profile bindings must cover both workflows")
+
+    blocking_line = next(
+        (line for line in text.splitlines(keepends=True) if '"blockingIssues":' in line),
+        None,
+    )
+    if blocking_line is None:
+        raise engine.PlanError("static profile blockingIssues line is missing")
+    text = engine._replace_once(
+        text,
+        blocking_line,
+        blocking_line.replace(
+            json.dumps(activation["blockingIssues"]),
+            json.dumps([value for value in activation["blockingIssues"] if value != issue]),
+        ),
+        operation["id"],
+    )
+    for selector in selected:
+        marker = f'"id": "{selector["id"]}"'
+        lines = [line for line in text.splitlines(keepends=True) if marker in line]
+        if len(lines) != 1:
+            raise engine.PlanError(
+                f"static profile selector formatting drifted: {selector['id']}"
+            )
+        text = engine._replace_once(text, lines[0], "", selector["id"])
+
+    for binding in bindings:
+        components = [
+            component
+            for component in document["components"]
+            if component["id"] == binding["componentId"]
+        ]
+        inputs = [
+            item
+            for component in components
+            for item in component["inputs"]
+            if item["path"] == binding["inputPath"]
+        ]
+        if len(components) != 1 or len(inputs) != 1:
+            raise engine.PlanError("static profile input must exist exactly once")
+        if inputs[0]["sha256"] != binding["fromSha256"]:
+            raise engine.PlanError("static profile input pre-state changed")
+        dependency = materialized.get(binding["inputPath"])
+        if dependency is None:
+            raise engine.PlanError("static profile rebind dependency is absent")
+        expected = engine._sha256(dependency)
+        if verify_target and binding["toSha256"] != expected:
+            raise engine.PlanError("static profile input post-state is not bound")
+        text = engine._replace_once(
+            text, binding["fromSha256"], expected, binding["inputPath"]
+        )
+
+    transformed = engine._json_load_bytes(
+        text.encode("utf-8"), "transformed static target profile"
+    )
+    if (
+        transformed["activation"]["pendingSelectors"]
+        or transformed["activation"]["blockingIssues"]
+    ):
+        raise engine.PlanError("issue #71 must be the final static profile blocker")
+    text = engine._replace_once(
+        text,
+        '"status": "pending-legacy-removal"',
+        '"status": "active"',
+        operation["id"],
+    )
+    return text.encode("utf-8")
 
 
 def _materialize_plan(
@@ -97,6 +240,7 @@ def _materialize_plan(
     custom_kinds = {
         "content-authority-handoff",
         "python-tuple-literal-value-delete",
+        "static-profile-multi-input-activation",
         "workflow-step-run-replace",
     }
     custom_entries = [
@@ -111,11 +255,17 @@ def _materialize_plan(
             for operation in entry["operations"]
             if operation["kind"] not in custom_kinds
         ]
-        if not entry["operations"] and not (
+        custom_only_allowed = (
             entry["path"] in CONTENT_AUTHORITY_HANDOFF_PATHS
             and len(original["operations"]) == 1
             and original["operations"][0]["kind"] == "content-authority-handoff"
-        ):
+        ) or (
+            entry["path"] == "contracts/supply-chain/v2/static-target-profile.json"
+            and len(original["operations"]) == 1
+            and original["operations"][0]["kind"]
+            == "static-profile-multi-input-activation"
+        )
+        if not entry["operations"] and not custom_only_allowed:
             raise engine.PlanError(
                 "issue #71 custom operation must accompany a structural operation"
             )
@@ -126,10 +276,9 @@ def _materialize_plan(
 
     for entry in custom_entries:
         content = materialized.get(entry["path"])
-        if content is None and all(
-            operation["kind"] == "content-authority-handoff"
-            for operation in entry["operations"]
-        ):
+        if content is None and len(entry["operations"]) == 1 and entry["operations"][0][
+            "kind"
+        ] in {"content-authority-handoff", "static-profile-multi-input-activation"}:
             content = engine._audited_blob(root, plan["auditedCommit"], entry["path"])
         if content is None:
             raise engine.PlanError("issue #71 custom operation target is absent")
@@ -158,10 +307,25 @@ def _materialize_plan(
                 content = issue70._delete_python_tuple_literal_values(
                     engine, content, operation
                 )
+            elif kind == "static-profile-multi-input-activation":
+                continue
         materialized[entry["path"]] = content
 
     for entry in plan["entries"]:
         operations = entry["operations"]
+        if (
+            len(operations) == 1
+            and operations[0]["kind"] == "static-profile-multi-input-activation"
+        ):
+            before = engine._audited_blob(root, plan["auditedCommit"], entry["path"])
+            materialized[entry["path"]] = _activate_static_profile(
+                engine,
+                before,
+                operations[0],
+                materialized,
+                verify_target=verify_after,
+            )
+            continue
         if (
             len(operations) == 1
             and operations[0]["kind"] == "static-profile-activation-transition"
