@@ -27,10 +27,23 @@ from searise_pipeline.supply_chain import (
 ROOT = Path(__file__).resolve().parents[4]
 PROFILE = ROOT / "contracts/supply-chain/v2/static-target-profile.json"
 SCHEMA = ROOT / "contracts/supply-chain/v2/static-target-profile.schema.json"
+ISSUE_71_PLAN = ROOT / "contracts/repository-removal/v2/issue-71/removal-plan.json"
 
 
 def _load(path: Path = PROFILE) -> dict[str, Any]:
     return json.loads(path.read_bytes())
+
+
+def _load_issue_71_base() -> dict[str, Any]:
+    commit = json.loads(ISSUE_71_PLAN.read_bytes())["auditedCommit"]
+    return json.loads(
+        subprocess.run(
+            ["git", "show", f"{commit}:contracts/supply-chain/v2/static-target-profile.json"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+    )
 
 
 def _write(path: Path, document: dict[str, Any]) -> Path:
@@ -67,6 +80,41 @@ def _copy_active_authority(destination: Path) -> None:
         else:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+
+
+def _copy_issue_71_base_authority(destination: Path) -> None:
+    document = _load_issue_71_base()
+    commit = json.loads(ISSUE_71_PLAN.read_bytes())["auditedCommit"]
+    paths = {
+        item["path"]
+        for component in document["components"]
+        for item in component["inputs"]
+    }
+    paths.add(document["historicalEvidence"]["dependencyInventory"]["path"])
+    for selector in document["activation"]["pendingSelectors"]:
+        paths.add(selector["path"])
+    for path in sorted(paths):
+        target = destination / path
+        object_type = subprocess.run(
+            ["git", "cat-file", "-t", f"{commit}:{path}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if object_type == "tree":
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        result = subprocess.run(
+            ["git", "show", f"{commit}:{path}"],
+            cwd=ROOT,
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(result.stdout)
+        else:
+            raise AssertionError(f"historical issue 71 authority is missing {path}")
 
 
 def _copy_historical_authority(destination: Path) -> None:
@@ -312,25 +360,12 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
 
     assert document["target"] == "static-browser"
     assert document["productionClaim"] is False
-    assert document["activation"]["status"] == "pending-legacy-removal"
-    assert document["activation"]["blockingIssues"] == [71]
+    assert document["activation"]["status"] == "active"
+    assert document["activation"]["blockingIssues"] == []
     assert {
         selector["id"]: selector["issue"]
         for selector in document["activation"]["pendingSelectors"]
-    } == {
-        "ci-legacy-api": 71,
-        "ci-legacy-infrastructure": 71,
-        "codeql-legacy-csharp": 71,
-        "legacy-api-tree": 71,
-        "legacy-blob-seed-tree": 71,
-        "legacy-db-geography": 71,
-        "legacy-db-init": 71,
-        "legacy-solution-file": 71,
-        "pipeline-pyproject-azure": 71,
-        "pipeline-pyproject-postgis": 71,
-        "pipeline-requirements-azure": 71,
-        "pipeline-requirements-postgis": 71,
-    }
+    } == {}
     historical_evidence = copy.deepcopy(document["historicalEvidence"])
     mode_authority = historical_evidence.pop("modeAuthority")
     assert historical_evidence == {
@@ -744,9 +779,9 @@ def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> 
 
     validated = validate_static_target_profile(PROFILE, repository_root=repository)
 
-    assert len(validated["components"]) == 14
-    assert validated["activation"]["status"] == "pending-legacy-removal"
-    assert validated["activation"]["blockingIssues"] == [71]
+    assert len(validated["components"]) == 13
+    assert validated["activation"]["status"] == "active"
+    assert validated["activation"]["blockingIssues"] == []
 
 
 def test_profile_rejects_legacy_runtime_as_an_active_input(tmp_path: Path) -> None:
@@ -829,7 +864,9 @@ def test_profile_rejects_changed_authority_bytes(tmp_path: Path) -> None:
 
 
 def test_profile_cannot_claim_active_while_legacy_selectors_remain(tmp_path: Path) -> None:
-    document = copy.deepcopy(_load())
+    repository = tmp_path / "repository"
+    _copy_issue_71_base_authority(repository)
+    document = copy.deepcopy(_load_issue_71_base())
     document["activation"] = {
         "status": "active",
         "blockingIssues": [],
@@ -837,12 +874,14 @@ def test_profile_cannot_claim_active_while_legacy_selectors_remain(tmp_path: Pat
     }
 
     with pytest.raises(SupplyChainContractError, match="activation does not match"):
-        validate_static_target_profile(_write(tmp_path / "profile.json", document))
+        validate_static_target_profile(
+            _write(tmp_path / "profile.json", document), repository_root=repository
+        )
 
 
 def test_profile_detects_pep508_legacy_name_with_alternate_whitespace(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
+    _copy_issue_71_base_authority(repository)
     pyproject_path = repository / "src/pipeline/pyproject.toml"
     pyproject_path.write_text(
         pyproject_path.read_text(encoding="utf-8").replace(
@@ -851,7 +890,7 @@ def test_profile_detects_pep508_legacy_name_with_alternate_whitespace(tmp_path: 
         ),
         encoding="utf-8",
     )
-    document = copy.deepcopy(_load())
+    document = copy.deepcopy(_load_issue_71_base())
     _refresh_hash(document, repository, "src/pipeline/pyproject.toml")
 
     validated = validate_static_target_profile(
@@ -893,12 +932,12 @@ def test_workflow_job_authority_resists_split_env_indirection(
     injected: str,
 ) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
+    _copy_issue_71_base_authority(repository)
     workflow = repository / path
     value = workflow.read_text(encoding="utf-8")
     assert needle in value
     workflow.write_text(value.replace(needle, replacement) + f"\n{injected}\n", encoding="utf-8")
-    document = copy.deepcopy(_load())
+    document = copy.deepcopy(_load_issue_71_base())
     _refresh_hash(document, repository, path)
 
     validated = validate_static_target_profile(
@@ -918,11 +957,11 @@ def test_workflow_yaml_parser_finds_quoted_or_spaced_job_keys(
     replacement: str,
 ) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
+    _copy_issue_71_base_authority(repository)
     workflow = repository / ".github/workflows/ci.yml"
     value = workflow.read_text(encoding="utf-8")
     workflow.write_text(value.replace("  api:", replacement, 1), encoding="utf-8")
-    document = copy.deepcopy(_load())
+    document = copy.deepcopy(_load_issue_71_base())
     _refresh_hash(document, repository, ".github/workflows/ci.yml")
 
     validated = validate_static_target_profile(
@@ -946,13 +985,13 @@ def test_workflow_yaml_parser_derives_jobs_child_indentation(
     quoted: bool,
 ) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
+    _copy_issue_71_base_authority(repository)
     workflow = repository / ".github/workflows/ci.yml"
     value = _set_workflow_jobs_indent(workflow.read_text(encoding="utf-8"), indent)
     if quoted:
         value = value.replace(" " * indent + "api:", " " * indent + '"api" :', 1)
     workflow.write_text(value, encoding="utf-8")
-    document = copy.deepcopy(_load())
+    document = copy.deepcopy(_load_issue_71_base())
     _refresh_hash(document, repository, ".github/workflows/ci.yml")
 
     validated = validate_static_target_profile(
@@ -968,14 +1007,14 @@ def test_workflow_yaml_parser_derives_jobs_child_indentation(
 
 def test_workflow_yaml_parser_rejects_duplicate_job_keys(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
+    _copy_issue_71_base_authority(repository)
     workflow = repository / ".github/workflows/ci.yml"
     workflow.write_text(
         workflow.read_text(encoding="utf-8")
         + '\n  "api" :\n    runs-on: ubuntu-latest\n    steps: []\n',
         encoding="utf-8",
     )
-    document = copy.deepcopy(_load())
+    document = copy.deepcopy(_load_issue_71_base())
     _refresh_hash(document, repository, ".github/workflows/ci.yml")
 
     with pytest.raises(SupplyChainContractError, match="duplicate workflow job identifier: api"):
@@ -987,8 +1026,8 @@ def test_workflow_yaml_parser_rejects_duplicate_job_keys(tmp_path: Path) -> None
 
 def test_profile_accepts_exact_partial_selector_shrink(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
-    document = copy.deepcopy(_load())
+    _copy_issue_71_base_authority(repository)
+    document = copy.deepcopy(_load_issue_71_base())
     _remove_issue_selectors(document, repository, 70)
 
     validated = validate_static_target_profile(
@@ -1005,8 +1044,8 @@ def test_profile_accepts_exact_partial_selector_shrink(tmp_path: Path) -> None:
 
 def test_issue_71_migration_requires_exact_static_contributor_parity(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
-    document = copy.deepcopy(_load())
+    _copy_issue_71_base_authority(repository)
+    document = copy.deepcopy(_load_issue_71_base())
     _migrate_issue_71_python_authority(document, repository)
     _remove_issue_selectors(document, repository, 71)
 
@@ -1024,8 +1063,8 @@ def test_issue_71_migration_requires_exact_static_contributor_parity(tmp_path: P
 
 def test_profile_becomes_active_only_after_final_tracked_absence(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
-    document = copy.deepcopy(_load())
+    _copy_issue_71_base_authority(repository)
+    document = copy.deepcopy(_load_issue_71_base())
     _migrate_issue_71_python_authority(document, repository)
     for issue in (70, 71):
         _remove_issue_selectors(document, repository, issue)
@@ -1057,8 +1096,8 @@ def test_profile_becomes_active_only_after_final_tracked_absence(tmp_path: Path)
 
 def test_broken_symlink_cannot_satisfy_active_absence(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
-    _copy_active_authority(repository)
-    document = copy.deepcopy(_load())
+    _copy_issue_71_base_authority(repository)
+    document = copy.deepcopy(_load_issue_71_base())
     _migrate_issue_71_python_authority(document, repository)
     for issue in (70, 71):
         _remove_issue_selectors(document, repository, issue)

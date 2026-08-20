@@ -214,7 +214,7 @@ def test_public_retention_uses_historical_inputs_after_current_legacy_deletion(
     candidate, evidence, crypto, public, output = _inputs(tmp_path / "inputs")
     repository = _full_history_repository(tmp_path / "repository")
     legacy_input = repository / "src/api/Directory.Build.props"
-    legacy_input.unlink()
+    assert not legacy_input.exists()
 
     result = retention.retain_release_evidence(
         candidate,
