@@ -39,10 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.route.outputs.web }}
-      api: ${{ steps.route.outputs.api }}
       pipeline: ${{ steps.route.outputs.pipeline }}
       release: ${{ steps.route.outputs.release }}
-      infrastructure: ${{ steps.route.outputs.infrastructure }}
       repository_removal: ${{ steps.route.outputs.repository_removal }}
       heavy: ${{ steps.route.outputs.heavy }}
     steps:
@@ -176,39 +174,6 @@ jobs:
           path: src/web/dist/build-report.json
           if-no-files-found: error
           retention-days: 14
-
-  api:
-    name: API (format, build, test)
-    needs: changes
-    if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/api
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
-        with:
-          dotnet-version: "8.0.x"
-
-      - name: Restore
-        run: dotnet restore SeaRise.sln
-
-      - name: Audit dependencies
-        run: dotnet list SeaRise.sln package --vulnerable --include-transitive 2>&1 | tee audit.txt && ! grep -qi 'has the following vulnerable packages' audit.txt
-
-      - name: Format check
-        run: dotnet format SeaRise.sln --verify-no-changes
-
-      - name: Build
-        run: dotnet build SeaRise.sln --no-restore -c Release
-
-      - name: Unit Tests
-        run: dotnet test SeaRise.sln --no-build -c Release --verbosity normal --filter "Category=Unit"
-
-      - name: Integration Tests
-        run: dotnet test SeaRise.sln --no-build -c Release --verbosity normal --filter "Category=Integration"
 
   pipeline:
     name: Pipeline (ruff, pytest)
@@ -1018,17 +983,6 @@ jobs:
           overwrite: false
           retention-days: 14
 
-  infrastructure:
-    name: Infrastructure (blob seed compile)
-    needs: changes
-    if: needs.changes.outputs.infrastructure == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - name: Compile blob seed
-        run: python3 -m py_compile infra/blob-seed/seed.py
-
   repository-removal-v2:
     name: Repository removal v2 authority
     needs: changes
@@ -1073,7 +1027,7 @@ jobs:
           EXECUTION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           APPLIED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
-          python scripts/repository/validate_issue70_removal.py ci
+          python scripts/repository/validate_issue71_removal.py ci
           --execution-base "${EXECUTION_BASE}"
           --applied-commit "${APPLIED_COMMIT}"
           --verify-owner-comment
@@ -1083,7 +1037,6 @@ jobs:
     needs:
       - changes
       - web
-      - api
       - pipeline
       - settlement-spatial-toolchain-macos
       - offline-release-fixture
@@ -1092,7 +1045,6 @@ jobs:
       - ar6-release-evidence
       - ar6-release-evidence-macos
       - repository-removal-v2
-      - infrastructure
     if: always()
     runs-on: ubuntu-latest
     steps:
