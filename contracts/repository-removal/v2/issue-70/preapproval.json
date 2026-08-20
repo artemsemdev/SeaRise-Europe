@@ -3,9 +3,9 @@
   "schemaVersion": "2.0.0",
   "preapprovalId": "phase-2-issue-70-removal-v2",
   "decisionState": "owner-approval-required",
-  "auditedCommit": "abf2e75181e482a5eb7e9b5a736d2f998860d66a",
-  "auditedTree": "41ff6d299bb7773b540f938d5059f7a66823fdda",
-  "removalPlanSha256": "5da5f21f98c712103ebb326fa744276068190fc3580c21d0a1d75c8f79949aec",
+  "auditedCommit": "fb542e4358e09f8e70c20415d3ab4422a18b7f87",
+  "auditedTree": "c8ae9f41d9ddebf69b01fe3e58b1818f56bf20e7",
+  "removalPlanSha256": "1dac7cfa6e9a66fd0856e7d6193e2fcd38a7b55adf53868323ea1b2350f02e0f",
   "trustRoots": {
     "v1Census": "contracts/repository-removal/v1/census.json",
     "v1CensusSchema": "contracts/repository-removal/v1/census.schema.json",
@@ -56,9 +56,9 @@
     "issue72Preapproval": "241cdd9ca463fd4f6e739dac3e69e70334b2eb91d57cc40a223b16bde5e0d81f",
     "issue72RemovalPlan": "e986cbfbe3549fa033b218ab226cceb8acf0107d3b8995369b13e617547c1ece",
     "issue70Profile": "89a57c595100e2be7fb43c6a069cfc9e8c818b56a706c08bb0623aa009f08afa",
-    "issue70Validator": "22f4a7d5e9ad5020608844df34cc0f7c30f13ef10e3af5ac2d4e5a7a3fc8df77"
+    "issue70Validator": "672ceea881a7308f441c8b4ab12d1332ff42adfef2d6456ef736c293c27c2a45"
   },
-  "ownerApprovalTemplate": "I approve the additive repository-removal v2 plan for issue #70 at preapproval commit <PREAPPROVAL_COMMIT>, preapproval SHA-256 <PREAPPROVAL_SHA256>, removal plan SHA-256 5da5f21f98c712103ebb326fa744276068190fc3580c21d0a1d75c8f79949aec, and audited removal base abf2e75181e482a5eb7e9b5a736d2f998860d66a. This authorizes only the exact before/after path states and structural operations bound by that plan. It does not authorize Candidate-v7 or TAR inspection, copying, publication, or upload, and it does not authorize deletion or mutation of any external resource, credential, GitHub environment, or secret.",
+  "ownerApprovalTemplate": "I approve the additive repository-removal v2 plan for issue #70 at preapproval commit <PREAPPROVAL_COMMIT>, preapproval SHA-256 <PREAPPROVAL_SHA256>, removal plan SHA-256 1dac7cfa6e9a66fd0856e7d6193e2fcd38a7b55adf53868323ea1b2350f02e0f, and audited removal base fb542e4358e09f8e70c20415d3ab4422a18b7f87. This authorizes only the exact before/after path states and structural operations bound by that plan. It does not authorize Candidate-v7 or TAR inspection, copying, publication, or upload, and it does not authorize deletion or mutation of any external resource, credential, GitHub environment, or secret.",
   "safety": {
     "candidatePublicationAuthorized": false,
     "externalResourceMutationAuthorized": false
