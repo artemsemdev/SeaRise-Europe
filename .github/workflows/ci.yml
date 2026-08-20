@@ -39,7 +39,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       web: ${{ steps.route.outputs.web }}
-      frontend: ${{ steps.route.outputs.frontend }}
       api: ${{ steps.route.outputs.api }}
       pipeline: ${{ steps.route.outputs.pipeline }}
       release: ${{ steps.route.outputs.release }}
@@ -177,45 +176,6 @@ jobs:
           path: src/web/dist/build-report.json
           if-no-files-found: error
           retention-days: 14
-
-  frontend:
-    name: Frontend (lint, type-check, test)
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/frontend
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 20.20.1
-          cache: npm
-          cache-dependency-path: src/frontend/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Audit dependencies
-        run: npm audit --audit-level=critical --omit=dev
-        continue-on-error: true
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Content guidelines lint
-        run: npm run lint:content
-
-      - name: i18n externalization lint
-        run: npm run lint:i18n
-
-      - name: Type check
-        run: npm run type-check
-
-      - name: Unit tests
-        run: npm test
 
   api:
     name: API (format, build, test)
@@ -1113,7 +1073,7 @@ jobs:
           EXECUTION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           APPLIED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
-          python scripts/repository/validate_removal_plan_v2.py ci
+          python scripts/repository/validate_issue70_removal.py ci
           --execution-base "${EXECUTION_BASE}"
           --applied-commit "${APPLIED_COMMIT}"
           --verify-owner-comment
@@ -1123,7 +1083,6 @@ jobs:
     needs:
       - changes
       - web
-      - frontend
       - api
       - pipeline
       - settlement-spatial-toolchain-macos

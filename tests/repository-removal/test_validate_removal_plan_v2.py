@@ -862,12 +862,9 @@ def test_issue70_inventory_retirement_rejects_cross_suite_baseline() -> None:
         engine._test_inventory_transform(content, operation)
 
 
-def test_issue70_inventory_retirement_accepts_current_exact_frontend_set() -> None:
-    adapter = _load_issue70_adapter()
-    engine = adapter.configure_engine(ROOT)
+def test_issue70_inventory_records_current_exact_frontend_retirement() -> None:
     inventory_path = ROOT / "tests/test-inventory.json"
-    content = inventory_path.read_bytes()
-    inventory = json.loads(content)
+    inventory = json.loads(inventory_path.read_bytes())
     suite_ids = sorted(
         suite["id"]
         for suite in inventory["suites"]
@@ -878,24 +875,12 @@ def test_issue70_inventory_retirement_accepts_current_exact_frontend_set() -> No
         for item in inventory["baselineTests"]
         if item["suite"] in suite_ids
     )
-    operation = {
-        "issue": 70,
-        "suiteIds": suite_ids,
-        "baselinePaths": baseline_paths,
-        "replacementEvidence": (
-            "Static target suites preserve equivalent-or-stronger issue #70 coverage."
-        ),
-        "fromUpdatedAt": inventory["updatedAt"],
-        "toUpdatedAt": "2026-08-20",
-    }
-
-    transformed = json.loads(engine._test_inventory_transform(content, operation))
     retired_suites = {
-        suite["id"] for suite in transformed["suites"] if suite["status"] == "retired"
+        suite["id"] for suite in inventory["suites"] if suite["status"] == "retired"
     }
     retired_baselines = {
         item["path"]
-        for item in transformed["baselineTests"]
+        for item in inventory["baselineTests"]
         if item["status"] == "retired" and item["removalGate"] == 70
     }
 

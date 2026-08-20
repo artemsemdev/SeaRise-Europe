@@ -29,7 +29,7 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
     def test_inventory_is_valid_before_it_drives_routing(self) -> None:
         self.assertEqual(validate_inventory(self.inventory), [])
 
-    def test_shared_fixture_routes_all_three_language_controls(self) -> None:
+    def test_shared_fixture_routes_remaining_active_language_controls(self) -> None:
         suites = select_suites(
             self.inventory,
             ["tests/fixtures/tdd/five-state-characterization-v1.json"],
@@ -39,10 +39,10 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
         self.assertTrue(
             {
                 "api-shared-characterization",
-                "frontend-five-state-characterization",
                 "pipeline-five-state-characterization",
             }.issubset(suite_ids)
         )
+        self.assertNotIn("frontend-five-state-characterization", suite_ids)
 
     def test_fast_filter_excludes_docker_and_credentials(self) -> None:
         suites = select_suites(

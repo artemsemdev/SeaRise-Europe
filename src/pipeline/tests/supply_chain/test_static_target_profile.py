@@ -313,20 +313,18 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     assert document["target"] == "static-browser"
     assert document["productionClaim"] is False
     assert document["activation"]["status"] == "pending-legacy-removal"
-    assert document["activation"]["blockingIssues"] == [70, 71]
+    assert document["activation"]["blockingIssues"] == [71]
     assert {
         selector["id"]: selector["issue"]
         for selector in document["activation"]["pendingSelectors"]
     } == {
         "ci-legacy-api": 71,
-        "ci-legacy-frontend": 70,
         "ci-legacy-infrastructure": 71,
         "codeql-legacy-csharp": 71,
         "legacy-api-tree": 71,
         "legacy-blob-seed-tree": 71,
         "legacy-db-geography": 71,
         "legacy-db-init": 71,
-        "legacy-frontend-tree": 70,
         "legacy-solution-file": 71,
         "pipeline-pyproject-azure": 71,
         "pipeline-pyproject-postgis": 71,
@@ -748,18 +746,17 @@ def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> 
 
     assert len(validated["components"]) == 14
     assert validated["activation"]["status"] == "pending-legacy-removal"
-    assert validated["activation"]["blockingIssues"] == [70, 71]
+    assert validated["activation"]["blockingIssues"] == [71]
 
 
 def test_profile_rejects_legacy_runtime_as_an_active_input(tmp_path: Path) -> None:
     document = copy.deepcopy(_load())
-    legacy = ROOT / "src/frontend/package.json"
     component = next(item for item in document["components"] if item["id"] == "static-web-npm")
     component["inputs"].append(
         {
             "path": "src/frontend/package.json",
             "role": "manifest",
-            "sha256": hashlib.sha256(legacy.read_bytes()).hexdigest(),
+            "sha256": hashlib.sha256(b'{"name":"legacy-nextjs"}\n').hexdigest(),
         }
     )
     component["inputs"].sort(key=lambda item: item["path"])
@@ -1018,7 +1015,7 @@ def test_issue_71_migration_requires_exact_static_contributor_parity(tmp_path: P
         repository_root=repository,
     )
 
-    assert validated["activation"]["blockingIssues"] == [70]
+    assert validated["activation"]["blockingIssues"] == []
     assert all(
         component["id"] != "pending-legacy-python-authorities"
         for component in validated["components"]
