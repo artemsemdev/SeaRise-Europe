@@ -25,6 +25,10 @@ COMPLETED_ISSUE_72_ARTIFACTS = {
     "issue72Preapproval": "contracts/repository-removal/v2/preapproval.json",
     "issue72RemovalPlan": "contracts/repository-removal/v2/removal-plan.json",
 }
+CONTENT_AUTHORITY_HANDOFF_PATHS = {
+    "src/web/scripts/check-target-content.mjs",
+    "src/web/scripts/static-repository-gates.test.mjs",
+}
 EXPECTED_PROFILE = {
     "schemaVersion": "2.0.0",
     "profileId": "phase-2-issue-70-removal-v2",
@@ -247,7 +251,7 @@ def _issue70_materialize_plan(
             if operation["kind"] not in custom_kinds
         ]
         if not entry["operations"] and not (
-            entry["path"] == "src/web/scripts/check-target-content.mjs"
+            entry["path"] in CONTENT_AUTHORITY_HANDOFF_PATHS
             and len(original_entry["operations"]) == 1
             and original_entry["operations"][0]["kind"] == "content-authority-handoff"
         ):
@@ -272,7 +276,7 @@ def _issue70_materialize_plan(
             raise engine.PlanError("issue #70 custom operation target is absent")
         for operation in entry["operations"]:
             if operation["kind"] == "content-authority-handoff":
-                if entry["path"] != "src/web/scripts/check-target-content.mjs":
+                if entry["path"] not in CONTENT_AUTHORITY_HANDOFF_PATHS:
                     raise engine.PlanError(
                         "content authority handoff is restricted to the content checker"
                     )

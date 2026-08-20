@@ -1002,10 +1002,15 @@ def test_issue70_content_authority_handoff_is_path_and_text_exact(
     )
     monkeypatch.setattr(engine, "_audited_blob", lambda *args: b"old authority")
 
-    materialized = adapter._issue70_materialize_plan(
-        engine, ROOT, plan, verify_after=False
-    )
-    assert materialized[path] == b"issue-70 authority"
+    for allowed_path in (
+        path,
+        "src/web/scripts/static-repository-gates.test.mjs",
+    ):
+        plan["entries"][0]["path"] = allowed_path
+        materialized = adapter._issue70_materialize_plan(
+            engine, ROOT, plan, verify_after=False
+        )
+        assert materialized[allowed_path] == b"issue-70 authority"
 
     plan["entries"][0]["path"] = "src/web/scripts/other.mjs"
     with pytest.raises(engine.PlanError, match="must accompany a structural operation"):
