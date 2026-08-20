@@ -1,1 +1,0 @@
-# Keep the public directory in git so Docker builds from a clean checkout succeed.

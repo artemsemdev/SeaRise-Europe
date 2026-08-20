@@ -6,17 +6,15 @@
   "productionClaim": false,
   "activation": {
     "status": "pending-legacy-removal",
-    "blockingIssues": [70, 71],
+    "blockingIssues": [71],
     "pendingSelectors": [
       { "id": "ci-legacy-api", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "workflow-job:api" },
-      { "id": "ci-legacy-frontend", "issue": 70, "path": ".github/workflows/ci.yml", "selector": "workflow-job:frontend" },
       { "id": "ci-legacy-infrastructure", "issue": 71, "path": ".github/workflows/ci.yml", "selector": "workflow-job:infrastructure" },
       { "id": "codeql-legacy-csharp", "issue": 71, "path": ".github/workflows/codeql.yml", "selector": "workflow-job:analyze-csharp" },
       { "id": "legacy-api-tree", "issue": 71, "path": "src/api", "selector": "path-exists" },
       { "id": "legacy-blob-seed-tree", "issue": 71, "path": "infra/blob-seed", "selector": "path-exists" },
       { "id": "legacy-db-geography", "issue": 71, "path": "infra/db/init-geography.sql", "selector": "path-exists" },
       { "id": "legacy-db-init", "issue": 71, "path": "infra/db/init.sql", "selector": "path-exists" },
-      { "id": "legacy-frontend-tree", "issue": 70, "path": "src/frontend", "selector": "path-exists" },
       { "id": "legacy-solution-file", "issue": 71, "path": "SeaRise Europe.sln", "selector": "path-exists" },
       { "id": "pipeline-pyproject-azure", "issue": 71, "path": "src/pipeline/pyproject.toml", "selector": "azure-storage-blob" },
       { "id": "pipeline-pyproject-postgis", "issue": 71, "path": "src/pipeline/pyproject.toml", "selector": "psycopg2-binary" },
@@ -116,7 +114,7 @@
       "releaseUse": "candidate",
       "coverage": "locked",
       "inputs": [
-        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "40c04f8d8e2e248039b3dd55d1721117dd2c545f67b49c35678f36bf4df8719a" },
+        { "path": ".github/workflows/ci.yml", "role": "workflow", "sha256": "ad0f9125d84da289acc6700a92fbc1a31b138a1c4a15ee2633f29f3917c15761" },
         { "path": ".github/workflows/codeql.yml", "role": "workflow", "sha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d" },
         { "path": ".github/workflows/offline-release-controlled.yml", "role": "workflow", "sha256": "4fa060e84f50ba5bfc9d20d597f548bed2db3fc999407d499852fc511268af4c" },
         { "path": ".github/workflows/phase-0r-owner-promotion.yml", "role": "workflow", "sha256": "ae923da8d4ac6a8d224cb008f1c416a78565d17987e269376630a49f3c3f3fd9" },

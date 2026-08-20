@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
 
 OUTPUTS = (
     "web",
-    "frontend",
     "api",
     "pipeline",
     "release",
@@ -33,11 +32,6 @@ FORCE_ALL = (
     "scripts/ci/**",
 )
 
-FRONTEND = (
-    "src/frontend/**",
-    "contracts/**",
-    "tests/fixtures/tdd/**",
-)
 
 WEB = (
     ".nvmrc",
@@ -98,8 +92,6 @@ RELEASE = (
     "scripts/science/validate_ar6_delivery_trace.py",
     "package.json",
     "package-lock.json",
-    "src/frontend/package.json",
-    "src/frontend/package-lock.json",
     "src/web/scripts/measure-ar6-release.mjs",
     "src/web/package.json",
     "src/web/scripts/verify-boundary-pmtiles-browser.mjs",
@@ -139,13 +131,14 @@ REPOSITORY_REMOVAL = (
     "scripts/compose-smoke.sh",
     "src/api/.dockerignore",
     "src/api/Dockerfile",
-    "src/frontend/.dockerignore",
-    "src/frontend/Dockerfile",
     "tests/harness/test_changed_components.py",
     "tests/harness/test_immutable_dependencies.py",
 )
 
-CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**", "tools/static-quality/**")
+CODEQL_JAVASCRIPT = (
+    'src/web/**',
+    'tools/static-quality/**',
+)
 
 CODEQL_CSHARP = ("src/api/**",)
 
@@ -170,7 +163,6 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
 
     result = {
         "web": any(_matches(path, WEB) for path in paths),
-        "frontend": any(_matches(path, FRONTEND) for path in paths),
         "api": any(_matches(path, API) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
         "release": any(_matches(path, RELEASE) for path in paths),

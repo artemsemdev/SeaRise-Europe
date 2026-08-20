@@ -87,20 +87,11 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertFalse(outputs["heavy"])
         self.assertTrue(all(not outputs[name] for name in OUTPUTS))
 
-    def test_frontend_runtime_change_routes_tests_and_codeql(self) -> None:
-        outputs = classify_paths(["src/frontend/src/app/page.tsx"])
-
-        self.assertTrue(outputs["frontend"])
-        self.assertTrue(outputs["codeql_javascript"])
-        self.assertFalse(outputs["api"])
-        self.assertFalse(outputs["pipeline"])
-
     def test_static_web_change_routes_only_target_web_and_codeql(self) -> None:
         outputs = classify_paths(["src/web/src/App.tsx"])
 
         self.assertTrue(outputs["web"])
         self.assertTrue(outputs["codeql_javascript"])
-        self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
 
     def test_static_quality_tool_change_routes_web_and_javascript_codeql(self) -> None:
@@ -112,7 +103,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 outputs = classify_paths([path])
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["codeql_javascript"])
-                self.assertFalse(outputs["frontend"])
                 self.assertFalse(outputs["api"])
 
     def test_static_repository_gate_authorities_route_web_validation(self) -> None:
@@ -144,19 +134,11 @@ class ChangedComponentRoutingTests(unittest.TestCase):
             "contracts/supply-chain/v2/static-target-profile.json",
             "docker-compose.yml",
             "src/api/Dockerfile",
-            "src/frontend/Dockerfile",
         )
 
         for path in paths:
             with self.subTest(path=path):
                 self.assertTrue(classify_paths([path])["repository_removal"])
-
-    def test_frontend_test_change_routes_frontend(self) -> None:
-        outputs = classify_paths(
-            ["src/frontend/src/__tests__/components/ResultPanel.test.tsx"]
-        )
-
-        self.assertTrue(outputs["frontend"])
 
     def test_pmtiles_render_authorities_route_static_web_evidence_check(self) -> None:
         paths = [
@@ -171,7 +153,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 outputs = classify_paths([path])
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["pipeline"])
-                self.assertFalse(outputs["frontend"])
 
     def test_static_pmtiles_release_dependencies_route_macos_toolchain(self) -> None:
         paths = [
@@ -186,7 +167,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 outputs = classify_paths([path])
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["release"])
-                self.assertFalse(outputs["frontend"])
                 self.assertFalse(outputs["api"])
 
     def test_unrelated_static_and_pipeline_paths_skip_release_toolchain(self) -> None:
@@ -207,7 +187,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["pipeline"])
         self.assertTrue(outputs["release"])
-        self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["infrastructure"])
 
@@ -254,21 +233,18 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["infrastructure"])
         self.assertTrue(outputs["api"])
-        self.assertFalse(outputs["frontend"])
 
-    def test_shared_contract_routes_all_language_tests_without_images(self) -> None:
+    def test_shared_contract_routes_api_and_pipeline_without_images(self) -> None:
         outputs = classify_paths(
             ["tests/fixtures/tdd/five-state-characterization-v1.json"]
         )
 
-        self.assertTrue(outputs["frontend"])
         self.assertTrue(outputs["api"])
         self.assertTrue(outputs["pipeline"])
 
-    def test_public_release_contract_routes_python_and_frontend_only(self) -> None:
+    def test_public_release_contract_routes_static_web_and_pipeline(self) -> None:
         outputs = classify_paths(["contracts/release/v1/manifest.schema.json"])
 
-        self.assertTrue(outputs["frontend"])
         self.assertTrue(outputs["web"])
         self.assertTrue(outputs["pipeline"])
         self.assertFalse(outputs["api"])
@@ -276,7 +252,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         candidate = classify_paths(
             ["contracts/candidate-completeness/v1/candidate.schema.json"]
         )
-        self.assertTrue(candidate["frontend"])
         self.assertTrue(candidate["pipeline"])
 
     def test_ci_router_change_exercises_every_route(self) -> None:
@@ -360,7 +335,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         workflow = (
             Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
         ).read_text(encoding="utf-8")
-        web = _workflow_job(workflow, "web", "frontend")
+        web = _workflow_job(workflow, "web", "api")
 
         self.assertIn("permissions:\n      contents: read\n      issues: read", web)
         self.assertIn("fetch-depth: 0", web)
@@ -750,14 +725,12 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(routes["pipeline"])
         self.assertTrue(routes["release"])
         self.assertTrue(routes["heavy"])
-        self.assertFalse(routes["frontend"])
         self.assertFalse(routes["api"])
 
         script_routes = classify_paths(["scripts/science/promote_phase_0r_release.py"])
         self.assertTrue(script_routes["pipeline"])
         self.assertTrue(script_routes["release"])
         self.assertTrue(script_routes["heavy"])
-        self.assertFalse(script_routes["frontend"])
         self.assertFalse(script_routes["api"])
 
         delivery_routes = classify_paths(
@@ -815,7 +788,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertTrue(outputs["pipeline"])
                 self.assertTrue(outputs["release"])
                 self.assertTrue(outputs["heavy"])
-                self.assertFalse(outputs["frontend"])
                 self.assertFalse(outputs["api"])
                 self.assertFalse(outputs["infrastructure"])
 
@@ -825,7 +797,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
 
         self.assertTrue(outputs["pipeline"])
-        self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
         self.assertFalse(outputs["infrastructure"])
 
@@ -883,7 +854,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["pipeline"])
         self.assertTrue(outputs["heavy"])
-        self.assertFalse(outputs["frontend"])
         self.assertFalse(outputs["api"])
 
     def test_rename_routes_both_old_and_new_paths(self) -> None:
@@ -903,7 +873,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertEqual([line.split("=", 1)[0] for line in lines], list(OUTPUTS))
         self.assertIn("pipeline=true", lines)
-        self.assertIn("frontend=false", lines)
 
 
 if __name__ == "__main__":
