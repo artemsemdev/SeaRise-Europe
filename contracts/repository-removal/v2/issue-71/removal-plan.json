@@ -1,0 +1,1835 @@
+{
+  "$schema": "./removal-plan.schema.json",
+  "schemaVersion": "2.0.0",
+  "planId": "phase-2-issue-71-exact-removal-v2",
+  "issue": 71,
+  "auditedCommit": "7d4a51db7d0ff67058ae690419720fd285de435c",
+  "auditedTree": "5d2b25475a2f7dfd73161964827eaf40c80f4ce8",
+  "entries": [
+    {
+      "path": ".env.pipeline.example",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "f927de4951a3d64e198b9abdb67eeb67e97259e8",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "5d5c38d4dab5d6ad7865b0f5fc76bec36c3e2ee3",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "6a403931e41397ccd628969e67962999c290862c",
+        "sha256": "e90422e53f25e77b500f05f6ccc7d103498fa8589efbc74cf78469a566796f17"
+      },
+      "operations": [
+        {
+          "id": "delete-api-job",
+          "kind": "workflow-job-delete",
+          "job": "api"
+        },
+        {
+          "id": "delete-api-need",
+          "kind": "workflow-needs-edge-delete",
+          "consumer": "ci-gate",
+          "dependency": "api"
+        },
+        {
+          "id": "delete-api-output",
+          "kind": "workflow-output-delete",
+          "job": "changes",
+          "output": "api"
+        },
+        {
+          "id": "delete-infrastructure-job",
+          "kind": "workflow-job-delete",
+          "job": "infrastructure"
+        },
+        {
+          "id": "delete-infrastructure-need",
+          "kind": "workflow-needs-edge-delete",
+          "consumer": "ci-gate",
+          "dependency": "infrastructure"
+        },
+        {
+          "id": "delete-infrastructure-output",
+          "kind": "workflow-output-delete",
+          "job": "changes",
+          "output": "infrastructure"
+        },
+        {
+          "id": "handoff-issue-71-validator",
+          "kind": "workflow-step-run-replace",
+          "job": "repository-removal-v2",
+          "name": "Enforce repository-removal lifecycle state",
+          "from": "python scripts/repository/validate_issue70_removal.py ci",
+          "to": "python scripts/repository/validate_issue71_removal.py ci"
+        },
+        {
+          "id": "retire-mutation-pilot-command",
+          "kind": "workflow-step-run-replace",
+          "job": "pipeline",
+          "name": "Validate test migration contracts",
+          "from": "PYTHONPATH=../.. python ../../scripts/tests/validate_test_inventory.py\n          PYTHONPATH=../.. python -m unittest discover -s ../../tests/harness -p 'test_*.py'\n          PYTHONPATH=../.. python ../../scripts/tests/run_mutation_pilot.py --verify-report ../../tests/evidence/mutation-pilot-result-state.json",
+          "to": "PYTHONPATH=../.. python ../../scripts/tests/validate_test_inventory.py\n          PYTHONPATH=../.. python -m unittest discover -s ../../tests/harness -p 'test_*.py'"
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a769c29e9ded223b62598fbf9adbeb530c5eaad1",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d9924bb1b8120e21ea0d429521f20d1bc2c15ca2",
+        "sha256": "b7aa256821becf05dc4578ead4d2a9779965770a05c94339e15cdf0b11030214"
+      },
+      "operations": [
+        {
+          "id": "delete-csharp-job",
+          "kind": "workflow-job-delete",
+          "job": "analyze-csharp"
+        },
+        {
+          "id": "delete-csharp-need",
+          "kind": "workflow-needs-edge-delete",
+          "consumer": "codeql-gate",
+          "dependency": "analyze-csharp"
+        },
+        {
+          "id": "delete-csharp-output",
+          "kind": "workflow-output-delete",
+          "job": "changes",
+          "output": "csharp"
+        }
+      ]
+    },
+    {
+      "path": "SeaRise Europe.sln",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "80532f5dc6b40ef6255fa288ae3fae74600b7cd9",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "6520c4a12146540fe7364fef44a445a400882dc3",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "f7330e81697f418d5660142b4a0bc9364876f0a4",
+        "sha256": "0bb68c1805b09116f832034173d885489876e6da59835ee01de2e1bb16ae5d16"
+      },
+      "operations": [
+        {
+          "id": "activate-issue-71-profile",
+          "kind": "static-profile-multi-input-activation",
+          "issue": 71,
+          "pendingSelectorIds": [
+            "ci-legacy-api",
+            "ci-legacy-infrastructure",
+            "codeql-legacy-csharp",
+            "legacy-api-tree",
+            "legacy-blob-seed-tree",
+            "legacy-db-geography",
+            "legacy-db-init",
+            "legacy-solution-file",
+            "pipeline-pyproject-azure",
+            "pipeline-pyproject-postgis",
+            "pipeline-requirements-azure",
+            "pipeline-requirements-postgis"
+          ],
+          "inputBindings": [
+            {
+              "componentId": "github-actions",
+              "inputPath": ".github/workflows/ci.yml",
+              "fromSha256": "ad0f9125d84da289acc6700a92fbc1a31b138a1c4a15ee2633f29f3917c15761",
+              "toSha256": "e90422e53f25e77b500f05f6ccc7d103498fa8589efbc74cf78469a566796f17"
+            },
+            {
+              "componentId": "github-actions",
+              "inputPath": ".github/workflows/codeql.yml",
+              "fromSha256": "bac674e642feff8669f2a2ab9f9a5bf9cb75c1d2819e0be1c65d888885a3c52d",
+              "toSha256": "b7aa256821becf05dc4578ead4d2a9779965770a05c94339e15cdf0b11030214"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": "infra/blob-seed/Dockerfile",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "729862229b448d7c527b1a9e5840007f568be3fa",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "infra/blob-seed/requirements.lock",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "8d1ac342300e278868f137966455a0b094b02f84",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "infra/blob-seed/requirements.txt",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "f15f70629a81f054fb9a53adc4a2e5592835a7d5",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "infra/blob-seed/seed.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "84f29060bdc37dd18ba339642b7c1fee91a4e354",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "infra/db/init-geography.sql",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c336319f6f158540d85ecee03f619551b48b0fcb",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "infra/db/init.sql",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "0fa690f7de593a6b9e92c2a697bb9f06107e44dd",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "scripts/ci/changed_components.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "2a0ca3ff4bb5e6dc28aec17f3dc24ae42597ccc9",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d56c0fe14fe7d045035696facfc390ab0c6dd792",
+        "sha256": "af2eab6be98f6db96ffacdf6f2cc13fc175ccb1ffa7cf1d23bc931881d1642fd"
+      },
+      "operations": [
+        {
+          "id": "delete-api-binding",
+          "kind": "python-binding-closure-delete",
+          "name": "API",
+          "expectedLoadCount": 1,
+          "useContainers": [
+            {
+              "function": "classify_paths",
+              "mapping": "result",
+              "key": "api"
+            }
+          ]
+        },
+        {
+          "id": "delete-csharp-binding",
+          "kind": "python-binding-closure-delete",
+          "name": "CODEQL_CSHARP",
+          "expectedLoadCount": 1,
+          "useContainers": [
+            {
+              "function": "classify_paths",
+              "mapping": "result",
+              "key": "codeql_csharp"
+            }
+          ]
+        },
+        {
+          "id": "delete-infrastructure-binding",
+          "kind": "python-binding-closure-delete",
+          "name": "INFRASTRUCTURE",
+          "expectedLoadCount": 1,
+          "useContainers": [
+            {
+              "function": "classify_paths",
+              "mapping": "result",
+              "key": "infrastructure"
+            }
+          ]
+        },
+        {
+          "id": "delete-retired-outputs",
+          "kind": "python-tuple-literals-delete",
+          "name": "OUTPUTS",
+          "values": [
+            "api",
+            "codeql_csharp",
+            "infrastructure"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "scripts/tests/run_mutation_pilot.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "ef8d4a31505ac06e88f23e156690d87c6d1734d6",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/Directory.Build.props",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "1b1aa214322b426a5bd75aeeaf2e4fe54e5afcac",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "67d9d7adbc22cc2d8486f53b69f58df0f8754b86",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "03b2e6084adeb102a37c703e65cf104ec5689c3d",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Domain/SharedResultStateFixtureTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "89e0c5b34616f402d0c0499d5a4df1309d23538a",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/GlobalUsings.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c802f4480b198aad9bb8709a616c0891f99086c9",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Infrastructure/TiTilerBlobPathValidationTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "2eba790a2996ed9375a2f6e1f33d258c109211f9",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Integration/EndpointTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "30a14c79b98459bbed3a9b140a8d56fa0ed3d753",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Integration/GeographyRepositoryTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "669b36c8addea7e64efcb5bf500285908ba49e2b",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Integration/LayerRepositoryTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "109f6c1d47e56263540d9befe3eae64057f4a392",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Integration/ScenarioRepositoryTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "0b93a99e6784b311a1be24d1657d7b1c11fd13c0",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Integration/SecurityHeaderTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "136b6f5c7ef2d25706c967dbb964aea7bac06d07",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Integration/TestDbFixture.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "cfaa204bce7dee298b914ec85a12c9235f537d78",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/SeaRise.Api.Tests.csproj",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a30ee07efe88f08c5d814b0fded994fbf6da518d",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Validators/AssessRequestValidatorTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "bc9adde80846a8f418715f58b57907b9f9ed6d50",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/Validators/GeocodeRequestValidatorTests.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "55db25300092417f661fc7f20dd211a80fb6d43c",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api.Tests/packages.lock.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "bdcd2c10a64c1e76d6a0398a1aa5e862774b0159",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/AssessRequest.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "bb46e512828706963f4d710766fc8fda4f485052",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/AssessResponse.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "d673a1285878b0713426dedbd98b473bed760326",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/ConfigMethodologyResponse.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "21d1c17f1a91fc0534ab20a2d71a51ef204c4373",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/ConfigScenariosResponse.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "8b444c59277f8c43e6bbc106ae6b7e419c84bab2",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/ErrorResponse.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "be8e4cd96a0d759d381de3a7cf8a6c2c826502bb",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/GeocodeRequest.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a0b030b412e6c11f877a69116399672948bbf29c",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/GeocodeResponse.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "fa549ef3bf8d1c96b3e9df693a0b777bfd8140a8",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Dtos/HealthResponse.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "dcacb2500d01e780e517603693239126ea5a6a7d",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Program.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "792678d311b0b32b71656713adaa2026aaae7b1f",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/SeaRise.Api.csproj",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "9c035028c72b80ccccab5b2442e2766a6633a272",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/StreamJsonResults.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "6695561b4062aecf351e8b2d2d73dbd1674e8d25",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Validators/AssessRequestValidator.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "978af3f632833c9e60b7f352223780e36cc5b54b",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/Validators/GeocodeRequestValidator.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "90fdf8eabb7cf80c8468ef7c84f2ad91b79d7fc3",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/appsettings.Development.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a6e86ace7a32495f9fb2d489949743e66f63b32a",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/appsettings.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "2d0595f9664808a14ca0ac9e0a895a318214ad3b",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Api/packages.lock.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "21153d18403d28d99763c6c6450191905d164f48",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Application/Interfaces/IAssessmentService.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "852367f0039e03b9c88ca197cf770cd76a9ba8e8",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Application/SeaRise.Application.csproj",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "912c41c4b934374e3f95cf53ff29fab81aecbf9d",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Application/Services/AssessmentService.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c7ece9b42a8cfda0f2d56daeb81c617b2ac2ca51",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Application/packages.lock.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "ebbf7a41fe2ef6ad94b915b3485bf9011e2791da",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Exceptions/GeocodingProviderException.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "d99fcd3d2bef81a3d0ba668237c421bebbbd03e8",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Interfaces/IExposureEvaluator.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "3eb85e32c082be8e086a01e73ec15851fd8c5ebd",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Interfaces/IGeocodingService.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "3ef2704ed4e042aa3435ebcfb84566c67c42f6df",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Interfaces/IGeographyRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "913ba1fa590e898728c33691cf5833a8d4b34a62",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Interfaces/ILayerResolver.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "acf14e1572e731d318e44742410291c2aa21222c",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Interfaces/IMethodologyRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "9aaffbbf8d125b2b3bc71c703195b1784b742631",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Interfaces/IScenarioRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "f218d0393d766268f9cb1c8c0b85917aeb1eaec4",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Logic/ResultStateDeterminator.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "7ad6cd3be6976cd592c2fb62d2477334c30eeb44",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/AssessmentQuery.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "f15df358813da9b133568248cab8ddbbe542cb9f",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/AssessmentResult.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "ae636c436a40d8ac6b966ea386474a36f5d80a86",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/ExposureLayer.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "5ee7cdc41b385ab5e1247aed461bf4a01058100a",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/GeocodingCandidate.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "77aa8ddf8282ecdae3d4f90d4f54003c0c28a1e8",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/GeographyClassification.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "747d2f4b2afe11c2e28d9e52d00f5d4c1c24ebcb",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/Horizon.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "5b4f55f3c45dc10cf12182d141047f74822dcc5c",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/MethodologyVersion.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "3f31e059b13024f2cac8dab8d7ae43ff81e26ff2",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/ResultState.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "97366f13975ea7a8448f109a934af1359172159f",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/Models/Scenario.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "e5da2aed178c65bef420ca72c3b6282c3bf2c523",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/SeaRise.Domain.csproj",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "5d6e8277cbf44dff2f68189908f084568a18b185",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Domain/packages.lock.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "807ab822b670b0140918f7d2eec0273c0b1dbdc7",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/Clients/NominatimGeocodingClient.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "2a62163583594a0e3af05bc826e1e049d9c8ea24",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/Clients/TiTilerExposureEvaluator.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "053a73591baa1f6bc2c869bdd40205b926c4582e",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/Repositories/LayerRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "9cf6e457a5c4caf13945ca0dc934ac927d9dd58f",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/Repositories/MethodologyRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "694e6f0a2cbd9b843aae5772f5527cdc27a68b09",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/Repositories/PostGisGeographyRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "ff1346c50c223856ddf5a8060e22c439df4d153e",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/Repositories/ScenarioRepository.cs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "73d467956fd68ad0d521d24b8bf3854870f313db",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/SeaRise.Infrastructure.csproj",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "d4b9f4c9fa7697d80aad12cd93553664abc3f1e5",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.Infrastructure/packages.lock.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "5679c132519dcd31e743888c07fce12644ebcf39",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/api/SeaRise.sln",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "05a9e0f9be5275a55c41ce9aeda2ef11750ac3f7",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/__init__.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a3c10dd8e2be048d9a4200947d5656e2dcdc14e3",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/cogify.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c9ddb357790cba996fafe10603df4677cbb8463d",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/compute_exposure.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c735c366f5f2a6d533889c81e0ac52a593eda893",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/config.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "218b7c97bfe84d9992bd0010aec7743dd2df87d2",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/download.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "f8ecf6b5f22f6a21654eb1d8da1bc2271d4d8f71",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/preprocess.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a7f0cede5cd7f34deeea3c72929adbc8ab85a0a9",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/pyproject.toml",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "532c1bcafba301e38efd5ab2fb4c2c550fb147b8",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e0acf6539795f19704687380b13f3bda2f8195e1",
+        "sha256": "022568a55d149d8a69f5e2bbcd7b13da67741540bda69b10413b5302012ac3b2"
+      },
+      "operations": [
+        {
+          "id": "prune-static-runtime-project",
+          "kind": "pyproject-static-runtime-prune"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/register.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "8ff9d1a842674d43dcdfbf914a49c422561e9472",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/requirements-pipeline.txt",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "72a6d332b669c4a896fc353b0d1b2b844ecc940f",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "510d5e7440ec5c3ea276c3b46659227609cbb3fb",
+        "sha256": "a4a9f5f36ad843e67645ea37e3746497555d510e50333baa1f36642cd58205c4"
+      },
+      "operations": [
+        {
+          "id": "prune-static-runtime-requirements",
+          "kind": "requirements-static-runtime-prune"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/run_pipeline.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "ae3d4e0f4f805acb90261bfbe9c19edebf987b08",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/searise_pipeline/domain/__init__.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "12d451ce11c66fbdaa71d5a56d5ed9713f6d47f1",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/searise_pipeline/domain/result_state.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "44c09182c168ecea852ee0961e39e15355df410b",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/tdd/test_result_state_characterization.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "eeb2e77ca5e3df19df97e2f4d4738fa0e634699e",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_cogify.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c73292caf8ff176d4cdabf0c6a7db60b851e410a",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_compute_exposure.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "93aede37a9657a462b41a273981a767893b2ef2f",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_config.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "6c3f9004e36783344f2e75bbb70dd04204cfda92",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_download.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "c274066d0512399bb868de16e626b4fe1b691166",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_preprocess.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "eda0802617b4d531313e6446443145d640d88af9",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_register.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "10797594a90b7edda170929ef1be9a81edb007c1",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_upload.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "e1b90f04143882ff2bfeee914cdc132fcacb88ce",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/tests/test_validate.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "caa8490a5bd81196a4ac7d97e8c2a7040ce844e2",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/upload.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "23f6362a258af9ceffd89eff2311db9933c6edf1",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/pipeline/validate.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "0b719eae281931e83aa4e0f2f29639155134825d",
+      "after": {
+        "state": "absent"
+      },
+      "operations": [
+        {
+          "id": "delete-file",
+          "kind": "file-delete"
+        }
+      ]
+    },
+    {
+      "path": "src/web/scripts/check-target-content.mjs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "91432d64c19905132b2a6741763b3e131b054597",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "4c9d4e2cf746be4e93179b8784a94167b38403e5",
+        "sha256": "5426828044e9b364133ee4008ac1d06976c156fb477ae339fd4a533969546d2d"
+      },
+      "operations": [
+        {
+          "id": "handoff-content-authority",
+          "kind": "content-authority-handoff",
+          "from": "function approvedRemovalChain(root) {\n  const validator = resolve(root, \"scripts/repository/validate_issue70_removal.py\");\n  const receiptPath = \"contracts/repository-removal/v2/issue-70/application-receipt.json\";\n  if (!existsSync(validator)) throw new Error(\"Issue-70 repository-removal validator is missing\");\n  readRegularFile(validator, null, root);\n  let receiptCommit;\n  let headCommit;\n  try {\n    const additions = execFileSync(\n      \"git\", [\"log\", \"--format=%H\", \"--diff-filter=A\", \"--\", receiptPath],\n      { cwd: root, encoding: \"utf8\" },\n    ).trim().split(\"\\n\").filter(Boolean);\n    if (additions.length !== 1) {\n      throw new Error(\"issue-70 receipt must have one exact addition commit\");\n    }\n    [receiptCommit] = additions;\n    headCommit = execFileSync(\"git\", [\"rev-parse\", \"HEAD\"], {\n      cwd: root,\n      encoding: \"utf8\",\n    }).trim();\n  } catch (error) {\n    throw new Error(`Issue-70 authority anchors cannot be derived: ${error.message}`);\n  }\n  try {\n    execFileSync(\"python3\", [\n      validator,\n      \"--repository-root\", root,\n      \"post-application\",\n      \"--receipt-commit\", receiptCommit,\n      \"--head-commit\", headCommit,\n      \"--verify-owner-comment\",\n    ], {\n      cwd: root,\n      encoding: \"utf8\",\n      stdio: \"pipe\",\n    });\n  } catch (error) {\n    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();\n    throw new Error(`Issue-70 repository-removal approval chain is invalid${detail ? `: ${detail}` : \"\"}`);\n  }\n}",
+          "to": "function approvedRemovalChain(root) {\n  const validator = resolve(root, \"scripts/repository/validate_issue71_removal.py\");\n  const receiptPath = \"contracts/repository-removal/v2/issue-71/application-receipt.json\";\n  if (!existsSync(validator)) throw new Error(\"Issue-71 repository-removal validator is missing\");\n  readRegularFile(validator, null, root);\n  let receiptCommit;\n  let headCommit;\n  try {\n    const additions = execFileSync(\n      \"git\", [\"log\", \"--format=%H\", \"--diff-filter=A\", \"--\", receiptPath],\n      { cwd: root, encoding: \"utf8\" },\n    ).trim().split(\"\\n\").filter(Boolean);\n    if (additions.length !== 1) {\n      throw new Error(\"issue-71 receipt must have one exact addition commit\");\n    }\n    [receiptCommit] = additions;\n    headCommit = execFileSync(\"git\", [\"rev-parse\", \"HEAD\"], {\n      cwd: root,\n      encoding: \"utf8\",\n    }).trim();\n  } catch (error) {\n    throw new Error(`Issue-71 authority anchors cannot be derived: ${error.message}`);\n  }\n  try {\n    execFileSync(\"python3\", [\n      validator,\n      \"--repository-root\", root,\n      \"post-application\",\n      \"--receipt-commit\", receiptCommit,\n      \"--head-commit\", headCommit,\n      \"--verify-owner-comment\",\n    ], {\n      cwd: root,\n      encoding: \"utf8\",\n      stdio: \"pipe\",\n    });\n  } catch (error) {\n    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();\n    throw new Error(`Issue-71 repository-removal approval chain is invalid${detail ? `: ${detail}` : \"\"}`);\n  }\n}"
+        }
+      ]
+    },
+    {
+      "path": "src/web/scripts/static-repository-gates.mjs",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "2bbaf3f9fef08b0bf7fab797dcf3c913e4da0885",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "29687de0b2cf2dd3fcfbe8c42afe3fe9af4286fb",
+        "sha256": "cd6d6908ed65f27e1e3d88acb36b74d38361fa1b5addd8d879515e745934aa0c"
+      },
+      "operations": [
+        {
+          "id": "activate-static-profile-component-count",
+          "kind": "exact-text-replace",
+          "from": "if (componentCount !== 14 || inputCount !== 57) {",
+          "to": "if (componentCount !== 13 || inputCount !== 57) {"
+        },
+        {
+          "id": "rebind-pyproject-contributor-input",
+          "kind": "exact-text-replace",
+          "from": "[\"src/pipeline/pyproject.toml\", [\"pending-legacy-python-authorities\", \"manifest\", \"100644\"]]",
+          "to": "[\"src/pipeline/pyproject.toml\", [\"pipeline-python-contributor\", \"manifest\", \"100644\"]]"
+        },
+        {
+          "id": "rebind-requirements-contributor-input",
+          "kind": "exact-text-replace",
+          "from": "[\"src/pipeline/requirements-pipeline.txt\", [\"pending-legacy-python-authorities\", \"manifest\", \"100644\"]]",
+          "to": "[\"src/pipeline/requirements-pipeline.txt\", [\"pipeline-python-contributor\", \"manifest\", \"100644\"]]"
+        },
+        {
+          "id": "remove-pending-python-component",
+          "kind": "exact-text-replace",
+          "from": "  [\"pending-legacy-python-authorities\", [\"python\", \"development\", \"range-constrained\"]],\n",
+          "to": ""
+        }
+      ]
+    },
+    {
+      "path": "tests/harness/test_changed_components.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "a525cf2626cb98b55aa9d7109612bc6fca4c77c1",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c9a0a6d01572476d744314acc8c65e02470e339e",
+        "sha256": "c43d93d440c28d16473be4b5e54414ae5b76a8cfce08a3c7e4643d6e240f3209"
+      },
+      "operations": [
+        {
+          "id": "rebind-test-macos-release-evidence-measures-locked-browser-delivery-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        macos = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n\n        build = macos.index(\"Build full real-source candidate\")\n        setup_node = macos.index(\n            \"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\"\n        )\n        measure = macos.index(\"Measure trusted browser delivery\")\n        validate = macos.index(\"Validate browser delivery evidence\")\n        upload = macos.index(\"Upload independently built candidate and timing\")\n        self.assertLess(build, setup_node)\n        self.assertLess(\n            macos.index(\"rm -f -- /tmp/ar6-regional-confidence.zip\", build),\n            setup_node,\n        )\n        self.assertLess(setup_node, measure)\n        self.assertLess(measure, validate)\n        self.assertLess(validate, upload)\n        self.assertIn(\"node-version: 20\", macos)\n        self.assertIn(\n            \"cache-dependency-path: package-lock.json\",\n            macos,\n        )\n        self.assertNotIn(\"working-directory: src/frontend\", macos)\n        self.assertIn(\"run: npm ci\", macos)\n        self.assertIn(\n            \"run: ./node_modules/.bin/playwright install chromium\",\n            macos,\n        )\n        self.assertNotIn(\"npx playwright\", macos)\n        command = (\n            \"node src/web/scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 \"\n            \"/tmp/browser-trace-macos-arm64.json\"\n        )\n        self.assertIn(command, macos)\n        self.assertIn(\"test -s /tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertIn(\n            \"python scripts/science/validate_ar6_delivery_trace.py\",\n            macos,\n        )\n        self.assertIn(\"--candidate /tmp/phase-0r-ar6-v1\", macos)\n        self.assertIn(\"--trace /tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertIn(\n            \"--harness src/web/scripts/measure-ar6-release.mjs\",\n            macos,\n        )\n        self.assertIn(\n            \"--build-timing /tmp/build-timing-macos-arm64.json\",\n            macos,\n        )\n        self.assertIn(\"test -s /tmp/delivery-report-macos-arm64.json\", macos)\n        self.assertIn('.status == \"passed\"', macos)\n        self.assertIn(\n            '.candidate.releaseId == \"phase-0r-ar6-v1\"',\n            macos,\n        )\n        self.assertIn(\n            '.trace.path == \"browser-trace-macos-arm64.json\"',\n            macos,\n        )\n        self.assertIn(\n            '.buildTiming.path == \"build-timing-macos-arm64.json\"',\n            macos,\n        )\n        self.assertIn('.profiles.hardware.architecture == \"arm64\"', macos)\n        self.assertIn('.profiles.browser.engine == \"Chromium\"', macos)\n        self.assertIn(\"            /tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertLess(\n            macos.index(\"test -s /tmp/browser-trace-macos-arm64.json\"),\n            upload,\n        )",
+          "to": "def test_macos_release_evidence_measures_locked_browser_delivery(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        macos = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n\n        build = macos.index(\"Build full real-source candidate\")\n        setup_node = macos.index(\n            \"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\"\n        )\n        measure = macos.index(\"Measure trusted browser delivery\")\n        validate = macos.index(\"Validate browser delivery evidence\")\n        upload = macos.index(\"Upload independently built candidate and timing\")\n        self.assertLess(build, setup_node)\n        self.assertLess(\n            macos.index(\"rm -f -- /tmp/ar6-regional-confidence.zip\", build),\n            setup_node,\n        )\n        self.assertLess(setup_node, measure)\n        self.assertLess(measure, validate)\n        self.assertLess(validate, upload)\n        self.assertIn(\"node-version: 20\", macos)\n        self.assertIn(\n            \"cache-dependency-path: package-lock.json\",\n            macos,\n        )\n        self.assertNotIn(\"working-directory: src/frontend\", macos)\n        self.assertIn(\"run: npm ci\", macos)\n        self.assertIn(\n            \"run: ./node_modules/.bin/playwright install chromium\",\n            macos,\n        )\n        self.assertNotIn(\"npx playwright\", macos)\n        command = (\n            \"node src/web/scripts/measure-ar6-release.mjs /tmp/phase-0r-ar6-v1 \"\n            \"/tmp/browser-trace-macos-arm64.json\"\n        )\n        self.assertIn(command, macos)\n        self.assertIn(\"test -s /tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertIn(\n            \"python scripts/science/validate_ar6_delivery_trace.py\",\n            macos,\n        )\n        self.assertIn(\"--candidate /tmp/phase-0r-ar6-v1\", macos)\n        self.assertIn(\"--trace /tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertIn(\n            \"--harness src/web/scripts/measure-ar6-release.mjs\",\n            macos,\n        )\n        self.assertIn(\n            \"--build-timing /tmp/build-timing-macos-arm64.json\",\n            macos,\n        )\n        self.assertIn(\"test -s /tmp/delivery-report-macos-arm64.json\", macos)\n        self.assertIn('.status == \"passed\"', macos)\n        self.assertIn(\n            '.candidate.releaseId == \"phase-0r-ar6-v1\"',\n            macos,\n        )\n        self.assertIn(\n            '.trace.path == \"browser-trace-macos-arm64.json\"',\n            macos,\n        )\n        self.assertIn(\n            '.buildTiming.path == \"build-timing-macos-arm64.json\"',\n            macos,\n        )\n        self.assertIn('.profiles.hardware.architecture == \"arm64\"', macos)\n        self.assertIn('.profiles.browser.engine == \"Chromium\"', macos)\n        self.assertIn(\"            /tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertLess(\n            macos.index(\"test -s /tmp/browser-trace-macos-arm64.json\"),\n            upload,\n        )"
+        },
+        {
+          "id": "rebind-test-macos-vector-toolchain-is-preflighted-on-release-changes-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_macos_vector_toolchain_is_preflighted_on_release_changes(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        preflight = _workflow_job(\n            workflow,\n            \"release-toolchain-macos\",\n            \"ar6-release-evidence\",\n        )\n        producer = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n\n        self.assertIn(\"name: AR6 release toolchain (pinned macOS ARM64)\", preflight)\n        self.assertIn(\"needs.changes.outputs.release == 'true'\", preflight)\n        self.assertIn(\"inputs.release_evidence != true\", preflight)\n        self.assertIn(\"runs-on: macos-14\", preflight)\n        self.assertIn(\"src/pipeline/toolchain/build_macos_tippecanoe.sh\", preflight)\n        self.assertIn(\"tippecanoe-darwin-arm64-build-receipt.json\", preflight)\n        self.assertIn('build_a=\"${RUNNER_TEMP}/ar6-tools-a\"', preflight)\n        self.assertIn('build_b=\"${RUNNER_TEMP}/ar6-tools-b\"', preflight)\n        self.assertIn('cmp \"${build_a}/tippecanoe\" \"${build_b}/tippecanoe\"', preflight)\n        self.assertIn(\n            'cmp \"${build_a}/tippecanoe-decode\" \"${build_b}/tippecanoe-decode\"',\n            preflight,\n        )\n        self.assertIn(\"src/pipeline/toolchain/build_macos_tippecanoe.sh\", producer)",
+          "to": "def test_macos_vector_toolchain_is_preflighted_on_release_changes(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        preflight = _workflow_job(\n            workflow,\n            \"release-toolchain-macos\",\n            \"ar6-release-evidence\",\n        )\n        producer = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n\n        self.assertIn(\"name: AR6 release toolchain (pinned macOS ARM64)\", preflight)\n        self.assertIn(\"needs.changes.outputs.release == 'true'\", preflight)\n        self.assertIn(\"inputs.release_evidence != true\", preflight)\n        self.assertIn(\"runs-on: macos-14\", preflight)\n        self.assertIn(\"src/pipeline/toolchain/build_macos_tippecanoe.sh\", preflight)\n        self.assertIn(\"tippecanoe-darwin-arm64-build-receipt.json\", preflight)\n        self.assertIn('build_a=\"${RUNNER_TEMP}/ar6-tools-a\"', preflight)\n        self.assertIn('build_b=\"${RUNNER_TEMP}/ar6-tools-b\"', preflight)\n        self.assertIn('cmp \"${build_a}/tippecanoe\" \"${build_b}/tippecanoe\"', preflight)\n        self.assertIn(\n            'cmp \"${build_a}/tippecanoe-decode\" \"${build_b}/tippecanoe-decode\"',\n            preflight,\n        )\n        self.assertIn(\"src/pipeline/toolchain/build_macos_tippecanoe.sh\", producer)"
+        },
+        {
+          "id": "rebind-test-release-evidence-builds-two-exact-trusted-profiles-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_release_evidence_builds_two_exact_trusted_profiles(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        linux = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n\n        self.assertIn(\"name: Full-source Linux AR6 candidate\", linux)\n        self.assertIn(\"runs-on: ubuntu-24.04\", linux)\n        self.assertIn('python-version: \"3.11.9\"', linux)\n        self.assertIn(\"requirements-release.lock\", linux)\n        self.assertIn(\n            'build-environment-id \"github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64\"',\n            linux,\n        )\n        self.assertIn(\n            \"name: ar6-linux-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}\",\n            linux,\n        )\n        self.assertIn(\"/tmp/build-timing-linux.json\", linux)\n        self.assertNotIn(\"/tmp/build-timing-macos-arm64.json\", linux)\n        self.assertNotIn(\"browser-trace\", linux)\n        self.assertNotIn(\"-macos-arm64\", linux)\n\n        self.assertIn(\"name: Full-source macOS ARM64 AR6 candidate\", macos)\n        self.assertIn(\"runs-on: macos-14\", macos)\n        self.assertIn('test \"$(uname -m)\" = \"arm64\"', macos)\n        self.assertIn('python-version: \"3.11.9\"', macos)\n        self.assertNotIn('python-version: \"3.9.6\"', macos)\n        self.assertIn(\"requirements-release-macos-arm64.lock\", macos)\n        self.assertIn(\"tippecanoe-darwin-arm64-build-receipt.json\", macos)\n        self.assertIn(\"--pmtiles-distribution-platform darwin-arm64\", macos)\n        self.assertIn(\n            'build-environment-id \"github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-macos-arm64\"',\n            macos,\n        )\n        self.assertIn(\n            \"name: ar6-macos-arm64-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}\",\n            macos,\n        )\n        self.assertIn(\"/tmp/build-timing-macos-arm64.json\", macos)\n        self.assertIn(\"/tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertNotIn(\"/tmp/build-timing-linux.json\", macos)\n        self.assertNotIn(\"-linux-x86_64\", macos)\n        self.assertEqual(linux.count(\"/tmp/phase-0r-ar6-v1\"), 4)\n        self.assertEqual(macos.count(\"/tmp/phase-0r-ar6-v1\"), 6)",
+          "to": "def test_release_evidence_builds_two_exact_trusted_profiles(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        linux = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n\n        self.assertIn(\"name: Full-source Linux AR6 candidate\", linux)\n        self.assertIn(\"runs-on: ubuntu-24.04\", linux)\n        self.assertIn('python-version: \"3.11.9\"', linux)\n        self.assertIn(\"requirements-release.lock\", linux)\n        self.assertIn(\n            'build-environment-id \"github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-linux-x86_64\"',\n            linux,\n        )\n        self.assertIn(\n            \"name: ar6-linux-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}\",\n            linux,\n        )\n        self.assertIn(\"/tmp/build-timing-linux.json\", linux)\n        self.assertNotIn(\"/tmp/build-timing-macos-arm64.json\", linux)\n        self.assertNotIn(\"browser-trace\", linux)\n        self.assertNotIn(\"-macos-arm64\", linux)\n\n        self.assertIn(\"name: Full-source macOS ARM64 AR6 candidate\", macos)\n        self.assertIn(\"runs-on: macos-14\", macos)\n        self.assertIn('test \"$(uname -m)\" = \"arm64\"', macos)\n        self.assertIn('python-version: \"3.11.9\"', macos)\n        self.assertNotIn('python-version: \"3.9.6\"', macos)\n        self.assertIn(\"requirements-release-macos-arm64.lock\", macos)\n        self.assertIn(\"tippecanoe-darwin-arm64-build-receipt.json\", macos)\n        self.assertIn(\"--pmtiles-distribution-platform darwin-arm64\", macos)\n        self.assertIn(\n            'build-environment-id \"github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-macos-arm64\"',\n            macos,\n        )\n        self.assertIn(\n            \"name: ar6-macos-arm64-candidate-${{ inputs.release_source_revision }}-${{ github.run_id }}\",\n            macos,\n        )\n        self.assertIn(\"/tmp/build-timing-macos-arm64.json\", macos)\n        self.assertIn(\"/tmp/browser-trace-macos-arm64.json\", macos)\n        self.assertNotIn(\"/tmp/build-timing-linux.json\", macos)\n        self.assertNotIn(\"-linux-x86_64\", macos)\n        self.assertEqual(linux.count(\"/tmp/phase-0r-ar6-v1\"), 4)\n        self.assertEqual(macos.count(\"/tmp/phase-0r-ar6-v1\"), 6)"
+        },
+        {
+          "id": "rebind-test-release-evidence-pins-actions-and-checks-disk-before-download-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_release_evidence_pins_actions_and_checks_disk_before_download(\n        self,\n    ) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n\n        for action in (\n            \"actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\",\n            \"actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065\",\n            \"actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809\",\n            \"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\n        ):\n            self.assertIn(action, evidence)\n        self.assertIn(\"required_kib=10599985\", evidence)\n        self.assertIn(\"/tmp/phase-0r-ar6-preflight\", evidence)\n        self.assertLess(evidence.index(\"df -Pk /tmp\"), evidence.index(\"zenodo.org\"))\n        self.assertIn(\"overwrite: false\", evidence)\n        for action in (\n            \"actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\",\n            \"actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065\",\n            \"actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809\",\n            \"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\n        ):\n            self.assertIn(action, macos_evidence)\n        self.assertIn(\n            \"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\",\n            macos_evidence,\n        )\n        self.assertIn(\"required_kib=10599985\", macos_evidence)\n        self.assertLess(\n            macos_evidence.index(\"df -Pk /tmp\"),\n            macos_evidence.index(\"zenodo.org\"),\n        )\n        self.assertIn(\"overwrite: false\", macos_evidence)",
+          "to": "def test_release_evidence_pins_actions_and_checks_disk_before_download(\n        self,\n    ) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n\n        for action in (\n            \"actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\",\n            \"actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065\",\n            \"actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809\",\n            \"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\n        ):\n            self.assertIn(action, evidence)\n        self.assertIn(\"required_kib=10599985\", evidence)\n        self.assertIn(\"/tmp/phase-0r-ar6-preflight\", evidence)\n        self.assertLess(evidence.index(\"df -Pk /tmp\"), evidence.index(\"zenodo.org\"))\n        self.assertIn(\"overwrite: false\", evidence)\n        for action in (\n            \"actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\",\n            \"actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065\",\n            \"actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809\",\n            \"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\",\n        ):\n            self.assertIn(action, macos_evidence)\n        self.assertIn(\n            \"actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\",\n            macos_evidence,\n        )\n        self.assertIn(\"required_kib=10599985\", macos_evidence)\n        self.assertLess(\n            macos_evidence.index(\"df -Pk /tmp\"),\n            macos_evidence.index(\"zenodo.org\"),\n        )\n        self.assertIn(\"overwrite: false\", macos_evidence)"
+        },
+        {
+          "id": "rebind-test-release-evidence-preflights-before-source-download-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_release_evidence_preflights_before_source_download(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n\n        preflight = evidence.index(\"Preflight exact release environment and fixture\")\n        acquire = evidence.index(\"Acquire and verify locked AR6 archive\")\n        self.assertLess(preflight, acquire)\n        self.assertIn(\"--fixture src/pipeline/fixtures/ar6-regional-release\", evidence)\n        self.assertNotIn(\"ar6-archive-cache\", evidence)\n        macos_preflight = macos_evidence.index(\n            \"Preflight exact release environment and fixture\"\n        )\n        macos_acquire = macos_evidence.index(\"Acquire and verify locked AR6 archive\")\n        self.assertLess(macos_preflight, macos_acquire)\n        self.assertIn(\n            \"--fixture src/pipeline/fixtures/ar6-regional-release\",\n            macos_evidence,\n        )\n        self.assertNotIn(\"ar6-archive-cache\", macos_evidence)",
+          "to": "def test_release_evidence_preflights_before_source_download(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n\n        preflight = evidence.index(\"Preflight exact release environment and fixture\")\n        acquire = evidence.index(\"Acquire and verify locked AR6 archive\")\n        self.assertLess(preflight, acquire)\n        self.assertIn(\"--fixture src/pipeline/fixtures/ar6-regional-release\", evidence)\n        self.assertNotIn(\"ar6-archive-cache\", evidence)\n        macos_preflight = macos_evidence.index(\n            \"Preflight exact release environment and fixture\"\n        )\n        macos_acquire = macos_evidence.index(\"Acquire and verify locked AR6 archive\")\n        self.assertLess(macos_preflight, macos_acquire)\n        self.assertIn(\n            \"--fixture src/pipeline/fixtures/ar6-regional-release\",\n            macos_evidence,\n        )\n        self.assertNotIn(\"ar6-archive-cache\", macos_evidence)"
+        },
+        {
+          "id": "rebind-test-release-evidence-requires-selector-and-exact-revision-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_release_evidence_requires_selector_and_exact_revision(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n\n        dispatch = workflow.split(\"permissions:\", maxsplit=1)[0]\n        changes = workflow.split(\"  changes:\", maxsplit=1)[1].split(\n            \"\\n  web:\", maxsplit=1\n        )[0]\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n        self.assertIn(\"release_evidence:\\n\", dispatch)\n        self.assertIn(\"default: false\", dispatch)\n        self.assertIn(\"release_source_revision:\\n\", dispatch)\n        self.assertIn(\"--release-only\", changes)\n        self.assertIn('\"${GITHUB_REF_NAME}\" != \"master\"', changes)\n        self.assertIn(\"^[0-9a-f]{40}$\", changes)\n        self.assertIn('\"${RELEASE_SOURCE_REVISION}\" != \"${GITHUB_SHA}\"', changes)\n        self.assertIn('\"${GITHUB_RUN_ATTEMPT}\" != \"1\"', changes)\n        self.assertLess(\n            changes.index(\"Validate manual workflow request\"),\n            changes.index(\"uses: actions/checkout\"),\n        )\n\n        self.assertIn(\"inputs.release_evidence == true\", evidence)\n        self.assertIn(\"github.ref_name == 'master'\", evidence)\n        self.assertIn(\"needs: changes\", evidence)\n        self.assertIn('\"${GITHUB_REF_NAME}\" != \"master\"', evidence)\n        self.assertIn(\"^[0-9a-f]{40}$\", evidence)\n        self.assertIn('\"${RELEASE_SOURCE_REVISION}\" != \"${GITHUB_SHA}\"', evidence)\n        self.assertIn('\"${GITHUB_RUN_ATTEMPT}\" != \"1\"', evidence)\n        self.assertLess(\n            evidence.index(\"Validate exact release source revision\"),\n            evidence.index(\"uses: actions/checkout\"),\n        )\n        self.assertIn(\"inputs.release_evidence == true\", macos_evidence)\n        self.assertIn(\"github.ref_name == 'master'\", macos_evidence)\n        self.assertIn(\"needs: changes\", macos_evidence)\n        self.assertIn('\"${GITHUB_REF_NAME}\" != \"master\"', macos_evidence)\n        self.assertIn(\"^[0-9a-f]{40}$\", macos_evidence)\n        self.assertIn(\n            '\"${RELEASE_SOURCE_REVISION}\" != \"${GITHUB_SHA}\"',\n            macos_evidence,\n        )\n        self.assertIn('\"${GITHUB_RUN_ATTEMPT}\" != \"1\"', macos_evidence)\n        self.assertLess(\n            macos_evidence.index(\"Validate exact release source revision\"),\n            macos_evidence.index(\"uses: actions/checkout\"),\n        )\n        self.assertNotIn(\"inputs.release_source_revision || github.sha\", workflow)",
+          "to": "def test_release_evidence_requires_selector_and_exact_revision(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n\n        dispatch = workflow.split(\"permissions:\", maxsplit=1)[0]\n        changes = workflow.split(\"  changes:\", maxsplit=1)[1].split(\n            \"\\n  web:\", maxsplit=1\n        )[0]\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n        self.assertIn(\"release_evidence:\\n\", dispatch)\n        self.assertIn(\"default: false\", dispatch)\n        self.assertIn(\"release_source_revision:\\n\", dispatch)\n        self.assertIn(\"--release-only\", changes)\n        self.assertIn('\"${GITHUB_REF_NAME}\" != \"master\"', changes)\n        self.assertIn(\"^[0-9a-f]{40}$\", changes)\n        self.assertIn('\"${RELEASE_SOURCE_REVISION}\" != \"${GITHUB_SHA}\"', changes)\n        self.assertIn('\"${GITHUB_RUN_ATTEMPT}\" != \"1\"', changes)\n        self.assertLess(\n            changes.index(\"Validate manual workflow request\"),\n            changes.index(\"uses: actions/checkout\"),\n        )\n\n        self.assertIn(\"inputs.release_evidence == true\", evidence)\n        self.assertIn(\"github.ref_name == 'master'\", evidence)\n        self.assertIn(\"needs: changes\", evidence)\n        self.assertIn('\"${GITHUB_REF_NAME}\" != \"master\"', evidence)\n        self.assertIn(\"^[0-9a-f]{40}$\", evidence)\n        self.assertIn('\"${RELEASE_SOURCE_REVISION}\" != \"${GITHUB_SHA}\"', evidence)\n        self.assertIn('\"${GITHUB_RUN_ATTEMPT}\" != \"1\"', evidence)\n        self.assertLess(\n            evidence.index(\"Validate exact release source revision\"),\n            evidence.index(\"uses: actions/checkout\"),\n        )\n        self.assertIn(\"inputs.release_evidence == true\", macos_evidence)\n        self.assertIn(\"github.ref_name == 'master'\", macos_evidence)\n        self.assertIn(\"needs: changes\", macos_evidence)\n        self.assertIn('\"${GITHUB_REF_NAME}\" != \"master\"', macos_evidence)\n        self.assertIn(\"^[0-9a-f]{40}$\", macos_evidence)\n        self.assertIn(\n            '\"${RELEASE_SOURCE_REVISION}\" != \"${GITHUB_SHA}\"',\n            macos_evidence,\n        )\n        self.assertIn('\"${GITHUB_RUN_ATTEMPT}\" != \"1\"', macos_evidence)\n        self.assertLess(\n            macos_evidence.index(\"Validate exact release source revision\"),\n            macos_evidence.index(\"uses: actions/checkout\"),\n        )\n        self.assertNotIn(\"inputs.release_source_revision || github.sha\", workflow)"
+        },
+        {
+          "id": "rebind-test-release-evidence-uses-only-hashed-python-install-next-job",
+          "kind": "exact-text-replace",
+          "from": "def test_release_evidence_uses_only_hashed_python_install(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"infrastructure\",\n        )\n\n        self.assertIn(\"--require-hashes -r requirements-release.lock\", evidence)\n        self.assertEqual(evidence.count(\"pip install\"), 1)\n        self.assertNotIn(\"pip install -e\", evidence)\n        self.assertIn(\n            \"--require-hashes -r requirements-release-macos-arm64.lock\",\n            macos_evidence,\n        )\n        self.assertEqual(macos_evidence.count(\"pip install\"), 1)\n        self.assertNotIn(\"pip install -e\", macos_evidence)",
+          "to": "def test_release_evidence_uses_only_hashed_python_install(self) -> None:\n        workflow = (\n            Path(__file__).resolve().parents[2] / \".github/workflows/ci.yml\"\n        ).read_text(encoding=\"utf-8\")\n        evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence\",\n            \"ar6-release-evidence-macos\",\n        )\n        macos_evidence = _workflow_job(\n            workflow,\n            \"ar6-release-evidence-macos\",\n            \"repository-removal-v2\",\n        )\n\n        self.assertIn(\"--require-hashes -r requirements-release.lock\", evidence)\n        self.assertEqual(evidence.count(\"pip install\"), 1)\n        self.assertNotIn(\"pip install -e\", evidence)\n        self.assertIn(\n            \"--require-hashes -r requirements-release-macos-arm64.lock\",\n            macos_evidence,\n        )\n        self.assertEqual(macos_evidence.count(\"pip install\"), 1)\n        self.assertNotIn(\"pip install -e\", macos_evidence)"
+        },
+        {
+          "id": "remove-api-route-assertion",
+          "kind": "exact-text-replace",
+          "from": "        self.assertFalse(routes[\"api\"])\n",
+          "to": ""
+        },
+        {
+          "id": "remove-rename-api-route-assertion",
+          "kind": "exact-text-replace",
+          "from": "        self.assertTrue(classify_paths(paths)[\"api\"])\n",
+          "to": ""
+        },
+        {
+          "id": "remove-retired-output-assertions",
+          "kind": "python-assertion-key-delete",
+          "keys": [
+            "api",
+            "codeql_csharp",
+            "infrastructure"
+          ],
+          "expectedAssertionCount": 14
+        },
+        {
+          "id": "remove-script-api-route-assertion",
+          "kind": "exact-text-replace",
+          "from": "        self.assertFalse(script_routes[\"api\"])\n",
+          "to": ""
+        }
+      ]
+    },
+    {
+      "path": "tests/harness/test_changed_suites.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "923715cd4ff2c7c2364527e3f049828301612082",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a3f79af2685cdbdba0d48841044c2b8972ca65b4",
+        "sha256": "c76ddffe6f7622ac74221abd95367902821f2b14bdb18c9ecc890b3620387f27"
+      },
+      "operations": [
+        {
+          "id": "retire-five-state-routing-expectation",
+          "kind": "exact-text-replace",
+          "from": "    def test_shared_fixture_routes_remaining_active_language_controls(self) -> None:\n        suites = select_suites(\n            self.inventory,\n            [\"tests/fixtures/tdd/five-state-characterization-v1.json\"],\n        )\n        suite_ids = {suite[\"id\"] for suite in suites}\n\n        self.assertTrue(\n            {\n                \"api-shared-characterization\",\n                \"pipeline-five-state-characterization\",\n            }.issubset(suite_ids)\n        )\n        self.assertNotIn(\"frontend-five-state-characterization\", suite_ids)\n",
+          "to": "    def test_historical_five_state_fixture_routes_no_retired_runtime_suite(self) -> None:\n        suites = select_suites(\n            self.inventory,\n            [\"tests/fixtures/tdd/five-state-characterization-v1.json\"],\n        )\n\n        self.assertEqual({suite[\"id\"] for suite in suites}, set())\n"
+        },
+        {
+          "id": "retire-infrastructure-routing-expectation",
+          "kind": "exact-text-replace",
+          "from": "    def test_legacy_infrastructure_routes_deletion_owners(self) -> None:\n        database_suites = select_suites(self.inventory, [\"infra/db/init.sql\"])\n        blob_seed_suites = select_suites(self.inventory, [\"infra/blob-seed/seed.py\"])\n\n        self.assertIn(\n            \"api-postgis-integration\", {suite[\"id\"] for suite in database_suites}\n        )\n        compose = next(\n            suite for suite in self.inventory[\"suites\"] if suite[\"id\"] == \"compose-smoke\"\n        )\n        selected_ids = {suite[\"id\"] for suite in blob_seed_suites}\n        if compose[\"status\"] == \"active\":\n            self.assertIn(\"compose-smoke\", selected_ids)\n        else:\n            self.assertEqual(compose[\"status\"], \"retired\")\n            self.assertNotIn(\"compose-smoke\", selected_ids)\n            self.assertEqual(compose[\"removalGate\"], 72)\n            self.assertIsNotNone(compose[\"replacementEvidence\"])\n",
+          "to": "    def test_retired_infrastructure_paths_route_static_content_guard(self) -> None:\n        database_suites = select_suites(self.inventory, [\"infra/db/init.sql\"])\n        blob_seed_suites = select_suites(self.inventory, [\"infra/blob-seed/seed.py\"])\n\n        self.assertEqual(\n            {suite[\"id\"] for suite in database_suites}, {\"static-target-content\"}\n        )\n        self.assertEqual(\n            {suite[\"id\"] for suite in blob_seed_suites}, {\"static-target-content\"}\n        )\n"
+        }
+      ]
+    },
+    {
+      "path": "tests/repository-removal/test_validate_removal_plan_v2.py",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "2bf919f617304c782ff993704935b4f669f0ee39",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c2f4daea1d3df42ea6a280379743f0b770264869",
+        "sha256": "da3f6096bd224125d311fad5e3cb760dde7692880f7ad9bb32ba230405bed33a"
+      },
+      "operations": [
+        {
+          "id": "add-audited-issue71-fixture-reader",
+          "kind": "exact-text-replace",
+          "from": "def _issue71_profile_activation_fixture(adapter):\n",
+          "to": "def _issue71_audited_bytes(path: str) -> bytes:\n    plan = json.loads((V2 / \"issue-71/removal-plan.json\").read_bytes())\n    return subprocess.run(\n        [\"git\", \"show\", f\"{plan['auditedCommit']}:{path}\"],\n        cwd=ROOT,\n        check=True,\n        capture_output=True,\n    ).stdout\n\n\ndef _issue71_profile_activation_fixture(adapter):\n"
+        },
+        {
+          "id": "read-audited-dependency-fixtures",
+          "kind": "exact-text-replace",
+          "from": "    pyproject = adapter._prune_pyproject(\n        engine, (ROOT / \"src/pipeline/pyproject.toml\").read_bytes(), ROOT\n    ).decode()\n    requirements = adapter._prune_requirements(\n        engine, (ROOT / \"src/pipeline/requirements-pipeline.txt\").read_bytes(), ROOT\n    ).decode()\n",
+          "to": "    pyproject = adapter._prune_pyproject(\n        engine, _issue71_audited_bytes(\"src/pipeline/pyproject.toml\"), ROOT\n    ).decode()\n    requirements = adapter._prune_requirements(\n        engine, _issue71_audited_bytes(\"src/pipeline/requirements-pipeline.txt\"), ROOT\n    ).decode()\n"
+        },
+        {
+          "id": "read-audited-profile-fixture",
+          "kind": "exact-text-replace",
+          "from": "    profile = (\n        ROOT / \"contracts/supply-chain/v2/static-target-profile.json\"\n    ).read_bytes()\n",
+          "to": "    profile = _issue71_audited_bytes(\n        \"contracts/supply-chain/v2/static-target-profile.json\"\n    )\n"
+        },
+        {
+          "id": "read-audited-pyproject-drift-fixture",
+          "kind": "exact-text-replace",
+          "from": "    pyproject = (ROOT / \"src/pipeline/pyproject.toml\").read_bytes().replace(\n",
+          "to": "    pyproject = _issue71_audited_bytes(\"src/pipeline/pyproject.toml\").replace(\n"
+        },
+        {
+          "id": "read-audited-pyproject-fixture",
+          "kind": "exact-text-replace",
+          "from": "            engine, (ROOT / \"src/pipeline/pyproject.toml\").read_bytes(), ROOT\n",
+          "to": "            engine, _issue71_audited_bytes(\"src/pipeline/pyproject.toml\"), ROOT\n"
+        },
+        {
+          "id": "read-audited-requirements-fixture",
+          "kind": "exact-text-replace",
+          "from": "            (ROOT / \"src/pipeline/requirements-pipeline.txt\").read_bytes(),\n            ROOT,\n",
+          "to": "            _issue71_audited_bytes(\"src/pipeline/requirements-pipeline.txt\"),\n            ROOT,\n"
+        }
+      ]
+    },
+    {
+      "path": "tests/test-inventory.json",
+      "beforeMode": "100644",
+      "beforeGitBlobSha": "ec67bf4eded6f91ed9080e88e4000d7c3ce19ba1",
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "fae949ee39f4dfec4359b3bca882554781118d29",
+        "sha256": "3b3343bfde9bae1b9ff4f819ddf747850ea514a5255ba16cffaa06ffc6378a8c"
+      },
+      "operations": [
+        {
+          "id": "retire-issue-71-suites",
+          "kind": "test-inventory-retire",
+          "issue": 71,
+          "suiteIds": [
+            "api-application-unit",
+            "api-domain-legacy",
+            "api-http-integration",
+            "api-postgis-integration",
+            "api-shared-characterization",
+            "api-validation-unit",
+            "codeql-csharp",
+            "pipeline-five-state-characterization",
+            "pipeline-legacy-transform",
+            "pipeline-result-state-mutation-pilot"
+          ],
+          "baselinePaths": [
+            "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs",
+            "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs",
+            "src/api/SeaRise.Api.Tests/Domain/SharedResultStateFixtureTests.cs",
+            "src/api/SeaRise.Api.Tests/Infrastructure/TiTilerBlobPathValidationTests.cs",
+            "src/api/SeaRise.Api.Tests/Integration/EndpointTests.cs",
+            "src/api/SeaRise.Api.Tests/Integration/GeographyRepositoryTests.cs",
+            "src/api/SeaRise.Api.Tests/Integration/LayerRepositoryTests.cs",
+            "src/api/SeaRise.Api.Tests/Integration/ScenarioRepositoryTests.cs",
+            "src/api/SeaRise.Api.Tests/Integration/SecurityHeaderTests.cs",
+            "src/api/SeaRise.Api.Tests/Validators/AssessRequestValidatorTests.cs",
+            "src/api/SeaRise.Api.Tests/Validators/GeocodeRequestValidatorTests.cs",
+            "src/pipeline/tests/tdd/test_result_state_characterization.py",
+            "src/pipeline/tests/test_cogify.py",
+            "src/pipeline/tests/test_compute_exposure.py",
+            "src/pipeline/tests/test_config.py",
+            "src/pipeline/tests/test_download.py",
+            "src/pipeline/tests/test_preprocess.py",
+            "src/pipeline/tests/test_register.py",
+            "src/pipeline/tests/test_upload.py",
+            "src/pipeline/tests/test_validate.py"
+          ],
+          "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence.",
+          "fromUpdatedAt": "2026-08-20",
+          "toUpdatedAt": "2026-08-20"
+        }
+      ]
+    }
+  ],
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
