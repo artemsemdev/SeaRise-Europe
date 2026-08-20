@@ -81,6 +81,135 @@ def _specialize_schema(value: Any) -> Any:
     return value
 
 
+def _issue70_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    specialized = _specialize_schema(copy.deepcopy(schema))
+    operations = specialized.get("$defs", {}).get("operation", {}).get("oneOf")
+    if isinstance(operations, list):
+        operations.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "kind", "job", "name", "from", "to"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "kind": {"const": "workflow-step-run-replace"},
+                    "job": {"type": "string", "minLength": 1},
+                    "name": {"type": "string", "minLength": 1},
+                    "from": {"type": "string", "minLength": 1},
+                    "to": {"type": "string", "minLength": 1},
+                },
+            }
+        )
+    return specialized
+
+
+def _replace_workflow_step_run(
+    engine: Any,
+    content: bytes,
+    operation: dict[str, Any],
+) -> bytes:
+    lines = content.decode("utf-8").splitlines(keepends=True)
+    job_start, job_end = engine._workflow_job(lines, operation["job"])
+    steps_start, steps_end = engine._mapping_key(
+        lines, job_start + 1, job_end, 4, "steps"
+    )
+    marker = f"      - name: {operation['name']}"
+    matches = [
+        index
+        for index in range(steps_start + 1, steps_end)
+        if lines[index].rstrip("\n") == marker
+    ]
+    if len(matches) != 1:
+        raise engine.PlanError(
+            f"workflow step must exist exactly once: {operation['name']}"
+        )
+    start = matches[0]
+    end = steps_end
+    for index in range(start + 1, steps_end):
+        if lines[index].startswith("      - "):
+            end = index
+            break
+    step = "".join(lines[start:end])
+    if step.count(operation["from"]) != 1:
+        raise engine.PlanError(
+            f"workflow step run source must match once: {operation['name']}"
+        )
+    lines[start:end] = [step.replace(operation["from"], operation["to"], 1)]
+    return "".join(lines).encode("utf-8")
+
+
+def _issue70_materialize_plan(
+    engine: Any,
+    root: Path,
+    plan: dict[str, Any],
+    *,
+    verify_after: bool = True,
+) -> dict[str, bytes | None]:
+    custom_kind = "workflow-step-run-replace"
+    custom_entries = [
+        entry
+        for entry in plan["entries"]
+        if any(operation["kind"] == custom_kind for operation in entry["operations"])
+    ]
+    if not custom_entries:
+        return engine._issue70_base_materialize_plan(
+            root, plan, verify_after=verify_after
+        )
+
+    base_plan = copy.deepcopy(plan)
+    for entry in base_plan["entries"]:
+        entry["operations"] = [
+            operation
+            for operation in entry["operations"]
+            if operation["kind"] != custom_kind
+        ]
+        if not entry["operations"]:
+            raise engine.PlanError(
+                "workflow step handoff must accompany a structural workflow operation"
+            )
+    materialized = engine._issue70_base_materialize_plan(
+        root, base_plan, verify_after=False
+    )
+
+    for entry in custom_entries:
+        if entry["path"] != ".github/workflows/ci.yml":
+            raise engine.PlanError("workflow step handoff is restricted to CI")
+        content = materialized[entry["path"]]
+        if content is None:
+            raise engine.PlanError("workflow step handoff target is absent")
+        for operation in entry["operations"]:
+            if operation["kind"] == custom_kind:
+                content = _replace_workflow_step_run(engine, content, operation)
+        materialized[entry["path"]] = content
+
+    for entry in plan["entries"]:
+        operations = entry["operations"]
+        if (
+            len(operations) != 1
+            or operations[0]["kind"] != "static-profile-activation-transition"
+        ):
+            continue
+        before = engine._audited_blob(root, plan["auditedCommit"], entry["path"])
+        materialized[entry["path"]] = engine._static_profile_activation(
+            before,
+            operations[0],
+            materialized,
+            verify_target=verify_after,
+        )
+
+    if verify_after:
+        for entry in plan["entries"]:
+            after = materialized[entry["path"]]
+            if after is None:
+                continue
+            expected = entry["after"]
+            if engine._git_blob_sha(after) != expected["gitBlobSha"]:
+                raise engine.PlanError(f"after Git blob mismatch: {entry['path']}")
+            if engine._sha256(after) != expected["sha256"]:
+                raise engine.PlanError(f"after SHA-256 mismatch: {entry['path']}")
+    return materialized
+
+
 def _issue70_test_inventory_transform(
     engine: Any,
     content: bytes,
@@ -165,13 +294,22 @@ def configure_engine(repository_root: Path) -> Any:
             "owner decision",
             "application receipt",
         }:
-            schema = _specialize_schema(copy.deepcopy(schema))
+            schema = _issue70_schema(schema)
         base_validate(document, schema, label)
 
     engine._schema_validate_document = validate_specialized
     engine._issue70_base_test_inventory_transform = engine._test_inventory_transform
     engine._test_inventory_transform = lambda content, operation: (
         _issue70_test_inventory_transform(engine, content, operation)
+    )
+    engine._issue70_base_materialize_plan = engine.materialize_plan
+    engine.materialize_plan = lambda root, plan, verify_after=True: (
+        _issue70_materialize_plan(
+            engine,
+            root,
+            plan,
+            verify_after=verify_after,
+        )
     )
     return engine
 
@@ -204,7 +342,7 @@ def validate_framework(repository_root: Path) -> None:
             repository_root / EXPECTED_PROFILE["baseSchemaDirectory"] / schema_name,
             schema_name,
         )
-        jsonschema.Draft202012Validator.check_schema(_specialize_schema(schema))
+        jsonschema.Draft202012Validator.check_schema(_issue70_schema(schema))
 
 
 def main() -> int:

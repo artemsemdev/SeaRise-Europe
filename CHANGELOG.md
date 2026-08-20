@@ -248,6 +248,11 @@ All notable changes to this project will be documented in this file.
   declares `replacementGate.issue == 70`. Cross-suite and unlisted baseline
   promotion remains fail-closed; no legacy source is removed by this change.
 
+- Issue #70 plans can bind the exact named CI lifecycle step that hands
+  validation from the completed issue #72 chain to the issue #70 adapter. The
+  handoff is restricted to `.github/workflows/ci.yml`, requires an accompanying
+  structural workflow operation, and rebinds the static-target workflow hash.
+
 - Corrected the test-retirement inventory so executable legacy frontend
   Python tests cannot escape discovery, removal-bound suites point to explicit
   stronger static-target evidence, and PostGIS/blob-seed changes route through
