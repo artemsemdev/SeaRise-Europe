@@ -1180,6 +1180,16 @@ def test_issue71_exact_rewrite_allowlist_is_narrow() -> None:
         [operation],
         "src/pipeline/tests/supply_chain/test_static_target_profile.py",
     ) == b"before\nafter\n"
+    assert engine._exact_text_transform(
+        b"before\nstale assertion\nafter\n",
+        [operation],
+        "tests/harness/test_changed_suites.py",
+    ) == b"before\nafter\n"
+    assert engine._exact_text_transform(
+        b"before\nstale assertion\nafter\n",
+        [operation],
+        "tests/repository-removal/test_validate_removal_plan_v2.py",
+    ) == b"before\nafter\n"
     with pytest.raises(engine.PlanError, match="not allowed for path"):
         engine._exact_text_transform(
             b"stale assertion\n", [operation], "README.md"
