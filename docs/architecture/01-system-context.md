@@ -146,11 +146,10 @@ Every scientific and browser artifact uses portable formats: JSON, PMTiles,
 COG, GeoParquet, STAC, and Sigstore bundles. Cloudflare is the reference host,
 not part of the product's scientific contract.
 
-## Current-to-target transition
+## Repository baseline
 
-The repository still contains a Next.js runtime, ASP.NET Core API,
-PostgreSQL/PostGIS, TiTiler, and local storage scaffolding. These describe the
-current implementation, not the accepted production target. They are removed
-only after real-source validation, client/server parity checks, artifact range
-tests, browser performance tests, and the remaining ADR-021 migration gates
-pass.
+The repository implements the accepted static-only boundary. The browser reads
+immutable release assets directly, while deterministic source processing stays
+in the offline build plane. Superseded request-time services and their local
+development scaffolding have been removed under ADR-025; Git history is the
+source rollback. Live provider provisioning remains a separate operation.

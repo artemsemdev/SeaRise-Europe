@@ -34,10 +34,10 @@ production.
 
 ## 2. Current implementation boundary
 
-The legacy modules under `src/pipeline/` still implement the Azure/PostGIS/
-TiTiler flow: they assume an IPCC grid, create COGs, upload to Blob Storage,
-register database rows, and optionally spot-check TiTiler. That code remains a
-migration input until Phase 3 parity, not the target pipeline described here.
+`src/pipeline/` contains the retained deterministic source, scientific,
+artifact, and offline-release build planes. It has no mutable database
+registration or request-time publication path. Publication and live provider
+activation remain explicitly separate from candidate construction.
 
 The approved Phase 0R implementation includes the SHA-256-locked AR6 reader, exact
 source-grid lookup, nine COG/GeoParquet/PMTiles triplets, manifest/STAC,
@@ -52,11 +52,9 @@ release, and atomically assembles an immutable candidate in a pinned,
 network-disabled container. The builder cannot publish or activate a release;
 see the [operator runbook](../operations/offline-release-builder.md) and
 [implementation evidence](../evidence/phase-1-offline-release-builder.md).
-GeoNames catalogs, later artifact workstreams, R2 publication, and the static
-application remain roadmap work.
-
-The target pipeline is introduced incrementally. Legacy upload/register steps
-are removed only at ADR-021 Phase 4, after scientific and browser parity gates.
+The static browser application and committed fixture consume the same release
+contracts. Public R2 publication remains roadmap work and is not implied by a
+successful local candidate build.
 
 ## 3. Inputs and pinning
 

@@ -1,7 +1,7 @@
 # Static-First Migration Plan
 
-> **Status:** Phase 1 complete; Phase 2 static-only repository cutover in progress
-> **Last updated:** 2026-08-16
+> **Status:** Phase 1 complete; Phase 2 static-only integration complete
+> **Last updated:** 2026-08-20
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md) and [ADR-025](../architecture/adr/ADR-025-accelerated-static-runtime-cutover.md)
 
 ## Purpose
@@ -10,14 +10,12 @@ This is the only active technical delivery plan for SeaRise Europe. The former
 eight-epic Azure/backend plan was removed after ADR-021 replaced its target
 architecture.
 
-The Phase 2 branch starts from a transition state:
+The Phase 2 integration branch now provides:
 
-- the checked-in application still implements the legacy Next.js, .NET,
-  PostGIS, TiTiler, and Docker Compose stack;
-- the accepted target is a React/Vite static application backed by immutable
-  browser-ready artifacts;
-- production migration has not started, but repository runtime removal is now
-  part of Phase 2 rather than production cutover;
+- a React/Vite static application backed by immutable browser-ready artifacts;
+- no checked-in request-time application, database, tile, geocoder, or Compose
+  runtime;
+- repository-only retirement evidence with rollback through Git history;
 - the binary Phase 0 investigation ended without a publishable release;
 - ADR-024, #135 parity, trusted dual-platform #110 evidence, and the protected
   owner `releaseDisposition=approved` are complete;
@@ -25,9 +23,9 @@ The Phase 2 branch starts from a transition state:
   remains ignored and local only; clean clones use the committed synthetic
   release fixture.
 
-ADR-025 makes the static application the only target repository runtime. The
-old runtime is removed through focused Phase 2 pull requests after replacement
-coverage passes; Git history is sufficient source recovery.
+ADR-025 makes the static application the only repository runtime. Focused Phase
+2 pull requests removed the superseded runtime after replacement coverage
+passed; Git history is sufficient source recovery.
 
 ## Delivery principles
 
@@ -222,16 +220,16 @@ Exit evidence:
 This work follows the relevant static target coverage in issues #54–#60. It
 does not wait for production cutover.
 
-- [ ] Remove the ASP.NET Core API and its tests/deployment definitions.
-- [ ] Remove PostgreSQL/PostGIS schema, seeds, and infrastructure.
-- [ ] Remove TiTiler and Azurite/blob-seed runtime scaffolding.
-- [ ] Remove runtime geocoder clients and Azure Maps secret/configuration.
-- [ ] Remove Next.js runtime configuration and unused server-state libraries.
-- [ ] Reduce Docker/local tooling to pipeline-only needs, if still useful.
-- [ ] Remove superseded repository deployment definitions while preserving
+- [x] Remove the ASP.NET Core API and its tests/deployment definitions.
+- [x] Remove PostgreSQL/PostGIS schema, seeds, and infrastructure.
+- [x] Remove TiTiler and Azurite/blob-seed runtime scaffolding.
+- [x] Remove runtime geocoder clients and Azure Maps secret/configuration.
+- [x] Remove Next.js runtime configuration and unused server-state libraries.
+- [x] Reduce Docker/local tooling to deterministic pipeline-only needs.
+- [x] Remove superseded repository deployment definitions while preserving
   reusable static-delivery IaC.
-- [ ] Re-run secret, dependency, licence, link, and documentation audits.
-- [ ] Update repository structure diagrams to match the final filesystem.
+- [x] Re-run repository, dependency, content, and documentation gates.
+- [x] Update active repository documentation to match the final filesystem.
 
 Exit evidence:
 
@@ -239,6 +237,10 @@ Exit evidence:
 - build/test/deploy instructions use only the static architecture;
 - a new contributor can run the fixture app without Docker or cloud keys;
 - the public architecture page matches measured production behaviour.
+
+The completed inventory, retained authority, executable gates, known
+limitations, and rollback boundary are recorded in the
+[Phase 2 static-only repository audit](../evidence/phase-2/final-static-only-audit.md).
 
 The deletion boundary is repository-only. Cloud resources, credentials,
 GitHub environments, secrets, and external storage are not deleted without a

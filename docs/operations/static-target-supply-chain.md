@@ -36,17 +36,13 @@ The v2 contributor manifest likewise omits and rejects the legacy
 `psycopg2-binary` and `azure-storage-blob` adapters while retaining the exact
 release and settlement graphs used by deterministic builds.
 
-The current repository is not yet represented as static-only. The profile is
-`pending-legacy-removal` while hash-bound Python contributor manifests and
-CI/CodeQL workflows contain the exact job selectors assigned to #70 (frontend),
-#71 (Python, API/.NET, CodeQL C#, and blob-seed), and #72 (Compose plus the
-legacy API/frontend Dockerfiles).
-Removing or changing a selector without updating the transition record
-fails closed; claiming `active` before all selectors disappear also fails.
+The current repository is represented by an `active` static profile with no
+blocking issues or pending selectors. Restoring a retired runtime path or job,
+or changing a hash-bound input without updating its authority, fails closed.
 Package selectors are normalized from the actual requirement syntax, so valid
-PEP 508 whitespace or underscore variants cannot bypass the gate. After the
-Python blockers clear, `pyproject.toml` and `requirements-pipeline.txt` must
-both exactly match the static contributor authority. Final activation also
+PEP 508 whitespace or underscore variants cannot bypass the gate.
+`pyproject.toml` and `requirements-pipeline.txt` both exactly match the static
+contributor authority. Active validation also
 proves the API, frontend, blob-seed, solution, Compose, and Compose-smoke paths
 are absent, both PostGIS initialization scripts and the API/frontend Dockerfiles
 are absent, and no reviewed .NET/C# legacy workflow jobs remain. A constrained

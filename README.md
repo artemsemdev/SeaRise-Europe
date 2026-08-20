@@ -17,12 +17,10 @@ data-product architecture.
 > The mock uses synthetic illustrative data and does not override the PRD,
 > methodology, or accepted architecture.
 
-> **Migration status:** ADR-021 was accepted on 2026-08-04. The repository still
-> contains the legacy distributed implementation while the Phase 2 integration
-> branch builds and verifies its replacement. The React/Vite static shell now
-> runs from the committed synthetic fixture; this is not a public scientific
-> release. ADR-025 requires the legacy repository runtime to be removed after
-> equivalent-or-stronger target coverage exists.
+> **Repository status:** The Phase 2 integration branch contains the static-only
+> React/Vite application and retained offline release pipeline. The superseded
+> distributed runtime has been removed under ADR-025. Clean-clone validation uses
+> the committed synthetic fixture; this is not a public scientific release.
 
 ## Run the static application
 
@@ -43,7 +41,7 @@ never discovered, bundled, or uploaded.
 
 ## Accepted architecture
 
-SeaRise Europe is moving to a static-first model: authoritative source data is
+SeaRise Europe uses a static-first model: authoritative source data is
 downloaded once, processed before release, and published as immutable
 browser-ready artifacts. A normal user request requires no application API,
 database, tile server, or geocoding service.
@@ -115,48 +113,22 @@ range requests.
 | Area | Status |
 |---|---|
 | Static-first ADR and technical documentation | Accepted/current |
-| Legacy interactive application | Implemented with synthetic demo data |
-| Real IPCC/Copernicus end-to-end validation | Not complete; blocks publication |
-| GeoNames coastal settlement catalog | Planned |
-| Static React/Vite browser path | Shell and pinned release domain implemented on Phase 2 integration branch |
-| Cloudflare/OpenTofu deployment | Planned |
-| Legacy service removal | Gated on parity and release evidence |
+| Static React/Vite browser application | Implemented and validated from the committed fixture |
+| Exact AR6 projection lookup | Implemented for all nine scenario/horizon combinations |
+| GeoNames settlement search | Implemented in a Web Worker from release-bound static indexes |
+| Generic static-host delivery | Build, serve, range, accessibility, and Lighthouse gates implemented |
+| Reference Cloudflare/OpenTofu deployment | Configuration retained; live provisioning is separate |
+| Superseded repository runtime | Removed; recoverable through Git history |
 
 The active sequence and exit gates are in the
 [static-first migration plan](docs/delivery/README.md).
 
-## Run the current local baseline
-
-The migration has not yet replaced the checked-in legacy stack. To inspect the
-current implementation:
-
-### Prerequisites
-
-- Docker with Docker Compose
-- optional Azure Maps credentials; the local baseline has limited fallbacks
-
-### Start
-
-```bash
-cp .env.local.example .env.local
-docker compose up --build
-```
-
-| Service | URL |
-|---|---|
-| Frontend | <http://localhost:3000> |
-| API | <http://localhost:8080> |
-| TiTiler | <http://localhost:8000> |
-
-This path exists for migration comparison. It uses a synthetic COG and must not
-be used as evidence that the real scientific data pipeline is complete.
-
-## Target repository shape
+## Repository shape
 
 ```text
 SeaRise Europe/
 ├── src/
-│   ├── frontend/          Static React/TypeScript application
+│   ├── web/               Static React/TypeScript application
 │   └── pipeline/          Offline data-release builder
 ├── data/
 │   ├── geometry/          Versioned support/coastal source geometry
@@ -168,9 +140,9 @@ SeaRise Europe/
     └── delivery/          Active migration plan and quality evidence
 ```
 
-The API, database, tile server, and legacy container scaffolding will be
-deleted only after the new flow passes scientific, parity, browser,
-accessibility, performance, cost, and rollback gates.
+The delivered application has no application server, runtime database, tile
+server, or runtime geocoder. Retained container recipes belong only to the
+deterministic offline build plane and are not deployment dependencies.
 
 ## Documentation
 

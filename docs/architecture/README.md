@@ -99,8 +99,8 @@ Documents use these terms consistently:
 
 | Status | Meaning |
 |---|---|
+| Current | Implemented repository architecture backed by executable gates |
 | Accepted target | The decision is approved for new work, even if migration is incomplete |
-| Migration in progress | Legacy implementation still exists and must be handled explicitly |
 | Provisional | Evidence is incomplete; the content cannot authorize a real-data release |
 | Released | Immutable artifacts have passed all scientific and technical gates and were published |
 | Superseded | No longer active guidance; retained only in Git history or the decision register |

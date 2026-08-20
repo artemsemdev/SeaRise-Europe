@@ -2,9 +2,8 @@
 
 `v2` is the static-browser supply-chain transition profile. Its target graph
 retains the web npm, Python, settlement, scientific, build-plane, signing,
-provenance, and SBOM authorities needed after migration. Until the recorded
-repository and CI selectors are removed, it fails closed in
-`pending-legacy-removal` rather than claiming the current checkout is static-only.
+provenance, and SBOM authorities needed after migration. The checked-in profile
+is active and fails closed if a retired runtime path or selector is restored.
 
 `v1` defines the immutable historical evidence boundary for the Phase 1 release
 candidate. It does not alter `contracts/release/v1`; its NuGet and legacy

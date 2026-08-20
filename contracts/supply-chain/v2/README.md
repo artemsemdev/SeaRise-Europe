@@ -21,15 +21,12 @@ validator rejects those paths even if a profile edit supplies a valid hash.
 This makes deletion of those runtime trees independent from the active
 supply-chain gate.
 
-The checked-in profile is honestly `pending-legacy-removal`: issue #70 owns the
-frontend/Next.js CI selector; issue #71 owns Azure/PostGIS, API/.NET, CodeQL C#,
-and blob-seed removal; issue #72 owns Compose and the legacy API/frontend
-Dockerfiles. Exact workflow jobs and Python selector source files are hash-bound;
-path-presence
-selectors carry issue ownership but intentionally bind existence rather than
-mutable legacy content. The validator derives both kinds from repository
-bytes; it rejects an `active` claim while any remain. Once the last selector is
-removed, only an `active` record with no blockers or pending selectors can pass.
+The checked-in profile is `active`: the issue #70, #71, and #72 selectors are
+absent, `blockingIssues` and `pendingSelectors` are empty, and the retained
+Python contributor manifests match the static authority. Exact workflow and
+Python input bytes remain hash-bound. The validator derives path absence and
+workflow state from repository bytes and rejects the active claim if any
+retired selector returns.
 Python package names are parsed and normalized independently of PEP 508
 whitespace, punctuation, or case. Clearing #71 also requires both real
 contributor manifests to match the v2 static authority package-for-package and
