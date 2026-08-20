@@ -1141,6 +1141,11 @@ def test_issue71_framework_binds_completed_issue70_authority() -> None:
     assert engine.EXPECTED_TRUST_ROOTS["issue71Validator"] == (
         "scripts/repository/validate_issue71_removal.py"
     )
+    assert adapter.CONTENT_AUTHORITY_HANDOFF_PATHS == {
+        "src/web/scripts/check-target-content.mjs",
+        "src/web/scripts/static-repository-gates.mjs",
+        "src/web/scripts/static-repository-gates.test.mjs",
+    }
 
 
 def test_issue71_schema_accepts_only_issue71_inventory_retirement() -> None:

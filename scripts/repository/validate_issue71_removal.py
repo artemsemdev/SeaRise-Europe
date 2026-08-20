@@ -42,6 +42,7 @@ COMPLETED_ISSUE_70_ARTIFACTS = {
 }
 CONTENT_AUTHORITY_HANDOFF_PATHS = {
     "src/web/scripts/check-target-content.mjs",
+    "src/web/scripts/static-repository-gates.mjs",
     "src/web/scripts/static-repository-gates.test.mjs",
 }
 EXPECTED_PROFILE = {
