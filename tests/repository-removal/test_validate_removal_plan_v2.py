@@ -1017,6 +1017,29 @@ def test_issue70_content_authority_handoff_is_path_and_text_exact(
         adapter._issue70_materialize_plan(engine, ROOT, plan, verify_after=False)
 
 
+def test_issue70_exact_text_delete_is_limited_to_content_gate_test() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    operation = {
+        "id": "delete-obsolete-content-authority-test",
+        "kind": "exact-text-replace",
+        "from": "obsolete authority block\n",
+        "to": "",
+    }
+
+    assert engine._exact_text_transform(
+        b"before\nobsolete authority block\nafter\n",
+        [operation],
+        "src/web/scripts/static-repository-gates.test.mjs",
+    ) == b"before\nafter\n"
+    with pytest.raises(engine.PlanError, match="not allowed for path"):
+        engine._exact_text_transform(
+            b"obsolete authority block\n",
+            [operation],
+            "src/web/scripts/check-target-content.mjs",
+        )
+
+
 def test_issue70_schema_accepts_only_explicit_workflow_handoff_shape() -> None:
     adapter = _load_issue70_adapter()
     engine = adapter.configure_engine(ROOT)
