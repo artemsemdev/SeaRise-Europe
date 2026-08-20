@@ -934,6 +934,49 @@ def test_issue70_workflow_handoff_is_exact_and_step_scoped() -> None:
         )
 
 
+def test_issue70_tuple_value_deletion_preserves_remaining_routes() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    operation = {
+        "id": "delete-retired-route",
+        "kind": "python-tuple-literal-value-delete",
+        "name": "CODEQL_JAVASCRIPT",
+        "values": ["src/frontend/**"],
+    }
+    content = (
+        b'CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**", '
+        b'"tools/static-quality/**")\n'
+    )
+
+    transformed = adapter._delete_python_tuple_literal_values(
+        engine, content, operation
+    )
+
+    assert b"src/frontend/**" not in transformed
+    assert b"src/web/**" in transformed
+    assert b"tools/static-quality/**" in transformed
+
+
+def test_issue70_tuple_value_deletion_fails_closed() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    operation = {
+        "id": "delete-retired-route",
+        "kind": "python-tuple-literal-value-delete",
+        "name": "ROUTES",
+        "values": ["retired"],
+    }
+
+    with pytest.raises(engine.PlanError, match="exist exactly once"):
+        adapter._delete_python_tuple_literal_values(
+            engine, b'ROUTES = ("active",)\n', operation
+        )
+    with pytest.raises(engine.PlanError, match="would empty binding"):
+        adapter._delete_python_tuple_literal_values(
+            engine, b'ROUTES = ("retired",)\n', operation
+        )
+
+
 def test_issue70_schema_accepts_only_explicit_workflow_handoff_shape() -> None:
     adapter = _load_issue70_adapter()
     engine = adapter.configure_engine(ROOT)

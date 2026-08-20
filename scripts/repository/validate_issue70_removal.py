@@ -8,6 +8,7 @@ roots. The adapter and profile become trust roots of every #70 preapproval.
 
 from __future__ import annotations
 
+import ast
 import copy
 import importlib.util
 import sys
@@ -100,6 +101,24 @@ def _issue70_schema(schema: dict[str, Any]) -> dict[str, Any]:
                 },
             }
         )
+        operations.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "kind", "name", "values"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "kind": {"const": "python-tuple-literal-value-delete"},
+                    "name": {"type": "string", "minLength": 1},
+                    "values": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": True,
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                },
+            }
+        )
     return specialized
 
 
@@ -138,6 +157,53 @@ def _replace_workflow_step_run(
     return "".join(lines).encode("utf-8")
 
 
+def _delete_python_tuple_literal_values(
+    engine: Any,
+    content: bytes,
+    operation: dict[str, Any],
+) -> bytes:
+    text = content.decode("utf-8")
+    tree = ast.parse(text)
+    assignment = engine._module_assignment(tree, operation["name"])
+    value = assignment.value
+    if not isinstance(value, ast.Tuple):
+        raise engine.PlanError(
+            f"Python binding is not a literal tuple: {operation['name']}"
+        )
+    literals: list[str] = []
+    for element in value.elts:
+        if not isinstance(element, ast.Constant) or not isinstance(element.value, str):
+            raise engine.PlanError(
+                f"Python tuple contains a non-string literal: {operation['name']}"
+            )
+        literals.append(element.value)
+    selected = operation["values"]
+    selected_set = set(selected)
+    for selected_value in selected:
+        if literals.count(selected_value) != 1:
+            raise engine.PlanError(
+                "Python tuple value must exist exactly once: "
+                f"{operation['name']}.{selected_value}"
+            )
+    remaining = [item for item in literals if item not in selected_set]
+    if not remaining:
+        raise engine.PlanError(
+            f"Python tuple deletion would empty binding: {operation['name']}"
+        )
+    if assignment.col_offset != 0:
+        raise engine.PlanError(
+            f"Python tuple binding must be module-scoped: {operation['name']}"
+        )
+    lines = text.splitlines(keepends=True)
+    replacement = [f"{operation['name']} = (\n"]
+    replacement.extend(f"    {item!r},\n" for item in remaining)
+    replacement.append(")\n")
+    lines[assignment.lineno - 1 : assignment.end_lineno] = replacement
+    transformed = "".join(lines)
+    ast.parse(transformed)
+    return transformed.encode("utf-8")
+
+
 def _issue70_materialize_plan(
     engine: Any,
     root: Path,
@@ -145,11 +211,14 @@ def _issue70_materialize_plan(
     *,
     verify_after: bool = True,
 ) -> dict[str, bytes | None]:
-    custom_kind = "workflow-step-run-replace"
+    custom_kinds = {
+        "python-tuple-literal-value-delete",
+        "workflow-step-run-replace",
+    }
     custom_entries = [
         entry
         for entry in plan["entries"]
-        if any(operation["kind"] == custom_kind for operation in entry["operations"])
+        if any(operation["kind"] in custom_kinds for operation in entry["operations"])
     ]
     if not custom_entries:
         return engine._issue70_base_materialize_plan(
@@ -161,25 +230,33 @@ def _issue70_materialize_plan(
         entry["operations"] = [
             operation
             for operation in entry["operations"]
-            if operation["kind"] != custom_kind
+            if operation["kind"] not in custom_kinds
         ]
         if not entry["operations"]:
             raise engine.PlanError(
-                "workflow step handoff must accompany a structural workflow operation"
+                "issue #70 custom operation must accompany a structural operation"
             )
     materialized = engine._issue70_base_materialize_plan(
         root, base_plan, verify_after=False
     )
 
     for entry in custom_entries:
-        if entry["path"] != ".github/workflows/ci.yml":
-            raise engine.PlanError("workflow step handoff is restricted to CI")
         content = materialized[entry["path"]]
         if content is None:
-            raise engine.PlanError("workflow step handoff target is absent")
+            raise engine.PlanError("issue #70 custom operation target is absent")
         for operation in entry["operations"]:
-            if operation["kind"] == custom_kind:
+            if operation["kind"] == "workflow-step-run-replace":
+                if entry["path"] != ".github/workflows/ci.yml":
+                    raise engine.PlanError("workflow step handoff is restricted to CI")
                 content = _replace_workflow_step_run(engine, content, operation)
+            elif operation["kind"] == "python-tuple-literal-value-delete":
+                if entry["path"] != "scripts/ci/changed_components.py":
+                    raise engine.PlanError(
+                        "Python tuple deletion is restricted to the CI router"
+                    )
+                content = _delete_python_tuple_literal_values(
+                    engine, content, operation
+                )
         materialized[entry["path"]] = content
 
     for entry in plan["entries"]:
