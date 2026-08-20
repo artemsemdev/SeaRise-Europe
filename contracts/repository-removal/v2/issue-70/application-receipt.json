@@ -1,0 +1,19 @@
+{
+  "$schema": "./application-receipt.schema.json",
+  "schemaVersion": "2.0.0",
+  "receiptId": "phase-2-issue-70-removal-v2-application",
+  "preapprovalCommit": "5fe44554bbeb477ca9efcff21be7c67418bae254",
+  "decisionCommit": "98723c5b3930eb534961592254009d2edacaffa6",
+  "appliedCommit": "d5acc459cc553ae48f43f096a76422e11ed6f039",
+  "appliedTree": "5af6bcb1d47bf00df7dde15ca9b3c18be5b10ce0",
+  "preapprovalSha256": "cf891e2dd95d6e25fffe4f9fbe4ed73631eefa73cf771fad4603eb0190b3a49c",
+  "removalPlanSha256": "5da5f21f98c712103ebb326fa744276068190fc3580c21d0a1d75c8f79949aec",
+  "ownerDecisionSha256": "667455b3170cdb2bfdec808f7a11087736800f51b474eee66552a72e4d3075d2",
+  "plannedStateSha256": "5a01a7af8f9a3b6c2d6fa7c5f83aef50b73c13105e75560d73a9b0d281796533",
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
