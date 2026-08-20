@@ -36,6 +36,7 @@ from scripts.repository.validate_removal_plan_v2 import (
 ROOT = Path(__file__).resolve().parents[2]
 V2 = ROOT / "contracts/repository-removal/v2"
 ISSUE70_ADAPTER = ROOT / "scripts/repository/validate_issue70_removal.py"
+ISSUE71_ADAPTER = ROOT / "scripts/repository/validate_issue71_removal.py"
 
 
 def _run(repo: Path, *arguments: str) -> str:
@@ -724,6 +725,16 @@ def _load_issue70_adapter():
     return module
 
 
+def _load_issue71_adapter():
+    spec = importlib.util.spec_from_file_location(
+        "_issue71_removal_adapter", ISSUE71_ADAPTER
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _issue70_plan() -> dict:
     plan = json.loads((V2 / "removal-plan.json").read_bytes())
     plan["planId"] = "phase-2-issue-70-exact-removal-v2"
@@ -1117,3 +1128,151 @@ def test_issue70_materializer_hands_off_before_profile_rebind(
 
     assert b"validate_issue70_removal.py ci" in materialized[workflow_path]
     assert materialized[profile_path] == b"activated profile"
+
+
+def test_issue71_framework_binds_completed_issue70_authority() -> None:
+    adapter = _load_issue71_adapter()
+    adapter.validate_framework(ROOT)
+    engine = adapter.configure_engine(ROOT)
+
+    assert engine.EXPECTED_TRUST_ROOTS["issue70ApplicationReceipt"] == (
+        "contracts/repository-removal/v2/issue-70/application-receipt.json"
+    )
+    assert engine.EXPECTED_TRUST_ROOTS["issue71Validator"] == (
+        "scripts/repository/validate_issue71_removal.py"
+    )
+
+
+def test_issue71_schema_accepts_only_issue71_inventory_retirement() -> None:
+    adapter = _load_issue71_adapter()
+    engine = adapter.configure_engine(ROOT)
+    schema = json.loads((V2 / "removal-plan.schema.json").read_bytes())
+    plan = _issue70_plan()
+    plan["planId"] = "phase-2-issue-71-exact-removal-v2"
+    plan["issue"] = 71
+    operations = [
+        operation
+        for entry in plan["entries"]
+        for operation in entry["operations"]
+        if operation.get("issue") == 70
+    ]
+    for operation in operations:
+        operation["issue"] = 71
+
+    engine._schema_validate_document(plan, schema, "removal plan")
+    operations[0]["issue"] = 70
+    with pytest.raises(engine.PlanError, match="schema violation"):
+        engine._schema_validate_document(plan, schema, "removal plan")
+
+
+def test_issue71_exact_rewrite_allowlist_is_narrow() -> None:
+    adapter = _load_issue71_adapter()
+    engine = adapter.configure_engine(ROOT)
+    operation = {
+        "id": "delete-stale-assertion",
+        "kind": "exact-text-replace",
+        "from": "stale assertion\n",
+        "to": "",
+    }
+
+    assert engine._exact_text_transform(
+        b"before\nstale assertion\nafter\n",
+        [operation],
+        "src/pipeline/tests/supply_chain/test_static_target_profile.py",
+    ) == b"before\nafter\n"
+    with pytest.raises(engine.PlanError, match="not allowed for path"):
+        engine._exact_text_transform(
+            b"stale assertion\n", [operation], "README.md"
+        )
+
+
+def _issue71_profile_activation_fixture(adapter):
+    engine = adapter.configure_engine(ROOT)
+    profile = (
+        ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    ).read_bytes()
+    document = json.loads(profile)
+    workflows = {
+        ".github/workflows/ci.yml": b"planned CI workflow\n",
+        ".github/workflows/codeql.yml": b"planned CodeQL workflow\n",
+    }
+    github = next(
+        component
+        for component in document["components"]
+        if component["id"] == "github-actions"
+    )
+    current = {item["path"]: item["sha256"] for item in github["inputs"]}
+    operation = {
+        "id": "activate-issue-71-profile",
+        "kind": "static-profile-multi-input-activation",
+        "issue": 71,
+        "pendingSelectorIds": [
+            item["id"]
+            for item in document["activation"]["pendingSelectors"]
+            if item["issue"] == 71
+        ],
+        "inputBindings": [
+            {
+                "componentId": "github-actions",
+                "inputPath": path,
+                "fromSha256": current[path],
+                "toSha256": hashlib.sha256(content).hexdigest(),
+            }
+            for path, content in workflows.items()
+        ],
+    }
+    return engine, profile, workflows, operation
+
+
+def test_issue71_profile_activation_rebinds_both_workflows_and_activates() -> None:
+    adapter = _load_issue71_adapter()
+    engine, profile, workflows, operation = _issue71_profile_activation_fixture(
+        adapter
+    )
+
+    transformed = adapter._activate_static_profile(
+        engine, profile, operation, workflows, verify_target=True
+    )
+    document = json.loads(transformed)
+
+    assert document["activation"] == {
+        "status": "active",
+        "blockingIssues": [],
+        "pendingSelectors": [],
+    }
+    github = next(
+        component
+        for component in document["components"]
+        if component["id"] == "github-actions"
+    )
+    inputs = {item["path"]: item["sha256"] for item in github["inputs"]}
+    for path, content in workflows.items():
+        assert inputs[path] == hashlib.sha256(content).hexdigest()
+
+
+def test_issue71_profile_activation_requires_both_exact_workflow_bindings() -> None:
+    adapter = _load_issue71_adapter()
+    engine, profile, workflows, operation = _issue71_profile_activation_fixture(
+        adapter
+    )
+    operation["inputBindings"] = operation["inputBindings"][:1]
+
+    with pytest.raises(engine.PlanError, match="must cover both workflows"):
+        adapter._activate_static_profile(
+            engine, profile, operation, workflows, verify_target=True
+        )
+
+
+def test_issue71_profile_activation_rejects_remaining_authority_state() -> None:
+    adapter = _load_issue71_adapter()
+    engine, profile, workflows, operation = _issue71_profile_activation_fixture(
+        adapter
+    )
+    document = json.loads(profile)
+    document["activation"]["blockingIssues"].append(99)
+    drifted = (json.dumps(document, indent=2) + "\n").encode()
+
+    with pytest.raises(engine.PlanError, match="final static profile blocker"):
+        adapter._activate_static_profile(
+            engine, drifted, operation, workflows, verify_target=True
+        )
