@@ -13,13 +13,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 OUTPUTS = (
     "web",
-    "api",
     "pipeline",
     "release",
-    "infrastructure",
     "repository_removal",
     "codeql_javascript",
-    "codeql_csharp",
     "heavy",
 )
 
@@ -52,12 +49,6 @@ WEB = (
     "src/pipeline/fixtures/ar6-regional-release/**",
 )
 
-API = (
-    "src/api/**",
-    "SeaRise Europe.sln",
-    "infra/db/**",
-    "tests/fixtures/tdd/**",
-)
 
 PIPELINE = (
     ".github/workflows/offline-release-controlled.yml",
@@ -112,10 +103,6 @@ RELEASE = (
     "src/pipeline/sources/source-lock*.json",
 )
 
-INFRASTRUCTURE = (
-    "infra/**",
-    "data/geometry/**",
-)
 
 
 
@@ -140,7 +127,6 @@ CODEQL_JAVASCRIPT = (
     'tools/static-quality/**',
 )
 
-CODEQL_CSHARP = ("src/api/**",)
 
 
 def _normalize(path: str) -> str:
@@ -163,13 +149,10 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
 
     result = {
         "web": any(_matches(path, WEB) for path in paths),
-        "api": any(_matches(path, API) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
         "release": any(_matches(path, RELEASE) for path in paths),
-        "infrastructure": any(_matches(path, INFRASTRUCTURE) for path in paths),
         "repository_removal": any(_matches(path, REPOSITORY_REMOVAL) for path in paths),
         "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
-        "codeql_csharp": any(_matches(path, CODEQL_CSHARP) for path in paths),
     }
     result["heavy"] = any(result.values())
     return result
