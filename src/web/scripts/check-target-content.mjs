@@ -83,7 +83,6 @@ const activeAuthorityPaths = new Set([
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 ]);
 const gatePolicyTrustPaths = Object.freeze([
-  "src/web/scripts/check-target-content.mjs",
   "src/web/scripts/static-repository-gates.mjs",
   "src/web/scripts/static-repository-gates.test.mjs",
 ]);
@@ -237,32 +236,44 @@ export function ownerCommentVerificationArguments(helpText, root) {
 }
 
 function approvedRemovalChain(root) {
-  const validator = resolve(root, "scripts/repository/validate_removal_approval.py");
-  if (!existsSync(validator)) throw new Error("Approved repository-removal validator is missing");
+  const validator = resolve(root, "scripts/repository/validate_issue70_removal.py");
+  const receiptPath = "contracts/repository-removal/v2/issue-70/application-receipt.json";
+  if (!existsSync(validator)) throw new Error("Issue-70 repository-removal validator is missing");
   readRegularFile(validator, null, root);
-  let helpText;
+  let receiptCommit;
+  let headCommit;
   try {
-    helpText = execFileSync("python3", [validator, "--help"], {
+    const additions = execFileSync(
+      "git", ["log", "--format=%H", "--diff-filter=A", "--", receiptPath],
+      { cwd: root, encoding: "utf8" },
+    ).trim().split("\n").filter(Boolean);
+    if (additions.length !== 1) {
+      throw new Error("issue-70 receipt must have one exact addition commit");
+    }
+    [receiptCommit] = additions;
+    headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: root,
       encoding: "utf8",
-      stdio: "pipe",
-    });
+    }).trim();
   } catch (error) {
-    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(
-      `Repository-removal validator capability check failed${detail ? `: ${detail}` : ""}`,
-    );
+    throw new Error(`Issue-70 authority anchors cannot be derived: ${error.message}`);
   }
-  const arguments_ = ownerCommentVerificationArguments(helpText, root);
   try {
-    execFileSync("python3", [validator, ...arguments_], {
+    execFileSync("python3", [
+      validator,
+      "--repository-root", root,
+      "post-application",
+      "--receipt-commit", receiptCommit,
+      "--head-commit", headCommit,
+      "--verify-owner-comment",
+    ], {
       cwd: root,
       encoding: "utf8",
       stdio: "pipe",
     });
   } catch (error) {
     const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
+    throw new Error(`Issue-70 repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
   }
 }
 
