@@ -29,20 +29,13 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
     def test_inventory_is_valid_before_it_drives_routing(self) -> None:
         self.assertEqual(validate_inventory(self.inventory), [])
 
-    def test_shared_fixture_routes_remaining_active_language_controls(self) -> None:
+    def test_historical_five_state_fixture_routes_no_retired_runtime_suite(self) -> None:
         suites = select_suites(
             self.inventory,
             ["tests/fixtures/tdd/five-state-characterization-v1.json"],
         )
-        suite_ids = {suite["id"] for suite in suites}
 
-        self.assertTrue(
-            {
-                "api-shared-characterization",
-                "pipeline-five-state-characterization",
-            }.issubset(suite_ids)
-        )
-        self.assertNotIn("frontend-five-state-characterization", suite_ids)
+        self.assertEqual({suite["id"] for suite in suites}, set())
 
     def test_fast_filter_excludes_docker_and_credentials(self) -> None:
         suites = select_suites(
@@ -82,24 +75,16 @@ class ChangedSuiteRoutingTests(unittest.TestCase):
             "pipeline-supply-chain-contract", {suite["id"] for suite in suites}
         )
 
-    def test_legacy_infrastructure_routes_deletion_owners(self) -> None:
+    def test_retired_infrastructure_paths_route_static_content_guard(self) -> None:
         database_suites = select_suites(self.inventory, ["infra/db/init.sql"])
         blob_seed_suites = select_suites(self.inventory, ["infra/blob-seed/seed.py"])
 
-        self.assertIn(
-            "api-postgis-integration", {suite["id"] for suite in database_suites}
+        self.assertEqual(
+            {suite["id"] for suite in database_suites}, {"static-target-content"}
         )
-        compose = next(
-            suite for suite in self.inventory["suites"] if suite["id"] == "compose-smoke"
+        self.assertEqual(
+            {suite["id"] for suite in blob_seed_suites}, {"static-target-content"}
         )
-        selected_ids = {suite["id"] for suite in blob_seed_suites}
-        if compose["status"] == "active":
-            self.assertIn("compose-smoke", selected_ids)
-        else:
-            self.assertEqual(compose["status"], "retired")
-            self.assertNotIn("compose-smoke", selected_ids)
-            self.assertEqual(compose["removalGate"], 72)
-            self.assertIsNotNone(compose["replacementEvidence"])
 
     def test_every_current_suite_has_consistent_lifecycle_metadata(self) -> None:
         self.assertTrue(self.inventory["suites"])
