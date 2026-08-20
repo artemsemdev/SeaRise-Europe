@@ -138,6 +138,21 @@ def _issue71_schema(schema: dict[str, Any]) -> dict[str, Any]:
                 },
             }
         )
+        for kind in (
+            "pyproject-static-runtime-prune",
+            "requirements-static-runtime-prune",
+        ):
+            operations.append(
+                {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["id", "kind"],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "kind": {"const": kind},
+                    },
+                }
+            )
     return specialized
 
 
@@ -230,6 +245,47 @@ def _activate_static_profile(
     return text.encode("utf-8")
 
 
+def _delete_exact_lines(
+    engine: Any,
+    content: bytes,
+    expected_lines: tuple[str, ...],
+    label: str,
+) -> bytes:
+    text = engine._decode(content, label)
+    for line in expected_lines:
+        if text.count(line) != 1:
+            raise engine.PlanError(f"{label} exact entry pre-state changed")
+        text = text.replace(line, "", 1)
+    return text.encode("utf-8")
+
+
+def _prune_pyproject(engine: Any, content: bytes) -> bytes:
+    return _delete_exact_lines(
+        engine,
+        content,
+        (
+            '    "azure-storage-blob>=12.19,<13.0",\n',
+            '    "psycopg2-binary>=2.9,<3.0",\n',
+            '    "pipeline",\n',
+            '    "searise_pipeline.domain",\n',
+            'pipeline = "."\n',
+        ),
+        "issue #71 pyproject prune",
+    )
+
+
+def _prune_requirements(engine: Any, content: bytes) -> bytes:
+    return _delete_exact_lines(
+        engine,
+        content,
+        (
+            "azure-storage-blob>=12.19,<13.0\n",
+            "psycopg2-binary>=2.9,<3.0\n",
+        ),
+        "issue #71 requirements prune",
+    )
+
+
 def _materialize_plan(
     engine: Any,
     root: Path,
@@ -239,7 +295,9 @@ def _materialize_plan(
 ) -> dict[str, bytes | None]:
     custom_kinds = {
         "content-authority-handoff",
+        "pyproject-static-runtime-prune",
         "python-tuple-literal-value-delete",
+        "requirements-static-runtime-prune",
         "static-profile-multi-input-activation",
         "workflow-step-run-replace",
     }
@@ -264,6 +322,18 @@ def _materialize_plan(
             and len(original["operations"]) == 1
             and original["operations"][0]["kind"]
             == "static-profile-multi-input-activation"
+        ) or (
+            entry["path"]
+            in {
+                "src/pipeline/pyproject.toml",
+                "src/pipeline/requirements-pipeline.txt",
+            }
+            and len(original["operations"]) == 1
+            and original["operations"][0]["kind"]
+            in {
+                "pyproject-static-runtime-prune",
+                "requirements-static-runtime-prune",
+            }
         )
         if not entry["operations"] and not custom_only_allowed:
             raise engine.PlanError(
@@ -278,7 +348,12 @@ def _materialize_plan(
         content = materialized.get(entry["path"])
         if content is None and len(entry["operations"]) == 1 and entry["operations"][0][
             "kind"
-        ] in {"content-authority-handoff", "static-profile-multi-input-activation"}:
+        ] in {
+            "content-authority-handoff",
+            "pyproject-static-runtime-prune",
+            "requirements-static-runtime-prune",
+            "static-profile-multi-input-activation",
+        }:
             content = engine._audited_blob(root, plan["auditedCommit"], entry["path"])
         if content is None:
             raise engine.PlanError("issue #71 custom operation target is absent")
@@ -307,6 +382,16 @@ def _materialize_plan(
                 content = issue70._delete_python_tuple_literal_values(
                     engine, content, operation
                 )
+            elif kind == "pyproject-static-runtime-prune":
+                if entry["path"] != "src/pipeline/pyproject.toml":
+                    raise engine.PlanError("pyproject prune is restricted to pyproject.toml")
+                content = _prune_pyproject(engine, content)
+            elif kind == "requirements-static-runtime-prune":
+                if entry["path"] != "src/pipeline/requirements-pipeline.txt":
+                    raise engine.PlanError(
+                        "requirements prune is restricted to requirements-pipeline.txt"
+                    )
+                content = _prune_requirements(engine, content)
             elif kind == "static-profile-multi-input-activation":
                 continue
         materialized[entry["path"]] = content
