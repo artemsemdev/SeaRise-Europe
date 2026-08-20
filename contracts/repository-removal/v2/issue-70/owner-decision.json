@@ -1,0 +1,21 @@
+{
+  "$schema": "./owner-decision.schema.json",
+  "schemaVersion": "2.0.0",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-08-20T14:50:48Z",
+  "preapprovalCommit": "ca806928fd42868ba30d2f488debbbcbdddc78ff",
+  "preapprovalSha256": "262435f71d7e8cd167894f34bb60f131283d530e7ec995c6c5cd44fb8ba7687f",
+  "removalPlanSha256": "1ef8788d5d058cff66f9459c9d196c22f5d32f293b844a754db4512bf3b875ec",
+  "approvalText": "I approve the additive repository-removal v2 plan for issue #70 at preapproval commit ca806928fd42868ba30d2f488debbbcbdddc78ff, preapproval SHA-256 262435f71d7e8cd167894f34bb60f131283d530e7ec995c6c5cd44fb8ba7687f, removal plan SHA-256 1ef8788d5d058cff66f9459c9d196c22f5d32f293b844a754db4512bf3b875ec, and audited removal base 82a8e206d6a93643131e12b7b9f51c1f5c0c10ef. This authorizes only the exact before/after path states and structural operations bound by that plan. It does not authorize Candidate-v7 or TAR inspection, copying, publication, or upload, and it does not authorize deletion or mutation of any external resource, credential, GitHub environment, or secret.",
+  "approvalSource": {
+    "issue": 68,
+    "commentId": 5357561733,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/68#issuecomment-5357561733",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "c7b35ca01ce116736b8e462a45bfece5a4f3cf11713de5cc65ca7b950206818b"
+  },
+  "candidatePublicationAuthorized": false,
+  "externalResourceMutationAuthorized": false
+}
