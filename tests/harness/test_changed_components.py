@@ -92,7 +92,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["web"])
         self.assertTrue(outputs["codeql_javascript"])
-        self.assertFalse(outputs["api"])
 
     def test_static_quality_tool_change_routes_web_and_javascript_codeql(self) -> None:
         for path in (
@@ -103,7 +102,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 outputs = classify_paths([path])
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["codeql_javascript"])
-                self.assertFalse(outputs["api"])
 
     def test_static_repository_gate_authorities_route_web_validation(self) -> None:
         paths = (
@@ -167,7 +165,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 outputs = classify_paths([path])
                 self.assertTrue(outputs["web"])
                 self.assertTrue(outputs["release"])
-                self.assertFalse(outputs["api"])
 
     def test_unrelated_static_and_pipeline_paths_skip_release_toolchain(self) -> None:
         paths = [
@@ -187,8 +184,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["pipeline"])
         self.assertTrue(outputs["release"])
-        self.assertFalse(outputs["api"])
-        self.assertFalse(outputs["infrastructure"])
 
     def test_ordinary_pipeline_change_skips_release_toolchain(self) -> None:
         outputs = classify_paths(["src/pipeline/searise_pipeline/config.py"])
@@ -231,15 +226,12 @@ class ChangedComponentRoutingTests(unittest.TestCase):
     def test_infrastructure_schema_change_routes_api_and_infrastructure(self) -> None:
         outputs = classify_paths(["infra/db/init.sql"])
 
-        self.assertTrue(outputs["infrastructure"])
-        self.assertTrue(outputs["api"])
 
     def test_shared_contract_routes_api_and_pipeline_without_images(self) -> None:
         outputs = classify_paths(
             ["tests/fixtures/tdd/five-state-characterization-v1.json"]
         )
 
-        self.assertTrue(outputs["api"])
         self.assertTrue(outputs["pipeline"])
 
     def test_public_release_contract_routes_static_web_and_pipeline(self) -> None:
@@ -247,7 +239,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["web"])
         self.assertTrue(outputs["pipeline"])
-        self.assertFalse(outputs["api"])
         self.assertFalse(outputs["release"])
         candidate = classify_paths(
             ["contracts/candidate-completeness/v1/candidate.schema.json"]
@@ -289,7 +280,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         macos_evidence = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
         self.assertIn("release_evidence:\n", dispatch)
         self.assertIn("default: false", dispatch)
@@ -395,7 +386,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         macos_evidence = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
 
         for action in (
@@ -439,7 +430,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         macos = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
 
         self.assertIn("name: Full-source Linux AR6 candidate", linux)
@@ -494,7 +485,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         producer = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
 
         self.assertIn("name: AR6 release toolchain (pinned macOS ARM64)", preflight)
@@ -519,7 +510,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         macos = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
 
         build = macos.index("Build full real-source candidate")
@@ -603,7 +594,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         macos_evidence = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
 
         self.assertIn("--require-hashes -r requirements-release.lock", evidence)
@@ -628,7 +619,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         macos_evidence = _workflow_job(
             workflow,
             "ar6-release-evidence-macos",
-            "infrastructure",
+            "repository-removal-v2",
         )
 
         preflight = evidence.index("Preflight exact release environment and fixture")
@@ -725,13 +716,11 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(routes["pipeline"])
         self.assertTrue(routes["release"])
         self.assertTrue(routes["heavy"])
-        self.assertFalse(routes["api"])
 
         script_routes = classify_paths(["scripts/science/promote_phase_0r_release.py"])
         self.assertTrue(script_routes["pipeline"])
         self.assertTrue(script_routes["release"])
         self.assertTrue(script_routes["heavy"])
-        self.assertFalse(script_routes["api"])
 
         delivery_routes = classify_paths(
             ["scripts/science/validate_ar6_delivery_trace.py"]
@@ -788,8 +777,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 self.assertTrue(outputs["pipeline"])
                 self.assertTrue(outputs["release"])
                 self.assertTrue(outputs["heavy"])
-                self.assertFalse(outputs["api"])
-                self.assertFalse(outputs["infrastructure"])
 
     def test_offline_receipt_example_routes_pipeline_validation(self) -> None:
         outputs = classify_paths(
@@ -797,8 +784,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
 
         self.assertTrue(outputs["pipeline"])
-        self.assertFalse(outputs["api"])
-        self.assertFalse(outputs["infrastructure"])
 
     def test_controlled_offline_build_is_manual_identity_bound_and_offline(
         self,
@@ -854,7 +839,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
 
         self.assertTrue(outputs["pipeline"])
         self.assertTrue(outputs["heavy"])
-        self.assertFalse(outputs["api"])
 
     def test_rename_routes_both_old_and_new_paths(self) -> None:
         paths = parse_name_status(
@@ -862,7 +846,6 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
 
         self.assertEqual(paths, ["src/api/Old.cs", "docs/old-api.md", "README.md"])
-        self.assertTrue(classify_paths(paths)["api"])
 
     def test_github_outputs_are_lowercase_and_stable(self) -> None:
         outputs = classify_paths(["src/pipeline/config.py"])

@@ -83,7 +83,6 @@ const activeAuthorityPaths = new Set([
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 ]);
 const gatePolicyTrustPaths = Object.freeze([
-  "src/web/scripts/static-repository-gates.mjs",
 ]);
 
 export const prohibitedTargetClaims = Object.freeze([
@@ -235,9 +234,9 @@ export function ownerCommentVerificationArguments(helpText, root) {
 }
 
 function approvedRemovalChain(root) {
-  const validator = resolve(root, "scripts/repository/validate_issue70_removal.py");
-  const receiptPath = "contracts/repository-removal/v2/issue-70/application-receipt.json";
-  if (!existsSync(validator)) throw new Error("Issue-70 repository-removal validator is missing");
+  const validator = resolve(root, "scripts/repository/validate_issue71_removal.py");
+  const receiptPath = "contracts/repository-removal/v2/issue-71/application-receipt.json";
+  if (!existsSync(validator)) throw new Error("Issue-71 repository-removal validator is missing");
   readRegularFile(validator, null, root);
   let receiptCommit;
   let headCommit;
@@ -247,7 +246,7 @@ function approvedRemovalChain(root) {
       { cwd: root, encoding: "utf8" },
     ).trim().split("\n").filter(Boolean);
     if (additions.length !== 1) {
-      throw new Error("issue-70 receipt must have one exact addition commit");
+      throw new Error("issue-71 receipt must have one exact addition commit");
     }
     [receiptCommit] = additions;
     headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -255,7 +254,7 @@ function approvedRemovalChain(root) {
       encoding: "utf8",
     }).trim();
   } catch (error) {
-    throw new Error(`Issue-70 authority anchors cannot be derived: ${error.message}`);
+    throw new Error(`Issue-71 authority anchors cannot be derived: ${error.message}`);
   }
   try {
     execFileSync("python3", [
@@ -272,7 +271,7 @@ function approvedRemovalChain(root) {
     });
   } catch (error) {
     const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Issue-70 repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
+    throw new Error(`Issue-71 repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
   }
 }
 

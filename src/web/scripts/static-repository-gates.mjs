@@ -26,7 +26,6 @@ const staticSupplyChainComponents = new Map([
   ["active-sboms", ["cyclonedx", "candidate", "locked"]],
   ["github-actions", ["github-actions", "candidate", "locked"]],
   ["native-build-plane", ["native", "candidate", "locked"]],
-  ["pending-legacy-python-authorities", ["python", "development", "range-constrained"]],
   ["pipeline-container", ["container", "candidate", "locked"]],
   ["pipeline-geoid-evaluator", ["python", "candidate", "locked"]],
   ["pipeline-python-contributor", ["python", "development", "range-constrained"]],
@@ -57,8 +56,8 @@ const staticSupplyChainInputs = new Map([
   ["src/pipeline/toolchain/duckdb-spatial-extensions.json", ["native-build-plane", "lock", "100644"]],
   ["src/pipeline/toolchain/tippecanoe-darwin-arm64-build-receipt.json", ["native-build-plane", "receipt", "100644"]],
   ["src/pipeline/toolchain/tippecanoe-linux-x86_64-build-receipt.json", ["native-build-plane", "receipt", "100644"]],
-  ["src/pipeline/pyproject.toml", ["pending-legacy-python-authorities", "manifest", "100644"]],
-  ["src/pipeline/requirements-pipeline.txt", ["pending-legacy-python-authorities", "manifest", "100644"]],
+  ["src/pipeline/pyproject.toml", ["pipeline-python-contributor", "manifest", "100644"]],
+  ["src/pipeline/requirements-pipeline.txt", ["pipeline-python-contributor", "manifest", "100644"]],
   ["src/pipeline/offline_release/Dockerfile", ["pipeline-container", "recipe", "100644"]],
   ["src/pipeline/offline_release/Dockerfile.dockerignore", ["pipeline-container", "recipe", "100644"]],
   ["src/pipeline/offline_release/profiles/fixture.json", ["pipeline-container", "manifest", "100644"]],
@@ -169,6 +168,10 @@ const allPolicyRuleIds = new Set(forbiddenDependencyRules.map(({ id }) => id));
 const gatePolicyRulePurpose = new Map([
   ["src/web/scripts/static-repository-gates.mjs", allPolicyRuleIds],
   ["src/web/scripts/static-repository-gates.test.mjs", allPolicyRuleIds],
+  ["contracts/repository-removal/v2/issue-71/removal-plan.json", new Map([
+    ["dotnet-csharp-nuget", new Set([".sln", ".csproj"])],
+    ["postgres-postgis-npgsql", new Set(["postgis"])],
+  ])],
   ["contracts/repository-removal/v1/census.json", new Set(["dotnet-csharp-nuget"])],
   ["contracts/repository-removal/v1/inventory.json", new Set([
     "dotnet-csharp-nuget",
@@ -406,7 +409,7 @@ export function validateStaticSupplyChainProfile(document, readPath, readMode) {
   const componentCount = document.components.length;
   const inputCount = document.components.reduce((count, component) =>
     count + (Array.isArray(component?.inputs) ? component.inputs.length : 0), 0);
-  if (componentCount !== 14 || inputCount !== 57) {
+  if (componentCount !== 13 || inputCount !== 57) {
     throw new Error(`Static-target supply-chain profile count drift: ${componentCount} components / ${inputCount} inputs`);
   }
   if (typeof readMode !== "function") throw new Error("Static-target supply-chain mode authority is required");
