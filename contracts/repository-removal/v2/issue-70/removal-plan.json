@@ -3,8 +3,8 @@
   "schemaVersion": "2.0.0",
   "planId": "phase-2-issue-70-exact-removal-v2",
   "issue": 70,
-  "auditedCommit": "3f2d1c393b4a6608873b18b25fac2ccb6151b3ae",
-  "auditedTree": "9c5319ad3f7cea60cd42f3dd982fbb02d642d171",
+  "auditedCommit": "abf2e75181e482a5eb7e9b5a736d2f998860d66a",
+  "auditedTree": "41ff6d299bb7773b540f938d5059f7a66823fdda",
   "entries": [
     {
       "path": ".github/workflows/ci.yml",
@@ -77,8 +77,8 @@
       "after": {
         "state": "present",
         "mode": "100644",
-        "gitBlobSha": "986aff62900d33ce294d2dd9de36e34450ef03f7",
-        "sha256": "904cbb22b05d28b8351df8a54d8d3f2e248addfddf0dfa25ab860c73f91cf864"
+        "gitBlobSha": "2a0ca3ff4bb5e6dc28aec17f3dc24ae42597ccc9",
+        "sha256": "bd2dd5ad5979c9e7c5a4f62c706f4cfea337edce672cf40af48aebfb7370a915"
       },
       "operations": [
         {
@@ -96,7 +96,7 @@
         },
         {
           "id": "delete-frontend-codeql-route",
-          "kind": "python-tuple-literals-delete",
+          "kind": "python-tuple-literal-value-delete",
           "name": "CODEQL_JAVASCRIPT",
           "values": [
             "src/frontend/**"
