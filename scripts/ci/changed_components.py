@@ -145,7 +145,11 @@ REPOSITORY_REMOVAL = (
     "tests/harness/test_immutable_dependencies.py",
 )
 
-CODEQL_JAVASCRIPT = ("src/frontend/**", "src/web/**", "tools/static-quality/**")
+CODEQL_JAVASCRIPT = (
+    "src/frontend/**",
+    "src/web/**",
+    "tools/static-quality/**",
+)
 
 CODEQL_CSHARP = ("src/api/**",)
 
