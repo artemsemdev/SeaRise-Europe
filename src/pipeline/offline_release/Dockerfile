@@ -33,6 +33,7 @@ COPY src/pipeline/requirements-release.lock /workspace/src/pipeline/requirements
 COPY src/pipeline/science/ar6-lookup-validation.json /workspace/src/pipeline/science/ar6-lookup-validation.json
 COPY src/pipeline/science/ar6-regional-release.json /workspace/src/pipeline/science/ar6-regional-release.json
 COPY src/pipeline/science/ar6-regional-release.schema.json /workspace/src/pipeline/science/ar6-regional-release.schema.json
+COPY src/pipeline/science/evidence/ar6-delivery-harness-relocation.json /workspace/src/pipeline/science/evidence/ar6-delivery-harness-relocation.json
 COPY src/pipeline/science/evidence/ar6-lookup-goldens.json /workspace/src/pipeline/science/evidence/ar6-lookup-goldens.json
 COPY src/pipeline/searise_pipeline /workspace/src/pipeline/searise_pipeline
 

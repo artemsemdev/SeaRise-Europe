@@ -1,0 +1,7 @@
+{
+  "auditedCommit": "c151d76c59736d41dbe29f64bb2da1520f80a861",
+  "checkId": "static-web-shell",
+  "command": "npm run web:check && npm run web:e2e",
+  "result": "passed",
+  "schemaVersion": "1.0.0"
+}

@@ -20,6 +20,7 @@ from searise_pipeline.candidate_completeness import (
 
 from .build_plane_sbom import validate_build_plane_sbom
 from .contracts import REPOSITORY_ROOT, SupplyChainContractError, _validate_evidence_files
+from .historical_inventory import materialize_historical_dependency_authority
 from .nuget_sbom import validate_nuget_sbom
 from .python_sbom import validate_python_sbom
 from .sbom import validate_npm_sbom
@@ -237,15 +238,21 @@ def _bind_bytes(descriptor: Mapping[str, Any], raw: bytes, label: str) -> None:
         _fail(f"{label} descriptor does not bind its exact bytes")
 
 
-def _validate_sbom_authority(logical: str, path: Path, root: Path) -> dict[str, Any]:
+def _validate_sbom_authority(
+    logical: str,
+    path: Path,
+    root: Path,
+    dependency_inventory: Path,
+) -> dict[str, Any]:
     if logical == _SBOM_PATHS[0]:
-        inventory = root / "contracts/supply-chain/v1/dependency-inventory.json"
-        return validate_build_plane_sbom(path, inventory, repository_root=root)
-    elif logical == _SBOM_PATHS[1]:
-        lock = root / "src/frontend/package-lock.json"
-        return validate_npm_sbom(
-            path, lock, repository_root=root, logical_path="src/frontend/package-lock.json"
+        return validate_build_plane_sbom(
+            path,
+            dependency_inventory,
+            repository_root=root,
         )
+    elif logical == _SBOM_PATHS[1]:
+        lock = root / "package-lock.json"
+        return validate_npm_sbom(path, lock, repository_root=root, logical_path="package-lock.json")
     elif logical.startswith("sbom/nuget/"):
         component = logical.split("searise-", 1)[1].split("-net8.0", 1)[0].title()
         project = root / f"src/api/SeaRise.{component}"
@@ -271,7 +278,11 @@ def _validate_candidate_evidence_pair(
     repository_root: Path = REPOSITORY_ROOT,
     trusted_invocation_uri: str,
     allow_production_envelope: bool,
+    dependency_inventory: Path | None = None,
 ) -> CandidateEvidenceSummary:
+    inventory_path = dependency_inventory or (
+        repository_root / "contracts/supply-chain/v1/dependency-inventory.json"
+    )
     candidate_descriptor = _open_root(candidate_root, "candidate")
     try:
         evidence_descriptor = _open_root(evidence_root, "evidence")
@@ -379,7 +390,12 @@ def _validate_candidate_evidence_pair(
         ) or _claimed(claims, "cryptographicVerification production publication"):
             _fail("offline pair validation must not claim signing, production, or publication")
         for logical in _SBOM_PATHS:
-            _validate_sbom_authority(logical, sbom_paths[logical], repository_root.absolute())
+            _validate_sbom_authority(
+                logical,
+                sbom_paths[logical],
+                repository_root.absolute(),
+                inventory_path,
+            )
 
     return CandidateEvidenceSummary(
         candidate_id=str(candidate["candidateId"]),
@@ -395,10 +411,16 @@ def validate_candidate_evidence_pair(
     repository_root: Path = REPOSITORY_ROOT,
     trusted_invocation_uri: str,
 ) -> CandidateEvidenceSummary:
-    return _validate_candidate_evidence_pair(
-        candidate_root,
-        evidence_root,
+    profile = repository_root / "contracts/supply-chain/v2/static-target-profile.json"
+    with materialize_historical_dependency_authority(
+        profile,
         repository_root=repository_root,
-        trusted_invocation_uri=trusted_invocation_uri,
-        allow_production_envelope=False,
-    )
+    ) as (historical_root, historical_inventory):
+        return _validate_candidate_evidence_pair(
+            candidate_root,
+            evidence_root,
+            repository_root=historical_root,
+            trusted_invocation_uri=trusted_invocation_uri,
+            allow_production_envelope=False,
+            dependency_inventory=historical_inventory,
+        )

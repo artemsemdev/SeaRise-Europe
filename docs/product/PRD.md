@@ -10,6 +10,9 @@
 >
 > **Architecture:** [ADR-021 — Static-First Offline Geospatial Architecture](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md),
 > amended by [ADR-024 — AR6 Regional Projection Contract](../architecture/adr/ADR-024-ar6-regional-projection-contract.md)
+>
+> **Visual and interaction authority:** [SeaRise Flight](Mock/SeaRise-Flight.html),
+> governed by its [active reconciliation contract](Mock/MOCK_REQUIREMENTS_MAP.md)
 
 ## 1. Product summary
 
@@ -25,9 +28,28 @@ without a production application server, database, tile server, or runtime
 geocoder. Scientific processing happens before publication; the browser reads
 versioned artifacts and performs bounded search and projection lookup locally.
 
-The target architecture is accepted but not yet implemented. The checked-in
-legacy runtime and synthetic raster are not evidence of a production-ready
-scientific release.
+The static target is implemented under `src/web` and is the only product
+baseline. Any legacy runtime code still present during Phase 2 removal is
+neither a baseline nor a rollback path. The committed synthetic fixture proves
+the application and release contracts, but it is not evidence of a
+production-ready scientific release.
+
+### Experience contract
+
+The static application preserves the canonical Flight experience: its
+editorial full-viewport and map-first composition, destination-led information
+hierarchy, dominant settlement search, geographic flight/arrival character,
+layered result panel, visible scenario/horizon controls, progressive evidence
+disclosure, and responsive reprioritization. Reduced-motion and skip paths must
+provide the same task without delay.
+
+Only scientifically invalid mock content is replaced. Both binary exposure
+cards map to `ProjectionAvailable`; the mock's unavailable and out-of-scope
+cards map to `DataUnavailable` and `OutOfScope`; and
+`UnsupportedGeography` is added as the fourth normal outcome. Terrain
+comparison, modeled-water/flood meaning, binary classification, and property
+or hazard claims are prohibited. ADR-024 changes those semantics, not the
+canonical layout or interaction character.
 
 ## 2. Problem
 

@@ -17,14 +17,31 @@ data-product architecture.
 > The mock uses synthetic illustrative data and does not override the PRD,
 > methodology, or accepted architecture.
 
-> **Migration status:** ADR-021 was accepted on 2026-08-04. The repository still
-> contains the legacy distributed implementation while the static-first path is
-> built and scientifically validated. Current demo rasters are synthetic; this
-> is not yet a validated real-data release.
+> **Repository status:** The Phase 2 integration branch contains the static-only
+> React/Vite application and retained offline release pipeline. The superseded
+> distributed runtime has been removed under ADR-025. Clean-clone validation uses
+> the committed synthetic fixture; this is not a public scientific release.
+
+## Run the static application
+
+The clean-clone path needs Node 20.20.1 and no Docker, database, API, tile
+server, cloud key, or private candidate:
+
+```bash
+npm ci
+npm run web:check
+npm run web:serve
+```
+
+Open `http://127.0.0.1:4173/` or the direct architecture route at
+`http://127.0.0.1:4173/about/architecture/`. Browser smoke tests run with
+`npm run web:e2e` after Playwright Chromium is installed. The build copies only
+the committed synthetic release fixture; ignored Phase 1 candidate bytes are
+never discovered, bundled, or uploaded.
 
 ## Accepted architecture
 
-SeaRise Europe is moving to a static-first model: authoritative source data is
+SeaRise Europe uses a static-first model: authoritative source data is
 downloaded once, processed before release, and published as immutable
 browser-ready artifacts. A normal user request requires no application API,
 database, tile server, or geocoding service.
@@ -65,7 +82,8 @@ Read the complete [accepted architecture decision](docs/architecture/adr/ADR-021
 
 - Three scenarios: SSP1-2.6, SSP2-4.5, and SSP5-8.5.
 - Three horizons: 2030, 2050, and 2100.
-- Five explicit result states, including out-of-scope and unavailable data.
+- Exactly four projection outcomes: `ProjectionAvailable`, `DataUnavailable`,
+  `OutOfScope`, and `UnsupportedGeography`; delivery failures are separate.
 - Local search over European places, including every active coastal settlement
   that qualifies in the pinned GeoNames snapshot.
 - A versioned coastal analysis boundary. The current checked-in 25 km geometry
@@ -95,48 +113,22 @@ range requests.
 | Area | Status |
 |---|---|
 | Static-first ADR and technical documentation | Accepted/current |
-| Legacy interactive application | Implemented with synthetic demo data |
-| Real IPCC/Copernicus end-to-end validation | Not complete; blocks publication |
-| GeoNames coastal settlement catalog | Planned |
-| Static React/Vite browser path | Planned |
-| Cloudflare/OpenTofu deployment | Planned |
-| Legacy service removal | Gated on parity and release evidence |
+| Static React/Vite browser application | Implemented and validated from the committed fixture |
+| Exact AR6 projection lookup | Implemented for all nine scenario/horizon combinations |
+| GeoNames settlement search | Implemented in a Web Worker from release-bound static indexes |
+| Generic static-host delivery | Build, serve, range, accessibility, and Lighthouse gates implemented |
+| Reference Cloudflare/OpenTofu deployment | Configuration retained; live provisioning is separate |
+| Superseded repository runtime | Removed; recoverable through Git history |
 
 The active sequence and exit gates are in the
 [static-first migration plan](docs/delivery/README.md).
 
-## Run the current local baseline
-
-The migration has not yet replaced the checked-in legacy stack. To inspect the
-current implementation:
-
-### Prerequisites
-
-- Docker with Docker Compose
-- optional Azure Maps credentials; the local baseline has limited fallbacks
-
-### Start
-
-```bash
-cp .env.local.example .env.local
-docker compose up --build
-```
-
-| Service | URL |
-|---|---|
-| Frontend | <http://localhost:3000> |
-| API | <http://localhost:8080> |
-| TiTiler | <http://localhost:8000> |
-
-This path exists for migration comparison. It uses a synthetic COG and must not
-be used as evidence that the real scientific data pipeline is complete.
-
-## Target repository shape
+## Repository shape
 
 ```text
 SeaRise Europe/
 ├── src/
-│   ├── frontend/          Static React/TypeScript application
+│   ├── web/               Static React/TypeScript application
 │   └── pipeline/          Offline data-release builder
 ├── data/
 │   ├── geometry/          Versioned support/coastal source geometry
@@ -148,9 +140,9 @@ SeaRise Europe/
     └── delivery/          Active migration plan and quality evidence
 ```
 
-The API, database, tile server, and legacy container scaffolding will be
-deleted only after the new flow passes scientific, parity, browser,
-accessibility, performance, cost, and rollback gates.
+The delivered application has no application server, runtime database, tile
+server, or runtime geocoder. Retained container recipes belong only to the
+deterministic offline build plane and are not deployment dependencies.
 
 ## Documentation
 

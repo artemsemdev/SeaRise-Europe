@@ -33,13 +33,14 @@ protected signing workflow, not evidence that signing occurred.
 ## npm SBOM generation
 
 `sboms/frontend-npm.cdx.json` is the canonical CycloneDX 1.7 inventory generated
-from the real frontend candidate lock. Regenerate it to a new review path with:
+from the root lock for the static `src/web` workspace. Regenerate it to a new
+review path with:
 
 ```shell
 PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
   npm-sbom \
-  --lock src/frontend/package-lock.json \
-  --logical-path src/frontend/package-lock.json \
+  --lock package-lock.json \
+  --logical-path package-lock.json \
   --output artifacts/sbom/frontend.cdx.json
 ```
 
@@ -55,8 +56,8 @@ Validate the checked-in public bytes against the exact repository lock:
 PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
   npm-sbom-validate \
   --repository-root . \
-  --lock src/frontend/package-lock.json \
-  --logical-path src/frontend/package-lock.json \
+  --lock package-lock.json \
+  --logical-path package-lock.json \
   --sbom contracts/supply-chain/v1/sboms/frontend-npm.cdx.json
 ```
 
@@ -65,8 +66,9 @@ hash or logical path, and symlinked lock or SBOM ancestry. Replace a reviewed
 artifact only through a new commit; the publication command itself never
 overwrites an existing path.
 
-The generator currently supports package-lock v3 registry packages only. It
-rejects links, workspaces, invalid names or aliases, non-registry tarballs,
+The generator currently supports package-lock v3 registry packages and one
+exact, lock-bound application workspace. It rejects other links, workspace
+patterns or multiple workspaces, invalid names or aliases, non-registry tarballs,
 invalid integrity hashes, unresolved required edges, unreachable package
 entries, symlink inputs, and non-regular lock paths. The document binds the
 exact input SHA-256, each lock-entry SHA-256, npm SHA-512 integrity, root

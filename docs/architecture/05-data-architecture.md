@@ -1,8 +1,8 @@
 # 05 — Data Architecture
 
-> **Status:** Accepted target architecture; migration in progress
+> **Status:** Current static-only repository architecture
 >
-> **Source of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Sources of truth:** [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md)
 > **Important:** checked-in demo rasters and the current pipeline are not a validated real-data release.
 
 ## 1. Data model in one sentence
@@ -32,7 +32,7 @@ flowchart LR
 | Source cache | Original IPCC, GeoNames, and Natural Earth snapshots | Ignored local/CI storage | Acquisition stage | None |
 | Build workspace | Normalized arrays, temporary rasters, DuckDB files, intermediate tables | Ephemeral local/CI workspace | Offline pipeline | None |
 | Release artifacts | Manifest, config, boundaries, search indexes, COG, PMTiles, GeoParquet, STAC, provenance | Versioned static host/object storage | Controlled publish job | Browser and reviewers |
-| Browser cache | App shell, config, search indexes, and requested byte ranges | User device | Service worker/browser | Browser only |
+| Browser cache | Verified complete resources in Cache Storage and integrity-authorized COG chunks in bounded IndexedDB; PMTiles is network-only with a `no-store` caching policy | User device | Service worker/browser | Browser only |
 
 No project-controlled system stores user searches, selected places, or precise
 coordinates. GeoNames place coordinates and scientific source coordinates are
@@ -77,9 +77,14 @@ releases/{dataReleaseId}/
 ```
 
 Paths are release-versioned or content-addressed and are never overwritten.
-Versioned objects use `Cache-Control: public, max-age=31536000, immutable`.
-A mutable `/release.json`, if used, has a short TTL and only points to a
-release; an application build pins one release for the duration of a session.
+Versioned objects use `Cache-Control: public, max-age=31536000, immutable` as
+the generic publication default. ADR-026 and the checked-in
+[`HTTP delivery policy`](../../contracts/http-delivery/v1/policy.json) override
+that transport policy for visual PMTiles: `200`, `206`, and `416` responses are
+`no-store`, even though their release paths remain append-only. Analysis COGs
+and other release objects retain immutable delivery. A mutable `/release.json`,
+if used, has a short TTL and only points to a release; an application build
+pins one release for the duration of a session.
 
 ## 4. Public contracts
 
@@ -193,7 +198,7 @@ and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
 | Build intermediates | Disposable after a successful release; retain only when needed to investigate QA |
 | Published releases | Keep the active and rollback releases; archive or remove older versions only under a documented retention policy |
 | Manifests, source records, provenance, QA summaries | Retain with every published release |
-| Browser cache | Bounded and versioned; evict least-recently-used ranges first |
+| Browser cache | Bounded and versioned; evict least-recently-used unleased COG chunks first; PMTiles remains network-only with a `no-store` caching policy |
 | User search/location data | Never collected or retained by project infrastructure |
 
 ## 7. Licence and integrity rules
@@ -207,12 +212,12 @@ and browser caches are namespaced by `dataReleaseId` so versions cannot mix.
 - The browser rejects an unsupported manifest schema or mismatched pinned
   release instead of silently falling back.
 
-## 8. Migration boundary
+## 8. Repository boundary
 
-The existing PostgreSQL schema, Azure Blob registration, TiTiler integration,
-and synthetic `demo.tif` describe the legacy runtime and are not part of this
-target data architecture. They remain only until ADR-021 Phases 0–3 establish
-scientific validity and parity. Removal is allowed only at the Phase 4 gate.
+The request-time database, mutable blob-registration path, and dynamic tile
+service have been removed. The retained pipeline produces immutable release
+artifacts and the browser validates them before use. Historical contracts and
+Git history preserve the removal evidence without reactivating that runtime.
 
 See [16 — Geospatial Data Pipeline](16-geospatial-data-pipeline.md) for build
 stages and [10 — Testing Strategy](10-testing-strategy.md) for publication

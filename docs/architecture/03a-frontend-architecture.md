@@ -1,8 +1,10 @@
 # 03a — Browser Application Architecture
 
 > **Status:** Accepted target architecture
-> **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
+> **Decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
 > **Role:** Primary runtime component view
+> **Experience authority:** [SeaRise Flight](../product/Mock/SeaRise-Flight.html)
+> and its [design contract](../product/Mock/DESIGN.md)
 
 ## Goals and constraints
 
@@ -11,7 +13,7 @@ request-time application service. It must:
 
 - search European settlements locally and privately;
 - assess a coordinate from immutable, pinned data artifacts;
-- preserve exactly five scientifically meaningful result states;
+- preserve exactly four scientifically meaningful result states;
 - keep location, scenario, horizon, layer, legend, methodology, and release in
   sync;
 - remain useful after the core resources have been cached;
@@ -36,6 +38,23 @@ Vite emits static HTML, CSS, JavaScript, worker, and service-worker assets.
 There are no server components, server actions, SSR runtime, or API routes.
 Both routes must provide meaningful document titles, landmarks, and fallback
 content before JavaScript initialization.
+
+## UI composition contract
+
+The runtime implements the active canonical Flight visual and interaction
+reference. Component boundaries, lazy loading, and scientific anti-corruption
+layers must preserve its editorial map-first composition, information
+hierarchy, dominant search entry, flight/arrival interaction character,
+layered result panel, visible controls, progressive evidence disclosure, and
+responsive behavior. Technical architecture is not permission to replace the
+experience with a generic dashboard or disconnected map and form.
+
+ADR-024 replaces only invalid scientific semantics. The mock's two binary
+exposure cards become one `ProjectionAvailable` presentation; unavailable and
+out-of-scope states map to `DataUnavailable` and `OutOfScope`; and the missing
+`UnsupportedGeography` state is added. Terrain comparison, modeled-water/flood
+meaning, binary exposure, and property claims are never implemented. The
+surrounding visual structure and interaction character remain authoritative.
 
 ## Logical component structure
 
@@ -144,6 +163,15 @@ ID mismatch is a technical startup error. The application must retain the
 shell, explain the problem, and provide a retry; it must not substitute an
 artifact from another release.
 
+The implemented `ManifestRepository` compiles the release v1 JSON Schemas,
+then applies identity, disposition, canonical 3 × 3 matrix, reference-role,
+media-type, path, and origin checks. It returns a deeply immutable
+`ReleaseContext`; feature code receives resolved artifact URLs and never
+constructs provider/storage paths. Generated TypeScript contracts are checked
+against the schemas on every static-target lint run. Fetch, range, decode,
+integrity, unsupported-browser, abort, schema, and identity failures form a
+separate exhaustive technical-error vocabulary.
+
 ## Search subsystem
 
 `SettlementSearch` communicates with a dedicated Web Worker through a small
@@ -151,13 +179,15 @@ typed protocol:
 
 ```typescript
 type SearchWorkerRequest =
-  | { type: 'initialize'; releaseId: string; coreUrl: string; coastalUrl: string }
-  | { type: 'query'; token: number; text: string; limit: number };
+  | { kind: 'initialize'; token: number; authority: SearchShardAuthority }
+  | { kind: 'load-shard'; token: number; authority: SearchShardAuthority }
+  | { kind: 'query'; token: number; query: string }
+  | { kind: 'terminate'; token: number };
 
 type SearchWorkerResponse =
-  | { type: 'ready'; shard: 'core' | 'coastal' }
-  | { type: 'results'; token: number; items: Place[] }
-  | { type: 'error'; token?: number; code: SearchErrorCode };
+  | { kind: 'ready'; token: number; shardId: SearchShardId; durationMilliseconds: number }
+  | { kind: 'results'; token: number; results: RankedSearchResult[]; readyShards: SearchShardId[] }
+  | { kind: 'error'; token: number; error: TechnicalError };
 ```
 
 The core shard becomes searchable first. Coastal results merge deterministically
@@ -169,6 +199,12 @@ Queries are debounced only to reduce unnecessary worker messages, not to make a
 network call. The client applies a monotonically increasing token and ignores a
 response for any earlier query. Country and first-level administration remain
 visible for duplicate names, and all candidates are keyboard navigable.
+
+The implemented static target verifies each shard's exact release-authorized
+transport bytes before decoding. Identity JSON is parsed directly; Brotli
+objects use a pinned decoder loaded lazily inside the Worker. Raw query text is
+memory-only and never enters URLs, request bodies, storage, caches, logs, or
+analytics. See the [static settlement search runbook](../operations/static-settlement-search.md).
 
 ## Assessment engine
 
@@ -268,12 +304,38 @@ Map clicks may refine a selected location. They use the same assessment engine
 as settlement selections and must not create a second implementation of the
 domain flow.
 
+The Phase 2 implementation keeps `MapExplorer` and the MapLibre/PMTiles adapter
+as separate dynamic entries. `MapExplorer` receives a controlled `Selection`
+and `SelectionCommand`; only the visual quantile band is local presentation
+state. `MapLayerResolver` can return only the active dataset's `visual-only`
+PMTiles URL from `ReleaseContext`. Optional support/coastal boundary roles are
+discovered from that same context when present. The committed synthetic fixture
+currently contains the nine projection archives but no separate boundary
+artifacts, so its grid-cell outlines and manifest extent are the only boundary
+context shown in clean-clone tests.
+
 ## Offline and cache behaviour
 
-The service worker uses release-scoped cache names. It precaches the app shell
-and minimal config, caches the core search index after use, and caches the
-coastal shard and geospatial ranges opportunistically. Cache cleanup may delete
-old releases only when no active client uses them.
+The service worker uses release-scoped cache names. Cache Storage holds only
+byte-verified complete shell and approved release resources. Bounded IndexedDB
+may hold only complete integrity-authorized analysis COG chunks. PMTiles stays
+network-only and visual-only with a `no-store` caching policy; it cannot enter
+Cache Storage, IndexedDB, or the session-memory range store without the
+separate promotion contract required by ADR-026. Cache cleanup may delete old
+releases only after exact fresh-boot authority is reconciled and the current
+worker proves that no active, unknown, or unresponsive client uses them. The
+active complete pair and immediately previous complete pair are retained;
+private Candidate sessions never enter production retention.
+
+The production shell inventory is generated from the recursive Vite main
+graph and exact references in emitted JavaScript and CSS. It includes lazy
+`MapExplorer` and `map-runtime` modules, their styles, the settlement-search
+Worker, its Brotli WASM decoder, fonts, and scientific decoder chunks. Build
+inspection independently reconstructs the inventory and rejects drift.
+Release manifests and the exact COG range-integrity bootstrap remain sealed
+members. Visual PMTiles and analysis COG payloads are excluded: search shards
+and only the COG ranges used by an accepted assessment enter their dedicated
+verified stores when requested.
 
 The UI distinguishes:
 

@@ -27,6 +27,8 @@ def select_suites(
 ) -> list[dict[str, Any]]:
     selected = []
     for suite in inventory["suites"]:
+        if suite.get("status") != "active":
+            continue
         if any(
             path_matches(path, pattern)
             for path in changed_paths
@@ -41,7 +43,8 @@ def fast_local_suites(suites: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         suite
         for suite in suites
-        if suite["execution"]["tier"] == "fast"
+        if suite.get("status") == "active"
+        and suite["execution"]["tier"] == "fast"
         and not suite["execution"]["requiresDocker"]
         and not suite["execution"]["requiresCredentials"]
         and suite["commands"]["focused"] is not None
@@ -60,6 +63,19 @@ def _git_changed_paths(base_ref: str) -> list[str]:
 
 
 def _run_commands(suites: Sequence[dict[str, Any]]) -> int:
+    non_active = [
+        str(suite.get("id", "<missing-id>"))
+        for suite in suites
+        if suite.get("status") != "active"
+    ]
+    if non_active:
+        print(
+            "ERROR: refusing to run non-active or malformed suites: "
+            + ", ".join(non_active),
+            flush=True,
+        )
+        return 2
+
     commands_seen: set[str] = set()
     for suite in suites:
         command = suite["commands"]["focused"]

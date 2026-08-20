@@ -113,8 +113,9 @@ def _raise_open_error(label: str, exc: OSError) -> None:
     raise SpatialAssetAuthorityError(f"cannot open {label}: {exc}") from exc
 
 
-def _note_cleanup(error: object, cleanup: object) -> None:
-    getattr(error, "add_note", lambda _: None)(f"spatial cleanup failed closed: {cleanup}")
+def _note_cleanup(error: BaseException, cleanup: object) -> None:
+    if sys.version_info >= (3, 11):
+        error.add_note(f"spatial cleanup failed closed: {cleanup}")  # type: ignore[attr-defined]
 
 
 def _close(descriptor: int, error: BaseException | None = None) -> None:

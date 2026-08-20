@@ -1,8 +1,8 @@
 # Design Direction: The Flight Experience
 
-> **Status:** Active visual direction
+> **Status:** Active canonical visual and interaction direction
 >
-> **Canonical interactive mock:** [SeaRise Flight](SeaRise-Flight.html)
+> **Canonical interactive reference:** [SeaRise Flight](SeaRise-Flight.html)
 >
 > **Behaviour authority:** [PRD](../PRD.md)
 >
@@ -10,10 +10,30 @@
 >
 > **Architecture authority:** [ADR-021](../../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
-The self-contained `SeaRise-Flight.html` export replaces the previous multi-page
-mock set. It is the visual and interaction reference for the static frontend,
-but it does not override the PRD, content guidelines, methodology, release
-contracts, accessibility requirements, or architecture fitness functions.
+The self-contained `SeaRise-Flight.html` export replaces the previous
+multi-page mock set and is the visual and interaction contract for the static
+frontend. Implementations preserve its layout, information hierarchy,
+map-first composition, controls, responsive behavior, and interaction
+character. The mock is not executable production code and does not override
+the PRD, Content Guidelines, release contracts, accessibility requirements, or
+accepted architecture and scientific decisions.
+
+## Authority split
+
+Flight is authoritative for experience design. ADR-024 is authoritative for
+scientific meaning. The mock's binary exposure, terrain comparison, modeled
+water/flood scene, and related hazard or property claims are scientifically
+invalid and must be replaced through the explicit mapping below. That mapping
+does not authorize redesigning or flattening the surrounding experience.
+
+| Mock content | Required static-target treatment |
+|---|---|
+| `exposed` and `notexposed` result cards | One `ProjectionAvailable` presentation with q0.167, q0.5, q0.833, metres, baseline, source-grid identity and distance, limitations, and disclaimer. |
+| `unavailable` | `DataUnavailable`, preserving nodata/no-substitution meaning and adding the inclusive 100 km reason. |
+| `outofscope` | `OutOfScope`, preserving the coastal product-boundary meaning without implying safety. |
+| Missing outside-Europe state | Add `UnsupportedGeography` as the fourth normal outcome. |
+| Incomplete artifact and delivery simulations | Keep as technical failures outside the four scientific outcomes. |
+| Modeled-water movement, exposure legend, terrain threshold, and flood-like captions | Preserve only the cinematic/map-first composition and motion character; replace scientific meaning with visual-only AR6 projection context and textual equivalents. |
 
 ## 1. Creative north star
 
@@ -31,8 +51,9 @@ The experience should feel:
 - scientifically cautious rather than predictive;
 - technically sophisticated without exposing infrastructure jargon by default.
 
-The flight animation is visual context only. Exact assessment continues to come
-from the classified analysis artifact declared by the active immutable release.
+The flight animation is visual context only. Exact assessment comes from the
+nearest native AR6 source-grid location in the analysis COG declared by the
+active immutable release.
 
 ## 2. Canonical composition
 

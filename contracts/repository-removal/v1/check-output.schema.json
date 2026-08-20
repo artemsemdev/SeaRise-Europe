@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v1/check-output.schema.json",
+  "title": "SeaRise Europe repository-removal check output v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "auditedCommit", "checkId", "command", "result"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "auditedCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "checkId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "command": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "result": { "const": "passed" }
+  }
+}

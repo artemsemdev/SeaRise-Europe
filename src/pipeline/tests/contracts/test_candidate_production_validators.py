@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import inspect
 import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from searise_pipeline.candidate_completeness import production_validators
 from searise_pipeline.candidate_completeness.production_binary_validators import (
     BoundaryQaAuthority,
     ProductionBinaryQaAuthorities,
@@ -13,6 +17,7 @@ from searise_pipeline.candidate_completeness.production_binary_validators import
     SettlementQaAuthority,
 )
 from searise_pipeline.candidate_completeness.production_validators import (
+    PRODUCTION_VALIDATOR_IDS,
     ProductionBuildProvenanceAuthority,
     ProductionQaAuthorities,
     production_json_validator_registry,
@@ -23,6 +28,7 @@ from searise_pipeline.candidate_completeness.qa_dispatch import (
     QaValidationRequest,
 )
 from searise_pipeline.candidate_completeness.qa_matrix import ArtifactSelector
+from searise_pipeline.candidate_completeness.validator import CandidateContractError
 
 ROOT = Path(__file__).resolve().parents[4]
 FIXTURES = ROOT / "contracts/release/v1/fixtures/valid"
@@ -53,6 +59,39 @@ def _projection_source() -> SimpleNamespace:
                 member_sha256="5" * 63 + "6",
             ),
         ),
+    )
+
+
+def _authorities(tmp_path: Path) -> ProductionQaAuthorities:
+    return ProductionQaAuthorities(
+        binary=ProductionBinaryQaAuthorities(
+            projection=ProjectionQaAuthority(
+                source=object(),  # type: ignore[arg-type]
+                contract={},
+                tippecanoe=tmp_path / "tippecanoe",
+                decode=tmp_path / "decode",
+                pmtiles=tmp_path / "pmtiles",
+                tippecanoe_source=tmp_path / "tippecanoe-source",
+                tippecanoe_build_receipt=tmp_path / "tippecanoe-receipt",
+                pmtiles_distribution_asset=tmp_path / "pmtiles-asset",
+                platform="test-platform",
+            ),
+            boundary=BoundaryQaAuthority(
+                contract={},
+                support_geojson=tmp_path / "support.geojson",
+                coastal_geojson=tmp_path / "coastal.geojson",
+                tools=object(),  # type: ignore[arg-type]
+            ),
+            settlement=SettlementQaAuthority(
+                spatial_database=tmp_path / "spatial.duckdb",
+                spatial_receipt=tmp_path / "spatial.receipt.json",
+                work_directory=tmp_path / "spatial-work",
+            ),
+        ),
+        brotli=tmp_path / "brotli",
+        brotli_sha256="0" * 64,
+        work_directory=tmp_path / "search-work",
+        provenance=_provenance(),
     )
 
 
@@ -369,40 +408,48 @@ def test_stac_catalog_and_collection_bind_the_exact_graph(tmp_path: Path) -> Non
 
 
 def test_production_dispatcher_covers_the_complete_closed_matrix(tmp_path: Path) -> None:
-    binary = ProductionBinaryQaAuthorities(
-        projection=ProjectionQaAuthority(
-            source=object(),  # type: ignore[arg-type]
-            contract={},
-            tippecanoe=tmp_path / "tippecanoe",
-            decode=tmp_path / "decode",
-            pmtiles=tmp_path / "pmtiles",
-            tippecanoe_source=tmp_path / "tippecanoe-source",
-            tippecanoe_build_receipt=tmp_path / "tippecanoe-receipt",
-            pmtiles_distribution_asset=tmp_path / "pmtiles-asset",
-            platform="test-platform",
-        ),
-        boundary=BoundaryQaAuthority(
-            contract={},
-            support_geojson=tmp_path / "support.geojson",
-            coastal_geojson=tmp_path / "coastal.geojson",
-            tools=object(),  # type: ignore[arg-type]
-        ),
-        settlement=SettlementQaAuthority(
-            spatial_database=tmp_path / "spatial.duckdb",
-            spatial_receipt=tmp_path / "spatial.receipt.json",
-            work_directory=tmp_path / "spatial-work",
-        ),
-    )
-    dispatcher = production_validator_dispatcher(
-        ProductionQaAuthorities(
-            binary=binary,
-            brotli=tmp_path / "brotli",
-            brotli_sha256="0" * 64,
-            work_directory=tmp_path / "search-work",
-            provenance=_provenance(),
-        )
-    )
-    assert len(dispatcher.validator_ids) == 23
+    dispatcher = production_validator_dispatcher(_authorities(tmp_path))
+    assert set(dispatcher.validator_ids) == PRODUCTION_VALIDATOR_IDS
     assert set(dispatcher.validator_ids) == {
         route.validator_id for route in dispatcher.matrix.routes
     }
+
+
+def test_production_dispatcher_has_no_runtime_registry_input() -> None:
+    assert production_validator_dispatcher.__module__ == (
+        "searise_pipeline.candidate_completeness.production_validators"
+    )
+    assert tuple(inspect.signature(production_validator_dispatcher).parameters) == (
+        "authorities",
+    )
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    ["searise_pipeline.domain.result_state", "external.runtime.plugin"],
+)
+def test_production_dispatcher_rejects_uncommitted_validator_modules(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    module_name: str,
+) -> None:
+    original = production_validators.production_json_validator_registry
+
+    def injected_registry(**kwargs: object):  # type: ignore[no-untyped-def]
+        registry = original(**kwargs)
+
+        def injected(_request: QaValidationRequest):  # type: ignore[no-untyped-def]
+            return None
+
+        injected.__module__ = module_name
+        registry["release.public-contract.scenario-config"] = injected
+        return registry
+
+    monkeypatch.setattr(
+        production_validators,
+        "production_json_validator_registry",
+        injected_registry,
+    )
+
+    with pytest.raises(CandidateContractError, match="validators are untrusted"):
+        production_validator_dispatcher(_authorities(tmp_path))

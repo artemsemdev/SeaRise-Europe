@@ -20,7 +20,7 @@ class ImmutableDependencyTests(unittest.TestCase):
             encoding="utf-8"
         )
         changes_job = workflow.split("  changes:\n", maxsplit=1)[1].split(
-            "\n  frontend:", maxsplit=1
+            "\n  web:", maxsplit=1
         )[0]
 
         self.assertNotIn("\n    if:", changes_job)
@@ -32,11 +32,7 @@ class ImmutableDependencyTests(unittest.TestCase):
             changes_job.index("Validate immutable third-party dependencies"),
             changes_job.index("id: route"),
         )
-        for path in (
-            ".github/workflows/codeql.yml",
-            "src/api/Dockerfile",
-            "docker-compose.yml",
-        ):
+        for path in (".github/workflows/codeql.yml",):
             with self.subTest(path=path):
                 self.assertTrue(any(classify_paths([path]).values()))
 

@@ -4,7 +4,460 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added an isolated issue #70 repository-removal authority profile and adapter
+  that reuses the reviewed v2 lifecycle engine without rewriting the completed
+  issue #72 chain. Future Next.js removal approval must bind the dedicated
+  contract directory, adapter, and preserved issue #72 decision artifacts.
+
+- Added fail-closed static target, repository-readiness, final-repository, and
+  built-output gates for legacy runtime dependencies and both unversioned and
+  `/v1/` dynamic endpoints. Historical terminology exceptions now require an
+  exact committed path, Git blob, and rule instead of directory exemptions;
+  retained build/test tooling and build-plane containers remain explicitly
+  classified without authorizing repository deletion. Token-free legacy paths,
+  alternate Compose names, JSON/binary build mutations, all authorization
+  channels, current canonical Flight bytes, and owner-approved final authority
+  now fail closed with match-purpose exceptions only. The two self-describing
+  gate-policy files are additionally bound to their owner-approved Git blobs;
+  repository modes bind all exact bytes and Git modes in the current
+  14-component, 57-input v2 profile. Repository and build traversal rejects
+  symlinks before reading them, while preapproval binds current historical
+  blobs without claiming the final post-gate audited commit prematurely. The
+  final gate also requires the trusted approval validator to advertise and run
+  exact owner-comment verification before accepting the removal chain.
+
+- Added clean-clone generic static-host and Chromium Lighthouse gates. The
+  production build now emits deterministic Brotli/gzip sidecars, validates
+  both static routes, build/release identity, assets, static 404 behavior, and
+  zero dynamic legacy endpoint handling, and requires at least 90 in all four
+  Lighthouse mobile categories across three isolated audits. Initial CSS is
+  embedded, the two initial Flight fonts are preloaded, scientific runtime
+  and release bootstrap loading are deferred past the initial render, and
+  generated delivery sidecars cannot expand the exact manifest-authorized
+  release inventory. Lighthouse
+  and generic-host dependencies use a separate audited quality-tool lock so
+  immutable Phase 1 npm and PMTiles evidence remains unchanged.
+
+- Added a versioned static-browser supply-chain transition profile that locks
+  the retained web npm, Python, settlement, scientific, build-plane, signing,
+  and SBOM target authorities while honestly recording the Azure/PostGIS and
+  CI/CodeQL/container legacy selectors owned by issues #70, #71, and #72.
+  Format-aware PEP 508 dependency parsing, exact contributor parity, semantic
+  workflow checks, and tracked legacy-path absence prevent premature activation. Phase 1
+  v1 evidence remains unchanged as historical audit material and is now
+  validated as a complete 48-file subtree by recomputing its Git tree and
+  executing a v2-vendored, SHA-256- and Git-blob-bound historical validator
+  rather than code from the mutable Phase 2 checkout. The gate verifies and
+  materializes current-tree inputs without requiring Git history or a network
+  fetch, and binds every outside-v1 input plus the vendored validator to its
+  reviewed Git executable mode. Current npm/pnpm/Yarn, workflow-job, local-action,
+  container/Compose, Pipenv/Poetry/uv/requirements, native-tool, SBOM, and
+  scoped-schema authorities remain exact and fail closed; workflow parsing
+  derives consistent jobs indentation, recognizes quoted or spaced keys, and
+  rejects duplicate job identities. Retained Phase 1 paths are resolved beneath
+  the repository without symlink traversal.
+
+- Added a metadata-only Phase 2 isolation gate proving private Candidate-v7
+  paths are ignored, untracked, absent from CI workflows, and absent from the
+  static output inventory without reading Candidate-v7 or TAR bytes.
+
+- Added versioned repository-removal inventory, evidence-receipt, and owner-
+  decision schemas. The approval chain is bound to one audited commit and two
+  SHA-256 digests, requires replacement evidence for every Phase 2 deletion,
+  and cannot authorize Candidate-v7 publication or external-resource mutation.
+  Canonical #70/#71/#72 scope, issue-owned semantic test retirement, exact
+  replacement-suite/target-path check coverage, structured committed command
+  outputs, and live Issue #68 owner-comment verification now fail closed.
+  Per-issue allowed/required replacement suites, inventoried command identity,
+  and glob-aware suite-source ownership prevent consistently relabelled or
+  unrelated evidence from authorizing deletion.
+
+- Added a production-like Chromium browser journey that rotates sealed
+  static deployments from A to B to C without forced activation, proves the
+  close-and-reopen update contract, retains only the active and immediately
+  previous generations, and reloads a warmed assessment offline. Terminal
+  update intents now roll forward only to a distinct verified candidate, and
+  exact-pair cleanup includes precache-addressed service-worker shell caches.
+  WebKit passed the same local journey as optional evidence; Firefox natural
+  waiting-worker activation remains explicitly deferred and is not a support
+  claim or required CI gate.
+
+- Added a fail-closed static-output inventory gate derived from the exact Vite,
+  embedded shell-precache, and release manifests. Production builds now reject
+  every unlisted file, including TAR/archive contamination, and scan emitted
+  code for legacy runtime endpoint requests without accessing private Candidate
+  files.
+
+- Added production browser retention after exact fresh-boot reconciliation.
+  The current worker now supplies the cleanup census under exact-pair Web
+  Locks; active, unknown, or unresponsive clients fail closed, while only
+  unleased `cleanup-pending` pairs older than the active and immediately
+  previous complete pair are removed. Partial deletion remains idempotently
+  retryable and is exposed as technical state, never as a scientific outcome.
+  Private Candidate sessions remain memory-only and do not create the
+  retention coordinator.
+
+- Bound every persistent browser lease to the service worker's authenticated
+  `Client.id` instead of a caller-supplied tab identity. The worker now mints
+  expiry, refuses cross-tab heartbeat and release attempts, challenges a stable
+  two-pass window-client census before pair cleanup, and keeps the durable
+  cleanup fence as the final race-prevention authority. Private Candidate
+  sessions still create no worker authority, lease, census listener, timer, or
+  persistent record.
+
+- Added a conservative static-host update coordinator that verifies a sealed
+  waiting candidate and records an explicit one-shot close-and-reopen intent
+  without activating a worker, reloading, or changing current authority. A
+  subsequent fresh boot must prove the exact confirmed controller identity;
+  immutable launch-boot pinning prevents same-page finalization, while
+  internally minted cryptographic per-instance entropy and generation binding
+  prevent transition collisions, stale-token reuse, async state overwrite, and
+  replay. Durable intent publication is two-phase: ambiguous or cancelled writes
+  remain non-consumable `PENDING` evidence, and only a same-generation,
+  abort-bound transaction can arm an intent for one-shot consumption. Browser
+  rollback receives recoverable `mutation-busy` while publication is active,
+  then on retry must durably tombstone the exact pending or armed intent before
+  reporting `deployment-required`; tombstone failure preserves and reports the
+  actual durable authority. Bounded abort-aware adapter deadlines fail closed
+  as `adapter-stalled` if a port never acknowledges settlement. Git/deployment
+  history, not browser storage, remains the application rollback authority.
+  Waiting workers now contribute only their build-sealed pair and precache
+  identity; runtime resource-plan and receipt authority is recorded only after
+  exact active-pair admission. A fresh boot reconciles an armed intent after
+  its actual controlling worker is challenged and matches admitted resources,
+  consumes an exact match once, tombstones a mismatch, and removes malformed
+  durable records without claiming activation.
+
+- Added a per-document production lease for the exact active app/release pair.
+  Public static tabs acquire before the resource router becomes available,
+  renew every 30 seconds with a 120-second expiry, isolate concurrent tabs,
+  fail closed after a renewal error, drain active work before orderly release,
+  reject use after exact expiry, preserve live leases across back-forward-cache
+  page transitions, and rotate active/previous protection atomically with
+  initial acquisition.
+  Private Candidate sessions remain memory-only and create no lease, timer,
+  lifecycle listener, or persistent storage activity.
+
+- Added a canonical Flight offline chip driven by exact accepted release
+  inventory, plus visible connection, storage, and safe-update notices in the
+  existing alert slot with explicit retry/activation actions. Visual PMTiles
+  remain network-only, online completion does not add header chrome, and
+  generic browser connectivity never authorizes an offline claim. Exact
+  interaction generations prevent one location's cached assessment from
+  authorizing another location with the same scenario and horizon. Static-host
+  coordinator state and actions now flow through the production browser
+  runtime, while pending and failed actions are fenced to the exact capability
+  subject and candidate identity. The canonical chip uses the mock's mint
+  translucent treatment and status dot.
+
+- Added a recursively generated, independently inspected production Flight
+  shell precache covering the Vite main graph, lazy map modules and styles,
+  settlement-search Worker, Brotli WASM decoder, fonts, and dynamic scientific
+  decoder chunks. A production Chromium journey now warms the exact shell,
+  search shards, and one assessment, removes the network, reloads the complete
+  app, repeats search and the cached result, and proves an uncached COG remains
+  `connection-required`; PMTiles and the nine COG payloads are not precached.
+
+- Added a versioned exact-pair lifecycle repository for verified browser
+  storage. It binds shell bootstrap, core resource-plan, and admission-receipt
+  SHA-256 identities; retains the active and immediately previous complete
+  pair; inventories pair-scoped Cache Storage, ranges, receipts, and leases;
+  and performs lease-gated cleanup in receipt/authority, cache/range, then
+  lifecycle-record order without persisting interaction data.
+
+- Added the final verified browser resource router: exact public whole
+  resources are admitted only when requested through receipt-gated Cache
+  Storage, and only COG chunks needed by the selected read use no-store
+  requests with exact immutable public HEAD/206 authority and receipt-gated
+  range reads. Private
+  Candidates remain memory-only, and visual PMTiles remain network-only and
+  outside every application resource store. The COG reader now accepts an
+  injected range transport without changing scientific lookup behavior.
+
+- Added one exact app/release-bound range-integrity bootstrap resource to the
+  byte-sealed service-worker precache. Warm persistent reloads verify and read
+  that artifact with zero network fallback, while explicit private Candidate
+  validation routes all nine lookups and its technical-failure probe through
+  one memory-only production resource router.
+
+- Added receipt-gated coordinated browser storage primitives with exact
+  verified-release route hashes, one release-disposition storage profile,
+  receipt-last logical publication, cross-context exclusive admission,
+  store-minted operation ownership, cancellation-aware conditional rollback,
+  and a bounded memory-only complete-resource adapter for private Candidates. Physical
+  crash orphans are non-authoritative until exact readback and receipt
+  publication; visual PMTiles remain outside every persistent and memory
+  resource store.
+
+- Added a deterministic verified-release resource plan that promotes only
+  exact COG integrity chunks to range authority, routes approved complete
+  resources to pair-scoped storage, keeps private and local candidates in
+  memory, and leaves visual PMTiles network-only with `no-store`.
+
+- Added a release-pinned root service worker shell with a generated minimal
+  app/manifest/range-integrity bootstrap precache, delayed public-static registration, private Candidate
+  refusal, conservative lifecycle behavior, and exact worker identity checks.
+
+- Added a bounded authoritative IndexedDB range store for release-authorized
+  COG chunks, with exact app/release/artifact isolation, verified containing
+  slices, atomic accounting and eviction, active/previous and lease protection,
+  corruption quarantine, atomic multi-chunk admission, and memory-only
+  private-candidate handling. Visual-only PMTiles remain network-only and are
+  rejected by every range-store implementation.
+
+- Added versioned release-scoped offline authority contracts for whole and
+  authorized range resources, with fail-closed private-candidate persistence
+  and an exact privacy allowlist for durable records.
+
+- Added independently validated offline capability, storage-budget, lease,
+  update, cleanup, rollback, worker-protocol, and technical-failure contracts.
+
+- Added a release-scoped complete-resource cache adapter with byte verification
+  before admission and after readback, staged promotion, corruption quarantine,
+  private-data exclusion, and aggregate-only availability evidence.
+- Added target-owned production settlement-search browser evidence with exact
+  manifest/receipt/shard/query bindings, private request allowlisting, retained
+  responsiveness and latency distributions, explicit browser budgets,
+  hash-bound nonclaim validation, and durable no-overwrite report publication.
+
+- Added the static target's production settlement-search shard builder. It
+  consumes the exact Python-validated projection authority, emits deterministic
+  v4 code-point-trie Brotli shards and a release/source/hash-bound receipt, and
+  publishes without overwrite through fail-closed atomic file promotion.
+
+- Added production-static browser journey evidence for all four ADR-024
+  outcomes and all nine scenario/horizon projections, including exact COG
+  values, release-scoped PMTiles identity, keyboard and reduced-motion flows,
+  URL restoration, stale-operation races, recoverable delivery failure, and
+  fail-closed range-integrity corruption. Screenshots and the exact projection
+  matrix are retained only as short-lived CI artifacts.
+
+- Added an explicitly browser-only synthetic `DataUnavailable` control at
+  62°N, 44°E. The isolated v2 fixture polygon drives the real static geography
+  and exact COG lookup chain, while deterministic gates prove all 27 source
+  bands are nodata, prove the control is disjoint from audited geometry, pin
+  cross-platform Arrow schemas, and keep the sealed v1 release unchanged.
+
+### Changed
+
+- Activated the 13-component, 57-input static-target supply-chain profile after
+  the final repository-only legacy removal. Active contributor, architecture,
+  delivery, and operations guidance now describes the same static-only
+  filesystem and clean-clone workflow.
+
+- The issue #70 authority adapter can now atomically bind an explicitly planned
+  legacy baseline from `removalGate: null` to issue #70 before retirement, but
+  only when the same exact plan selects its owning suite and that suite already
+  declares `replacementGate.issue == 70`. Cross-suite and unlisted baseline
+  promotion remains fail-closed; no legacy source is removed by this change.
+
+- Issue #70 plans can bind the exact named CI lifecycle step that hands
+  validation from the completed issue #72 chain to the issue #70 adapter. The
+  handoff is restricted to `.github/workflows/ci.yml`, requires an accompanying
+  structural workflow operation, and rebinds the static-target workflow hash.
+
+- Corrected the test-retirement inventory so executable legacy frontend
+  Python tests cannot escape discovery, removal-bound suites point to explicit
+  stronger static-target evidence, and PostGIS/blob-seed changes route through
+  active legacy characterization gates before repository deletion.
+
+- Routed production geography, methodology, settlement-index, and exact COG
+  reads through the verified resource router. Search shard bytes are verified
+  and admitted on the main thread before transfer to the Web Worker, persistent
+  adapters require service-worker identity plus Cache Storage, IndexedDB, and
+  Web Locks, and private Candidate sessions use memory-only adapters.
+
+- Replaced the URL-only application-shell precache with one immutable
+  per-resource byte authority. Service-worker installation now verifies the
+  exact path, media type, byte size, and SHA-256 of both network responses and
+  existing candidate-cache entries before installation can complete, and
+  removes only that incomplete candidate cache on failure. Controlled shell
+  reads repeat the same verification, including any missing-entry network
+  recovery, so post-install cache mutation cannot be served.
+
+- Sealed Vite, the browser runtime, the service worker, build inspection, and
+  explicit local Candidate mode to one immutable build-identity object. Static
+  builds now fail closed on consumer mismatches, while private Candidate mode
+  remains local, session-only, and excluded from service-worker persistence.
+
+- Bound the complete-resource scenario configuration to its exact release
+  artifact identity, canonical URL path, and media type. The versioned v2
+  offline capability protocol now carries its interaction subject and treats
+  each visual PMTiles map as explicitly network-only, so a map can never claim
+  `available-offline`; the original v1 wire contract remains unchanged.
+
+- Routed every visual PMTiles byte request through a supported custom PMTiles
+  `Source` that enforces the exact release URL, manifest byte size and SHA-bound
+  strong ETag, bounded Range and short-archive retry
+  semantics, `Request.cache = no-store`, and a `no-store` response. PMTiles
+  remains visual-only and is excluded from Cache Storage, IndexedDB, session
+  storage, and the service-worker precache; Vite preview now serves PMTiles as
+  `no-store` through one portable delivery policy while retaining immutable
+  caching for analysis COGs and other release artifacts.
+
+- Accepted ADR-026 after real Chromium, Firefox, and WebKit measurements showed
+  that Cache Storage rejects `206` responses and range requests can match a
+  cached whole `200`. Verified complete resources use Cache Storage, while
+  only integrity-authorized COG chunks may use bounded IndexedDB. PMTiles stays
+  network-only, visual-only, and `no-store` until a separate promotion contract
+  supplies authoritative interval digests; the original browser observations
+  remain unchanged.
+- Relocated the reusable AR6 Chromium delivery measurement harness into the
+  static `src/web` workspace and rebound its exact release contract to the
+  root npm lockfile without changing lookup values or engineering budgets.
+  The committed offline source fixture is deterministically rebound to that
+  contract with its previous identities recorded and no verified-archive or
+  scientific-release capability granted to the migration.
+
+- Relocated the permanent PMTiles browser and deterministic render evidence
+  harnesses into the static `src/web` workspace and bound them to the root npm
+  lockfile, without changing the approved scientific inputs or rendered PNG
+  bytes.
+
+- Made test-suite retirement an explicit, fail-closed inventory lifecycle:
+  active suites alone own, route, and execute tests, while retired suite and
+  baseline records require an approved removal gate plus replacement evidence
+  and cannot conceal test files that remain on disk.
+
+- Bound the canonical frontend npm SBOM to the static `src/web` workspace in
+  the root lockfile, including the Flight icon dependency and its exact
+  registry integrity, instead of retaining the superseded Next.js lock as the
+  active frontend authority.
+
+- Confirmed the SeaRise Flight mock as the active canonical visual and
+  interaction reference while adding an explicit ADR-024 correction map and a
+  fail-closed annotation gate. Its layout, hierarchy, map-first composition,
+  controls, responsive behavior, and interaction character remain required;
+  binary exposure, terrain/flood/property meaning, and other prohibited claims
+  remain excluded from the target application and built assets.
+
+### Removed
+
+- Removed the superseded Next.js and ASP.NET runtimes, request-time PostGIS,
+  TiTiler, runtime geocoder and Azurite/blob-seed integrations, aggregate
+  Compose stack, obsolete deployment entrypoints, and their retired CI jobs.
+  Immutable scientific and Phase 1 evidence, deterministic offline build code,
+  local-only candidate documentation, and Git-history rollback are retained.
+
+### Security
+
+- Bound the signed v1 test-inventory transition to a complete, live-owner-
+  verified v2 removal receipt. Inventory drift is accepted only when the v1
+  hash matches the exact v2 before-state and committed bytes match its approved
+  after-state; missing, invalid, or altered authority continues to fail closed.
+
+- Pinned private overlay cleanup to an open directory identity so immediate
+  inode reuse cannot redirect recursive deletion to a replacement directory.
+
+- Enforced an exact static-document Content Security Policy and `no-referrer`
+  policy on both browser entry routes, with browser/build gates for blocked
+  unlisted origins and the one optional OpenFreeMap origin. Manifest schemas
+  are now compiled ahead of time so runtime validation needs no `unsafe-eval`;
+  deployment retains responsibility for the response-only `frame-ancestors`
+  protection.
+
+- Pinned the legacy API test container dependency graph to SSH.NET 2026.0.0,
+  removing the high-severity recursive SCP path-traversal advisory from the
+  locked restore while that test runtime awaits Phase 2 removal.
+
 ### Fixed
+
+- Preserved Phase 1 dependency-inventory verification after legacy deletion by
+  materializing outside-v1 inputs from their exact reviewed Git commit instead
+  of requiring legacy paths in the current tree. Full-history, commit, tree,
+  path, blob, mode, and hash checks now fail closed without lazy fetching or
+  restoring legacy files into the checkout. Protected finalization now checks
+  out full history before invoking that authority.
+
+- Kept the caller's current checkout as the release-retention output isolation
+  boundary while using the materialized Phase 1 tree only for historical
+  inventory and SBOM validation.
+
+- Allowed content validation to scan lifecycle builds staged outside the Git
+  checkout while retaining strict containment and symlink rejection within the
+  selected build root.
+- Kept mobile Flight capability/update alerts below the optional basemap control
+  and made the browser technical-failure journey wait for its exact query-free
+  release COG `HEAD` interception before injecting the transient failure.
+
+- Bound one-shot coordinated-admission proofs and accepted receipt gates to
+  their exact issuing and consuming storage profiles. Cross-profile
+  Candidate/public reads, publication, and deletion now fail before any
+  persistent browser API call.
+
+- Bound the committed Brotli settlement indexes to their exact manifest IDs,
+  roles, paths, and search-index media type so strict static preview can load
+  them without allowing generic `.br` MIME spoofing. Verified transport
+  integrity failures now retain their technical classification, recoverable
+  core-index failures replace the failed worker before retry, and the fallback
+  COG transport accepts the release contract's exact immutable public cache
+  authority while preserving private `no-store` delivery.
+
+- Bound every persisted COG range to an immutable trusted identity catalog,
+  isolated lease IDs by app/release pair across the IndexedDB v1-to-v2
+  migration, and made rejected memory protection updates non-mutating.
+  COG-shaped relabeling cannot authorize bytes that are absent from the
+  verified range-index authority.
+
+- Restored the canonical SeaRise Flight landing and result composition across
+  desktop and mobile, with durable same-viewport visual QA evidence, while
+  retaining the corrected ADR-024 scientific outcomes and accessibility flow.
+
+- Corrected Flight search-result announcements, first-selection failure focus,
+  segmented control rows, mobile landing composition, and idle map chrome while
+  keeping assessment and search live regions distinct.
+
+- Aligned the static landing copy with the approved product language and bound
+  its release disclosure to the verified synthetic, private-engineering, or
+  public-promoted disposition instead of hard-coding fixture status.
+
+- Aligned settlement no-match guidance with the approved product copy and
+  corrected active product documentation to identify the implemented static
+  runtime as the sole code baseline.
+
+- Corrected the application live status after terminal projection failures so
+  assistive technology no longer announces that a completed failed operation
+  is still being checked, while any previous accepted outcome remains explicit.
+
+- Made the committed browser release checksum list an exact, canonical view of
+  the manifest artifact inventory. Comments and blank lines can no longer be
+  misread as artifacts, and missing, extra, duplicate, or stale entries fail
+  the deterministic fixture gate.
+
+- Corrected the methodology dialog definitions so `OutOfScope` means inside
+  supported Europe but outside the versioned coastal analysis area, while
+  `UnsupportedGeography` means outside the versioned Europe support geometry.
+
+- Separated the sealed v1 release identity from the deterministic browser
+  overlay identity. The v1 build receipt and provenance remain byte-identical;
+  the overlay now has dedicated versioned derivation evidence with no
+  fabricated run, workflow, platform, timestamp, revision, or SLSA claim, and
+  its acyclicity gate is scoped to the overlay-derived digest graph.
+
+- Bound browser support/coastal classification to a shared twelve-case Shapely
+  parity golden covering exterior and hole boundaries plus epsilon seams. Exact
+  COG reads now cancel uncached post-open range transport only after their last
+  caller leaves, preserve concurrent readers, and gate the inclusive 100 km
+  decision in the production reader.
+
+- Restored complete npm registry URL and SHA-512 integrity metadata for the
+  static browser dependency graph, pinned its scientific readers, and made the
+  dependency inventory fail closed if future registry identities are missing.
+
+- Strengthened static COG delivery validation with a deterministic valid COG
+  whose unchanged image tiles occupy a later fourth range chunk, strict
+  malformed-range rejection, and a production-built same-origin browser lookup
+  that proves CSP-compatible `HEAD`/`206` delivery, later-chunk SHA-256
+  verification, sub-artifact transfer, and scoped cold-versus-cached budgets.
+  CORS headers are inspected separately without claiming public cross-origin
+  browser enforcement or Candidate performance.
+
+- Replaced the cross-port private-candidate harness with one read-only,
+  same-origin loopback binding that derives only `verified: false` local
+  metadata, strictly allowlists immutable files and ranges, and proves the
+  complete ignored Candidate-v7 tree is unchanged after browser testing.
 
 - Bound private real-source candidates to reviewed STAC archive/member lineage,
   an existing Git code revision, the exact local dependency lock, build
@@ -14,15 +467,19 @@ All notable changes to this project will be documented in this file.
   new lock is included in the reviewed dependency inventory and regenerated
   build-plane CycloneDX SBOM.
 
-- Fixed bounded settlement search failing closed on the production europe-core
-  and europe-coastal shards. The fuzzy walk opened every shallow trie subtree
-  regardless of the query, so the multi-script alternate-name index exhausted
-  the traversal-work limit before any result was ranked. Subtrees are now
-  skipped by two admissible edit-distance lower bounds, and the walk is skipped
-  entirely when better-ranked matches already fill the candidate set. Results,
-  ranking, shard bytes, and the 250,000-unit work limit are unchanged.
+- Fixed bounded settlement search failing closed on production-scale core and
+  coastal shards. The browser now searches the canonical sorted entries through
+  compact length and signature-count indexes, applies admissible lower bounds
+  before banded fuzzy distance, and uses direct ordinal-array lookup. Results,
+  ranking, candidate bytes, and the 250,000-unit work limit are unchanged;
+  exact manifest-bound artifacts now pass the browser latency and memory gates.
 
 ### Changed
+
+- Adopted an accelerated static-runtime cutover: Phase 2 now removes the
+  superseded repository runtime after equivalent-or-stronger target coverage
+  exists. Git history is the source rollback; private candidate bytes and
+  destructive external cloud cleanup remain outside this authorization.
 
 - Required real-source architecture evidence to expose the exact cryptographic,
   public-readback, and local-handoff receipt links while keeping those
@@ -32,6 +489,45 @@ All notable changes to this project will be documented in this file.
   loader, and worker decoder while retaining byte-exact v3 fixture validation.
 
 ### Added
+
+- Added a framework-neutral atomic projection state contract that binds every
+  accepted outcome to its immutable selection and release, retains prior
+  results explicitly during updates, and rejects stale asynchronous
+  completions by monotonic token, selection identity, and release identity.
+
+- Added a lazy MapLibre/PMTiles visualization path that resolves all nine
+  visual-only overlays from the pinned release context, keeps map clicks on the
+  shared selection command, degrades safely without the optional basemap, and
+  preserves keyboard, text-alternative, attribution, range-request, and initial
+  bundle gates.
+
+- Added an exact browser-side AR6 projection lookup that verifies release-bound
+  support geometry, consumes the verified release source-grid identity, checks
+  COG `HEAD` and canonical range-chunk hashes, validates embedded
+  scenario/horizon/source/quantile metadata, selects the nearest native
+  source-grid location within the inclusive 100 km limit, returns the three
+  required quantiles, and preserves technical failures outside the four
+  scientific outcomes. The committed synthetic release now carries the
+  browser-decodable boundary fixtures used by clean-clone tests.
+
+- Added a release-scoped static GeoNames search Worker with deterministic
+  normalization and ranking, core-first partial readiness, exact transport-byte
+  verification, authoritative v4 release/source/spatial/index validation,
+  pinned lazy Brotli decoding, core-then-unseen-coastal merge, private in-memory
+  queries, stale-selection prevention, and an accessible keyboard combobox.
+  Search failures remain technical errors and do not expand the four scientific
+  outcomes.
+
+- Added the browser's pinned-manifest anti-corruption layer: generated
+  schema-derived TypeScript contracts, an immutable release context, exact
+  nine-combination and artifact-reference validation, origin-safe URLs,
+  release-scoped share state, bounded same-release startup retry, and a
+  technical-error vocabulary separate from the four scientific outcomes.
+
+- Added the React 19 and Vite 8 static application shell with two direct static
+  routes, bundled fonts, honest synthetic-fixture identity, lazy architecture
+  evidence, a measured build inventory, zero-API boundary checks, and desktop
+  and mobile Chromium accessibility smoke tests.
 
 - Added local retained-evidence PMTiles validation so an exact final candidate
   can be fully gated on Apple Silicon without executing pinned Linux x86_64

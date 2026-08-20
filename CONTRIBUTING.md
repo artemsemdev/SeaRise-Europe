@@ -38,8 +38,31 @@ Use the repository pull request template and include:
 
 ## Local verification
 
-Run the checks relevant to the files you changed. The current legacy baseline
-uses:
+The static application is the authoritative target workflow. From the
+repository root:
+
+```bash
+npm ci
+npm run web:check
+npm run web:e2e
+npm run web:serve
+```
+
+`web:serve` serves only the generated static output. Clean-clone builds copy the
+committed synthetic release fixture into that output; they never discover or
+copy the ignored private Phase 1 candidate. The manifest is the only browser
+entry point for a data release. Regenerate schema-derived browser types after a
+contract change with `npm run generate:contracts --workspace @searise/web`;
+`web:check` fails if the committed generated file is stale.
+
+An operator may bind the ignored private candidate read-only for an explicit
+local test by following
+[`docs/operations/phase-2-private-release-binding.md`](docs/operations/phase-2-private-release-binding.md).
+That workflow serves the existing directory in place and is never part of a
+production build or CI.
+
+Run the checks relevant to the files you changed. Until #70 and #71 remove the
+legacy baseline, its focused compatibility commands remain:
 
 ```bash
 # Frontend
@@ -84,8 +107,15 @@ Use `--run` only for the listed credential-free fast suites. Regional, release,
 browser, public-delivery, and scheduled gates remain separate and mandatory for
 their promotion stage.
 
+Test retirement is an explicit lifecycle transition. Keep retired suite and
+baseline records for audit history, set both to `status: retired`, cite the
+approved removal issue, and record equivalent-or-stronger target evidence.
+Retired suites are never selected or executed. Do not mark a suite or baseline
+retired while any declared test remains on disk, and do not assign an active
+baseline test to a retired suite.
+
 Do not delete or disable a useful test when adding its replacement. A later
-retirement PR must update the exact `baselineTests` entry in
+retirement PR must update the exact suite and `baselineTests` entries in
 `tests/test-inventory.json`, cite the approved removal issue, and link
 equivalent-or-stronger evidence. A flake needs an owner, defect issue, expiry,
 and inventory record; retrying until green is not an acceptance result.

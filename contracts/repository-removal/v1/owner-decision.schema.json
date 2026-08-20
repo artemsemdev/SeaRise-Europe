@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://artemsemdev.github.io/SeaRise-Europe/contracts/repository-removal/v1/owner-decision.schema.json",
+  "title": "SeaRise Europe repository-removal owner decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "decisionId",
+    "decision",
+    "approvedBy",
+    "approvedAt",
+    "auditedCommit",
+    "inventorySha256",
+    "evidenceReceiptSha256",
+    "approvalText",
+    "approvalSource",
+    "liveVerificationRequired",
+    "authorizedIssues",
+    "candidatePublicationAuthorized",
+    "externalResourceMutationAuthorized"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "decisionId": { "type": "string", "pattern": "^repository-removal-owner-decision-v1-[a-z0-9-]+$" },
+    "decision": { "const": "approved" },
+    "approvedBy": { "const": "project-owner" },
+    "approvedAt": { "type": "string", "format": "date-time" },
+    "auditedCommit": { "$ref": "#/$defs/gitCommit" },
+    "inventorySha256": { "$ref": "#/$defs/sha256" },
+    "evidenceReceiptSha256": { "$ref": "#/$defs/sha256" },
+    "approvalText": {
+      "type": "string",
+      "pattern": "^I approve repository-removal inventory v1 for issues #70, #71, and #72 at commit [a-f0-9]{40}, inventory SHA-256 [a-f0-9]{64}, and evidence receipt SHA-256 [a-f0-9]{64}\\. This authorizes only the listed repository dispositions\\. It does not authorize Candidate-v7 publication/upload or deletion/mutation of any external resource, credential, GitHub environment, or secret\\.$"
+    },
+    "approvalSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "commentId", "commentUrl", "author", "authorAssociation", "bodySha256"],
+      "properties": {
+        "issue": { "const": 68 },
+        "commentId": { "type": "integer", "minimum": 1 },
+        "commentUrl": { "type": "string", "format": "uri", "pattern": "^https://github\\.com/artemsemdev/SeaRise-Europe/issues/68#issuecomment-[0-9]+$" },
+        "author": { "const": "artemsemdev" },
+        "authorAssociation": { "const": "OWNER" },
+        "bodySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "liveVerificationRequired": { "const": true },
+    "authorizedIssues": {
+      "type": "array",
+      "prefixItems": [{ "const": 70 }, { "const": 71 }, { "const": 72 }],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "candidatePublicationAuthorized": { "const": false },
+    "externalResourceMutationAuthorized": { "const": false }
+  },
+  "$defs": {
+    "gitCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

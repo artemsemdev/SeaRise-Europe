@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -27,6 +28,79 @@ SOURCE_HASHES = {
     "support-boundary": "dd98b938df00fc582bbd220b913d96b1fd19bab812e2e9d95ecc4b409330a385",
     "coastal-boundary": "aa08f31460c80cbe35eefb44c6f8feb22b90727840eda3734241d707d7a910d9",
 }
+PARITY_PATH = (
+    REPO_ROOT
+    / "src/pipeline/science/evidence/geography-classifier-parity-v1.json"
+)
+PARITY_RELEASE_ROOT = (
+    REPO_ROOT
+    / "contracts/release/v2/fixtures/browser-release"
+    / "searise-europe-v1.0.0-20260810-c096aeab4e09"
+)
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_browser_classifier_golden_matches_shapely_covers_on_exact_geoparquet() -> None:
+    fixture = json.loads(PARITY_PATH.read_text(encoding="utf-8"))
+    support_identity = fixture["release"]["supportArtifact"]
+    coastal_identity = fixture["release"]["coastalArtifact"]
+    support_path = PARITY_RELEASE_ROOT / support_identity["path"]
+    coastal_path = PARITY_RELEASE_ROOT / coastal_identity["path"]
+    assert _sha256(support_path) == support_identity["sha256"]
+    assert _sha256(coastal_path) == coastal_identity["sha256"]
+
+    support = gpd.read_parquet(support_path).geometry.iloc[0]
+    coastal = gpd.read_parquet(coastal_path).geometry.iloc[0]
+    assert fixture["semantics"] == {
+        "operation": "OGC-covers",
+        "boundaryInclusive": True,
+        "epsilonDegrees": 0.00001,
+        "classificationOrder": ["support", "coastal"],
+    }
+    assert {case["boundaryRole"] for case in fixture["cases"]} == {
+        "support",
+        "coastal",
+    }
+    assert {case["relation"] for case in fixture["cases"]} == {
+        "browser-fixture-control",
+        "exterior-boundary",
+        "hole-boundary",
+        "epsilon-inside",
+        "epsilon-outside",
+    }
+
+    for case in fixture["cases"]:
+        coordinates = case["coordinates"]
+        point = shapely.Point(coordinates["longitude"], coordinates["latitude"])
+        support_covers = support.covers(point)
+        coastal_covers = coastal.covers(point)
+        classification = (
+            "OutsideEurope"
+            if not support_covers
+            else (
+                "InEuropeAndCoastalZone"
+                if coastal_covers
+                else "InEuropeOutsideCoastalZone"
+            )
+        )
+        assert support_covers is case["expectedSupportCovers"], case["id"]
+        assert coastal_covers is case["expectedCoastalCovers"], case["id"]
+        assert classification == case["expectedClassification"], case["id"]
+        if case["relation"].endswith("boundary"):
+            boundary = support.boundary if case["boundaryRole"] == "support" else coastal.boundary
+            assert boundary.covers(point), case["id"]
+
+    control = fixture["release"]["browserFixtureControl"]
+    assert control == {
+        "controlId": "browser-only-source-nodata-62n-44e",
+        "path": "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json",
+        "sha256": "55a3811d7c56879b5ac5cff6e0a868cd22a8a545305ddb718a9697244c431d2e",
+        "fixtureOnly": True,
+    }
+    assert _sha256(REPO_ROOT / control["path"]) == control["sha256"]
 
 
 @pytest.mark.parametrize("role", sorted(SOURCES))

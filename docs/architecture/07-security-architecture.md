@@ -62,21 +62,41 @@ The application must meet these controls:
 - Keep visible MapLibre/OpenFreeMap/OpenMapTiles/OpenStreetMap attribution.
 - Disable embedding unless a later product requirement explicitly permits it.
 
-The initial production header policy should include:
+Both checked-in static entry documents enforce this policy before any
+application script runs:
 
 ```http
-Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://data.<domain> https://tiles.openfreemap.org; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests
-Referrer-Policy: strict-origin-when-cross-origin
+Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'
+Referrer-Policy: no-referrer
+```
+
+The `blob:` worker allowance is required by MapLibre. The inline-style
+allowance is required by MapLibre's DOM controls; inline scripts remain
+forbidden. AJV compiles the release schema into a checked-in standalone
+validator at build time, so browser validation does not require `unsafe-eval`.
+The only cross-origin runtime access is the exact OpenFreeMap tile origin, for
+optional visual context. The current committed fixture and release artifacts
+are same-origin. A future separate canonical data origin requires a reviewed
+CSP and CORS change before use.
+
+The production response headers should enforce the same policy and add the
+controls that a meta policy cannot provide:
+
+```http
+Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'self'; media-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+Referrer-Policy: no-referrer
 X-Content-Type-Options: nosniff
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 Cross-Origin-Opener-Policy: same-origin
 ```
 
-The exact OpenFreeMap origins must be taken from the pinned style and tested
-before deployment. If cross-origin isolation is later enabled, verify that all
-map and data origins provide compatible resource policies first. The
-`'unsafe-inline'` style exception is accepted only while required by the map/UI
-stack; CI records and tests any CSP relaxation.
+`frame-ancestors` must remain a deployment response-header requirement because
+browsers do not enforce it from a meta CSP. The exact OpenFreeMap origin is
+taken from the pinned style and tested before deployment. If cross-origin
+isolation is later enabled, verify that all map and data origins provide
+compatible resource policies first. The `'unsafe-inline'` style exception is
+accepted only while required by MapLibre; CI records and tests any CSP
+relaxation.
 
 ## Object delivery and CORS
 
@@ -149,11 +169,20 @@ coverage, and artifact metadata before assessment. HTTPS plus the pinned release
 is the normal runtime trust boundary; full signature and checksum verification
 runs in CI and is exposed as evidence on `/about/architecture`.
 
-Service-worker caches are versioned. Activation must either expose a complete
-new shell/manifest pair or retain the previous pair. Data ranges from two
-releases must never share a cache namespace. On a mismatch, malformed response,
-or missing uncached range, the UI returns an honest availability state and does
-not infer a scientific result.
+Service-worker caches are versioned. The built worker contains exactly one
+immutable bootstrap authority with the canonical path, media type, byte size,
+and SHA-256 for every shell resource. Installation verifies both fetched bytes
+and an existing exact-name candidate cache before it can complete. A mismatch
+removes only that exact failed cache; caches for unrelated or differently
+versioned application/release pairs remain untouched. Controlled reads verify
+cached bytes again, and a missing entry is restored only after its network
+response passes the same authority;
+any mismatch quarantines the exact shell cache without touching unrelated
+caches. Activation must either expose a complete new shell/manifest
+pair or retain the previous pair. Data ranges from two releases must never
+share a cache namespace. On a mismatch, malformed response, or missing uncached
+range, the UI returns an honest availability state and does not infer a
+scientific result.
 
 ## Incident response and recovery
 

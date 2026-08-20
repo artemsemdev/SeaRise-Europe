@@ -1,8 +1,20 @@
 # Supply-chain contracts
 
-`v1` defines the immutable evidence boundary for a Phase 1 release candidate.
-It does not alter `contracts/release/v1`, and incompatible changes require a new
-versioned directory.
+`v2` is the static-browser supply-chain transition profile. Its target graph
+retains the web npm, Python, settlement, scientific, build-plane, signing,
+provenance, and SBOM authorities needed after migration. The checked-in profile
+is active and fails closed if a retired runtime path or selector is restored.
+
+`v1` defines the immutable historical evidence boundary for the Phase 1 release
+candidate. It does not alter `contracts/release/v1`; its NuGet and legacy
+runtime records are not the active Phase 2 dependency graph. The v2 transition
+profile binds the complete 48-file v1 subtree, reviewed inventory, Git tree,
+and a v2-vendored copy of the exact historical validator Git blob. Historical
+validation recomputes the tree and blob from checkout bytes, materializes the
+verified inputs, and executes only that vendored validator. Git history is
+provenance metadata and is not required by the gate. A complete v2 mode manifest
+also binds executable status for every dependency input outside v1 and for the
+vendored validator.
 
 ## Evidence boundary
 
@@ -82,7 +94,7 @@ official Draft 7 schema. The vendored schemas are Apache-2.0 licensed.
 
 ## Dependency-defining input inventory
 
-`v1/dependency-inventory.json` binds the exact bytes of all 45 inputs discovered
+`v1/dependency-inventory.json` binds the exact bytes of all 49 inputs discovered
 at this reviewed revision. The inventory validation command below derives and
 reports the current validated count, avoiding a separate operational count.
 Coverage includes npm,
@@ -128,8 +140,9 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
   --document contracts/supply-chain/v1/fixtures/valid/dependency-exception.json \
   --as-of 2026-08-11T12:00:00Z
 
-PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py inventory \
-  --document contracts/supply-chain/v1/dependency-inventory.json \
+PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py \
+  historical-inventory \
+  --profile contracts/supply-chain/v2/static-target-profile.json \
   --repository-root .
 ```
 

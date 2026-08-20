@@ -21,6 +21,8 @@ the trust planes separate:
    reviewed production-evidence finalizer once with dedicated private mode-0700
    snapshot and output parents. Only the exact durable evidence leaf is
    retained; the workflow contains no duplicate finalization implementation.
+   Its checkout uses `fetch-depth: 0` so the finalizer can load the exact pinned
+   Phase 1 commit and all reachable objects without a lazy network fetch.
 4. `verify` has no OIDC permission or protected environment. It independently
    authenticates and extracts the original candidate and the retained evidence
    archive, validates the truthful pre-verification envelope, and verifies both
@@ -80,6 +82,8 @@ PYTHONPATH=src/pipeline python scripts/release/retain_release_evidence.py \
 
 The output parent must already exist, be owned by the runner, have mode `0700`,
 and sit outside the candidate, evidence, receipt, and repository authorities.
+Run the command from a full-history checkout containing the pinned Phase 1 Git
+authority; shallow or missing-object repositories fail closed.
 The command publishes one no-overwrite tree containing 18 initially read-only
 files: the manifest, 14 finalized evidence files, both verification receipts,
 and `retention-receipt.json`. The receipt binds the other 17 exact ordered files

@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import shutil
+import subprocess
 from datetime import timezone
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from searise_pipeline.supply_chain import (
     validate_dependency_exception,
     validate_dependency_inventory,
     validate_evidence_files,
+    validate_historical_dependency_inventory,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
@@ -33,6 +35,7 @@ POLICY = CONTRACT_ROOT / "identity-policy.json"
 SBOM = VALID_ROOT / "frontend.cdx.json"
 SBOM_LOGICAL_PATH = "sbom/frontend.cdx.json"
 DEPENDENCY_INVENTORY = CONTRACT_ROOT / "dependency-inventory.json"
+HISTORICAL_AUTHORITY_COMMIT = "1637057f758599b1edcd35ffba0d31ec65cf8c24"
 
 
 def _write_json(path: Path, document: dict[str, Any]) -> Path:
@@ -57,7 +60,40 @@ def _copy_dependency_inputs(destination: Path) -> None:
         for item in component["inputs"]:
             target = destination / item["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(REPOSITORY_ROOT / item["path"], target)
+            target.write_bytes(
+                subprocess.run(
+                    [
+                        "git",
+                        "show",
+                        f"{HISTORICAL_AUTHORITY_COMMIT}:{item['path']}",
+                    ],
+                    cwd=REPOSITORY_ROOT,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+            )
+
+
+def _validate_dependency_document(
+    tmp_path: Path,
+    document: dict[str, Any],
+) -> dict[str, Any]:
+    repository = tmp_path / "historical-inputs"
+    _copy_dependency_inputs(repository)
+    for component in document["components"]:
+        for item in component["inputs"]:
+            logical = Path(item["path"])
+            if logical.is_absolute() or ".." in logical.parts:
+                continue
+            source = REPOSITORY_ROOT / logical
+            target = repository / logical
+            if source.is_file() and not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+    return validate_dependency_inventory(
+        _write_json(tmp_path / "inventory.json", document),
+        repository_root=repository,
+    )
 
 
 def _dependency_component(document: dict[str, Any], component_id: str) -> dict[str, Any]:
@@ -224,16 +260,16 @@ def test_expired_dependency_exception_fails_closed() -> None:
 
 
 def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
-    document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
-    discovered = discover_dependency_inputs()
+    profile = REPOSITORY_ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    document = validate_historical_dependency_inventory(profile, repository_root=REPOSITORY_ROOT)
     recorded = tuple(
         item["path"] for component in document["components"] for item in component["inputs"]
     )
     opentofu = _dependency_component(document, "deployment-opentofu")
 
-    assert len(discovered) == 46
-    assert discovered == tuple(sorted(set(discovered)))
-    assert set(recorded) == set(discovered)
+    assert len(recorded) == 49
+    assert len(set(recorded)) == 49
+    assert {"package.json", "package-lock.json", "src/web/package.json"} <= set(recorded)
     assert document["inventoryKind"] == "dependency-defining-inputs"
     assert document["productionClaim"] is False
     assert (opentofu["releaseUse"], opentofu["coverage"], opentofu["inputs"]) == (
@@ -243,9 +279,60 @@ def test_dependency_inventory_exactly_binds_discovered_inputs() -> None:
     )
 
 
+def test_static_web_lock_pins_scientific_readers_with_complete_integrity() -> None:
+    lock = load_json(REPOSITORY_ROOT / "package-lock.json")
+    packages = lock["packages"]
+    direct = packages["src/web"]["dependencies"]
+    expected = {
+        "brotli-wasm": "3.0.1",
+        "geotiff": "3.0.5",
+        "hyparquet": "1.28.2",
+        "hyparquet-compressors": "1.1.1",
+    }
+
+    assert {name: direct[name] for name in expected} == expected
+    assert {name: packages[f"node_modules/{name}"]["version"] for name in expected} == expected
+    assert packages["node_modules/@searise/web"] == {
+        "resolved": "src/web",
+        "link": True,
+    }
+    assert all(
+        isinstance(entry.get("resolved"), str)
+        and entry["resolved"].startswith("https://registry.npmjs.org/")
+        and isinstance(entry.get("integrity"), str)
+        and entry["integrity"].startswith("sha512-")
+        for path, entry in packages.items()
+        if path and "node_modules" in Path(path).parts and entry.get("link") is not True
+    )
+
+
+@pytest.mark.parametrize("field", ["resolved", "integrity"])
+def test_dependency_inventory_rejects_incomplete_npm_registry_identity(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    repository = tmp_path / "repository"
+    _copy_dependency_inputs(repository)
+    lock_path = repository / "package-lock.json"
+    lock = load_json(lock_path)
+    del lock["packages"]["node_modules/geotiff"][field]
+    _write_json(lock_path, lock)
+
+    inventory = _dependency_document()
+    component = _dependency_component(inventory, "frontend-npm")
+    root_lock = next(item for item in component["inputs"] if item["path"] == "package-lock.json")
+    root_lock["sha256"] = hashlib.sha256(lock_path.read_bytes()).hexdigest()
+
+    with pytest.raises(SupplyChainContractError, match=rf"npm registry package .*{field}"):
+        validate_dependency_inventory(
+            _write_json(tmp_path / "inventory.json", inventory),
+            repository_root=repository,
+        )
+
+
 def test_dependency_discovery_binds_real_python_graphs_but_not_synthetic_fixtures() -> None:
-    discovered = set(discover_dependency_inputs())
-    document = validate_dependency_inventory(DEPENDENCY_INVENTORY)
+    profile = REPOSITORY_ROOT / "contracts/supply-chain/v2/static-target-profile.json"
+    document = validate_historical_dependency_inventory(profile, repository_root=REPOSITORY_ROOT)
     recorded = {
         item["path"]: item["sha256"]
         for component in document["components"]
@@ -260,9 +347,9 @@ def test_dependency_discovery_binds_real_python_graphs_but_not_synthetic_fixture
         ),
     }
 
-    assert expected.keys() <= discovered
+    assert expected.keys() <= recorded.keys()
     assert {path: recorded[path] for path in expected} == expected
-    assert "contracts/supply-chain/v1/fixtures/python-graph/valid.json" not in discovered
+    assert "contracts/supply-chain/v1/fixtures/python-graph/valid.json" not in recorded
 
 
 def test_dependency_inventory_rejects_changed_or_missing_real_python_graph(
@@ -298,7 +385,7 @@ def test_dependency_inventory_rejects_stale_recorded_hash(tmp_path: Path) -> Non
     document["components"][0]["inputs"][0]["sha256"] = "f" * 64
 
     with pytest.raises(SupplyChainContractError, match="SHA-256 mismatch"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_changed_input_bytes(tmp_path: Path) -> None:
@@ -316,7 +403,7 @@ def test_dependency_inventory_rejects_missing_record(tmp_path: Path) -> None:
     document["components"][0]["inputs"].pop(0)
 
     with pytest.raises(SupplyChainContractError, match="discovery mismatch"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_extra_record(tmp_path: Path) -> None:
@@ -333,7 +420,7 @@ def test_dependency_inventory_rejects_extra_record(tmp_path: Path) -> None:
     component["inputs"].sort(key=lambda item: item["path"])
 
     with pytest.raises(SupplyChainContractError, match="unclassified dependency input"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_duplicate_input(tmp_path: Path) -> None:
@@ -344,7 +431,7 @@ def test_dependency_inventory_rejects_duplicate_input(tmp_path: Path) -> None:
     component["inputs"].insert(1, duplicate)
 
     with pytest.raises(SupplyChainContractError, match="duplicate dependency input"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 @pytest.mark.parametrize("mutation", ["missing", "extra", "duplicate"])
@@ -377,7 +464,7 @@ def test_dependency_inventory_rejects_component_set_drift(
         SupplyChainContractError,
         match="component set mismatch|identifiers must be unique",
     ):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_path_escape(tmp_path: Path) -> None:
@@ -385,7 +472,7 @@ def test_dependency_inventory_rejects_path_escape(tmp_path: Path) -> None:
     document["components"][0]["inputs"][0]["path"] = "../outside"
 
     with pytest.raises(SupplyChainContractError, match="unsafe dependency input path"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_inventory_rejects_symlinked_input(tmp_path: Path) -> None:
@@ -417,7 +504,7 @@ def test_dependency_inventory_rejects_invalid_status_combination(tmp_path: Path)
     document["components"][0]["coverage"] = "range-constrained"
 
     with pytest.raises(SupplyChainContractError, match="invalid dependency status combination"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 @pytest.mark.parametrize("level", ["component", "input"])
@@ -429,7 +516,7 @@ def test_dependency_inventory_rejects_unstable_order(tmp_path: Path, level: str)
         document["components"][0]["inputs"].reverse()
 
     with pytest.raises(SupplyChainContractError, match="stable sorted order"):
-        validate_dependency_inventory(_write_json(tmp_path / "inventory.json", document))
+        _validate_dependency_document(tmp_path, document)
 
 
 def test_dependency_discovery_rejects_new_unclassified_input(tmp_path: Path) -> None:
@@ -441,6 +528,32 @@ def test_dependency_discovery_rejects_new_unclassified_input(tmp_path: Path) -> 
 
     with pytest.raises(SupplyChainContractError, match=r"unclassified=.*tools/package.json"):
         validate_dependency_inventory(DEPENDENCY_INVENTORY, repository_root=repository)
+
+
+def test_v1_dependency_discovery_excludes_only_exact_static_quality_authority(
+    tmp_path: Path,
+) -> None:
+    quality = tmp_path / "tools" / "static-quality"
+    quality.mkdir(parents=True)
+    (quality / "package.json").write_text('{"private": true}\n', encoding="utf-8")
+    (quality / "package-lock.json").write_text(
+        '{"lockfileVersion": 3, "packages": {}}\n', encoding="utf-8"
+    )
+    (quality / "pnpm-lock.yaml").write_text("lockfileVersion: '9.0'\n", encoding="utf-8")
+    workflow = tmp_path / ".github/workflows/static-quality.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("jobs: {}\n", encoding="utf-8")
+    sibling_workflow = tmp_path / ".github/workflows/static-quality-extra.yml"
+    sibling_workflow.write_text("jobs: {}\n", encoding="utf-8")
+    similarly_named = tmp_path / "other" / "static-quality" / "package.json"
+    similarly_named.parent.mkdir(parents=True)
+    similarly_named.write_text('{"private": true}\n', encoding="utf-8")
+
+    assert discover_dependency_inputs(tmp_path) == (
+        ".github/workflows/static-quality-extra.yml",
+        "other/static-quality/package.json",
+        "tools/static-quality/pnpm-lock.yaml",
+    )
 
 
 def test_dependency_discovery_includes_local_composite_actions(tmp_path: Path) -> None:

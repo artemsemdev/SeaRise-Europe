@@ -1,19 +1,19 @@
 # 01 — System Context
 
-> **Status:** Accepted target architecture
+> **Status:** Accepted static-first architecture
 > **Decision:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md)
-> **Implementation:** Migration target; the existing service-based implementation remains temporary until the ADR-021 validation gates pass
+> **Implementation:** Static browser runtime; removed service-based code is recoverable through Git history only
 
 ## Purpose
 
 SeaRise Europe is a public, read-only explorer that answers:
 
-> Is this European coastal location modeled as exposed to sea-level rise for
-> the selected scenario and time horizon?
+> What regional relative sea-level change does the selected IPCC AR6 scenario
+> project at the nearest native source-grid location for this absolute horizon?
 
 The product makes precomputed scientific results understandable and
-inspectable. It does not forecast property-level flooding, guarantee safety,
-estimate probability, or recommend adaptation measures.
+inspectable. It does not determine flooding, inundation, terrain exposure,
+flood probability, property risk, safety, or adaptation measures.
 
 The target system is a static geospatial data product. Scientific processing
 occurs before publication; a browser searches places, checks scope, reads the
@@ -146,11 +146,10 @@ Every scientific and browser artifact uses portable formats: JSON, PMTiles,
 COG, GeoParquet, STAC, and Sigstore bundles. Cloudflare is the reference host,
 not part of the product's scientific contract.
 
-## Current-to-target transition
+## Repository baseline
 
-The repository still contains a Next.js runtime, ASP.NET Core API,
-PostgreSQL/PostGIS, TiTiler, and local storage scaffolding. These describe the
-current implementation, not the accepted production target. They are removed
-only after real-source validation, client/server parity checks, artifact range
-tests, browser performance tests, and the remaining ADR-021 migration gates
-pass.
+The repository implements the accepted static-only boundary. The browser reads
+immutable release assets directly, while deterministic source processing stays
+in the offline build plane. Superseded request-time services and their local
+development scaffolding have been removed under ADR-025; Git history is the
+source rollback. Live provider provisioning remains a separate operation.

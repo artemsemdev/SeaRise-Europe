@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "ar6-four-outcome-cross-runtime-v1",
+  "fixtureRole": "authoritative-adr-024-behavior-golden",
+  "dataProvenanceClass": "synthetic-fixture",
+  "authority": "ADR-024",
+  "purpose": "Prove that independent Python and browser evaluators produce all and only the four ADR-024 outcomes from one neutral serialized control set.",
+  "limitations": [
+    "This synthetic release fixture is authoritative for behavior parity, not for public scientific release values.",
+    "The nodata control reads an actual three-band nodata cell from every committed COG through an isolated browser-only polygon appended to both synthetic v2 boundary artifacts.",
+    "The control polygon is not part of the audited support/coastal geometry and is not production or public scientific evidence."
+  ],
+  "release": {
+    "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+    "manifestPath": "contracts/release/v2/fixtures/browser-release/searise-europe-v1.0.0-20260810-c096aeab4e09/manifest.json"
+  },
+  "browserFixtureControl": {
+    "controlId": "browser-only-source-nodata-62n-44e",
+    "path": "src/pipeline/fixtures/browser-release/adr-024-nodata-control-v1.json",
+    "sha256": "55a3811d7c56879b5ac5cff6e0a868cd22a8a545305ddb718a9697244c431d2e",
+    "fixtureOnly": true
+  },
+  "selection": {
+    "scenario": "ssp2-45",
+    "horizon": 2050
+  },
+  "contract": {
+    "resultStates": [
+      "ProjectionAvailable",
+      "DataUnavailable",
+      "OutOfScope",
+      "UnsupportedGeography"
+    ],
+    "requiredQuantiles": [
+      0.167,
+      0.5,
+      0.833
+    ],
+    "locationSelection": "nearest-source-grid-location",
+    "maximumDistanceKilometres": 100,
+    "distanceLimitInclusive": true,
+    "prohibitedOperations": [
+      "interpolation",
+      "terrain-comparison",
+      "binary-exposure-classification",
+      "pmtiles-as-science"
+    ]
+  },
+  "cases": [
+    {
+      "id": "projection-available-rotterdam",
+      "coordinates": {
+        "latitude": 51.9244,
+        "longitude": 4.4777
+      },
+      "geographyClassification": "InEuropeAndCoastalZone",
+      "expected": {
+        "resultState": "ProjectionAvailable",
+        "reason": "projection-available",
+        "source": {
+          "locationId": 1003800040,
+          "latitude": 52.0,
+          "longitude": 4.0,
+          "distanceKilometres": 33.792469
+        },
+        "projectionMillimetres": {
+          "lower": 156,
+          "median": 247,
+          "upper": 351
+        }
+      }
+    },
+    {
+      "id": "data-unavailable-real-cog-nodata",
+      "coordinates": {
+        "latitude": 62.0,
+        "longitude": 44.0
+      },
+      "geographyClassification": "InEuropeAndCoastalZone",
+      "expected": {
+        "resultState": "DataUnavailable",
+        "reason": "source-value-nodata",
+        "source": {
+          "locationId": 1002800440,
+          "latitude": 62.0,
+          "longitude": 44.0,
+          "distanceKilometres": 0.0
+        }
+      },
+      "nodataEvidence": {
+        "kind": "committed-nine-cog-cell-and-browser-boundary-control",
+        "artifactPathPattern": "contracts/release/v1/fixtures/release/searise-europe-v1.0.0-20260810-c096aeab4e09/analysis/{scenario}/{horizon}.tif",
+        "row": 13,
+        "column": 74,
+        "storedNodata": -32768,
+        "bandValuesForEveryCombination": [
+          -32768,
+          -32768,
+          -32768
+        ]
+      }
+    },
+    {
+      "id": "out-of-scope-berlin",
+      "coordinates": {
+        "latitude": 52.52,
+        "longitude": 13.405
+      },
+      "geographyClassification": "InEuropeOutsideCoastalZone",
+      "expected": {
+        "resultState": "OutOfScope",
+        "reason": "outside-coastal-scope"
+      }
+    },
+    {
+      "id": "unsupported-geography-new-york",
+      "coordinates": {
+        "latitude": 40.7128,
+        "longitude": -74.006
+      },
+      "geographyClassification": "OutsideEurope",
+      "expected": {
+        "resultState": "UnsupportedGeography",
+        "reason": "outside-europe-support"
+      }
+    }
+  ]
+}

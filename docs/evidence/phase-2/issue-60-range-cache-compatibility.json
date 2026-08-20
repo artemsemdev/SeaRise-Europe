@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "1.0.0",
+  "issue": 60,
+  "observedAt": "2026-08-16T13:40:00+02:00",
+  "scope": {
+    "origin": "same-origin loopback production-like range server",
+    "dataReleaseId": "searise-europe-v1.0.0-20260810-c096aeab4e09",
+    "fixture": "committed synthetic fixture only",
+    "range": "bytes=65536-65599",
+    "slice": "bytes=65544-65559",
+    "artifacts": [
+      {
+        "artifactId": "projection-ssp2-45-2050-cog",
+        "role": "projection-analysis-cog",
+        "byteSize": 216928,
+        "sha256": "595338f5d3f439497b3bb0992c54f57c7b3514a01806286baa684cf570d21721"
+      },
+      {
+        "artifactId": "projection-ssp2-45-2050-pmtiles",
+        "role": "projection-visual-pmtiles",
+        "byteSize": 624674,
+        "sha256": "8de5613f8af55e01f0a9cb61718803a5bb2f56aca043859faf032829da573126"
+      }
+    ]
+  },
+  "environment": {
+    "host": "macOS 26.5.2 (25F84) arm64",
+    "node": "20.20.1",
+    "npm": "11.12.1",
+    "playwright": "1.62.1",
+    "engines": [
+      {
+        "name": "chromium",
+        "version": "151.0.7922.34",
+        "emulatedDesktopUserAgentPlatform": "Windows 10"
+      },
+      {
+        "name": "firefox",
+        "version": "153.0",
+        "emulatedDesktopUserAgentPlatform": "Windows 10"
+      },
+      {
+        "name": "webkit",
+        "version": "26.5",
+        "emulatedDesktopUserAgentPlatform": "macOS 10.15.7"
+      }
+    ]
+  },
+  "observations": {
+    "cases": 6,
+    "passed": 6,
+    "sharedAcrossEveryEngineAndArtifact": {
+      "originRangeResponse": {
+        "status": 206,
+        "bytes": 64,
+        "acceptRanges": "bytes",
+        "contentLength": "64",
+        "contentRangeMatchedArtifactSize": true,
+        "etagMatchedManifestSha256": true
+      },
+      "cacheApiPut206": {
+        "outcome": "rejected",
+        "errorName": "TypeError",
+        "matchAfterRejection": null
+      },
+      "cacheApiWholeResponseControl": {
+        "putAndMatchStatus": 200,
+        "putAndMatchBytesMatchedArtifactSize": true,
+        "rangeRequestMatchedWholeResponse": true,
+        "rangeRequestMatchedStatus": 200
+      },
+      "indexedDbByteStore": {
+        "storedBytes": 64,
+        "selectedBytes": 16,
+        "selectedBytesMatchedOrigin": true,
+        "synthesizedStatus": 206,
+        "synthesizedContentRangeMatchedSlice": true,
+        "synthesizedContentLength": "16",
+        "synthesizedAcceptRanges": "bytes",
+        "synthesizedEtagMatchedManifestSha256": true
+      }
+    }
+  },
+  "ownerScopeRefinement": {
+    "status": "accepted",
+    "decidedAt": "2026-08-16",
+    "authority": "docs/architecture/adr/ADR-026-authoritative-browser-range-persistence.md",
+    "measurementsChanged": false,
+    "interpretation": "The IndexedDB observation proves byte-storage mechanics for both sampled artifact types. Production admission additionally requires release-authorized interval digests, which currently exist only for COG chunks."
+  },
+  "decision": {
+    "status": "accepted-with-adr-026-owner-scope-refinement",
+    "wholeResponsePersistence": "Cache Storage may be used only for explicitly routed complete responses with exact byte, MIME, integrity, policy, and app/release authority.",
+    "rangePersistence": "Persist only complete release-authorized COG chunks in bounded IndexedDB. PMTiles remains network-only with no-store fetch and response caching policies and must not enter Cache Storage, IndexedDB, or the session-memory range store until a separately reviewed promotion contract supplies authoritative interval digests.",
+    "rangeResponse": "Return only an exact authorized COG chunk or a half-open slice contained by that single chunk; never assemble adjacent records to manufacture interval authority.",
+    "cacheMatchRule": "Never rely on Cache.match(request-with-Range) to distinguish a partial request from a cached whole response.",
+    "transactionRule": "Byte admission, metadata, accounting, and eviction must share one IndexedDB transaction boundary where practical.",
+    "releaseRule": "Every record must be isolated by exact application build, dataReleaseId, and artifact identity; no range may cross an authority.",
+    "scientificFailureRule": "Cache, network, integrity, quota, transaction, storage, and update failures are technical states, not additional ADR-024 scientific outcomes.",
+    "privateCandidateRule": "Candidate-v7 remains explicit, local, read-only, and session-only; it is never a durable browser, build, CI, or external-storage input."
+  },
+  "limitations": [
+    "This is a same-origin loopback measurement, not evidence for a deployed public origin, CDN, CORS policy, or R2 behavior.",
+    "The host measurement is macOS arm64; Linux CI and other operating systems remain unmeasured here.",
+    "The test covers one deterministic 64-byte range and contained 16-byte slice for each committed fixture artifact; it does not measure quota, eviction, overlapping intervals, concurrency, browser restart durability, or storage pressure.",
+    "The probe exercises browser Cache Storage and IndexedDB directly; it does not implement or validate the production service worker or range store.",
+    "Candidate-v7, TAR files, private artifacts, external storage, and public network services were not accessed."
+  ]
+}

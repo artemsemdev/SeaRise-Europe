@@ -7,10 +7,12 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from click.testing import CliRunner
 
+import searise_pipeline.sources.cli as source_cli
 from searise_pipeline.sources.cli import cli
 from searise_pipeline.sources.registry import (
     RegistryError,
@@ -365,6 +367,42 @@ def test_source_cli_accepts_and_enforces_the_scoped_settlement_lock(tmp_path: Pa
     result = runner.invoke(cli, ["validate", "--lock", str(mutated)])
     assert result.exit_code == 1
     assert "GeoNames" in result.output
+
+
+@pytest.mark.parametrize("operation", ["fetch", "verify"])
+def test_source_cli_uses_only_explicit_acquisition_operations(
+    operation: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls: list[str] = []
+    source = object()
+    asset = object()
+
+    class FakeAcquirer:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def fetch(self, _source: object, _asset: object):  # type: ignore[no-untyped-def]
+            calls.append("fetch")
+            return None, SimpleNamespace(to_json=lambda: '{"status":"fetch"}\n')
+
+        def verify(self, _source: object, _asset: object):  # type: ignore[no-untyped-def]
+            calls.append("verify")
+            return None, SimpleNamespace(to_json=lambda: '{"status":"verify"}\n')
+
+    monkeypatch.setattr(
+        source_cli,
+        "_registry",
+        lambda _path: SimpleNamespace(targets=lambda _targets: [(source, asset)]),
+    )
+    monkeypatch.setattr(source_cli, "Acquirer", FakeAcquirer)
+
+    source_cli._run(operation, tmp_path / "lock.json", (), tmp_path, tmp_path, 1, 0, 1)
+
+    assert calls == [operation]
+    assert f'{{"status":"{operation}"}}' in capsys.readouterr().out
 
 
 def test_target_selection_supports_source_and_asset_ids():

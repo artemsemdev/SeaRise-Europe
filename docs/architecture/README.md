@@ -1,8 +1,8 @@
 # Architecture Documentation
 
 > **Status:** Current for the accepted target architecture
-> **Last reviewed:** 2026-08-06
-> **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md) and [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md)
+> **Last reviewed:** 2026-08-16
+> **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md), [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md), and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)
 
 ## Architecture in one paragraph
 
@@ -38,15 +38,20 @@ Read in this order:
    alternatives, consequences, costs, scientific gates, and migration.
 2. [System context](01-system-context.md) — actors, boundaries, dependencies,
    and project outcomes.
-3. [Container view](02-container-view.md) — build, artifact, delivery, and
+3. [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) — exact
+   complete-resource, COG-range, PMTiles, failure, and private-candidate storage
+   boundaries.
+4. [Container view](02-container-view.md) — build, artifact, delivery, and
    browser responsibilities.
-4. [Browser application](03a-frontend-architecture.md) — runtime components,
+5. [Browser application](03a-frontend-architecture.md) — runtime components,
    search, assessment, map, state, and offline behaviour.
-5. [Data architecture](05-data-architecture.md) — immutable release layout and
+6. [Atomic projection state](17-atomic-projection-state.md) — release-scoped
+   transitions and stale-completion guards.
+7. [Data architecture](05-data-architecture.md) — immutable release layout and
    public data contracts.
-6. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
+8. [Pipeline](16-geospatial-data-pipeline.md) — reproducible source-to-release
    processing and publication gates.
-7. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
+9. [Deployment](08-deployment-topology.md) — Cloudflare/R2 reference topology
    and portable delivery requirements.
 
 ## Current document set
@@ -68,9 +73,11 @@ Read in this order:
 | [14 — Integration Patterns](14-integration-patterns.md) | Build ingestion, publication, HTTPS artifact contracts, basemap boundary |
 | [15 — Performance and Scalability](15-performance-and-scalability.md) | Browser/CDN budgets, caching, range requests, and cost controls |
 | [16 — Geospatial Pipeline](16-geospatial-data-pipeline.md) | Real-data workflow, settlement index, reproducibility, and validation |
+| [17 — Atomic Projection State](17-atomic-projection-state.md) | Immutable result/selection/release tuple and guarded state transitions |
 | [Public release contracts](../../contracts/release/README.md) | Authoritative JSON Schemas, version compatibility, deprecation, and rollback |
 | [ADR directory](adr/README.md) | Standalone architecture decision records and ADR conventions |
 | [ADR-021](adr/ADR-021-static-first-offline-geospatial-architecture.md) | Authoritative static-first architecture decision |
+| [ADR-026](adr/ADR-026-authoritative-browser-range-persistence.md) | Authoritative complete-resource, COG range, and PMTiles persistence boundary |
 
 Supporting current documents:
 
@@ -78,6 +85,13 @@ Supporting current documents:
 - [Static-first migration plan](../delivery/README.md)
 - [Product requirements](../product/PRD.md)
 - [Content guidelines](../product/CONTENT_GUIDELINES.md)
+- [Canonical Flight visual and interaction contract](../product/Mock/DESIGN.md)
+
+Architecture components implement the canonical Flight experience rather than
+substituting a generic dashboard or map utility. ADR-024 overrides the mock's
+binary exposure, terrain comparison, modeled-water/flood meaning, and related
+scientific copy; it does not override Flight's layout, information hierarchy,
+map-first composition, controls, responsive behavior, or interaction character.
 
 ## Status model
 
@@ -85,8 +99,8 @@ Documents use these terms consistently:
 
 | Status | Meaning |
 |---|---|
+| Current | Implemented repository architecture backed by executable gates |
 | Accepted target | The decision is approved for new work, even if migration is incomplete |
-| Migration in progress | Legacy implementation still exists and must be handled explicitly |
 | Provisional | Evidence is incomplete; the content cannot authorize a real-data release |
 | Released | Immutable artifacts have passed all scientific and technical gates and were published |
 | Superseded | No longer active guidance; retained only in Git history or the decision register |
@@ -107,6 +121,9 @@ target architecture without executable evidence.
 - Projection lookup: nearest native AR6 grid location within 100 km, with no
   interpolation, fallback, or rendered-colour sampling.
 - Search: local qualifying records from a declared GeoNames snapshot.
+- Browser persistence: verified complete resources use Cache Storage;
+  integrity-authorized COG chunks may use bounded IndexedDB; PMTiles remains
+  network-only and visual-only with a `no-store` caching policy.
 
 ## Deliberately removed documents
 

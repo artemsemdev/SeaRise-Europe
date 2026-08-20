@@ -7,6 +7,7 @@ import hashlib
 import json
 import runpy
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any, Callable, cast
 
@@ -40,6 +41,33 @@ REAL_TARGETS = {
     "searise-domain-net8.0": ("SeaRise.Domain", "library", 0),
     "searise-infrastructure-net8.0": ("SeaRise.Infrastructure", "library", 17),
 }
+
+
+@pytest.fixture
+def historical_legacy_repository(tmp_path: Path) -> Path:
+    repository = tmp_path / "historical-repository"
+    profile = json.loads(
+        (ROOT / "contracts/supply-chain/v2/static-target-profile.json").read_bytes()
+    )
+    commit = profile["historicalEvidence"]["gitAuthority"]["commit"]
+    for directory in [*{value[0] for value in REAL_TARGETS.values()}, "SeaRise.Api.Tests"]:
+        for name in (f"{directory}.csproj", "packages.lock.json"):
+            logical = f"src/api/{directory}/{name}"
+            target = repository / logical
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(
+                subprocess.run(
+                    ["git", "show", f"{commit}:{logical}"],
+                    cwd=ROOT,
+                    check=True,
+                    capture_output=True,
+                ).stdout
+            )
+    shutil.copytree(
+        ROOT / "contracts/supply-chain/v1",
+        repository / "contracts/supply-chain/v1",
+    )
+    return repository
 
 
 def _generate(
@@ -145,12 +173,13 @@ def test_root_binds_exact_authority_target_kind_and_non_claims() -> None:
     ],
 )
 def test_all_real_project_locks_have_supported_truthful_graphs(
-    directory: str, count: int, kind: str
+    historical_legacy_repository: Path, directory: str, count: int, kind: str
 ) -> None:
-    project_root = ROOT / "src/api" / directory
+    project_root = historical_legacy_repository / "src/api" / directory
     document = _generate(
         project_root / f"{directory}.csproj",
         project_root / "packages.lock.json",
+        repository=historical_legacy_repository,
     )
     assert len(document["components"]) == count
     assert (
@@ -357,8 +386,12 @@ def test_outside_non_sibling_and_symlinked_sbom_paths_fail_closed(tmp_path: Path
         )
 
 
-def test_real_artifact_manifest_binds_exact_authorities_and_non_claims() -> None:
-    manifest = json.loads(MANIFEST.read_bytes())
+def test_real_artifact_manifest_binds_exact_authorities_and_non_claims(
+    historical_legacy_repository: Path,
+) -> None:
+    repository = historical_legacy_repository
+    artifact_root = repository / "contracts/supply-chain/v1/sboms/nuget"
+    manifest = json.loads((artifact_root / "manifest.json").read_bytes())
     assert set(manifest) == {
         "artifacts",
         "candidateAttachmentStatus",
@@ -388,12 +421,12 @@ def test_real_artifact_manifest_binds_exact_authorities_and_non_claims() -> None
             "projectSha256",
             "targetFramework",
         }
-        project = ROOT / entry["projectPath"]
-        lock = ROOT / entry["lockPath"]
-        artifact = ROOT / entry["artifactPath"]
-        assert project == ROOT / f"src/api/{directory}/{directory}.csproj"
-        assert lock == ROOT / f"src/api/{directory}/packages.lock.json"
-        assert artifact == ARTIFACT_ROOT / f"{identifier}.cdx.json"
+        project = repository / entry["projectPath"]
+        lock = repository / entry["lockPath"]
+        artifact = repository / entry["artifactPath"]
+        assert project == repository / f"src/api/{directory}/{directory}.csproj"
+        assert lock == repository / f"src/api/{directory}/packages.lock.json"
+        assert artifact == artifact_root / f"{identifier}.cdx.json"
         assert hashlib.sha256(project.read_bytes()).hexdigest() == entry["projectSha256"]
         assert hashlib.sha256(lock.read_bytes()).hexdigest() == entry["lockSha256"]
         assert hashlib.sha256(artifact.read_bytes()).hexdigest() == entry["artifactSha256"]
@@ -405,7 +438,7 @@ def test_real_artifact_manifest_binds_exact_authorities_and_non_claims() -> None
             artifact,
             project,
             lock,
-            repository_root=ROOT,
+            repository_root=repository,
             target_framework=TARGET,
         )
         properties = _properties(document["metadata"]["component"])
@@ -418,8 +451,12 @@ def test_real_artifact_manifest_binds_exact_authorities_and_non_claims() -> None
         assert properties["org.searise.sbom.license-completeness"] == "unclaimed"
 
 
-def test_test_project_is_exactly_recorded_but_not_published() -> None:
-    excluded = json.loads(MANIFEST.read_bytes())["excludedTargets"]
+def test_test_project_is_exactly_recorded_but_not_published(
+    historical_legacy_repository: Path,
+) -> None:
+    repository = historical_legacy_repository
+    artifact_root = repository / "contracts/supply-chain/v1/sboms/nuget"
+    excluded = json.loads((artifact_root / "manifest.json").read_bytes())["excludedTargets"]
     assert len(excluded) == 1
     entry = excluded[0]
     assert set(entry) == {
@@ -436,29 +473,35 @@ def test_test_project_is_exactly_recorded_but_not_published() -> None:
     assert entry["projectKind"] == "test" and entry["targetFramework"] == TARGET
     assert entry["reason"] == "Test project excluded from candidate production attachment."
     assert (
-        hashlib.sha256((ROOT / entry["projectPath"]).read_bytes()).hexdigest()
+        hashlib.sha256((repository / entry["projectPath"]).read_bytes()).hexdigest()
         == entry["projectSha256"]
     )
     assert (
-        hashlib.sha256((ROOT / entry["lockPath"]).read_bytes()).hexdigest() == entry["lockSha256"]
+        hashlib.sha256((repository / entry["lockPath"]).read_bytes()).hexdigest()
+        == entry["lockSha256"]
     )
-    assert not (ARTIFACT_ROOT / "searise-api-tests-net8.0.cdx.json").exists()
+    assert not (artifact_root / "searise-api-tests-net8.0.cdx.json").exists()
 
 
-def test_public_api_publishes_exact_real_target_once(tmp_path: Path) -> None:
+def test_public_api_publishes_exact_real_target_once(
+    tmp_path: Path, historical_legacy_repository: Path
+) -> None:
+    repository = historical_legacy_repository
     directory = "SeaRise.Domain"
-    project = ROOT / f"src/api/{directory}/{directory}.csproj"
-    lock = ROOT / f"src/api/{directory}/packages.lock.json"
+    project = repository / f"src/api/{directory}/{directory}.csproj"
+    lock = repository / f"src/api/{directory}/packages.lock.json"
     output = tmp_path / "domain.cdx.json"
     document = publish_nuget_sbom(
         output,
         project,
         lock,
-        repository_root=ROOT,
+        repository_root=repository,
         target_framework=TARGET,
     )
 
-    assert output.read_bytes() == (ARTIFACT_ROOT / "searise-domain-net8.0.cdx.json").read_bytes()
+    assert output.read_bytes() == (
+        repository / "contracts/supply-chain/v1/sboms/nuget/searise-domain-net8.0.cdx.json"
+    ).read_bytes()
     assert output.read_bytes() == canonical_sbom_bytes(document)
     assert supply_chain.generate_nuget_sbom
     assert supply_chain.publish_nuget_sbom
@@ -468,45 +511,58 @@ def test_public_api_publishes_exact_real_target_once(tmp_path: Path) -> None:
             output,
             project,
             lock,
-            repository_root=ROOT,
+            repository_root=repository,
             target_framework=TARGET,
         )
 
 
 def test_cli_generates_and_validates_one_explicit_real_target(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    historical_legacy_repository: Path,
 ) -> None:
+    repository = historical_legacy_repository
     directory = "SeaRise.Domain"
     output = tmp_path / "domain.cdx.json"
     common = [
         "--project",
-        str(ROOT / f"src/api/{directory}/{directory}.csproj"),
+        str(repository / f"src/api/{directory}/{directory}.csproj"),
         "--lock",
-        str(ROOT / f"src/api/{directory}/packages.lock.json"),
+        str(repository / f"src/api/{directory}/packages.lock.json"),
         "--repository-root",
-        str(ROOT),
+        str(repository),
         "--target-framework",
         TARGET,
     ]
     assert main(["nuget-sbom", *common, "--output", str(output)]) == 0
     assert f"generated 0 NuGet components for {TARGET}" in capsys.readouterr().out
-    assert output.read_bytes() == (ARTIFACT_ROOT / "searise-domain-net8.0.cdx.json").read_bytes()
+    assert output.read_bytes() == (
+        repository / "contracts/supply-chain/v1/sboms/nuget/searise-domain-net8.0.cdx.json"
+    ).read_bytes()
     assert main(["nuget-sbom-validate", *common, "--sbom", str(output)]) == 0
     assert f"validated 0 NuGet components for {TARGET}" in capsys.readouterr().out
 
 
-def test_missing_mutated_and_symlinked_real_artifacts_fail_closed(tmp_path: Path) -> None:
+def test_missing_mutated_and_symlinked_real_artifacts_fail_closed(
+    tmp_path: Path, historical_legacy_repository: Path
+) -> None:
+    repository = historical_legacy_repository
     directory = "SeaRise.Application"
-    project = ROOT / f"src/api/{directory}/{directory}.csproj"
-    lock = ROOT / f"src/api/{directory}/packages.lock.json"
+    project = repository / f"src/api/{directory}/{directory}.csproj"
+    lock = repository / f"src/api/{directory}/packages.lock.json"
     arguments = {
-        "repository_root": ROOT,
+        "repository_root": repository,
         "target_framework": TARGET,
     }
     with pytest.raises(SupplyChainContractError):
         validate_nuget_sbom(tmp_path / "missing.json", project, lock, **arguments)
 
-    document = json.loads((ARTIFACT_ROOT / "searise-application-net8.0.cdx.json").read_bytes())
+    document = json.loads(
+        (
+            repository
+            / "contracts/supply-chain/v1/sboms/nuget/searise-application-net8.0.cdx.json"
+        ).read_bytes()
+    )
     _forge_claim(document)
     mutated = tmp_path / "mutated.json"
     _write_sbom(mutated, document)

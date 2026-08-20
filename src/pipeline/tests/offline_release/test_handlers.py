@@ -71,8 +71,8 @@ def test_fixture_handlers_build_a_complete_new_public_release(tmp_path: Path) ->
     assert receipt["sourceReceipts"] == [
         {"path": source_artifact["path"], "sha256": source_artifact["sha256"]}
     ]
-    assert len(list(root.rglob("*"))) == 57
-    assert len([path for path in root.rglob("*") if path.is_file()]) == 42
+    assert len(list(root.rglob("*"))) == 59
+    assert len([path for path in root.rglob("*") if path.is_file()]) == 44
     assert not any(path.name.endswith("-verification.json") for path in root.rglob("*"))
     assert all(stage.quality_results for stage in result.stages)
     assert validate_complete_release(root, schema_directory=SCHEMAS)["complete"] is True
@@ -180,4 +180,21 @@ def test_projection_bundle_adapter_rejects_unapproved_owner_gate(
     monkeypatch.setattr(projection_bundle_module, "_read_json", read_with_rejected_gate)
 
     with pytest.raises(ScienceContractError, match="owner-approved"):
+        validate_reviewed_projection_bundle(BUNDLE, repository_root=REPO_ROOT)
+
+
+def test_projection_bundle_adapter_rejects_delivery_amendment_science_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_read = projection_bundle_module._read_json
+
+    def read_with_drift(path: Path):
+        document = original_read(path)
+        if path.name == "ar6-delivery-harness-relocation.json":
+            document["previousDeliveryMeasurement"]["minimumColdLookups"] = 11
+        return document
+
+    monkeypatch.setattr(projection_bundle_module, "_read_json", read_with_drift)
+
+    with pytest.raises(ScienceContractError, match="changes approved science"):
         validate_reviewed_projection_bundle(BUNDLE, repository_root=REPO_ROOT)

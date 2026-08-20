@@ -28,6 +28,7 @@ from .candidate_evidence import (
     _validate_candidate_evidence_pair,
 )
 from .contracts import REPOSITORY_ROOT, SupplyChainContractError, _validate_schema
+from .historical_inventory import materialize_historical_dependency_authority
 from .production_evidence import (
     _MAX_BUNDLE_BYTES,
     _MAX_MANIFEST_BYTES,
@@ -449,6 +450,34 @@ def retain_release_evidence(
     repository_root: Path = REPOSITORY_ROOT,
 ) -> ReleaseEvidenceRetention:
     """Publish one complete no-overwrite handoff under an exact data-release prefix."""
+    profile = repository_root / "contracts/supply-chain/v2/static-target-profile.json"
+    with materialize_historical_dependency_authority(
+        profile,
+        repository_root=repository_root,
+    ) as (historical_root, historical_inventory):
+        return _retain_release_evidence(
+            candidate_root,
+            evidence_root,
+            cryptographic_receipt,
+            public_readback_receipt,
+            output_root,
+            repository_root=repository_root,
+            repository_authority_root=historical_root,
+            dependency_inventory=historical_inventory,
+        )
+
+
+def _retain_release_evidence(
+    candidate_root: Path,
+    evidence_root: Path,
+    cryptographic_receipt: Path,
+    public_readback_receipt: Path,
+    output_root: Path,
+    *,
+    repository_root: Path,
+    repository_authority_root: Path,
+    dependency_inventory: Path,
+) -> ReleaseEvidenceRetention:
     budget = _ReadBudget(_MAX_TOTAL_READ_BYTES)
     candidate_descriptor = evidence_descriptor = -1
     output_parent = stage_descriptor = -1
@@ -507,9 +536,10 @@ def retain_release_evidence(
             pair = _validate_candidate_evidence_pair(
                 candidate_copy,
                 evidence_copy,
-                repository_root=repository_root,
+                repository_root=repository_authority_root,
                 trusted_invocation_uri=trusted_invocation,
                 allow_production_envelope=True,
+                dependency_inventory=dependency_inventory,
             )
         if pair.candidate_id != candidate.candidate_id:
             _fail("candidate and finalized evidence identities differ")

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
-import importlib
 import json
 import os
 import platform
@@ -347,7 +346,11 @@ def verify_spatial_toolchain(
     extension = _cache_path(cache_root, platform_pin.extension.relative_path)
     _verify_file(archive, platform_pin.archive, "cached Spatial archive")
     _verify_file(extension, platform_pin.extension, "cached Spatial extension")
-    module = duckdb_module or importlib.import_module("duckdb")
+    if duckdb_module is None:
+        import duckdb
+        module = duckdb
+    else:
+        module = duckdb_module
     if str(getattr(module, "__version__", "")) != manifest.duckdb_version:
         raise SpatialToolchainError("DuckDB version differs from the spatial toolchain pin")
     connection = module.connect()

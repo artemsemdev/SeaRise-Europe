@@ -1,0 +1,16 @@
+# Active Phase 2 contributor dependency ranges for retained pipeline code.
+# Candidate/release execution remains governed by the exact hash-locked graphs.
+click>=8.1,<9.0
+cryptography>=42,<51
+geopandas>=0.14,<2.0
+jsonschema[format]>=4.23,<5.0
+netCDF4>=1.6,<2.0
+numpy>=1.26,<2.0
+pandas==2.3.2
+pyarrow==16.1.0
+pyproj==3.6.1
+pytest>=8.0,<9.0
+rasterio>=1.3,<2.0
+rio-cogeo>=5.0,<6.0
+shapely==2.0.7
+xarray>=2024.1,<2025.0

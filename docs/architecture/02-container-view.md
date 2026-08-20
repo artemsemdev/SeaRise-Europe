@@ -15,8 +15,8 @@ has two deployed origins and no continuously running application service.
 | Browser search worker | Web Worker, serialized MiniSearch-compatible index | Browser | Loads, normalizes, ranks, and returns settlement matches off the UI thread. |
 | Browser assessment engine | TypeScript, geometry and COG readers | Browser | Validates scope, selects the nearest AR6 grid location, and returns exact projection values or an unavailable reason. |
 | Map renderer | MapLibre GL JS with PMTiles protocol | Browser | Renders basemap, selected location, support geometry, and visual projection overlay. |
-| Service worker | Web platform Cache API | Browser | Precaches the shell and caches versioned search/geospatial resources within a bounded policy. |
-| Release artifact store | R2 through a custom domain/CDN | Cloudflare edge/object storage | Serves immutable PMTiles, COG, GeoParquet, STAC, manifest, and provenance objects with byte-range support. |
+| Service worker | Web platform Cache API | Browser | Precaches the shell and caches eligible versioned search/resources within a bounded policy; visual PMTiles is excluded. |
+| Release artifact store | R2 through a custom domain/CDN | Cloudflare edge/object storage | Serves append-only PMTiles, COG, GeoParquet, STAC, manifest, and provenance objects with byte-range support; visual PMTiles uses the ADR-026 role-specific `no-store` delivery override. |
 | Offline build pipeline | Python, GDAL, Rasterio, DuckDB Spatial, packaging/signing tools | Developer workstation or GitHub Actions | Acquires sources, produces artifacts, runs QA, records provenance, and publishes a complete release. |
 | Source cache | Ignored local/CI filesystem | Build environment only | Holds pinned raw inputs; it is never served to visitors or committed by default. |
 

@@ -12,16 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 OUTPUTS = (
-    "frontend",
-    "api",
+    "web",
     "pipeline",
     "release",
-    "infrastructure",
-    "docker_frontend",
-    "docker_api",
-    "compose",
+    "repository_removal",
     "codeql_javascript",
-    "codeql_csharp",
     "heavy",
 )
 
@@ -34,21 +29,26 @@ FORCE_ALL = (
     "scripts/ci/**",
 )
 
-FRONTEND = (
-    "src/frontend/**",
+
+WEB = (
+    ".nvmrc",
+    ".github/workflows/**",
+    "package.json",
+    "package-lock.json",
+    "contracts/repository-removal/v1/historical-allowlist*.json",
+    "src/web/**",
+    "tools/static-quality/**",
+    "contracts/release/v1/**",
+    "contracts/supply-chain/v2/**",
+    "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
+    "docs/methodology.md",
+    "docs/product/Mock/SeaRise-Flight.html",
+    "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
     "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
     "src/pipeline/evidence/ar6-regional-release/**",
     "src/pipeline/fixtures/ar6-regional-release/**",
-    "contracts/**",
-    "tests/fixtures/tdd/**",
 )
 
-API = (
-    "src/api/**",
-    "SeaRise Europe.sln",
-    "infra/db/**",
-    "tests/fixtures/tdd/**",
-)
 
 PIPELINE = (
     ".github/workflows/offline-release-controlled.yml",
@@ -81,9 +81,11 @@ RELEASE = (
     "scripts/science/*ar6*release*.py",
     "scripts/science/build_ar6_lookup_goldens.py",
     "scripts/science/validate_ar6_delivery_trace.py",
-    "src/frontend/package.json",
-    "src/frontend/package-lock.json",
-    "src/frontend/scripts/measure-ar6-release.mjs",
+    "package.json",
+    "package-lock.json",
+    "src/web/scripts/measure-ar6-release.mjs",
+    "src/web/package.json",
+    "src/web/scripts/verify-boundary-pmtiles-browser.mjs",
     "src/pipeline/fixtures/ar6-regional-release/**",
     "src/pipeline/requirements-release*.lock",
     "src/pipeline/science/ar6-regional-release*.json",
@@ -101,54 +103,30 @@ RELEASE = (
     "src/pipeline/sources/source-lock*.json",
 )
 
-INFRASTRUCTURE = (
-    "infra/**",
-    "data/geometry/**",
-    "docker-compose.yml",
+
+
+
+
+REPOSITORY_REMOVAL = (
+    "contracts/repository-removal/**",
+    "contracts/supply-chain/v2/static-target-profile.json",
+    "scripts/repository/**",
+    "tests/repository-removal/**",
+    "tests/test-inventory.json",
     ".env.local.example",
-    "scripts/compose-smoke.sh",
-)
-
-FRONTEND_IMAGE = (
-    "src/frontend/Dockerfile",
-    "src/frontend/package.json",
-    "src/frontend/package-lock.json",
-    "src/frontend/next.config.js",
-    "src/frontend/postcss.config.mjs",
-    "src/frontend/tsconfig.json",
-    "src/frontend/src/**",
-)
-
-API_IMAGE = (
-    "src/api/Dockerfile",
-    "src/api/Directory.Build.props",
-    "src/api/*.sln",
-    "src/api/**/*.csproj",
-    "src/api/**/*.cs",
-    "src/api/**/appsettings*.json",
-)
-
-COMPOSE = (
     "docker-compose.yml",
-    ".env.local.example",
     "scripts/compose-smoke.sh",
-    "infra/**",
-    "data/geometry/**",
-    "src/frontend/Dockerfile",
-    "src/frontend/package.json",
-    "src/frontend/package-lock.json",
-    "src/frontend/next.config.js",
-    "src/frontend/src/app/api/health/route.ts",
+    "src/api/.dockerignore",
     "src/api/Dockerfile",
-    "src/api/Directory.Build.props",
-    "src/api/**/*.csproj",
-    "src/api/SeaRise.Api/Program.cs",
-    "src/api/SeaRise.Api/appsettings*.json",
+    "tests/harness/test_changed_components.py",
+    "tests/harness/test_immutable_dependencies.py",
 )
 
-CODEQL_JAVASCRIPT = ("src/frontend/**",)
+CODEQL_JAVASCRIPT = (
+    'src/web/**',
+    'tools/static-quality/**',
+)
 
-CODEQL_CSHARP = ("src/api/**",)
 
 
 def _normalize(path: str) -> str:
@@ -159,12 +137,8 @@ def _matches(path: str, patterns: Sequence[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
-def _is_frontend_test(path: str) -> bool:
-    return "/__tests__/" in path or ".test." in path or ".spec." in path
 
 
-def _is_api_test(path: str) -> bool:
-    return "/SeaRise.Api.Tests/" in path
 
 
 def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
@@ -174,21 +148,11 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
         return {name: True for name in OUTPUTS}
 
     result = {
-        "frontend": any(_matches(path, FRONTEND) for path in paths),
-        "api": any(_matches(path, API) for path in paths),
+        "web": any(_matches(path, WEB) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
         "release": any(_matches(path, RELEASE) for path in paths),
-        "infrastructure": any(_matches(path, INFRASTRUCTURE) for path in paths),
-        "docker_frontend": any(
-            _matches(path, FRONTEND_IMAGE) and not _is_frontend_test(path)
-            for path in paths
-        ),
-        "docker_api": any(
-            _matches(path, API_IMAGE) and not _is_api_test(path) for path in paths
-        ),
-        "compose": any(_matches(path, COMPOSE) for path in paths),
+        "repository_removal": any(_matches(path, REPOSITORY_REMOVAL) for path in paths),
         "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
-        "codeql_csharp": any(_matches(path, CODEQL_CSHARP) for path in paths),
     }
     result["heavy"] = any(result.values())
     return result

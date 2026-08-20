@@ -87,8 +87,9 @@ p50/p95, and peak memory on the reference mobile device.
 
 ### 5.1 Visual layers
 
-PMTiles stores each visual layer in one immutable archive and uses HTTP byte
-ranges. The build should optimize directory locality, zoom limits, tile
+PMTiles stores each visual layer in one append-only, hash-bound archive and
+uses network-only HTTP byte ranges with `no-store` request/response policy.
+The build should optimize directory locality, zoom limits, tile
 extent, and compression against measured map quality. MapLibre loads only the
 selected scenario/horizon layer and the visible viewport.
 

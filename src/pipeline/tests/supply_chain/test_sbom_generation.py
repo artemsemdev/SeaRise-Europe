@@ -32,11 +32,11 @@ FIXTURE = (
     / "sbom"
     / "npm-lock.synthetic.json"
 )
-REAL_LOCK = REPOSITORY_ROOT / "src" / "frontend" / "package-lock.json"
+REAL_LOCK = REPOSITORY_ROOT / "package-lock.json"
 REAL_ARTIFACT = (
     REPOSITORY_ROOT / "contracts" / "supply-chain" / "v1" / "sboms" / "frontend-npm.cdx.json"
 )
-REAL_LOGICAL_PATH = "src/frontend/package-lock.json"
+REAL_LOGICAL_PATH = "package-lock.json"
 LOGICAL_PATH = "contracts/supply-chain/v1/fixtures/sbom/npm-lock.synthetic.json"
 
 
@@ -167,42 +167,17 @@ def test_real_lock_generates_reachable_graph_and_validated_aliases() -> None:
                 reachable.add(reference)
                 pending.append(reference)
 
-    assert len(components) == 597
-    assert len(reachable) == 598
-    alias = next(
-        component
-        for component in components
-        if _properties(component)["org.searise.sbom.npm.install-name"] == "string-width-cjs"
-    )
-    assert (alias["name"], alias["purl"]) == (
-        "string-width",
-        "pkg:npm/string-width@4.2.3",
-    )
+    assert len(components) == 340
+    assert len(reachable) == 341
     by_path = _components_by_path(document)
-    assert {
-        path
-        for path, component in by_path.items()
-        if _properties(component)["org.searise.sbom.npm.devOptional"] == "true"
-    } == {
-        "node_modules/@types/prop-types",
-        "node_modules/@types/react",
-        "node_modules/csstype",
-    }
-    for path in (
-        "node_modules/@types/prop-types",
-        "node_modules/@types/react",
-        "node_modules/csstype",
-    ):
-        assert by_path[path]["scope"] == "optional"
-
-    assert (
-        by_path["node_modules/supports-color"]["bom-ref"]
-        not in graph[by_path["node_modules/debug"]["bom-ref"]]
+    phosphor = by_path["node_modules/@phosphor-icons/react"]
+    assert (phosphor["name"], phosphor["version"], phosphor["purl"]) == (
+        "@phosphor-icons/react",
+        "2.1.10",
+        "pkg:npm/%40phosphor-icons/react@2.1.10",
     )
-    assert (
-        by_path["node_modules/eslint"]["bom-ref"]
-        not in graph[by_path["node_modules/eslint-module-utils"]["bom-ref"]]
-    )
+    assert "src/web" not in by_path
+    assert "node_modules/@searise/web" not in by_path
 
 
 def test_checked_in_real_frontend_artifact_matches_exact_lock_authority() -> None:
@@ -216,8 +191,9 @@ def test_checked_in_real_frontend_artifact_matches_exact_lock_authority() -> Non
     root_properties = _properties(document["metadata"]["component"])
 
     assert raw == canonical_sbom_bytes(document)
-    assert len(document["components"]) == 597
+    assert len(document["components"]) == 340
     assert root_properties["org.searise.sbom.input.path"] == REAL_LOGICAL_PATH
+    assert root_properties["org.searise.sbom.npm.workspace.path"] == "src/web"
     assert (
         root_properties["org.searise.sbom.input.sha256"]
         == hashlib.sha256(REAL_LOCK.read_bytes()).hexdigest()
@@ -339,7 +315,10 @@ def test_real_validation_rejects_symlinked_lock_or_artifact_ancestry(tmp_path: P
     ("mutation", "message"),
     [
         (lambda lock: lock.update(lockfileVersion=2), "package-lock v3"),
-        (lambda lock: lock["packages"][""].update(workspaces=["packages/*"]), "workspaces"),
+        (
+            lambda lock: lock["packages"][""].update(workspaces=["packages/*"]),
+            "workspace declaration",
+        ),
         (lambda lock: lock["packages"]["node_modules/alpha"].update(link=True), "links"),
         (
             lambda lock: lock["packages"]["node_modules/alpha"].update(integrity="sha256-invalid"),

@@ -24,6 +24,10 @@ The measured pipeline and browser examples are recorded in
 [`tests/evidence/tdd-slices.json`](../../tests/evidence/tdd-slices.json). They
 also show that target parity alone does not authorize legacy deletion.
 
+The [legacy frontend removal inventory](legacy-frontend-removal-inventory.md)
+maps every API-shaped store, type, component test, and directly related
+frontend suite to static target evidence and explicit issue #70 blocking gates.
+
 ## Locations and naming
 
 | Evidence | Location | Naming rule |
@@ -33,8 +37,9 @@ also show that target parity alone does not authorize legacy deletion.
 | Measured evidence | `tests/evidence/` | `<experiment-or-gate>.json` |
 | Repository harness tests | `tests/harness/` | `test_<behavior>.py` |
 | Pipeline target tests | `src/pipeline/tests/<domain>/` | `test_<behavior>.py` |
-| Frontend target tests | `src/frontend/src/__tests__/<domain>/` | `<behavior>.<kind>.test.ts[x]` |
-| Browser journeys | `tests/browser/` | `<journey>.spec.ts` when #70 adds Playwright |
+| Static browser unit/component tests | `src/web/src/<domain>/` | `<behavior>.test.ts[x]` |
+| Static browser journeys | `src/web/tests/` | `<journey>.spec.ts` |
+| Legacy frontend evidence | `src/frontend/src/` | Historical test names remain until their approved retirement PR |
 
 Builders belong next to the consuming test suite under a `builders/` directory.
 They expose domain intent and must not copy legacy request, database, TiTiler,
@@ -44,6 +49,8 @@ or server-lifecycle types into target tests.
 
 Every suite declares:
 
+- lifecycle `status`, an approved `removalGate`, and concrete
+  `replacementEvidence` when retired;
 - owner and purpose;
 - exact source and changed-path patterns;
 - migration disposition and replacement gate;
@@ -51,11 +58,23 @@ Every suite declares:
 - measured or traceable estimated cost;
 - flake status and accountable owner.
 
-`baselineTests` locks every discovered current test file. The inventory check
-fails when a baseline path disappears. A retirement PR must keep the entry,
-set `status` to `retired`, cite the approved `removalGate`, and put the target
-test/PR/report in `replacementEvidence`. New tests must receive a baseline
-entry and suite ownership in the PR that introduces them.
+`baselineTests` locks every discovered current test file. An active suite must
+use `status: active` with null suite-level retirement metadata, and every one
+of its `sourcePaths` patterns must resolve. A retirement PR keeps both the
+suite and baseline history, changes them to `status: retired`, cites the
+approved `removalGate`, and records the target test, PR, or report in
+`replacementEvidence`. Retired source paths may be absent because deletion is
+the event they record; a retired baseline path must be absent. The validator
+rejects on-disk tests marked retired and active baseline tests owned by a
+retired suite.
+
+Only active suites own discovered tests or participate in changed-path
+routing. Selection, the credential-free fast filter, and command execution
+each reject retired suites independently, including direct `--run` use. The
+legacy Compose smoke test is discovered only while its script exists, so its
+approved removal cannot create a phantom unowned test. New tests must receive
+an active baseline entry and active suite ownership in the PR that introduces
+them.
 
 No `WIP`, skip, quarantine, or reduced assertion count is removal evidence.
 Coverage percentage is not replacement evidence. A replacement must cite the
@@ -85,6 +104,10 @@ The tiers have different purposes:
 
 A fast pass cannot waive regional or release evidence. Promotion workflows in
 #61 must consume the same suite IDs rather than maintain an unrelated path map.
+
+Settlement search validation and its fixture-versus-production evidence limits
+are documented in the
+[static settlement search runbook](../operations/static-settlement-search.md).
 
 ## Path-aware pull request CI
 

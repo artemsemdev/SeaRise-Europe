@@ -49,11 +49,13 @@ from .contracts import (
     SupplyChainContractError,
     _component_for_input,
     _is_dependency_input,
+    _is_v1_non_candidate_dependency,
     _role_for_input,
     _validate_real_source_unverified_evidence,
     _validate_schema,
     validate_dependency_inventory,
 )
+from .historical_inventory import materialize_historical_dependency_authority
 
 _PROVENANCE = PurePosixPath("provenance.intoto.jsonl")
 _ENVELOPE = PurePosixPath("evidence-envelope.json")
@@ -497,7 +499,7 @@ def _discover_source_dependencies(
         visited += len(names)
         for name in names:
             logical = _logical(PurePosixPath(*prefix, name).as_posix(), "repository discovery")
-            if name in _IGNORED_DEPENDENCY_PARTS:
+            if name in _IGNORED_DEPENDENCY_PARTS or _is_v1_non_candidate_dependency(logical):
                 continue
             try:
                 linked = os.stat(name, dir_fd=directory, follow_symlinks=False)
@@ -635,20 +637,20 @@ def _repository_snapshots(
             for component in inventory["components"]
             for item in component["inputs"]
         }
-        for logical in dependency_paths:
+        for dependency_logical in dependency_paths:
             raw = _read_bounded(
                 descriptor,
-                logical,
-                f"dependency input {logical}",
+                dependency_logical,
+                f"dependency input {dependency_logical}",
                 maximum=_MAX_DEPENDENCY_BYTES,
                 budget=budget,
             )
-            if _sha256(raw) != recorded_sha256[logical]:
-                _fail(f"dependency input SHA-256 mismatch: {logical}")
-            repository_files[logical] = raw
+            if _sha256(raw) != recorded_sha256[dependency_logical]:
+                _fail(f"dependency input SHA-256 mismatch: {dependency_logical}")
+            repository_files[dependency_logical] = raw
         sboms: dict[str, bytes] = {}
-        for logical in _SBOM_PATHS:
-            source = _SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
+        for sbom_logical in _SBOM_PATHS:
+            source = _SBOM_ROOT / PurePosixPath(sbom_logical).relative_to("sbom")
             raw = _read_bounded(
                 descriptor,
                 source,
@@ -656,12 +658,12 @@ def _repository_snapshots(
                 maximum=_MAX_SBOM_BYTES,
                 budget=budget,
             )
-            sboms[logical] = raw
+            sboms[sbom_logical] = raw
             if source in repository_files:
                 _fail(f"repository snapshot path is duplicated: {source}")
             repository_files[source] = raw
-        for logical, raw in repository_files.items():
-            _snapshot_fd(destination_descriptor, logical, raw)
+        for snapshot_logical, raw in repository_files.items():
+            _snapshot_fd(destination_descriptor, snapshot_logical, raw)
         baseline = _validate_tree(destination_descriptor, repository_files)
         with _descriptor_working_directory(destination_descriptor):
             descriptor_root = Path(".")
@@ -671,13 +673,19 @@ def _repository_snapshots(
             )
             if validated_inventory != inventory:
                 _fail("dependency inventory validator did not consume descriptor snapshot bytes")
-            for logical in _SBOM_PATHS:
-                source = _SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
+            for sbom_logical in _SBOM_PATHS:
+                source = _SBOM_ROOT / PurePosixPath(sbom_logical).relative_to("sbom")
                 validated = _validate_sbom_authority(
-                    logical, descriptor_root / source, descriptor_root
+                    sbom_logical,
+                    descriptor_root / source,
+                    descriptor_root,
+                    descriptor_root / _DEPENDENCY_INVENTORY,
                 )
-                if canonical_provenance_bytes(validated) != sboms[logical]:
-                    _fail(f"SBOM validator did not consume descriptor snapshot bytes: {logical}")
+                if canonical_provenance_bytes(validated) != sboms[sbom_logical]:
+                    _fail(
+                        "SBOM validator did not consume descriptor snapshot bytes: "
+                        f"{sbom_logical}"
+                    )
         _validate_tree(destination_descriptor, repository_files, baseline=baseline)
         current_discovery, current_records = _discover_source_dependencies(descriptor)
         if current_discovery != discovered or current_records != source_baseline:
@@ -720,7 +728,12 @@ def _validate_snapshot_authorities(
             _fail("dependency inventory validator did not consume descriptor snapshot bytes")
         for logical in _SBOM_PATHS:
             source = _SBOM_ROOT / PurePosixPath(logical).relative_to("sbom")
-            validated = _validate_sbom_authority(logical, descriptor_root / source, descriptor_root)
+            validated = _validate_sbom_authority(
+                logical,
+                descriptor_root / source,
+                descriptor_root,
+                descriptor_root / _DEPENDENCY_INVENTORY,
+            )
             if canonical_provenance_bytes(validated) != sboms[logical]:
                 _fail(f"SBOM validator did not consume descriptor snapshot bytes: {logical}")
     with _descriptor_working_directory(candidate_descriptor):
@@ -1315,14 +1328,20 @@ def finalize_production_evidence(
         _fail("production evidence finalization is non-reentrant")
     try:
         try:
-            return _finalize_production_evidence(
-                candidate_root,
+            profile = repository_root / "contracts/supply-chain/v2/static-target-profile.json"
+            with materialize_historical_dependency_authority(
+                profile,
                 repository_root=repository_root,
-                controlled_build_run_id=controlled_build_run_id,
-                manifest_bundle=manifest_bundle,
-                provenance_bundle=provenance_bundle,
-                output_root=output_root,
-            )
+            ) as (historical_root, _historical_inventory):
+                return _finalize_production_evidence(
+                    candidate_root,
+                    repository_root=repository_root,
+                    repository_authority_root=historical_root,
+                    controlled_build_run_id=controlled_build_run_id,
+                    manifest_bundle=manifest_bundle,
+                    provenance_bundle=provenance_bundle,
+                    output_root=output_root,
+                )
         except ProvenanceContractError as exc:
             raise SupplyChainContractError(str(exc)) from exc
     finally:
@@ -1333,6 +1352,7 @@ def _finalize_production_evidence(
     candidate_root: Path,
     *,
     repository_root: Path = REPOSITORY_ROOT,
+    repository_authority_root: Path,
     controlled_build_run_id: str,
     manifest_bundle: Path,
     provenance_bundle: Path,
@@ -1394,7 +1414,7 @@ def _finalize_production_evidence(
                     repository_files,
                     repository_baseline,
                 ) = _repository_snapshots(
-                    repository_root,
+                    repository_authority_root,
                     repository_snapshot,
                     repository_descriptor,
                     budget,

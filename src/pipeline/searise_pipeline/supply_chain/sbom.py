@@ -681,7 +681,52 @@ def _assert_graph_reachable(
         raise SupplyChainContractError(f"unreachable npm package entries: {', '.join(unreachable)}")
 
 
-def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, Any]:
+def _npm_application_entry(
+    root: Mapping[str, Any],
+    packages: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], frozenset[str], str | None]:
+    """Resolve either a traditional root package or one exact npm workspace app."""
+    workspaces = root.get("workspaces")
+    if workspaces is None:
+        return root, frozenset(), None
+    if (
+        not isinstance(workspaces, list)
+        or len(workspaces) != 1
+        or not isinstance(workspaces[0], str)
+    ):
+        raise SupplyChainContractError("npm workspace declaration must name one exact path")
+    workspace_path = _logical_path(workspaces[0])
+    if any(character in workspace_path for character in "*?[]{}"):
+        raise SupplyChainContractError("npm workspace declaration must name one exact path")
+    workspace = packages.get(workspace_path)
+    if not isinstance(workspace, dict):
+        raise SupplyChainContractError("npm workspace package entry is missing")
+    workspace_name = _validate_npm_name(
+        workspace.get("name"), context=f"workspace {workspace_path}"
+    )
+    workspace_version = workspace.get("version")
+    if not isinstance(workspace_version, str) or not workspace_version:
+        raise SupplyChainContractError("npm workspace package version is missing")
+    for group in _ROOT_GROUPS:
+        if root.get(group, {}) != {}:
+            raise SupplyChainContractError(
+                "npm workspace lock must declare application dependencies in the workspace"
+            )
+    link_path = f"node_modules/{workspace_name}"
+    link = packages.get(link_path)
+    if link != {"resolved": workspace_path, "link": True}:
+        raise SupplyChainContractError("npm workspace link does not match its exact package path")
+    return workspace, frozenset({workspace_path, link_path}), workspace_path
+
+
+def _generate_npm_sbom_file(
+    lock_path: Path,
+    *,
+    logical_path: str,
+    scope: str,
+) -> dict[str, Any]:
+    if scope not in {"frontend-npm-lock-only", "static-web-npm-lock-only"}:
+        raise SupplyChainContractError("unsupported npm SBOM scope")
     input_bytes, lock = _load_lock_bytes(lock_path)
     if lock.get("lockfileVersion") != 3 or lock.get("requires") is not True:
         raise SupplyChainContractError("npm SBOM generation requires package-lock v3")
@@ -689,27 +734,33 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
     if not isinstance(packages, dict) or not isinstance(packages.get(""), dict):
         raise SupplyChainContractError("package-lock v3 must contain one root package")
     root = packages[""]
-    if "workspaces" in root:
-        raise SupplyChainContractError("npm workspaces are unsupported")
-    root_name = root.get("name")
-    root_version = root.get("version")
+    if lock.get("name") != root.get("name"):
+        raise SupplyChainContractError("npm lock and root package identity mismatch")
+    application, excluded_paths, workspace_path = _npm_application_entry(root, packages)
+    root_name = application.get("name")
+    root_version = application.get("version")
     if (
         not isinstance(root_name, str)
         or not root_name
         or not isinstance(root_version, str)
         or not root_version
-        or lock.get("name") != root_name
-        or lock.get("version") != root_version
+        or (workspace_path is None and lock.get("name") != root_name)
+        or (workspace_path is None and lock.get("version") != root_version)
     ):
         raise SupplyChainContractError("npm root name/version identity mismatch")
     _validate_npm_name(root_name, context="root package")
 
-    package_entries = {path: entry for path, entry in packages.items() if path}
+    package_entries = {
+        path: entry
+        for path, entry in packages.items()
+        if path and path not in excluded_paths
+    }
     if not all(
         isinstance(path, str) and isinstance(entry, dict) for path, entry in package_entries.items()
     ):
         raise SupplyChainContractError("npm package entries must be objects")
-    alias_targets = _alias_targets(packages)
+    dependency_authority = {"": application, **package_entries}
+    alias_targets = _alias_targets(dependency_authority)
     components = [
         _npm_component(path, package_entries[path], alias_targets)
         for path in sorted(package_entries)
@@ -718,12 +769,12 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
     refs = {path: _npm_ref(path) for path in package_entries}
     input_sha256 = _sha256_bytes(input_bytes)
     root_ref = f"urn:searise:sbom:npm-root:sha256:{input_sha256}"
-    _dependency_groups(root, root=True)
+    _dependency_groups(application, root=True)
     root_properties: list[tuple[str, object]] = [
         (
             f"npm.root.{group}",
             json.dumps(
-                root.get(group, {}),
+                application.get(group, {}),
                 ensure_ascii=False,
                 separators=(",", ":"),
                 sort_keys=True,
@@ -736,9 +787,11 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
             ("input.path", _logical_path(logical_path)),
             ("input.sha256", input_sha256),
             ("production-claim", False),
-            ("scope", "frontend-npm-lock-only"),
+            ("scope", scope),
         ]
     )
+    if workspace_path is not None:
+        root_properties.append(("npm.workspace.path", workspace_path))
     root_component = {
         "type": "application",
         "bom-ref": root_ref,
@@ -751,7 +804,9 @@ def _generate_npm_sbom_file(lock_path: Path, *, logical_path: str) -> dict[str, 
     relationships: list[dict[str, Any]] = [
         {
             "ref": root_ref,
-            "dependsOn": list(_resolved_edges(None, root, package_entries, refs)),
+            "dependsOn": list(
+                _resolved_edges(None, application, package_entries, refs)
+            ),
         }
     ]
     relationships.extend(
@@ -825,10 +880,11 @@ def generate_npm_sbom(
     *,
     logical_path: str,
     repository_root: Path | None = None,
+    scope: str = "frontend-npm-lock-only",
 ) -> dict[str, Any]:
     """Generate a deterministic CycloneDX 1.7 graph from package-lock v3."""
     if repository_root is None:
-        return _generate_npm_sbom_file(lock_path, logical_path=logical_path)
+        return _generate_npm_sbom_file(lock_path, logical_path=logical_path, scope=scope)
     authority = _repository_lock_bytes(
         lock_path,
         repository_root=repository_root,
@@ -837,7 +893,11 @@ def generate_npm_sbom(
     with tempfile.TemporaryDirectory(prefix="searise-npm-sbom-") as temporary:
         snapshot = Path(temporary) / "package-lock.json"
         snapshot.write_bytes(authority)
-        document = _generate_npm_sbom_file(snapshot, logical_path=logical_path)
+        document = _generate_npm_sbom_file(
+            snapshot,
+            logical_path=logical_path,
+            scope=scope,
+        )
     if authority != _repository_lock_bytes(
         lock_path,
         repository_root=repository_root,
@@ -903,6 +963,7 @@ def validate_npm_sbom(
     *,
     repository_root: Path,
     logical_path: str,
+    scope: str = "frontend-npm-lock-only",
 ) -> dict[str, Any]:
     """Validate exact canonical BOM bytes against the current npm lock authority."""
     raw, document = _read_canonical_npm_sbom(sbom_path)
@@ -910,6 +971,7 @@ def validate_npm_sbom(
         lock_path,
         repository_root=repository_root,
         logical_path=logical_path,
+        scope=scope,
     )
     if raw != canonical_sbom_bytes(expected):
         raise SupplyChainContractError("npm SBOM differs from its lock authority")
@@ -922,12 +984,14 @@ def publish_npm_sbom(
     *,
     repository_root: Path,
     logical_path: str,
+    scope: str = "frontend-npm-lock-only",
 ) -> dict[str, Any]:
     """Generate and durably publish one immutable npm SBOM."""
     document = generate_npm_sbom(
         lock_path,
         repository_root=repository_root,
         logical_path=logical_path,
+        scope=scope,
     )
     write_new_sbom(output_path, canonical_sbom_bytes(document))
     return document

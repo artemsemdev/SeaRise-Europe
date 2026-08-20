@@ -1,15 +1,20 @@
 {
   "archiveSha256": "d3b1c2ed093cca491db2461e67b782bcca98763d326378ffee39908c2b094e91",
-  "byteSize": 119705,
-  "derivation": "verified-archive-native-grid-subset-no-resampling",
+  "byteSize": 119701,
+  "contractRebind": {
+    "previousContractSha256": "be5f9a1b43a97819a0a06a4cfdeb388896205e8361d7aa3f70158ac3d7eec93f",
+    "previousFixtureSha256": "edd929a5ce15447d6a960cbc94ec716e2d22f44613dce1e009a6855463c4544c",
+    "scientificValuesChanged": false
+  },
+  "derivation": "verified-archive-native-grid-subset-no-resampling-contract-rebind",
   "fixtureId": "ar6-europe-regional-source-v1",
   "memberSha256": {
     "ssp1-26": "28ca163c13470047aefb75ae8f4a8bc6e06c3e44b824ff37e8743ca8d3a1b716",
     "ssp2-45": "3f31aadb53b7962a729a839cd58e841f171e72575f9e2b802399be6656aa8cb8",
     "ssp5-85": "b3bcf98c6a17b43fbb24d0e60ede382886f3487883022aa88b513ea582a607e0"
   },
-  "releaseContractSha256": "be5f9a1b43a97819a0a06a4cfdeb388896205e8361d7aa3f70158ac3d7eec93f",
+  "releaseContractSha256": "75cd7e4966af2067a96584ca15a7e11278b8e8a405f49bf2df84f7589a8938ee",
   "scientificReleaseEligible": false,
-  "sha256": "edd929a5ce15447d6a960cbc94ec716e2d22f44613dce1e009a6855463c4544c",
-  "sourceArchiveVerifiedForThisWrite": true
+  "sha256": "dcf79b058fb73fee9a78768ed813f7239998446281db9f7cb5e4afa0252d5484",
+  "sourceArchiveVerifiedForThisWrite": false
 }
