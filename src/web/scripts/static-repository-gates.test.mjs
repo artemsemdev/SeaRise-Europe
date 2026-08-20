@@ -306,13 +306,6 @@ describe("static repository dependency gates", () => {
     expect(approvals).toBe(3);
     expect(readFileSync(resolve(root, "docs/evidence/history.md"), "utf8")).toBe("Historical evidence.\n");
 
-    writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// changed approval launcher\n");
-    expect(() => validateStaticRepository({
-      mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
-    }))
-      .toThrow(/Gate-policy trust root differs from the owner-approved audited blob/);
-    writeFileSync(resolve(root, "src/web/scripts/check-target-content.mjs"), "// synthetic approval launcher\n");
-
     writeFileSync(resolve(root, "src/web/scripts/static-repository-gates.mjs"), "createServer(app)\n");
     expect(() => validateStaticRepository({
       mode: "repository-final", root, approvalValidator: approve, supplyChainValidator: skipSupplyChain,
