@@ -1276,3 +1276,53 @@ def test_issue71_profile_activation_rejects_remaining_authority_state() -> None:
         adapter._activate_static_profile(
             engine, drifted, operation, workflows, verify_target=True
         )
+
+
+def test_issue71_dependency_prunes_are_exact_and_path_specific() -> None:
+    adapter = _load_issue71_adapter()
+    engine = adapter.configure_engine(ROOT)
+
+    pyproject = adapter._prune_pyproject(
+        engine, (ROOT / "src/pipeline/pyproject.toml").read_bytes()
+    ).decode()
+    requirements = adapter._prune_requirements(
+        engine, (ROOT / "src/pipeline/requirements-pipeline.txt").read_bytes()
+    ).decode()
+
+    for retired in ("azure-storage-blob", "psycopg2-binary"):
+        assert retired not in pyproject
+        assert retired not in requirements
+    assert '\n    "pipeline",\n' not in pyproject
+    assert '\n    "searise_pipeline.domain",\n' not in pyproject
+    assert '\npipeline = "."\n' not in pyproject
+    assert '    "searise_pipeline",\n' in pyproject
+
+
+def test_issue71_dependency_prunes_reject_prestate_drift() -> None:
+    adapter = _load_issue71_adapter()
+    engine = adapter.configure_engine(ROOT)
+    pyproject = (ROOT / "src/pipeline/pyproject.toml").read_bytes().replace(
+        b'    "pipeline",\n', b'    "pipeline-legacy",\n'
+    )
+
+    with pytest.raises(engine.PlanError, match="exact entry pre-state changed"):
+        adapter._prune_pyproject(engine, pyproject)
+
+
+def test_issue71_dependency_operations_accept_no_variable_scope() -> None:
+    adapter = _load_issue71_adapter()
+    schema = adapter._issue71_schema(
+        json.loads((V2 / "removal-plan.schema.json").read_bytes())
+    )
+    operations = schema["$defs"]["operation"]["oneOf"]
+
+    for kind in (
+        "pyproject-static-runtime-prune",
+        "requirements-static-runtime-prune",
+    ):
+        definition = next(
+            item for item in operations if item["properties"]["kind"].get("const") == kind
+        )
+        assert definition["additionalProperties"] is False
+        assert definition["required"] == ["id", "kind"]
+        assert set(definition["properties"]) == {"id", "kind"}
