@@ -449,6 +449,7 @@ def configure_engine(repository_root: Path) -> Any:
     engine.SUPPORT_REWRITE_PATHS = {
         *engine.SUPPORT_REWRITE_PATHS,
         "src/pipeline/tests/supply_chain/test_static_target_profile.py",
+        "src/web/scripts/static-repository-gates.mjs",
         "src/web/scripts/static-repository-gates.test.mjs",
         "tests/harness/test_changed_suites.py",
         "tests/repository-removal/test_validate_removal_plan_v2.py",
