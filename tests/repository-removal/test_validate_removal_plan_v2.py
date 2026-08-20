@@ -901,3 +901,128 @@ def test_issue70_inventory_retirement_accepts_current_exact_frontend_set() -> No
 
     assert retired_suites.issuperset(suite_ids)
     assert retired_baselines.issuperset(baseline_paths)
+
+
+def test_issue70_workflow_handoff_is_exact_and_step_scoped() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    content = b"""jobs:
+  authority:
+    steps:
+      - name: Enforce repository-removal lifecycle state
+        run: >-
+          python scripts/repository/validate_removal_plan_v2.py ci
+      - name: Preserve following step
+        run: echo preserved
+"""
+    operation = {
+        "id": "handoff-issue-70-validator",
+        "kind": "workflow-step-run-replace",
+        "job": "authority",
+        "name": "Enforce repository-removal lifecycle state",
+        "from": "python scripts/repository/validate_removal_plan_v2.py ci",
+        "to": "python scripts/repository/validate_issue70_removal.py ci",
+    }
+
+    transformed = adapter._replace_workflow_step_run(engine, content, operation)
+
+    assert b"validate_issue70_removal.py ci" in transformed
+    assert b"echo preserved" in transformed
+    with pytest.raises(engine.PlanError, match="source must match once"):
+        adapter._replace_workflow_step_run(
+            engine, content, {**operation, "from": "echo preserved"}
+        )
+
+
+def test_issue70_schema_accepts_only_explicit_workflow_handoff_shape() -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    schema = json.loads((V2 / "removal-plan.schema.json").read_bytes())
+    plan = _issue70_plan()
+    plan["entries"][0]["operations"].append(
+        {
+            "id": "handoff-issue-70-validator",
+            "kind": "workflow-step-run-replace",
+            "job": "repository-removal-v2",
+            "name": "Enforce repository-removal lifecycle state",
+            "from": "validate_removal_plan_v2.py ci",
+            "to": "validate_issue70_removal.py ci",
+        }
+    )
+    plan["entries"][0]["operations"].sort(key=lambda operation: operation["id"])
+
+    engine._schema_validate_document(plan, schema, "removal plan")
+    del plan["entries"][0]["operations"][-1]["name"]
+    with pytest.raises(engine.PlanError, match="schema violation"):
+        engine._schema_validate_document(plan, schema, "removal plan")
+
+
+def test_issue70_materializer_hands_off_before_profile_rebind(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _load_issue70_adapter()
+    engine = adapter.configure_engine(ROOT)
+    workflow_path = ".github/workflows/ci.yml"
+    profile_path = "contracts/supply-chain/v2/static-target-profile.json"
+    workflow = b"""jobs:
+  authority:
+    steps:
+      - name: Enforce repository-removal lifecycle state
+        run: >-
+          python scripts/repository/validate_removal_plan_v2.py ci
+"""
+    plan = {
+        "auditedCommit": "0" * 40,
+        "entries": [
+            {
+                "path": workflow_path,
+                "after": {"state": "present"},
+                "operations": [
+                    {
+                        "id": "delete-output",
+                        "kind": "workflow-output-delete",
+                    },
+                    {
+                        "id": "handoff",
+                        "kind": "workflow-step-run-replace",
+                        "job": "authority",
+                        "name": "Enforce repository-removal lifecycle state",
+                        "from": "validate_removal_plan_v2.py ci",
+                        "to": "validate_issue70_removal.py ci",
+                    },
+                ],
+            },
+            {
+                "path": profile_path,
+                "after": {"state": "present"},
+                "operations": [
+                    {
+                        "id": "activate",
+                        "kind": "static-profile-activation-transition",
+                    }
+                ],
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        engine,
+        "_issue70_base_materialize_plan",
+        lambda root, plan, verify_after: {
+            workflow_path: workflow,
+            profile_path: b"pending profile",
+        },
+    )
+    monkeypatch.setattr(engine, "_audited_blob", lambda *args: b"pending profile")
+
+    def activate(before, operation, materialized, verify_target):
+        assert b"validate_issue70_removal.py ci" in materialized[workflow_path]
+        return b"activated profile"
+
+    monkeypatch.setattr(engine, "_static_profile_activation", activate)
+
+    materialized = adapter._issue70_materialize_plan(
+        engine, ROOT, plan, verify_after=False
+    )
+
+    assert b"validate_issue70_removal.py ci" in materialized[workflow_path]
+    assert materialized[profile_path] == b"activated profile"
