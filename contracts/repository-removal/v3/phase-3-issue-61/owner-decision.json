@@ -1,0 +1,25 @@
+{
+  "$schema": "../gate-policy-evolution.schema.json",
+  "schemaVersion": "3.0.0",
+  "documentType": "owner-decision",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-08-25T12:05:13Z",
+  "preapprovalCommit": "3d6eca009edeb9c961ff4aa727d7e34758904750",
+  "preapprovalSha256": "e8904c2a51ea85a5310275582e5f6a9295aba6eb017344904d8f4b8f106ee21b",
+  "approvalText": "I approve Phase 3 gate-policy evolution v1 for issue #61 at preapproval commit 3d6eca009edeb9c961ff4aa727d7e34758904750, preapproval SHA-256 e8904c2a51ea85a5310275582e5f6a9295aba6eb017344904d8f4b8f106ee21b, audited base 4df5bfdeaaa66b68222519276fb72c912e457f97, and immutable Phase 2 issue #71 receipt commit fd38eddccb5dce6405df48a8f25c045e740efdca. This authorizes only the exact before/after Git blob states for the governed repository paths listed in that preapproval. It does not modify or waive issue #71 P/D/A/R history and does not authorize Candidate-v7 or TAR inspection, copying, publication, or upload, or deletion or mutation of any external resource, credential, GitHub environment, or secret.",
+  "approvalSource": {
+    "issue": 61,
+    "commentId": 5410117561,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/61#issuecomment-5410117561",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "5c709a4393fa4f5a8a9ca251de3f0cc8b88eaf10174822d3e264f58b69df6542"
+  },
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
