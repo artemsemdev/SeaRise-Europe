@@ -123,6 +123,8 @@ component jobs between them are conditional:
   full-stack smoke test;
 - image builds run only for production/container inputs, not test-only edits;
 - Markdown and other documentation-only changes skip all heavyweight jobs;
+- tracked Markdown still runs local-link validation, so a docs-only change
+  cannot retain a link to a removed repository target;
 - router or workflow changes run every route so filtering cannot weaken itself.
 
 Manual CI and scheduled/manual CodeQL runs enable every route. Renames evaluate
@@ -131,7 +133,14 @@ former owner.
 
 Branch protection should require the stable `CI Gate` and `CodeQL Gate`
 checks, not each conditional implementation job. A skipped component is valid
-only when its aggregate gate succeeds.
+only when its aggregate gate proves that the component was not selected. A
+selected job that reports `skipped`, or an unselected job that runs, fails the
+aggregate. Target release v1/v2 and HTTP-delivery contracts route both the
+pipeline producer and `src/web` consumer gates.
+
+The complete routing, retention, waiver, trust-boundary, rollback, and future
+#62/#74 activation rules are documented in the
+[path-aware CI operator guide](../operations/path-aware-ci.md).
 
 ## Review ownership
 

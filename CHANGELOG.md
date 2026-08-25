@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added fail-closed static-first CI routing with lightweight tracked-Markdown
+  link validation, target release-v2 and HTTP-delivery producer/consumer
+  routing, and exact aggregate checks that reject selected jobs reported as
+  skipped. `CI Gate` and `CodeQL Gate` remain the stable required statuses;
+  Cloudflare/OpenTofu and managed-platform paths are explicitly deferred to
+  #62/#74 and cannot land without activating their owner routes and jobs.
+
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed
   issue #72 chain. Future Next.js removal approval must bind the dedicated

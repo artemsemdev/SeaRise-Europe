@@ -117,7 +117,7 @@ range requests.
 | Exact AR6 projection lookup | Implemented for all nine scenario/horizon combinations |
 | GeoNames settlement search | Implemented in a Web Worker from release-bound static indexes |
 | Generic static-host delivery | Build, serve, range, accessibility, and Lighthouse gates implemented |
-| Reference Cloudflare/OpenTofu deployment | Configuration retained; live provisioning is separate |
+| Reference Cloudflare/OpenTofu deployment | Deferred to #62/#74; no live or checked-in target IaC is claimed |
 | Superseded repository runtime | Removed; recoverable through Git history |
 
 The active sequence and exit gates are in the
@@ -133,7 +133,7 @@ SeaRise Europe/
 ├── data/
 │   ├── geometry/          Versioned support/coastal source geometry
 │   └── fixtures/          Small, committed test release
-├── infra/                 OpenTofu for static hosting and object delivery
+├── contracts/ci/          CI fitness and future-owner activation contract
 └── docs/
     ├── product/           Product intent, language, personas, and mocks
     ├── architecture/      Current architecture and ADR register
