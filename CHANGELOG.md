@@ -6,10 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Added a Phase 3 gate-policy evolution preapproval that revalidates the
-  immutable Issue #71 P/D/A/R history at its receipt commit and permits only
-  exact, separately OWNER-approved CI policy blob transitions. Candidate-v7,
-  TAR, publication, and external-resource prohibitions remain unchanged.
+- Added sealed, fail-closed static-first CI routing with tracked-Markdown link
+  validation, release-v2 and HTTP-delivery producer/consumer routing, and
+  exact aggregate checks that reject selected jobs reported as skipped. The
+  corrected v4 P2/D2/A2/R2 authority preserves immutable Issue #71 history and
+  records the conflicting v3 approval as superseded before application.
+  `CI Gate` and `CodeQL Gate` remain the stable required statuses; Cloudflare
+  delivery and managed-platform paths owned by #62/#74 remain deferred and
+  fail closed until their routes and jobs are implemented and activated.
 
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed
