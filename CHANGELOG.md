@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a Phase 3 gate-policy evolution preapproval that revalidates the
+  immutable Issue #71 P/D/A/R history at its receipt commit and permits only
+  exact, separately OWNER-approved CI policy blob transitions. Candidate-v7,
+  TAR, publication, and external-resource prohibitions remain unchanged.
+
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed
   issue #72 chain. Future Next.js removal approval must bind the dedicated

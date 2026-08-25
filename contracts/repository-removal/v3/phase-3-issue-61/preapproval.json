@@ -1,0 +1,110 @@
+{
+  "$schema": "../gate-policy-evolution.schema.json",
+  "schemaVersion": "3.0.0",
+  "documentType": "preapproval",
+  "preapprovalId": "phase-3-issue-61-gate-policy-evolution-v1",
+  "decisionState": "owner-approval-required",
+  "issue": 61,
+  "auditedBaseCommit": "4df5bfdeaaa66b68222519276fb72c912e457f97",
+  "phase2Issue71History": {
+    "preapprovalCommit": "336647a4b9bd0709e8625136ee6b4bfad83309b7",
+    "preapprovalTree": "e8dfb63fec967a5158b7fea359144c8b6a6c9da7",
+    "decisionCommit": "85f51b3dc6837d878675a514e57f8e205dda9a26",
+    "decisionTree": "1260deb7083e26fc1f3e660e70c5070982937967",
+    "appliedCommit": "f942a07b33d89247146e54d2441421ca6dabf316",
+    "appliedTree": "e8d61a187facd894d610a413c39290932d15a08c",
+    "receiptCommit": "fd38eddccb5dce6405df48a8f25c045e740efdca",
+    "receiptTree": "84457c6d403d4b4402e862fd84395ca470396384",
+    "receiptSha256": "bb962fb569218e4a8e7cf74383ece2dc3d766963cbd502637df3e2b11428b8bf"
+  },
+  "authorityPaths": [
+    "CHANGELOG.md",
+    "contracts/repository-removal/README.md",
+    "contracts/repository-removal/v3/gate-policy-evolution.schema.json",
+    "contracts/repository-removal/v3/phase-3-issue-61/preapproval.json",
+    "scripts/repository/validate_gate_policy_evolution.py"
+  ],
+  "trustRootSha256": {
+    "gatePolicySchema": "7894dea81187b7f3b11c99cb18917f67142d97886caa1bc69c281c2b5cff3058",
+    "gatePolicyValidator": "06d40be346c343ef9d754c8fc29dd4adc6ba34ce8a180d23e7fc1b85da444483"
+  },
+  "governedPaths": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "77e1886d7ea9df933d5990765b43d3c9fd73df29", "sha256": "4b301cac22a0fb2365f13d84d23210b7428be9154bd604a9820c1e19c6e6bd7c" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "5400665653d3cc1739c433c3b4964b0b10200c30", "sha256": "5e35d3bc59e68abde6c48a8b1e68483e28e13324aefb6029ae2ea4b704e2722c" }
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "d9924bb1b8120e21ea0d429521f20d1bc2c15ca2", "sha256": "b7aa256821becf05dc4578ead4d2a9779965770a05c94339e15cdf0b11030214" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "15ee53f42f88d06e777e33e9a03cbbd519912a06", "sha256": "e5596c4ac5ec49616503501160001caab6aedeaa6572cea69adecb4b7e2b0882" }
+    },
+    {
+      "path": "contracts/ci/v1/architecture-fitness.json",
+      "before": { "state": "absent" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "a899cbeef5c0092772f43b9fbd00a8f89dbdd2fd", "sha256": "bde6c09439b7a0364530071ae954ace167f150742092fa5a7136f76cbdaf1c47" }
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.json",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "73ec8ab58b9e6c2c10f94cba428d0dca9c9b6794", "sha256": "bda119408a2a44fce490dc836f90608ec84130d468e1df913c9066adb8732770" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "1a8bb826a9f48e07bd1199ec5c8519dc5f8e0374", "sha256": "967380d5f99e6e03fc6b6139a53e1eab7528b61320fc4cc9d2d0fab561af18c3" }
+    },
+    {
+      "path": "scripts/ci/changed_components.py",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "d56c0fe14fe7d045035696facfc390ab0c6dd792", "sha256": "af2eab6be98f6db96ffacdf6f2cc13fc175ccb1ffa7cf1d23bc931881d1642fd" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "caa0eb20d8e88f541f7e71f3f87d871d6780d57d", "sha256": "1cf6178f913dee3414125e26507bb955b024b549e4521a5f56d8ab21c7fdfcf3" }
+    },
+    {
+      "path": "scripts/ci/validate_markdown.py",
+      "before": { "state": "absent" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "8e0a11ec3fd5b4974de6239f5aff78d3fa22e309", "sha256": "50fd89e1b1d337eb8048180b52bf1506319347e24b51cae40fa24d0a326ec0ad" }
+    },
+    {
+      "path": "scripts/ci/verify_ci_gate.py",
+      "before": { "state": "absent" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "12e8b9e89fe52783d07e581a4ffc258cb27f1a58", "sha256": "faaa87c05fe049ff194c9af7617324512c9682880e048a9b259e5bd347efc98e" }
+    },
+    {
+      "path": "src/web/scripts/check-target-content.mjs",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "4b633cf393633131e540b993ff8121f9e9546eec", "sha256": "768db03bab1d1cb25d46d4221b6f5b42af38ea2e1c76c41e5652b8d53cb809b7" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "7d42b2769d6200bc4966d4b78de9cba68d7b31e4", "sha256": "ca934e10ed12566531ac5226d4881285df1a4dc790bc81547370b74164077866" }
+    },
+    {
+      "path": "tests/harness/test_changed_components.py",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "c9a0a6d01572476d744314acc8c65e02470e339e", "sha256": "c43d93d440c28d16473be4b5e54414ae5b76a8cfce08a3c7e4643d6e240f3209" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "48a967f3e64763a6e67b4650ebede461685aad79", "sha256": "0326c6573c5f38dbdea605afdbe10b5c7f4b2ba0d386b12495df477d499b7a81" }
+    },
+    {
+      "path": "tests/harness/test_ci_gate.py",
+      "before": { "state": "absent" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "0ee401c742443b7c76ada5bb621eee181e2ae43f", "sha256": "4745b0c3232ae17590450ac456024650aafbafd5c0ed7777a8f8f30e9e17acd7" }
+    },
+    {
+      "path": "tests/harness/test_immutable_dependencies.py",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "be58194dd0a4366db0f9689c5c2b9aa1f0f4a0cd", "sha256": "252a21a8fda88f3ac62c297198fb6bbf5813a18ff1e354fc5650ed4ca4a76b06" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "06b0ab2fd66cd87b16b1907897cdf1c3be75ecab", "sha256": "3f283ac10f80f3aca446ba8b95ef95675ea3db11ef0f737366e727d5a37f5ddf" }
+    },
+    {
+      "path": "tests/harness/test_validate_markdown.py",
+      "before": { "state": "absent" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "1536d093e1c4241d09f56168f0e70b77b21d06e9", "sha256": "79bcde694c5846d6faadcc799332902ef9ec409ab1a1d41d5afddf8be218c43e" }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_gate_policy_evolution.py",
+      "before": { "state": "absent" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "e8ba59158fc5120a712c26dbf029e32149c9104a", "sha256": "ce2777c23ae737ec020a4278a04e7578c59a5b9ac9beb7c2d83a7cc1e9be0f63" }
+    },
+    {
+      "path": "tests/test-inventory.json",
+      "before": { "state": "present", "mode": "100644", "gitBlobSha": "fae949ee39f4dfec4359b3bca882554781118d29", "sha256": "3b3343bfde9bae1b9ff4f819ddf747850ea514a5255ba16cffaa06ffc6378a8c" },
+      "after": { "state": "present", "mode": "100644", "gitBlobSha": "bc14cd36acdcdc8e86e2243b0727b8378b554e5b", "sha256": "e7534ee930b40b1b4867c02f258b01fe193fad53112115e342b5d5cae7f0e93a" }
+    }
+  ],
+  "ownerApprovalTemplate": "I approve Phase 3 gate-policy evolution v1 for issue #61 at preapproval commit <PREAPPROVAL_COMMIT>, preapproval SHA-256 <PREAPPROVAL_SHA256>, audited base 4df5bfdeaaa66b68222519276fb72c912e457f97, and immutable Phase 2 issue #71 receipt commit fd38eddccb5dce6405df48a8f25c045e740efdca. This authorizes only the exact before/after Git blob states for the governed repository paths listed in that preapproval. It does not modify or waive issue #71 P/D/A/R history and does not authorize Candidate-v7 or TAR inspection, copying, publication, or upload, or deletion or mutation of any external resource, credential, GitHub environment, or secret.",
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
