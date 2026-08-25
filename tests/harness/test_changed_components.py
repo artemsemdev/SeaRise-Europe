@@ -7,7 +7,10 @@ import unittest
 from pathlib import Path
 
 from scripts.ci.changed_components import (
+    ArchitectureFitnessContractError,
     OUTPUTS,
+    DeferredCapabilityError,
+    _load_fitness_contract,
     classify_paths,
     parse_name_status,
     release_only_outputs,
@@ -33,6 +36,82 @@ def _workflow_event_paths(workflow: str, event: str, next_event: str) -> set[str
 
 
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_ci_wires_docs_and_exact_aggregate_verification(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        changes = workflow.split("  changes:", maxsplit=1)[1].split(
+            "\n  docs:", maxsplit=1
+        )[0]
+        docs = _workflow_job(workflow, "docs", "web")
+        gate = workflow.split("  ci-gate:", maxsplit=1)[1]
+
+        self.assertIn("docs: ${{ steps.route.outputs.docs }}", changes)
+        self.assertIn("needs.changes.outputs.docs == 'true'", docs)
+        self.assertIn("python3 scripts/ci/validate_markdown.py", docs)
+        self.assertIn("      - docs", gate)
+        self.assertIn("scripts/ci/verify_ci_gate.py", gate)
+        self.assertIn("ROUTES: ${{ toJSON(needs.changes.outputs) }}", gate)
+        self.assertIn("persist-credentials: false", gate)
+
+    def test_codeql_gate_uses_exact_route_verification(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/codeql.yml"
+        ).read_text(encoding="utf-8")
+        gate = workflow.split("  codeql-gate:", maxsplit=1)[1]
+
+        self.assertIn("scripts/ci/verify_ci_gate.py", gate)
+        self.assertIn("codeql_javascript", gate)
+        self.assertIn("persist-credentials: false", gate)
+
+    def test_privileged_workflows_are_not_triggered_by_untrusted_pr_code(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        for relative in (
+            ".github/workflows/offline-release-controlled.yml",
+            ".github/workflows/phase-0r-owner-promotion.yml",
+            ".github/workflows/phase-1-release-sign.yml",
+        ):
+            with self.subTest(workflow=relative):
+                workflow = (root / relative).read_text(encoding="utf-8")
+                event_block = workflow.split("permissions:", maxsplit=1)[0]
+                self.assertNotIn("pull_request:", event_block)
+                self.assertNotIn("pull_request_target:", workflow)
+
+    def test_fitness_contract_names_stable_statuses_and_deferred_owners(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        contract = json.loads(
+            (root / "contracts/ci/v1/architecture-fitness.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(contract["requiredStatuses"], ["CI Gate", "CodeQL Gate"])
+        self.assertEqual(
+            {
+                capability["id"]: (capability["ownerIssue"], capability["status"])
+                for capability in contract["capabilities"]
+            },
+            {
+                "static-delivery-iac": (62, "deferred"),
+                "managed-platform-controls": (74, "deferred"),
+            },
+        )
+
+    def test_fitness_contract_cannot_activate_an_unimplemented_route(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        contract = json.loads(
+            (root / "contracts/ci/v1/architecture-fitness.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        contract["capabilities"][0]["status"] = "active"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fitness.json"
+            path.write_text(json.dumps(contract), encoding="utf-8")
+            with self.assertRaisesRegex(
+                ArchitectureFitnessContractError, "has no implemented route"
+            ):
+                _load_fitness_contract(path)
+
     def test_static_quality_routes_every_direct_release_fixture_input(self) -> None:
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/static-quality.yml").read_text(
@@ -85,7 +164,10 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         outputs = classify_paths(["README.md", "docs/architecture/README.md"])
 
         self.assertFalse(outputs["heavy"])
-        self.assertTrue(all(not outputs[name] for name in OUTPUTS))
+        self.assertTrue(outputs["docs"])
+        self.assertTrue(
+            all(not outputs[name] for name in OUTPUTS if name not in {"docs"})
+        )
 
     def test_static_web_change_routes_only_target_web_and_codeql(self) -> None:
         outputs = classify_paths(["src/web/src/App.tsx"])
@@ -235,15 +317,31 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertTrue(outputs["pipeline"])
 
     def test_public_release_contract_routes_static_web_and_pipeline(self) -> None:
-        outputs = classify_paths(["contracts/release/v1/manifest.schema.json"])
-
-        self.assertTrue(outputs["web"])
-        self.assertTrue(outputs["pipeline"])
-        self.assertFalse(outputs["release"])
+        for path in (
+            "contracts/release/v1/manifest.schema.json",
+            "contracts/release/v2/manifest.schema.json",
+            "contracts/http-delivery/v1/policy.json",
+        ):
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["web"])
+                self.assertTrue(outputs["pipeline"])
+                self.assertFalse(outputs["release"])
         candidate = classify_paths(
             ["contracts/candidate-completeness/v1/candidate.schema.json"]
         )
         self.assertTrue(candidate["pipeline"])
+
+    def test_future_owner_paths_fail_closed_until_their_contract_is_activated(
+        self,
+    ) -> None:
+        for path, capability in (
+            ("infra/cloudflare/main.tf", "static-delivery-iac"),
+            ("infra/github/rulesets.tf", "managed-platform-controls"),
+        ):
+            with self.subTest(path=path):
+                with self.assertRaisesRegex(DeferredCapabilityError, capability):
+                    classify_paths([path])
 
     def test_ci_router_change_exercises_every_route(self) -> None:
         outputs = classify_paths(["scripts/ci/changed_components.py"])
@@ -367,7 +465,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("python -m pytest tests/repository-removal", job)
         self.assertIn("tests/harness/test_changed_suites.py", job)
         self.assertIn("validate_supply_chain_contract.py static-profile", job)
-        self.assertIn("github.event.pull_request.base.sha", job)
+        self.assertIn("validate_gate_policy_correction.py ci", job)
         self.assertIn("--verify-owner-comment", job)
         self.assertIn("GH_TOKEN: ${{ github.token }}", job)
         self.assertIn("- repository-removal-v2", gate)

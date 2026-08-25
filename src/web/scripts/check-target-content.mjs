@@ -235,21 +235,11 @@ export function ownerCommentVerificationArguments(helpText, root) {
 }
 
 function approvedRemovalChain(root) {
-  const validator = resolve(root, "scripts/repository/validate_issue71_removal.py");
-  const receiptPath = "contracts/repository-removal/v2/issue-71/application-receipt.json";
-  if (!existsSync(validator)) throw new Error("Issue-71 repository-removal validator is missing");
+  const validator = resolve(root, "scripts/repository/validate_gate_policy_correction.py");
+  if (!existsSync(validator)) throw new Error("Gate-policy evolution validator is missing");
   readRegularFile(validator, null, root);
-  let receiptCommit;
   let headCommit;
   try {
-    const additions = execFileSync(
-      "git", ["log", "--format=%H", "--diff-filter=A", "--", receiptPath],
-      { cwd: root, encoding: "utf8" },
-    ).trim().split("\n").filter(Boolean);
-    if (additions.length !== 1) {
-      throw new Error("issue-71 receipt must have one exact addition commit");
-    }
-    [receiptCommit] = additions;
     headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: root,
       encoding: "utf8",
@@ -261,8 +251,7 @@ function approvedRemovalChain(root) {
     execFileSync("python3", [
       validator,
       "--repository-root", root,
-      "post-application",
-      "--receipt-commit", receiptCommit,
+      "ci",
       "--head-commit", headCommit,
       "--verify-owner-comment",
     ], {
@@ -272,7 +261,7 @@ function approvedRemovalChain(root) {
     });
   } catch (error) {
     const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Issue-71 repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
+    throw new Error(`Gate-policy evolution approval chain is invalid${detail ? `: ${detail}` : ""}`);
   }
   const plan = JSON.parse(readRegularFile(
     resolve(root, "contracts/repository-removal/v2/issue-71/removal-plan.json"),

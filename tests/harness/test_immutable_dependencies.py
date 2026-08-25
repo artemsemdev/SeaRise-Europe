@@ -20,7 +20,7 @@ class ImmutableDependencyTests(unittest.TestCase):
             encoding="utf-8"
         )
         changes_job = workflow.split("  changes:\n", maxsplit=1)[1].split(
-            "\n  web:", maxsplit=1
+            "\n  docs:", maxsplit=1
         )[0]
 
         self.assertNotIn("\n    if:", changes_job)

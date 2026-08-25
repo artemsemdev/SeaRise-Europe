@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "requiredStatuses": [
+    "CI Gate",
+    "CodeQL Gate"
+  ],
+  "nonWaivableGates": [
+    "scientific-regression",
+    "artifact-integrity",
+    "licence-completeness",
+    "scenario-completeness",
+    "four-outcome-contract",
+    "zero-runtime-api",
+    "public-delivery",
+    "release-provenance"
+  ],
+  "capabilities": [
+    {
+      "id": "static-delivery-iac",
+      "ownerIssue": 62,
+      "status": "deferred",
+      "paths": [
+        "infra/cloudflare/**",
+        ".github/workflows/static-delivery*.yml"
+      ],
+      "activation": {
+        "requiredRoute": "static_delivery_iac",
+        "requiredCiJob": "static-delivery-iac"
+      }
+    },
+    {
+      "id": "managed-platform-controls",
+      "ownerIssue": 74,
+      "status": "deferred",
+      "paths": [
+        "infra/github/**",
+        ".github/workflows/iac-*.yml"
+      ],
+      "activation": {
+        "requiredRoute": "managed_platform_controls",
+        "requiredCiJob": "managed-platform-controls"
+      }
+    }
+  ]
+}
