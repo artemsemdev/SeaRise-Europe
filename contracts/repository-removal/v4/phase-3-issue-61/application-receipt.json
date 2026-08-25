@@ -1,0 +1,19 @@
+{
+  "$schema": "../gate-policy-correction.schema.json",
+  "schemaVersion": "4.0.0",
+  "documentType": "application-receipt",
+  "receiptId": "phase-3-issue-61-gate-policy-correction-v1-application",
+  "preapprovalCommit": "e49398964790c949fc9d64010d8fe7416bf90ba3",
+  "decisionCommit": "b9aab46abfd18ecad3f54394e4a5b90681c6677b",
+  "appliedCommit": "236ed27ad54d02b8665fee4c803329c2c88ef5e5",
+  "appliedTree": "0880765fa14e2d37caa0f77926b4b98d998dff43",
+  "preapprovalSha256": "e35c90ea571f7625413775605fcf1e241173e34204b6df682a8a7a2ae7e528de",
+  "ownerDecisionSha256": "40c3d176ae09bac14fa14088e6b1344fd915e5587cc2fa7ddd49fa566964f00a",
+  "governedStateSha256": "41134cda5f3036f8441bb2d0ff48b1bc686ba2e51d3c04cd445c2a7bde4b99e9",
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
