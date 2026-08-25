@@ -124,12 +124,12 @@
         {
           "path": ".github/workflows/ci.yml",
           "role": "workflow",
-          "sha256": "4b301cac22a0fb2365f13d84d23210b7428be9154bd604a9820c1e19c6e6bd7c"
+          "sha256": "826dfa07bd07c45931325063a91359dca9f557d68c683b8ee4491fc8d8aaba6f"
         },
         {
           "path": ".github/workflows/codeql.yml",
           "role": "workflow",
-          "sha256": "b7aa256821becf05dc4578ead4d2a9779965770a05c94339e15cdf0b11030214"
+          "sha256": "e5596c4ac5ec49616503501160001caab6aedeaa6572cea69adecb4b7e2b0882"
         },
         {
           "path": ".github/workflows/offline-release-controlled.yml",

@@ -10,8 +10,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+FITNESS_CONTRACT = ROOT / "contracts/ci/v1/architecture-fitness.json"
 
 OUTPUTS = (
+    "docs",
     "web",
     "pipeline",
     "release",
@@ -19,6 +21,14 @@ OUTPUTS = (
     "codeql_javascript",
     "heavy",
 )
+
+
+class ArchitectureFitnessContractError(ValueError):
+    """The repository-owned routing contract is missing or malformed."""
+
+
+class DeferredCapabilityError(RuntimeError):
+    """A changed path needs an owner gate that has not been activated yet."""
 
 # Changes to routing or either consuming workflow exercise every route. This is
 # deliberately conservative because an incorrect filter can silently remove a
@@ -39,6 +49,8 @@ WEB = (
     "src/web/**",
     "tools/static-quality/**",
     "contracts/release/v1/**",
+    "contracts/release/v2/**",
+    "contracts/http-delivery/**",
     "contracts/supply-chain/v2/**",
     "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
     "docs/methodology.md",
@@ -47,6 +59,13 @@ WEB = (
     "src/pipeline/evidence/phase-1/pmtiles-render-v1/**",
     "src/pipeline/evidence/ar6-regional-release/**",
     "src/pipeline/fixtures/ar6-regional-release/**",
+)
+
+DOCS = (
+    "*.md",
+    "docs/**",
+    "contracts/**/*.md",
+    "src/**/*.md",
 )
 
 
@@ -137,6 +156,107 @@ def _matches(path: str, patterns: Sequence[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
+def _load_fitness_contract(path: Path = FITNESS_CONTRACT) -> dict[str, object]:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ArchitectureFitnessContractError(
+            f"cannot load architecture fitness contract {path}: {error}"
+        ) from error
+    if document.get("schemaVersion") != 1:
+        raise ArchitectureFitnessContractError("unsupported fitness contract version")
+    required_document_fields = {
+        "schemaVersion",
+        "requiredStatuses",
+        "nonWaivableGates",
+        "capabilities",
+    }
+    if set(document) != required_document_fields:
+        raise ArchitectureFitnessContractError(
+            f"fitness contract fields must be exactly {sorted(required_document_fields)}"
+        )
+    if document["requiredStatuses"] != ["CI Gate", "CodeQL Gate"]:
+        raise ArchitectureFitnessContractError(
+            "fitness contract must retain the stable CI Gate and CodeQL Gate statuses"
+        )
+    gates = document["nonWaivableGates"]
+    if (
+        not isinstance(gates, list)
+        or not gates
+        or not all(isinstance(gate, str) and gate for gate in gates)
+        or len(gates) != len(set(gates))
+    ):
+        raise ArchitectureFitnessContractError(
+            "non-waivable fitness gates must be unique non-empty strings"
+        )
+    capabilities = document.get("capabilities")
+    if not isinstance(capabilities, list):
+        raise ArchitectureFitnessContractError("fitness capabilities must be a list")
+    capability_ids: set[str] = set()
+    for capability in capabilities:
+        if not isinstance(capability, dict):
+            raise ArchitectureFitnessContractError("fitness capability must be an object")
+        required = {"id", "ownerIssue", "status", "paths", "activation"}
+        if set(capability) != required:
+            raise ArchitectureFitnessContractError(
+                f"fitness capability fields must be exactly {sorted(required)}"
+            )
+        if capability["status"] not in {"deferred", "active"}:
+            raise ArchitectureFitnessContractError(
+                f"invalid status for capability {capability['id']}"
+            )
+        if not isinstance(capability["id"], str) or not capability["id"]:
+            raise ArchitectureFitnessContractError("capability id must be non-empty")
+        if capability["id"] in capability_ids:
+            raise ArchitectureFitnessContractError(
+                f"duplicate fitness capability {capability['id']}"
+            )
+        capability_ids.add(capability["id"])
+        if not isinstance(capability["ownerIssue"], int):
+            raise ArchitectureFitnessContractError(
+                f"capability {capability['id']} needs an integer owner issue"
+            )
+        if not isinstance(capability["paths"], list) or not capability["paths"]:
+            raise ArchitectureFitnessContractError(
+                f"capability {capability['id']} needs path patterns"
+            )
+        if not all(isinstance(pattern, str) and pattern for pattern in capability["paths"]):
+            raise ArchitectureFitnessContractError(
+                f"capability {capability['id']} path patterns must be strings"
+            )
+        activation = capability["activation"]
+        if not isinstance(activation, dict) or set(activation) != {
+            "requiredRoute",
+            "requiredCiJob",
+        }:
+            raise ArchitectureFitnessContractError(
+                f"capability {capability['id']} needs exact activation fields"
+            )
+        if not all(isinstance(value, str) and value for value in activation.values()):
+            raise ArchitectureFitnessContractError(
+                f"capability {capability['id']} activation values must be strings"
+            )
+        if capability["status"] == "active" and activation["requiredRoute"] not in OUTPUTS:
+            raise ArchitectureFitnessContractError(
+                f"active capability {capability['id']} has no implemented route"
+            )
+    return document
+
+
+def _enforce_deferred_capabilities(paths: Sequence[str]) -> None:
+    contract = _load_fitness_contract()
+    blocked = []
+    for capability in contract["capabilities"]:  # type: ignore[index]
+        if capability["status"] != "deferred":
+            continue
+        if any(_matches(path, capability["paths"]) for path in paths):
+            blocked.append(f"{capability['id']} (issue #{capability['ownerIssue']})")
+    if blocked:
+        raise DeferredCapabilityError(
+            "changed paths require deferred owner capabilities: " + ", ".join(blocked)
+        )
+
+
 
 
 
@@ -144,17 +264,22 @@ def _matches(path: str, patterns: Sequence[str]) -> bool:
 def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
     """Return stable GitHub-output flags for the supplied changed paths."""
     paths = sorted({_normalize(path) for path in changed_paths if path.strip()})
+    _enforce_deferred_capabilities(paths)
     if any(_matches(path, FORCE_ALL) for path in paths):
         return {name: True for name in OUTPUTS}
 
     result = {
+        "docs": any(_matches(path, DOCS) for path in paths),
         "web": any(_matches(path, WEB) for path in paths),
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
         "release": any(_matches(path, RELEASE) for path in paths),
         "repository_removal": any(_matches(path, REPOSITORY_REMOVAL) for path in paths),
         "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
     }
-    result["heavy"] = any(result.values())
+    result["heavy"] = any(
+        result[name]
+        for name in ("web", "pipeline", "release", "repository_removal")
+    )
     return result
 
 
