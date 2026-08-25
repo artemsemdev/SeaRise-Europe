@@ -40,6 +40,20 @@ Git history is the source-recovery path. Product rollback uses a previously
 verified static application/release pair. Neither mechanism expands the
 approval to external resources.
 
+## Phase 3 gate-policy continuation
+
+`v3/phase-3-issue-61/preapproval.json` preserves Issue #71 as immutable
+historical P/D/A/R evidence while enumerating exact future before/after blobs
+for CI gate evolution. It is not an owner decision. Protected path changes
+remain blocked until a new Issue #61 `OWNER` comment exactly matches the
+preapproval-bound template and the decision is committed in a later slice.
+The continuation never authorizes Candidate-v7/TAR access, publication, or
+external-resource, credential, environment, or secret mutation.
+
+The discoverable continuation test and its inventory baseline are exact future
+governed blobs, not bootstrap-P files: Issue #71 freezes the inventory itself.
+This avoids changing that trust root before the new owner approval exists.
+
 ## Hash chain
 
 The schemas define the closed document shapes; the trusted validator
