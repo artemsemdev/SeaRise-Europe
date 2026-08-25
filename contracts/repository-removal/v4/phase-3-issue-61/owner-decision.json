@@ -1,0 +1,25 @@
+{
+  "$schema": "../gate-policy-correction.schema.json",
+  "schemaVersion": "4.0.0",
+  "documentType": "owner-decision",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-08-25T13:26:43Z",
+  "preapprovalCommit": "e49398964790c949fc9d64010d8fe7416bf90ba3",
+  "preapprovalSha256": "e35c90ea571f7625413775605fcf1e241173e34204b6df682a8a7a2ae7e528de",
+  "approvalText": "I approve Phase 3 gate-policy correction v1 for issue #61 at correction preapproval commit e49398964790c949fc9d64010d8fe7416bf90ba3, correction preapproval SHA-256 e35c90ea571f7625413775605fcf1e241173e34204b6df682a8a7a2ae7e528de, audited base 1813f33ff71b04d88ba6b3390d5abb2d05a053cf, superseded Phase 3 v3 preapproval 3d6eca009edeb9c961ff4aa727d7e34758904750, and superseded Phase 3 v3 decision c62b7870b0798daaf24fdca3d11ba4c2d8c34b4f. I confirm that the v3 authority is superseded before application because its approved CI and test blobs conflict, and it authorizes no governed repository state. This approval authorizes only the complete exact corrected before/after Git blob states listed in the correction preapproval, including the v4 validator handoff and its pre-bound tests. It does not modify or waive immutable Issue #71 P/D/A/R history and does not authorize Candidate-v7 or TAR inspection, copying, publication, or upload, or deletion or mutation of any external resource, credential, GitHub environment, or secret.",
+  "approvalSource": {
+    "issue": 61,
+    "commentId": 5411068685,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/61#issuecomment-5411068685",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "3856b9eaf3f0b4a0989148da7bfb55226dfdbc34e32a0dc81d891d6ed6830529"
+  },
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "externalResourceMutationAuthorized": false
+  }
+}
