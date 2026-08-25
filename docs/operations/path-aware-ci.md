@@ -7,7 +7,8 @@ contract.
 
 ## Stable required statuses
 
-Branch protection requires these workflow job names:
+When Issue #74 activates managed branch protection, its ruleset must require
+these workflow job names:
 
 - `CI Gate` for tests, builds, browser checks, and routed release preflights;
 - `CodeQL Gate` for path-aware JavaScript/TypeScript analysis.
@@ -19,8 +20,8 @@ aggregate. Add a new route and its exact job expectations to
 `scripts/ci/changed_components.py` and `scripts/ci/verify_ci_gate.py` in the
 same reviewed change.
 
-Issue #74 must import the two stable status names before changing repository
-rulesets. This inventory does not claim that OpenTofu already manages them.
+Until that owner slice activates, these names are a normative contract only;
+this inventory does not claim that OpenTofu already manages them.
 
 ## Routes
 
