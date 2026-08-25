@@ -38,6 +38,7 @@ jobs:
     name: Detect changed components
     runs-on: ubuntu-latest
     outputs:
+      docs: ${{ steps.route.outputs.docs }}
       web: ${{ steps.route.outputs.web }}
       pipeline: ${{ steps.route.outputs.pipeline }}
       release: ${{ steps.route.outputs.release }}
@@ -95,6 +96,21 @@ jobs:
           else
             python3 scripts/ci/changed_components.py --base "${BASE_SHA}" --head "${HEAD_SHA}" --github-output "${GITHUB_OUTPUT}"
           fi
+
+  docs:
+    name: Documentation links and references
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Validate tracked Markdown links
+        run: python3 scripts/ci/validate_markdown.py
 
   web:
     name: Static Web (lint, type-check, test, build, browser smoke)
@@ -1023,18 +1039,17 @@ jobs:
       - name: Enforce repository-removal lifecycle state
         env:
           GH_TOKEN: ${{ github.token }}
-          EXECUTION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           APPLIED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
-          python scripts/repository/validate_issue71_removal.py ci
-          --execution-base "${EXECUTION_BASE}"
-          --applied-commit "${APPLIED_COMMIT}"
+          python scripts/repository/validate_gate_policy_correction.py ci
+          --head-commit "${APPLIED_COMMIT}"
           --verify-owner-comment
 
   ci-gate:
     name: CI Gate
     needs:
       - changes
+      - docs
       - web
       - pipeline
       - settlement-spatial-toolchain-macos
@@ -1046,6 +1061,8 @@ jobs:
       - repository-removal-v2
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Summarize routed jobs
         env:
@@ -1059,12 +1076,22 @@ jobs:
             jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' <<<"${JOBS}"
           } >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Verify routed jobs
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Verify exact routed job results
         env:
+          ROUTES: ${{ toJSON(needs.changes.outputs) }}
           JOBS: ${{ toJSON(needs) }}
+          RELEASE_EVIDENCE: ${{ inputs.release_evidence }}
         run: |
-          if jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' <<<"${JOBS}" >/dev/null; then
-            echo "A required routed job failed or was cancelled."
-            exit 1
+          arguments=()
+          if [[ "${RELEASE_EVIDENCE}" == "true" ]]; then
+            arguments+=(--release-evidence)
           fi
-          echo "All selected jobs passed; unselected jobs were skipped."
+          python3 scripts/ci/verify_ci_gate.py \
+            --profile ci \
+            --routes-json "${ROUTES}" \
+            --jobs-json "${JOBS}" \
+            "${arguments[@]}"

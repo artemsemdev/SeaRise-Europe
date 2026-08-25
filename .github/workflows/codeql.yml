@@ -76,13 +76,19 @@ jobs:
       - analyze-javascript
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Verify selected analyses
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: Verify exact routed analysis results
         env:
+          ROUTES: '{"codeql_javascript":"${{ needs.changes.outputs.javascript }}"}'
           JOBS: ${{ toJSON(needs) }}
-        run: |
-          if jq -e 'to_entries | any(.value.result == "failure" or .value.result == "cancelled")' <<<"${JOBS}" >/dev/null; then
-            echo "A selected CodeQL analysis failed or was cancelled."
-            exit 1
-          fi
-          echo "All selected CodeQL analyses passed; unchanged languages were skipped."
+        run: >-
+          python3 scripts/ci/verify_ci_gate.py
+          --profile codeql
+          --routes-json "${ROUTES}"
+          --jobs-json "${JOBS}"
