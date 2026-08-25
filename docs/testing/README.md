@@ -116,13 +116,19 @@ Its mapping is versioned and covered by `tests/harness/test_changed_components.p
 Each workflow always runs a lightweight detection job and an aggregate gate;
 component jobs between them are conditional:
 
-- frontend paths run frontend checks and JavaScript/TypeScript CodeQL;
-- API paths run .NET checks and C# CodeQL;
-- pipeline, scientific data, and test-contract paths run pipeline checks;
-- infrastructure/compose paths run infrastructure validation and the relevant
-  full-stack smoke test;
-- image builds run only for production/container inputs, not test-only edits;
-- Markdown and other documentation-only changes skip all heavyweight jobs;
+- tracked Markdown runs local-link validation while documentation-only changes
+  skip heavyweight component jobs;
+- static-web paths run lint, types, unit tests, production build,
+  browser/accessibility, and offline-lifecycle checks;
+- target release-v1/v2, HTTP-delivery, and supply-chain contracts route their
+  static-web consumers as well as any matching pipeline producers;
+- pipeline, scientific, data, or test-contract paths run the Python pipeline,
+  macOS settlement preflight, offline fixture, and inventory gates;
+- release-toolchain inputs run pinned Linux and macOS preflights, while trusted
+  full-source builders remain manual-only;
+- repository-removal authority paths run their dedicated framework and static
+  profile gate, plus overlapping pipeline ownership;
+- static web and static-quality code select JavaScript/TypeScript CodeQL;
 - router or workflow changes run every route so filtering cannot weaken itself.
 
 Manual CI and scheduled/manual CodeQL runs enable every route. Renames evaluate
@@ -131,7 +137,18 @@ former owner.
 
 Branch protection should require the stable `CI Gate` and `CodeQL Gate`
 checks, not each conditional implementation job. A skipped component is valid
-only when its aggregate gate succeeds.
+only when its aggregate gate proves that the component was not selected. A
+selected job that reports `skipped`, or an unselected job that runs, fails the
+aggregate.
+
+The architecture-fitness contract keeps Cloudflare delivery IaC (#62) and
+managed-platform controls (#74) deferred. Their declared paths fail closed
+until the owner route, named CI job, aggregate expectations, and tests are
+implemented together.
+
+The complete routing, sealed v4 correction lifecycle, retention,
+trust-boundary, rollback, and future-owner activation rules are in the
+[path-aware CI operator guide](../operations/path-aware-ci.md).
 
 ## Review ownership
 
