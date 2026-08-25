@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.invalid/contracts/repository-removal/v4/gate-policy-correction.schema.json",
+  "oneOf": [
+    { "$ref": "#/$defs/preapproval" },
+    { "$ref": "#/$defs/decision" },
+    { "$ref": "#/$defs/receipt" }
+  ],
+  "$defs": {
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateV7BytesUsed",
+        "tarBytesUsed",
+        "publicationAuthorized",
+        "externalResourceMutationAuthorized"
+      ],
+      "properties": {
+        "candidateV7BytesUsed": { "const": false },
+        "tarBytesUsed": { "const": false },
+        "publicationAuthorized": { "const": false },
+        "externalResourceMutationAuthorized": { "const": false }
+      }
+    },
+    "state": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "absent" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "mode", "gitBlobSha", "sha256"],
+          "properties": {
+            "state": { "const": "present" },
+            "mode": { "const": "100644" },
+            "gitBlobSha": { "$ref": "#/$defs/sha1" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "issue71History": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "decisionCommit",
+        "decisionTree",
+        "appliedCommit",
+        "appliedTree",
+        "receiptCommit",
+        "receiptTree",
+        "receiptSha256"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "decisionTree": { "$ref": "#/$defs/sha1" },
+        "appliedCommit": { "$ref": "#/$defs/sha1" },
+        "appliedTree": { "$ref": "#/$defs/sha1" },
+        "receiptCommit": { "$ref": "#/$defs/sha1" },
+        "receiptTree": { "$ref": "#/$defs/sha1" },
+        "receiptSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "supersededAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "preapprovalSha256",
+        "decisionCommit",
+        "decisionTree",
+        "decisionSha256",
+        "status",
+        "appliedCommit",
+        "receiptCommit",
+        "reason"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "decisionTree": { "$ref": "#/$defs/sha1" },
+        "decisionSha256": { "$ref": "#/$defs/sha256" },
+        "status": { "const": "superseded-before-application" },
+        "appliedCommit": { "type": "null" },
+        "receiptCommit": { "type": "null" },
+        "reason": { "type": "string", "minLength": 100 }
+      }
+    },
+    "preapproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "documentType",
+        "preapprovalId",
+        "decisionState",
+        "issue",
+        "auditedBaseCommit",
+        "supersededAuthority",
+        "phase2Issue71History",
+        "authorityPaths",
+        "trustRootSha256",
+        "governedPaths",
+        "ownerApprovalTemplate",
+        "safety"
+      ],
+      "properties": {
+        "$schema": { "const": "../gate-policy-correction.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "documentType": { "const": "preapproval" },
+        "preapprovalId": { "const": "phase-3-issue-61-gate-policy-correction-v1" },
+        "decisionState": { "const": "owner-approval-required" },
+        "issue": { "const": 61 },
+        "auditedBaseCommit": { "$ref": "#/$defs/sha1" },
+        "supersededAuthority": { "$ref": "#/$defs/supersededAuthority" },
+        "phase2Issue71History": { "$ref": "#/$defs/issue71History" },
+        "authorityPaths": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "trustRootSha256": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        },
+        "governedPaths": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "before", "after"],
+            "properties": {
+              "path": { "type": "string" },
+              "before": { "$ref": "#/$defs/state" },
+              "after": { "$ref": "#/$defs/state" }
+            }
+          }
+        },
+        "ownerApprovalTemplate": { "type": "string", "minLength": 400 },
+        "safety": { "$ref": "#/$defs/safety" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "documentType",
+        "decision",
+        "approvedBy",
+        "approvedAt",
+        "preapprovalCommit",
+        "preapprovalSha256",
+        "approvalText",
+        "approvalSource",
+        "safety"
+      ],
+      "properties": {
+        "$schema": { "const": "../gate-policy-correction.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "documentType": { "const": "owner-decision" },
+        "decision": { "const": "approved" },
+        "approvedBy": { "const": "project-owner" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "approvalText": { "type": "string" },
+        "approvalSource": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issue",
+            "commentId",
+            "commentUrl",
+            "author",
+            "authorAssociation",
+            "bodySha256"
+          ],
+          "properties": {
+            "issue": { "const": 61 },
+            "commentId": { "type": "integer", "minimum": 1 },
+            "commentUrl": {
+              "type": "string",
+              "pattern": "^https://github.com/artemsemdev/SeaRise-Europe/issues/61#issuecomment-[0-9]+$"
+            },
+            "author": { "const": "artemsemdev" },
+            "authorAssociation": { "const": "OWNER" },
+            "bodySha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "safety": { "$ref": "#/$defs/safety" }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "documentType",
+        "receiptId",
+        "preapprovalCommit",
+        "decisionCommit",
+        "appliedCommit",
+        "appliedTree",
+        "preapprovalSha256",
+        "ownerDecisionSha256",
+        "governedStateSha256",
+        "safety"
+      ],
+      "properties": {
+        "$schema": { "const": "../gate-policy-correction.schema.json" },
+        "schemaVersion": { "const": "4.0.0" },
+        "documentType": { "const": "application-receipt" },
+        "receiptId": {
+          "const": "phase-3-issue-61-gate-policy-correction-v1-application"
+        },
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "appliedCommit": { "$ref": "#/$defs/sha1" },
+        "appliedTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "ownerDecisionSha256": { "$ref": "#/$defs/sha256" },
+        "governedStateSha256": { "$ref": "#/$defs/sha256" },
+        "safety": { "$ref": "#/$defs/safety" }
+      }
+    }
+  }
+}
