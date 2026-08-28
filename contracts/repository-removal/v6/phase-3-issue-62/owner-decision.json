@@ -1,0 +1,29 @@
+{
+  "$schema": "../static-delivery-correction.schema.json",
+  "schemaVersion": "6.0.0",
+  "documentType": "owner-decision",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-08-28T20:01:30Z",
+  "preapprovalCommit": "cb53ae73732114ad00856c5b29c1ffb5c7560167",
+  "preapprovalSha256": "f4145b8d022f88bba2a22e487aa0a9d454a95cff06e40b53d1b2ebd2929e016d",
+  "approvalText": "I approve Phase 3 static-delivery correction v1 for issue #62 at correction preapproval commit cb53ae73732114ad00856c5b29c1ffb5c7560167, correction preapproval SHA-256 f4145b8d022f88bba2a22e487aa0a9d454a95cff06e40b53d1b2ebd2929e016d, audited base 499414227b92eead387551e8f5f78ccc9f21815d, superseded Phase 3 v5 preapproval 9934d69e4025f6dd2032375bae7e92c300b66459, superseded v5 OWNER comment 5416851308 with body SHA-256 6281fb8316237c9bca7949e2d36710aab47c98bdbc26062e217a7715496d9016, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v5 is superseded before decision and application because its inherited live-comment verifier hard-codes the Issue #61 API URL, and that v5 authorizes no governed repository state. This approval authorizes only the complete exact corrected before/after Git blob states for the 43 governed repository paths listed in the correction preapproval, including the v6 CI validator handoff and its pre-bound v5/v6 tests and inventory. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves the v5 preapproval and OWNER comment byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+  "approvalSource": {
+    "issue": 62,
+    "commentId": 5457178200,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5457178200",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "8cc30711f69766e17026c773a487219ddc56a1622e344c5f9b0e52971da78ba2"
+  },
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "infrastructureApplyAuthorized": false,
+    "externalResourceMutationAuthorized": false,
+    "externalDeletionAuthorized": false,
+    "credentialMutationAuthorized": false,
+    "githubEnvironmentMutationAuthorized": false
+  }
+}
