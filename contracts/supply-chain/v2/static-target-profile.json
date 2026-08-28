@@ -116,6 +116,54 @@
       ]
     },
     {
+      "id": "cloudflare-delivery-opentofu",
+      "ecosystem": "opentofu",
+      "releaseUse": "candidate",
+      "coverage": "locked",
+      "inputs": [
+        {
+          "path": "infra/cloudflare/.opentofu-version",
+          "role": "lock",
+          "sha256": "054c4ee293061b6ceb58529b43f2651cc873ee52e1814ac2f4190554d073eff4"
+        },
+        {
+          "path": "infra/cloudflare/.terraform.lock.hcl",
+          "role": "lock",
+          "sha256": "a84e57d015ff4d5127198ce0a0704b801ccdb83cae45ffcd33588e4a9d2f7d85"
+        },
+        {
+          "path": "infra/cloudflare/fixtures/plan/.terraform.lock.hcl",
+          "role": "lock",
+          "sha256": "a84e57d015ff4d5127198ce0a0704b801ccdb83cae45ffcd33588e4a9d2f7d85"
+        },
+        {
+          "path": "infra/cloudflare/fixtures/plan/main.tf",
+          "role": "manifest",
+          "sha256": "240d70a58872bdd165dda13ee204e0dbbea5841d0076a689880eb16b89a9373b"
+        },
+        {
+          "path": "infra/cloudflare/main.tf",
+          "role": "manifest",
+          "sha256": "22751b0195d0a3740551713daedd973bec05abb305ec8c7958750d01ee80f028"
+        },
+        {
+          "path": "infra/cloudflare/outputs.tf",
+          "role": "manifest",
+          "sha256": "9b2294126ea02f1aebd3af86d133758dfb707f395df2dbae1ff9273f5f27baff"
+        },
+        {
+          "path": "infra/cloudflare/variables.tf",
+          "role": "manifest",
+          "sha256": "5527b6bca9abbcf28be1d185247b3ac70aaa317136c86336b060a8beb7e97206"
+        },
+        {
+          "path": "infra/cloudflare/versions.tf",
+          "role": "manifest",
+          "sha256": "57302449b50fe34d3fb7211b09257dbd011e0e4da212d8481ec6ace519f6d61b"
+        }
+      ]
+    },
+    {
       "id": "github-actions",
       "ecosystem": "github-actions",
       "releaseUse": "candidate",
@@ -124,7 +172,7 @@
         {
           "path": ".github/workflows/ci.yml",
           "role": "workflow",
-          "sha256": "319cad776d6e8c8f938d729dbe2bfe8e3b674ef02476f86a73f86e44fa3db1b5"
+          "sha256": "290c630acadc7518bfc1f75557a5b740ee90d14a61a682856bd1ad85915b16aa"
         },
         {
           "path": ".github/workflows/codeql.yml",
@@ -145,6 +193,16 @@
           "path": ".github/workflows/phase-1-release-sign.yml",
           "role": "workflow",
           "sha256": "149a6791c25d80ab9c4d5e1f8ec52f9d387c1d8abc2e3c459b15a23cc195d2e0"
+        },
+        {
+          "path": ".github/workflows/static-delivery-apply.yml",
+          "role": "workflow",
+          "sha256": "785e5918f9ca899bf2719ac4ae7b1cc2f86b901d80e2e6ded01f97d5caa0384f"
+        },
+        {
+          "path": ".github/workflows/static-delivery-plan.yml",
+          "role": "workflow",
+          "sha256": "ed546686f89e426245005b0888b604b331a28a0ce61a04c9f1223f2477487413"
         },
         {
           "path": ".github/workflows/static-quality.yml",
@@ -307,7 +365,7 @@
         {
           "path": "contracts/supply-chain/v2/static-target-profile.schema.json",
           "role": "schema",
-          "sha256": "dfa66bcd89e5d50cead1bc6a47adce251dfd5962d0490072359d46f867ef6150"
+          "sha256": "cee8b263c0aba0bed88304aaeb3ecf8704d94d17491805690940b7776feb72a5"
         }
       ]
     },

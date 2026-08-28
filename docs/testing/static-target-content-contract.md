@@ -100,7 +100,7 @@ three scopes:
   production HTTP-server dependencies, including a dependency whose name is
   also used by a retained test script. Before scanning dependency terms, target,
   readiness, and final modes also require the current v2 transition profile's
-  exact 14 components and 57 inputs. Every input must occupy its exact
+  exact 14 components and 67 inputs. Every input must occupy its exact
   component and role, match its recorded SHA-256 before its tracked Git mode is
   checked, and use the bound profile schema; extra, missing, reordered,
   symlinked, or mode-mutated authority fails closed. Repository and built-output

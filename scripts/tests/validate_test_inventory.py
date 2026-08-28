@@ -95,6 +95,10 @@ def _discover_test_files() -> set[str]:
     )
     files.update(
         str(path.relative_to(ROOT))
+        for path in (ROOT / "tests/infra").rglob("test_*.py")
+    )
+    files.update(
+        str(path.relative_to(ROOT))
         for path in (ROOT / "tests/repository-removal").rglob("test_*.py")
     )
     for path in (ROOT / "src/api/SeaRise.Api.Tests").rglob("*.cs"):

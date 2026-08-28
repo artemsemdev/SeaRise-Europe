@@ -18,10 +18,13 @@
     {
       "id": "static-delivery-iac",
       "ownerIssue": 62,
-      "status": "deferred",
+      "status": "active",
       "paths": [
         "infra/cloudflare/**",
-        ".github/workflows/static-delivery*.yml"
+        ".github/workflows/static-delivery*.yml",
+        "scripts/infra/**",
+        "tests/infra/**",
+        "docs/delivery/cloudflare-static-delivery.md"
       ],
       "activation": {
         "requiredRoute": "static_delivery_iac",

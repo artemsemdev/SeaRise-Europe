@@ -395,8 +395,20 @@ def test_checked_in_profile_validates_only_the_static_target() -> None:
     assert "contracts/supply-chain/v2/sboms/static-web-npm.cdx.json" in paths
     assert {
         ".github/workflows/static-quality.yml",
+        ".github/workflows/static-delivery-apply.yml",
+        ".github/workflows/static-delivery-plan.yml",
         "tools/static-quality/package-lock.json",
         "tools/static-quality/package.json",
+    } <= paths
+    assert {
+        "infra/cloudflare/.opentofu-version",
+        "infra/cloudflare/.terraform.lock.hcl",
+        "infra/cloudflare/fixtures/plan/.terraform.lock.hcl",
+        "infra/cloudflare/fixtures/plan/main.tf",
+        "infra/cloudflare/main.tf",
+        "infra/cloudflare/outputs.tf",
+        "infra/cloudflare/variables.tf",
+        "infra/cloudflare/versions.tf",
     } <= paths
     assert (
         "contracts/supply-chain/v2/historical/v1-contracts.py"
@@ -779,7 +791,7 @@ def test_profile_reconstructs_hash_bound_readiness_authority(tmp_path: Path) -> 
 
     validated = validate_static_target_profile(PROFILE, repository_root=repository)
 
-    assert len(validated["components"]) == 13
+    assert len(validated["components"]) == 14
     assert validated["activation"]["status"] == "active"
     assert validated["activation"]["blockingIssues"] == []
 

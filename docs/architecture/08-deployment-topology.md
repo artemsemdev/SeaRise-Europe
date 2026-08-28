@@ -40,7 +40,7 @@ is used as a static host.
 | HTML entry points and service worker | Static site domain | Short TTL or revalidation; must activate atomically |
 | Hashed JavaScript, CSS, fonts, icons | Static site domain | `public, max-age=31536000, immutable` |
 | Small pinned config/search files within platform limits | Static site or canonical data domain | Immutable release path |
-| Visual PMTiles | R2 custom data domain | Network-only `no-store` request and response policy from ADR-026 |
+| Visual PMTiles | R2 custom data domain | Versioned object response is `public, max-age=31536000, immutable`; the application still does not persist it |
 | Analysis COG, GeoParquet, large indexes, STAC and provenance | R2 custom data domain | `public, max-age=31536000, immutable` |
 | `/release.json`, if used | Static site domain | Short TTL plus revalidation; discovery only |
 
@@ -60,13 +60,13 @@ R2 must support `GET`, `HEAD`, and byte-range requests with the CORS and exposed
 headers in ADR-021. Large artifacts use one public canonical URL so browser,
 STAC, manifest, and smoke tests all address the same object.
 
-The manifest's generic `publication.cacheControl` remains the immutable default
-for release objects. ADR-026 is the role-specific delivery override for visual
-PMTiles: host/R2 metadata must return `Cache-Control: no-store` for PMTiles
-`200`, `206`, and `416` responses. The object path is still append-only and
-hash-bound, but neither the browser nor an intermediary may persist its bytes.
-Analysis COGs and other release objects retain immutable delivery; only
-integrity-authorized COG chunks may enter bounded IndexedDB persistence.
+The manifest's `publication.cacheControl` applies to every canonical versioned
+release object. PMTiles and COG `200`, `206`, and `416` responses therefore use
+`Cache-Control: public, max-age=31536000, immutable`. The application-level
+retention boundary still keeps visual PMTiles out of Cache Storage, IndexedDB,
+memory caches, and the service-worker precache. The unversioned mutable
+`/release.json` discovery alias, if deployed, is the separate `no-store`
+response. Only integrity-authorized COG chunks may enter bounded IndexedDB.
 
 ## Environments
 
@@ -94,7 +94,12 @@ configuration should stay small and portable and manage, at minimum:
 - static-site project/environment bindings;
 - budget or usage notifications where supported;
 - least-privilege CI publication identities and protected variables, without
-  storing secret values in state or Git.
+storing secret values in state or Git.
+
+The reproducible Issue #62 root and protected workflow contract are described
+in the [Cloudflare static delivery operations guide](../delivery/cloudflare-static-delivery.md).
+The repository implementation is not evidence that accounts, domains, state,
+credentials, protected environments, DNS, or public data have been created.
 
 Remote OpenTofu state, if used, is encrypted, access-controlled, and not public.
 State changes and plans are reviewed before apply. Tool and provider versions
@@ -199,9 +204,9 @@ Cloudflare is the reference host, not an application dependency. A replacement
 platform must provide:
 
 - HTTPS static hosting;
-- object storage or CDN with `GET`, `HEAD`, byte ranges, CORS, role-specific
-  `no-store` delivery for visual PMTiles, and immutable cache headers for other
-  release objects;
+- object storage or CDN with `GET`, `HEAD`, byte ranges, CORS, immutable cache
+  headers for every versioned release object, and `no-store` for any explicit
+  unversioned mutable discovery alias;
 - atomic deployment or a recoverable application pointer;
 - the ability to serve PMTiles, COG, GeoParquet, JSON, STAC, and Sigstore
   bundles without format conversion.

@@ -91,7 +91,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 for capability in contract["capabilities"]
             },
             {
-                "static-delivery-iac": (62, "deferred"),
+                "static-delivery-iac": (62, "active"),
                 "managed-platform-controls": (74, "deferred"),
             },
         )
@@ -103,7 +103,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        contract["capabilities"][0]["status"] = "active"
+        contract["capabilities"][1]["status"] = "active"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "fitness.json"
             path.write_text(json.dumps(contract), encoding="utf-8")
@@ -332,11 +332,23 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         self.assertTrue(candidate["pipeline"])
 
+    def test_static_delivery_paths_use_the_active_owner_route(self) -> None:
+        for path in (
+            "infra/cloudflare/main.tf",
+            ".github/workflows/static-delivery-plan.yml",
+            "scripts/infra/validate_cloudflare_delivery.py",
+            "tests/infra/test_cloudflare_delivery.py",
+            "docs/delivery/cloudflare-static-delivery.md",
+        ):
+            with self.subTest(path=path):
+                outputs = classify_paths([path])
+                self.assertTrue(outputs["static_delivery_iac"])
+                self.assertTrue(outputs["heavy"])
+
     def test_future_owner_paths_fail_closed_until_their_contract_is_activated(
         self,
     ) -> None:
         for path, capability in (
-            ("infra/cloudflare/main.tf", "static-delivery-iac"),
             ("infra/github/rulesets.tf", "managed-platform-controls"),
         ):
             with self.subTest(path=path):
@@ -465,10 +477,24 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         self.assertIn("python -m pytest tests/repository-removal", job)
         self.assertIn("tests/harness/test_changed_suites.py", job)
         self.assertIn("validate_supply_chain_contract.py static-profile", job)
-        self.assertIn("validate_gate_policy_correction.py ci", job)
+        self.assertIn("validate_static_delivery_correction.py ci", job)
         self.assertIn("--verify-owner-comment", job)
         self.assertIn("GH_TOKEN: ${{ github.token }}", job)
         self.assertIn("- repository-removal-v2", gate)
+
+    def test_static_delivery_job_is_routed_and_aggregated(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+        job = _workflow_job(workflow, "static-delivery-iac", "repository-removal-v2")
+        gate = workflow.split("  ci-gate:", maxsplit=1)[1]
+
+        self.assertIn("needs.changes.outputs.static_delivery_iac == 'true'", job)
+        self.assertIn("validate_cloudflare_delivery.py repository", job)
+        self.assertIn("-backend=false -lockfile=readonly", job)
+        self.assertIn("-refresh=false -lock=false", job)
+        self.assertIn("tests.infra.test_cloudflare_delivery", job)
+        self.assertIn("- static-delivery-iac", gate)
 
     def test_release_evidence_pins_actions_and_checks_disk_before_download(
         self,
