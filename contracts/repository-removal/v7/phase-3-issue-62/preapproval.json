@@ -1,0 +1,755 @@
+{
+  "$schema": "../static-delivery-handoff-correction.schema.json",
+  "schemaVersion": "7.0.0",
+  "documentType": "preapproval",
+  "preapprovalId": "phase-3-issue-62-static-delivery-handoff-correction-v1",
+  "decisionState": "owner-approval-required",
+  "issue": 62,
+  "auditedBaseCommit": "eb2c3709410e6873929a810b89214222f4b6cd1b",
+  "phase2Issue71History": {
+    "preapprovalCommit": "336647a4b9bd0709e8625136ee6b4bfad83309b7",
+    "preapprovalTree": "e8dfb63fec967a5158b7fea359144c8b6a6c9da7",
+    "decisionCommit": "85f51b3dc6837d878675a514e57f8e205dda9a26",
+    "decisionTree": "1260deb7083e26fc1f3e660e70c5070982937967",
+    "appliedCommit": "f942a07b33d89247146e54d2441421ca6dabf316",
+    "appliedTree": "e8d61a187facd894d610a413c39290932d15a08c",
+    "receiptCommit": "fd38eddccb5dce6405df48a8f25c045e740efdca",
+    "receiptTree": "84457c6d403d4b4402e862fd84395ca470396384",
+    "receiptSha256": "bb962fb569218e4a8e7cf74383ece2dc3d766963cbd502637df3e2b11428b8bf"
+  },
+  "phase3Issue61History": {
+    "preapprovalCommit": "e49398964790c949fc9d64010d8fe7416bf90ba3",
+    "preapprovalTree": "1b92605c722fb91115a4740b60700b4286c3337e",
+    "preapprovalSha256": "e35c90ea571f7625413775605fcf1e241173e34204b6df682a8a7a2ae7e528de",
+    "decisionCommit": "b9aab46abfd18ecad3f54394e4a5b90681c6677b",
+    "decisionTree": "31db7d87ac041a741a0aa74ddd4ea99ea2ae78b3",
+    "decisionSha256": "40c3d176ae09bac14fa14088e6b1344fd915e5587cc2fa7ddd49fa566964f00a",
+    "appliedCommit": "236ed27ad54d02b8665fee4c803329c2c88ef5e5",
+    "appliedTree": "0880765fa14e2d37caa0f77926b4b98d998dff43",
+    "receiptCommit": "c5ae8de77cef991dd21f3b7956b2b2cb23ac2918",
+    "receiptTree": "dfdf259332fced98bb66331873b2c201c9d5674c",
+    "receiptSha256": "d73ff10e7d1818f071b2a264704d3476b765a84572057a60eb169d7cd34d2652"
+  },
+  "phase3Issue62V5SupersededAuthority": {
+    "preapprovalCommit": "9934d69e4025f6dd2032375bae7e92c300b66459",
+    "preapprovalTree": "d0f82b22fde8ac5fe5f91cf73f6ad54e99d5a567",
+    "preapprovalSha256": "99837823dc003aaa516ff9842c38dbb1ccdad3e744195765f9f165baa070410f",
+    "ownerComment": {
+      "id": 5416851308,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5416851308",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-08-25T21:11:27Z",
+      "updatedAt": "2026-08-25T21:11:27Z",
+      "body": "I approve Phase 3 static-delivery policy evolution v1 for issue #62 at preapproval commit 9934d69e4025f6dd2032375bae7e92c300b66459, preapproval SHA-256 99837823dc003aaa516ff9842c38dbb1ccdad3e744195765f9f165baa070410f, audited base df3b54f9b2566e2550ea15a408c4900c74c70102, immutable Phase 2 issue #71 receipt commit fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt commit c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. This authorizes only the complete exact before/after Git blob states for the 42 governed repository paths listed in that preapproval, including the pre-bound Issue #62 tests. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It does not modify or waive Issue #71 or Issue #61 P/D/A/R history and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "6281fb8316237c9bca7949e2d36710aab47c98bdbc26062e217a7715496d9016"
+    },
+    "status": "superseded-before-decision-and-application",
+    "governedStateAuthorized": false,
+    "decisionCommit": null,
+    "appliedCommit": null,
+    "receiptCommit": null,
+    "reason": "The v5 validator aliases the Issue #61 live-comment verifier, whose exact comparison hard-codes the Issue #61 API URL. It therefore rejects the approved byte-exact Issue #62 OWNER comment. No v5 decision or governed state was committed, so v5 is superseded before decision and application."
+  },
+  "phase3Issue62V6Authority": {
+    "preapprovalCommit": "cb53ae73732114ad00856c5b29c1ffb5c7560167",
+    "preapprovalTree": "8ba49f074641dccb4757b69b16e9e8ff570ce341",
+    "preapprovalSha256": "f4145b8d022f88bba2a22e487aa0a9d454a95cff06e40b53d1b2ebd2929e016d",
+    "decisionCommit": "4689320af62061ab0cba31863cb7ace8e4974dd8",
+    "decisionTree": "bc5a2eeec761714ee9da7df4c9931ceac3d92267",
+    "decisionSha256": "747f5ee5de26cde96acb3e8d2fdcb935413c6e6fda6f52e59e472d98676a0ac0",
+    "ownerComment": {
+      "id": 5457178200,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5457178200",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-08-28T20:01:30Z",
+      "updatedAt": "2026-08-28T20:01:30Z",
+      "body": "I approve Phase 3 static-delivery correction v1 for issue #62 at correction preapproval commit cb53ae73732114ad00856c5b29c1ffb5c7560167, correction preapproval SHA-256 f4145b8d022f88bba2a22e487aa0a9d454a95cff06e40b53d1b2ebd2929e016d, audited base 499414227b92eead387551e8f5f78ccc9f21815d, superseded Phase 3 v5 preapproval 9934d69e4025f6dd2032375bae7e92c300b66459, superseded v5 OWNER comment 5416851308 with body SHA-256 6281fb8316237c9bca7949e2d36710aab47c98bdbc26062e217a7715496d9016, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v5 is superseded before decision and application because its inherited live-comment verifier hard-codes the Issue #61 API URL, and that v5 authorizes no governed repository state. This approval authorizes only the complete exact corrected before/after Git blob states for the 43 governed repository paths listed in the correction preapproval, including the v6 CI validator handoff and its pre-bound v5/v6 tests and inventory. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves the v5 preapproval and OWNER comment byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "8cc30711f69766e17026c773a487219ddc56a1622e344c5f9b0e52971da78ba2"
+    },
+    "status": "decision-preserved-application-superseded",
+    "governedStateAuthorized": true,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV6Application": {
+    "commit": "72e239e98d38e4fb2ece2fd2a9ce6a167b151220",
+    "tree": "5b79283a32ab5b4967bc817a08d13aadbac45fd6",
+    "pullRequest": 479,
+    "pullRequestUrl": "https://github.com/artemsemdev/SeaRise-Europe/pull/479",
+    "status": "superseded-after-decision-before-application-and-integration",
+    "ancestorOfAuditedBase": false,
+    "governedStateIntegrated": false,
+    "reason": "The v6 application attempt left check-target-content.mjs dispatching to the Issue #61 v4 validator, so Static Web rejected the Issue #62 CI state. The exact attempt remains an unmerged diagnostic and is superseded before repository application or integration."
+  },
+  "authorityPaths": [
+    "contracts/repository-removal/v7/phase-3-issue-62/preapproval.json",
+    "contracts/repository-removal/v7/static-delivery-handoff-correction.schema.json",
+    "scripts/repository/validate_static_delivery_handoff_correction.py"
+  ],
+  "trustRootSha256": {
+    "staticDeliveryHandoffSchema": "e36d4f1c80b88a23ccf93344a3819899a75e2a04a4915d0177fb9374d087d8af",
+    "staticDeliveryHandoffValidator": "cd3b965edd050b496b1937f7ecf6cadfc2b8fffee977c13509fccff70fd29832",
+    "staticRepositoryGates": "b97d051d616738dc12d24f9d364bd9fcda59d1a0ab41c705b7cdac1bc199637c"
+  },
+  "governedPaths": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d236c078963456c07bac2cb5d53134b1ec0ab8d1",
+        "sha256": "319cad776d6e8c8f938d729dbe2bfe8e3b674ef02476f86a73f86e44fa3db1b5"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a99b464538ad16b95cd618af026f0f5f52d34500",
+        "sha256": "88435a7ecc0ae8e43c5d899ecff25fb55e8207b95ff46a055913264c6a7e16e7"
+      }
+    },
+    {
+      "path": ".github/workflows/static-delivery-apply.yml",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "544272236d07133e5e738dd0a2c1646fb7174eb4",
+        "sha256": "785e5918f9ca899bf2719ac4ae7b1cc2f86b901d80e2e6ded01f97d5caa0384f"
+      }
+    },
+    {
+      "path": ".github/workflows/static-delivery-plan.yml",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c91c308b91385105fe9bc589aa3f667ff11890d3",
+        "sha256": "ed546686f89e426245005b0888b604b331a28a0ce61a04c9f1223f2477487413"
+      }
+    },
+    {
+      "path": "CHANGELOG.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e3c841e5f6f8dc67501cb14145087f773f94bf41",
+        "sha256": "7d353663f7f8f6f5294a1a94e61e1d918f5e09fb8a71b13f59a9ac8b27b03ca3"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c21675e50a17b13e76318bc17b3921b95cc0a338",
+        "sha256": "e03645c5c4c7b08a34bc0d86213de0c24ca75e580db854c024576324b9762f58"
+      }
+    },
+    {
+      "path": "contracts/ci/v1/architecture-fitness.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a899cbeef5c0092772f43b9fbd00a8f89dbdd2fd",
+        "sha256": "bde6c09439b7a0364530071ae954ace167f150742092fa5a7136f76cbdaf1c47"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "199072f5415c644c047d64827038e2b5622520eb",
+        "sha256": "7e1bbf4729160fa936736beb3aae8d5e175ce02139eddce6cc853938038e639f"
+      }
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "22a9cd00da0de4517020a7fde15419a58bc08d0b",
+        "sha256": "ec3dbd5efa84a623612dcdd3290c4407b89fdeb22278ee704664e90839b79d35"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "cbcc7b4ea27cf9c6ca17ffcc444188c88ce0f1f4",
+        "sha256": "159cff784987e35d19b6705955447ed5df1de97c2d62d7d95c62abee70d9af9a"
+      }
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.schema.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "116efcde4cb01e928ce9a7c0b79e9cb209c09583",
+        "sha256": "dfa66bcd89e5d50cead1bc6a47adce251dfd5962d0490072359d46f867ef6150"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0550efe45518a25483da189caf5b92086b8aa8fc",
+        "sha256": "cee8b263c0aba0bed88304aaeb3ecf8704d94d17491805690940b7776feb72a5"
+      }
+    },
+    {
+      "path": "docs/architecture/08-deployment-topology.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "05e2cb905d6dd8d404d63d14b6c6b659eecf344d",
+        "sha256": "8187662c96aa16ec04a78bc708339b31f1db7f5137640dd356d9510d2d792f65"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "60a10164c2c762acc2aabf500b3caef737cdb12f",
+        "sha256": "add8240cecec9f9ad5dcb3e8c211d17d0a79c67e1cc1aba56f70f1ee0870b646"
+      }
+    },
+    {
+      "path": "docs/delivery/README.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "ec50d73593cc543f6a8bfaa38dc5a7d2f873d5bd",
+        "sha256": "c888524a063b49294ea68a2d13663418b34430950d20ba089a6b0ed5cc00a6a9"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "26faa01fb4cb2f4523b523f33d7f2434bcfbc6c8",
+        "sha256": "2b7cbc01f5d1c8af8e043ea405a2444ade4d7317a98e7987b575d7e637b213db"
+      }
+    },
+    {
+      "path": "docs/delivery/cloudflare-static-delivery.md",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a91af871fe6331b2d6bae4f7493427553b1e916a",
+        "sha256": "34ff3ad88540a79ce8cabf430c5f6c8baa4898fb71c7477fdf3a20e064406aa6"
+      }
+    },
+    {
+      "path": "docs/evidence/phase-3/issue-62-cloudflare-delivery.md",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "73fb1b8ba00dba2a0717486e4eb956ff81efc580",
+        "sha256": "466e3d902639fd7c83af1c69c805483f7d777c51e45dffb5845f7bff0e87ac30"
+      }
+    },
+    {
+      "path": "docs/operations/static-target-supply-chain.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "dfc79bdeea4532fc1cabed0d109125616c74b4a5",
+        "sha256": "d3f18566e8fb55f5730ea9590e0a93ba53c2ce82350ec33611704359438d1f5a"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e5c5e3df0e2d7d58ce69824a6c9ab10500df8d5e",
+        "sha256": "c6e9b1cba51ea610455fa17907af5f13e60a9e14a5d26618538b439a638d5eeb"
+      }
+    },
+    {
+      "path": "docs/testing/static-target-content-contract.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "bfd1511e8d40f394c72ccd2378c145850f3e79a4",
+        "sha256": "2b8e6a83948b89df2d73fae1734c40a1d29dd72b6b876d8f1c6e172b8290f6d2"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "da16f8ccde2a10240fe623204eae8f87e9a580b3",
+        "sha256": "8c932f60cbb11e93e32147a5186f3441d93a9c9fad5d540fa7ce50c992f9114d"
+      }
+    },
+    {
+      "path": "infra/cloudflare/.opentofu-version",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "456e5c4ad803e25a845fa5cae78746eb9fee91ea",
+        "sha256": "054c4ee293061b6ceb58529b43f2651cc873ee52e1814ac2f4190554d073eff4"
+      }
+    },
+    {
+      "path": "infra/cloudflare/.terraform.lock.hcl",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "150394b8219a8d94c7d0ebbd75b1c1e29c8e863e",
+        "sha256": "a84e57d015ff4d5127198ce0a0704b801ccdb83cae45ffcd33588e4a9d2f7d85"
+      }
+    },
+    {
+      "path": "infra/cloudflare/backends/fixture.s3.tfbackend.example",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "8c85b2207bf5b02eb366a99cbea707ff6d2efb23",
+        "sha256": "510878e27a16fd1c5b5e8c6b0fb0e14652ed71874a95777cefad97554802db6a"
+      }
+    },
+    {
+      "path": "infra/cloudflare/backends/production.s3.tfbackend.example",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d56216b98037c26f863d2ad35cb0b78957dbb8f7",
+        "sha256": "75b93115ab2e2012f1c55cb57845c9cf6aaf3b902c121b27c12e48b22dbbe1ff"
+      }
+    },
+    {
+      "path": "infra/cloudflare/backends/staging.s3.tfbackend.example",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "984c36a6be2e6e1a89022c33e28f6880c40ce287",
+        "sha256": "b2b36730bc61cf536dd7fd722572e1f4dee93bd32e5f08f0c375563a757687c2"
+      }
+    },
+    {
+      "path": "infra/cloudflare/delivery-contract.json",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "924b4c5fea42b06477ca97c3c4db0899732db897",
+        "sha256": "113eb8b57c1007e9a06c0662c1dff88ab0015807dbe4bd567c5be465fbbe8888"
+      }
+    },
+    {
+      "path": "infra/cloudflare/environments/fixture.tfvars",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0d2e300a845eab1b93c977cda7b1e2d9576daaf4",
+        "sha256": "e912f7619daeb0836fe3d73b81f967bcaaf3c6a7bcf4da5ff0b196460ac4e9f3"
+      }
+    },
+    {
+      "path": "infra/cloudflare/environments/production.tfvars",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c70bd41f577fa88a6588abb3ee3ae7a45f59ff81",
+        "sha256": "c63a764c8a147d7090113830bf21ff6c7d680b72fe73798985443f02f9ce837d"
+      }
+    },
+    {
+      "path": "infra/cloudflare/environments/staging.tfvars",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "94561deb3a128b3eae6fed1ad19b86cd593cfeb7",
+        "sha256": "329c80de4eaa24d341e0e35d11dc3b7a2ff0dc0e803d96549e493ed8b4d8b728"
+      }
+    },
+    {
+      "path": "infra/cloudflare/fixtures/plan/.terraform.lock.hcl",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "150394b8219a8d94c7d0ebbd75b1c1e29c8e863e",
+        "sha256": "a84e57d015ff4d5127198ce0a0704b801ccdb83cae45ffcd33588e4a9d2f7d85"
+      }
+    },
+    {
+      "path": "infra/cloudflare/fixtures/plan/main.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "fa4c6685b5fbeb456696974642d964a8456e476e",
+        "sha256": "240d70a58872bdd165dda13ee204e0dbbea5841d0076a689880eb16b89a9373b"
+      }
+    },
+    {
+      "path": "infra/cloudflare/fixtures/static-site/index.html",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "869ca70ce419afc3f94a13bfb764458f5bc71d6e",
+        "sha256": "c3eb8796cd94438dc90f59a5d803ba19266e8fd9f12a8b3ac239ae4362bf08d8"
+      }
+    },
+    {
+      "path": "infra/cloudflare/main.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d73b778dd5e4b8c2f1914788c7a8a24b5a51f821",
+        "sha256": "22751b0195d0a3740551713daedd973bec05abb305ec8c7958750d01ee80f028"
+      }
+    },
+    {
+      "path": "infra/cloudflare/outputs.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "46be0b4a05aa7bee70fba9b73e7b1ca95960f4f1",
+        "sha256": "9b2294126ea02f1aebd3af86d133758dfb707f395df2dbae1ff9273f5f27baff"
+      }
+    },
+    {
+      "path": "infra/cloudflare/static-assets.headers",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "eea9270b002ce6d4d7f81d2c7b5289c59eb8ed38",
+        "sha256": "cd0b4cbd73ec8dad394ada5db7334d2dde07c00078d4228e8f2b171874015111"
+      }
+    },
+    {
+      "path": "infra/cloudflare/variables.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "4886cc65770d2e7d4ed492667f69efb33cb51d11",
+        "sha256": "5527b6bca9abbcf28be1d185247b3ac70aaa317136c86336b060a8beb7e97206"
+      }
+    },
+    {
+      "path": "infra/cloudflare/versions.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "9e77f40955a349106508da21c954adef0b558dd1",
+        "sha256": "57302449b50fe34d3fb7211b09257dbd011e0e4da212d8481ec6ace519f6d61b"
+      }
+    },
+    {
+      "path": "scripts/ci/changed_components.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "caa0eb20d8e88f541f7e71f3f87d871d6780d57d",
+        "sha256": "1cf6178f913dee3414125e26507bb955b024b549e4521a5f56d8ab21c7fdfcf3"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e790d9bb96d3f80db96189bf9ba9631a760957a2",
+        "sha256": "2ac4d70f0b285456153c1cbf94f3e58ce4451141b67fe072e2b26929a85f93c3"
+      }
+    },
+    {
+      "path": "scripts/ci/verify_ci_gate.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "12e8b9e89fe52783d07e581a4ffc258cb27f1a58",
+        "sha256": "faaa87c05fe049ff194c9af7617324512c9682880e048a9b259e5bd347efc98e"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "eb0cb60b5e4446b9324cbf27de67e39e25a46f5f",
+        "sha256": "cf1a42221cecca4d3de27779a70bfd12779afaa7714b8531f975eb04a261cd66"
+      }
+    },
+    {
+      "path": "scripts/infra/validate_cloudflare_delivery.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "5c241d66399d2d20e684e5837981d4de3ef76f47",
+        "sha256": "0cdc3feb2535545088c4cb9e60f52b362b62eee078f2e5d097a5938afe85020a"
+      }
+    },
+    {
+      "path": "scripts/infra/verify_http_delivery.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "ff0d6de7f385cfdc3f3c6202d821931b2dcad9b0",
+        "sha256": "e17e75b809dd682689d14f1a2f7c627143f4cb73dba395057d062d9142f89a33"
+      }
+    },
+    {
+      "path": "scripts/tests/validate_test_inventory.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0fb37fb06af3c17b5909f7638cd1c74acad83040",
+        "sha256": "c056999a28756df25e5aedcf0580ffcfee45cfb5f16677633595d39b71de3399"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c1fa404b04c92130ea44d86e5205fb72aa8e5bfb",
+        "sha256": "75f652ea2bcf2b673a550a526c914f7d2c97b142ce042a4b949ecb5bcba0b26b"
+      }
+    },
+    {
+      "path": "src/pipeline/searise_pipeline/supply_chain/static_profile.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0998d244a8eef4d5dc6dcce331ce5dbb51b7c312",
+        "sha256": "e2a2fed5873867eac559bca743b0b5aeb7c3700a85b857c95a05c2c41c230aa0"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "3a1f19e4bd4463ff95053d9915061ad0e94a01a2",
+        "sha256": "c22f9fd19e0bb9fa2e0d2ab7685d396285fb9eca0d3da8ee1555c3e250ab23a5"
+      }
+    },
+    {
+      "path": "src/pipeline/tests/supply_chain/test_static_target_profile.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "8da0144c2ecd8b20b538b60d9dd0fab698c56b1a",
+        "sha256": "2e926cf02c80ae87fc40706fc93550c1560f6a36d9a53eb4d1404e28fa0c3119"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0a3eddc3c5e4b614b8f147d7b801ae31e8faf008",
+        "sha256": "f8c64e2a5aa18d3fb5a6d7fea64d97da5e7b19ce3d3c2a5fe52da36dbad54994"
+      }
+    },
+    {
+      "path": "src/web/scripts/check-target-content.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "82e90bd3a3cf3b34e21d615385fe8b0f1cdd5716",
+        "sha256": "01e78a0ceba81cfc831f319c64c24e4edbed4cd2731dc2f79063268a82d078d5"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "7149539b70156f94351bc9b900a19565ab34a7b5",
+        "sha256": "9a5db219f55ab7bde067a72f68895851599bafab6772b4c9a4ef0f6876c9f653"
+      }
+    },
+    {
+      "path": "src/web/scripts/check-target-content.test.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "bec45f13e5a304e82bfd27810e61054daa35822a",
+        "sha256": "25ae3fff49209b72fa225dcb44d36661f684dda67ddabdee2a23c7d59d14fa76"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a83558f3e2be8c13971836c17638053ccd820f0a",
+        "sha256": "2e191a27d3f87f030628498a7ee9a7e4cd367409c52b4f15d92d1951d411d01a"
+      }
+    },
+    {
+      "path": "src/web/scripts/static-repository-gates.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "02e32cda7a01460c3055f61cccaf9f03fc0552f9",
+        "sha256": "b97d051d616738dc12d24f9d364bd9fcda59d1a0ab41c705b7cdac1bc199637c"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "71352f591d7205b4fad314428c2aadc5529d6299",
+        "sha256": "322a24aa3a64a39c0f1889ea415a7a87d152081204ad92b9e9106c89ad636e98"
+      }
+    },
+    {
+      "path": "src/web/scripts/static-repository-gates.test.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0f57f9b100315edc0d9e4bdc2fa74e758405116c",
+        "sha256": "e95f804e54e982f6ce34c18e84256eeb884ffccb57f5a3b0900d5c42e528dd73"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d022d9a4fca128b7781f3a111a88ecfe46b9e71e",
+        "sha256": "57f7a9bf93a2d4e3aca0b157909ec9e07fa672f36357e59e72668324b0a2ab88"
+      }
+    },
+    {
+      "path": "tests/harness/test_changed_components.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "85248a2be8b03943e889532d2dd9d9910f8f37f3",
+        "sha256": "cb2ba81baf294e3475649722b49ad5850bd48ef8dcbe28bc24b3459676692b0b"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "1cd81333a781e4acb9d4a2868b3f7fa1aeab1ec3",
+        "sha256": "0bdef7103de3e787f1a7af323fba23ae556ee59310d296f611bb878b2834ed3e"
+      }
+    },
+    {
+      "path": "tests/harness/test_ci_gate.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0ee401c742443b7c76ada5bb621eee181e2ae43f",
+        "sha256": "4745b0c3232ae17590450ac456024650aafbafd5c0ed7777a8f8f30e9e17acd7"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "4e39f66c8d7c97d7c95a764f010ab88becb440de",
+        "sha256": "c1b7f9df35fc8b5b3e9e1232d2ca77290f9ce5f8cdf3e3db16e52215fc2d27ea"
+      }
+    },
+    {
+      "path": "tests/infra/test_cloudflare_delivery.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "3776b002183f7a9a5f2e7bafdb0e88375d799ae7",
+        "sha256": "a0f9a1c982cca913a0709e7c68e2bc16296159905f2185b9f0a7844402bdab8b"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a4a22abca78cc5b40b069d10687d5d514055fcf7",
+        "sha256": "552a9e5bab469a2f0f618cece7220bc63e299901809c64aefa464aca2743ceb1"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_evolution.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "5345be6bdf5a75a50e378f86ac4d4249473a6e0c",
+        "sha256": "3a1ee7d5d6d3cf57182e148d8369b67cc31c206b1d56b281fb5847a819710420"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_handoff_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "6850961cebfc72334a59da3d86637a31255292af",
+        "sha256": "31b3de96e299e7b1c5bc2ec38376775beb88fbc1d99e527c5b5aeab33573e807"
+      }
+    },
+    {
+      "path": "tests/test-inventory.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "b64e3089221ab2975a51fb0179a704f77d7d4716",
+        "sha256": "fe9f96d9203e757bada3174180d6d8fa2ead3f61781410e3465b5943156ba770"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c31c79ae07674537de099ab63cc5c0a08d0d4e1e",
+        "sha256": "fa97c31012e4446d0d8a0579134a4f9fe64b873d7590791ffc33e9b8df2b4668"
+      }
+    }
+  ],
+  "deferredOwnership": {
+    "issue64PublicationGateRequired": true,
+    "issue74ManagedControlsRequired": true,
+    "liveCloudflareEvidenceClaimed": false
+  },
+  "ownerApprovalTemplate": "I approve Phase 3 static-delivery handoff correction v1 for issue #62 at v7 preapproval commit <PREAPPROVAL_COMMIT>, preapproval SHA-256 <PREAPPROVAL_SHA256>, audited base eb2c3709410e6873929a810b89214222f4b6cd1b, preserved v6 preapproval cb53ae73732114ad00856c5b29c1ffb5c7560167 and preserved v6 decision 4689320af62061ab0cba31863cb7ace8e4974dd8, superseded unmerged v6 application attempt 72e239e98d38e4fb2ece2fd2a9ce6a167b151220 at tree 5b79283a32ab5b4967bc817a08d13aadbac45fd6 in diagnostic PR #479, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that the v6 P/D authority remains valid, while only its PR #479 application attempt is superseded after decision and before repository application or integration because check-target-content.mjs still dispatched to the Issue #61 v4 validator; that attempt is not an ancestor of the audited base and authorizes no integrated governed state. This approval authorizes only the complete exact before/after Git blob states for the 48 governed repository paths listed in the v7 preapproval, including the corrected check-target-content.mjs handoff, the exact static-repository-gates.mjs evolution from 13 components and 57 inputs to 14 components and 67 inputs, its pre-bound tests, CI/profile/inventory hashes, and the complete v6 future state. The historical Issue #71 static-repository-gates.mjs Git blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 and Issue #71 P/D/A/R history are preserved and validated before the exact replacement is authorized; no profile projection or bypass adapter is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves the Issue #62 v5 superseded history and v6 P/D authority byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "infrastructureApplyAuthorized": false,
+    "externalResourceMutationAuthorized": false,
+    "externalDeletionAuthorized": false,
+    "credentialMutationAuthorized": false,
+    "githubEnvironmentMutationAuthorized": false
+  }
+}
