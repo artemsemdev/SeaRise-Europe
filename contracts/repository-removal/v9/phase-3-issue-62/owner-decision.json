@@ -1,0 +1,29 @@
+{
+  "$schema": "../static-delivery-owner-verifier-correction.schema.json",
+  "schemaVersion": "9.0.0",
+  "documentType": "owner-decision",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-09-01T15:22:39Z",
+  "preapprovalCommit": "6d14058acdc18e06f1e7023e85e254f584c499b4",
+  "preapprovalSha256": "43f62d66dae8b0939645be92c564e84487032cfee09d0a21dcc0be8b52d7ff58",
+  "approvalText": "I approve Phase 3 static-delivery OWNER-verifier correction v1 for issue #62 at v9 preapproval commit 6d14058acdc18e06f1e7023e85e254f584c499b4, preapproval SHA-256 43f62d66dae8b0939645be92c564e84487032cfee09d0a21dcc0be8b52d7ff58, audited base 48b744b26cbe52c1a462853ce8c7f7ecb5c2489a, preserved v8 preapproval 4d0c8191c53816592223476e2f969b707d9db35a and its merge 48b744b26cbe52c1a462853ce8c7f7ecb5c2489a, superseded unpushed v8 owner-decision attempt f87a01af07eaa4c7d48c9b77df7f7603d8e0207d at tree 57fe0f7fb367111d8a19001ddd6488ffdb3789a7 with owner-decision SHA-256 233c2913bfdee6516b9bec984d1844636ac2b06b5653406a297a864a1442bac9 and OWNER comment 5494452061, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v8 P remains valid, while its exact D attempt existed only as a local unpushed commit and is superseded before publication, pull request, repository integration, or application because the v8 validator calls V7._verify_owner_comment, a symbol the v7 module does not expose; no v8 D/A/R was published or integrated and no governed v8 state was integrated. This approval authorizes only the complete exact before/after Git blob states for the 50 governed repository paths listed in the v9 preapproval, including the corrected check-target-content.mjs and CI routing to the v9 validator, the inventory and harness bindings, a RED/GREEN test that executes the real D validation path through the existing exported OWNER-comment verifier, and the complete corrected static-delivery future. The handoff preserves and validates the historical Issue #71 P/D/A/R history and exact gate transition from blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 to blob 71352f591d7205b4fad314428c2aadc5529d6299; no projection or bypass adapter and no alternate before or after blob is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves Issue #62 v5/v6/v7 history and v8 P byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+  "approvalSource": {
+    "issue": 62,
+    "commentId": 5496247462,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5496247462",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "a07b12804a9f63ee0f27f90262e7fbd459d3dbda1a8d2795942c8d7e02714e00"
+  },
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "infrastructureApplyAuthorized": false,
+    "externalResourceMutationAuthorized": false,
+    "externalDeletionAuthorized": false,
+    "credentialMutationAuthorized": false,
+    "githubEnvironmentMutationAuthorized": false
+  }
+}
