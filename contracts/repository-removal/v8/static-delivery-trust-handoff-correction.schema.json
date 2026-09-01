@@ -1,0 +1,456 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://searise-europe.invalid/contracts/repository-removal/v8/static-delivery-trust-handoff-correction.schema.json",
+  "oneOf": [
+    { "$ref": "#/$defs/preapproval" },
+    { "$ref": "#/$defs/decision" },
+    { "$ref": "#/$defs/receipt" }
+  ],
+  "$defs": {
+    "sha1": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateV7BytesUsed",
+        "tarBytesUsed",
+        "publicationAuthorized",
+        "infrastructureApplyAuthorized",
+        "externalResourceMutationAuthorized",
+        "externalDeletionAuthorized",
+        "credentialMutationAuthorized",
+        "githubEnvironmentMutationAuthorized"
+      ],
+      "properties": {
+        "candidateV7BytesUsed": { "const": false },
+        "tarBytesUsed": { "const": false },
+        "publicationAuthorized": { "const": false },
+        "infrastructureApplyAuthorized": { "const": false },
+        "externalResourceMutationAuthorized": { "const": false },
+        "externalDeletionAuthorized": { "const": false },
+        "credentialMutationAuthorized": { "const": false },
+        "githubEnvironmentMutationAuthorized": { "const": false }
+      }
+    },
+    "state": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "absent" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "mode", "gitBlobSha", "sha256"],
+          "properties": {
+            "state": { "const": "present" },
+            "mode": { "const": "100644" },
+            "gitBlobSha": { "$ref": "#/$defs/sha1" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "governedPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "before", "after"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "before": { "$ref": "#/$defs/state" },
+        "after": { "$ref": "#/$defs/state" }
+      }
+    },
+    "issue71History": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "decisionCommit",
+        "decisionTree",
+        "appliedCommit",
+        "appliedTree",
+        "receiptCommit",
+        "receiptTree",
+        "receiptSha256"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "decisionTree": { "$ref": "#/$defs/sha1" },
+        "appliedCommit": { "$ref": "#/$defs/sha1" },
+        "appliedTree": { "$ref": "#/$defs/sha1" },
+        "receiptCommit": { "$ref": "#/$defs/sha1" },
+        "receiptTree": { "$ref": "#/$defs/sha1" },
+        "receiptSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "issueHistory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "preapprovalSha256",
+        "decisionCommit",
+        "decisionTree",
+        "decisionSha256",
+        "appliedCommit",
+        "appliedTree",
+        "receiptCommit",
+        "receiptTree",
+        "receiptSha256"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "decisionTree": { "$ref": "#/$defs/sha1" },
+        "decisionSha256": { "$ref": "#/$defs/sha256" },
+        "appliedCommit": { "$ref": "#/$defs/sha1" },
+        "appliedTree": { "$ref": "#/$defs/sha1" },
+        "receiptCommit": { "$ref": "#/$defs/sha1" },
+        "receiptTree": { "$ref": "#/$defs/sha1" },
+        "receiptSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "ownerComment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "url",
+        "issueApiUrl",
+        "author",
+        "association",
+        "createdAt",
+        "updatedAt",
+        "body",
+        "bodySha256"
+      ],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "url": {
+          "type": "string",
+          "pattern": "^https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-[0-9]+$"
+        },
+        "issueApiUrl": {
+          "const": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62"
+        },
+        "author": { "const": "artemsemdev" },
+        "association": { "const": "OWNER" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "body": { "type": "string", "minLength": 700 },
+        "bodySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "v6Authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "preapprovalSha256",
+        "decisionCommit",
+        "decisionTree",
+        "decisionSha256",
+        "ownerComment",
+        "status",
+        "governedStateAuthorized",
+        "integratedApplicationCommit",
+        "receiptCommit"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "decisionTree": { "$ref": "#/$defs/sha1" },
+        "decisionSha256": { "$ref": "#/$defs/sha256" },
+        "ownerComment": { "$ref": "#/$defs/ownerComment" },
+        "status": { "const": "decision-preserved-application-superseded" },
+        "governedStateAuthorized": { "const": true },
+        "integratedApplicationCommit": { "type": "null" },
+        "receiptCommit": { "type": "null" }
+      }
+    },
+    "v7Authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "preapprovalSha256",
+        "decisionCommit",
+        "decisionTree",
+        "decisionSha256",
+        "ownerComment",
+        "status",
+        "governedStateAuthorized",
+        "integratedApplicationCommit",
+        "receiptCommit"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "decisionTree": { "$ref": "#/$defs/sha1" },
+        "decisionSha256": { "$ref": "#/$defs/sha256" },
+        "ownerComment": { "$ref": "#/$defs/ownerComment" },
+        "status": { "const": "decision-preserved-uncommitted-application-superseded" },
+        "governedStateAuthorized": { "const": true },
+        "integratedApplicationCommit": { "type": "null" },
+        "receiptCommit": { "type": "null" }
+      }
+    },
+    "supersededV7ProposedApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree",
+        "pullRequest",
+        "status",
+        "governedPathCount",
+        "governedTransitionsSha256",
+        "governedAfterStateSha256",
+        "governedStateIntegrated",
+        "reason"
+      ],
+      "properties": {
+        "commit": { "type": "null" },
+        "tree": { "type": "null" },
+        "pullRequest": { "type": "null" },
+        "status": { "const": "superseded-before-application-commit-and-integration" },
+        "governedPathCount": { "const": 48 },
+        "governedTransitionsSha256": { "$ref": "#/$defs/sha256" },
+        "governedAfterStateSha256": { "$ref": "#/$defs/sha256" },
+        "governedStateIntegrated": { "const": false },
+        "reason": { "type": "string", "minLength": 220 }
+      }
+    },
+    "v5SupersededAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preapprovalCommit",
+        "preapprovalTree",
+        "preapprovalSha256",
+        "ownerComment",
+        "status",
+        "governedStateAuthorized",
+        "decisionCommit",
+        "appliedCommit",
+        "receiptCommit",
+        "reason"
+      ],
+      "properties": {
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "ownerComment": { "$ref": "#/$defs/ownerComment" },
+        "status": { "const": "superseded-before-decision-and-application" },
+        "governedStateAuthorized": { "const": false },
+        "decisionCommit": { "type": "null" },
+        "appliedCommit": { "type": "null" },
+        "receiptCommit": { "type": "null" },
+        "reason": { "type": "string", "minLength": 100 }
+      }
+    },
+    "supersededApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree",
+        "pullRequest",
+        "pullRequestUrl",
+        "status",
+        "ancestorOfAuditedBase",
+        "governedStateIntegrated",
+        "reason"
+      ],
+      "properties": {
+        "commit": { "$ref": "#/$defs/sha1" },
+        "tree": { "$ref": "#/$defs/sha1" },
+        "pullRequest": { "const": 479 },
+        "pullRequestUrl": { "const": "https://github.com/artemsemdev/SeaRise-Europe/pull/479" },
+        "status": { "const": "superseded-after-decision-before-application-and-integration" },
+        "ancestorOfAuditedBase": { "const": false },
+        "governedStateIntegrated": { "const": false },
+        "reason": { "type": "string", "minLength": 180 }
+      }
+    },
+    "deferredOwnership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue64PublicationGateRequired",
+        "issue74ManagedControlsRequired",
+        "liveCloudflareEvidenceClaimed"
+      ],
+      "properties": {
+        "issue64PublicationGateRequired": { "const": true },
+        "issue74ManagedControlsRequired": { "const": true },
+        "liveCloudflareEvidenceClaimed": { "const": false }
+      }
+    },
+    "preapproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "documentType",
+        "preapprovalId",
+        "decisionState",
+        "issue",
+        "auditedBaseCommit",
+        "phase2Issue71History",
+        "phase3Issue61History",
+        "phase3Issue62V5SupersededAuthority",
+        "phase3Issue62V6Authority",
+        "supersededV6Application",
+        "phase3Issue62V7Authority",
+        "supersededV7ProposedApplication",
+        "authorityPaths",
+        "trustRootSha256",
+        "governedPaths",
+        "deferredOwnership",
+        "ownerApprovalTemplate",
+        "safety"
+      ],
+      "properties": {
+        "$schema": { "const": "../static-delivery-trust-handoff-correction.schema.json" },
+        "schemaVersion": { "const": "8.0.0" },
+        "documentType": { "const": "preapproval" },
+        "preapprovalId": { "const": "phase-3-issue-62-static-delivery-trust-handoff-correction-v1" },
+        "decisionState": { "const": "owner-approval-required" },
+        "issue": { "const": 62 },
+        "auditedBaseCommit": { "$ref": "#/$defs/sha1" },
+        "phase2Issue71History": { "$ref": "#/$defs/issue71History" },
+        "phase3Issue61History": { "$ref": "#/$defs/issueHistory" },
+        "phase3Issue62V5SupersededAuthority": { "$ref": "#/$defs/v5SupersededAuthority" },
+        "phase3Issue62V6Authority": { "$ref": "#/$defs/v6Authority" },
+        "supersededV6Application": { "$ref": "#/$defs/supersededApplication" },
+        "phase3Issue62V7Authority": { "$ref": "#/$defs/v7Authority" },
+        "supersededV7ProposedApplication": { "$ref": "#/$defs/supersededV7ProposedApplication" },
+        "authorityPaths": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "trustRootSha256": {
+          "type": "object",
+          "minProperties": 3,
+          "maxProperties": 3,
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        },
+        "governedPaths": {
+          "type": "array",
+          "minItems": 49,
+          "maxItems": 49,
+          "items": { "$ref": "#/$defs/governedPath" }
+        },
+        "deferredOwnership": { "$ref": "#/$defs/deferredOwnership" },
+        "ownerApprovalTemplate": { "type": "string", "minLength": 1200 },
+        "safety": { "$ref": "#/$defs/safety" }
+      }
+    },
+    "approvalSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue",
+        "commentId",
+        "commentUrl",
+        "author",
+        "authorAssociation",
+        "bodySha256"
+      ],
+      "properties": {
+        "issue": { "const": 62 },
+        "commentId": { "type": "integer", "minimum": 1 },
+        "commentUrl": {
+          "type": "string",
+          "pattern": "^https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-[0-9]+$"
+        },
+        "author": { "const": "artemsemdev" },
+        "authorAssociation": { "const": "OWNER" },
+        "bodySha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "documentType",
+        "decision",
+        "approvedBy",
+        "approvedAt",
+        "preapprovalCommit",
+        "preapprovalSha256",
+        "approvalText",
+        "approvalSource",
+        "safety"
+      ],
+      "properties": {
+        "$schema": { "const": "../static-delivery-trust-handoff-correction.schema.json" },
+        "schemaVersion": { "const": "8.0.0" },
+        "documentType": { "const": "owner-decision" },
+        "decision": { "const": "approved" },
+        "approvedBy": { "const": "project-owner" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "approvalText": { "type": "string", "minLength": 1200 },
+        "approvalSource": { "$ref": "#/$defs/approvalSource" },
+        "safety": { "$ref": "#/$defs/safety" }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "schemaVersion",
+        "documentType",
+        "receiptId",
+        "preapprovalCommit",
+        "decisionCommit",
+        "appliedCommit",
+        "appliedTree",
+        "preapprovalSha256",
+        "ownerDecisionSha256",
+        "governedStateSha256",
+        "safety"
+      ],
+      "properties": {
+        "$schema": { "const": "../static-delivery-trust-handoff-correction.schema.json" },
+        "schemaVersion": { "const": "8.0.0" },
+        "documentType": { "const": "application-receipt" },
+        "receiptId": { "const": "phase-3-issue-62-static-delivery-trust-handoff-correction-v1-application" },
+        "preapprovalCommit": { "$ref": "#/$defs/sha1" },
+        "decisionCommit": { "$ref": "#/$defs/sha1" },
+        "appliedCommit": { "$ref": "#/$defs/sha1" },
+        "appliedTree": { "$ref": "#/$defs/sha1" },
+        "preapprovalSha256": { "$ref": "#/$defs/sha256" },
+        "ownerDecisionSha256": { "$ref": "#/$defs/sha256" },
+        "governedStateSha256": { "$ref": "#/$defs/sha256" },
+        "safety": { "$ref": "#/$defs/safety" }
+      }
+    }
+  }
+}
