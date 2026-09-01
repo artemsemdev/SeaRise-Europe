@@ -1,0 +1,29 @@
+{
+  "$schema": "../static-delivery-handoff-correction.schema.json",
+  "schemaVersion": "7.0.0",
+  "documentType": "owner-decision",
+  "decision": "approved",
+  "approvedBy": "project-owner",
+  "approvedAt": "2026-09-01T11:09:32Z",
+  "preapprovalCommit": "caa49ae8eaf4dcf06107f45cd72d104f88386544",
+  "preapprovalSha256": "26aea62dab0093c262bc5caa34bea3e4edf3ab506f491d766b769e33cb1e448b",
+  "approvalText": "I approve Phase 3 static-delivery handoff correction v1 for issue #62 at v7 preapproval commit caa49ae8eaf4dcf06107f45cd72d104f88386544, preapproval SHA-256 26aea62dab0093c262bc5caa34bea3e4edf3ab506f491d766b769e33cb1e448b, audited base eb2c3709410e6873929a810b89214222f4b6cd1b, preserved v6 preapproval cb53ae73732114ad00856c5b29c1ffb5c7560167 and preserved v6 decision 4689320af62061ab0cba31863cb7ace8e4974dd8, superseded unmerged v6 application attempt 72e239e98d38e4fb2ece2fd2a9ce6a167b151220 at tree 5b79283a32ab5b4967bc817a08d13aadbac45fd6 in diagnostic PR #479, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that the v6 P/D authority remains valid, while only its PR #479 application attempt is superseded after decision and before repository application or integration because check-target-content.mjs still dispatched to the Issue #61 v4 validator; that attempt is not an ancestor of the audited base and authorizes no integrated governed state. This approval authorizes only the complete exact before/after Git blob states for the 48 governed repository paths listed in the v7 preapproval, including the corrected check-target-content.mjs handoff, the exact static-repository-gates.mjs evolution from 13 components and 57 inputs to 14 components and 67 inputs, its pre-bound tests, CI/profile/inventory hashes, and the complete v6 future state. The historical Issue #71 static-repository-gates.mjs Git blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 and Issue #71 P/D/A/R history are preserved and validated before the exact replacement is authorized; no profile projection or bypass adapter is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves the Issue #62 v5 superseded history and v6 P/D authority byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+  "approvalSource": {
+    "issue": 62,
+    "commentId": 5493019624,
+    "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5493019624",
+    "author": "artemsemdev",
+    "authorAssociation": "OWNER",
+    "bodySha256": "95f677bc5eb8f47d147cbcaf0a41e80fc216eaab757b8167b85c0d58fffddd69"
+  },
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "infrastructureApplyAuthorized": false,
+    "externalResourceMutationAuthorized": false,
+    "externalDeletionAuthorized": false,
+    "credentialMutationAuthorized": false,
+    "githubEnvironmentMutationAuthorized": false
+  }
+}
