@@ -1,0 +1,254 @@
+name: Protected static delivery apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Exact isolated delivery environment
+        required: true
+        type: choice
+        options:
+          - fixture
+          - staging
+          - production
+      source_revision:
+        description: Exact reviewed master commit SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-delivery-apply-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Protected ${{ inputs.environment }} plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: cloudflare-${{ inputs.environment }}-plan
+    outputs:
+      plan_sha256: ${{ steps.identity.outputs.plan_sha256 }}
+      configuration_sha256: ${{ steps.identity.outputs.configuration_sha256 }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PLAN_API_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TOFU_STATE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TOFU_STATE_SECRET_ACCESS_KEY }}
+      TF_VAR_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+      TF_VAR_environment: ${{ inputs.environment }}
+      TF_VAR_release_bucket_name: ${{ vars.CLOUDFLARE_RELEASE_BUCKET }}
+      TF_VAR_data_domain: ${{ vars.CLOUDFLARE_DATA_DOMAIN }}
+      TF_VAR_approved_origins: ${{ vars.CLOUDFLARE_APPROVED_ORIGINS_JSON }}
+      TF_VAR_static_worker_name: ${{ vars.CLOUDFLARE_STATIC_WORKER }}
+      TF_VAR_static_assets_directory: ${{ vars.CLOUDFLARE_STATIC_ASSETS_DIRECTORY }}
+      TF_BACKEND_ENDPOINT: https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - name: Enforce protected activation and exact master revision
+        env:
+          APPLY_ENABLED: ${{ vars.CLOUDFLARE_ISSUE_62_APPLY_ENABLED }}
+          PUBLICATION_ENABLED: ${{ vars.CLOUDFLARE_ISSUE_64_PUBLICATION_ENABLED }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          test "${APPLY_ENABLED}" = "true"
+          test "${PUBLICATION_ENABLED}" = "true"
+          test "${GITHUB_REF_NAME}" = "master"
+          test "${SOURCE_REVISION}" = "${GITHUB_SHA}"
+          [[ "${SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]]
+          test "${GITHUB_RUN_ATTEMPT}" = "1"
+          test -n "${CLOUDFLARE_API_TOKEN}"
+          test -n "${AWS_ACCESS_KEY_ID}"
+          test -n "${AWS_SECRET_ACCESS_KEY}"
+          test "${TF_BACKEND_ENDPOINT}" != "https://.r2.cloudflarestorage.com"
+          assets_lower="${TF_VAR_static_assets_directory,,}"
+          case "${assets_lower}" in
+            /*|*\\*|*..*|*candidate-v7*|*.tar|*.tar.*) exit 1 ;;
+          esac
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          ref: ${{ inputs.source_revision }}
+
+      - name: Verify checkout and static build authority
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_REVISION}"
+          test -d "${TF_VAR_static_assets_directory}"
+          test -f "${TF_VAR_static_assets_directory}/index.html"
+          test -z "$(find "${TF_VAR_static_assets_directory}" -type l -print -quit)"
+          test -z "$(find "${TF_VAR_static_assets_directory}" -type f \( -iname '*.tar' -o -iname '*.tar.*' \) -print -quit)"
+          test -z "$(git ls-files --others --exclude-standard -- "${TF_VAR_static_assets_directory}")"
+          git ls-files --error-unmatch -- "${TF_VAR_static_assets_directory}/index.html"
+          assets_path="$(cd "${TF_VAR_static_assets_directory}" && pwd -P)"
+          case "${assets_path}" in
+            "${GITHUB_WORKSPACE}"/*) ;;
+            *) exit 1 ;;
+          esac
+          echo "TF_VAR_static_assets_directory=${assets_path}" >> "${GITHUB_ENV}"
+
+      - name: Install checksum-verified OpenTofu 1.12.6
+        run: |
+          curl --fail --location --retry 4 \
+            --output /tmp/tofu.zip \
+            https://github.com/opentofu/opentofu/releases/download/v1.12.6/tofu_1.12.6_linux_amd64.zip
+          printf '%s  %s\n' \
+            5dc43da4f750f33873dc25e94587128709e819e544b7be9016b255316153c3a8 \
+            /tmp/tofu.zip | sha256sum --check --strict
+          unzip -q /tmp/tofu.zip tofu -d /tmp/searise-tofu
+          echo /tmp/searise-tofu >> "${GITHUB_PATH}"
+
+      - name: Build and scan reviewed plan
+        working-directory: infra/cloudflare
+        run: |
+          tofu init -input=false -lockfile=readonly \
+            -backend-config="backends/${{ inputs.environment }}.s3.tfbackend.example" \
+            -backend-config="endpoint=${TF_BACKEND_ENDPOINT}"
+          tofu plan -input=false -out=/tmp/delivery.tfplan
+          tofu show -json /tmp/delivery.tfplan > /tmp/delivery-plan.json
+          python ../../scripts/infra/validate_cloudflare_delivery.py plan \
+            --plan-json /tmp/delivery-plan.json \
+            --summary /tmp/delivery-plan-summary.json
+
+      - name: Bind exact reviewed plan artifact
+        id: identity
+        run: |
+          plan_sha256="$(sha256sum /tmp/delivery.tfplan | awk '{print $1}')"
+          configuration_sha256="$(printf '%s\0' \
+            "${TF_BACKEND_ENDPOINT}" \
+            "${TF_VAR_account_id}" \
+            "${TF_VAR_zone_id}" \
+            "${TF_VAR_environment}" \
+            "${TF_VAR_release_bucket_name}" \
+            "${TF_VAR_data_domain}" \
+            "${TF_VAR_approved_origins}" \
+            "${TF_VAR_static_worker_name}" \
+            "${TF_VAR_static_assets_directory}" | sha256sum | awk '{print $1}')"
+          echo "plan_sha256=${plan_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "configuration_sha256=${configuration_sha256}" >> "${GITHUB_OUTPUT}"
+          printf '%s  %s\n' "${plan_sha256}" /tmp/delivery.tfplan > /tmp/delivery.tfplan.sha256
+
+      - name: Retain protected plan for approval
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: issue-62-${{ inputs.environment }}-plan-${{ github.run_id }}
+          path: |
+            /tmp/delivery.tfplan
+            /tmp/delivery.tfplan.sha256
+            /tmp/delivery-plan-summary.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 1
+
+  apply:
+    name: Protected ${{ inputs.environment }} apply
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: cloudflare-${{ inputs.environment }}-apply
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APPLY_API_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.TOFU_STATE_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TOFU_STATE_SECRET_ACCESS_KEY }}
+      TF_VAR_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
+      TF_VAR_environment: ${{ inputs.environment }}
+      TF_VAR_release_bucket_name: ${{ vars.CLOUDFLARE_RELEASE_BUCKET }}
+      TF_VAR_data_domain: ${{ vars.CLOUDFLARE_DATA_DOMAIN }}
+      TF_VAR_approved_origins: ${{ vars.CLOUDFLARE_APPROVED_ORIGINS_JSON }}
+      TF_VAR_static_worker_name: ${{ vars.CLOUDFLARE_STATIC_WORKER }}
+      TF_VAR_static_assets_directory: ${{ vars.CLOUDFLARE_STATIC_ASSETS_DIRECTORY }}
+      TF_BACKEND_ENDPOINT: https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+    steps:
+      - name: Enforce independently protected application handoff
+        env:
+          APPLY_ENABLED: ${{ vars.CLOUDFLARE_ISSUE_62_APPLY_ENABLED }}
+          PUBLICATION_ENABLED: ${{ vars.CLOUDFLARE_ISSUE_64_PUBLICATION_ENABLED }}
+        run: |
+          test "${APPLY_ENABLED}" = "true"
+          test "${PUBLICATION_ENABLED}" = "true"
+          test "${GITHUB_REF_NAME}" = "master"
+          test "${GITHUB_RUN_ATTEMPT}" = "1"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_revision }}
+
+      - name: Reconstruct exact reviewed static build path
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ inputs.source_revision }}"
+          assets_lower="${TF_VAR_static_assets_directory,,}"
+          case "${assets_lower}" in
+            /*|*\\*|*..*|*candidate-v7*|*.tar|*.tar.*) exit 1 ;;
+          esac
+          test -f "${TF_VAR_static_assets_directory}/index.html"
+          test -z "$(find "${TF_VAR_static_assets_directory}" -type l -print -quit)"
+          test -z "$(find "${TF_VAR_static_assets_directory}" -type f \( -iname '*.tar' -o -iname '*.tar.*' \) -print -quit)"
+          test -z "$(git ls-files --others --exclude-standard -- "${TF_VAR_static_assets_directory}")"
+          git ls-files --error-unmatch -- "${TF_VAR_static_assets_directory}/index.html"
+          assets_path="$(cd "${TF_VAR_static_assets_directory}" && pwd -P)"
+          case "${assets_path}" in
+            "${GITHUB_WORKSPACE}"/*) ;;
+            *) exit 1 ;;
+          esac
+          echo "TF_VAR_static_assets_directory=${assets_path}" >> "${GITHUB_ENV}"
+
+      - name: Install checksum-verified OpenTofu 1.12.6
+        run: |
+          curl --fail --location --retry 4 \
+            --output /tmp/tofu.zip \
+            https://github.com/opentofu/opentofu/releases/download/v1.12.6/tofu_1.12.6_linux_amd64.zip
+          printf '%s  %s\n' \
+            5dc43da4f750f33873dc25e94587128709e819e544b7be9016b255316153c3a8 \
+            /tmp/tofu.zip | sha256sum --check --strict
+          unzip -q /tmp/tofu.zip tofu -d /tmp/searise-tofu
+          echo /tmp/searise-tofu >> "${GITHUB_PATH}"
+
+      - name: Restore exact approved plan
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: issue-62-${{ inputs.environment }}-plan-${{ github.run_id }}
+          path: /tmp/reviewed-plan
+
+      - name: Verify approved plan identity
+        env:
+          EXPECTED_PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
+          EXPECTED_CONFIGURATION_SHA256: ${{ needs.plan.outputs.configuration_sha256 }}
+        run: |
+          test -n "${EXPECTED_PLAN_SHA256}"
+          printf '%s  %s\n' \
+            "${EXPECTED_PLAN_SHA256}" \
+            /tmp/reviewed-plan/delivery.tfplan | sha256sum --check --strict
+          configuration_sha256="$(printf '%s\0' \
+            "${TF_BACKEND_ENDPOINT}" \
+            "${TF_VAR_account_id}" \
+            "${TF_VAR_zone_id}" \
+            "${TF_VAR_environment}" \
+            "${TF_VAR_release_bucket_name}" \
+            "${TF_VAR_data_domain}" \
+            "${TF_VAR_approved_origins}" \
+            "${TF_VAR_static_worker_name}" \
+            "${TF_VAR_static_assets_directory}" | sha256sum | awk '{print $1}')"
+          test "${configuration_sha256}" = "${EXPECTED_CONFIGURATION_SHA256}"
+
+      - name: Apply only the approved infrastructure plan
+        working-directory: infra/cloudflare
+        run: |
+          tofu init -input=false -lockfile=readonly \
+            -backend-config="backends/${{ inputs.environment }}.s3.tfbackend.example" \
+            -backend-config="endpoint=${TF_BACKEND_ENDPOINT}"
+          tofu apply -input=false -auto-approve /tmp/reviewed-plan/delivery.tfplan
+
+      - name: Prove idempotent second plan
+        working-directory: infra/cloudflare
+        run: |
+          set +e
+          tofu plan -input=false -detailed-exitcode -out=/tmp/second.tfplan
+          status=$?
+          set -e
+          test "${status}" = "0"

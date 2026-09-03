@@ -150,6 +150,7 @@
               "github-actions",
               "native",
               "npm",
+              "opentofu",
               "python",
               "standard-schema"
             ]

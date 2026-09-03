@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from scripts.ci.verify_ci_gate import GateVerificationError, verify_gate_results
 
@@ -10,6 +11,7 @@ ROUTES = {
     "pipeline": False,
     "release": False,
     "repository_removal": False,
+    "static_delivery_iac": False,
 }
 JOBS = {
     "changes": "success",
@@ -23,6 +25,7 @@ JOBS = {
     "ar6-release-evidence": "skipped",
     "ar6-release-evidence-macos": "skipped",
     "repository-removal-v2": "skipped",
+    "static-delivery-iac": "skipped",
 }
 
 
@@ -31,6 +34,28 @@ def changed(source: dict[str, object], **updates: object) -> dict[str, object]:
 
 
 class CiGateVerificationTests(unittest.TestCase):
+    def test_repository_removal_uses_current_v6_authority(self) -> None:
+        workflow = (
+            Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "python scripts/repository/validate_static_delivery_correction.py ci",
+            workflow,
+        )
+        self.assertNotIn(
+            "python scripts/repository/validate_static_delivery_evolution.py ci",
+            workflow,
+        )
+
+    def test_static_delivery_route_requires_its_exact_job(self) -> None:
+        with self.assertRaisesRegex(GateVerificationError, "static-delivery-iac.*skipped"):
+            verify_gate_results(
+                "ci",
+                changed(ROUTES, static_delivery_iac=True),
+                JOBS,
+            )
+
     def test_selected_target_job_must_succeed(self) -> None:
         with self.assertRaisesRegex(GateVerificationError, "web.*skipped"):
             verify_gate_results("ci", changed(ROUTES, web=True), JOBS)

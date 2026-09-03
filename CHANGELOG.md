@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added pinned, credential-free OpenTofu delivery infrastructure for isolated
+  Cloudflare Workers Static Assets and R2 environments, with exact CORS/range/
+  ETag/cache contracts, deletion protection, plan scanning, protected apply
+  handoff, fixture HTTP coverage, cost and recovery guidance, and explicit
+  provider/activation gaps. Versioned PMTiles, COG, and other release objects
+  use the same immutable response contract, while only the explicit unversioned
+  `/release.json` alias uses `no-store`; no data publication or external
+  resource mutation is authorized.
+
 - Added sealed, fail-closed static-first CI routing with tracked-Markdown link
   validation, release-v2 and HTTP-delivery producer/consumer routing, and
   exact aggregate checks that reject selected jobs reported as skipped. The

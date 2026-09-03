@@ -21,6 +21,7 @@ CI_ROUTE_JOBS = {
         "offline-release-fixture",
     ),
     "repository_removal": ("repository-removal-v2",),
+    "static_delivery_iac": ("static-delivery-iac",),
 }
 
 

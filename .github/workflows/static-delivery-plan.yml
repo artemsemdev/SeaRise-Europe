@@ -1,0 +1,88 @@
+name: Static delivery plan
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/static-delivery*.yml"
+      - "infra/cloudflare/**"
+      - "scripts/infra/**"
+      - "tests/infra/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-delivery-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture-plan:
+    name: Credential-free fixture plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11.9"
+
+      - name: Install checksum-verified OpenTofu 1.12.6
+        run: |
+          curl --fail --location --retry 4 \
+            --output /tmp/tofu.zip \
+            https://github.com/opentofu/opentofu/releases/download/v1.12.6/tofu_1.12.6_linux_amd64.zip
+          printf '%s  %s\n' \
+            5dc43da4f750f33873dc25e94587128709e819e544b7be9016b255316153c3a8 \
+            /tmp/tofu.zip | sha256sum --check --strict
+          unzip -q /tmp/tofu.zip tofu -d /tmp/searise-tofu
+          echo /tmp/searise-tofu >> "${GITHUB_PATH}"
+
+      - name: Validate repository-owned delivery policy
+        run: python scripts/infra/validate_cloudflare_delivery.py repository
+
+      - name: Format and validate target root
+        working-directory: infra/cloudflare
+        run: |
+          tofu fmt -check -recursive
+          tofu init -backend=false -lockfile=readonly
+          tofu validate
+
+      - name: Build credential-free fixture plan
+        working-directory: infra/cloudflare/fixtures/plan
+        run: |
+          tofu init -lockfile=readonly
+          tofu validate
+          tofu plan -refresh=false -lock=false -input=false -out=/tmp/fixture.tfplan
+          tofu show -json /tmp/fixture.tfplan > /tmp/fixture-plan.json
+
+      - name: Scan and summarize fixture plan
+        run: >-
+          python scripts/infra/validate_cloudflare_delivery.py plan
+          --plan-json /tmp/fixture-plan.json
+          --summary /tmp/fixture-plan-summary.json
+
+      - name: Run provider-neutral HTTP delivery tests
+        run: python -m unittest tests.infra.test_cloudflare_delivery -v
+
+      - name: Scan IaC for security misconfiguration
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: infra/cloudflare/main.tf
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+          version: v0.72.0
+
+      - name: Retain reviewed redacted plan summary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: issue-62-fixture-plan-${{ github.sha }}
+          path: /tmp/fixture-plan-summary.json
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 14

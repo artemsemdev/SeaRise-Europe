@@ -17,7 +17,7 @@ PYTHONPATH=src/pipeline python scripts/release/validate_supply_chain_contract.py
   --repository-root .
 ```
 
-The current readiness record validates 57 exact inputs. It also regenerates and compares the
+The current readiness record validates 67 exact inputs. It also regenerates and compares the
 static `src/web` npm SBOM and the Linux/macOS release and settlement Python
 SBOMs against their locked graphs. Input paths must be repository-relative,
 regular, non-symlinked files with exact SHA-256 values.

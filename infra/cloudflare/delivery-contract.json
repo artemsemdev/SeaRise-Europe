@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "contractId": "phase-3-issue-62-cloudflare-delivery-v1",
+  "reviewedAt": "2026-08-25",
+  "toolchain": {
+    "opentofu": "1.12.6",
+    "cloudflareProvider": "5.23.0"
+  },
+  "environments": {
+    "fixture": {
+      "variables": "environments/fixture.tfvars",
+      "backend": "backends/fixture.s3.tfbackend.example",
+      "stateBucket": "searise-tofu-state-fixture",
+      "stateKey": "cloudflare/fixture/terraform.tfstate",
+      "bucket": "searise-fixture-release",
+      "dataDomain": "data-fixture.example.invalid",
+      "approvedOrigins": ["https://app-fixture.example.invalid"],
+      "worker": "searise-fixture-static",
+      "planCredentialScope": "cloudflare-fixture-plan-infrastructure",
+      "applyCredentialScope": "cloudflare-fixture-apply-infrastructure",
+      "stateCredentialScope": "cloudflare-fixture-state"
+    },
+    "production": {
+      "variables": "environments/production.tfvars",
+      "backend": "backends/production.s3.tfbackend.example",
+      "stateBucket": "searise-tofu-state-production",
+      "stateKey": "cloudflare/production/terraform.tfstate",
+      "bucket": "searise-production-release",
+      "dataDomain": "data.example.invalid",
+      "approvedOrigins": ["https://app.example.invalid"],
+      "worker": "searise-production-static",
+      "planCredentialScope": "cloudflare-production-plan-infrastructure",
+      "applyCredentialScope": "cloudflare-production-apply-infrastructure",
+      "stateCredentialScope": "cloudflare-production-state"
+    },
+    "staging": {
+      "variables": "environments/staging.tfvars",
+      "backend": "backends/staging.s3.tfbackend.example",
+      "stateBucket": "searise-tofu-state-staging",
+      "stateKey": "cloudflare/staging/terraform.tfstate",
+      "bucket": "searise-staging-release",
+      "dataDomain": "data-staging.example.invalid",
+      "approvedOrigins": ["https://app-staging.example.invalid"],
+      "worker": "searise-staging-static",
+      "planCredentialScope": "cloudflare-staging-plan-infrastructure",
+      "applyCredentialScope": "cloudflare-staging-apply-infrastructure",
+      "stateCredentialScope": "cloudflare-staging-state"
+    }
+  },
+  "http": {
+    "allowedMethods": ["GET", "HEAD"],
+    "allowedRequestHeaders": ["If-Match", "If-None-Match", "Range"],
+    "exposedResponseHeaders": [
+      "Accept-Ranges",
+      "Cache-Control",
+      "Content-Length",
+      "Content-Range",
+      "Content-Type",
+      "ETag"
+    ],
+    "immutableCacheControl": "public, max-age=31536000, immutable",
+    "visualPmtilesCacheControl": "public, max-age=31536000, immutable",
+    "visualPmtilesRationale": "Issue #62 public-delivery acceptance applies the immutable policy to every versioned object, including PMTiles and COG; no-store is limited to the unversioned mutable release alias.",
+    "mutableAliasCacheControl": "no-store",
+    "strongEtagAuthority": "fixture-sha256"
+  },
+  "ownership": {
+    "issue62": [
+      "R2 delivery buckets",
+      "R2 CORS and incomplete-multipart lifecycle",
+      "R2 custom data domains",
+      "release cache and response-header rules",
+      "Workers Static Assets resources"
+    ],
+    "issue64": [
+      "immutable release object upload",
+      "application/release activation",
+      "public candidate authorization"
+    ],
+    "issue74": [
+      "GitHub protected environments and reviewers",
+      "OIDC and repository rulesets",
+      "state backend bootstrap and imports",
+      "drift detection and provider-gap exception register"
+    ]
+  },
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "publicationRequiresIssue64Gate": true,
+    "externalResourceMutationAuthorizedByRepositoryState": false,
+    "dataUploadAuthoritySeparated": true,
+    "prohibitedResourceTypes": [
+      "cloudflare_d1_database",
+      "cloudflare_durable_object_namespace",
+      "cloudflare_queue",
+      "cloudflare_r2_object",
+      "cloudflare_workers_kv_namespace"
+    ]
+  },
+  "providerGaps": [
+    {
+      "id": "r2-custom-domain-import",
+      "status": "provider-gap",
+      "ownerIssue": 74,
+      "effect": "Cloudflare provider 5.23.0 does not support import for cloudflare_r2_custom_domain; existing domains require a reviewed import exception before management."
+    },
+    {
+      "id": "r2-cors-lifecycle-import",
+      "status": "provider-gap",
+      "ownerIssue": 74,
+      "effect": "Cloudflare provider 5.23.0 does not support import for R2 CORS or lifecycle resources; apply remains blocked for unknown existing policies."
+    },
+    {
+      "id": "r2-budget-notification",
+      "status": "provider-gap",
+      "ownerIssue": 74,
+      "effect": "No provider-supported R2 spend-budget notification is modeled; cost thresholds remain an explicit monitoring follow-up."
+    }
+  ],
+  "pricing": {
+    "sourceDate": "2026-08-07",
+    "currency": "USD",
+    "standardStoragePerGbMonth": 0.015,
+    "classAPerMillion": 4.5,
+    "classBPerMillion": 0.36,
+    "internetEgressPerGb": 0,
+    "monthlyFree": {
+      "storageGbMonth": 10,
+      "classAOperations": 1000000,
+      "classBOperations": 10000000
+    },
+    "scenarios": [
+      {
+        "id": "reference-mvp",
+        "storageGbMonth": 1,
+        "classAOperations": 500000,
+        "classBOperations": 5000000,
+        "estimatedMonthlyUsd": 0
+      },
+      {
+        "id": "mandatory-review-guardrail",
+        "storageGbMonth": 100,
+        "classAOperations": 5000000,
+        "classBOperations": 50000000,
+        "estimatedMonthlyUsd": 33.75
+      }
+    ],
+    "idleCostClaim": "target-zero-within-free-allowances-not-guaranteed"
+  }
+}
