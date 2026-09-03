@@ -1,6 +1,15 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,7 +17,10 @@ import {
   activeAuthoritativeDocument,
   ownerCommentVerificationArguments,
   readScanFile,
+  repositoryAuthorityValidatorPath,
+  resolveApprovedGatePolicyBlobs,
   scanContent,
+  staticSupplyChainValidationArguments,
   validateHistoricalAllowlist,
 } from "./check-target-content.mjs";
 
@@ -31,6 +43,79 @@ describe("built content containment", () => {
       rmSync(outsideRoot, { recursive: true, force: true });
     }
   });
+});
+
+function git(root, ...arguments_) {
+  return execFileSync("git", arguments_, { cwd: root, encoding: "utf8" }).trim();
+}
+
+function createCliRepositoryFixture() {
+  const source = resolve(process.cwd(), "../..");
+  const root = mkdtempSync(resolve(tmpdir(), "target-content-cli-"));
+  cpSync(source, root, {
+    recursive: true,
+    filter: (path) => !path.slice(source.length + 1).split("/")
+      .some((part) => [".git", "node_modules", "dist", ".terraform"].includes(part)),
+  });
+  for (const validator of [
+    "scripts/release/validate_supply_chain_contract.py",
+    "scripts/repository/validate_static_delivery_owner_verifier_chain_correction.py",
+  ]) {
+    writeFileSync(resolve(root, validator), "raise SystemExit(0)\n");
+  }
+  mkdirSync(resolve(root, "src/web/dist"), { recursive: true });
+  writeFileSync(resolve(root, "src/web/dist/index.html"), "<!doctype html><title>static fixture</title>\n");
+  git(root, "init", "-q");
+  git(root, "fetch", "-q", source, "+refs/heads/*:refs/remotes/source/*");
+  git(root, "add", ".");
+  git(root, "-c", "user.name=Artem", "-c",
+    "user.email=6793222+artemsemdev@users.noreply.github.com",
+    "commit", "-qm", "test: create static target fixture");
+  return root;
+}
+
+function runContentCli(root, ...arguments_) {
+  return spawnSync(process.execPath, ["scripts/check-target-content.mjs", ...arguments_], {
+    cwd: resolve(root, "src/web"),
+    encoding: "utf8",
+  });
+}
+
+describe("target-content CLI module graph", () => {
+  it("reproduces the old exit-13 cycle and runs the corrected source and built CLIs", () => {
+    const root = createCliRepositoryFixture();
+    const gatePath = resolve(root, "src/web/scripts/static-repository-gates.mjs");
+    const authorityPath = resolve(root, "contracts/repository-removal/v11/phase-3-issue-62/preapproval.json");
+    const corrected = readFileSync(gatePath, "utf8");
+    const approved = readFileSync(authorityPath, "utf8");
+    try {
+      const cyclicGate = corrected.replace(
+        'from "./static-repository-authority.mjs";',
+        'from "./check-target-content.mjs";',
+      );
+      writeFileSync(gatePath, cyclicGate);
+      const cyclicAuthority = JSON.parse(approved);
+      cyclicAuthority.governedPaths.find(({ path }) =>
+        path === "src/web/scripts/static-repository-gates.mjs").after.gitBlobSha = blob(cyclicGate);
+      writeFileSync(authorityPath, `${JSON.stringify(cyclicAuthority, null, 2)}\n`);
+      const cyclic = runContentCli(root);
+      expect(cyclic.status, cyclic.stderr).toBe(13);
+
+      writeFileSync(gatePath, corrected);
+      writeFileSync(authorityPath, approved);
+      const source = runContentCli(root);
+      expect(source.stderr).toBe("");
+      expect(source.status).toBe(0);
+      expect(source.stdout).toMatch(/Target content contract passed/);
+
+      const built = runContentCli(root, "--built", "dist");
+      expect(built.stderr).toBe("");
+      expect(built.status).toBe(0);
+      expect(built.stdout).toMatch(/Target content contract passed/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
 });
 
 function blob(content) {
@@ -60,6 +145,42 @@ function fixture(overrides = {}) {
 }
 
 describe("repository-removal validator capability", () => {
+  it("hands approved content checks to the complete Issue 62 v11 authority", () => {
+    expect(repositoryAuthorityValidatorPath).toBe(
+      "scripts/repository/validate_static_delivery_owner_verifier_chain_correction.py",
+    );
+  });
+
+  it("hands off the historical Issue 71 gate only to the exact current after blob", () => {
+    const historical = "1".repeat(40);
+    const evolved = "2".repeat(40);
+    const plan = { entries: [{
+      path: "src/web/scripts/static-repository-gates.mjs",
+      after: { state: "present", gitBlobSha: historical },
+    }] };
+    const authority = { governedPaths: [{
+      path: "src/web/scripts/static-repository-gates.mjs",
+      before: { state: "present", gitBlobSha: historical },
+      after: { state: "present", gitBlobSha: evolved },
+    }] };
+    expect(resolveApprovedGatePolicyBlobs(plan, authority).get(
+      "src/web/scripts/static-repository-gates.mjs",
+    )).toBe(evolved);
+    authority.governedPaths[0].before.gitBlobSha = "3".repeat(40);
+    expect(() => resolveApprovedGatePolicyBlobs(plan, authority)).toThrow(/Issue-71 plan/);
+  });
+
+  it("hands the complete evolved profile to the current Python validator", () => {
+    expect(staticSupplyChainValidationArguments("/repository")).toEqual([
+      "/repository/scripts/release/validate_supply_chain_contract.py",
+      "static-profile",
+      "--document",
+      "contracts/supply-chain/v2/static-target-profile.json",
+      "--repository-root",
+      "/repository",
+    ]);
+  });
+
   it("fails closed when owner-comment verification is unavailable", () => {
     expect(() => ownerCommentVerificationArguments(
       "usage: validator [--repository-root REPOSITORY_ROOT]",

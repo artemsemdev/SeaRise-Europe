@@ -63,6 +63,12 @@ function approvalRepository() {
 }
 
 describe("static repository dependency gates", () => {
+  it("owns repository authority outside the target-content launcher module graph", () => {
+    const source = readFileSync(resolve(process.cwd(), "scripts/static-repository-gates.mjs"), "utf8");
+    expect(source).toContain('from "./static-repository-authority.mjs"');
+    expect(source).not.toContain('from "./check-target-content.mjs"');
+  });
+
   it.each([
     ["nextjs-runtime", `{"dependencies":{"next":"14.2.0"}}`],
     ["dotnet-csharp-nuget", "dotnet publish SeaRise.sln"],
@@ -342,7 +348,7 @@ describe("static repository dependency gates", () => {
     const readPath = (path) => readFileSync(resolve(root, path));
     const readMode = (path) => git(root, "ls-files", "--stage", "--", path).split(" ", 1)[0];
     expect(validateStaticSupplyChainProfile(profile, readPath, readMode))
-      .toEqual({ componentCount: 13, inputCount: 57 });
+      .toEqual({ componentCount: 14, inputCount: 67 });
 
     const countMutation = JSON.parse(JSON.stringify(profile));
     countMutation.components.at(-1).inputs.pop();

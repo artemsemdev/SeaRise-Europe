@@ -18,6 +18,7 @@ OUTPUTS = (
     "pipeline",
     "release",
     "repository_removal",
+    "static_delivery_iac",
     "codeql_javascript",
     "heavy",
 )
@@ -139,6 +140,14 @@ REPOSITORY_REMOVAL = (
     "src/api/Dockerfile",
     "tests/harness/test_changed_components.py",
     "tests/harness/test_immutable_dependencies.py",
+)
+
+STATIC_DELIVERY_IAC = (
+    ".github/workflows/static-delivery*.yml",
+    "infra/cloudflare/**",
+    "scripts/infra/**",
+    "tests/infra/**",
+    "docs/delivery/cloudflare-static-delivery.md",
 )
 
 CODEQL_JAVASCRIPT = (
@@ -274,11 +283,20 @@ def classify_paths(changed_paths: Sequence[str]) -> dict[str, bool]:
         "pipeline": any(_matches(path, PIPELINE) for path in paths),
         "release": any(_matches(path, RELEASE) for path in paths),
         "repository_removal": any(_matches(path, REPOSITORY_REMOVAL) for path in paths),
+        "static_delivery_iac": any(
+            _matches(path, STATIC_DELIVERY_IAC) for path in paths
+        ),
         "codeql_javascript": any(_matches(path, CODEQL_JAVASCRIPT) for path in paths),
     }
     result["heavy"] = any(
         result[name]
-        for name in ("web", "pipeline", "release", "repository_removal")
+        for name in (
+            "web",
+            "pipeline",
+            "release",
+            "repository_removal",
+            "static_delivery_iac",
+        )
     )
     return result
 

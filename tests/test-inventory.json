@@ -345,6 +345,12 @@
       "reference": ".github/workflows/ci.yml and .github/workflows/codeql.yml",
       "environment": "agent/issue-73-tdd-harness worktree"
     },
+    "local-2026-08-25-cloudflare-delivery": {
+      "kind": "local-measurement",
+      "observedAt": "2026-08-25T18:02:39+02:00",
+      "reference": "docs/evidence/phase-3/issue-62-cloudflare-delivery.md, infra/cloudflare/delivery-contract.json, and tests/infra/test_cloudflare_delivery.py",
+      "environment": "macOS arm64; OpenTofu 1.12.6; Cloudflare provider 5.23.0; credential-free fixture plan with 7 creates, 0 changes, and 0 destroys; 8 repository and loopback HTTP cases; versioned PMTiles and COG immutable, explicit unversioned release alias no-store; synthetic committed fixture only; no Cloudflare/GitHub mutation, Candidate-v7, TAR, credentials, upload, publication, or production claim"
+    },
     "local-2026-08-17-removal-v2-framework": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T00:00:00+02:00",
@@ -360,8 +366,8 @@
       "replacementEvidence": null,
       "layer": "static-analysis",
       "owner": "frontend",
-      "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, product-copy limits, dynamic endpoint exclusions, legacy dependency exclusions, exact historical path/blob/rule evidence, and the 14-component/57-input v2 static-quality supply-chain authority fail closed across production source, active documentation, the tracked repository, and emitted static assets.",
-      "sourcePaths": ["src/web/scripts/check-target-content.mjs", "src/web/scripts/check-target-content.test.mjs", "src/web/scripts/static-repository-gates.mjs", "src/web/scripts/static-repository-gates.test.mjs", "contracts/repository-removal/v1/historical-allowlist.preapproval.json", "contracts/supply-chain/v2/static-target-profile.json", ".github/workflows/static-quality.yml", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "docs/testing/static-target-content-contract.md", "docs/evidence/phase-2/issue-59-content-review.md", "docs/product/Mock/SeaRise-Flight.html", "docs/product/Mock/DESIGN.md", "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"],
+      "purpose": "Keep ADR-024 outcome names, scientific nonclaims, absolute horizons, release-disposition language, product-copy limits, dynamic endpoint exclusions, legacy dependency exclusions, exact historical path/blob/rule evidence, and the 14-component/67-input v2 static-quality supply-chain authority fail closed across production source, active documentation, the tracked repository, and emitted static assets.",
+      "sourcePaths": ["src/web/scripts/check-target-content.mjs", "src/web/scripts/check-target-content.test.mjs", "src/web/scripts/static-repository-authority.mjs", "src/web/scripts/static-repository-gates.mjs", "src/web/scripts/static-repository-gates.test.mjs", "contracts/repository-removal/v1/historical-allowlist.preapproval.json", "contracts/supply-chain/v2/static-target-profile.json", ".github/workflows/static-quality.yml", "tools/static-quality/package.json", "tools/static-quality/package-lock.json", "docs/testing/static-target-content-contract.md", "docs/evidence/phase-2/issue-59-content-review.md", "docs/product/Mock/SeaRise-Flight.html", "docs/product/Mock/DESIGN.md", "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"],
       "changedPaths": ["src/web/**", "src/api/**", "src/frontend/**", "src/pipeline/**", "infra/**", ".github/workflows/**", "docker-compose.yml", "package.json", "tools/static-quality/**", "contracts/supply-chain/v2/**", "docs/product/**", "docs/methodology.md", "docs/testing/static-target-content-contract.md", "contracts/repository-removal/v1/historical-allowlist*.json"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent mutation-sensitive static target content, canonical Flight annotation, and historical-evidence boundary." },
@@ -1714,6 +1720,23 @@
       "flakiness": { "status": "environment-sensitive", "owner": "security", "issue": null, "expiresAt": null, "evidence": "GitHub service action plus C# build; referenced scheduled run passed." }
     },
     {
+      "id": "cloudflare-static-delivery",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "contract",
+      "owner": "platform",
+      "purpose": "Keep isolated OpenTofu delivery resources, supply-chain pins, exact immutable versioned-object HTTP behavior, mutable-alias no-store behavior, protected plan/apply separation, deletion safety, and non-publication boundaries fail closed.",
+      "sourcePaths": ["infra/cloudflare/**", "scripts/infra/**", "tests/infra/test_cloudflare_delivery.py", ".github/workflows/static-delivery-plan.yml", ".github/workflows/static-delivery-apply.yml", ".github/workflows/ci.yml", "contracts/ci/v1/architecture-fitness.json", "contracts/supply-chain/v2/static-target-profile.json", "docs/delivery/cloudflare-static-delivery.md"],
+      "changedPaths": ["infra/cloudflare/**", "scripts/infra/**", "tests/infra/**", ".github/workflows/static-delivery*.yml", ".github/workflows/ci.yml", "contracts/ci/v1/architecture-fitness.json", "contracts/supply-chain/v2/**", "docs/delivery/cloudflare-static-delivery.md"],
+      "disposition": "keep-permanently",
+      "replacementGate": { "issue": null, "evidenceRequired": "Permanent credential-free plan, HTTP, supply-chain, route, and protected-delivery safety contract." },
+      "commands": { "focused": "python -m unittest tests.infra.test_cloudflare_delivery -v", "full": "python -m unittest tests.infra.test_cloudflare_delivery tests.harness.test_changed_components tests.harness.test_ci_gate tests.harness.test_immutable_dependencies -v && python scripts/release/validate_supply_chain_contract.py static-profile --document contracts/supply-chain/v2/static-target-profile.json --repository-root ." },
+      "execution": { "tier": "fast", "ciWorkflow": "ci.yml", "ciJob": "static-delivery-iac", "requiresDocker": false, "requiresCredentials": false },
+      "cost": { "estimatedSeconds": 90, "class": "medium", "evidenceRef": "local-2026-08-25-cloudflare-delivery", "scope": "focused-suite" },
+      "flakiness": { "status": "none-observed", "owner": "platform", "issue": null, "expiresAt": null, "evidence": "The fixture plan uses invalid synthetic identifiers without refresh or credentials; HTTP checks use committed synthetic bytes and an isolated loopback server; no external service, Candidate-v7, TAR, or clock-dependent assertion is involved." }
+    },
+    {
       "id": "repository-removal-v2-framework",
       "status": "active",
       "removalGate": null,
@@ -1732,6 +1755,7 @@
     }
   ],
   "baselineTests": [
+    { "path": "tests/infra/test_cloudflare_delivery.py", "suite": "cloudflare-static-delivery", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "scripts/compose-smoke.sh", "suite": "compose-smoke", "status": "retired", "removalGate": 72, "replacementEvidence": "Repository-removal v2 issue #72 plan and signed checks: static-generic-host-lighthouse, static-offline-lifecycle-journey, static-target-content, static-web-shell." },
     { "path": "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs", "suite": "api-application-unit", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
     { "path": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs", "suite": "api-domain-legacy", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
@@ -1968,6 +1992,13 @@
     { "path": "tests/repository-removal/test_candidate_isolation.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_gate_policy_evolution.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_gate_policy_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_evolution.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_handoff_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_trust_handoff_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_owner_verifier_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_module_cycle_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "tests/repository-removal/test_validate_static_delivery_owner_verifier_chain_correction.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_removal_approval.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "tests/repository-removal/test_validate_removal_plan_v2.py", "suite": "repository-removal-v2-framework", "status": "active", "removalGate": null, "replacementEvidence": null }
   ],
