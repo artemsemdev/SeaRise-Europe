@@ -102,6 +102,9 @@ _BASE_COMPONENTS = {
 _PENDING_COMPONENT = {
     "pending-legacy-python-authorities": ("python", "development", "range-constrained")
 }
+_CLOUDFLARE_COMPONENT = {
+    "cloudflare-delivery-opentofu": ("opentofu", "candidate", "locked")
+}
 
 
 def _authority(component: str, role: str, *paths: str) -> dict[str, tuple[str, str]]:
@@ -234,6 +237,30 @@ _BASE_INPUT_AUTHORITY = {
         "pipeline-geoid-evaluator",
         "lock",
         "src/pipeline/science/geoid-evaluator-requirements.txt",
+    ),
+}
+_CLOUDFLARE_INPUT_AUTHORITY = {
+    **_authority(
+        "github-actions",
+        "workflow",
+        ".github/workflows/static-delivery-apply.yml",
+        ".github/workflows/static-delivery-plan.yml",
+    ),
+    **_authority(
+        "cloudflare-delivery-opentofu",
+        "lock",
+        "infra/cloudflare/.opentofu-version",
+        "infra/cloudflare/.terraform.lock.hcl",
+        "infra/cloudflare/fixtures/plan/.terraform.lock.hcl",
+    ),
+    **_authority(
+        "cloudflare-delivery-opentofu",
+        "manifest",
+        "infra/cloudflare/fixtures/plan/main.tf",
+        "infra/cloudflare/main.tf",
+        "infra/cloudflare/outputs.tf",
+        "infra/cloudflare/variables.tf",
+        "infra/cloudflare/versions.tf",
     ),
 }
 _PENDING_INPUT_AUTHORITY = {
@@ -659,6 +686,10 @@ def _is_current_dependency_authority(path: PurePosixPath) -> bool:
         "contracts/release/v2/browser-derivation-provenance.schema.json"
     )
     sbom = path.parent == _CURRENT_SBOM_ROOT and path.name.endswith(".cdx.json")
+    opentofu = path.parts[:2] == ("infra", "cloudflare") and (
+        path.suffix == ".tf"
+        or path.name in {".opentofu-version", ".terraform.lock.hcl"}
+    )
     return (
         path.name in _NODE_AUTHORITY_FILES
         or path.name in _FORBIDDEN_FILES
@@ -671,6 +702,7 @@ def _is_current_dependency_authority(path: PurePosixPath) -> bool:
         or schema
         or release_schema
         or sbom
+        or opentofu
     )
 
 
@@ -897,6 +929,12 @@ def validate_static_target_profile(
         )
     expected_components = dict(_BASE_COMPONENTS)
     expected_inputs = dict(_BASE_INPUT_AUTHORITY)
+    if any(
+        _path_lexists(repository_root / path)
+        for path in _CLOUDFLARE_INPUT_AUTHORITY
+    ):
+        expected_components.update(_CLOUDFLARE_COMPONENT)
+        expected_inputs.update(_CLOUDFLARE_INPUT_AUTHORITY)
     if python_pending:
         expected_components.update(_PENDING_COMPONENT)
         expected_inputs.update(_PENDING_INPUT_AUTHORITY)

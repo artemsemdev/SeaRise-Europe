@@ -1,9 +1,29 @@
 import { createHash } from "node:crypto";
-import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  approvedRemovalChain,
+  loadHistoricalAllowlist,
+  ownerCommentVerificationArguments,
+  repositoryAuthorityValidatorPath,
+  resolveApprovedGatePolicyBlobs,
+  staticSupplyChainValidationArguments,
+  staticSupplyChainValidatorPath,
+  validateHistoricalAllowlist,
+} from "./static-repository-authority.mjs";
+
+export {
+  approvedRemovalChain,
+  loadHistoricalAllowlist,
+  ownerCommentVerificationArguments,
+  repositoryAuthorityValidatorPath,
+  resolveApprovedGatePolicyBlobs,
+  staticSupplyChainValidationArguments,
+  staticSupplyChainValidatorPath,
+  validateHistoricalAllowlist,
+};
 
 const moduleUrl = new URL(import.meta.url);
 const webRoot = moduleUrl.protocol === "file:"
@@ -50,41 +70,6 @@ const excludedSourceParts = [
   ".test.ts",
   ".test.tsx",
 ];
-const historicalRules = Object.freeze({
-  "historical-adr-term": /^docs\/architecture\/adr\/[^/]+\.md$/u,
-  "historical-changelog-term": /^CHANGELOG\.md$/u,
-  "historical-five-state-evidence": /^docs\/(?:evidence|science)\/[^/]+(?:\/[^/]+)*\.md$/u,
-  "immutable-v1-supply-chain-evidence": /^contracts\/supply-chain\/v1\//u,
-  "canonical-design-reference": /^docs\/product\/Mock\/SeaRise-Flight\.html$/u,
-});
-const historicalRuleClaims = Object.freeze({
-  "historical-adr-term": new Set([
-    "legacy-outcome-modeled-exposure",
-    "legacy-outcome-no-modeled-exposure",
-  ]),
-  "historical-changelog-term": new Set([
-    "legacy-outcome-modeled-exposure",
-    "legacy-outcome-no-modeled-exposure",
-  ]),
-  "historical-five-state-evidence": new Set([
-    "legacy-outcome-modeled-exposure",
-    "legacy-outcome-no-modeled-exposure",
-    "legacy-copy-modeled-exposure",
-    "legacy-copy-no-modeled-exposure",
-    "binary-exposure-product",
-    "terrain-comparison-product",
-  ]),
-  "immutable-v1-supply-chain-evidence": new Set(),
-  "canonical-design-reference": new Set(),
-});
-const activeAuthorityPaths = new Set([
-  "docs/architecture/adr/ADR-024-ar6-regional-projection-contract.md",
-  "docs/methodology.md",
-  "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
-]);
-const gatePolicyTrustPaths = Object.freeze([
-  "src/web/scripts/static-repository-gates.mjs",
-]);
 
 export const prohibitedTargetClaims = Object.freeze([
   Object.freeze({ id: "legacy-outcome-modeled-exposure", pattern: /\bModeledExposureDetected\b/giu }),
@@ -158,184 +143,6 @@ function readRegularFile(path, encoding = null, root = repositoryRoot) {
 
 export function readScanFile(path, scanRoot) {
   return readRegularFile(path, "utf8", scanRoot);
-}
-
-function gitBlobSha(content) {
-  const bytes = Buffer.from(content);
-  return createHash("sha1").update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
-}
-
-function hasExactKeys(value, expected) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    && Object.keys(value).sort().join("\0") === [...expected].sort().join("\0");
-}
-
-export function validateHistoricalAllowlist(document, readPath, {
-  authority = "approved",
-  resolveTree = null,
-  resolveBlob = null,
-} = {}) {
-  const approved = authority === "approved";
-  const readiness = authority === "readiness";
-  const anchorValid = approved
-    ? /^[a-f0-9]{40}$/u.test(document?.auditedCommit ?? "")
-      && /^[a-f0-9]{40}$/u.test(document?.auditedTree ?? "")
-      && hasExactKeys(document, ["schemaVersion", "auditedCommit", "auditedTree", "entries"])
-    : readiness && document?.authority === "preapproval-current-blobs"
-      && hasExactKeys(document, ["schemaVersion", "authority", "entries"]);
-  if (!document || document.schemaVersion !== "1.0.0" || !Array.isArray(document.entries)
-      || document.entries.length === 0 || !anchorValid) {
-    throw new Error("Historical terminology allowlist is not a v1 document");
-  }
-  if (approved && resolveTree && resolveTree(document.auditedCommit) !== document.auditedTree) {
-    throw new Error("Historical terminology allowlist audited tree does not match its commit");
-  }
-  const entries = new Map();
-  const ids = new Set();
-  for (const entry of document.entries) {
-    const rule = historicalRules[entry?.rule];
-    if (!entry || !hasExactKeys(entry, [
-      "id", "path", "gitBlobSha", "rule", "reason", "activeRuntimeAllowed",
-    ]) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(entry.id ?? "")
-        || typeof entry.path !== "string" || !rule || !rule.test(entry.path)
-        || !/^[a-f0-9]{40}$/u.test(entry.gitBlobSha ?? "")
-        || typeof entry.reason !== "string" || entry.reason.length === 0
-        || entry.activeRuntimeAllowed !== false || entry.path.startsWith("src/web/")
-        || entry.path.startsWith("src/pipeline/searise_pipeline/")
-        || activeAuthorityPaths.has(entry.path)) {
-      throw new Error(`Historical terminology allowlist has an invalid entry: ${entry?.id ?? "unknown"}`);
-    }
-    if (ids.has(entry.id)) throw new Error(`Historical terminology allowlist repeats id ${entry.id}`);
-    if (entries.has(entry.path)) throw new Error(`Historical terminology allowlist repeats ${entry.path}`);
-    ids.add(entry.id);
-    const content = readPath(entry.path);
-    if (gitBlobSha(content) !== entry.gitBlobSha) {
-      throw new Error(`Historical terminology allowlist blob mismatch: ${entry.path}`);
-    }
-    if (approved && resolveBlob && resolveBlob(document.auditedCommit, entry.path) !== entry.gitBlobSha) {
-      throw new Error(`Historical terminology allowlist audited blob mismatch: ${entry.path}`);
-    }
-    entries.set(entry.path, Object.freeze({
-      rule: entry.rule,
-      gitBlobSha: entry.gitBlobSha,
-      allowedClaims: historicalRuleClaims[entry.rule],
-    }));
-  }
-  return entries;
-}
-
-export function ownerCommentVerificationArguments(helpText, root) {
-  const options = new Set(String(helpText).match(/--[a-z0-9-]+/gu) ?? []);
-  if (!options.has("--verify-owner-comment")) {
-    throw new Error(
-      "Repository-removal validator lacks required --verify-owner-comment capability",
-    );
-  }
-  return ["--repository-root", root, "--verify-owner-comment"];
-}
-
-function approvedRemovalChain(root) {
-  const validator = resolve(root, "scripts/repository/validate_gate_policy_correction.py");
-  if (!existsSync(validator)) throw new Error("Gate-policy evolution validator is missing");
-  readRegularFile(validator, null, root);
-  let headCommit;
-  try {
-    headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim();
-  } catch (error) {
-    throw new Error(`Issue-71 authority anchors cannot be derived: ${error.message}`);
-  }
-  try {
-    execFileSync("python3", [
-      validator,
-      "--repository-root", root,
-      "ci",
-      "--head-commit", headCommit,
-      "--verify-owner-comment",
-    ], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: "pipe",
-    });
-  } catch (error) {
-    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Gate-policy evolution approval chain is invalid${detail ? `: ${detail}` : ""}`);
-  }
-  const plan = JSON.parse(readRegularFile(
-    resolve(root, "contracts/repository-removal/v2/issue-71/removal-plan.json"),
-    "utf8",
-    root,
-  ));
-  return new Map(gatePolicyTrustPaths.map((path) => {
-    const matches = plan.entries.filter((entry) =>
-      entry.path === path && entry.after?.state === "present");
-    const approvedBlob = matches[0]?.after?.gitBlobSha;
-    if (matches.length !== 1 || !/^[a-f0-9]{40}$/u.test(approvedBlob ?? "")) {
-      throw new Error(`Issue-71 plan lacks one exact approved gate-policy blob: ${path}`);
-    }
-    return [path, approvedBlob];
-  }));
-}
-
-function validateGatePolicyTrustRoots(root, auditedCommit, approvedBlobs) {
-  for (const path of gatePolicyTrustPaths) {
-    const currentBlob = gitBlobSha(readRegularFile(resolve(root, path), null, root));
-    const auditedBlob = execFileSync("git", ["rev-parse", `${auditedCommit}:${path}`], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim();
-    if (currentBlob !== (approvedBlobs?.get(path) ?? auditedBlob)) {
-      throw new Error(`Gate-policy trust root differs from the owner-approved audited blob: ${path}`);
-    }
-  }
-}
-
-export function loadHistoricalAllowlist({
-  authority = "readiness",
-  root = repositoryRoot,
-  validateApproval = approvedRemovalChain,
-} = {}) {
-  const approvedPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.json");
-  const preapprovalPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.preapproval.json");
-  if (authority !== "approved" && authority !== "readiness") {
-    throw new Error(`Unknown historical allowlist authority: ${authority}`);
-  }
-  const approvedExists = existsSync(approvedPath);
-  if (authority === "approved" && !approvedExists) {
-    throw new Error("Approved historical allowlist is missing");
-  }
-  const effectiveAuthority = approvedExists ? "approved" : authority;
-  const approvedGatePolicyBlobs = effectiveAuthority === "approved"
-    ? validateApproval(root)
-    : undefined;
-  const path = approvedExists ? approvedPath : preapprovalPath;
-  if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
-  const document = JSON.parse(readRegularFile(path, "utf8", root));
-  // A pull-request checkout is intentionally shallow.  Readiness still binds
-  // every allowlisted path to its declared Git-blob digest, but only the
-  // owner-approved authority may require the older audited commit object and
-  // its tree to be present locally.
-  const approvedGitResolvers = effectiveAuthority === "approved" ? {
-    resolveTree: (commit) => execFileSync("git", ["rev-parse", `${commit}^{tree}`], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim(),
-    resolveBlob: (commit, repositoryPath) => execFileSync("git", ["rev-parse", `${commit}:${repositoryPath}`], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim(),
-  } : {};
-  const entries = validateHistoricalAllowlist(document, (repositoryPath) =>
-    readRegularFile(resolve(root, repositoryPath), "utf8", root), {
-      authority: effectiveAuthority,
-      ...approvedGitResolvers,
-    });
-  if (effectiveAuthority === "approved") {
-    validateGatePolicyTrustRoots(root, document.auditedCommit, approvedGatePolicyBlobs);
-  }
-  return entries;
 }
 
 function activeMethodology(content, path) {
@@ -445,7 +252,42 @@ function verifyMutationSensitivity() {
   }
 }
 
-function main() {
+function validateEvolvedStaticSupplyChain(root) {
+  execFileSync("python3", staticSupplyChainValidationArguments(root), {
+    cwd: root,
+    encoding: "utf8",
+    stdio: "pipe",
+    env: { ...process.env, PYTHONPATH: resolve(root, "src/pipeline") },
+  });
+}
+
+async function runRepositoryGates({ builtRoot }) {
+  const {
+    validateStaticRepository,
+    validateStaticSupplyChainProfile,
+  } = await import("./static-repository-gates.mjs");
+  validateEvolvedStaticSupplyChain(repositoryRoot);
+  if (builtRoot) {
+    approvedRemovalChain(repositoryRoot);
+    validateStaticRepository({ mode: "built", builtRoot });
+    return;
+  }
+  const supplyChainValidator = (document, readPath, readMode) =>
+    validateStaticSupplyChainProfile(document, readPath, readMode);
+  validateStaticRepository({
+    mode: "target",
+    root: repositoryRoot,
+    supplyChainValidator,
+  });
+  validateStaticRepository({
+    mode: "repository-readiness",
+    root: repositoryRoot,
+    supplyChainValidator,
+    approvalValidator: approvedRemovalChain,
+  });
+}
+
+async function main() {
   verifyMutationSensitivity();
   verifyCanonicalFlightContract();
   const builtIndex = process.argv.indexOf("--built");
@@ -475,20 +317,10 @@ function main() {
   if (violations.length > 0) {
     throw new Error(`Prohibited target-domain claims found:\n${violations.join("\n")}`);
   }
-  const repositoryGate = resolve(webRoot, "scripts/static-repository-gates.mjs");
-  const gateOptions = builtRoot
-    ? [["--built", builtRoot]]
-    : [["--target"], ["--repository-readiness"]];
-  for (const options of gateOptions) {
-    execFileSync(process.execPath, [repositoryGate, ...options], {
-      cwd: webRoot,
-      encoding: "utf8",
-      stdio: "inherit",
-    });
-  }
+  await runRepositoryGates({ builtRoot });
   const scope = builtRoot ? `built assets in ${builtRoot}` : "static target source and active documentation";
   console.log(`Target content contract passed for ${files.length} files (${scope}).`);
 }
 
 if (moduleUrl.protocol === "file:" && process.argv[1]
-    && resolve(process.argv[1]) === fileURLToPath(moduleUrl)) main();
+    && resolve(process.argv[1]) === fileURLToPath(moduleUrl)) await main();

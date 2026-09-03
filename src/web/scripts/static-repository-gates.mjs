@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadHistoricalAllowlist } from "./check-target-content.mjs";
+import { loadHistoricalAllowlist } from "./static-repository-authority.mjs";
 
 const moduleUrl = new URL(import.meta.url);
 const webRoot = moduleUrl.protocol === "file:"
@@ -24,6 +24,7 @@ const ARCHIVE_EXTENSIONS = /\.(?:7z|rar|tar|tar\.bz2|tar\.gz|tar\.xz|tgz|zip)$/i
 
 const staticSupplyChainComponents = new Map([
   ["active-sboms", ["cyclonedx", "candidate", "locked"]],
+  ["cloudflare-delivery-opentofu", ["opentofu", "candidate", "locked"]],
   ["github-actions", ["github-actions", "candidate", "locked"]],
   ["native-build-plane", ["native", "candidate", "locked"]],
   ["pipeline-container", ["container", "candidate", "locked"]],
@@ -44,11 +45,21 @@ const staticSupplyChainInputs = new Map([
   ["contracts/supply-chain/v1/sboms/python-settlement-spatial-linux-x86-64-cp311.cdx.json", ["active-sboms", "sbom", "100644"]],
   ["contracts/supply-chain/v1/sboms/python-settlement-spatial-macos-arm64-cp311.cdx.json", ["active-sboms", "sbom", "100644"]],
   ["contracts/supply-chain/v2/sboms/static-web-npm.cdx.json", ["active-sboms", "sbom", "100644"]],
+  ["infra/cloudflare/.opentofu-version", ["cloudflare-delivery-opentofu", "lock", "100644"]],
+  ["infra/cloudflare/.terraform.lock.hcl", ["cloudflare-delivery-opentofu", "lock", "100644"]],
+  ["infra/cloudflare/fixtures/plan/.terraform.lock.hcl", ["cloudflare-delivery-opentofu", "lock", "100644"]],
+  ["infra/cloudflare/fixtures/plan/main.tf", ["cloudflare-delivery-opentofu", "manifest", "100644"]],
+  ["infra/cloudflare/main.tf", ["cloudflare-delivery-opentofu", "manifest", "100644"]],
+  ["infra/cloudflare/outputs.tf", ["cloudflare-delivery-opentofu", "manifest", "100644"]],
+  ["infra/cloudflare/variables.tf", ["cloudflare-delivery-opentofu", "manifest", "100644"]],
+  ["infra/cloudflare/versions.tf", ["cloudflare-delivery-opentofu", "manifest", "100644"]],
   [".github/workflows/ci.yml", ["github-actions", "workflow", "100644"]],
   [".github/workflows/codeql.yml", ["github-actions", "workflow", "100644"]],
   [".github/workflows/offline-release-controlled.yml", ["github-actions", "workflow", "100644"]],
   [".github/workflows/phase-0r-owner-promotion.yml", ["github-actions", "workflow", "100644"]],
   [".github/workflows/phase-1-release-sign.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/static-delivery-apply.yml", ["github-actions", "workflow", "100644"]],
+  [".github/workflows/static-delivery-plan.yml", ["github-actions", "workflow", "100644"]],
   [".github/workflows/static-quality.yml", ["github-actions", "workflow", "100644"]],
   ["contracts/supply-chain/v1/tools/cosign-linux-amd64.json", ["native-build-plane", "lock", "100644"]],
   ["src/pipeline/toolchain/Dockerfile.tippecanoe-linux-x86_64", ["native-build-plane", "recipe", "100644"]],
@@ -409,7 +420,7 @@ export function validateStaticSupplyChainProfile(document, readPath, readMode) {
   const componentCount = document.components.length;
   const inputCount = document.components.reduce((count, component) =>
     count + (Array.isArray(component?.inputs) ? component.inputs.length : 0), 0);
-  if (componentCount !== 13 || inputCount !== 57) {
+  if (componentCount !== 14 || inputCount !== 67) {
     throw new Error(`Static-target supply-chain profile count drift: ${componentCount} components / ${inputCount} inputs`);
   }
   if (typeof readMode !== "function") throw new Error("Static-target supply-chain mode authority is required");

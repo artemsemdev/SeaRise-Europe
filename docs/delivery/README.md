@@ -1,7 +1,7 @@
 # Static-First Migration Plan
 
-> **Status:** Phase 1 complete; Phase 2 static-only integration complete
-> **Last updated:** 2026-08-20
+> **Status:** Phase 1 complete; Phase 2 static-only integration complete; Phase 3 delivery IaC implemented but not externally activated
+> **Last updated:** 2026-08-25
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md) and [ADR-025](../architecture/adr/ADR-025-accelerated-static-runtime-cutover.md)
 
 ## Purpose
@@ -26,6 +26,9 @@ The Phase 2 integration branch now provides:
 ADR-025 makes the static application the only repository runtime. Focused Phase
 2 pull requests removed the superseded runtime after replacement coverage
 passed; Git history is sufficient source recovery.
+
+The Issue #62 repository implementation and its explicit external blockers are
+recorded in the [Cloudflare static delivery operations guide](cloudflare-static-delivery.md).
 
 ## Delivery principles
 
