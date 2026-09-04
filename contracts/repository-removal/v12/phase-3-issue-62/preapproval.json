@@ -1,0 +1,1132 @@
+{
+  "$schema": "../static-delivery-portable-witness-correction.schema.json",
+  "schemaVersion": "12.0.0",
+  "documentType": "preapproval",
+  "preapprovalId": "phase-3-issue-62-static-delivery-portable-witness-correction-v1",
+  "decisionState": "owner-approval-required",
+  "issue": 62,
+  "auditedBaseCommit": "9f1ca57cdaf4fb6617cdffd5fcd13fac1a359a71",
+  "phase2Issue71History": {
+    "preapprovalCommit": "336647a4b9bd0709e8625136ee6b4bfad83309b7",
+    "preapprovalTree": "e8dfb63fec967a5158b7fea359144c8b6a6c9da7",
+    "decisionCommit": "85f51b3dc6837d878675a514e57f8e205dda9a26",
+    "decisionTree": "1260deb7083e26fc1f3e660e70c5070982937967",
+    "appliedCommit": "f942a07b33d89247146e54d2441421ca6dabf316",
+    "appliedTree": "e8d61a187facd894d610a413c39290932d15a08c",
+    "receiptCommit": "fd38eddccb5dce6405df48a8f25c045e740efdca",
+    "receiptTree": "84457c6d403d4b4402e862fd84395ca470396384",
+    "receiptSha256": "bb962fb569218e4a8e7cf74383ece2dc3d766963cbd502637df3e2b11428b8bf"
+  },
+  "phase3Issue61History": {
+    "preapprovalCommit": "e49398964790c949fc9d64010d8fe7416bf90ba3",
+    "preapprovalTree": "1b92605c722fb91115a4740b60700b4286c3337e",
+    "preapprovalSha256": "e35c90ea571f7625413775605fcf1e241173e34204b6df682a8a7a2ae7e528de",
+    "decisionCommit": "b9aab46abfd18ecad3f54394e4a5b90681c6677b",
+    "decisionTree": "31db7d87ac041a741a0aa74ddd4ea99ea2ae78b3",
+    "decisionSha256": "40c3d176ae09bac14fa14088e6b1344fd915e5587cc2fa7ddd49fa566964f00a",
+    "appliedCommit": "236ed27ad54d02b8665fee4c803329c2c88ef5e5",
+    "appliedTree": "0880765fa14e2d37caa0f77926b4b98d998dff43",
+    "receiptCommit": "c5ae8de77cef991dd21f3b7956b2b2cb23ac2918",
+    "receiptTree": "dfdf259332fced98bb66331873b2c201c9d5674c",
+    "receiptSha256": "d73ff10e7d1818f071b2a264704d3476b765a84572057a60eb169d7cd34d2652"
+  },
+  "phase3Issue62V5SupersededAuthority": {
+    "preapprovalCommit": "9934d69e4025f6dd2032375bae7e92c300b66459",
+    "preapprovalTree": "d0f82b22fde8ac5fe5f91cf73f6ad54e99d5a567",
+    "preapprovalSha256": "99837823dc003aaa516ff9842c38dbb1ccdad3e744195765f9f165baa070410f",
+    "ownerComment": {
+      "id": 5416851308,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5416851308",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-08-25T21:11:27Z",
+      "updatedAt": "2026-08-25T21:11:27Z",
+      "body": "I approve Phase 3 static-delivery policy evolution v1 for issue #62 at preapproval commit 9934d69e4025f6dd2032375bae7e92c300b66459, preapproval SHA-256 99837823dc003aaa516ff9842c38dbb1ccdad3e744195765f9f165baa070410f, audited base df3b54f9b2566e2550ea15a408c4900c74c70102, immutable Phase 2 issue #71 receipt commit fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt commit c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. This authorizes only the complete exact before/after Git blob states for the 42 governed repository paths listed in that preapproval, including the pre-bound Issue #62 tests. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It does not modify or waive Issue #71 or Issue #61 P/D/A/R history and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "6281fb8316237c9bca7949e2d36710aab47c98bdbc26062e217a7715496d9016"
+    },
+    "status": "superseded-before-decision-and-application",
+    "governedStateAuthorized": false,
+    "decisionCommit": null,
+    "appliedCommit": null,
+    "receiptCommit": null,
+    "reason": "The v5 validator aliases the Issue #61 live-comment verifier, whose exact comparison hard-codes the Issue #61 API URL. It therefore rejects the approved byte-exact Issue #62 OWNER comment. No v5 decision or governed state was committed, so v5 is superseded before decision and application."
+  },
+  "phase3Issue62V6Authority": {
+    "preapprovalCommit": "cb53ae73732114ad00856c5b29c1ffb5c7560167",
+    "preapprovalTree": "8ba49f074641dccb4757b69b16e9e8ff570ce341",
+    "preapprovalSha256": "f4145b8d022f88bba2a22e487aa0a9d454a95cff06e40b53d1b2ebd2929e016d",
+    "decisionCommit": "4689320af62061ab0cba31863cb7ace8e4974dd8",
+    "decisionTree": "bc5a2eeec761714ee9da7df4c9931ceac3d92267",
+    "decisionSha256": "747f5ee5de26cde96acb3e8d2fdcb935413c6e6fda6f52e59e472d98676a0ac0",
+    "ownerComment": {
+      "id": 5457178200,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5457178200",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-08-28T20:01:30Z",
+      "updatedAt": "2026-08-28T20:01:30Z",
+      "body": "I approve Phase 3 static-delivery correction v1 for issue #62 at correction preapproval commit cb53ae73732114ad00856c5b29c1ffb5c7560167, correction preapproval SHA-256 f4145b8d022f88bba2a22e487aa0a9d454a95cff06e40b53d1b2ebd2929e016d, audited base 499414227b92eead387551e8f5f78ccc9f21815d, superseded Phase 3 v5 preapproval 9934d69e4025f6dd2032375bae7e92c300b66459, superseded v5 OWNER comment 5416851308 with body SHA-256 6281fb8316237c9bca7949e2d36710aab47c98bdbc26062e217a7715496d9016, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v5 is superseded before decision and application because its inherited live-comment verifier hard-codes the Issue #61 API URL, and that v5 authorizes no governed repository state. This approval authorizes only the complete exact corrected before/after Git blob states for the 43 governed repository paths listed in the correction preapproval, including the v6 CI validator handoff and its pre-bound v5/v6 tests and inventory. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves the v5 preapproval and OWNER comment byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "8cc30711f69766e17026c773a487219ddc56a1622e344c5f9b0e52971da78ba2"
+    },
+    "status": "decision-preserved-application-superseded",
+    "governedStateAuthorized": true,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV6Application": {
+    "commit": "72e239e98d38e4fb2ece2fd2a9ce6a167b151220",
+    "tree": "5b79283a32ab5b4967bc817a08d13aadbac45fd6",
+    "pullRequest": 479,
+    "pullRequestUrl": "https://github.com/artemsemdev/SeaRise-Europe/pull/479",
+    "status": "superseded-after-decision-before-application-and-integration",
+    "ancestorOfAuditedBase": false,
+    "governedStateIntegrated": false,
+    "reason": "The v6 application attempt left check-target-content.mjs dispatching to the Issue #61 v4 validator, so Static Web rejected the Issue #62 CI state. The exact attempt remains an unmerged diagnostic and is superseded before repository application or integration."
+  },
+  "phase3Issue62V7Authority": {
+    "preapprovalCommit": "caa49ae8eaf4dcf06107f45cd72d104f88386544",
+    "preapprovalTree": "0d68e787cc6b3f92ee5bde288808388c09be2cc0",
+    "preapprovalSha256": "26aea62dab0093c262bc5caa34bea3e4edf3ab506f491d766b769e33cb1e448b",
+    "decisionCommit": "82ef074298f362e32163d140f81d403776f5a3d6",
+    "decisionTree": "acf98632762eceaec70616287abc76da29c23979",
+    "decisionSha256": "6fb4b42389e223ac08351549e75a8aef6b8d0e5ee4a118613602868b4ede70d3",
+    "ownerComment": {
+      "id": 5493019624,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5493019624",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-09-01T11:09:32Z",
+      "updatedAt": "2026-09-01T11:09:32Z",
+      "body": "I approve Phase 3 static-delivery handoff correction v1 for issue #62 at v7 preapproval commit caa49ae8eaf4dcf06107f45cd72d104f88386544, preapproval SHA-256 26aea62dab0093c262bc5caa34bea3e4edf3ab506f491d766b769e33cb1e448b, audited base eb2c3709410e6873929a810b89214222f4b6cd1b, preserved v6 preapproval cb53ae73732114ad00856c5b29c1ffb5c7560167 and preserved v6 decision 4689320af62061ab0cba31863cb7ace8e4974dd8, superseded unmerged v6 application attempt 72e239e98d38e4fb2ece2fd2a9ce6a167b151220 at tree 5b79283a32ab5b4967bc817a08d13aadbac45fd6 in diagnostic PR #479, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that the v6 P/D authority remains valid, while only its PR #479 application attempt is superseded after decision and before repository application or integration because check-target-content.mjs still dispatched to the Issue #61 v4 validator; that attempt is not an ancestor of the audited base and authorizes no integrated governed state. This approval authorizes only the complete exact before/after Git blob states for the 48 governed repository paths listed in the v7 preapproval, including the corrected check-target-content.mjs handoff, the exact static-repository-gates.mjs evolution from 13 components and 57 inputs to 14 components and 67 inputs, its pre-bound tests, CI/profile/inventory hashes, and the complete v6 future state. The historical Issue #71 static-repository-gates.mjs Git blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 and Issue #71 P/D/A/R history are preserved and validated before the exact replacement is authorized; no profile projection or bypass adapter is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves the Issue #62 v5 superseded history and v6 P/D authority byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "95f677bc5eb8f47d147cbcaf0a41e80fc216eaab757b8167b85c0d58fffddd69"
+    },
+    "status": "decision-preserved-uncommitted-application-superseded",
+    "governedStateAuthorized": true,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV7ProposedApplication": {
+    "commit": null,
+    "tree": null,
+    "pullRequest": null,
+    "status": "superseded-before-application-commit-and-integration",
+    "governedPathCount": 48,
+    "governedTransitionsSha256": "807fadfb3d0503cc0d408a1c6cc0fe0ad221db6086cf1018317c725a285433fb",
+    "governedAfterStateSha256": "7fe24d5dd3f05e7c347f59e9a61a487ded1eecdbfcbbe49a982a8675bf0a73ff",
+    "governedStateIntegrated": false,
+    "reason": "The exact 48-path v7 after-state was prepared only in an uncommitted worktree and never became a Git commit, pull request, repository application, or integration state. Review found that its Web handoff selected the evolved static-repository gate without first proving that the transition began at the exact historical Issue #71 gate blob. The proposal is therefore superseded before application; its exact transitions and after-state remain bound only as diagnostic evidence and authorize no governed repository state."
+  },
+  "phase3Issue62V8Authority": {
+    "preapprovalCommit": "4d0c8191c53816592223476e2f969b707d9db35a",
+    "preapprovalTree": "260038379eb411081251ec95a053287e36594273",
+    "preapprovalSha256": "fa2b7087225b93ca49044467f07d46618f90287bded7442acfa7ed4afc702a94",
+    "preapprovalMergeCommit": "48b744b26cbe52c1a462853ce8c7f7ecb5c2489a",
+    "ownerComment": {
+      "id": 5494452061,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5494452061",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-09-01T13:10:23Z",
+      "updatedAt": "2026-09-01T13:10:23Z",
+      "body": "I approve Phase 3 static-delivery trust-root handoff correction v1 for issue #62 at v8 preapproval commit 4d0c8191c53816592223476e2f969b707d9db35a, preapproval SHA-256 fa2b7087225b93ca49044467f07d46618f90287bded7442acfa7ed4afc702a94, audited base caa161e5a53014b73f30bd43b78c1026c24e9c98, preserved v7 preapproval caa49ae8eaf4dcf06107f45cd72d104f88386544 and preserved v7 decision 82ef074298f362e32163d140f81d403776f5a3d6, superseded exact uncommitted v7 48-path proposal at governed-transitions SHA-256 807fadfb3d0503cc0d408a1c6cc0fe0ad221db6086cf1018317c725a285433fb and governed-after-state SHA-256 7fe24d5dd3f05e7c347f59e9a61a487ded1eecdbfcbbe49a982a8675bf0a73ff, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v7 P/D remains valid, while its exact 48-path future was prepared only in an uncommitted worktree and is superseded before application commit, pull request, repository application, or integration because the Web handoff did not first prove the exact historical Issue #71 static-repository gate before accepting its evolved replacement; no v7 A/R exists and no governed v7 state was integrated. This approval authorizes only the complete exact before/after Git blob states for the 49 governed repository paths listed in the v8 preapproval, including the corrected check-target-content.mjs trust-root handoff, CI validator routing, inventory and harness bindings, and the complete corrected static-delivery future. The handoff must prove historical gate blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 and its immutable Issue #71 P/D/A/R history before accepting only evolved gate blob 71352f591d7205b4fad314428c2aadc5529d6299; no projection or bypass adapter and no alternate before or after blob is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves Issue #62 v5/v6 history and v7 P/D byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "7a6ac23e73a895899eae50d4dff85e944f55350effe39afd377bd02f58d2cebd"
+    },
+    "status": "preapproval-preserved-decision-attempt-superseded",
+    "ownerApprovalRecorded": true,
+    "repositoryDecisionIntegrated": false,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV8DecisionAttempt": {
+    "commit": "f87a01af07eaa4c7d48c9b77df7f7603d8e0207d",
+    "tree": "57fe0f7fb367111d8a19001ddd6488ffdb3789a7",
+    "ownerDecisionSha256": "233c2913bfdee6516b9bec984d1844636ac2b06b5653406a297a864a1442bac9",
+    "pullRequest": null,
+    "status": "superseded-before-publication-and-integration",
+    "published": false,
+    "integrated": false,
+    "approvalSource": {
+      "issue": 62,
+      "commentId": 5494452061,
+      "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5494452061",
+      "author": "artemsemdev",
+      "authorAssociation": "OWNER",
+      "bodySha256": "7a6ac23e73a895899eae50d4dff85e944f55350effe39afd377bd02f58d2cebd"
+    },
+    "reason": "The exact v8 owner-decision JSON was committed only on a local, unpushed diagnostic branch. Live D validation proved that the v8 validator calls V7._verify_owner_comment, a symbol the v7 module does not expose. The attempt is superseded before publication or integration and authorizes no applied governed repository state."
+  },
+  "phase3Issue62V9Authority": {
+    "preapprovalCommit": "6d14058acdc18e06f1e7023e85e254f584c499b4",
+    "preapprovalTree": "09871d4456666e3a2c94d9e4d5a58bdf78fefa22",
+    "preapprovalSha256": "43f62d66dae8b0939645be92c564e84487032cfee09d0a21dcc0be8b52d7ff58",
+    "preapprovalMergeCommit": "a53e8f4bec8df248713b2013e25996744952023e",
+    "decisionCommit": "e2dcb08ae70a7c665b02600c8cc1c758e052b1b4",
+    "decisionTree": "ecb519cfab0f5802c3fbf8ec287448accc856a39",
+    "ownerDecisionSha256": "49db66844fee59edf3be08c9bc7be4917865e298411693cf64e0a592a7786964",
+    "decisionMergeCommit": "a083c06747e6d1a0860171db926f528ab54ecefa",
+    "ownerComment": {
+      "id": 5496247462,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5496247462",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-09-01T15:22:39Z",
+      "updatedAt": "2026-09-01T15:22:39Z",
+      "body": "I approve Phase 3 static-delivery OWNER-verifier correction v1 for issue #62 at v9 preapproval commit 6d14058acdc18e06f1e7023e85e254f584c499b4, preapproval SHA-256 43f62d66dae8b0939645be92c564e84487032cfee09d0a21dcc0be8b52d7ff58, audited base 48b744b26cbe52c1a462853ce8c7f7ecb5c2489a, preserved v8 preapproval 4d0c8191c53816592223476e2f969b707d9db35a and its merge 48b744b26cbe52c1a462853ce8c7f7ecb5c2489a, superseded unpushed v8 owner-decision attempt f87a01af07eaa4c7d48c9b77df7f7603d8e0207d at tree 57fe0f7fb367111d8a19001ddd6488ffdb3789a7 with owner-decision SHA-256 233c2913bfdee6516b9bec984d1844636ac2b06b5653406a297a864a1442bac9 and OWNER comment 5494452061, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v8 P remains valid, while its exact D attempt existed only as a local unpushed commit and is superseded before publication, pull request, repository integration, or application because the v8 validator calls V7._verify_owner_comment, a symbol the v7 module does not expose; no v8 D/A/R was published or integrated and no governed v8 state was integrated. This approval authorizes only the complete exact before/after Git blob states for the 50 governed repository paths listed in the v9 preapproval, including the corrected check-target-content.mjs and CI routing to the v9 validator, the inventory and harness bindings, a RED/GREEN test that executes the real D validation path through the existing exported OWNER-comment verifier, and the complete corrected static-delivery future. The handoff preserves and validates the historical Issue #71 P/D/A/R history and exact gate transition from blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 to blob 71352f591d7205b4fad314428c2aadc5529d6299; no projection or bypass adapter and no alternate before or after blob is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves Issue #62 v5/v6/v7 history and v8 P byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "a07b12804a9f63ee0f27f90262e7fbd459d3dbda1a8d2795942c8d7e02714e00"
+    },
+    "status": "decision-preserved-application-superseded",
+    "ownerApprovalRecorded": true,
+    "repositoryDecisionIntegrated": true,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV9ProposedApplication": {
+    "commit": null,
+    "tree": null,
+    "pullRequest": null,
+    "status": "superseded-before-application-commit-and-integration",
+    "governedPathCount": 50,
+    "governedTransitionsSha256": "e2aecd26242e91e02f724a240cbc1687c620c8b115ce3af77b0966c57d25ea7c",
+    "governedAfterStateSha256": "103b3d6f1fc238d523edb45af2d3af654a3fca09deb9c1d9080f74969058c9f4",
+    "governedStateIntegrated": false,
+    "reason": "The exact v9 50-file after state was materialized only in an uncommitted diagnostic worktree. Real source and built Node CLI execution exposed a circular top-level-await module graph between check-target-content.mjs and static-repository-gates.mjs, exiting with status 13. No v9 application commit, pull request, integration, receipt, deployment, publication, upload, or external mutation exists."
+  },
+  "phase3Issue62V10Authority": {
+    "preapprovalCommit": "45c9e855c904bf93f2cb9e5b79497114827a63aa",
+    "preapprovalTree": "b0fad8c1480a2a38827a09c63f1991e30d63f561",
+    "preapprovalSha256": "90d2c6faa4f389f405e3087a37e56ae1fe9373ca0941bc948428bb9fbd4a42c2",
+    "preapprovalMergeCommit": "a264a3c15b6b00d79b10582d53c0082c145b4cc9",
+    "ownerComment": {
+      "id": 5498258726,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5498258726",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-09-01T18:06:49Z",
+      "updatedAt": "2026-09-01T18:06:49Z",
+      "body": "I approve Phase 3 static-delivery module-cycle correction v1 for issue #62 at v10 preapproval commit 45c9e855c904bf93f2cb9e5b79497114827a63aa, preapproval SHA-256 90d2c6faa4f389f405e3087a37e56ae1fe9373ca0941bc948428bb9fbd4a42c2, audited base a083c06747e6d1a0860171db926f528ab54ecefa, preserved integrated v9 preapproval 6d14058acdc18e06f1e7023e85e254f584c499b4 and v9 decision e2dcb08ae70a7c665b02600c8cc1c758e052b1b4, and immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca and Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v9 P/D remain valid and integrated, while its exact uncommitted 50-file application state with governed transition SHA-256 e2aecd26242e91e02f724a240cbc1687c620c8b115ce3af77b0966c57d25ea7c is superseded before application commit, pull request, integration, or receipt because the target-content launcher and repository gate form a circular top-level-await module graph that makes real source and built Node CLI execution exit with status 13. This approval authorizes only the complete exact before/after Git blob states for the 52 governed repository paths listed in this v10 preapproval. The corrected handoff extracts repository authority into static-repository-authority.mjs, makes check-target-content.mjs import and re-export that authority, and makes static-repository-gates.mjs import the authority module directly. It includes pre-bound RED/GREEN tests that reproduce the old circular import exit 13 and execute the corrected real source and built Node CLI paths. The handoff preserves and validates historical Issue #71 P/D/A/R and the exact gate transition from blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 to exact v10-governed replacement blob 7971d3888da3e8f51480a216e689e1576c71c75e; no projection, bypass adapter, alternate trust root, or alternate before/after blob is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves Issue #62 v5/v6/v7/v8/v9 history byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "9254010c32c5b2a6112ea0549e471fe2b8a4868c835354df4270cf46a55c022f"
+    },
+    "status": "preapproval-preserved-decision-attempt-superseded",
+    "ownerApprovalRecorded": true,
+    "repositoryDecisionIntegrated": false,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV10DecisionAttempt": {
+    "commit": "6ed3ca54e5d2063d44950fe362dee5329ef71f71",
+    "tree": "8e95bc3b25e52d7f1659ab01345f1c9015c53347",
+    "ownerDecisionSha256": "d42ae6d5880e15ca5658e2fe8e455c9013608460d02c791c5d98720c6ebff7b9",
+    "pullRequest": null,
+    "status": "superseded-before-publication-and-integration",
+    "published": false,
+    "integrated": false,
+    "approvalSource": {
+      "issue": 62,
+      "commentId": 5498258726,
+      "commentUrl": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5498258726",
+      "author": "artemsemdev",
+      "authorAssociation": "OWNER",
+      "bodySha256": "9254010c32c5b2a6112ea0549e471fe2b8a4868c835354df4270cf46a55c022f"
+    },
+    "reason": "The exact v10 owner-decision JSON was committed only on a local, unpushed diagnostic branch. Live D validation proved that the v10 validator calls V9.V7.V6._verify_owner_comment even though the v9 module exposes v8 rather than v7. The attempt is superseded before publication or integration and authorizes no applied governed repository state."
+  },
+  "authorityPaths": [
+    "contracts/repository-removal/v12/static-delivery-portable-witness-correction.schema.json",
+    "contracts/repository-removal/v12/phase-3-issue-62/preapproval.json",
+    "scripts/repository/validate_static_delivery_portable_witness_correction.py"
+  ],
+  "trustRootSha256": {
+    "staticDeliveryPortableWitnessSchema": "c8495ba8445db68686729b11a4701707a6edd9e11859fa30306bc1fc9c00b034",
+    "staticDeliveryPortableWitnessValidator": "10266170f7f529b677765a438651ef08b14538aa84b2da75b94d2f16ed954fd9",
+    "staticRepositoryGates": "b97d051d616738dc12d24f9d364bd9fcda59d1a0ab41c705b7cdac1bc199637c"
+  },
+  "governedPaths": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d236c078963456c07bac2cb5d53134b1ec0ab8d1",
+        "sha256": "319cad776d6e8c8f938d729dbe2bfe8e3b674ef02476f86a73f86e44fa3db1b5"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "6bb617688a28890eb51161b6ea5623e1cb96bfef",
+        "sha256": "82e55b94e11a0fd71ceefd6219dd7e78cbee7d76eaa41c326904db5abb4f8c04"
+      }
+    },
+    {
+      "path": ".github/workflows/static-delivery-apply.yml",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "544272236d07133e5e738dd0a2c1646fb7174eb4",
+        "sha256": "785e5918f9ca899bf2719ac4ae7b1cc2f86b901d80e2e6ded01f97d5caa0384f"
+      }
+    },
+    {
+      "path": ".github/workflows/static-delivery-plan.yml",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c91c308b91385105fe9bc589aa3f667ff11890d3",
+        "sha256": "ed546686f89e426245005b0888b604b331a28a0ce61a04c9f1223f2477487413"
+      }
+    },
+    {
+      "path": ".github/workflows/static-quality.yml",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "b871247dcfb59e9d95d8a0c010c06931a0d1c641",
+        "sha256": "7bc23ad1d142f14f3ee1224aec2d585f439928c647ac7613464a6570d760de66"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "4aa7fff2957c7a2de0e7a43d575b0016c3804828",
+        "sha256": "1d227a950eb8c7bdf30e8d3063432993f0103eec2335c1295aea2596629e6021"
+      }
+    },
+    {
+      "path": "CHANGELOG.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e3c841e5f6f8dc67501cb14145087f773f94bf41",
+        "sha256": "7d353663f7f8f6f5294a1a94e61e1d918f5e09fb8a71b13f59a9ac8b27b03ca3"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c21675e50a17b13e76318bc17b3921b95cc0a338",
+        "sha256": "e03645c5c4c7b08a34bc0d86213de0c24ca75e580db854c024576324b9762f58"
+      }
+    },
+    {
+      "path": "contracts/ci/v1/architecture-fitness.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a899cbeef5c0092772f43b9fbd00a8f89dbdd2fd",
+        "sha256": "bde6c09439b7a0364530071ae954ace167f150742092fa5a7136f76cbdaf1c47"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "199072f5415c644c047d64827038e2b5622520eb",
+        "sha256": "7e1bbf4729160fa936736beb3aae8d5e175ce02139eddce6cc853938038e639f"
+      }
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "22a9cd00da0de4517020a7fde15419a58bc08d0b",
+        "sha256": "ec3dbd5efa84a623612dcdd3290c4407b89fdeb22278ee704664e90839b79d35"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "67d3dd625e7426038d3a00f7b5a912aa6ae7d5cc",
+        "sha256": "6655f048730e1b66a04c82cc133c61c5f7e3641cf56b0710b6eef4fff5a2a75d"
+      }
+    },
+    {
+      "path": "contracts/supply-chain/v2/static-target-profile.schema.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "116efcde4cb01e928ce9a7c0b79e9cb209c09583",
+        "sha256": "dfa66bcd89e5d50cead1bc6a47adce251dfd5962d0490072359d46f867ef6150"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0550efe45518a25483da189caf5b92086b8aa8fc",
+        "sha256": "cee8b263c0aba0bed88304aaeb3ecf8704d94d17491805690940b7776feb72a5"
+      }
+    },
+    {
+      "path": "docs/architecture/08-deployment-topology.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "05e2cb905d6dd8d404d63d14b6c6b659eecf344d",
+        "sha256": "8187662c96aa16ec04a78bc708339b31f1db7f5137640dd356d9510d2d792f65"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "60a10164c2c762acc2aabf500b3caef737cdb12f",
+        "sha256": "add8240cecec9f9ad5dcb3e8c211d17d0a79c67e1cc1aba56f70f1ee0870b646"
+      }
+    },
+    {
+      "path": "docs/delivery/README.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "ec50d73593cc543f6a8bfaa38dc5a7d2f873d5bd",
+        "sha256": "c888524a063b49294ea68a2d13663418b34430950d20ba089a6b0ed5cc00a6a9"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "26faa01fb4cb2f4523b523f33d7f2434bcfbc6c8",
+        "sha256": "2b7cbc01f5d1c8af8e043ea405a2444ade4d7317a98e7987b575d7e637b213db"
+      }
+    },
+    {
+      "path": "docs/delivery/cloudflare-static-delivery.md",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a91af871fe6331b2d6bae4f7493427553b1e916a",
+        "sha256": "34ff3ad88540a79ce8cabf430c5f6c8baa4898fb71c7477fdf3a20e064406aa6"
+      }
+    },
+    {
+      "path": "docs/evidence/phase-3/issue-62-cloudflare-delivery.md",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "73fb1b8ba00dba2a0717486e4eb956ff81efc580",
+        "sha256": "466e3d902639fd7c83af1c69c805483f7d777c51e45dffb5845f7bff0e87ac30"
+      }
+    },
+    {
+      "path": "docs/operations/static-target-supply-chain.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "dfc79bdeea4532fc1cabed0d109125616c74b4a5",
+        "sha256": "d3f18566e8fb55f5730ea9590e0a93ba53c2ce82350ec33611704359438d1f5a"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e5c5e3df0e2d7d58ce69824a6c9ab10500df8d5e",
+        "sha256": "c6e9b1cba51ea610455fa17907af5f13e60a9e14a5d26618538b439a638d5eeb"
+      }
+    },
+    {
+      "path": "docs/testing/static-target-content-contract.md",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "bfd1511e8d40f394c72ccd2378c145850f3e79a4",
+        "sha256": "2b8e6a83948b89df2d73fae1734c40a1d29dd72b6b876d8f1c6e172b8290f6d2"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "da16f8ccde2a10240fe623204eae8f87e9a580b3",
+        "sha256": "8c932f60cbb11e93e32147a5186f3441d93a9c9fad5d540fa7ce50c992f9114d"
+      }
+    },
+    {
+      "path": "infra/cloudflare/.opentofu-version",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "456e5c4ad803e25a845fa5cae78746eb9fee91ea",
+        "sha256": "054c4ee293061b6ceb58529b43f2651cc873ee52e1814ac2f4190554d073eff4"
+      }
+    },
+    {
+      "path": "infra/cloudflare/.terraform.lock.hcl",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "150394b8219a8d94c7d0ebbd75b1c1e29c8e863e",
+        "sha256": "a84e57d015ff4d5127198ce0a0704b801ccdb83cae45ffcd33588e4a9d2f7d85"
+      }
+    },
+    {
+      "path": "infra/cloudflare/backends/fixture.s3.tfbackend.example",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "8c85b2207bf5b02eb366a99cbea707ff6d2efb23",
+        "sha256": "510878e27a16fd1c5b5e8c6b0fb0e14652ed71874a95777cefad97554802db6a"
+      }
+    },
+    {
+      "path": "infra/cloudflare/backends/production.s3.tfbackend.example",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d56216b98037c26f863d2ad35cb0b78957dbb8f7",
+        "sha256": "75b93115ab2e2012f1c55cb57845c9cf6aaf3b902c121b27c12e48b22dbbe1ff"
+      }
+    },
+    {
+      "path": "infra/cloudflare/backends/staging.s3.tfbackend.example",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "984c36a6be2e6e1a89022c33e28f6880c40ce287",
+        "sha256": "b2b36730bc61cf536dd7fd722572e1f4dee93bd32e5f08f0c375563a757687c2"
+      }
+    },
+    {
+      "path": "infra/cloudflare/delivery-contract.json",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "924b4c5fea42b06477ca97c3c4db0899732db897",
+        "sha256": "113eb8b57c1007e9a06c0662c1dff88ab0015807dbe4bd567c5be465fbbe8888"
+      }
+    },
+    {
+      "path": "infra/cloudflare/environments/fixture.tfvars",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0d2e300a845eab1b93c977cda7b1e2d9576daaf4",
+        "sha256": "e912f7619daeb0836fe3d73b81f967bcaaf3c6a7bcf4da5ff0b196460ac4e9f3"
+      }
+    },
+    {
+      "path": "infra/cloudflare/environments/production.tfvars",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c70bd41f577fa88a6588abb3ee3ae7a45f59ff81",
+        "sha256": "c63a764c8a147d7090113830bf21ff6c7d680b72fe73798985443f02f9ce837d"
+      }
+    },
+    {
+      "path": "infra/cloudflare/environments/staging.tfvars",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "94561deb3a128b3eae6fed1ad19b86cd593cfeb7",
+        "sha256": "329c80de4eaa24d341e0e35d11dc3b7a2ff0dc0e803d96549e493ed8b4d8b728"
+      }
+    },
+    {
+      "path": "infra/cloudflare/fixtures/plan/.terraform.lock.hcl",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "150394b8219a8d94c7d0ebbd75b1c1e29c8e863e",
+        "sha256": "a84e57d015ff4d5127198ce0a0704b801ccdb83cae45ffcd33588e4a9d2f7d85"
+      }
+    },
+    {
+      "path": "infra/cloudflare/fixtures/plan/main.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "fa4c6685b5fbeb456696974642d964a8456e476e",
+        "sha256": "240d70a58872bdd165dda13ee204e0dbbea5841d0076a689880eb16b89a9373b"
+      }
+    },
+    {
+      "path": "infra/cloudflare/fixtures/static-site/index.html",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "869ca70ce419afc3f94a13bfb764458f5bc71d6e",
+        "sha256": "c3eb8796cd94438dc90f59a5d803ba19266e8fd9f12a8b3ac239ae4362bf08d8"
+      }
+    },
+    {
+      "path": "infra/cloudflare/main.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d73b778dd5e4b8c2f1914788c7a8a24b5a51f821",
+        "sha256": "22751b0195d0a3740551713daedd973bec05abb305ec8c7958750d01ee80f028"
+      }
+    },
+    {
+      "path": "infra/cloudflare/outputs.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "46be0b4a05aa7bee70fba9b73e7b1ca95960f4f1",
+        "sha256": "9b2294126ea02f1aebd3af86d133758dfb707f395df2dbae1ff9273f5f27baff"
+      }
+    },
+    {
+      "path": "infra/cloudflare/static-assets.headers",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "eea9270b002ce6d4d7f81d2c7b5289c59eb8ed38",
+        "sha256": "cd0b4cbd73ec8dad394ada5db7334d2dde07c00078d4228e8f2b171874015111"
+      }
+    },
+    {
+      "path": "infra/cloudflare/variables.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "4886cc65770d2e7d4ed492667f69efb33cb51d11",
+        "sha256": "5527b6bca9abbcf28be1d185247b3ac70aaa317136c86336b060a8beb7e97206"
+      }
+    },
+    {
+      "path": "infra/cloudflare/versions.tf",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "9e77f40955a349106508da21c954adef0b558dd1",
+        "sha256": "57302449b50fe34d3fb7211b09257dbd011e0e4da212d8481ec6ace519f6d61b"
+      }
+    },
+    {
+      "path": "scripts/ci/changed_components.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "caa0eb20d8e88f541f7e71f3f87d871d6780d57d",
+        "sha256": "1cf6178f913dee3414125e26507bb955b024b549e4521a5f56d8ab21c7fdfcf3"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "e790d9bb96d3f80db96189bf9ba9631a760957a2",
+        "sha256": "2ac4d70f0b285456153c1cbf94f3e58ce4451141b67fe072e2b26929a85f93c3"
+      }
+    },
+    {
+      "path": "scripts/ci/verify_ci_gate.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "12e8b9e89fe52783d07e581a4ffc258cb27f1a58",
+        "sha256": "faaa87c05fe049ff194c9af7617324512c9682880e048a9b259e5bd347efc98e"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "eb0cb60b5e4446b9324cbf27de67e39e25a46f5f",
+        "sha256": "cf1a42221cecca4d3de27779a70bfd12779afaa7714b8531f975eb04a261cd66"
+      }
+    },
+    {
+      "path": "scripts/infra/validate_cloudflare_delivery.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "5c241d66399d2d20e684e5837981d4de3ef76f47",
+        "sha256": "0cdc3feb2535545088c4cb9e60f52b362b62eee078f2e5d097a5938afe85020a"
+      }
+    },
+    {
+      "path": "scripts/infra/verify_http_delivery.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "ff0d6de7f385cfdc3f3c6202d821931b2dcad9b0",
+        "sha256": "e17e75b809dd682689d14f1a2f7c627143f4cb73dba395057d062d9142f89a33"
+      }
+    },
+    {
+      "path": "scripts/tests/validate_test_inventory.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0fb37fb06af3c17b5909f7638cd1c74acad83040",
+        "sha256": "c056999a28756df25e5aedcf0580ffcfee45cfb5f16677633595d39b71de3399"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c1fa404b04c92130ea44d86e5205fb72aa8e5bfb",
+        "sha256": "75f652ea2bcf2b673a550a526c914f7d2c97b142ce042a4b949ecb5bcba0b26b"
+      }
+    },
+    {
+      "path": "src/pipeline/searise_pipeline/supply_chain/static_profile.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0998d244a8eef4d5dc6dcce331ce5dbb51b7c312",
+        "sha256": "e2a2fed5873867eac559bca743b0b5aeb7c3700a85b857c95a05c2c41c230aa0"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "3a1f19e4bd4463ff95053d9915061ad0e94a01a2",
+        "sha256": "c22f9fd19e0bb9fa2e0d2ab7685d396285fb9eca0d3da8ee1555c3e250ab23a5"
+      }
+    },
+    {
+      "path": "src/pipeline/tests/supply_chain/test_static_target_profile.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "8da0144c2ecd8b20b538b60d9dd0fab698c56b1a",
+        "sha256": "2e926cf02c80ae87fc40706fc93550c1560f6a36d9a53eb4d1404e28fa0c3119"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0a3eddc3c5e4b614b8f147d7b801ae31e8faf008",
+        "sha256": "f8c64e2a5aa18d3fb5a6d7fea64d97da5e7b19ce3d3c2a5fe52da36dbad54994"
+      }
+    },
+    {
+      "path": "src/web/scripts/check-target-content.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "82e90bd3a3cf3b34e21d615385fe8b0f1cdd5716",
+        "sha256": "01e78a0ceba81cfc831f319c64c24e4edbed4cd2731dc2f79063268a82d078d5"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "379dcd6b6af0ab711dd9f7b3521373d41302fb12",
+        "sha256": "7436c0108b0f6a6632496d7a0fcab3efdf47bb4268aed531b58dd2f56aaf5a24"
+      }
+    },
+    {
+      "path": "src/web/scripts/check-target-content.test.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "bec45f13e5a304e82bfd27810e61054daa35822a",
+        "sha256": "25ae3fff49209b72fa225dcb44d36661f684dda67ddabdee2a23c7d59d14fa76"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "2af310094018c48744da0b6f121efc7e7dded4a8",
+        "sha256": "edf581d120e4223e9a67d495e0d01c8bafa4c42e3ddc877a7d00f4eff4e66050"
+      }
+    },
+    {
+      "path": "src/web/scripts/static-repository-authority.mjs",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0ecaf29faebe56f6c73a5bd34723344f2570516c",
+        "sha256": "060de598c13bdf3e74f188ef91621ce5cd8f4d7399f95fe453db7316a7dbeb23"
+      }
+    },
+    {
+      "path": "src/web/scripts/static-repository-gates.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "02e32cda7a01460c3055f61cccaf9f03fc0552f9",
+        "sha256": "b97d051d616738dc12d24f9d364bd9fcda59d1a0ab41c705b7cdac1bc199637c"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "7971d3888da3e8f51480a216e689e1576c71c75e",
+        "sha256": "4b44776c2533aab48c830ea8d0495a25cb0350c6c3912c94c2c73451f12fbfb6"
+      }
+    },
+    {
+      "path": "src/web/scripts/static-repository-gates.test.mjs",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0f57f9b100315edc0d9e4bdc2fa74e758405116c",
+        "sha256": "e95f804e54e982f6ce34c18e84256eeb884ffccb57f5a3b0900d5c42e528dd73"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "5bf9b71b859c44c469cc78865b6274ed72f8e9ec",
+        "sha256": "48e67778f1b3419f2e25f9390ca6fcbfd65a43363ccd9aa7b4d3614ef5ce223c"
+      }
+    },
+    {
+      "path": "tests/harness/test_changed_components.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "85248a2be8b03943e889532d2dd9d9910f8f37f3",
+        "sha256": "cb2ba81baf294e3475649722b49ad5850bd48ef8dcbe28bc24b3459676692b0b"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "9cd72e7d4c907a219f5113abe67b5c4b936f894e",
+        "sha256": "810da3b16bfc8e60f602ab4a6a50f2c98ca786fd63a3044800db661ad87c7632"
+      }
+    },
+    {
+      "path": "tests/harness/test_ci_gate.py",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "0ee401c742443b7c76ada5bb621eee181e2ae43f",
+        "sha256": "4745b0c3232ae17590450ac456024650aafbafd5c0ed7777a8f8f30e9e17acd7"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "5da2cdb089533595722f63a0e84120ba365cb704",
+        "sha256": "9dc4395111d4522b29899dea70a4374edb123540a495bcf07f80e1199b391473"
+      }
+    },
+    {
+      "path": "tests/infra/test_cloudflare_delivery.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "3776b002183f7a9a5f2e7bafdb0e88375d799ae7",
+        "sha256": "a0f9a1c982cca913a0709e7c68e2bc16296159905f2185b9f0a7844402bdab8b"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "a4a22abca78cc5b40b069d10687d5d514055fcf7",
+        "sha256": "552a9e5bab469a2f0f618cece7220bc63e299901809c64aefa464aca2743ceb1"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_evolution.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "5345be6bdf5a75a50e378f86ac4d4249473a6e0c",
+        "sha256": "3a1ee7d5d6d3cf57182e148d8369b67cc31c206b1d56b281fb5847a819710420"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_handoff_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "6850961cebfc72334a59da3d86637a31255292af",
+        "sha256": "31b3de96e299e7b1c5bc2ec38376775beb88fbc1d99e527c5b5aeab33573e807"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_module_cycle_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "61413cdea867d724151f070f6a7b60a485b83c4f",
+        "sha256": "874c15de4d3b0ea621087cb9a055fadc26e2f1de3185d0e8a5f20d646783ba4e"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_owner_verifier_chain_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "8e9e2c7009b0d44c97c1783a0ac63bdefe0ca8e8",
+        "sha256": "c410cc271894d2f15371cec9cb4c6d7d1065eb0a5e9f141c9087d5d22cdb3a17"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_owner_verifier_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "d6a59433069671d63138196d0fbcd6ca8c628e88",
+        "sha256": "506e25e1efcaf6cd9bd12f0b9c6f57c3cda5944f10d9d9f4e3ac739994536fb9"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_portable_witness_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "c0ced15dbff3a4e95ea94c59e64ad356e311483a",
+        "sha256": "1372973750fea041d438c4d5ec71e55aca88d5253eb4dbac93e044491530ff6d"
+      }
+    },
+    {
+      "path": "tests/repository-removal/test_validate_static_delivery_trust_handoff_correction.py",
+      "before": {
+        "state": "absent"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "28ab3f6534085de3b81b6d9c4901e33c346e105a",
+        "sha256": "733ae0f6e8b4efd1fd2a7e2000014003ff72d15e944941943aa2966f176fffad"
+      }
+    },
+    {
+      "path": "tests/test-inventory.json",
+      "before": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "b64e3089221ab2975a51fb0179a704f77d7d4716",
+        "sha256": "fe9f96d9203e757bada3174180d6d8fa2ead3f61781410e3465b5943156ba770"
+      },
+      "after": {
+        "state": "present",
+        "mode": "100644",
+        "gitBlobSha": "49bfd6bc6c2cedd2bc2fa1914d85485377c58b4b",
+        "sha256": "c0097a087be3aaa24d99520ee0295eaccdb9baf4ede65e7b802da03c2603870a"
+      }
+    }
+  ],
+  "deferredOwnership": {
+    "issue64PublicationGateRequired": true,
+    "issue74ManagedControlsRequired": true,
+    "liveCloudflareEvidenceClaimed": false
+  },
+  "ownerApprovalTemplate": "I approve Phase 3 static-delivery portable-witness correction v1 for issue #62 at preapproval commit <PREAPPROVAL_COMMIT>, preapproval SHA-256 <PREAPPROVAL_SHA256>, and audited base 9f1ca57cdaf4fb6617cdffd5fcd13fac1a359a71. I preserve immutable v11 P 5042bf9e3c440a73a161719754f15ffa1ea9efd8 and D a328f607858cbfa368f308425a165906852d14f0, and supersede before integration the exact published 53-file v11 application commit 7819ded9bd96fcea7cb76b1c6b998918bd138f6f, tree e66c3259f3dcd5d922f9ba47f8cf55b2ecd7c4eb, draft PR #488, governed transition SHA-256 8df420b1892a059869d86d87208488954d38cd0d7bd20d28e45c4766649b7041, and governed after-state SHA-256 3faf0bfee280c9811323c69fa21c698f5a8d579f6c70076d917b1730079d7a8a. This authorizes only the complete exact before/after Git blob states for the 55 governed repository paths listed in this preapproval. The v12 validator uses authority-bound portable Git witnesses to rehydrate the exact unavailable v8 and v10 diagnostic objects and the v11 application commit identity in a temporary alternate object store, verifies every Git object hash and exact commit parent/tree, then executes the immutable historical validators and proves the diagnostic commits are non-ancestors. This is no projection or bypass. The corrected static-quality job uses fetch-depth: 0, installs pinned Python contributor dependencies, grants read-only issue access, and passes the workflow token only to the real source and built CLI validation path. Versioned PMTiles and COG assets remain public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. Immutable Issue #71 and Issue #61 P/D/A/R histories and Issue #62 v5-v11 histories remain preserved. Infrastructure apply remains unauthorized; Issue #64 publication and Issue #74 managed controls remain independently gated. This does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; deployment, publication, upload, credentials, secrets, environments, DNS, Cloudflare mutation, infrastructure apply, deletion, or any external resource mutation.",
+  "safety": {
+    "candidateV7BytesUsed": false,
+    "tarBytesUsed": false,
+    "publicationAuthorized": false,
+    "infrastructureApplyAuthorized": false,
+    "externalResourceMutationAuthorized": false,
+    "externalDeletionAuthorized": false,
+    "credentialMutationAuthorized": false,
+    "githubEnvironmentMutationAuthorized": false
+  },
+  "phase3Issue62V11Authority": {
+    "preapprovalCommit": "5042bf9e3c440a73a161719754f15ffa1ea9efd8",
+    "preapprovalTree": "24cd905433dba2917597551959ef3e7a76119782",
+    "preapprovalSha256": "14fe77925f870e8661a0f3a454e179e54a5683c7075ac6e42e47c77fce63d849",
+    "preapprovalMergeCommit": "963ffa2aeb2ca43d54f2dd5868a0ba0a7abcb946",
+    "decisionCommit": "a328f607858cbfa368f308425a165906852d14f0",
+    "decisionTree": "981a02b5c6507d2e7ddfb6360e171f4442c4cb3a",
+    "ownerDecisionSha256": "865c38b0bc2a0992c6481997c4ff4dadb07fbad611caeebd43935ad70bb3de18",
+    "decisionMergeCommit": "9f1ca57cdaf4fb6617cdffd5fcd13fac1a359a71",
+    "ownerComment": {
+      "id": 5513566198,
+      "url": "https://github.com/artemsemdev/SeaRise-Europe/issues/62#issuecomment-5513566198",
+      "issueApiUrl": "https://api.github.com/repos/artemsemdev/SeaRise-Europe/issues/62",
+      "author": "artemsemdev",
+      "association": "OWNER",
+      "createdAt": "2026-09-02T17:23:41Z",
+      "updatedAt": "2026-09-02T17:23:41Z",
+      "body": "I approve Phase 3 static-delivery OWNER-verifier-chain correction v1 for issue #62 at v11 preapproval commit 5042bf9e3c440a73a161719754f15ffa1ea9efd8, preapproval SHA-256 14fe77925f870e8661a0f3a454e179e54a5683c7075ac6e42e47c77fce63d849, audited base a264a3c15b6b00d79b10582d53c0082c145b4cc9, preserved v10 preapproval 45c9e855c904bf93f2cb9e5b79497114827a63aa and its integration merge a264a3c15b6b00d79b10582d53c0082c145b4cc9, superseded unpushed v10 owner-decision attempt 6ed3ca54e5d2063d44950fe362dee5329ef71f71 at tree 8e95bc3b25e52d7f1659ab01345f1c9015c53347 with owner-decision SHA-256 d42ae6d5880e15ca5658e2fe8e455c9013608460d02c791c5d98720c6ebff7b9 and OWNER comment 5498258726, immutable Phase 2 issue #71 receipt fd38eddccb5dce6405df48a8f25c045e740efdca, and immutable Phase 3 issue #61 v4 receipt c5ae8de77cef991dd21f3b7956b2b2cb23ac2918. I confirm that v10 P remains valid and integrated, while its exact D attempt existed only as a local unpushed commit and is superseded before publication, pull request, repository integration, or application because the v10 validator calls V9.V7.V6._verify_owner_comment even though the v9 module exposes V8 rather than V7; no v10 D/A/R was published or integrated and no governed v10 state was integrated. This approval authorizes only the complete exact before/after Git blob states for the 53 governed repository paths listed in this v11 preapproval, including CI, static repository authority, profile, inventory and harness routing to the v11 validator, a RED/GREEN test that executes the real v10 D attempt through V10.V9.V8.V7.V6._verify_owner_comment, and the complete corrected static-delivery future. The v10 authority files remain immutable: the v11 validator independently validates the exact historical v10 P and superseded D attempt rather than modifying or bypassing them. The handoff preserves and validates historical Issue #71 P/D/A/R and the exact gate transition from blob 02e32cda7a01460c3055f61cccaf9f03fc0552f9 to exact replacement blob 7971d3888da3e8f51480a216e689e1576c71c75e; no projection or bypass adapter, alternate trust root, or alternate before/after blob is authorized. Versioned PMTiles and versioned COG assets use public, max-age=31536000, immutable; only the separate unversioned mutable alias or manifest uses no-store. It authorizes repository-only OpenTofu, workflow, validation, fixture, documentation, and evidence states; infrastructure apply remains unauthorized, and publication or data upload remains independently gated by Issue #64. Issue #74 managed rulesets, environments, OIDC, imports, drift scheduling, and exception-register resources remain required and deferred, and this approval does not claim that they exist. It preserves Issue #62 v5/v6/v7/v8/v9/v10 history byte-for-byte, does not modify or waive Issue #71 or Issue #61 P/D/A/R history, and does not authorize Candidate-v7 or TAR inspection, copying, publication, upload, or use; Cloudflare resource, DNS, state, credential, GitHub environment, or secret creation, deletion, mutation, apply, publication, or upload; or deletion or mutation of any external resource.",
+      "bodySha256": "4bb866a83da1c5cb89e19e8a364867fd773e239bf42edbb2239c36363bab7ee1"
+    },
+    "status": "preapproval-and-decision-preserved",
+    "ownerApprovalRecorded": true,
+    "repositoryDecisionIntegrated": true,
+    "integratedApplicationCommit": null,
+    "receiptCommit": null
+  },
+  "supersededV11ApplicationAttempt": {
+    "commit": "7819ded9bd96fcea7cb76b1c6b998918bd138f6f",
+    "tree": "e66c3259f3dcd5d922f9ba47f8cf55b2ecd7c4eb",
+    "parent": "9f1ca57cdaf4fb6617cdffd5fcd13fac1a359a71",
+    "pullRequest": 488,
+    "governedTransitionsSha256": "8df420b1892a059869d86d87208488954d38cd0d7bd20d28e45c4766649b7041",
+    "governedAfterStateSha256": "3faf0bfee280c9811323c69fa21c698f5a8d579f6c70076d917b1730079d7a8a",
+    "status": "superseded-after-publication-before-integration",
+    "published": true,
+    "integrated": false,
+    "reason": "The exact v11 application was published only in draft PR #488 and is superseded before integration because clean CI cannot resolve the intentionally unpushed v8/v10 diagnostic objects and the generic-host job lacks its Python validator environment."
+  },
+  "portableGitWitnesses": [
+    {
+      "name": "v8-unpushed-owner-decision",
+      "commit": "f87a01af07eaa4c7d48c9b77df7f7603d8e0207d",
+      "parent": "48b744b26cbe52c1a462853ce8c7f7ecb5c2489a",
+      "tree": "57fe0f7fb367111d8a19001ddd6488ffdb3789a7",
+      "objects": [
+        {
+          "oid": "f87a01af07eaa4c7d48c9b77df7f7603d8e0207d",
+          "type": "commit",
+          "base64": "dHJlZSA1N2ZlMGY3ZmIzNjcxMTFkOGExOTAwMWRkZDY0ODhmZmRiMzc4OWE3CnBhcmVudCA0OGI3NDRiMjZjYmU1MmMxYTQ2Mjg1M2NlOGM3ZjdlY2I1YzI0ODlhCmF1dGhvciBBcnRlbSA8Njc5MzIyMithcnRlbXNlbWRldkB1c2Vycy5ub3JlcGx5LmdpdGh1Yi5jb20+IDE3ODgyNjg4NDggKzAyMDAKY29tbWl0dGVyIEFydGVtIDw2NzkzMjIyK2FydGVtc2VtZGV2QHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT4gMTc4ODI2ODg0OCArMDIwMAoKY2hvcmUocmVwb3NpdG9yeSk6IHJlY29yZCBzdGF0aWMgZGVsaXZlcnkgdjggZGVjaXNpb24K"
+        },
+        {
+          "oid": "57fe0f7fb367111d8a19001ddd6488ffdb3789a7",
+          "type": "tree",
+          "base64": "MTAwNjQ0IC5naXRhdHRyaWJ1dGVzAPY0D0SVF1zNHVuc3t9/DTvSKSa7NDAwMDAgLmdpdGh1YgDALqfL9mdu4pDde5UZdG6yP9Y0kzEwMDY0NCAuZ2l0aWdub3JlABcSmfNnWtIbvJPoBIJjCji0WugiMTAwNjQ0IC5udm1yYwDwEMEzrzTiHSBpO5NW6V6bPiYmETEwMDY0NCBBR0VOVFMubWQAXU4yIV4ZTygmGOfLoSaPvKrGuNwxMDA2NDQgQ0hBTkdFTE9HLm1kAOPIQeX2+NxnUByxQUUIf3c/lL9BMTAwNjQ0IENPREVfT0ZfQ09ORFVDVC5tZAAKRZ4zHi7dUxnjyrpRR5x9of9OVzEwMDY0NCBDT05UUklCVVRJTkcubWQAdWlxSYXp/nmg3Orl1gJFy9fHT60xMDA2NDQgTElDRU5TRQDZmLnPd0cUe7yjBhYtzoTnyt/pojEwMDY0NCBSRUFETUUubWQAwcvAxm7xEeRrDGKiCr9Cvy5ElcQxMDA2NDQgU0VDVVJJVFkubWQAlBTuWt5w1KZ7OGei0hxI1fWmjhk0MDAwMCBjb250cmFjdHMAfZKux7ir+uJN1dW3jJXKcAyLSVU0MDAwMCBkYXRhANzgtlRngtgWSBraHXbzcDx/TVGCMTAwNjQ0IGRlc2lnbi1xYS5tZABGoq5QY4bGAH/pRcRTRVJMBdPviDQwMDAwIGRvY3MAnp5tERY/9jP0w5ECpsXs1YG7U34xMDA2NDQgcGFja2FnZS1sb2NrLmpzb24AcQN2LftX5tOvm4WJUN9NRJ7dXYoxMDA2NDQgcGFja2FnZS5qc29uAJCJVmtiH9gEtupV7T87wpKzoHLBNDAwMDAgc2NyaXB0cwCBKSPogrFxFdChV8yuNKlSXwQbkjQwMDAwIHNyYwBEAx2B8OzG5H33U5HRvtcU4wNSyzQwMDAwIHRlc3RzAGdu5oiNUSWlK652DOHtUCggebg8NDAwMDAgdG9vbHMAHspBqysbWdndcKlGXO272drXLaE="
+        },
+        {
+          "oid": "7d92aec7b8abfae24dd5d5b78c95ca700c8b4955",
+          "type": "tree",
+          "base64": "NDAwMDAgY2FuZGlkYXRlLWNvbXBsZXRlbmVzcwBd3rmAxGRe7xiHwzLeZJbM5Jo//zQwMDAwIGNhbmRpZGF0ZS1xYQDniFqJKbga1y7TdY87Jirlv8IiGTQwMDAwIGNpAKoiPLR58A5/mABx5dd2WXPnSwy5NDAwMDAgaHR0cC1kZWxpdmVyeQA/FcBDtNIvtESE9BRgIkQE9E23NDQwMDAwIHJlbGVhc2UtZ2F0ZXMAF4OPIHFtnygPHXMY/1EgJC1fUk80MDAwMCByZWxlYXNlAEOY7z0DmhpRN3oY2Mgp2mkiywCcNDAwMDAgcmVwb3NpdG9yeS1yZW1vdmFsABwQhB8AWW4HKK5QzCyO8J/pRhECNDAwMDAgc2VhcmNoLWV2YWx1YXRpb24AfNepKNaKxXqvAceISzRrUfGec8w0MDAwMCBzZXR0bGVtZW50cwAZgYKCAdI1WoSSSuq9kPSodyCvwjQwMDAwIHN1cHBseS1jaGFpbgC9jq1TpvwFpgBps4OLX2M6P1H+Hg=="
+        },
+        {
+          "oid": "1c10841f00596e0728ae50cc2c8ef09fe9461102",
+          "type": "tree",
+          "base64": "MTAwNjQ0IFJFQURNRS5tZAAH7cZJCGmSm1e1X3U6Ya3nFLNjZjQwMDAwIHYxAHooJV12soRXdivsJYlxYsAROBYYNDAwMDAgdjIA+/QTUQDEobaqIzP+BOTE3OAQswA0MDAwMCB2MwBaYaFtRnoGvrcSGf5oRqzdJFlmRjQwMDAwIHY0ADSHFFCCmEnCIvptRsuVoIbX7SNFNDAwMDAgdjUAhui6OHGr+0I5GjblDQ+ThWw+whY0MDAwMCB2NgBTvF3XOXLkKdCiH769sLINfh43WzQwMDAwIHY3AG8N+4MfFthT1F5GzLxfSOsku/RpNDAwMDAgdjgAuknlBem7c07nOO13qc7XVqGThlk="
+        },
+        {
+          "oid": "ba49e505e9bb734ee738ed77a9ced756a1938659",
+          "type": "tree",
+          "base64": "NDAwMDAgcGhhc2UtMy1pc3N1ZS02MgAifPgedIytfg49lVnyD+4wCRudyzEwMDY0NCBzdGF0aWMtZGVsaXZlcnktdHJ1c3QtaGFuZG9mZi1jb3JyZWN0aW9uLnNjaGVtYS5qc29uAKLwpIlPolueDSDmlfK8IgYrvPAX"
+        },
+        {
+          "oid": "227cf81e748cad7e0e3d9559f20fee30091b9dcb",
+          "type": "tree",
+          "base64": "MTAwNjQ0IG93bmVyLWRlY2lzaW9uLmpzb24A8iplJ8rlhzanwoA/QWoA4Rr3CesxMDA2NDQgcHJlYXBwcm92YWwuanNvbgCNMIXzsUfZXPsrS0X+reerexSS4A=="
+        },
+        {
+          "oid": "f22a6527cae58736a7c2803f416a00e11af709eb",
+          "type": "blob",
+          "base64": "ewogICIkc2NoZW1hIjogIi4uL3N0YXRpYy1kZWxpdmVyeS10cnVzdC1oYW5kb2ZmLWNvcnJlY3Rpb24uc2NoZW1hLmpzb24iLAogICJzY2hlbWFWZXJzaW9uIjogIjguMC4wIiwKICAiZG9jdW1lbnRUeXBlIjogIm93bmVyLWRlY2lzaW9uIiwKICAiZGVjaXNpb24iOiAiYXBwcm92ZWQiLAogICJhcHByb3ZlZEJ5IjogInByb2plY3Qtb3duZXIiLAogICJhcHByb3ZlZEF0IjogIjIwMjYtMDktMDFUMTM6MTA6MjNaIiwKICAicHJlYXBwcm92YWxDb21taXQiOiAiNGQwYzgxOTFjNTM4MTY1OTIyMjM0NzZlMmY5NjliNzA3ZDlkYjM1YSIsCiAgInByZWFwcHJvdmFsU2hhMjU2IjogImZhMmI3MDg3MjI1YjkzY2E0OTA0NDQ2N2YwN2Q0NjYxOGY5MDI4N2JkZWQ3NDQyYWNmYTdlZDRhZmM3MDJhOTQiLAogICJhcHByb3ZhbFRleHQiOiAiSSBhcHByb3ZlIFBoYXNlIDMgc3RhdGljLWRlbGl2ZXJ5IHRydXN0LXJvb3QgaGFuZG9mZiBjb3JyZWN0aW9uIHYxIGZvciBpc3N1ZSAjNjIgYXQgdjggcHJlYXBwcm92YWwgY29tbWl0IDRkMGM4MTkxYzUzODE2NTkyMjIzNDc2ZTJmOTY5YjcwN2Q5ZGIzNWEsIHByZWFwcHJvdmFsIFNIQS0yNTYgZmEyYjcwODcyMjViOTNjYTQ5MDQ0NDY3ZjA3ZDQ2NjE4ZjkwMjg3YmRlZDc0NDJhY2ZhN2VkNGFmYzcwMmE5NCwgYXVkaXRlZCBiYXNlIGNhYTE2MWU1YTUzMDE0YjczZjMwYmQ0M2I3OGMxMDI2YzI0ZTljOTgsIHByZXNlcnZlZCB2NyBwcmVhcHByb3ZhbCBjYWE0OWFlOGVhZjRkY2YwNjEwN2Y0NWNkNzJkMTA0Zjg4Mzg2NTQ0IGFuZCBwcmVzZXJ2ZWQgdjcgZGVjaXNpb24gODJlZjA3NDI5OGYzNjJlMzIxNjNkMTQwZjgxZDQwMzc3NmY1YTNkNiwgc3VwZXJzZWRlZCBleGFjdCB1bmNvbW1pdHRlZCB2NyA0OC1wYXRoIHByb3Bvc2FsIGF0IGdvdmVybmVkLXRyYW5zaXRpb25zIFNIQS0yNTYgODA3ZmFkZmIzZDA1MDNjYzBkNDA4YTFjNmNjMGZlMGFkMjIxZGI2MDg2Y2YxMDE4MzE3YzcyNWEyODU0MzNmYiBhbmQgZ292ZXJuZWQtYWZ0ZXItc3RhdGUgU0hBLTI1NiA3ZmUyNGQ1ZGQzZjA1ZTdjMzQ3ZjU5ZTlhNjFhNDg3ZGVkMWVlY2RiZmNiYmU0OWE5ODJhODY3NWJmMGE3M2ZmLCBpbW11dGFibGUgUGhhc2UgMiBpc3N1ZSAjNzEgcmVjZWlwdCBmZDM4ZWRkY2NiNWRjZTY0MDVkZjQ4YThmMjVjMDQ1ZTc0MGVmZGNhLCBhbmQgaW1tdXRhYmxlIFBoYXNlIDMgaXNzdWUgIzYxIHY0IHJlY2VpcHQgYzVhZThkZTc3Y2VmOTkxZGQyMWYzYjc5NTZiMmIyY2IyM2FjMjkxOC4gSSBjb25maXJtIHRoYXQgdjcgUC9EIHJlbWFpbnMgdmFsaWQsIHdoaWxlIGl0cyBleGFjdCA0OC1wYXRoIGZ1dHVyZSB3YXMgcHJlcGFyZWQgb25seSBpbiBhbiB1bmNvbW1pdHRlZCB3b3JrdHJlZSBhbmQgaXMgc3VwZXJzZWRlZCBiZWZvcmUgYXBwbGljYXRpb24gY29tbWl0LCBwdWxsIHJlcXVlc3QsIHJlcG9zaXRvcnkgYXBwbGljYXRpb24sIG9yIGludGVncmF0aW9uIGJlY2F1c2UgdGhlIFdlYiBoYW5kb2ZmIGRpZCBub3QgZmlyc3QgcHJvdmUgdGhlIGV4YWN0IGhpc3RvcmljYWwgSXNzdWUgIzcxIHN0YXRpYy1yZXBvc2l0b3J5IGdhdGUgYmVmb3JlIGFjY2VwdGluZyBpdHMgZXZvbHZlZCByZXBsYWNlbWVudDsgbm8gdjcgQS9SIGV4aXN0cyBhbmQgbm8gZ292ZXJuZWQgdjcgc3RhdGUgd2FzIGludGVncmF0ZWQuIFRoaXMgYXBwcm92YWwgYXV0aG9yaXplcyBvbmx5IHRoZSBjb21wbGV0ZSBleGFjdCBiZWZvcmUvYWZ0ZXIgR2l0IGJsb2Igc3RhdGVzIGZvciB0aGUgNDkgZ292ZXJuZWQgcmVwb3NpdG9yeSBwYXRocyBsaXN0ZWQgaW4gdGhlIHY4IHByZWFwcHJvdmFsLCBpbmNsdWRpbmcgdGhlIGNvcnJlY3RlZCBjaGVjay10YXJnZXQtY29udGVudC5tanMgdHJ1c3Qtcm9vdCBoYW5kb2ZmLCBDSSB2YWxpZGF0b3Igcm91dGluZywgaW52ZW50b3J5IGFuZCBoYXJuZXNzIGJpbmRpbmdzLCBhbmQgdGhlIGNvbXBsZXRlIGNvcnJlY3RlZCBzdGF0aWMtZGVsaXZlcnkgZnV0dXJlLiBUaGUgaGFuZG9mZiBtdXN0IHByb3ZlIGhpc3RvcmljYWwgZ2F0ZSBibG9iIDAyZTMyY2RhN2EwMTQ2MGMzMDU1ZjYxY2NjYWY5ZjAzZmMwNTUyZjkgYW5kIGl0cyBpbW11dGFibGUgSXNzdWUgIzcxIFAvRC9BL1IgaGlzdG9yeSBiZWZvcmUgYWNjZXB0aW5nIG9ubHkgZXZvbHZlZCBnYXRlIGJsb2IgNzEzNTJmNTkxZDcyMDViNGZhZDMxNDQyOGMyYWFkYzU1MjlkNjI5OTsgbm8gcHJvamVjdGlvbiBvciBieXBhc3MgYWRhcHRlciBhbmQgbm8gYWx0ZXJuYXRlIGJlZm9yZSBvciBhZnRlciBibG9iIGlzIGF1dGhvcml6ZWQuIFZlcnNpb25lZCBQTVRpbGVzIGFuZCB2ZXJzaW9uZWQgQ09HIGFzc2V0cyB1c2UgcHVibGljLCBtYXgtYWdlPTMxNTM2MDAwLCBpbW11dGFibGU7IG9ubHkgdGhlIHNlcGFyYXRlIHVudmVyc2lvbmVkIG11dGFibGUgYWxpYXMgb3IgbWFuaWZlc3QgdXNlcyBuby1zdG9yZS4gSXQgYXV0aG9yaXplcyByZXBvc2l0b3J5LW9ubHkgT3BlblRvZnUsIHdvcmtmbG93LCB2YWxpZGF0aW9uLCBmaXh0dXJlLCBkb2N1bWVudGF0aW9uLCBhbmQgZXZpZGVuY2Ugc3RhdGVzOyBpbmZyYXN0cnVjdHVyZSBhcHBseSByZW1haW5zIHVuYXV0aG9yaXplZCwgYW5kIHB1YmxpY2F0aW9uIG9yIGRhdGEgdXBsb2FkIHJlbWFpbnMgaW5kZXBlbmRlbnRseSBnYXRlZCBieSBJc3N1ZSAjNjQuIElzc3VlICM3NCBtYW5hZ2VkIHJ1bGVzZXRzLCBlbnZpcm9ubWVudHMsIE9JREMsIGltcG9ydHMsIGRyaWZ0IHNjaGVkdWxpbmcsIGFuZCBleGNlcHRpb24tcmVnaXN0ZXIgcmVzb3VyY2VzIHJlbWFpbiByZXF1aXJlZCBhbmQgZGVmZXJyZWQsIGFuZCB0aGlzIGFwcHJvdmFsIGRvZXMgbm90IGNsYWltIHRoYXQgdGhleSBleGlzdC4gSXQgcHJlc2VydmVzIElzc3VlICM2MiB2NS92NiBoaXN0b3J5IGFuZCB2NyBQL0QgYnl0ZS1mb3ItYnl0ZSwgZG9lcyBub3QgbW9kaWZ5IG9yIHdhaXZlIElzc3VlICM3MSBvciBJc3N1ZSAjNjEgUC9EL0EvUiBoaXN0b3J5LCBhbmQgZG9lcyBub3QgYXV0aG9yaXplIENhbmRpZGF0ZS12NyBvciBUQVIgaW5zcGVjdGlvbiwgY29weWluZywgcHVibGljYXRpb24sIHVwbG9hZCwgb3IgdXNlOyBDbG91ZGZsYXJlIHJlc291cmNlLCBETlMsIHN0YXRlLCBjcmVkZW50aWFsLCBHaXRIdWIgZW52aXJvbm1lbnQsIG9yIHNlY3JldCBjcmVhdGlvbiwgZGVsZXRpb24sIG11dGF0aW9uLCBhcHBseSwgcHVibGljYXRpb24sIG9yIHVwbG9hZDsgb3IgZGVsZXRpb24gb3IgbXV0YXRpb24gb2YgYW55IGV4dGVybmFsIHJlc291cmNlLiIsCiAgImFwcHJvdmFsU291cmNlIjogewogICAgImlzc3VlIjogNjIsCiAgICAiY29tbWVudElkIjogNTQ5NDQ1MjA2MSwKICAgICJjb21tZW50VXJsIjogImh0dHBzOi8vZ2l0aHViLmNvbS9hcnRlbXNlbWRldi9TZWFSaXNlLUV1cm9wZS9pc3N1ZXMvNjIjaXNzdWVjb21tZW50LTU0OTQ0NTIwNjEiLAogICAgImF1dGhvciI6ICJhcnRlbXNlbWRldiIsCiAgICAiYXV0aG9yQXNzb2NpYXRpb24iOiAiT1dORVIiLAogICAgImJvZHlTaGEyNTYiOiAiN2E2YWMyM2U3M2E4OTU4OTllYWU1MGQ0ZGZmODVlOTQ0ZjU1MzUwZWZmZTM5YWZkMzc3YmQwMmY1OGQyY2ViZCIKICB9LAogICJzYWZldHkiOiB7CiAgICAiY2FuZGlkYXRlVjdCeXRlc1VzZWQiOiBmYWxzZSwKICAgICJ0YXJCeXRlc1VzZWQiOiBmYWxzZSwKICAgICJwdWJsaWNhdGlvbkF1dGhvcml6ZWQiOiBmYWxzZSwKICAgICJpbmZyYXN0cnVjdHVyZUFwcGx5QXV0aG9yaXplZCI6IGZhbHNlLAogICAgImV4dGVybmFsUmVzb3VyY2VNdXRhdGlvbkF1dGhvcml6ZWQiOiBmYWxzZSwKICAgICJleHRlcm5hbERlbGV0aW9uQXV0aG9yaXplZCI6IGZhbHNlLAogICAgImNyZWRlbnRpYWxNdXRhdGlvbkF1dGhvcml6ZWQiOiBmYWxzZSwKICAgICJnaXRodWJFbnZpcm9ubWVudE11dGF0aW9uQXV0aG9yaXplZCI6IGZhbHNlCiAgfQp9Cg=="
+        }
+      ]
+    },
+    {
+      "name": "v10-unpushed-owner-decision",
+      "commit": "6ed3ca54e5d2063d44950fe362dee5329ef71f71",
+      "parent": "a264a3c15b6b00d79b10582d53c0082c145b4cc9",
+      "tree": "8e95bc3b25e52d7f1659ab01345f1c9015c53347",
+      "objects": [
+        {
+          "oid": "6ed3ca54e5d2063d44950fe362dee5329ef71f71",
+          "type": "commit",
+          "base64": "dHJlZSA4ZTk1YmMzYjI1ZTUyZDdmMTY1OWFiMDEzNDVmMWM5MDE1YzUzMzQ3CnBhcmVudCBhMjY0YTNjMTViNmIwMGQ3OWIxMDU4MmQ1M2MwMDgyYzE0NWI0Y2M5CmF1dGhvciBBcnRlbSA8Njc5MzIyMithcnRlbXNlbWRldkB1c2Vycy5ub3JlcGx5LmdpdGh1Yi5jb20+IDE3ODgyOTczODMgKzAyMDAKY29tbWl0dGVyIEFydGVtIDw2NzkzMjIyK2FydGVtc2VtZGV2QHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT4gMTc4ODI5NzM4MyArMDIwMAoKY2hvcmUoZ292ZXJuYW5jZSk6IHJlY29yZCBpc3N1ZSA2MiB2MTAgb3duZXIgZGVjaXNpb24K"
+        },
+        {
+          "oid": "8e95bc3b25e52d7f1659ab01345f1c9015c53347",
+          "type": "tree",
+          "base64": "MTAwNjQ0IC5naXRhdHRyaWJ1dGVzAPY0D0SVF1zNHVuc3t9/DTvSKSa7NDAwMDAgLmdpdGh1YgDALqfL9mdu4pDde5UZdG6yP9Y0kzEwMDY0NCAuZ2l0aWdub3JlABcSmfNnWtIbvJPoBIJjCji0WugiMTAwNjQ0IC5udm1yYwDwEMEzrzTiHSBpO5NW6V6bPiYmETEwMDY0NCBBR0VOVFMubWQAXU4yIV4ZTygmGOfLoSaPvKrGuNwxMDA2NDQgQ0hBTkdFTE9HLm1kAOPIQeX2+NxnUByxQUUIf3c/lL9BMTAwNjQ0IENPREVfT0ZfQ09ORFVDVC5tZAAKRZ4zHi7dUxnjyrpRR5x9of9OVzEwMDY0NCBDT05UUklCVVRJTkcubWQAdWlxSYXp/nmg3Orl1gJFy9fHT60xMDA2NDQgTElDRU5TRQDZmLnPd0cUe7yjBhYtzoTnyt/pojEwMDY0NCBSRUFETUUubWQAwcvAxm7xEeRrDGKiCr9Cvy5ElcQxMDA2NDQgU0VDVVJJVFkubWQAlBTuWt5w1KZ7OGei0hxI1fWmjhk0MDAwMCBjb250cmFjdHMAG/bv3hrtkmVvpATiiSZLqhNk+380MDAwMCBkYXRhANzgtlRngtgWSBraHXbzcDx/TVGCMTAwNjQ0IGRlc2lnbi1xYS5tZABGoq5QY4bGAH/pRcRTRVJMBdPviDQwMDAwIGRvY3MAnp5tERY/9jP0w5ECpsXs1YG7U34xMDA2NDQgcGFja2FnZS1sb2NrLmpzb24AcQN2LftX5tOvm4WJUN9NRJ7dXYoxMDA2NDQgcGFja2FnZS5qc29uAJCJVmtiH9gEtupV7T87wpKzoHLBNDAwMDAgc2NyaXB0cwABi3ERzGTcghiTlQkyMJK9vG7JCDQwMDAwIHNyYwBEAx2B8OzG5H33U5HRvtcU4wNSyzQwMDAwIHRlc3RzAGdu5oiNUSWlK652DOHtUCggebg8NDAwMDAgdG9vbHMAHspBqysbWdndcKlGXO272drXLaE="
+        },
+        {
+          "oid": "1bf6efde1aed92656fa404e289264baa1364fb7f",
+          "type": "tree",
+          "base64": "NDAwMDAgY2FuZGlkYXRlLWNvbXBsZXRlbmVzcwBd3rmAxGRe7xiHwzLeZJbM5Jo//zQwMDAwIGNhbmRpZGF0ZS1xYQDniFqJKbga1y7TdY87Jirlv8IiGTQwMDAwIGNpAKoiPLR58A5/mABx5dd2WXPnSwy5NDAwMDAgaHR0cC1kZWxpdmVyeQA/FcBDtNIvtESE9BRgIkQE9E23NDQwMDAwIHJlbGVhc2UtZ2F0ZXMAF4OPIHFtnygPHXMY/1EgJC1fUk80MDAwMCByZWxlYXNlAEOY7z0DmhpRN3oY2Mgp2mkiywCcNDAwMDAgcmVwb3NpdG9yeS1yZW1vdmFsAJl4g1moPsOmYmbIOD+1So5TkI3RNDAwMDAgc2VhcmNoLWV2YWx1YXRpb24AfNepKNaKxXqvAceISzRrUfGec8w0MDAwMCBzZXR0bGVtZW50cwAZgYKCAdI1WoSSSuq9kPSodyCvwjQwMDAwIHN1cHBseS1jaGFpbgC9jq1TpvwFpgBps4OLX2M6P1H+Hg=="
+        },
+        {
+          "oid": "99788359a83ec3a66266c8383fb54a8e53908dd1",
+          "type": "tree",
+          "base64": "MTAwNjQ0IFJFQURNRS5tZAAH7cZJCGmSm1e1X3U6Ya3nFLNjZjQwMDAwIHYxAHooJV12soRXdivsJYlxYsAROBYYNDAwMDAgdjEwAOZerstkhAmRqAGSP1vNTLygKA3ENDAwMDAgdjIA+/QTUQDEobaqIzP+BOTE3OAQswA0MDAwMCB2MwBaYaFtRnoGvrcSGf5oRqzdJFlmRjQwMDAwIHY0ADSHFFCCmEnCIvptRsuVoIbX7SNFNDAwMDAgdjUAhui6OHGr+0I5GjblDQ+ThWw+whY0MDAwMCB2NgBTvF3XOXLkKdCiH769sLINfh43WzQwMDAwIHY3AG8N+4MfFthT1F5GzLxfSOsku/RpNDAwMDAgdjgAm6ePsbSZ17s2AxE76VH3OVCCdkE0MDAwMCB2OQDHT4Z6AoR8csX2NdtEu4ubq+A/3A=="
+        },
+        {
+          "oid": "e65eaecb64840991a801923f5bcd4cbca0280dc4",
+          "type": "tree",
+          "base64": "NDAwMDAgcGhhc2UtMy1pc3N1ZS02MgBOKnQJOnz2eOilDFUAEEFVTU6iKDEwMDY0NCBzdGF0aWMtZGVsaXZlcnktbW9kdWxlLWN5Y2xlLWNvcnJlY3Rpb24uc2NoZW1hLmpzb24A4F/4CWk+6GHyfbqQEVr3kLcznHQ="
+        },
+        {
+          "oid": "4e2a74093a7cf678e8a50c55001041554d4ea228",
+          "type": "tree",
+          "base64": "MTAwNjQ0IG93bmVyLWRlY2lzaW9uLmpzb24AlUJ0g3pW2Y3iqD1lERvpjnDls1sxMDA2NDQgcHJlYXBwcm92YWwuanNvbgBwUFe7s7TdE4FR/DEbw+9SFMRyIw=="
+        },
+        {
+          "oid": "954274837a56d98de2a83d65111be98e70e5b35b",
+          "type": "blob",
+          "base64": "ewogICIkc2NoZW1hIjogIi4uL3N0YXRpYy1kZWxpdmVyeS1tb2R1bGUtY3ljbGUtY29ycmVjdGlvbi5zY2hlbWEuanNvbiIsCiAgInNjaGVtYVZlcnNpb24iOiAiMTAuMC4wIiwKICAiZG9jdW1lbnRUeXBlIjogIm93bmVyLWRlY2lzaW9uIiwKICAiZGVjaXNpb24iOiAiYXBwcm92ZWQiLAogICJhcHByb3ZlZEJ5IjogInByb2plY3Qtb3duZXIiLAogICJhcHByb3ZlZEF0IjogIjIwMjYtMDktMDFUMTg6MDY6NDlaIiwKICAicHJlYXBwcm92YWxDb21taXQiOiAiNDVjOWU4NTVjOTA0YmY5M2YyY2I5ZTViNzk0OTcxMTQ4MjdhNjNhYSIsCiAgInByZWFwcHJvdmFsU2hhMjU2IjogIjkwZDJjNmZhYTRmMzg5ZjQwNWUzMDg3YTM3ZTU2YWUxZmU5MzczY2EwOTQxYmM5NDg0MjhiYjlmYmQ0YTQyYzIiLAogICJhcHByb3ZhbFRleHQiOiAiSSBhcHByb3ZlIFBoYXNlIDMgc3RhdGljLWRlbGl2ZXJ5IG1vZHVsZS1jeWNsZSBjb3JyZWN0aW9uIHYxIGZvciBpc3N1ZSAjNjIgYXQgdjEwIHByZWFwcHJvdmFsIGNvbW1pdCA0NWM5ZTg1NWM5MDRiZjkzZjJjYjllNWI3OTQ5NzExNDgyN2E2M2FhLCBwcmVhcHByb3ZhbCBTSEEtMjU2IDkwZDJjNmZhYTRmMzg5ZjQwNWUzMDg3YTM3ZTU2YWUxZmU5MzczY2EwOTQxYmM5NDg0MjhiYjlmYmQ0YTQyYzIsIGF1ZGl0ZWQgYmFzZSBhMDgzYzA2NzQ3ZTZkMWEwODYwMTcxZGI5MjZmNTI4YWI1NGVjZWZhLCBwcmVzZXJ2ZWQgaW50ZWdyYXRlZCB2OSBwcmVhcHByb3ZhbCA2ZDE0MDU4YWNkYzE4ZTA2ZjFlNzAyM2U4NWUyNTRmNTg0YzQ5OWI0IGFuZCB2OSBkZWNpc2lvbiBlMmRjYjA4YWU3MGE3YzY2NWIwMjYwMGM4Y2MxYzc1OGUwNTJiMWI0LCBhbmQgaW1tdXRhYmxlIFBoYXNlIDIgaXNzdWUgIzcxIHJlY2VpcHQgZmQzOGVkZGNjYjVkY2U2NDA1ZGY0OGE4ZjI1YzA0NWU3NDBlZmRjYSBhbmQgUGhhc2UgMyBpc3N1ZSAjNjEgdjQgcmVjZWlwdCBjNWFlOGRlNzdjZWY5OTFkZDIxZjNiNzk1NmIyYjJjYjIzYWMyOTE4LiBJIGNvbmZpcm0gdGhhdCB2OSBQL0QgcmVtYWluIHZhbGlkIGFuZCBpbnRlZ3JhdGVkLCB3aGlsZSBpdHMgZXhhY3QgdW5jb21taXR0ZWQgNTAtZmlsZSBhcHBsaWNhdGlvbiBzdGF0ZSB3aXRoIGdvdmVybmVkIHRyYW5zaXRpb24gU0hBLTI1NiBlMmFlY2QyNjI0MmU5MWUwMmY3MjRhMjQwY2JjMTY4N2M2MjBjOGIxMTVjZTNhZjc3YjA5NjZjNTdkMjVlYTdjIGlzIHN1cGVyc2VkZWQgYmVmb3JlIGFwcGxpY2F0aW9uIGNvbW1pdCwgcHVsbCByZXF1ZXN0LCBpbnRlZ3JhdGlvbiwgb3IgcmVjZWlwdCBiZWNhdXNlIHRoZSB0YXJnZXQtY29udGVudCBsYXVuY2hlciBhbmQgcmVwb3NpdG9yeSBnYXRlIGZvcm0gYSBjaXJjdWxhciB0b3AtbGV2ZWwtYXdhaXQgbW9kdWxlIGdyYXBoIHRoYXQgbWFrZXMgcmVhbCBzb3VyY2UgYW5kIGJ1aWx0IE5vZGUgQ0xJIGV4ZWN1dGlvbiBleGl0IHdpdGggc3RhdHVzIDEzLiBUaGlzIGFwcHJvdmFsIGF1dGhvcml6ZXMgb25seSB0aGUgY29tcGxldGUgZXhhY3QgYmVmb3JlL2FmdGVyIEdpdCBibG9iIHN0YXRlcyBmb3IgdGhlIDUyIGdvdmVybmVkIHJlcG9zaXRvcnkgcGF0aHMgbGlzdGVkIGluIHRoaXMgdjEwIHByZWFwcHJvdmFsLiBUaGUgY29ycmVjdGVkIGhhbmRvZmYgZXh0cmFjdHMgcmVwb3NpdG9yeSBhdXRob3JpdHkgaW50byBzdGF0aWMtcmVwb3NpdG9yeS1hdXRob3JpdHkubWpzLCBtYWtlcyBjaGVjay10YXJnZXQtY29udGVudC5tanMgaW1wb3J0IGFuZCByZS1leHBvcnQgdGhhdCBhdXRob3JpdHksIGFuZCBtYWtlcyBzdGF0aWMtcmVwb3NpdG9yeS1nYXRlcy5tanMgaW1wb3J0IHRoZSBhdXRob3JpdHkgbW9kdWxlIGRpcmVjdGx5LiBJdCBpbmNsdWRlcyBwcmUtYm91bmQgUkVEL0dSRUVOIHRlc3RzIHRoYXQgcmVwcm9kdWNlIHRoZSBvbGQgY2lyY3VsYXIgaW1wb3J0IGV4aXQgMTMgYW5kIGV4ZWN1dGUgdGhlIGNvcnJlY3RlZCByZWFsIHNvdXJjZSBhbmQgYnVpbHQgTm9kZSBDTEkgcGF0aHMuIFRoZSBoYW5kb2ZmIHByZXNlcnZlcyBhbmQgdmFsaWRhdGVzIGhpc3RvcmljYWwgSXNzdWUgIzcxIFAvRC9BL1IgYW5kIHRoZSBleGFjdCBnYXRlIHRyYW5zaXRpb24gZnJvbSBibG9iIDAyZTMyY2RhN2EwMTQ2MGMzMDU1ZjYxY2NjYWY5ZjAzZmMwNTUyZjkgdG8gZXhhY3QgdjEwLWdvdmVybmVkIHJlcGxhY2VtZW50IGJsb2IgNzk3MWQzODg4ZGEzZThmNTE0ODBhMjE2ZTY4OWUxNTc2YzcxYzc1ZTsgbm8gcHJvamVjdGlvbiwgYnlwYXNzIGFkYXB0ZXIsIGFsdGVybmF0ZSB0cnVzdCByb290LCBvciBhbHRlcm5hdGUgYmVmb3JlL2FmdGVyIGJsb2IgaXMgYXV0aG9yaXplZC4gVmVyc2lvbmVkIFBNVGlsZXMgYW5kIHZlcnNpb25lZCBDT0cgYXNzZXRzIHVzZSBwdWJsaWMsIG1heC1hZ2U9MzE1MzYwMDAsIGltbXV0YWJsZTsgb25seSB0aGUgc2VwYXJhdGUgdW52ZXJzaW9uZWQgbXV0YWJsZSBhbGlhcyBvciBtYW5pZmVzdCB1c2VzIG5vLXN0b3JlLiBJdCBhdXRob3JpemVzIHJlcG9zaXRvcnktb25seSBPcGVuVG9mdSwgd29ya2Zsb3csIHZhbGlkYXRpb24sIGZpeHR1cmUsIGRvY3VtZW50YXRpb24sIGFuZCBldmlkZW5jZSBzdGF0ZXM7IGluZnJhc3RydWN0dXJlIGFwcGx5IHJlbWFpbnMgdW5hdXRob3JpemVkLCBhbmQgcHVibGljYXRpb24gb3IgZGF0YSB1cGxvYWQgcmVtYWlucyBpbmRlcGVuZGVudGx5IGdhdGVkIGJ5IElzc3VlICM2NC4gSXNzdWUgIzc0IG1hbmFnZWQgcnVsZXNldHMsIGVudmlyb25tZW50cywgT0lEQywgaW1wb3J0cywgZHJpZnQgc2NoZWR1bGluZywgYW5kIGV4Y2VwdGlvbi1yZWdpc3RlciByZXNvdXJjZXMgcmVtYWluIHJlcXVpcmVkIGFuZCBkZWZlcnJlZCwgYW5kIHRoaXMgYXBwcm92YWwgZG9lcyBub3QgY2xhaW0gdGhhdCB0aGV5IGV4aXN0LiBJdCBwcmVzZXJ2ZXMgSXNzdWUgIzYyIHY1L3Y2L3Y3L3Y4L3Y5IGhpc3RvcnkgYnl0ZS1mb3ItYnl0ZSwgZG9lcyBub3QgbW9kaWZ5IG9yIHdhaXZlIElzc3VlICM3MSBvciBJc3N1ZSAjNjEgUC9EL0EvUiBoaXN0b3J5LCBhbmQgZG9lcyBub3QgYXV0aG9yaXplIENhbmRpZGF0ZS12NyBvciBUQVIgaW5zcGVjdGlvbiwgY29weWluZywgcHVibGljYXRpb24sIHVwbG9hZCwgb3IgdXNlOyBDbG91ZGZsYXJlIHJlc291cmNlLCBETlMsIHN0YXRlLCBjcmVkZW50aWFsLCBHaXRIdWIgZW52aXJvbm1lbnQsIG9yIHNlY3JldCBjcmVhdGlvbiwgZGVsZXRpb24sIG11dGF0aW9uLCBhcHBseSwgcHVibGljYXRpb24sIG9yIHVwbG9hZDsgb3IgZGVsZXRpb24gb3IgbXV0YXRpb24gb2YgYW55IGV4dGVybmFsIHJlc291cmNlLiIsCiAgImFwcHJvdmFsU291cmNlIjogewogICAgImlzc3VlIjogNjIsCiAgICAiY29tbWVudElkIjogNTQ5ODI1ODcyNiwKICAgICJjb21tZW50VXJsIjogImh0dHBzOi8vZ2l0aHViLmNvbS9hcnRlbXNlbWRldi9TZWFSaXNlLUV1cm9wZS9pc3N1ZXMvNjIjaXNzdWVjb21tZW50LTU0OTgyNTg3MjYiLAogICAgImF1dGhvciI6ICJhcnRlbXNlbWRldiIsCiAgICAiYXV0aG9yQXNzb2NpYXRpb24iOiAiT1dORVIiLAogICAgImJvZHlTaGEyNTYiOiAiOTI1NDAxMGMzMmM1YjJhNjExMmVhMDU0OWU0NzFmZTJiOGE0ODY4YzgzNTM1NGRmNDI3MGNmNDZhNTVjMDIyZiIKICB9LAogICJzYWZldHkiOiB7CiAgICAiY2FuZGlkYXRlVjdCeXRlc1VzZWQiOiBmYWxzZSwKICAgICJ0YXJCeXRlc1VzZWQiOiBmYWxzZSwKICAgICJwdWJsaWNhdGlvbkF1dGhvcml6ZWQiOiBmYWxzZSwKICAgICJpbmZyYXN0cnVjdHVyZUFwcGx5QXV0aG9yaXplZCI6IGZhbHNlLAogICAgImV4dGVybmFsUmVzb3VyY2VNdXRhdGlvbkF1dGhvcml6ZWQiOiBmYWxzZSwKICAgICJleHRlcm5hbERlbGV0aW9uQXV0aG9yaXplZCI6IGZhbHNlLAogICAgImNyZWRlbnRpYWxNdXRhdGlvbkF1dGhvcml6ZWQiOiBmYWxzZSwKICAgICJnaXRodWJFbnZpcm9ubWVudE11dGF0aW9uQXV0aG9yaXplZCI6IGZhbHNlCiAgfQp9Cg=="
+        }
+      ]
+    },
+    {
+      "name": "v11-published-application",
+      "commit": "7819ded9bd96fcea7cb76b1c6b998918bd138f6f",
+      "parent": "9f1ca57cdaf4fb6617cdffd5fcd13fac1a359a71",
+      "tree": "e66c3259f3dcd5d922f9ba47f8cf55b2ecd7c4eb",
+      "objects": [
+        {
+          "oid": "7819ded9bd96fcea7cb76b1c6b998918bd138f6f",
+          "type": "commit",
+          "base64": "dHJlZSBlNjZjMzI1OWYzZGNkNWQ5MjJmOWJhNDdmOGNmNTViMmVjZDdjNGViCnBhcmVudCA5ZjFjYTU3Y2RhZjRmYjY2MTdjZGZmZDVmY2QxM2ZhYzFhMzU5YTcxCmF1dGhvciBBcnRlbSA8Njc5MzIyMithcnRlbXNlbWRldkB1c2Vycy5ub3JlcGx5LmdpdGh1Yi5jb20+IDE3ODg0MDc3MDggKzAyMDAKY29tbWl0dGVyIEFydGVtIDw2NzkzMjIyK2FydGVtc2VtZGV2QHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT4gMTc4ODQwNzcwOCArMDIwMAoKZmVhdChkZWxpdmVyeSk6IGFkZCBnb3Zlcm5lZCBzdGF0aWMgaG9zdGluZyBmb3VuZGF0aW9uCg=="
+        }
+      ]
+    }
+  ]
+}
