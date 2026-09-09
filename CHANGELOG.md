@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Corrected contributor, architecture, delivery, and testing documentation to
+  reflect the completed static-runtime repository cutover and current CI path
+  routing.
+
 ### Added
 
 - Added an isolated issue #70 repository-removal authority profile and adapter

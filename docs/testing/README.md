@@ -1,7 +1,8 @@
 # Executable test migration contract
 
-This directory explains how SeaRise moves from the legacy distributed stack to
-the static-first target without losing the only evidence for an invariant.
+This directory explains how SeaRise preserves test evidence in the static-first
+repository and how the completed legacy-runtime removal retained the evidence
+for each invariant.
 The machine-readable source of truth is
 [`tests/test-inventory.json`](../../tests/test-inventory.json); its schema and
 enforcement live in `tests/contracts/test-inventory.schema.json` and
@@ -39,7 +40,7 @@ frontend suite to static target evidence and explicit issue #70 blocking gates.
 | Pipeline target tests | `src/pipeline/tests/<domain>/` | `test_<behavior>.py` |
 | Static browser unit/component tests | `src/web/src/<domain>/` | `<behavior>.test.ts[x]` |
 | Static browser journeys | `src/web/tests/` | `<journey>.spec.ts` |
-| Legacy frontend evidence | `src/frontend/src/` | Historical test names remain until their approved retirement PR |
+| Retired frontend evidence | `tests/test-inventory.json` | Historical names and replacement evidence remain in the inventory after source removal |
 
 Builders belong next to the consuming test suite under a `builders/` directory.
 They expose domain intent and must not copy legacy request, database, TiTiler,
@@ -116,13 +117,13 @@ Its mapping is versioned and covered by `tests/harness/test_changed_components.p
 Each workflow always runs a lightweight detection job and an aggregate gate;
 component jobs between them are conditional:
 
-- frontend paths run frontend checks and JavaScript/TypeScript CodeQL;
-- API paths run .NET checks and C# CodeQL;
-- pipeline, scientific data, and test-contract paths run pipeline checks;
-- infrastructure/compose paths run infrastructure validation and the relevant
-  full-stack smoke test;
-- image builds run only for production/container inputs, not test-only edits;
-- Markdown and other documentation-only changes skip all heavyweight jobs;
+- web application, web contract, and named target-content paths run web checks;
+- `src/web/**` and static-quality tool paths run JavaScript/TypeScript CodeQL;
+- pipeline, scientific data, contract, and test paths run pipeline checks;
+- release-authority and pinned toolchain paths run release checks;
+- repository-removal contract, script, and inventory paths run removal checks;
+- Markdown-only changes skip heavyweight jobs unless their exact path is named
+  by the router;
 - router or workflow changes run every route so filtering cannot weaken itself.
 
 Manual CI and scheduled/manual CodeQL runs enable every route. Renames evaluate

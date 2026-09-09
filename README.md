@@ -17,7 +17,7 @@ data-product architecture.
 > The mock uses synthetic illustrative data and does not override the PRD,
 > methodology, or accepted architecture.
 
-> **Repository status:** The Phase 2 integration branch contains the static-only
+> **Repository status:** The master branch contains the static-only
 > React/Vite application and retained offline release pipeline. The superseded
 > distributed runtime has been removed under ADR-025. Clean-clone validation uses
 > the committed synthetic fixture; this is not a public scientific release.
