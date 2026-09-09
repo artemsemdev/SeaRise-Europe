@@ -82,9 +82,6 @@ const activeAuthorityPaths = new Set([
   "docs/methodology.md",
   "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
 ]);
-const gatePolicyTrustPaths = Object.freeze([
-  "src/web/scripts/static-repository-gates.mjs",
-]);
 
 export const prohibitedTargetClaims = Object.freeze([
   Object.freeze({ id: "legacy-outcome-modeled-exposure", pattern: /\bModeledExposureDetected\b/giu }),
@@ -234,72 +231,27 @@ export function ownerCommentVerificationArguments(helpText, root) {
   return ["--repository-root", root, "--verify-owner-comment"];
 }
 
-function approvedRemovalChain(root) {
-  const validator = resolve(root, "scripts/repository/validate_issue71_removal.py");
-  const receiptPath = "contracts/repository-removal/v2/issue-71/application-receipt.json";
-  if (!existsSync(validator)) throw new Error("Issue-71 repository-removal validator is missing");
-  readRegularFile(validator, null, root);
-  let receiptCommit;
-  let headCommit;
-  try {
-    const additions = execFileSync(
-      "git", ["log", "--format=%H", "--diff-filter=A", "--", receiptPath],
-      { cwd: root, encoding: "utf8" },
-    ).trim().split("\n").filter(Boolean);
-    if (additions.length !== 1) {
-      throw new Error("issue-71 receipt must have one exact addition commit");
-    }
-    [receiptCommit] = additions;
-    headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim();
-  } catch (error) {
-    throw new Error(`Issue-71 authority anchors cannot be derived: ${error.message}`);
-  }
-  try {
-    execFileSync("python3", [
-      validator,
-      "--repository-root", root,
-      "post-application",
-      "--receipt-commit", receiptCommit,
-      "--head-commit", headCommit,
-      "--verify-owner-comment",
-    ], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: "pipe",
-    });
-  } catch (error) {
-    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Issue-71 repository-removal approval chain is invalid${detail ? `: ${detail}` : ""}`);
-  }
-  const plan = JSON.parse(readRegularFile(
-    resolve(root, "contracts/repository-removal/v2/issue-71/removal-plan.json"),
-    "utf8",
-    root,
-  ));
-  return new Map(gatePolicyTrustPaths.map((path) => {
-    const matches = plan.entries.filter((entry) =>
-      entry.path === path && entry.after?.state === "present");
-    const approvedBlob = matches[0]?.after?.gitBlobSha;
-    if (matches.length !== 1 || !/^[a-f0-9]{40}$/u.test(approvedBlob ?? "")) {
-      throw new Error(`Issue-71 plan lacks one exact approved gate-policy blob: ${path}`);
-    }
-    return [path, approvedBlob];
-  }));
+export function postCutoverValidationArguments(root, headCommit) {
+  return [
+    resolve(root, "scripts/repository/validate_post_cutover.py"),
+    "--repository-root", root,
+    "--head-commit", headCommit,
+    "--verify-owner-comment",
+  ];
 }
 
-function validateGatePolicyTrustRoots(root, auditedCommit, approvedBlobs) {
-  for (const path of gatePolicyTrustPaths) {
-    const currentBlob = gitBlobSha(readRegularFile(resolve(root, path), null, root));
-    const auditedBlob = execFileSync("git", ["rev-parse", `${auditedCommit}:${path}`], {
-      cwd: root,
-      encoding: "utf8",
-    }).trim();
-    if (currentBlob !== (approvedBlobs?.get(path) ?? auditedBlob)) {
-      throw new Error(`Gate-policy trust root differs from the owner-approved audited blob: ${path}`);
-    }
+function approvedRemovalChain(root) {
+  const headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  const args = postCutoverValidationArguments(root, headCommit);
+  readRegularFile(args[0], null, root);
+  try {
+    execFileSync("python3", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
+  } catch (error) {
+    const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
+    throw new Error(`Completed removal history or current safeguards are invalid${detail ? `: ${detail}` : ""}`);
   }
 }
 
@@ -318,9 +270,7 @@ export function loadHistoricalAllowlist({
     throw new Error("Approved historical allowlist is missing");
   }
   const effectiveAuthority = approvedExists ? "approved" : authority;
-  const approvedGatePolicyBlobs = effectiveAuthority === "approved"
-    ? validateApproval(root)
-    : undefined;
+  if (effectiveAuthority === "approved") validateApproval(root);
   const path = approvedExists ? approvedPath : preapprovalPath;
   if (!existsSync(path)) throw new Error("Exact historical terminology allowlist is missing");
   const document = JSON.parse(readRegularFile(path, "utf8", root));
@@ -343,9 +293,6 @@ export function loadHistoricalAllowlist({
       authority: effectiveAuthority,
       ...approvedGitResolvers,
     });
-  if (effectiveAuthority === "approved") {
-    validateGatePolicyTrustRoots(root, document.auditedCommit, approvedGatePolicyBlobs);
-  }
   return entries;
 }
 

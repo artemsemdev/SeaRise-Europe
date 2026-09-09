@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added post-cutover validation that lets retained application and CI files
+  evolve while preserving completed removal approvals and preventing the
+  retired runtime from returning. Publication restrictions remain unchanged.
+
 - Added an isolated issue #70 repository-removal authority profile and adapter
   that reuses the reviewed v2 lifecycle engine without rewriting the completed
   issue #72 chain. Future Next.js removal approval must bind the dedicated

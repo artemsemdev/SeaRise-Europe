@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   activeAuthoritativeDocument,
   ownerCommentVerificationArguments,
+  postCutoverValidationArguments,
   readScanFile,
   scanContent,
   validateHistoricalAllowlist,
@@ -60,6 +61,15 @@ function fixture(overrides = {}) {
 }
 
 describe("repository-removal validator capability", () => {
+  it("uses the current adapter with mandatory owner verification and exact checked revision", () => {
+    expect(postCutoverValidationArguments("/repository", "a".repeat(40))).toEqual([
+      "/repository/scripts/repository/validate_post_cutover.py",
+      "--repository-root", "/repository",
+      "--head-commit", "a".repeat(40),
+      "--verify-owner-comment",
+    ]);
+  });
+
   it("fails closed when owner-comment verification is unavailable", () => {
     expect(() => ownerCommentVerificationArguments(
       "usage: validator [--repository-root REPOSITORY_ROOT]",

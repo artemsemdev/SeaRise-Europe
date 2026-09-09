@@ -1020,15 +1020,13 @@ jobs:
           --document contracts/supply-chain/v2/static-target-profile.json
           --repository-root .
 
-      - name: Enforce repository-removal lifecycle state
+      - name: Enforce completed removal history and current safeguards
         env:
           GH_TOKEN: ${{ github.token }}
-          EXECUTION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
           APPLIED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: >-
-          python scripts/repository/validate_issue71_removal.py ci
-          --execution-base "${EXECUTION_BASE}"
-          --applied-commit "${APPLIED_COMMIT}"
+          python scripts/repository/validate_post_cutover.py
+          --head-commit "${APPLIED_COMMIT}"
           --verify-owner-comment
 
   ci-gate:
