@@ -1,7 +1,6 @@
 # Contributing
 
-SeaRise Europe is migrating from its legacy distributed implementation to the
-static-first architecture accepted in
+SeaRise Europe uses the static-first architecture accepted in
 [ADR-021](docs/architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md).
 Read that decision and the [active delivery plan](docs/delivery/README.md)
 before proposing implementation work.
@@ -16,7 +15,7 @@ before proposing implementation work.
   acquired dataset.
 - Keep raw/large datasets, build outputs, credentials, and local state out of
   Git unless a reviewed fixture or public contract explicitly belongs here.
-- New product flows must not add dependencies to the retiring backend,
+- New product flows must not add dependencies to a request-time backend,
   database, tile server, or runtime geocoder.
 - Make scientific assumptions and uncertainty explicit.
 
@@ -61,27 +60,18 @@ local test by following
 That workflow serves the existing directory in place and is never part of a
 production build or CI.
 
-Run the checks relevant to the files you changed. Until #70 and #71 remove the
-legacy baseline, its focused compatibility commands remain:
+Run the checks relevant to the files you changed:
 
 ```bash
-# Frontend
-cd src/frontend
-npm ci
-npm run type-check
-npm test
-npm run build
-
-# API
-cd src/api
-dotnet test SeaRise.sln -c Release
+# Static browser application
+npm run web:check
 
 # Pipeline
 python -m pytest src/pipeline/tests
 ```
 
-As the static frontend and release pipeline are introduced, their checked-in
-scripts and CI jobs become authoritative. Do not rely on documentation-only
+The static browser and release pipeline's checked-in scripts and CI jobs are
+authoritative. Do not rely on documentation-only
 claims when an executable check can enforce the contract.
 
 ## TDD and test migration

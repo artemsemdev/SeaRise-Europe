@@ -6,7 +6,7 @@
 
 ## Architecture in one paragraph
 
-SeaRise Europe is becoming a static geospatial data product. A reproducible
+SeaRise Europe is a static geospatial data product. A reproducible
 offline pipeline acquires pinned IPCC, GeoNames, and Natural Earth
 snapshots; validates and packages immutable COG, PMTiles, GeoParquet, JSON, and
 STAC artifacts; and publishes them with checksums and signed provenance. A
@@ -25,10 +25,10 @@ flowchart LR
     Source --> Build --> Release --> Edge --> Browser
 ```
 
-The checked-in application still uses the retiring service-based stack. These
-documents describe the accepted target; the
-[migration plan](../delivery/README.md) records the gates that must pass before
-legacy code is removed.
+The checked-in application implements this static architecture. The superseded
+service-based runtime has been removed from the repository under ADR-025. The
+[delivery plan](../delivery/README.md) records completed repository migration
+evidence and the remaining scientific release and deployment gates.
 
 ## Start here
 

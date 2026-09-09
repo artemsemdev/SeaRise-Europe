@@ -422,10 +422,10 @@ These are CI fitness functions, not aspirational prose.
 - Offline: warm caches, remove the network, repeat supported flows, and verify
   honest failure for uncached data.
 
-## Migration boundary
+## Implemented runtime boundary
 
-The current Next.js/TanStack Query/API implementation is not the target
-frontend. Migration should first introduce fixture-compatible artifact
-contracts and parity tests, then move to Vite and local assessment. Old runtime
-code is removed only after ADR-021 Phases 0–3 pass. New target code must not
-depend on the temporary API, PostGIS, TiTiler, Azure Maps, or Next.js runtime.
+The checked-in frontend is the React/Vite static application described here.
+It loads fixture-compatible artifact contracts and performs assessment in the
+browser. The superseded Next.js, TanStack Query, and application API runtime
+has been removed under ADR-025. Browser code must remain independent of
+PostGIS, TiTiler, Azure Maps, and a Next.js server.
