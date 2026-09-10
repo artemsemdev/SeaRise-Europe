@@ -65,7 +65,7 @@ export class HttpAtlasDataSource implements AtlasDataSource {
   async #response(path: string, signal?: AbortSignal): Promise<Response> {
     throwIfAborted(signal);
     try {
-      return await this.#fetch(`${this.#baseUrl}${path}`, { method: "GET", signal });
+      return await this.#fetch(`${this.#baseUrl}${path}`, { method: "GET", cache: "no-store", signal });
     } catch (error) {
       if (isAbortError(error, signal)) throw error;
       throw new AtlasDataSourceError("unavailable", "The real-local atlas service is unavailable.", { cause: error });
