@@ -15,6 +15,9 @@ All notable changes to this project will be documented in this file.
   pixel validation and useful browser failure diagnostics. Refreshed the
   software-render QA receipt's dependency hash; rendered PNGs and scientific
   approval evidence are unchanged.
+- Routine source validation now checks pinned removal evidence without GitHub
+  credentials or network access. CI separately retains live owner verification
+  for application and repository-authority changes.
 
 - Corrected contributor, architecture, delivery, and testing documentation to
   reflect the completed static-runtime repository cutover and current CI path

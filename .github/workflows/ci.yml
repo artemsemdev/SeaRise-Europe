@@ -131,8 +131,6 @@ jobs:
         run: npm audit --audit-level=critical --omit=dev
 
       - name: Validate static target
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: npm run web:check
 
       - name: Validate deterministic PMTiles render evidence
@@ -985,7 +983,7 @@ jobs:
   repository-removal-v2:
     name: Repository removal v2 authority
     needs: changes
-    if: needs.changes.outputs.repository_removal == 'true'
+    if: needs.changes.outputs.repository_removal == 'true' || needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read

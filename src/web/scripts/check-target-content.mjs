@@ -236,11 +236,11 @@ export function postCutoverValidationArguments(root, headCommit) {
     resolve(root, "scripts/repository/validate_post_cutover.py"),
     "--repository-root", root,
     "--head-commit", headCommit,
-    "--verify-owner-comment",
+    "--evidence-only",
   ];
 }
 
-function approvedRemovalChain(root) {
+function completedRemovalEvidence(root) {
   const headCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: root,
     encoding: "utf8",
@@ -251,14 +251,14 @@ function approvedRemovalChain(root) {
     execFileSync("python3", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
   } catch (error) {
     const detail = error?.stdout?.toString().trim() || error?.stderr?.toString().trim();
-    throw new Error(`Completed removal history or current safeguards are invalid${detail ? `: ${detail}` : ""}`);
+    throw new Error(`Pinned completed evidence or current safeguards are invalid${detail ? `: ${detail}` : ""}`);
   }
 }
 
 export function loadHistoricalAllowlist({
   authority = "readiness",
   root = repositoryRoot,
-  validateApproval = approvedRemovalChain,
+  validateApproval = completedRemovalEvidence,
 } = {}) {
   const approvedPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.json");
   const preapprovalPath = resolve(root, "contracts/repository-removal/v1/historical-allowlist.preapproval.json");

@@ -124,7 +124,7 @@
         {
           "path": ".github/workflows/ci.yml",
           "role": "workflow",
-          "sha256": "36d06526d834d9da5a762242407c06005e4077e1db6f592d7ab33d09d35a264f"
+          "sha256": "c21fbcf96a7fed12fc383e0741c32a3e1c04cf49e05df07676e399901272df64"
         },
         {
           "path": ".github/workflows/codeql.yml",

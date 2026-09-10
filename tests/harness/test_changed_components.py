@@ -347,7 +347,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         )
         validation = web.split("- name: Validate static target", maxsplit=1)[1]
         validation = validation.split("\n      - name:", maxsplit=1)[0]
-        self.assertIn("GH_TOKEN: ${{ github.token }}", validation)
+        self.assertNotIn("GH_TOKEN", validation)
         self.assertIn("run: npm run web:check", validation)
 
     def test_repository_removal_job_enforces_committed_lifecycle_and_profile(
@@ -359,7 +359,7 @@ class ChangedComponentRoutingTests(unittest.TestCase):
         job = _workflow_job(workflow, "repository-removal-v2", "ci-gate")
         gate = workflow.split("  ci-gate:", maxsplit=1)[1]
 
-        self.assertIn("needs.changes.outputs.repository_removal == 'true'", job)
+        self.assertIn("if: needs.changes.outputs.repository_removal == 'true' || needs.changes.outputs.web == 'true'", job)
         self.assertIn("contents: read\n      issues: read", job)
         self.assertIn("fetch-depth: 0", job)
         self.assertIn("persist-credentials: false", job)
