@@ -1,7 +1,8 @@
-import maplibregl, {
-  type GeoJSONSourceSpecification,
-  type Map as MapLibreMap,
-  type StyleSpecification,
+import * as maplibregl from "maplibre-gl";
+import type {
+  GeoJSONSourceSpecification,
+  Map as MapLibreMap,
+  StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Protocol, ResolvedValueCache, type Cache } from "pmtiles";

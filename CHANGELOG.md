@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+
+- Updated MapLibre GL JS and its transitive URI parser to patched versions and
+  refreshed the active npm supply-chain profile and SBOM.
+
 ### Fixed
 
 - Corrected contributor, architecture, delivery, and testing documentation to
