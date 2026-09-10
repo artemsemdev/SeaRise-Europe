@@ -138,10 +138,10 @@ def test_npm_cli_generates_and_validates_active_static_web_bytes(
     ]
 
     assert main(["npm-sbom", *common, "--output", str(output)]) == 0
-    assert "generated 340 npm components" in capsys.readouterr().out
+    assert "generated 341 npm components" in capsys.readouterr().out
     assert output.read_bytes() == NPM_ARTIFACT.read_bytes()
     assert main(["npm-sbom-validate", *common, "--sbom", str(output)]) == 0
-    assert "validated 340 npm components" in capsys.readouterr().out
+    assert "validated 341 npm components" in capsys.readouterr().out
 
 
 def test_parent_inode_swap_fails_without_publishing_to_either_directory(
