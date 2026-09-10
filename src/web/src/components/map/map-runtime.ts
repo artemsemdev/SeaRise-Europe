@@ -1,4 +1,5 @@
 import * as maplibregl from "maplibre-gl";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type {
   GeoJSONSourceSpecification,
   Map as MapLibreMap,
@@ -14,6 +15,8 @@ import type {
 } from "../../data/map-layer-resolver";
 import { RenderToken } from "./render-token";
 import { registerNetworkOnlyPmtiles } from "./pmtiles-network-source";
+
+maplibregl.setWorkerUrl(maplibreWorkerUrl);
 
 const SOURCE_ID = "searise-projection";
 const FILL_LAYER_ID = "searise-projection-fill";
