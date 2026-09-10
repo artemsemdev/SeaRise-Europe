@@ -1,5 +1,7 @@
 # SeaRise Europe
 
+> **Current development:** The accepted coastal atlas is being adopted in [#490](https://github.com/artemsemdev/SeaRise-Europe/issues/490). The normal entry still serves the AR6 projection reference until that migration lands. Start with the [documentation index](docs/README.md) for current versus reference scope.
+
 [![CI](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/ci.yml/badge.svg)](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/codeql.yml/badge.svg)](https://github.com/artemsemdev/SeaRise-Europe/actions/workflows/codeql.yml)
 

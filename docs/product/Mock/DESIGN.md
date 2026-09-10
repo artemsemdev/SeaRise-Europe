@@ -1,12 +1,12 @@
 # Design Direction: The Flight Experience
 
-> **Status:** Active canonical visual and interaction direction
+> **Status:** Retained AR6 projection visual and interaction direction
 >
 > **Canonical interactive reference:** [SeaRise Flight](SeaRise-Flight.html)
 >
-> **Behaviour authority:** [PRD](../PRD.md)
+> **Behaviour authority:** [AR6 requirements](../PRD.md)
 >
-> **Copy authority:** [Content guidelines](../CONTENT_GUIDELINES.md)
+> **Copy authority:** [AR6 content guidelines](../CONTENT_GUIDELINES.md)
 >
 > **Architecture authority:** [ADR-021](../../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md)
 
@@ -19,6 +19,9 @@ the PRD, Content Guidelines, release contracts, accessibility requirements, or
 accepted architecture and scientific decisions.
 
 ## Authority split
+
+This direction applies only to the retained projection reference. The main
+product follows the [accepted coastal atlas design](../COASTAL_ATLAS_DESIGN.md).
 
 Flight is authoritative for experience design. ADR-024 is authoritative for
 scientific meaning. The mock's binary exposure, terrain comparison, modeled

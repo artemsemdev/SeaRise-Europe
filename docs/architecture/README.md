@@ -1,5 +1,7 @@
 # Architecture Documentation
 
+> **Atlas adoption:** [ADR-028](adr/ADR-028-coastal-atlas-adoption.md) defines the accepted main product target. The runtime described below remains the implemented projection reference until the atlas entry-point slice lands.
+
 > **Status:** Current for the accepted target architecture
 > **Last reviewed:** 2026-08-16
 > **Authoritative decisions:** [ADR-021 — Static-First Offline Geospatial Architecture](adr/ADR-021-static-first-offline-geospatial-architecture.md), [ADR-024 — AR6 Regional Projection Product Contract](adr/ADR-024-ar6-regional-projection-contract.md), and [ADR-026 — Authoritative Browser Range Persistence](adr/ADR-026-authoritative-browser-range-persistence.md)

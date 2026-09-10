@@ -1,5 +1,7 @@
 # Static-First Migration Plan
 
+> **Current product integration:** [#490 — Adopt the coastal atlas](https://github.com/artemsemdev/SeaRise-Europe/issues/490) governs the main application migration. The roadmap below records the earlier static projection migration and subsequent public delivery work.
+
 > **Status:** Phase 1 complete; Phase 2 static-only integration complete
 > **Last updated:** 2026-08-20
 > **Decision sources:** [ADR-021](../architecture/adr/ADR-021-static-first-offline-geospatial-architecture.md), amended by [ADR-024](../architecture/adr/ADR-024-ar6-regional-projection-contract.md) and [ADR-025](../architecture/adr/ADR-025-accelerated-static-runtime-cutover.md)

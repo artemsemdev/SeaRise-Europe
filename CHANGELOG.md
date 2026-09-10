@@ -265,6 +265,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Established the accepted coastal atlas as the main product target, with its own source and design contract. Earlier AR6/Flight guidance is now explicitly scoped to the retained projection reference; engineering adoption remains in progress.
+
 - Activated the 13-component, 57-input static-target supply-chain profile after
   the final repository-only legacy removal. Active contributor, architecture,
   delivery, and operations guidance now describes the same static-only

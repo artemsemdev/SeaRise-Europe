@@ -1,57 +1,41 @@
-# Static target content contract
+# Application content contract
 
-ADR-024 defines one projection product with exactly four scientific outcomes:
-`ProjectionAvailable`, `DataUnavailable`, `OutOfScope`, and
-`UnsupportedGeography`. The target application reports regional relative
-sea-level change and never restores the rejected binary terrain-comparison
-product through copy, code, tests, or build output.
+[ADR-028](../architecture/adr/ADR-028-coastal-atlas-adoption.md) defines the
+accepted main coastal atlas target. ADR-024 continues to define the retained
+AR6 projection reference with its four scientific outcomes. Source-backed
+CoCliCo depth values and AR6 regional relative-level values are different
+contracts, not interchangeable result states.
 
-`src/web/scripts/check-target-content.mjs` runs during both lint and production
-build. It scans production web source, active project documentation, and emitted
-JavaScript/CSS/HTML for obsolete outcome identifiers and affirmative exposure,
-terrain-comparison, inundation, or property-risk product claims. Built assets
-are scanned separately so source transforms or dependencies cannot reintroduce
-the language after the source check.
+`src/web/scripts/check-target-content.mjs` runs during lint and production
+build. The explicit `src/web/src/atlas/` source and named active atlas documents
+may describe source-backed coastal inundation. The projection source,
+projection reference documents, and all other paths retain projection-only
+terminology checks. Noncanonical paths cannot acquire atlas scope.
 
-A second, product-copy-only layer scans production web source and emitted
-assets, but not guidance that must discuss rejected wording. It rejects
-certainty about flooding, safety, risk, personal property, or precision;
-unsupported promises about complete settlement coverage, permanent cost, or
-fully offline operation; relative `+N years` horizons; forecast-model framing;
-five-state target models; and affirmative flood-probability statements.
+Legacy binary outcome identifiers, property-risk scores, and unsupported
+certainty remain prohibited in both products. Product copy also rejects
+fabricated flood probability, safety or precision guarantees, unqualified
+coverage/offline/cost promises, and relative year horizons. Tests demonstrate
+both the permitted source-backed terms and continued rejection of unsafe claims.
 
-The scanner executes mutation controls for every category on every run. A
-future change that weakens either the target-domain exclusions or the stricter
-product-copy rules fails before repository content is accepted.
+The current emitted build still belongs to the projection application and is
+scanned under its existing rules. The primary-entry migration must explicitly
+update emitted-artifact scope and output isolation together. Adding a source
+exception does not change the application entry or approve any published data.
 
-## Canonical Flight reference exception
+## Retained Flight reference
 
-`docs/product/Mock/SeaRise-Flight.html` is the active canonical visual and
-interaction reference, not historical-only evidence. Its layout, information
-hierarchy, map-first composition, controls, responsive behavior, and
-interaction character are reusable target requirements. The self-contained
-mock also contains rejected prototype science that cannot be scanned as target
-product copy or copied into the production bundle.
+`docs/product/Mock/SeaRise-Flight.html` is scoped to the retained AR6 projection
+application. The coastal atlas uses its separate accepted design contract.
+The mock body still contains rejected prototype science; its exact-byte SHA-256
+and annotation must preserve the four-outcome interpretation before the scanner
+excludes the mock body. It is never copied into the application build.
 
-The scanner therefore excludes the mock body from the target-domain text scan
-only after its pre-document annotation proves all of the following:
-
-- active canonical visual and interaction authority;
-- explicit preservation of the Flight composition and behavior;
-- `exposed` and `notexposed` map to `ProjectionAvailable`;
-- `unavailable` maps to `DataUnavailable`;
-- `outofscope` maps to `OutOfScope`;
-- missing `UnsupportedGeography` must be added;
-- technical failures remain outside the scientific outcome domain.
-
-The gate also requires the active preservation contract and four-outcome map in
-`MOCK_REQUIREMENTS_MAP.md`, and verifies that its declared SHA-256 matches the
-exact canonical mock bytes. Removing or weakening any marker or changing the
-mock without updating its reviewed digest fails the content gate. This narrow
-exception authorizes reuse of visual and interaction design, not binary
-exposure, terrain comparison, modeled-water/flood meaning, hazard claims,
-fixture facts, or product copy. The canonical mock is never copied into the
-production build.
+The annotation identifies the AR6 reference, preserves its layout/interaction
+character, maps the old mock cards to the four AR6 outcomes, and keeps technical
+failures outside the scientific outcome domain. `MOCK_REQUIREMENTS_MAP.md`
+records the same scope and digest. Mutation checks reject broadened authority,
+missing semantic mappings, and a digest that no longer matches the mock bytes.
 
 ## Historical evidence allowlist
 
@@ -84,7 +68,8 @@ property-risk, inundation, or other product claims. The separately marked
 historical section of `docs/methodology.md` continues to use its narrow in-file
 boundary.
 
-ADR-024 remains active authoritative policy, never historical evidence. Its
+ADR-024 remains authoritative for its projection release contract, never a
+blanket atlas content prohibition or historical terminology exemption. Its
 two obsolete outcome identifiers are accepted only inside the exact sentence
 that says they do not appear in an ADR-024 release. The loader is prepared for
 the schema's forthcoming exact `canonical-design-reference` rule for

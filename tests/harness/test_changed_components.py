@@ -33,6 +33,17 @@ def _workflow_event_paths(workflow: str, event: str, next_event: str) -> set[str
 
 
 class ChangedComponentRoutingTests(unittest.TestCase):
+    def test_product_contract_changes_always_run_web_checks(self) -> None:
+        for path in (
+            "docs/product/PRD.md",
+            "docs/product/CONTENT_GUIDELINES.md",
+            "docs/product/COASTAL_ATLAS_DESIGN.md",
+            "docs/product/COASTAL_ATLAS_PRD.md",
+            "docs/architecture/adr/ADR-028-coastal-atlas-adoption.md",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(classify_paths([path])["web"])
+
     def test_static_quality_routes_every_direct_release_fixture_input(self) -> None:
         root = Path(__file__).resolve().parents[2]
         workflow = (root / ".github/workflows/static-quality.yml").read_text(

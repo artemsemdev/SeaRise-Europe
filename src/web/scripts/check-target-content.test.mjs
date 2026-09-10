@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +10,9 @@ import {
   postCutoverValidationArguments,
   readScanFile,
   scanContent,
+  scanProductCopy,
+  sourceProductScope,
+  validateFlightReferenceContract,
   validateHistoricalAllowlist,
 } from "./check-target-content.mjs";
 
@@ -163,5 +166,51 @@ describe("historical terminology allowlist", () => {
     expect(scanContent(activeAuthoritativeDocument(exact, path))).toHaveLength(0);
     expect(scanContent(activeAuthoritativeDocument(exact.replace("do\nnot appear", "remain available"), path)))
       .toHaveLength(2);
+  });
+});
+
+
+describe("coastal atlas and projection reference scopes", () => {
+  it("allows source-backed atlas terms without changing projection semantics", () => {
+    const content = "Land modeled as exposed. Coastal inundation map.";
+    expect(scanContent(content, "atlas")).toHaveLength(0);
+    expect(scanContent(content, "projection").map((item) => item.claim)).toEqual([
+      "affirmative-modeled-exposure", "inundation-product",
+    ]);
+    expect(() => scanContent(content, "unreviewed")).toThrow(/Unknown product scope/);
+  });
+
+  it.each([
+    "src/web/src/components/map/map-runtime.ts",
+    "src/web/src/atlas-research/experiment.ts",
+    "src/web/src/atlas/../components/map.ts",
+    "src/web/src/atlas//map.ts",
+    "docs/product/PRD.md",
+    "docs/product/Mock/MOCK_REQUIREMENTS_MAP.md",
+    "docs/product/COASTAL_ATLAS_PRD-copy.md",
+  ])("keeps non-atlas or noncanonical paths in the projection scope: %s", (path) => {
+    expect(sourceProductScope(path)).toBe("projection");
+  });
+
+  it.each(["src/web/src/atlas/AtlasApp.tsx", "docs/product/COASTAL_ATLAS_PRD.md"])(
+    "recognizes the explicit atlas source: %s", (path) => {
+      expect(sourceProductScope(path)).toBe("atlas");
+    },
+  );
+
+  it("rejects legacy binary results and unsupported claims in the atlas too", () => {
+    expect(scanContent("ModeledExposureDetected. Property risk score.", "atlas"))
+      .toHaveLength(2);
+    expect(scanProductCopy("This location will flood. This place is safe. Flood probability is 20%."))
+      .toHaveLength(3);
+  });
+
+  it("retains the Flight reference meaning and exact mock integrity", () => {
+    const mock = readFileSync(resolve(process.cwd(), "../../docs/product/Mock/SeaRise-Flight.html"), "utf8");
+    const requirements = readFileSync(resolve(process.cwd(), "../../docs/product/Mock/MOCK_REQUIREMENTS_MAP.md"), "utf8");
+    expect(() => validateFlightReferenceContract(mock, requirements)).not.toThrow();
+    expect(() => validateFlightReferenceContract(mock.replace("AR6 PROJECTION REFERENCE ONLY.", "MAIN PRODUCT."), requirements))
+      .toThrow(/authority marker/);
+    expect(() => validateFlightReferenceContract(`${mock}\n`, requirements)).toThrow(/SHA-256/);
   });
 });
