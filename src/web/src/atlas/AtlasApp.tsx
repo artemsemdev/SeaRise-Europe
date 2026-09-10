@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowClockwise, ArrowsLeftRight, CaretDown, CaretUp, Crosshair, Eye, EyeSlash, Info, X, Pause, Play } from "@phosphor-icons/react";
-import { EuropeMap } from "./EuropeMap";
+const EuropeMap = lazy(() => import("./EuropeMap").then((module) => ({ default: module.EuropeMap })));
+import { MapChunkBoundary } from "./MapChunkBoundary";
 import { AboutDialog } from "./AboutDialog";
 import { PointInspection } from "./PointInspection";
 import { CitySearch } from "./CitySearch";
@@ -10,9 +11,11 @@ import type { AtlasDataSource } from "./data-source";
 import "./atlas.css";
 
 export default function AtlasApp({ dataSource }: { dataSource: AtlasDataSource }) {
+  const [qaMapEnabled] = useState(() => new URLSearchParams(window.location.search).get("qa") === "map");
   const [selection, setSelection] = useState(() => readSelection(window.location.search));
   const { cityId, year, protection, visible, compare, camera, point } = selection;
   const [mapRevision, setMapRevision] = useState(0);
+  const mapModuleFailed = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const [pointOpen, setPointOpen] = useState(true);
   const [focusRequest, setFocusRequest] = useState(0);
@@ -36,6 +39,11 @@ export default function AtlasApp({ dataSource }: { dataSource: AtlasDataSource }
   const loading = !catalog && !catalogError || mapStatus.loading;
   const error = catalogError ?? mapStatus.error ?? placeError;
   const onStatus = useCallback((status: { loading: boolean; error: string | null; validPixels: number | null; floodPixels: number | null }) => setMapStatus(status), []);
+
+  const onMapFailure = useCallback(() => {
+    mapModuleFailed.current = true;
+    setMapStatus({ loading: false, error: "The map application could not load. Retry to reload this view.", validPixels: null, floodPixels: null });
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -115,6 +123,11 @@ export default function AtlasApp({ dataSource }: { dataSource: AtlasDataSource }
     setSelection((current) => ({ ...current, compare: !current.compare, year: !current.compare ? 2100 : current.year, visible: true }));
   }
   function retryMap() {
+    if (mapModuleFailed.current) {
+      // React.lazy retains a rejected import; a new document retries the module.
+      window.location.reload();
+      return;
+    }
     setCatalogError(null); setPlaceError(null);
     setMapStatus({ loading: true, error: null, validPixels: null, floodPixels: null });
     setInitialCamera(camera);
@@ -134,17 +147,17 @@ export default function AtlasApp({ dataSource }: { dataSource: AtlasDataSource }
   return <main className={`atlas-app${hasPlace ? " has-selection" : ""}`}>
     <header className="atlas-header">
       <div className="brand-row"><a className="atlas-brand" href="/" aria-label="SeaRise Europe home">SeaRise <span>Europe</span></a><button className="mobile-about" type="button" aria-label="About the map" onClick={() => setAbout(true)}><Info size={20} /></button></div>
-      {!hasPlace && <p className="intro">How Europe's coasts change as seas rise. <span>Choose a place, then move through 2030, 2050, and 2100.</span></p>}
+      {!hasPlace && !error && <p className="intro">How Europe's coasts change as seas rise. <span>Choose a place, then move through 2030, 2050, and 2100.</span></p>}
       {dataSource.edition === "synthetic-fixture" && <p className="atlas-fixture-label"><strong>Illustrative fixture</strong><span>Software demonstration · Not CoCliCo data</span></p>}
       <CitySearch dataSource={dataSource} onSelect={selectCity} />
-      {!hasPlace && <div className="coast-examples" aria-label="Explore a coast"><h2>Start with a coast</h2>{destinations.map(({ name, detail }) => <button type="button" key={name} onClick={() => { setPlaceError(null); setPointOpen(true); setSelection((current) => ({ ...current, cityId: name.toLowerCase(), point: null })); }}><span><strong>{name}</strong><small>{detail}</small></span><CaretDown size={15} /></button>)}</div>}
+      {!hasPlace && !error && <div className="coast-examples" aria-label="Explore a coast"><h2>Start with a coast</h2>{destinations.map(({ name, detail }) => <button type="button" key={name} onClick={() => { setPlaceError(null); setPointOpen(true); setSelection((current) => ({ ...current, cityId: name.toLowerCase(), point: null })); }}><span><strong>{name}</strong><small>{detail}</small></span><CaretDown size={15} /></button>)}</div>}
     </header>
     <div className="scenario-pill"><span><strong>SSP5-8.5</strong> · Spring high tide · {protection === "protected" ? "High protection" : "No additional defenses"}</span><button type="button" className="about-trigger" aria-label="About the map" onClick={() => setAbout(true)}><Info size={19} /></button></div>
     <div className="atlas-geography" aria-label="Interactive coastal flood map" data-testid="atlas-map" data-model={dataSource.edition === "synthetic-fixture" ? "illustrative-fixture" : "coclico"} data-year={year} data-layer={layer?.id ?? ""}>
-      <EuropeMap dataSource={dataSource} key={`${retry}-${mapRevision}`} city={city} year={year} protection={protection} visible={visible && !!layer} onStatus={onStatus}
+      <MapChunkBoundary onFailure={onMapFailure}><Suspense fallback={<div className="map-loading" role="status">Loading the European map…</div>}><EuropeMap qaMapEnabled={qaMapEnabled} dataSource={dataSource} key={`${retry}-${mapRevision}`} city={city} year={year} protection={protection} visible={visible && !!layer} onStatus={onStatus}
         initialCamera={initialCamera} restoreCity={restoreCity} onCameraChange={onCameraChange} inspectionPoint={inspectedPoint} onInspect={onInspect} focusRequest={focusRequest}
         onOverview={exploreEurope} onShare={() => void share()} shared={shared} onRefocus={() => setFocusRequest((value) => value + 1)}
-        onPlace={(id) => { setPointOpen(true); setPlaceError(null); setSelection((current) => ({ ...current, cityId: id, point: null })); }} />
+        onPlace={(id) => { setPointOpen(true); setPlaceError(null); setSelection((current) => ({ ...current, cityId: id, point: null })); }} /></Suspense></MapChunkBoundary>
       <div className="map-view-label"><span>{compare ? "COMPARING · HIGH TIDE" : "HIGH EMISSIONS · HIGH TIDE"}</span><strong>{year}</strong>{!visible && <small>Flood layer hidden</small>}</div>
     </div>
 

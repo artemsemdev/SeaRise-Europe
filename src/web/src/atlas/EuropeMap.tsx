@@ -1,6 +1,6 @@
 import { Crosshair, Minus, Plus, GlobeHemisphereEast, Link, Check, NavigationArrow } from "@phosphor-icons/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import * as maplibregl from "maplibre-gl";
+import { maplibregl } from "./map-runtime";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
@@ -62,6 +62,7 @@ export async function loadFloodTile(
 }
 
 export interface EuropeMapProps {
+  readonly qaMapEnabled?: boolean;
   readonly dataSource: EuropeMapDataSource;
   onOverview?: () => void;
   onShare?: () => void;
@@ -110,7 +111,6 @@ const FLOOD_LAYER = "atlas-europe-flood";
 const PROTOCOL_PREFIX = "searise-europe-flood";
 const PLAIN_MAP_ERROR = "The map could not load its local geographic data.";
 
-const QA_MAP_ENABLED = new URLSearchParams(window.location.search).get("qa") === "map";
 let protocolSequence = 0;
 
 function layerKey(year: EuropeMapProps["year"], protection: EuropeMapProps["protection"]): string {
@@ -191,7 +191,7 @@ function focusCity(map: MapLibreMap, city: EuropeMapCity): void {
 }
 
 export function EuropeMap({
-  dataSource,
+  dataSource, qaMapEnabled = false,
   city, year, protection, visible, onStatus, initialCamera = null, onCameraChange,
   inspectionPoint = null, onInspect, focusRequest, restoreCity = false, onOverview, onShare, onRefocus, onPlace, shared = false,
 }: EuropeMapProps) {
@@ -383,7 +383,7 @@ export function EuropeMap({
     });
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: "metric" }), "bottom-right");
     const qaWindow = window as Window & { __SEARISE_ATLAS_MAP__?: MapLibreMap };
-    if (QA_MAP_ENABLED) qaWindow.__SEARISE_ATLAS_MAP__ = map;
+    if (qaMapEnabled) qaWindow.__SEARISE_ATLAS_MAP__ = map;
     map.on("error", (event) => {
       if (destroyedRef.current || (event.error instanceof Error && event.error.name === "AbortError")) return;
       publishError();
@@ -423,7 +423,7 @@ export function EuropeMap({
       maplibregl.removeProtocol(protocolName);
       setMapReady(false);
     };
-  }, [protocolName, publish, publishError]);
+  }, [protocolName, publish, publishError, qaMapEnabled]);
 
   useLayoutEffect(() => {
     const map = mapRef.current;
