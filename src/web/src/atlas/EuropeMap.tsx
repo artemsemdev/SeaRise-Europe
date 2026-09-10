@@ -165,7 +165,7 @@ function fixturePlaceLabel(name: string, onActivate: () => void): HTMLButtonElem
   label.setAttribute("aria-label", `Open ${name}`);
   Object.assign(label.style, {
     border: "0", background: "rgba(247,247,240,.9)", color: "#1B1F26",
-    borderRadius: "4px", padding: "2px 5px", font: "600 12px system-ui, sans-serif",
+    borderRadius: "4px", minHeight: "24px", minWidth: "24px", padding: "2px 5px", font: "600 12px system-ui, sans-serif",
     boxShadow: "0 1px 4px rgba(2,17,31,.18)", cursor: "pointer",
   });
   label.addEventListener("click", (event) => { event.stopPropagation(); onActivate(); });
@@ -304,7 +304,8 @@ export function EuropeMap({
       fixturePlaceMarkersRef.current = FIXTURE_ORIENTATION_PLACES.features.map((place) =>
         new maplibregl.Marker({
           element: fixturePlaceLabel(place.properties.name, () => onPlaceRef.current?.(place.properties.sourceId)),
-          anchor: "left", offset: [8, 0],
+          anchor: place.properties.name === "Rotterdam" ? "right" : "left",
+          offset: [place.properties.name === "Rotterdam" ? -8 : 8, 0],
         }).setLngLat(place.geometry.coordinates as [number, number]).addTo(map));
     }
     map.dragRotate.disable();

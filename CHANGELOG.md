@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Made fixture city markers easier to tap and aligned the flood-layer control
+  label with its accessible name.
+
 - Static-quality CI now installs the declared npm version for both the application
   build and isolated Lighthouse tools.
 

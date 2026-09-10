@@ -43,7 +43,12 @@ test("clean entry renders Europe with explicit fixture disclosure and no externa
   await expect(page.locator(".atlas-fixture-label strong")).toBeVisible();
   await expect(page.getByTestId("atlas-map")).toHaveAttribute("data-model", "illustrative-fixture");
   for (const city of ["Venice", "Rotterdam", "Hamburg", "Bordeaux"]) {
-    await expect(page.locator(".atlas-map").getByRole("button", { name: `Open ${city}`, exact: true })).toBeVisible();
+    const marker = page.locator(".atlas-map").getByRole("button", { name: `Open ${city}`, exact: true });
+    await expect(marker).toBeVisible();
+    const target = await marker.boundingBox();
+    expect(target!.width).toBeGreaterThanOrEqual(24);
+    expect(target!.height).toBeGreaterThanOrEqual(24);
+    await marker.click({ trial: true });
   }
   const geography = await page.evaluate(() => {
     const map = (window as unknown as { __SEARISE_ATLAS_MAP__: import("maplibre-gl").Map }).__SEARISE_ATLAS_MAP__;
