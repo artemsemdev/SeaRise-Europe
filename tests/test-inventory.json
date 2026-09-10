@@ -464,7 +464,7 @@
       "layer": "contract",
       "owner": "frontend",
       "purpose": "Validate one pinned immutable manifest, the exact nine-combination release aggregate, verified support geometry including the explicit browser-only nodata control, exact range-only native-grid COG lookup including a real later-chunk tile, an atomic four-outcome projection state contract, separate technical failures, and release-scoped URL reload state.",
-      "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/src/atlas/**", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
+      "sourcePaths": ["contracts/release/v2/**", "src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/scripts/real-local-*.mjs", "src/web/src/atlas/**", "src/web/src/contracts/**", "src/web/src/data/**", "src/web/src/domain/**", "src/web/src/use-release-context.ts"],
       "changedPaths": ["src/pipeline/science/evidence/geography-classifier-parity-v1.json", "src/pipeline/tests/release/test_boundary_geoparquet.py", "src/web/**", "contracts/release/v1/**", "contracts/release/v2/**"],
       "disposition": "keep-permanently",
       "replacementGate": { "issue": null, "evidenceRequired": "Permanent static release/domain anti-corruption contract." },
@@ -1785,6 +1785,7 @@
   ],
   "baselineTests": [
     {"path": "src/pipeline/tests/atlas/test_europe_raster_service.py", "suite": "atlas-real-local-raster-service", "status": "active", "removalGate": null, "replacementEvidence": null},
+    {"path": "src/web/scripts/real-local-atlas.test.mjs", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null},
     { "path": "scripts/compose-smoke.sh", "suite": "compose-smoke", "status": "retired", "removalGate": 72, "replacementEvidence": "Repository-removal v2 issue #72 plan and signed checks: static-generic-host-lighthouse, static-offline-lifecycle-journey, static-target-content, static-web-shell." },
     { "path": "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs", "suite": "api-application-unit", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
     { "path": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs", "suite": "api-domain-legacy", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
