@@ -11,6 +11,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Restored boundary browser checks after the MapLibre update, including visible
+  pixel validation and useful browser failure diagnostics. Refreshed the
+  software-render QA receipt's dependency hash; rendered PNGs and scientific
+  approval evidence are unchanged.
+
 - Corrected contributor, architecture, delivery, and testing documentation to
   reflect the completed static-runtime repository cutover and current CI path
   routing.

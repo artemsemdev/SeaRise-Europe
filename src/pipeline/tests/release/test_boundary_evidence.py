@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -341,3 +342,38 @@ def test_browser_harness_binds_candidate_and_safe_limitations(
         )
         assert record["path"] == "browser-report.json"
         assert record["sha256"] == boundary_evidence.sha256(output)
+
+
+@pytest.mark.parametrize(
+    ("stderr", "stdout", "expected"),
+    [
+        ("Error: MapLibre worker module missing\n", "setup", "MapLibre worker module missing"),
+        ("", "Error: Chromium executable missing\n", "Chromium executable missing"),
+        (None, None, "no child output"),
+    ],
+)
+def test_browser_harness_failure_preserves_child_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stderr: str | None,
+    stdout: str | None,
+    expected: str,
+) -> None:
+    node = tmp_path / "node"
+    harness = tmp_path / "browser.mjs"
+    node.write_bytes(b"node")
+    harness.write_text("// fixture\n", encoding="utf-8")
+
+    def fail(command: list[str], **_kwargs: object) -> None:
+        raise subprocess.CalledProcessError(1, command, output=stdout, stderr=stderr)
+
+    monkeypatch.setattr(boundary_evidence.subprocess, "run", fail)
+    with pytest.raises(ScienceContractError, match=f"failed \\(exit 1\\):.*{expected}"):
+        boundary_evidence._run_browser_harness(
+            tmp_path / "report.json",
+            candidate=tmp_path / "candidate",
+            node_path=node,
+            browser_harness_path=harness,
+            node_workspace_directory=tmp_path,
+        )
+    assert not (tmp_path / "report.json").exists()
