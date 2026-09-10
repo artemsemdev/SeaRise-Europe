@@ -13,13 +13,13 @@ const buildIdentity = {
   manifestPath: `/releases/${release}/manifest.json`,
 } as const;
 const resourceBodies = Object.freeze({
-  "/": "<html>shell</html>",
+  "/projections/index.html": "<html>shell</html>",
   "/assets/app.js": "console.log('app');",
   [`/releases/${release}/manifest.json`]: '{"release":"release-a"}',
   [`/releases/${release}/analysis/cog-range-integrity.json`]: '{"range":"sealed"}',
 });
 const resourceMediaTypes = Object.freeze({
-  "/": "text/html",
+  "/projections/index.html": "text/html",
   "/assets/app.js": "text/javascript",
   [`/releases/${release}/manifest.json`]: "application/json",
   [`/releases/${release}/analysis/cog-range-integrity.json`]: "application/json",
@@ -198,12 +198,15 @@ describe("service worker shell runtime", () => {
     expect(test.deleted).toEqual([test.runtime.cacheName]);
   });
 
-  it("serves exact cached resources and canonicalizes only root navigation queries", async () => {
+  it("serves exact cached resources and canonicalizes only projection navigation queries", async () => {
     const test = harness();
-    test.stores.set(test.runtime.cacheName, new Map([[`${origin}/`, responseFor("/")]]));
-    expect(await (await test.runtime.fetch(request("/?scenario=ssp2-45", { mode: "navigate" }))!)!.text()).toBe(resourceBodies["/"]);
+    test.stores.set(test.runtime.cacheName, new Map([[`${origin}/projections/index.html`, responseFor("/projections/index.html")]]));
+    expect(await (await test.runtime.fetch(request("/projections/?scenario=ssp2-45", { mode: "navigate" }))!)!.text()).toBe(resourceBodies["/projections/index.html"]);
     expect(test.runtime.fetch(request("/assets/app.js?query=private"))).toBeUndefined();
-    expect(test.candidateStore()!.has(`${origin}/?scenario=ssp2-45`)).toBe(false);
+    expect(test.candidateStore()!.has(`${origin}/projections/?scenario=ssp2-45`)).toBe(false);
+    for (const path of ["/", "/?year=2100", "/index.html", "/atlas-data/manifest.json", "/atlas-data/tiles/2050/unprotected/0/0/0.png"]) {
+      expect(test.runtime.fetch(request(path, { mode: "navigate" })), path).toBeUndefined();
+    }
   });
 
   it("serves the exact build-bound range-integrity bootstrap with zero network after warm install", async () => {

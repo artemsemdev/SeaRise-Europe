@@ -21,7 +21,7 @@ for (const artifact of artifacts) test(`measures real 206 Cache API behavior for
   browserName,
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/projections/");
   const observation = await page.evaluate(async ({
     artifactPath,
     artifactSize,

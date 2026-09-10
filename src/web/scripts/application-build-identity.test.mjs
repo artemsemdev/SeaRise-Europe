@@ -139,8 +139,10 @@ describe("authoritative application build identity", () => {
       writeFileSync(join(dist, "assets", name), source);
     }
     const manifest = {
-      _main: {
+      "src/main.tsx": {
         file: "assets/main-a.js",
+        src: "src/main.tsx",
+        isEntry: true,
         imports: ["_shared"],
         dynamicImports: ["src/components/map/MapExplorer.tsx"],
       },
@@ -151,12 +153,17 @@ describe("authoritative application build identity", () => {
       decoder: { file: "assets/decoder-e.js" },
       "src/components/map/MapExplorer.tsx": {
         file: "assets/MapExplorer-b.js",
-        imports: ["_main"],
+        imports: ["src/main.tsx"],
         dynamicImports: ["src/components/map/map-runtime.ts"],
       },
       "src/components/map/map-runtime.ts": {
         file: "assets/map-runtime-f.js",
         css: ["assets/map-runtime-g.css"],
+      },
+      "src/atlas/main.tsx": {
+        file: "assets/unreferenced-j.js",
+        src: "src/atlas/main.tsx",
+        isEntry: true,
       },
     };
 
@@ -172,5 +179,15 @@ describe("authoritative application build identity", () => {
       "/assets/search.worker-c.js",
     ]));
     expect(paths).not.toContain("/assets/unreferenced-j.js");
+    expect(paths).toContain("/projections/index.html");
+    expect(paths).not.toContain("/");
+    expect(paths).not.toContain("/index.html");
+    const unnamed = { ...manifest, _old: manifest["src/main.tsx"] };
+    delete unnamed["src/main.tsx"];
+    expect(() => shellPrecachePaths({ dist, viteManifest: unnamed, dataReleaseId: "old-release" }))
+      .toThrow(/no named application entry src\/main.tsx/);
+    writeFileSync(join(dist, "assets", "main-a.js"), 'import("./unreferenced-j.js");');
+    expect(() => shellPrecachePaths({ dist, viteManifest: manifest, dataReleaseId: "old-release" }))
+      .toThrow(/Atlas-only asset/);
   });
 });
