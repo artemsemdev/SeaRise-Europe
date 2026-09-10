@@ -35,6 +35,8 @@ All notable changes to this project will be documented in this file.
   activation factory validates confined metadata, starts one verified raster
   process, and serves loopback context, inspection, tile, and basemap requests
   without exposing local storage identities or falling back to fixture data.
+- Added the accepted Europe atlas map component with source-provided flood
+  tiles, local fixture geography, and detailed real-local basemap styling.
 
 - Added post-cutover validation that lets retained application and CI files
   evolve while preserving completed removal approvals and preventing the
