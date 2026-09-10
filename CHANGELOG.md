@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Static-quality CI now installs the declared npm version for both the application
+  build and isolated Lighthouse tools.
+
 - Aligned contributor verification guidance with the atlas fixture and explicit
   provisioned local workflow, keeping AR6 reference checks separately scoped.
 
