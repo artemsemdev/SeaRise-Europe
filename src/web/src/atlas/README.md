@@ -48,5 +48,25 @@ counts after resampling each requested output tile.
 Runtime adapters are responsible for translating either the fixture or a
 verified real-local disk manifest into these contracts. Real-local adapters
 must retain paths, hashes, and source receipts on the trusted server side.
-Neither this module nor the fixture activates an endpoint, map, or application
-entry.
+
+## Data sources
+
+`AtlasDataSource` is the UI and map injection boundary. Its catalog, search,
+place, inspection, and tile methods accept cancellation signals. Tile results
+carry PNG bytes plus counts calculated from measurements. `AtlasDataSourceError`
+represents invalid requests, unavailable transport, and invalid responses;
+native `AbortError` cancellation remains unchanged. Technical failures never
+become flooded, zero, or unknown point values.
+
+`createAtlasDataSource()` selects the synthetic fixture by its explicit
+`DEFAULT_ATLAS_EDITION`. Selecting `{ edition: "real-local" }` creates only the
+HTTP provider for the existing `/atlas-data` routes. A missing or invalid local
+service rejects the request and never falls back to fixture values.
+
+The fixture provider performs no network or Python work. It samples the same
+bounded Venice grid for inspection and tile rendering. Places outside that
+grid remain searchable examples but every inspected year is unknown and their
+map cells stay transparent. A deterministic 256 by 256 PNG is rendered for the
+requested Web Mercator tile with the pinned flood-depth palette. Valid zero
+pixels contribute to `validPixels` even though they share transparent display
+alpha with unknown pixels.

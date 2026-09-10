@@ -81,44 +81,6 @@ function pointResult(year: AtlasYear, depthMeters: number | null): AtlasPointRes
   });
 }
 
-function inspection(
-  place: AtlasPlaceV1,
-  protection: AtlasProtection,
-  depths: readonly [number | null, number | null, number | null],
-): AtlasInspectionV1 {
-  return validateAtlasInspection({
-    coordinates: place.coordinates,
-    protection,
-    cellSizeMeters: 25,
-    results: ATLAS_YEARS.map((year, index) => pointResult(year, depths[index])),
-  });
-}
-
-const INSPECTION_DEPTHS: Readonly<Record<string, readonly [number | null, number | null, number | null]>> = Object.freeze({
-  "fixture:venice/unprotected": [0, 0.4, 1.2],
-  "fixture:venice/protected": [null, 0, 0.6],
-  "fixture:rotterdam/unprotected": [null, 0, 0.35],
-  "fixture:rotterdam/protected": [null, null, 0],
-  "fixture:hamburg/unprotected": [0, 0, 0.2],
-  "fixture:hamburg/protected": [null, null, null],
-  "fixture:bordeaux/unprotected": [null, 0.15, 0.5],
-  "fixture:bordeaux/protected": [null, 0, 0.2],
-});
-
-export const SYNTHETIC_ATLAS_INSPECTIONS: readonly AtlasInspectionV1[] = Object.freeze(
-  SYNTHETIC_ATLAS_PLACES.flatMap((place) => ATLAS_PROTECTIONS.map((protection) =>
-    inspection(place, protection, INSPECTION_DEPTHS[`${place.id}/${protection}`]))),
-);
-
-export function syntheticAtlasInspection(placeId: string, protection: AtlasProtection): AtlasInspectionV1 | null {
-  const place = SYNTHETIC_ATLAS_PLACES.find((candidate) => candidate.id === placeId);
-  if (!place) return null;
-  return SYNTHETIC_ATLAS_INSPECTIONS.find((candidate) =>
-    candidate.coordinates[0] === place.coordinates[0]
-    && candidate.coordinates[1] === place.coordinates[1]
-    && candidate.protection === protection) ?? null;
-}
-
 export interface SyntheticAtlasGridV1 {
   readonly year: AtlasYear;
   readonly protection: AtlasProtection;
@@ -169,10 +131,48 @@ function grid(
 
 const N = null;
 export const SYNTHETIC_ATLAS_GRIDS: readonly SyntheticAtlasGridV1[] = Object.freeze([
-  grid(2030, "unprotected", [N, N, N, N, N, 0, 0, N, N, 0, 0.1, N, N, N, N, N], 4, 1),
-  grid(2050, "unprotected", [N, N, N, N, N, 0, 0.15, N, N, 0, 0.4, 0.3, N, N, N, N], 5, 3),
-  grid(2100, "unprotected", [N, N, N, N, 0, 0.2, 0.4, N, 0.1, 0, 1.2, 0.8, N, N, N, N], 7, 5),
+  grid(2030, "unprotected", [N, N, N, N, N, 0.1, 0, N, N, 0, 0, N, N, N, N, N], 4, 1),
+  grid(2050, "unprotected", [N, N, N, N, N, 0, 0.4, N, N, 0, 0.4, 0.3, N, N, N, N], 5, 3),
+  grid(2100, "unprotected", [N, N, N, N, 0, 0.2, 1.2, N, 0.1, 0, 1.2, 0.8, N, N, N, N], 7, 5),
   grid(2030, "protected", [N, N, N, N, N, 0, N, N, N, N, N, N, N, N, N, N], 1, 0),
-  grid(2050, "protected", [N, N, N, N, N, 0, 0.1, N, N, 0, 0, N, N, N, N, N], 4, 1),
-  grid(2100, "protected", [N, N, N, N, 0, 0.1, 0.2, N, N, 0, 0.6, 0.3, N, N, N, N], 6, 4),
+  grid(2050, "protected", [N, N, N, N, N, 0.1, 0, N, N, 0, 0, N, N, N, N, N], 4, 1),
+  grid(2100, "protected", [N, N, N, N, 0, 0.1, 0.6, N, N, 0, 0.6, 0.3, N, N, N, N], 6, 4),
 ]);
+
+export function syntheticAtlasDepthAt(
+  coordinates: readonly [number, number],
+  year: AtlasYear,
+  protection: AtlasProtection,
+): number | null {
+  const grid = SYNTHETIC_ATLAS_GRIDS.find((candidate) =>
+    candidate.year === year && candidate.protection === protection);
+  if (!grid || !coordinates.every(Number.isFinite)) return null;
+  const [west, south, east, north] = grid.extent.bounds;
+  const [longitude, latitude] = coordinates;
+  if (longitude < west || longitude > east || latitude < south || latitude > north) return null;
+  const column = Math.min(grid.extent.width - 1, Math.floor((longitude - west) / (east - west) * grid.extent.width));
+  const row = Math.min(grid.extent.height - 1, Math.floor((north - latitude) / (north - south) * grid.extent.height));
+  return grid.depthsMeters[row * grid.extent.width + column];
+}
+
+export function syntheticAtlasInspectionAt(
+  coordinates: readonly [number, number],
+  protection: AtlasProtection,
+): AtlasInspectionV1 {
+  return validateAtlasInspection({
+    coordinates,
+    protection,
+    cellSizeMeters: 25,
+    results: ATLAS_YEARS.map((year) => pointResult(year, syntheticAtlasDepthAt(coordinates, year, protection))),
+  });
+}
+
+export const SYNTHETIC_ATLAS_INSPECTIONS: readonly AtlasInspectionV1[] = Object.freeze(
+  SYNTHETIC_ATLAS_PLACES.flatMap((place) => ATLAS_PROTECTIONS.map((protection) =>
+    syntheticAtlasInspectionAt(place.coordinates, protection))),
+);
+
+export function syntheticAtlasInspection(placeId: string, protection: AtlasProtection): AtlasInspectionV1 | null {
+  const place = SYNTHETIC_ATLAS_PLACES.find((candidate) => candidate.id === placeId);
+  return place ? syntheticAtlasInspectionAt(place.coordinates, protection) : null;
+}
