@@ -8,9 +8,11 @@
 
 ## Purpose
 
-This is the only active technical delivery plan for SeaRise Europe. The former
-eight-epic Azure/backend plan was removed after ADR-021 replaced its target
-architecture.
+This roadmap records the static projection migration and its later public
+delivery work. The current coastal atlas integration is tracked in #490; see the
+[backlog scope mapping](coastal-atlas-backlog.md) for retained and deferred work. The
+former eight-epic Azure/backend plan was removed after ADR-021 replaced that
+runtime.
 
 The Phase 2 integration branch now provides:
 

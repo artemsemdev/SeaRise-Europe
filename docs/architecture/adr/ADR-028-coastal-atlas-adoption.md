@@ -6,8 +6,9 @@ This decision is not a public deployment or scientific release approval.
 
 ## Context
 
-The accepted local product depicts CoCliCo coastal inundation. The normal
-repository build still serves the AR6 relative sea-level application. Treating
+At the time of this decision, the accepted local product depicted CoCliCo
+coastal inundation while the normal repository build served the AR6 relative
+sea-level application. Treating
 both as one scientific contract creates contradictory product requirements,
 and keeping the accepted app outside normal build/CI prevents reproducible work.
 
