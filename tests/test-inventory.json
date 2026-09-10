@@ -1838,6 +1838,7 @@
     { "path": "src/web/src/application/runtime-capability.test.ts", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/use-assessment-runtime.test.tsx", "suite": "static-assessment-controller", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/application/use-projection-url.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
+    { "path": "src/web/src/atlas/AtlasApp.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/atlas/CitySearch.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/atlas/PointInspection.test.tsx", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },
     { "path": "src/web/src/atlas/model.test.ts", "suite": "static-release-domain", "status": "active", "removalGate": null, "replacementEvidence": null },

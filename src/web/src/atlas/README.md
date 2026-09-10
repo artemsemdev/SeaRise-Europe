@@ -48,6 +48,8 @@ counts after resampling each requested output tile.
 Runtime adapters are responsible for translating either the fixture or a
 verified real-local disk manifest into these contracts. Real-local adapters
 must retain paths, hashes, and source receipts on the trusted server side.
+Neither this module nor the fixture activates an endpoint, map, or application
+entry.
 
 ## Data sources
 
@@ -70,3 +72,29 @@ map cells stay transparent. A deterministic 256 by 256 PNG is rendered for the
 requested Web Mercator tile with the pinned flood-depth palette. Valid zero
 pixels contribute to `validPixels` even though they share transparent display
 alpha with unknown pixels.
+
+## Atlas experience
+
+Issue #501 transfers the accepted coastal atlas interface from checkpoint
+`a84279a9` without its retired calculation experiment. `AtlasApp` requires one
+`AtlasDataSource` and passes it to the map, city search, and point inspector.
+It does not choose a provider or make direct network requests. The application
+entry is responsible for selecting the edition and providing its adapter.
+
+The model uses the strict browser catalog, place, and point contracts above;
+it does not import the local disk manifest or its provenance fields. Shared
+links preserve the year, defenses, overlay, comparison, city, camera, and
+selected point. Retired experiment parameters are ignored and removed when
+writing the current view URL.
+
+The accepted light layout, portal search menu, mobile detail panel, timeline,
+and year comparison remain in `atlas.css`. Synthetic editions show an
+**Illustrative fixture** label in the header and methods dialog, with fixture
+credits. Real-local editions retain CoCliCo and local geographic data credits.
+
+Component tests inject an in-memory provider and isolate the map renderer.
+They cover canceled searches and point requests, unknown versus valid zero,
+exact point matching and retry, catalog retry, shared links and browser
+history, timeline and comparison controls, mobile detail expansion, clipboard
+fallback, and edition disclosure. Map pixels and real-local transport are
+verified by their separate provider and map suites.

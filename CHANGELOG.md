@@ -25,6 +25,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added the accepted coastal atlas interface behind an injected data source,
+  preserving city search, point inspection, comparison, shared views, and
+  mobile controls. The software fixture is visibly identified; the normal
+  application entry is connected separately.
+
 - Added explicit synthetic-fixture and real-local coastal atlas data sources
   behind one abort-aware browser interface. Fixture inspection and PNG tiles
   now sample the same bounded grid, while real-local failures remain technical
