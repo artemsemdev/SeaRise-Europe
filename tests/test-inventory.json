@@ -1,8 +1,14 @@
 {
   "$schema": "contracts/test-inventory.schema.json",
   "schemaVersion": "1.0.0",
-  "updatedAt": "2026-08-20",
+  "updatedAt": "2026-09-10",
   "evidence": {
+    "local-2026-09-10-atlas-raster-service": {
+      "kind": "local-measurement",
+      "observedAt": "2026-09-10T12:00:00+02:00",
+      "reference": "scripts/atlas/europe_raster_service.py and src/pipeline/tests/atlas/test_europe_raster_service.py",
+      "environment": "macOS arm64; Python 3.9; Rasterio; five deterministic temporary-raster cases passed, covering one-pass integrity, path confinement, native-grid point semantics, tile validity counts, and the closed HTTP route surface; no network, production raster, private candidate, durable cache, or publication claim"
+    },
     "local-2026-08-17-generic-static-lighthouse": {
       "kind": "local-measurement",
       "observedAt": "2026-08-17T12:16:37+02:00",
@@ -353,6 +359,52 @@
     }
   },
   "suites": [
+    {
+      "id": "atlas-real-local-raster-service",
+      "status": "active",
+      "removalGate": null,
+      "replacementEvidence": null,
+      "layer": "integration",
+      "owner": "data",
+      "purpose": "Keep the real-local atlas raster boundary read-only, path-confined, one-pass integrity checked, and exact about unknown, valid zero, flooded, and tile-count semantics.",
+      "sourcePaths": [
+        "scripts/atlas/europe_raster_service.py",
+        "src/pipeline/tests/atlas/test_europe_raster_service.py"
+      ],
+      "changedPaths": [
+        "scripts/atlas/**",
+        "src/pipeline/tests/atlas/**"
+      ],
+      "disposition": "keep-permanently",
+      "replacementGate": {
+        "issue": null,
+        "evidenceRequired": "Permanent real-local raster integrity, confinement, native-cell point, tile-count, and route-surface gate."
+      },
+      "commands": {
+        "focused": "python -m pytest src/pipeline/tests/atlas/test_europe_raster_service.py -q",
+        "full": "python -m pytest src/pipeline/tests -q"
+      },
+      "execution": {
+        "tier": "fast",
+        "ciWorkflow": "ci.yml",
+        "ciJob": "pipeline",
+        "requiresDocker": false,
+        "requiresCredentials": false
+      },
+      "cost": {
+        "estimatedSeconds": 1,
+        "class": "fast",
+        "evidenceRef": "local-2026-09-10-atlas-raster-service",
+        "scope": "focused-suite"
+      },
+      "flakiness": {
+        "status": "none-observed",
+        "owner": "data",
+        "issue": null,
+        "expiresAt": null,
+        "evidence": "Fixed three-cell EPSG:3035 rasters and in-process handler calls use temporary files only; no clock, network, browser, production data, or external executable is involved."
+      }
+    },
     {
       "id": "static-target-content",
       "status": "active",
@@ -1732,6 +1784,7 @@
     }
   ],
   "baselineTests": [
+    {"path": "src/pipeline/tests/atlas/test_europe_raster_service.py", "suite": "atlas-real-local-raster-service", "status": "active", "removalGate": null, "replacementEvidence": null},
     { "path": "scripts/compose-smoke.sh", "suite": "compose-smoke", "status": "retired", "removalGate": 72, "replacementEvidence": "Repository-removal v2 issue #72 plan and signed checks: static-generic-host-lighthouse, static-offline-lifecycle-journey, static-target-content, static-web-shell." },
     { "path": "src/api/SeaRise.Api.Tests/Application/AssessmentServiceTests.cs", "suite": "api-application-unit", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },
     { "path": "src/api/SeaRise.Api.Tests/Domain/ResultStateDeterminatorTests.cs", "suite": "api-domain-legacy", "status": "retired", "removalGate": 71, "replacementEvidence": "Issue #71 retirement preserves equivalent-or-stronger static target coverage for all four outcomes, nine scenario/horizon combinations, exact AR6 lookup, technical-failure separation, release isolation, offline behavior, and zero runtime API requests. Historical five-state fixtures remain explicitly classified evidence." },

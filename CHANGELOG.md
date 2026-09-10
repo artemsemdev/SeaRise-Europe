@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Prevented browsers and intermediaries from retaining private, locally derived
+  coastal raster tiles by marking every tile response `no-store`.
 - Restored boundary browser checks after the MapLibre update, including visible
   pixel validation and useful browser failure diagnostics. Refreshed the
   software-render QA receipt's dependency hash; rendered PNGs and scientific
